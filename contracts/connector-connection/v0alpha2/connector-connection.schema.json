@@ -1,0 +1,1951 @@
+{
+  "$comment": "The reader additionally enforces serialized UTF-8 input/frame/response byte budgets, string byte budgets, equality of independently supplied target/session/expiry values (including mediated-route self-reference refusal), and the frozen v1 WHATWG browser URL parser's route/capability grammar. Schema length counts code points; Draft 2020-12 has no instance-data equality operator. See the bundle README and independent schema/reader vectors.",
+  "$defs": {
+    "AuthenticationNeed": {
+      "enum": [
+        "authorize_configured",
+        "reauthorize_existing"
+      ],
+      "type": "string"
+    },
+    "BoundRemediationStatus": {
+      "additionalProperties": false,
+      "description": "Trusted session projection. Never serialize it directly into a model/tool result.",
+      "oneOf": [
+        {
+          "properties": {
+            "resume_state": {
+              "const": "pending"
+            },
+            "session": {
+              "properties": {
+                "state": {
+                  "const": "pending"
+                }
+              }
+            },
+            "session_state": {
+              "const": "pending"
+            }
+          }
+        },
+        {
+          "properties": {
+            "resume_state": {
+              "const": "ready"
+            },
+            "session": {
+              "properties": {
+                "state": {
+                  "const": "completed"
+                }
+              }
+            },
+            "session_state": {
+              "const": "completed"
+            }
+          }
+        },
+        {
+          "properties": {
+            "resume_state": {
+              "const": "consumed"
+            },
+            "session": {
+              "properties": {
+                "state": {
+                  "const": "completed"
+                }
+              }
+            },
+            "session_state": {
+              "const": "completed"
+            }
+          }
+        },
+        {
+          "properties": {
+            "resume_state": {
+              "const": "expired"
+            },
+            "session": {
+              "properties": {
+                "state": {
+                  "const": "expired"
+                }
+              }
+            },
+            "session_state": {
+              "const": "expired"
+            }
+          }
+        },
+        {
+          "properties": {
+            "resume_state": {
+              "const": "expired"
+            },
+            "session": {
+              "properties": {
+                "state": {
+                  "const": "completed"
+                }
+              }
+            },
+            "session_state": {
+              "const": "completed"
+            }
+          }
+        },
+        {
+          "properties": {
+            "resume_state": {
+              "const": "failed"
+            },
+            "session": {
+              "properties": {
+                "state": {
+                  "const": "failed"
+                }
+              }
+            },
+            "session_state": {
+              "const": "failed"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "auth_profile": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._-]+$",
+          "type": "string"
+        },
+        "connect_session_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "expires_at_unix_ms": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "need": {
+          "$ref": "#/$defs/AuthenticationNeed"
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "resume_state": {
+          "$ref": "#/$defs/RemediationResumeState"
+        },
+        "session": {
+          "$ref": "#/$defs/ConnectSessionStatus"
+        },
+        "session_state": {
+          "$ref": "#/$defs/ConnectSessionState"
+        }
+      },
+      "required": [
+        "connect_session_ref",
+        "operation_ref",
+        "connection_ref",
+        "integration_ref",
+        "auth_profile",
+        "need",
+        "session_state",
+        "expires_at_unix_ms",
+        "resume_state",
+        "session"
+      ],
+      "type": "object"
+    },
+    "CandidateActivateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_ref",
+        "label"
+      ],
+      "type": "object"
+    },
+    "CandidateSearchRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "maxLength": 512,
+          "type": "string"
+        }
+      },
+      "required": [
+        "integration_ref",
+        "query",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "ChannelState": {
+      "enum": [
+        "starting",
+        "connected",
+        "reconnecting",
+        "stopped"
+      ],
+      "type": "string"
+    },
+    "ChannelSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "channel_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "events": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/ChannelState"
+        }
+      },
+      "required": [
+        "channel_ref",
+        "binding_ref",
+        "state",
+        "events"
+      ],
+      "type": "object"
+    },
+    "ConnectSessionCreateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "auth_profile": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "type": "string"
+        }
+      },
+      "required": [
+        "integration_ref",
+        "label"
+      ],
+      "type": "object"
+    },
+    "ConnectSessionState": {
+      "enum": [
+        "pending",
+        "completed",
+        "expired",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "ConnectSessionStatus": {
+      "additionalProperties": false,
+      "description": "Value-free status for one single-purpose acquisition session.\n\nCompletion endpoints are short-lived Connector-owned endpoints, not Agent Endpoints and not\nthe durable Connection. They are present only while pending and accept one completion attempt.",
+      "oneOf": [
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "completion_endpoint": {
+                  "not": {
+                    "type": "null"
+                  }
+                }
+              },
+              "required": [
+                "completion_endpoint"
+              ]
+            },
+            {
+              "properties": {
+                "browser_completion_url": {
+                  "not": {
+                    "type": "null"
+                  }
+                }
+              },
+              "required": [
+                "browser_completion_url"
+              ]
+            }
+          ],
+          "properties": {
+            "connection_ref": {
+              "type": "null"
+            },
+            "state": {
+              "const": "pending"
+            }
+          }
+        },
+        {
+          "properties": {
+            "browser_completion_url": {
+              "type": "null"
+            },
+            "completion_endpoint": {
+              "type": "null"
+            },
+            "connection_ref": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "state": {
+              "const": "completed"
+            }
+          },
+          "required": [
+            "connection_ref"
+          ]
+        },
+        {
+          "properties": {
+            "browser_completion_url": {
+              "type": "null"
+            },
+            "completion_endpoint": {
+              "type": "null"
+            },
+            "connection_ref": {
+              "type": "null"
+            },
+            "state": {
+              "const": "expired"
+            }
+          }
+        },
+        {
+          "properties": {
+            "browser_completion_url": {
+              "type": "null"
+            },
+            "completion_endpoint": {
+              "type": "null"
+            },
+            "connection_ref": {
+              "type": "null"
+            },
+            "state": {
+              "const": "failed"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "browser_completion_url": {
+          "anyOf": [
+            {
+              "$comment": "Legacy WHATWG parse, route and fragment-capability checks are enforced by the unchanged v1 reader.",
+              "maxLength": 4096,
+              "minLength": 1,
+              "pattern": "^[^\\r\\n]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completion_endpoint": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "minLength": 1,
+              "pattern": "^[^\\n]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connect_session_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expires_at_unix_ms": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ConnectSessionState"
+        }
+      },
+      "required": [
+        "connect_session_ref",
+        "integration_ref",
+        "state",
+        "expires_at_unix_ms"
+      ],
+      "type": "object"
+    },
+    "ConnectSessionStatusRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "connect_session_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connect_session_ref"
+      ],
+      "type": "object"
+    },
+    "ConnectionActor": {
+      "description": "External actor whose identity the provider observes for calls through a Connection.",
+      "enum": [
+        "app",
+        "user"
+      ],
+      "type": "string"
+    },
+    "ConnectionCandidateState": {
+      "enum": [
+        "detected",
+        "activated"
+      ],
+      "type": "string"
+    },
+    "ConnectionCandidateSummary": {
+      "additionalProperties": false,
+      "description": "Value-free projection of a potential direct Connection found in trusted local configuration.",
+      "oneOf": [
+        {
+          "properties": {
+            "connection_ref": {
+              "type": "null"
+            },
+            "state": {
+              "const": "detected"
+            }
+          }
+        },
+        {
+          "properties": {
+            "connection_ref": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "state": {
+              "const": "activated"
+            }
+          },
+          "required": [
+            "connection_ref"
+          ]
+        }
+      ],
+      "properties": {
+        "candidate_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "type": "string"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ConnectionCandidateState"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_ref",
+        "integration_ref",
+        "title",
+        "state",
+        "evidence_sha256"
+      ],
+      "type": "object"
+    },
+    "ConnectionDescription": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "actor": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "scope": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          },
+          "then": {
+            "properties": {
+              "actor": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "actor"
+            ]
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "scope": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "actor": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "actor"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scope": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "actor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionActor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "auth_profile": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "channels": {
+          "items": {
+            "$ref": "#/$defs/ChannelSummary"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "initiation": {
+          "items": {
+            "$ref": "#/$defs/ConnectionInitiator"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "type": "array"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "type": "string"
+        },
+        "route": {
+          "$ref": "#/$defs/ConnectionRoute"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Ownership and actor metadata are value-free and must not be inferred from token prefixes."
+        },
+        "state": {
+          "$ref": "#/$defs/ConnectionState"
+        }
+      },
+      "required": [
+        "connection_ref",
+        "integration_ref",
+        "label",
+        "state",
+        "initiation",
+        "route",
+        "channels"
+      ],
+      "type": "object"
+    },
+    "ConnectionError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ConnectionErrorCode"
+        },
+        "message": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retriable"
+      ],
+      "type": "object"
+    },
+    "ConnectionErrorCode": {
+      "enum": [
+        "unavailable",
+        "not_found",
+        "not_granted",
+        "invalid_input",
+        "stale_authority",
+        "conflict",
+        "protocol"
+      ],
+      "type": "string"
+    },
+    "ConnectionInitiator": {
+      "oneOf": [
+        {
+          "enum": [
+            "provider"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "b10x",
+          "description": "Wire id `b10x`: pinned by the connector-connection contract vectors (D5).",
+          "type": "string"
+        }
+      ]
+    },
+    "ConnectionRequest": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "candidate_search",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/CandidateSearchRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "candidate_activate",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/CandidateActivateRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "search",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SearchRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "describe",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/DescribeRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "observation_search",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/ObservationSearchRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "materialize",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/MaterializeRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "connect_session_create",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/ConnectSessionCreateRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "connect_session_status",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/ConnectSessionStatusRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "remediation_start",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/RemediationStartRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "remediation_status",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/RemediationStatusRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "remediation_acknowledge",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/RemediationAcknowledgeRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ConnectionResult": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "candidate_search",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "candidates": {
+                  "items": {
+                    "$ref": "#/$defs/ConnectionCandidateSummary"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "candidates"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "candidate_activate",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ConnectionDescription"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "search",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "connections": {
+                  "items": {
+                    "$ref": "#/$defs/ConnectionSummary"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "connections"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "describe",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ConnectionDescription"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "observation_search",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "observations": {
+                  "items": {
+                    "$ref": "#/$defs/DiscoveryObservationSummary"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "observations"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "materialize",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ConnectionDescription"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "connect_session_create",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ConnectSessionStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "connect_session_status",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/ConnectSessionStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "remediation_start",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/BoundRemediationStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "remediation_status",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/BoundRemediationStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "remediation_acknowledge",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/RemediationAcknowledgement"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ConnectionRoute": {
+      "description": "Value-free projection of a Connection's immutable route.\n\nThe Connector-owned resource binding is deliberately absent: callers need to know that a route\nis mediated, not the Grafana data-source UID or proxy path used to implement it.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "direct",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "via_connection",
+              "type": "string"
+            },
+            "parent_connection_ref": {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+              "type": "string"
+            },
+            "route_adapter": {
+              "$ref": "#/$defs/RouteAdapter"
+            }
+          },
+          "required": [
+            "kind",
+            "parent_connection_ref",
+            "route_adapter"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ConnectionScope": {
+      "description": "Durable authority owner for a Connection.",
+      "enum": [
+        "tenant",
+        "principal"
+      ],
+      "type": "string"
+    },
+    "ConnectionState": {
+      "enum": [
+        "created",
+        "authorized",
+        "callable",
+        "degraded",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "ConnectionSummary": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "actor": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "scope": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          },
+          "then": {
+            "properties": {
+              "actor": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "actor"
+            ]
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "scope": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "actor": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "actor"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scope": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "required": [
+              "scope"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "actor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionActor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "auth_profile": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "initiation": {
+          "items": {
+            "$ref": "#/$defs/ConnectionInitiator"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "type": "array"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "type": "string"
+        },
+        "route": {
+          "$ref": "#/$defs/ConnectionRoute"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Ownership and actor metadata are value-free and must not be inferred from token prefixes."
+        },
+        "state": {
+          "$ref": "#/$defs/ConnectionState"
+        }
+      },
+      "required": [
+        "connection_ref",
+        "integration_ref",
+        "label",
+        "state",
+        "initiation",
+        "route"
+      ],
+      "type": "object"
+    },
+    "DescribeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_ref"
+      ],
+      "type": "object"
+    },
+    "DiscoveryObservationState": {
+      "enum": [
+        "observed",
+        "unsupported",
+        "materialized",
+        "withdrawn"
+      ],
+      "type": "string"
+    },
+    "DiscoveryObservationSummary": {
+      "additionalProperties": false,
+      "description": "Value-free projection of one already-reconciled discovery observation.",
+      "oneOf": [
+        {
+          "properties": {
+            "connection_ref": {
+              "type": "null"
+            },
+            "state": {
+              "const": "observed"
+            },
+            "target_provider_ref": {
+              "not": {
+                "type": "null"
+              }
+            }
+          },
+          "required": [
+            "target_provider_ref"
+          ]
+        },
+        {
+          "properties": {
+            "connection_ref": {
+              "type": "null"
+            },
+            "state": {
+              "const": "unsupported"
+            },
+            "target_provider_ref": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "connection_ref": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "state": {
+              "const": "materialized"
+            },
+            "target_provider_ref": {
+              "not": {
+                "type": "null"
+              }
+            }
+          },
+          "required": [
+            "target_provider_ref",
+            "connection_ref"
+          ]
+        },
+        {
+          "properties": {
+            "connection_ref": {
+              "type": "null"
+            },
+            "state": {
+              "const": "withdrawn"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "connection_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "discovery_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "evidence_generation": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "type": "string"
+        },
+        "observation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "observed_type": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+          "type": "string"
+        },
+        "source_connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/DiscoveryObservationState"
+        },
+        "target_provider_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "type": "string"
+        }
+      },
+      "required": [
+        "observation_ref",
+        "discovery_ref",
+        "source_connection_ref",
+        "observed_type",
+        "title",
+        "state",
+        "evidence_generation",
+        "evidence_sha256"
+      ],
+      "type": "object"
+    },
+    "MaterializeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "observation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "observation_ref"
+      ],
+      "type": "object"
+    },
+    "ObservationSearchRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "maxLength": 512,
+          "type": "string"
+        },
+        "source_connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_connection_ref",
+        "query",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "OwnerContext": {
+      "additionalProperties": false,
+      "description": "Owner facts presented by a client and re-evaluated by Connectors.",
+      "properties": {
+        "agent_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "agent_revision": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "authority_snapshot_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "authority_snapshot_sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "agent_id",
+        "agent_revision",
+        "authority_snapshot_id",
+        "authority_snapshot_sha256"
+      ],
+      "type": "object"
+    },
+    "RemediationAcknowledgeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "connect_session_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connect_session_ref",
+        "operation_ref",
+        "connection_ref"
+      ],
+      "type": "object"
+    },
+    "RemediationAcknowledgement": {
+      "additionalProperties": false,
+      "properties": {
+        "connect_session_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "next_action": {
+          "$ref": "#/$defs/RemediationNextAction"
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connect_session_ref",
+        "operation_ref",
+        "connection_ref",
+        "next_action"
+      ],
+      "type": "object"
+    },
+    "RemediationNextAction": {
+      "enum": [
+        "fresh_description_then_explicit_invoke"
+      ],
+      "type": "string"
+    },
+    "RemediationResumeState": {
+      "enum": [
+        "pending",
+        "ready",
+        "consumed",
+        "expired",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "RemediationStartRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "input": true,
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_ref",
+        "connection_ref",
+        "input"
+      ],
+      "type": "object"
+    },
+    "RemediationStatusRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "connect_session_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connect_session_ref"
+      ],
+      "type": "object"
+    },
+    "RequestEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/OwnerContext"
+        },
+        "protocol": {
+          "const": "b10x.connector-connection.v0alpha2"
+        },
+        "request": {
+          "$ref": "#/$defs/ConnectionRequest"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "context",
+        "request"
+      ],
+      "type": "object"
+    },
+    "ResponseEnvelope": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "error": {
+              "type": "null"
+            },
+            "response": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "status": {
+              "const": "ok"
+            }
+          },
+          "required": [
+            "response"
+          ]
+        },
+        {
+          "properties": {
+            "error": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "response": {
+              "type": "null"
+            },
+            "status": {
+              "const": "error"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ],
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protocol": {
+          "const": "b10x.connector-connection.v0alpha2"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/ResponseStatus"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ResponseStatus": {
+      "enum": [
+        "ok",
+        "error"
+      ],
+      "type": "string"
+    },
+    "RouteAdapter": {
+      "enum": [
+        "grafana_datasource_proxy_v1",
+        "kubernetes_service_proxy_v1"
+      ],
+      "type": "string"
+    },
+    "SearchRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "maxLength": 512,
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "limit"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/beyond10x/connectors/blob/main/contracts/connector-connection/v0alpha2/connector-connection.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/RequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ResponseEnvelope"
+    }
+  ],
+  "title": "B10x ConnectorConnection v0alpha2 frame"
+}
