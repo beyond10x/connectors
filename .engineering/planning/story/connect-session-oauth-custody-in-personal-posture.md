@@ -302,6 +302,8 @@ scope:
 - confidence: inferred
   path: crates/integration-catalog/src/oauth_acquisition.rs
 - confidence: inferred
+  path: crates/integration-catalog/src/oauth_adversary_tests.rs
+- confidence: inferred
   path: crates/integration-catalog/src/oauth_tests.rs
 - confidence: cited
   path: crates/integration-catalog/src/tests.rs
@@ -341,7 +343,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 71
+revision: 73
 ---
 ## Acceptance
 
@@ -589,3 +591,11 @@ The read-only whole-unit checklist is prepared at SHA256 78f3b2af0490335ded1abaa
 Add the inferred test owner crates/connectors-client/tests/personal_oauth_adversary.rs for public-API Unix/HTTP fixtures proving the trusted client handoff and its closed output/error boundaries. Cargo's normal integration-test discovery and the existing dependencies suffice; no production hook, manifest change or public protocol edit is assigned. The other ten proposed test files are already machine-scoped by this story. Keep existing test assertions and original reports, with only the earlier explicitly recorded fixture-version/citation exceptions. This exact new file is for the later independent reviewer; the implementor continues its already scoped inline client/console cases.
 
 The review must cover real controlling-terminal and private-file behavior, interrupted private delivery, exact owner/profile/Connection checks, callback/device bounds, actual FULL-store reopen recovery, refresh uncertainty and no operation resend, frozen/current schema compatibility, and mixed raw/OAuth custody. The coordinator has separately identified unexecuted client completion checks: Callable state, exact pending/status/Describe correlation, and successful daemon labels/references containing a synthetic private marker. Their actual deciding evidence and narrow implementation remain the implementor's responsibility before freeze. Preserve the meaning of the daemon ConnectionDescription and use trusted local display data plus the existing receiver-derived expected Connection reference for the console's public summary; no new wire target or CLI selection authority is introduced.
+
+## Additional first-pass test owner for the existing size fence — 2026-09-06
+
+The reviewer reports the completed first root full command exited 101. Alongside the measured personal_flows authoring-contract mismatch, the existing size fence rejected its appended cases because crates/integration-catalog/src/oauth_tests.rs grew from 1,470 to 1,699 lines. Root independently compared the current file to 6fae9df000986f39d009a2e8503bdff03db41762 and verified all original bytes remain an exact prefix, with 229 added lines. This size failure is the reviewer's test placement, not an introduced product defect or a resource interruption; retain the original output and the two already passing deciding runs.
+
+Prospectively add exactly crates/integration-catalog/src/oauth_adversary_tests.rs as an inferred test owner. Move only the reviewer's two new cases, oauth_pass1_explicit_reauthorization_repairs_only_coherent_subject_after_rotation and oauth_pass1_device_slowdown_and_denial_keep_one_authorization_and_original_deadline, verbatim to that file under use super::*;. The already assigned oauth_tests.rs receives only an appended path/module registration, preserving all original bytes. Its parent is already cfg(test), so no production module or hook is required. Preserve all assertions, literals and function names; only the new cases' module qualification changes. Keep the 1,500-line fence unchanged.
+
+The additional owner and exact validation assignment are in whole-unit-adversary-1/oauth-test-owner-assignment.md. Root preimage proof is oauth-pass1-test-owner-preimage.json under the coordinator scratch. After placement, execute both exact new cases and rerun the affected root full command with no-fail-fast; remaining strict/fmt checks see final source. Preserve every original deciding/compiler/full-run observation and report the scope exception. The complete first-pass review is still pending and production correction remains held until its immutable report is recorded. This does not add an attack or widen implementation scope.
