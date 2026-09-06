@@ -39,6 +39,8 @@ scope:
   path: contracts/connector-operation/v0alpha3/vectors.schema.json
 - confidence: inferred
   path: crates/connectors-cli/README.md
+- confidence: cited
+  path: crates/connectors-cli/src/error.rs
 - confidence: inferred
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
@@ -47,10 +49,14 @@ scope:
   path: crates/connectors-cli/tests/one_shot_operations.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/remediation.rs
+- confidence: cited
+  path: crates/connectors-client/src/identity.rs
 - confidence: inferred
   path: crates/connectors-client/src/lib.rs
 - confidence: inferred
   path: crates/connectors-client/src/model.rs
+- confidence: inferred
+  path: crates/connectors-client/src/personal_oauth.rs
 - confidence: inferred
   path: crates/connectors-client/src/remediation.rs
 - confidence: inferred
@@ -61,10 +67,16 @@ scope:
   path: crates/connectors-console/src/envelope.rs
 - confidence: inferred
   path: crates/connectors-console/src/lib.rs
+- confidence: cited
+  path: crates/connectors-console/src/output.rs
+- confidence: cited
+  path: crates/connectors-console/src/output_tests.rs
 - confidence: inferred
   path: crates/connectors-console/src/remediation.rs
 - confidence: inferred
   path: crates/connectors-console/tests/remediation.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/composition.rs
 - confidence: inferred
   path: crates/connectors-runtime/src/one_shot.rs
 - confidence: cited
@@ -75,10 +87,22 @@ scope:
   path: crates/connectors-runtime/src/remediation_tests.rs
 - confidence: inferred
   path: crates/connectors-runtime/tests/one_shot_runtime.rs
+- confidence: cited
+  path: crates/connectors-runtime/tests/personal_oauth.rs
 - confidence: inferred
   path: crates/integration-catalog/src/hosted.rs
 - confidence: inferred
   path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth_acquisition.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/oauth_remediation.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/oauth_remediation_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth_tests.rs
 - confidence: inferred
   path: crates/integration-catalog/src/remediation_tests.rs
 - confidence: cited
@@ -117,8 +141,14 @@ scope:
   path: crates/server/src/hosted/enforcement.rs
 - confidence: inferred
   path: crates/server/src/hosted/mcp.rs
+- confidence: cited
+  path: crates/server/src/hosted/mcp/toolset.rs
+- confidence: cited
+  path: crates/server/src/hosted/operation_transport.rs
 - confidence: inferred
   path: crates/server/src/hosted/remediation.rs
+- confidence: cited
+  path: crates/server/src/hosted/routing.rs
 - confidence: inferred
   path: crates/server/src/hosted/tests/contract_validation.rs
 - confidence: inferred
@@ -157,7 +187,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 44
+revision: 60
 ---
 ## Acceptance
 
@@ -281,3 +311,35 @@ Freeze byte-for-byte all existing complete Operationv1/v2 and Connectionv1 bundl
 Use selected original request/response bytes for strict decoding so duplicate fields cannot disappear through a Value intermediate. Operationv3 auth payload is mandatory exactly for authentication_required, non-null, non-retriable and not_attempted with exact safe references; reject incompatible payload/code/success/retry-delay combinations and unknown fields. Pure downgrade to v1/v2 is neutral bounded Unavailable with no URL/capability/auth payload/delay. Preserve ordinary/rate projection behavior and reject unknown identities with no fallback/resend. Connectionv2 input is bounded64KiB inside a128KiB frame; v1 remains64KiB. Bound-to-v1 conversion is a typed refusal, never unbound session creation. Validate nested trusted status and duplicate identities consistently, without claiming a DTO performs real-time expiry, grants or one-use acknowledgement.
 
 Prepare meaningful deciding cases before implementation, retaining actual first executions and compiler/fixture failures separately. Exercise complete ordinary/bound variants, malformed references, profile fields, boundaries, duplicate keys, all unknown/mismatched versions, exact auth downgrade, frozen artifacts and independent Rust/Draft2020-12 vector checks. Prove deterministic regeneration twice and manifest hashes. Compile only with the coordinator's explicit slot, jobs1, own target and prospective12GiB reserve; preserve source/evidence before completed-target cleanup. The OAuth implementor owns the current compile slot, so begin with noncompiling inspection/fixtures. Return complete source/evidence report for independent review. No server/runtime/registry/client/CLI/console/config/custody/session/grant/helper wiring, external consumer changes, live provider actions, release or tag is assigned.
+
+## Prospective ownership for the reviewed OAuth handoff — 2026-09-06
+
+The frozen OAuth source at 6fae9df000986f39d009a2e8503bdff03db41762 supplies the concrete owners that were still provisional in the stage2-runtime-handoff-plan.md proposal. Its first formal whole-unit review is running. Record the following additional machine scopes prospectively; this does not release implementation or a compiling slot before the coordinator hands over reviewed OAuth source. Current protocol source remains 05c94ac457938d2f9a8059f7f905dd8a87ec4dca. No runtime completion or review verdict is asserted.
+
+Root compared every path with current story revision 44; all fifteen were absent. Existing file hashes and the purpose of each prospective edit are in auth-runtime-prospective-scope-comparison.json in the assigned coordinator scratch. The source locations are from the frozen OAuth commit; new owners and conditional helper reuse are marked inferred.
+
+| Confidence | Path | Assigned responsibility |
+| --- | --- | --- |
+| cited | crates/integration-catalog/src/oauth.rs | Existing policy/session owner; binding and trait delegation only. |
+| cited | crates/integration-catalog/src/oauth_acquisition.rs | Share existing exact-index acquisition with bound start. |
+| inferred | crates/integration-catalog/src/oauth_remediation.rs | New private bound readiness/start/status/ack owner. |
+| inferred | crates/integration-catalog/src/oauth_remediation_tests.rs | New additive exact binding and acknowledgement tests. |
+| cited | crates/integration-catalog/src/oauth_tests.rs | Additive regressions, retaining all reviewed OAuth cases. |
+| cited | crates/server/src/hosted/operation_transport.rs | Original-byte version dispatch with exact response identity. |
+| cited | crates/server/src/hosted/routing.rs | Connection outer-frame bounds and existing authentication route wiring. |
+| cited | crates/server/src/hosted/mcp/toolset.rs | Safe authentication projection through actual admitted operation seam. |
+| cited | crates/connectors-client/src/identity.rs | Typed 409 without Identity renewal or resend; existing 401 behavior preserved. |
+| inferred | crates/connectors-client/src/personal_oauth.rs | If needed, narrow reuse of reviewed private instruction fetch/validation; no generic decoder weakening. |
+| cited | crates/connectors-console/src/output.rs | Explicit safe authentication output projection. |
+| cited | crates/connectors-console/src/output_tests.rs | Actual hostile valid-envelope formatter tests. |
+| cited | crates/connectors-cli/src/error.rs | Nonzero structured authentication result handling. |
+| cited | crates/connectors-runtime/src/composition.rs | Default protocol/readiness change only with coordinated supported transport. |
+| cited | crates/connectors-runtime/tests/personal_oauth.rs | Additive real composition witnesses; retain all reviewed OAuth assertions. |
+
+Preserve every reviewed OAuth, raw, custody, rate and GitLab assertion. Existing typed test owners hosted/tests/remediation.rs, CLI/tests/remediation.rs and runtime/src/remediation_tests.rs remain the intended test families where they suffice; do not create duplicate authentication_remediation.rs families. The new private OAuth remediation module shares the existing Session map, binding gate, custody owner and exact-index acquisition path. It adds no parallel journal, credential store, policy subsystem or durable session entity.
+
+The separately frozen service-port proposal has 45 evidence members, all independently rehashed by the coordinator; manifest SHA256 74233b129a3e8b8133a970008d39322895fafff51d3b98502648ef23d99437b1. Its three source paths already have typed ownership. Patch application checks pass without source changes. Its tests remain unexecuted, and its constructor-only stable-authority seed hypothesis remains unassigned and not a blocker: no shipped authentication producer for the proposed pair was established.
+
+Measured module sizes at the OAuth source are registry 1,489 lines, client lib 1,500, hosted 1,452, composition 1,463 and CLI lib 1,471. Additional extraction owners require an exact minimal proposal and coordinator scope before edits; this note grants no size waiver or broad refactor. Preserve original test bodies and source preimages in any later explicitly assigned extraction.
+
+The personal authority seam uses the actual immutable configuration for that process, its real configured grant_ref with no fabricated revision, and the existing mutable CurrentAuthority/generation/evidence checks. Restart forgets ephemeral sessions. Hosted wire/grant tests must truthfully keep production acquisition Unsupported until a supported adapter is composed. A valid DTO or an allowed field name alone does not make arbitrary daemon references or messages safe output; the later client/console/MCP paths require closed or exact request-bound projections and actual hostile-envelope cases.
