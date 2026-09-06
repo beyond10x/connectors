@@ -230,7 +230,7 @@
       "post": {
         "operationId": "operationEnvelope",
         "summary": "Search, describe, invoke, and control sessions over admitted Connector operations",
-        "description": "One strict connector-operation envelope per request; the closed method set is search, describe, invoke, session_status, session_terminate, session_reconcile, and session_signal. Frames above 524288 bytes are refused. Scopes: connectors.catalog.read admits search and describe; connectors.invoke admits invoke and every session method.",
+        "description": "One strict connector-operation envelope per request; the closed method set is search, describe, invoke, session_status, session_terminate, session_reconcile, and session_signal. Frames above 524288 bytes are refused. Scopes: connectors.catalog.read admits search and describe; connectors.invoke admits invoke and every session method. Select b10x.connector-operation.v0alpha1, v0alpha2 or v0alpha3 explicitly; the response retains the selected identity, without negotiation or retry. Only v0alpha3 can report authentication_required as HTTP 409 after current operation and Connection admission, before provider dispatch or approval consumption. Older versions retain a closed non-retriable unavailable refusal. Identity failure remains 401 and unadmitted authority remains 403. A remediation response neither starts a session nor retries the operation.",
         "security": [
           {
             "identityAccessToken": []
@@ -241,7 +241,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/operation.requestEnvelope"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/operation.v1.requestEnvelope"
+                  },
+                  {
+                    "$ref": "#/components/schemas/operation.requestEnvelope"
+                  },
+                  {
+                    "$ref": "#/components/schemas/operation.v3.requestEnvelope"
+                  }
+                ]
               },
               "examples": {
                 "search": {
@@ -415,6 +425,58 @@
                       }
                     }
                   }
+                },
+                "invoke_v3": {
+                  "summary": "V3 wire example; replace references with the exact current description and granted Connection.",
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha3",
+                    "request_id": "request-1",
+                    "context": {
+                      "tenant_id": "tenant-1",
+                      "agent_id": "agent-1",
+                      "agent_revision": 1,
+                      "authority_snapshot_id": "authority-1",
+                      "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    },
+                    "request": {
+                      "method": "invoke",
+                      "params": {
+                        "operation_ref": "slack-conversations-history",
+                        "connection_ref": "connection-1",
+                        "description_ref": "description-1",
+                        "input": {
+                          "cursor": "cursor-1"
+                        },
+                        "approval_evidence_ref": "approval-1"
+                      }
+                    }
+                  }
+                },
+                "invoke_v2": {
+                  "summary": "The retained v2 request vocabulary; no authentication payload is added to this identity.",
+                  "value": {
+                    "protocol": "b10x.connector-operation.v0alpha2",
+                    "request_id": "request-1",
+                    "context": {
+                      "tenant_id": "tenant-1",
+                      "agent_id": "agent-1",
+                      "agent_revision": 1,
+                      "authority_snapshot_id": "authority-1",
+                      "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    },
+                    "request": {
+                      "method": "invoke",
+                      "params": {
+                        "operation_ref": "slack-conversations-history",
+                        "connection_ref": "connection-1",
+                        "description_ref": "description-1",
+                        "input": {
+                          "cursor": "cursor-1"
+                        },
+                        "approval_evidence_ref": "approval-1"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -426,7 +488,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/operation.responseEnvelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/operation.v1.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.v3.responseEnvelope"
+                    }
+                  ]
                 },
                 "examples": {
                   "success": {
@@ -516,7 +588,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/operation.responseEnvelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/operation.v1.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.v3.responseEnvelope"
+                    }
+                  ]
                 },
                 "examples": {
                   "invalid_input": {
@@ -569,7 +651,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/operation.responseEnvelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/operation.v1.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.v3.responseEnvelope"
+                    }
+                  ]
                 },
                 "examples": {
                   "not_granted": {
@@ -623,6 +715,40 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The admitted operation was not attempted and needs explicit trusted authentication remediation. This does not renew Identity, spend approval, or resend the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/operation.v3.responseEnvelope"
+                },
+                "examples": {
+                  "authentication_required": {
+                    "summary": "Illustrative typed refusal; reference strings must be bound to trusted request context before public output.",
+                    "value": {
+                      "protocol": "b10x.connector-operation.v0alpha3",
+                      "request_id": "request-1",
+                      "status": "error",
+                      "error": {
+                        "code": "authentication_required",
+                        "message": "Authentication is required.",
+                        "retriable": false,
+                        "authentication": {
+                          "operation_ref": "slack-conversations-history",
+                          "connection_ref": "connection-1",
+                          "integration_ref": "slack",
+                          "auth_profile": "personal",
+                          "need": "reauthorize_existing",
+                          "attempt": "not_attempted",
+                          "next_action": "start_trusted_remediation"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -631,7 +757,7 @@
       "post": {
         "operationId": "connectionEnvelope",
         "summary": "Discover, activate, materialize, and describe Connections; run credential-free Connect Sessions",
-        "description": "One strict connector-connection envelope per request; the closed method set is candidate_search, candidate_activate, search, describe, observation_search, materialize, connect_session_create, and connect_session_status. No frame can carry credential material. Frames above 65536 bytes are refused. Scopes: connectors.catalog.read admits the reads; connectors.connections.manage admits activation, materialization, and session creation; connectors.connections.self admits self-service session creation.",
+        "description": "One strict connector-connection envelope per request; the v0alpha1 method set is candidate_search, candidate_activate, search, describe, observation_search, materialize, connect_session_create, and connect_session_status. There are no credential-value fields. V1 frames above 65536 bytes are refused. Scopes: connectors.catalog.read admits the reads; connectors.connections.manage admits activation, materialization, and session creation; connectors.connections.self admits self-service session creation. Select b10x.connector-connection.v0alpha1 or v0alpha2 explicitly. V2 additionally carries remediation_start, remediation_status and remediation_acknowledge with a 131072-byte request ceiling; v1 keeps its 65536-byte ceiling. Bound acquisition is implemented by the admitted personal-local OAuth composition; production hosted acquisition remains Unsupported. A wire-valid request or session reference is not management authority. After one-use acknowledgement obtain a fresh description, validate the same intended input, and stop for a separate explicit invocation. No operation is saved or replayed, and private session instructions never belong in model or generic CLI output.",
         "security": [
           {
             "identityAccessToken": []
@@ -642,7 +768,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/connection.request_envelope"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/connection.request_envelope"
+                  },
+                  {
+                    "$ref": "#/components/schemas/connection.v2.request_envelope"
+                  }
+                ]
               },
               "examples": {
                 "candidate_search": {
@@ -804,6 +937,72 @@
                       }
                     }
                   }
+                },
+                "remediation_start": {
+                  "summary": "V2 wire example; hosted acquisition remains Unsupported in the current production composition.",
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha2",
+                    "request_id": "request-1",
+                    "context": {
+                      "tenant_id": "tenant-1",
+                      "agent_id": "agent-1",
+                      "agent_revision": 1,
+                      "authority_snapshot_id": "authority-1",
+                      "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    },
+                    "request": {
+                      "method": "remediation_start",
+                      "params": {
+                        "operation_ref": "slack-conversations-history",
+                        "connection_ref": "connection-1",
+                        "input": {
+                          "limit": 20
+                        }
+                      }
+                    }
+                  }
+                },
+                "remediation_status": {
+                  "summary": "V2 wire example; hosted acquisition remains Unsupported in the current production composition.",
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha2",
+                    "request_id": "request-1",
+                    "context": {
+                      "tenant_id": "tenant-1",
+                      "agent_id": "agent-1",
+                      "agent_revision": 1,
+                      "authority_snapshot_id": "authority-1",
+                      "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    },
+                    "request": {
+                      "method": "remediation_status",
+                      "params": {
+                        "connect_session_ref": "session-1"
+                      }
+                    }
+                  }
+                },
+                "remediation_acknowledge": {
+                  "summary": "V2 wire example; hosted acquisition remains Unsupported in the current production composition.",
+                  "value": {
+                    "protocol": "b10x.connector-connection.v0alpha2",
+                    "request_id": "request-1",
+                    "context": {
+                      "tenant_id": "tenant-1",
+                      "agent_id": "agent-1",
+                      "agent_revision": 1,
+                      "authority_snapshot_id": "authority-1",
+                      "authority_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    },
+                    "request": {
+                      "method": "remediation_acknowledge",
+                      "params": {
+                        "connect_session_ref": "session-1",
+                        "operation_ref": "slack-conversations-history",
+                        "connection_ref": "connection-1"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -815,7 +1014,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/connection.response_envelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/connection.response_envelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/connection.v2.response_envelope"
+                    }
+                  ]
                 },
                 "examples": {
                   "success": {
@@ -856,7 +1062,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/connection.response_envelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/connection.response_envelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/connection.v2.response_envelope"
+                    }
+                  ]
                 },
                 "examples": {
                   "invalid_input": {
@@ -909,7 +1122,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/connection.response_envelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/connection.response_envelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/connection.v2.response_envelope"
+                    }
+                  ]
                 },
                 "examples": {
                   "not_granted": {
