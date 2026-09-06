@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 36
+revision: 37
 ---
 ## Authorization and objective
 
@@ -3386,3 +3386,12 @@ Seven selected stories already reached published main. Personal OAuth passed its
 Current source includes Operation v3 default with explicit operation-only v2, Connection v2 bound remediation, schema4 with matching readers, and development-only GitLab public PKCE/device authorization through a dedicated unsealed store. Hosted remediation remains Unsupported after admission where no acquisition owner exists. Protected instructions stay outside model output; completion ends with fresh validation and an explicit new invocation. Full affected local gates pass: server115, runtime455 per default/no-default configuration with two existing PostgreSQL ignores, console107, CLI140, strict affected checks and the final catalog/Markdown/story/ESS gate. Initial root1301pass/2fail/4oldignores was closed by full affected server115 and catalog-cli14 rechecks. Complete sharded CI and auth review remain pending.
 
 Exact runtime final seal: eba21e5f93152eb0aacd01dadf31a19569401421c8a8397f3b09216d11ed7b04 (179 members). Exact client final seal:334ab4c9adf141862dcb9a701e930f80dcdf909dfb3a1c1142dc75af3c8fcae7 (95 members). All first failures remain in those records. Counts describe executed cases per command, not a unique aggregate. Future review results are recorded in full before any findings are routed.
+
+
+## Bounded tmpfs review continuation — 2026-09-07
+
+The first authentication reviewer preserved a console-format preflight refusal at 22:42:08 UTC: the shared filesystem had 11,004,416,000 available bytes, below the prior 12 GiB reserve. Exit125 occurred before Cargo launched, and the owned process-group list was empty. Console Clippy had already completed successfully. No completed test or historical reserve observation is relabeled. The reviewer report retains the exact refusal and resource timeline.
+
+For the remaining first-pass review commands only, the coordinator prospectively allocates an 8 GiB disk reserve (8,589,934,592 bytes), while keeping the same private tmpfs target, 12 GiB target cap, 8 GiB tmpfs reserve and 16 GiB MemAvailable reserve. The numeric disk reserve is a coordinator scheduling choice; neither the operator nor the wave skill prescribed 12 GiB. This exception is limited to the already populated tmpfs target and does not authorize an ordinary disk target or another compiler.
+
+The reviewer confirmed one job, no incremental compilation or debug information, no compiler wrapper, and the identical target. The assigned temporary directory measured 4,096 bytes. Existing CLI fixtures use bounded small files; prior runs did not measure a hard temporary-size cap, so no such prior guarantee is claimed. The continuation must additionally enforce a prospective 128 MiB temporary-directory cap, checking all reserves each second and stopping only its owned process group on a violation. Preserve all old runners and outputs; record a distinct continuation runner and command prefixes. Source, tests, ordinary review count, validation requirements, publication controls and all other units' resource policies remain unchanged.
