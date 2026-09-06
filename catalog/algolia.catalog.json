@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "An Algolia API key with the ACLs this connector needs: `search` and `browse` for the reads, `addObject` and `deleteObject` for the writes. Scope it to the indices this connection should reach rather than using the Admin key",
@@ -100,6 +100,7 @@
         "method": "GET",
         "url": "{base}/1/indexes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -324,6 +325,7 @@
         ],
         "url": "{base}/1/indexes/{index_name}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -465,6 +467,7 @@
         "method": "GET",
         "url": "{base}/1/indexes/{index_name}/{object_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -583,6 +586,7 @@
         "method": "PUT",
         "url": "{base}/1/indexes/{index_name}/{object_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -690,6 +694,7 @@
         "method": "DELETE",
         "url": "{base}/1/indexes/{index_name}/{object_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -715,7 +720,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "1",

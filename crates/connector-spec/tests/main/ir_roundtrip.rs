@@ -278,6 +278,8 @@ fn parameter_and_response_schemas_survive_the_round_trip() {
     let mut connector = babelforce();
     let operation = &mut connector.operations[1];
     operation.params = ParamSet {
+        request_semantics: connector_spec::RequestSemantics::LegacyV1,
+        body_required: None,
         path: vec![Param {
             name: "call_id".into(),
             wire: None,

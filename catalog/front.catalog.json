@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Front API token sent as a bearer",
@@ -101,6 +101,7 @@
         ],
         "url": "{base}/conversations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -183,6 +184,7 @@
         ],
         "url": "{base}/conversations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -288,6 +290,7 @@
         "method": "GET",
         "url": "{base}/conversations/{conversation_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -438,6 +441,7 @@
         ],
         "url": "{base}/conversations/{conversation_id}/messages"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -603,6 +607,7 @@
         "method": "POST",
         "url": "{base}/conversations/{conversation_id}/messages"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -711,6 +716,7 @@
         "method": "POST",
         "url": "{base}/conversations/{conversation_id}/tags"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -719,7 +725,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [

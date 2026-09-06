@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 21
+revision: 31
 ---
 
 
@@ -3261,3 +3261,82 @@ Computed selection command: aep plan artifact waves --kind story --status propos
   "cycles": []
 }
 ```
+
+## Rate-limit managed triple
+
+Rate unit created before dispatch as manager id wt-af054beacfba at `~/.local/state/worktree/trees/b10x/connectors/wt-af054beacfba`, branch `impl/rate-limit-in-the-protocol`, exact base/head `e101a24e73fe22a58cb67e0a2e7ac95a7b83b688`. Build roots are this tree's root `target/` and satellite crate `target/` directories only. Scratch `~/.cache/connectors-cli-wave-20260906/rate-limit-in-the-protocol`; TMPDIR `~/.cache/cw6/r`. Brief is scratch `brief.md`, source-only aep-drive:implementor charter in ordinary harness. Stage1 released owners and holds are the preceding staged-dispatch decision; no whole-unit independence or readiness claim before its handoffs. Opening cheap checks after bot commit: portable Markdown links,73legacy story records,10ESS files valid, diff whitespace clear. One-shot root compilation idle before rate stage1 begins.
+
+## One-shot final attack
+
+First attack review-result:cli-one-shot-adversary-1-20260906 is retained verbatim. The coordinator classifies its stale Monitoring citation finding as introduced: the unit added five lines before every cited function; exact base/source comparison and the first batch gate establish that change, without claiming a new base execution. The invalid extra-input-key probe remains INFEASIBLE and its original red and exact coordinator correction are retained.
+
+Correction committed as17763bbc1552fcda2b9a323bfdd04f5fcef9bd22, bot author and committer verified. It retains eight adversary cases and changes37 model lines only in numeric source citations: introduced Monitoring/Registry shifts plus ten separately identified pre-existing Kubernetes offsets. The static audit inspected32 direct citations reaching four of19 changed unit paths; no lifecycle, fields, refusal vocabulary or test assertions were weakened.
+
+After Monitoring correction the complete root workspace passed1141,0failed,4ignored (exit0), versus the first attack's1140pass/1fail. After the final Registry/Kubernetes citation-only corrections, all15 targeted ESS citation/claim fences passed,58nonselected (exit0); the expected ESS0.18.0 binary validated all10files. The shell's older PATH-first ESS refused the newer command/model; use the expected installed binary for final checks, do not alter the model to fit an older CLI. Affected full lanes from attack1 remain626passed,2ignored; final full attack must add its own cases and rerun the affected lanes.
+
+Reports and exact patches are under `~/.cache/connectors-cli-wave-20260906/one-shot-operations-without-a-daemon/`; root correction logs under `~/.cache/cw6/p/`. Second/final test-only adversary receives the complete unit base3df1cd2df32472a4afc8feeaac8c46c9de8d1b55 to corrected17763bbc, preserved reports, and existing managed triple. No third attack or whole-wave closure is implied.
+
+## Session recovery 2026-09-06
+
+Recovered the operator-approved session 01a0737b-6eb5-79f1-9bd4-87292c6a8743 after its usage-limit interruption. The recovered ten-story scope and standing official-source/schema-fidelity instructions remain unchanged. This is an interactive continuation with three workers beside the coordinator, using the saved implementor/adversary charters through ordinary agents. No new release authorization is inferred.
+
+Inspected integration HEAD e101a24e and its four coordinator-owned dirty planning files. Preserved their pending rate-limit generator scope and one-shot final-review records. AEP validation reports 161 artifacts, historical assertion/findings notices, and valid. Source state: one-shot corrected HEAD17763bbc awaits its second/final attack; GitLab source-fidelity HEAD50256e4b has three pending stage2 files; rate-limit stage1 retains five interrupted source/lock changes. Credential HEAD9f15c108 remains held by decision-blocker:cli-credentials-final-review, with its final tests preserved.
+
+Atlas primary is dirty and stale; new managed authority wt-679b510698e5 is clean at exact advertised main f686fe034bc3f1c7c5d276476b814ee05c2bca9f. Its path is ~/.local/state/worktree/trees/b10x/atlas/wt-679b510698e5. Current Connectors remote main is a61e0a748be58ad03cf1907a48f9fefbb4423434 and wave remote50f0ab5107de9f07f42d9f2b73df80bcfe978e89. Both are observations, not merged-source claims.
+
+Workers resume the existing one-shot final review, GitLab stage2, and additive rate-limit stage1. They retain their original managed tree/build/scratch triples and short TMPDIRs. No Git, AEP, model, service or live-provider mutations are delegated. Free space measured26GiB against20GiB floor; only the one-shot reviewer initially has the build slot. Connectors doctor is healthy, but operation search exposes no GitHub operation, so Atlas bot tooling remains the declared GitHub path.
+
+## Remote main reconciliation
+
+Integrated remote main a61e0a748be58ad03cf1907a48f9fefbb4423434 while preserving both published histories. Its seven source/lock files were applied from the exact merge-base diff. The eleven independent remote planning events for story:git-http-oauth-authentication and its immutable review were replayed sequentially through AEP under the current agent actor; both resulting artifact files were verified byte-for-byte against remote main. The merge retains the original remote event provenance through its second parent and avoids a textual append-only-journal merge. No new delivery or verification is claimed for that separate active story. Full wave verification remains pending.
+
+## GitLab parser ownership handoff
+
+The resumed GitLab worker recovered the three stage2 source/fixture/guide files and prepared exact search-bound patches. Current one-shot ownership is tests only in its separate tree; production CLI implementation is committed at17763bbc. Release GitLab parser ownership for ConnectionCommand::{Candidates,List,Observations}, OperationCommand::Search and EventCommand::Search limit attributes (current integration crates/connectors-cli/src/lib.rs lines267-395), plus the already scoped new tests/search_bounds.rs. This is disjoint by symbols from committed one-shot runtime routing and by file from the active one-shot test-only review. The GitLab tree will prove parser refusals before configuration/transport; the final integration gate must prove combined behavior. Preserve existing numeric defaults through their matching protocol constants, bound exactly to declared maxima, and leave Event Receive outside scope. Record diff hunk headers and perform a dry merge check before integrating both heads.
+
+## One-shot final review and source integration
+
+Second/final attack of corrected17763bbc is recorded verbatim as review-result:cli-one-shot-adversary-2-portable-20260906. Five appended cases increased affected execution626->631 passing with no confirmed product defect. Two initial invalid-fixture reds are retained as INFEASIBLE notes, not product defects. Full selected runners observed1685 nonduplicated passes and6 existing ignored; strict clippy/fmt and ESS0.18.0 validation passed. Tests-only commitd86716fb preserves both earlier and final adversary cases. The final public derivative renders scratch references as plain text for durable AEP recording; original frozen scratch reports and hashes remain retained. Whole-wave final gate and installation remain outstanding before lifecycle closure.
+
+Unpublished recording transactionad5a75a49cdb69fcadd6258fcda3263f10b2c0d4 is retained on recovery/cli-review-link-transaction-20260906. Its immutable report used machine-local Markdown links, rejected by the link fence. Integration resumed from its clean parent620d60ee on wave/cli-ten-slack-first-resumed; prior valid parser ownership/scope mutations were replayed through AEP, then a distinct portable review id was created from the reviewer-returned derivative. No published history or original review bytes were changed. This is one final review with mechanical presentation variants, not an extra attack.
+
+## Rate-limit additive stage1 handoff
+
+Recovered stage1 now passes194->209 affected cases, strict clippy/fmt and deterministic85-vector checks. Exact original baseline argv was recovered from the predecessor transcript, not reconstructed. Existing public DTOs still re-export the byte-identical legacy snapshot; actual default transport/catalog/CLI migration remains held for the reviewed GitLab source handoff. Coordinator applies the source relocation citation patch to runtime/system/components only. Historical review citations retain their original context.
+
+Stage2 fixture closure adds existing Slack backend and one-shot CLI test files. GitLab source remains unpublished and schema3 has not frozen; the rate stage may add its optional conditional declarations under this same migration after the independent GitLab review and handoff. No v1/v2 frozen schema is changed. One-shot reviewed source integrated at7a2de67bd291f719115d6094b995004c60ee956e; dry combined GitLab merge at6e655168 is conflict-free. This scope record authorizes preparation, not concurrent edits to GitLab's review tree.
+
+## One-shot integration gate projection refresh
+
+The exact published integration84ccd024 ran all12workspace lanes with2133passing executions,0failures and27existing ignored, including both runtime feature sets. Final catalog/link/story/ESS validation checks passed before generated-clap comparison failed. The stale generated projection predates the added request-semantics and rate-advice model values; source additions were modeled before implementation but their derivative was not refreshed. Current model/source evidence is retained in the final gate log.
+
+Coordinator owns regeneration of ess/generated/clap from the complete validated ess/system through ESS0.18.0, with no manual generated edits. Only the already committed emitted crate/notes are copied; unclassified plan.json/target.json stay scratch as the gate requires. Shared model projection refresh is serialized in integration. Report full gate green only after the exact final check reruns successfully.
+
+## Reviewed one-shot and closed-pipe gate closure
+
+Source84ccd024 completed every declared workspace lane, including both runtime feature sets. Generated-only commitc08c4728 refreshes six exact ESS derivatives; the final gate rerun is green:65providers,68artifacts verified, portable Markdown,73legacy story records consistent,10ESSfiles valid and generated clap byte-identity confirmed. Complete raw runner logs, exits and counts are retained in the assigned one-shot-integration-gate scratch directory. The first final-gate refusal remains retained; no test was skipped or changed to obtain the final result.
+
+| Workspace | Passed | Failed | Existing ignored |
+|---|---:|---:|---:|
+| . | 1141 | 0 | 4 |
+| crates/connectors-runtime | 668 | 0 | 4 |
+| crates/connectors-cli | 123 | 0 | 0 |
+| crates/connectors-console | 87 | 0 | 0 |
+| crates/driver-audio | 15 | 0 | 0 |
+| crates/driver-speech | 22 | 0 | 2 |
+| crates/driver-cdp | 29 | 0 | 2 |
+| crates/driver-sip | 5 | 0 | 0 |
+| crates/driver-sql | 28 | 0 | 14 |
+| crates/rtvbp-voice-endpoint | 7 | 0 | 0 |
+| crates/voice-local-audio | 4 | 0 | 1 |
+| crates/voice-runtime | 4 | 0 | 0 |
+
+Total2133passing executions,0failures,27existing ignored. These are executions, including the two declared runtime variants, not a count of unique assertions. One-shot and closed-pipe acceptance have their retained two-pass review records and are eligible for implemented. Final installed-byte verification still owns the urgent delivery story. GitLab, rate-limit and OAuth/auth-remediation remain separate incomplete units.
+
+Published reviewed one-shot unit HEADd86716fb was finished and removed by worktree after exact-id dry-run, with remote recovery through origin/wave/cli-ten-slack-first-resumed. Its scratch reports and all test logs remain retained.
+
+## GitLab whole-unit review and rate handoff
+
+review-result:cli-gitlab-adversary-1-20260906 records the first whole-unit attack of6e655168. Six first-run deciding cases passed, with no findings. Source lanes784->789, runtime/catalog80->81, CLI88->88 and service57->57 passed with strict clippy/fmt. All1847pinned source operations were checked against actual importability/coverage classification; frozen schema2 bytes remain unchanged. Source/test commitseafffa88,6e655168 and50256e4b preserve all selected schemas and source provenance. This is a bounded schedule slice with explicit remaining coverage, not complete GitLab operation coverage.
+
+Independent tests were authorized in affected test directories; the new resolver test file is now recorded as an exact cited machine scope. Coordinator merges this green source after conflict-free dry merge; final combined gate remains required for lifecycle closure. Rate stage2 receives this source and the reviewed one-shot integration as prerequisites. Schema3 is still this unpublished migration's active new schema; optional conditional rate metadata may join it before final publication/freeze, preserving schema2 and literal vendor schemas. OAuth acquisition interpretation will be a separate subsequent schema4 migration and requires its own Atlas reliance/rollout update.

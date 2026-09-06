@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "PagerDuty REST API access key, sent as the Authorization header after the literal `Token token=`. A read-only key satisfies the four read operations; the two incident writes need a full-access key",
@@ -121,6 +121,7 @@
         ],
         "url": "{base}/incidents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -324,6 +325,7 @@
         "method": "GET",
         "url": "{base}/incidents/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -533,6 +535,7 @@
         ],
         "url": "{base}/services"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -724,6 +727,7 @@
         ],
         "url": "{base}/oncalls"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -872,6 +876,7 @@
         "method": "PUT",
         "url": "{base}/incidents/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1030,6 +1035,7 @@
         "method": "PUT",
         "url": "{base}/incidents/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1102,7 +1108,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [

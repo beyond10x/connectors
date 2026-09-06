@@ -146,6 +146,9 @@ impl SpecKind {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SpecSource {
+    /// The explicit source-preserving importer, or the inherited interpretation for legacy sources.
+    #[serde(default, skip_serializing_if = "crate::RequestSemantics::is_legacy")]
+    pub request_semantics: crate::RequestSemantics,
     /// The vendored spec file, relative to the repository root
     /// (`specs/babelforce/manager-2026-07-10.openapi.yaml`).
     pub path: String,

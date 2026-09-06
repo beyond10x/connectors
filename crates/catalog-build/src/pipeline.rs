@@ -177,6 +177,12 @@ fn plan_at_width(
 
     let mut artifacts = Vec::new();
 
+    artifacts.push(planned(
+        workspace.document_schema_v2_path(),
+        crate::document::schema_v2_text(),
+        Ownership::Family(workspace.documents_dir()),
+    )?);
+
     // The schema the canonical documents validate against (C-536). Planned on every run, scoped
     // ones included: it is a constant of the generator — no provider data, so a scoped run can
     // write it honestly — and a provider-scoped build must validate its own document against the

@@ -243,6 +243,8 @@ pub enum RequiredCapability {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Operation {
+    /// The versioned interpretation of its stored schemas and request template.
+    pub request_semantics: RequestSemantics,
     /// The Flux symbol the operation is declared and called by, e.g. `zendesk-ticket-show`. Unique
     /// across the whole catalog, and the key [`OperationKey::id`] matches on.
     pub id: &'static str,
@@ -339,9 +341,22 @@ pub struct Operation {
     /// [`expose`](Self::expose) this is the complete caller-facing contract, built from document
     /// data alone.
     pub input_schema: &'static str,
+    /// The build-time translated successful response schema, absent when none was declared.
+    pub output_schema: Option<&'static str>,
     /// Whether the operation is published to callers. An unexposed operation exists (its document
     /// entry is the audit trail) but is not offered.
     pub expose: bool,
+}
+
+/// Closed catalog request interpretation. Schema 3 readers must recognize this before dispatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+pub enum RequestSemantics {
+    /// The inherited caller contract and request-template behavior.
+    #[serde(rename = "legacy_v1")]
+    LegacyV1,
+    /// The supported source-preserving OpenAPI 3.0 JSON and scalar parameter class.
+    #[serde(rename = "openapi_3_0_json_v1")]
+    OpenApi30JsonV1,
 }
 
 /// **Where a credential goes on the way out** — the *placement* axis of

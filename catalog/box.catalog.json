@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Box access token sent as a bearer — an OAuth2 access token or a Developer Console token",
@@ -74,6 +74,7 @@
         "method": "GET",
         "url": "{base}/2.0/users/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -156,6 +157,7 @@
         "method": "GET",
         "url": "{base}/2.0/folders/{folder_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -252,6 +254,7 @@
         "method": "GET",
         "url": "{base}/2.0/folders/{folder_id}/items"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -336,6 +339,7 @@
         "method": "GET",
         "url": "{base}/2.0/files/{file_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -465,6 +469,7 @@
         "method": "POST",
         "url": "{base}/2.0/folders"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -579,6 +584,7 @@
         "method": "POST",
         "url": "{base}/2.0/files/{file_id}/copy"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -608,7 +614,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "2.0",
