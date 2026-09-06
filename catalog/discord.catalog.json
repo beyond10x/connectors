@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "Discord bot token, sent as `Authorization: Bot <token>`. The `Bot ` scheme word is supplied by the connector; the token is the value alone. `Bearer ` is a valid Discord scheme word for a different credential — an OAuth2 user token — so sending this token with that prefix yields a 401 indistinguishable from a revoked token",
@@ -915,7 +915,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "v10",

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "babelforce access token. Either supplied through the environment, or obtained by the host running one of the grants below",
@@ -118684,7 +118684,7 @@
       "service": "task-schedule"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "v2",

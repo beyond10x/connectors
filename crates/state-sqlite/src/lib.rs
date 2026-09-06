@@ -41,6 +41,11 @@ pub struct SqliteState {
     connection: Mutex<Connection>,
 }
 
+enum Synchronization {
+    Normal,
+    Full,
+}
+
 impl SqliteState {
     /// Open or create a database file.
     ///
@@ -49,7 +54,22 @@ impl SqliteState {
     /// [`StateError::Unavailable`] when the file cannot be opened or the schema cannot be created.
     pub fn open(path: &Path) -> Result<Self, StateError> {
         let connection = Connection::open(path).map_err(|_| StateError::Unavailable)?;
-        Self::prepare(connection)
+        Self::prepare(connection, Synchronization::Normal)
+    }
+
+    /// Open a file-backed WAL database with SQLite's FULL synchronization at every commit.
+    ///
+    /// Use this port for decision journals whose committed record must be synchronized before
+    /// another durable effect. The mode belongs to this connection: every journal writer must
+    /// choose it explicitly. [`Self::open`] and [`Self::in_memory`] retain NORMAL synchronization.
+    ///
+    /// # Errors
+    ///
+    /// [`StateError::Unavailable`] if opening, WAL/FULL configuration or schema creation fails.
+    /// In-memory and temporary databases cannot enter WAL mode and are refused.
+    pub fn open_full(path: &Path) -> Result<Self, StateError> {
+        let connection = Connection::open(path).map_err(|_| StateError::Unavailable)?;
+        Self::prepare(connection, Synchronization::Full)
     }
 
     /// A database that lives only as long as this value. For tests, and for a deployment that
@@ -60,19 +80,36 @@ impl SqliteState {
     /// [`StateError::Unavailable`] when SQLite cannot allocate it.
     pub fn in_memory() -> Result<Self, StateError> {
         let connection = Connection::open_in_memory().map_err(|_| StateError::Unavailable)?;
-        Self::prepare(connection)
+        Self::prepare(connection, Synchronization::Normal)
     }
 
-    fn prepare(connection: Connection) -> Result<Self, StateError> {
+    fn prepare(
+        connection: Connection,
+        synchronization: Synchronization,
+    ) -> Result<Self, StateError> {
+        // WAL preserves concurrent readers. Existing openers keep NORMAL, which can lose the
+        // last commit on power loss; decision-journal callers explicitly select FULL instead.
+        connection
+            .execute_batch("PRAGMA journal_mode = WAL;")
+            .map_err(|_| StateError::Unavailable)?;
+        let synchronous = match synchronization {
+            Synchronization::Normal => "NORMAL",
+            Synchronization::Full => "FULL",
+        };
+        connection
+            .pragma_update(None, "synchronous", synchronous)
+            .map_err(|_| StateError::Unavailable)?;
+        if matches!(synchronization, Synchronization::Full) {
+            let journal_mode: String = connection
+                .pragma_query_value(None, "journal_mode", |row| row.get(0))
+                .map_err(|_| StateError::Unavailable)?;
+            if journal_mode != "wal" {
+                return Err(StateError::Unavailable);
+            }
+        }
         connection
             .execute_batch(
-                // WAL for a workstation: a reader — `connectors doctor`, or a second one-shot
-                // command — must not block on the daemon's writes. `synchronous = NORMAL` is the
-                // documented companion to WAL and survives process death, which is the failure
-                // that matters here; only host power loss can lose the last commit.
-                "PRAGMA journal_mode = WAL;
-                 PRAGMA synchronous = NORMAL;
-                 PRAGMA foreign_keys = ON;
+                "PRAGMA foreign_keys = ON;
                  CREATE TABLE IF NOT EXISTS connector_state_cells (
                      state_key TEXT PRIMARY KEY NOT NULL,
                      body BLOB NOT NULL,
@@ -190,6 +227,128 @@ impl StateStore for SqliteState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn settings(store: &SqliteState) -> (String, u32, bool) {
+        let connection = store.connection.lock().expect("connection lock");
+        (
+            connection
+                .pragma_query_value(None, "journal_mode", |row| row.get(0))
+                .unwrap(),
+            connection
+                .pragma_query_value(None, "synchronous", |row| row.get(0))
+                .unwrap(),
+            connection
+                .pragma_query_value(None, "foreign_keys", |row| row.get(0))
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn full_open_configures_wal_and_full_synchronization_on_every_open() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("journal.db");
+        for _ in 0..2 {
+            let full = SqliteState::open_full(&path).unwrap();
+            assert_eq!(settings(&full), ("wal".into(), 2, true));
+            let normal = SqliteState::open(&path).unwrap();
+            assert_eq!(settings(&normal), ("wal".into(), 1, true));
+            assert_eq!(
+                settings(&full),
+                ("wal".into(), 2, true),
+                "another opener must not lower this connection's synchronization"
+            );
+        }
+    }
+
+    #[test]
+    fn existing_openers_keep_normal_synchronization() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("legacy.db");
+        assert_eq!(
+            settings(&SqliteState::open(&path).unwrap()),
+            ("wal".into(), 1, true)
+        );
+        assert_eq!(
+            settings(&SqliteState::in_memory().unwrap()),
+            ("memory".into(), 1, true)
+        );
+    }
+
+    #[test]
+    fn the_full_file_backend_preserves_state_and_grant_conformance() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = SqliteState::open_full(&directory.path().join("journal.db")).unwrap();
+        connector_state::conformance::run(&store);
+        domain::grant_conformance::run(std::sync::Arc::new(store));
+    }
+
+    #[test]
+    fn full_commits_are_visible_before_close_and_survive_reopening() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("journal.db");
+        let value = b"\x00decision\xff";
+        {
+            let store = SqliteState::open_full(&path).unwrap();
+            assert_eq!(settings(&store).1, 2);
+            store
+                .replace("custody.decision", b"\x00decision", 32)
+                .unwrap();
+            assert_eq!(
+                store.append("custody.decision", b"\xff", 32),
+                Ok(value.len())
+            );
+            assert_eq!(
+                store.append("custody.decision", b"overflow", value.len()),
+                Err(StateError::Capacity)
+            );
+            // An independent connection sees the committed record while the writer is still open.
+            let reader = Connection::open(&path).unwrap();
+            let body: Vec<u8> = reader
+                .query_row(
+                    "SELECT body FROM connector_state_cells WHERE state_key = 'custody.decision'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(body, value);
+        }
+        {
+            let reopened = SqliteState::open_full(&path).unwrap();
+            assert_eq!(settings(&reopened), ("wal".into(), 2, true));
+            assert_eq!(
+                reopened.read("custody.decision", 32),
+                Ok(Some(value.to_vec()))
+            );
+            reopened.delete("custody.decision").unwrap();
+        }
+        assert_eq!(
+            SqliteState::open_full(&path)
+                .unwrap()
+                .read("custody.decision", 32),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn full_open_refuses_unusable_paths() {
+        assert!(matches!(
+            SqliteState::open_full(Path::new(":memory:")),
+            Err(StateError::Unavailable)
+        ));
+        assert!(matches!(
+            SqliteState::open_full(Path::new("")),
+            Err(StateError::Unavailable)
+        ));
+        let directory = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            SqliteState::open_full(directory.path()),
+            Err(StateError::Unavailable)
+        ));
+        assert!(matches!(
+            SqliteState::open_full(&directory.path().join("missing/journal.db")),
+            Err(StateError::Unavailable)
+        ));
+    }
 
     #[test]
     fn the_in_memory_backend_conforms() {

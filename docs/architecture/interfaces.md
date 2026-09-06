@@ -23,7 +23,9 @@ flowchart TB
     discover[Search and describe operation] --> request[Operation, Connection, description reference, input]
     request --> admission[Validate caller and request authority]
     admission --> grant[Check current Grant and description]
-    grant --> approval[Verify and redeem approval when required]
+    grant --> readiness[Check supported credential readiness]
+    readiness --> approval[Verify and redeem approval when required]
+    readiness -->|Authentication needed| connect[Return next step without dispatch or approval redemption]
     approval --> dispatch[Record attempt and dispatch admitted request]
     credentials[Resolve provider credentials] --> dispatch
     dispatch --> result[Result or typed refusal, with audit reference]
@@ -69,6 +71,7 @@ caller-supplied approval string looks sufficient.
 | D1 no longer matches the current description | Describe again and review the resulting request before seeking approval. |
 | Authority, Grant, approval binding, expiry, or one-time redemption refuses | The hosted write is not admitted. Missing, mismatched, expired, and replayed approvals do not become distinct public authorization disclosures. |
 | The authority store is unavailable | Admission cannot answer. The effect must not proceed through that failed admission. |
+| An admitted request needs initial authentication or reauthorization | No operation was attempted. Complete the bound authentication flow, inspect fresh descriptions, then explicitly invoke again. |
 | The provider returns a definite HTTP 429 | The request was refused for rate limiting. A trusted retry delay may be supplied; it does not authorize another invocation. |
 | The provider may have accepted the write, but no terminal outcome is durable | The outcome is uncertain. Inspect the recorded result and provider state before deciding on another action. |
 
@@ -82,13 +85,15 @@ unknown; a missing in-memory record does not prove that no effect occurred.
 
 ## Operation versions and rate advice
 
-Local and hosted operation boundaries accept `b10x.connector-operation.v0alpha1` and
-`b10x.connector-operation.v0alpha2`. Both use the same admission and backend path. The declared
-identity and request are validated before dispatch; unknown versions are refused. Operation
-replies use the requested supported identity. Upgrade a local CLI and daemon together, and check
-provider support before adopting v2 in an independently pinned client.
+Local and hosted operation boundaries accept `b10x.connector-operation.v0alpha1`,
+`b10x.connector-operation.v0alpha2` and `b10x.connector-operation.v0alpha3`. The CLI defaults to
+v3; use `connectors operation --protocol-version v2 ...` for an explicitly selected v2 peer.
+Upgrade a local CLI and daemon together. Each supported version uses the same admission and
+backend path, with its defined response projection. Original request bytes and the declared
+identity are validated before dispatch; unknown versions are refused. Replies retain the requested
+supported identity. There is no negotiation or automatic resend when a peer rejects that version.
 
-In v2, a definite provider HTTP 429 produces an error with `code: rate_limited` and
+In v2 and v3, a definite provider HTTP 429 produces an error with `code: rate_limited` and
 `retriable: true`. An optional `retry_after_seconds` gives an unsigned delay in seconds, including
 zero. Connectors trusts only one admitted numeric Retry-After header, with surrounding ASCII spaces
 or tabs removed. Missing, duplicate, malformed, overflowing or HTTP-date values leave the delay
@@ -116,14 +121,46 @@ bundle bytes remain unchanged. Existing deployed-v1 `purpose` and `session_signa
 tracked separately from that older schema. The [operation contract](../../contracts/connector-operation/v0alpha2/README.md)
 documents the complete v2 shape and exact compatibility loss.
 
-Catalog schema 3 introduces a separate compatibility requirement. Its explicit request-semantics
+Catalog schema 4 introduces a separate compatibility requirement and retains schema 3's explicit request-semantics
 profiles preserve supported vendor constraints, whole JSON bodies and omission versus null for
 migrated operations. Legacy operations keep their declared legacy profile. Publish a matching
 producer, schema, documents/pack, reader and resolver together; an external pack consumer must
-upgrade its reader/resolver before loading schema 3. An older executable may retain its matching
+upgrade its reader/resolver before loading schema 4. Schema 4 adds personal OAuth declarations;
+the schema 2 and 3 artifacts remain frozen. An older executable may retain its matching
 older pack. Changing the catalog version alone does not establish source fidelity for every
 provider. The [domain amendment](../design/01-domain-model.md#2026-09-06-amendment-source-request-semantics)
 describes the distinction.
+
+## Authentication as a next step
+
+Operation v3 can return `authentication_required` after the exact operation and Connection pass
+grant admission and the supported credential owner reports missing or degraded credentials.
+Hosted HTTP carries this pre-dispatch result as 409. It states `not_attempted`, distinguishes
+initial authorization from reauthorization, and identifies the admitted binding and trusted next
+action. It creates no session, redeems no approval and dispatches no operation. Unknown or
+unadmitted requests retain an opaque refusal; an unavailable authority store remains an outage.
+The retained v1/v2 projections do not acquire v3 authentication authority.
+
+The trusted personal-local setup flow uses Connection v2 to start a session for the exact configured
+Connection, intended operation and input. A configured Created Connection can be authenticated
+without advertising it as callable. Current authority, grant, integration and credential purpose
+are checked through start, completion and one-use acknowledgement. Expiry, changed policy or a
+mismatched binding cannot authorize a retry. Connection v1 remains available for its existing
+methods; bound v2 requests have an explicit refusal when projected to v1.
+
+Human instructions go to a controlling terminal or a new owner-only file. Public CLI and MCP
+authentication output excludes session capabilities, private URLs and arbitrary daemon messages.
+After acknowledgement, the client requires fresh matching Connection and Operation descriptions,
+validates the intended input against the fresh schema, and stops ready for a separate explicit
+invocation. It does not retain an operation for replay. An authentication-required 409 does not
+renew Identity or resend the request; the existing Identity 401 renewal path remains separate.
+
+Acquisition is currently implemented for the configured personal-local path described in
+[Deployment and runtime](deployment.md#personal-oauth-and-authentication-recovery). Hosted
+Connection v2 still enforces operation and management admission, then reports Unsupported where
+there is no acquisition adapter. A hosted transport is not itself an implemented acquisition flow.
+The [Operation v3 contract](../../contracts/connector-operation/v0alpha3/README.md) and
+[Connection v2 contract](../../contracts/connector-connection/v0alpha2/README.md) define the wire boundaries.
 
 ## The CLI at a glance
 

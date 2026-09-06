@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "Personal access token entered once through a protected Connect Session. Acts as the person who created it; choose read_api for reads or api for writes",
@@ -45,7 +45,47 @@
         "endpoint": "login",
         "grants": [
           "authorization_code",
-          "refresh_token"
+          "refresh_token",
+          "device_authorization"
+        ],
+        "personal_flows": [
+          {
+            "client_authentication": "public",
+            "flow": "authorization_code_pkce",
+            "redirect_shape": "loopback_ipv4_http",
+            "refresh_policy": "required",
+            "registration_use": "development_only",
+            "token_evidence": {
+              "client_id_pointer": "/application/uid",
+              "endpoint": {
+                "path": "/oauth/token/info",
+                "service": "login"
+              },
+              "scope_encoding": "string_array",
+              "scopes_pointer": "/scope",
+              "subject_pointer": "/resource_owner_id"
+            }
+          },
+          {
+            "client_authentication": "public",
+            "device_authorization_endpoint": {
+              "path": "/oauth/authorize_device",
+              "service": "login"
+            },
+            "flow": "device_authorization",
+            "refresh_policy": "if_issued",
+            "registration_use": "development_only",
+            "token_evidence": {
+              "client_id_pointer": "/application/uid",
+              "endpoint": {
+                "path": "/oauth/token/info",
+                "service": "login"
+              },
+              "scope_encoding": "string_array",
+              "scopes_pointer": "/scope",
+              "subject_pointer": "/resource_owner_id"
+            }
+          }
         ],
         "scopes": [
           "api"
@@ -7154,7 +7194,7 @@
       "service": "rest"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "v4",

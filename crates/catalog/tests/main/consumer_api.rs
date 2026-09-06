@@ -139,6 +139,7 @@ fn the_closed_vocabularies_match_exhaustively() {
                     grants,
                     redirect,
                     public_client: _,
+                    personal_flows: _,
                 } = *spec;
                 match scope_separator {
                     OAuthScopeSeparator::Space => {}
@@ -150,6 +151,7 @@ fn the_closed_vocabularies_match_exhaustively() {
                         OAuthGrant::Password => {}
                         OAuthGrant::RefreshToken => {}
                         OAuthGrant::ClientCredentials => {}
+                        OAuthGrant::DeviceAuthorization => {}
                     }
                 }
                 if let Some(OAuthRedirect { port: _, path: _ }) = redirect {}

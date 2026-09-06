@@ -293,6 +293,96 @@ fn validate_one_credential_scope_response_pointer(method: &AuthMethod, problems:
     }
 }
 
+/// Personal flows are explicit, structurally complete provider facts. Runtime admission is narrower.
+fn validate_personal_oauth(connector: &Connector, method: &AuthMethod, problems: &mut Vec<String>) {
+    use crate::{OAuthRefreshPolicy, PersonalOAuthFlow};
+    let Some(spec) = &method.oauth2 else { return };
+    if spec.personal_flows.is_empty() {
+        return;
+    }
+    let services = connector.service_names();
+    let path = |value: &str| {
+        value.starts_with('/')
+            && value.len() > 1
+            && value.len() <= 1024
+            && !value.contains(['?', '#', '%', '\\'])
+            && value.bytes().all(|b| b.is_ascii_graphic())
+            && !value[1..]
+                .split('/')
+                .any(|s| s.is_empty() || s == "." || s == "..")
+    };
+    let endpoint = |value: &crate::OAuthEndpoint| {
+        services.contains(&value.service.as_str()) && path(&value.path)
+    };
+    let pointer = |value: &str| {
+        value.starts_with('/')
+            && value.len() <= 512
+            && value.bytes().all(|b| b.is_ascii_graphic())
+            && value.split('/').skip(1).all(|segment| {
+                !segment.is_empty()
+                    && segment.as_bytes().iter().enumerate().all(|(index, b)| {
+                        *b != b'~' || matches!(segment.as_bytes().get(index + 1), Some(b'0' | b'1'))
+                    })
+                    && ![
+                        "access_token",
+                        "refresh_token",
+                        "client_secret",
+                        "client_assertion",
+                        "device_code",
+                        "code_verifier",
+                    ]
+                    .contains(
+                        &segment
+                            .replace("~1", "/")
+                            .replace("~0", "~")
+                            .to_ascii_lowercase()
+                            .as_str(),
+                    )
+            })
+    };
+    let mut seen = Vec::new();
+    for admission in &spec.personal_flows {
+        let evidence = &admission.token_evidence;
+        let malformed = seen.contains(&admission.flow)
+            || !spec.client_id.is_empty()
+            || method.scheme != AuthScheme::Bearer
+            || !services.contains(&spec.endpoint.as_str())
+            || !path(&spec.token_path)
+            || !endpoint(&evidence.endpoint)
+            || !pointer(&evidence.scopes_pointer)
+            || evidence
+                .subject_pointer
+                .as_deref()
+                .is_some_and(|p| !pointer(p))
+            || evidence
+                .client_id_pointer
+                .as_deref()
+                .is_some_and(|p| !pointer(p))
+            || admission.refresh_policy == OAuthRefreshPolicy::Required
+                && !spec.grants.contains(&OAuthGrant::RefreshToken)
+            || match admission.flow {
+                PersonalOAuthFlow::AuthorizationCodePkce => {
+                    admission.redirect_shape.is_none()
+                        || admission.device_authorization_endpoint.is_some()
+                        || !spec.grants.contains(&OAuthGrant::AuthorizationCode)
+                        || !path(&spec.authorize_path)
+                }
+                PersonalOAuthFlow::DeviceAuthorization => {
+                    admission.redirect_shape.is_some()
+                        || !admission
+                            .device_authorization_endpoint
+                            .as_ref()
+                            .is_some_and(endpoint)
+                        || !spec.grants.contains(&OAuthGrant::DeviceAuthorization)
+                }
+            };
+        if malformed {
+            problems.push(format!("credential {:?} has invalid personal_flows: require unique flows, matching grants, declared service/path endpoints, value-free JSON Pointer evidence and no registration values", method.name));
+        }
+        seen.push(admission.flow);
+    }
+}
+
 /// **A grant that carries a declared weakness must declare it** (C-440).
 ///
 /// The closed [`AuthHazard`] vocabulary is only worth having if a connector cannot opt out of it by
@@ -482,6 +572,7 @@ pub(super) fn validate_credentials(connector: &Connector, problems: &mut Vec<Str
         validate_one_credential_acquisition(connector, method, problems);
         validate_one_credential_token_endpoint(connector, method, problems);
         validate_one_credential_scope_response_pointer(method, problems);
+        validate_personal_oauth(connector, method, problems);
         validate_one_credential_hazard(method, problems);
         validate_one_credential_workarounds(method, problems);
         for key in method.env.iter().chain(&method.user_env) {

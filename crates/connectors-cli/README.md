@@ -56,6 +56,46 @@ pagination cursors also belong to its process generation. These commands refuse 
 command instead of returning a handle that dies on exit. `connectors inspect doctor` names this
 distinction.
 
+## Repair authentication for an intended operation
+
+Operation commands default to `b10x.connector-operation.v0alpha3`. An admitted authentication need is a
+nonzero-exit `authentication_required` refusal with `attempt: not_attempted` and
+`next_action: start_trusted_remediation`. It does not retry the operation or renew an Identity
+login. Structured output retains the closed authentication need, attempt and next action;
+daemon messages, labels, references and private instructions are absent from this projection.
+Existing v2 rate-limit details and `outcome_unknown` remain distinct refusals. For interoperability with a v2 daemon, select `connectors operation --protocol-version v2 …`;
+`--protocol-version v3` explicitly selects the default. The selection applies to operation
+commands, including one-shot calls, and does not change Connection remediation v2. The CLI
+sends exactly the selected contract without negotiation, fallback or resend. Unknown versions
+are refused before input or socket access.
+
+For a configured personal OAuth Connection, select the intended operation and Connection together:
+
+```sh
+connectors setup connect \
+  --operation '<operation-ref>' --connection '<connection-ref>' \
+  --input-file ./intended-input.json \
+  --config /absolute/path/connectors.toml --state-root /absolute/owner-only/state/root
+```
+
+This mode requires a persistent personal daemon. Provider, label, profile, credential, instance,
+route and enrollment overrides are not accepted with the bound selectors. Input may instead use
+`--input-json` or `--input -`; each source is bounded to 64 KiB. Hosted bound acquisition remains
+unsupported. The hosted operation client still uses its existing invoke scope and renews only for
+Identity HTTP 401, never for a provider authentication HTTP 409.
+
+Human URLs and device codes go only to the controlling terminal, or to a new owner-only file
+selected with `--instruction-file` in a private directory. They never enter command output.
+The private file is cleared on success, refusal, deadline or client cancellation; stopping the
+client does not send a protocol cancellation, and the daemon owns bounded session cleanup.
+
+The client polls the bound session, acknowledges readiness once, obtains fresh Connection and
+operation descriptions, validates the original input against the current schema without external
+schema retrieval, and stops. Its public success is `ready: true`, `attempt: not_attempted`, and
+`next_action: explicit_invoke`. A separate explicit invocation still requires a current description
+and ordinary grant admission. An acknowledgement response loss or changed schema never triggers
+an automatic invoke or a second acknowledgement.
+
 ## Administer a hosted Integration
 
 Hosted GitLab, Slack, and Jira registrations are activated by value-free deployment configuration.

@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 35
+revision: 36
 ---
 ## Authorization and objective
 
@@ -3376,3 +3376,13 @@ The complete Atlas fence at that same commit ran149passing Rust tests, with cata
 Verification-report cli-schema3-publication-gate-20260906 retains the complete implementor report at900fac0a. All12workspaces and13test configurations passed:2244test executions,0failures,27existing ignored. All13strict Clippy configurations,12fmt/metadata lanes, deterministic catalog/bundle checks, final link/story/ESS/projection, release identity refusal and exactcandidate/public-ref history scan passed. Root verified all719immutable evidence files and exact raw-to-portable prefix-only equality. Portable report SHA256840c6cde65142a54a72c633dddc6bed119a732d3d25138d0560bc5b5a0837b8c; manifest SHA256774a4d4e5a950e7d66a10530cc6163f492f55d95af0be6d77a60685e3b1413fb.
 
 GitLab schedules and rate-limit stories now record their named test_result and implemented transition. Retained review counts, original red observations, exact SQL formatter correction and both resource interruptions remain intact. The only subsequent candidate edits are planning closure and current Atlas citation records; all998nonplanning source bytes remain frozen. The final planning HEAD needs its own unchanged history/link/story refresh before publication. Actual sourcePR/CI/main merge, deterministic documentation delivery and final supported-source installation remain coordinator work. Schema4/OAuth/auth-remediation are separate unfinished units, and the credentials unit stays held after two red reviews.
+
+## Publication continuation — 2026-09-07
+
+The same approved CLI wave continues from public main 0c69450921ab1794c81dadec915b717a61bf0983. The coordinator carries the tested nonplanning source into this isolated publication checkout and records its exact content equivalence before CI. Raw execution records and the original implementation branches remain preserved separately. Published branch history is not rewritten. This public store keeps its existing journal prefix and records current scope and evidence through AEP.
+
+Seven selected stories already reached published main. Personal OAuth passed its two ordinary reviews; the first whole-authentication review is running against the frozen identical source. The several-credentials story remains held under its existing decision blocker. No version bump, release tag, live provider action or additional credential-store support is authorized here. Source publication, normal documentation delivery, supported source installation and the two already authorized daemon replacements remain in the approved delivery sequence.
+
+Current source includes Operation v3 default with explicit operation-only v2, Connection v2 bound remediation, schema4 with matching readers, and development-only GitLab public PKCE/device authorization through a dedicated unsealed store. Hosted remediation remains Unsupported after admission where no acquisition owner exists. Protected instructions stay outside model output; completion ends with fresh validation and an explicit new invocation. Full affected local gates pass: server115, runtime455 per default/no-default configuration with two existing PostgreSQL ignores, console107, CLI140, strict affected checks and the final catalog/Markdown/story/ESS gate. Initial root1301pass/2fail/4oldignores was closed by full affected server115 and catalog-cli14 rechecks. Complete sharded CI and auth review remain pending.
+
+Exact runtime final seal: eba21e5f93152eb0aacd01dadf31a19569401421c8a8397f3b09216d11ed7b04 (179 members). Exact client final seal:334ab4c9adf141862dcb9a701e930f80dcdf909dfb3a1c1142dc75af3c8fcae7 (95 members). All first failures remain in those records. Counts describe executed cases per command, not a unique aggregate. Future review results are recorded in full before any findings are routed.

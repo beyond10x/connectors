@@ -6,6 +6,59 @@ domain: connectors.runtime
 summary: The unit of authority, the granted executions that run under it, the live sessions those executions open, and the record every one of them leaves.
 
 types:
+
+  # Operation v0alpha3 value vocabulary from `crates/protocol/src/operation/v3.rs`;
+  # CredentialReadiness is the internal observation in `crates/service/src/remediation.rs`.
+  # These values leave the retained rate v0alpha2 identity unchanged. Runtime admission
+  # and safe presentation are separate Rust obligations, not guarantees of these field types.
+  - name: connectors.runtime.CredentialReadiness
+    kind: enum
+    variants: [Ready, MissingCredential, CredentialDegraded, DependencyUnavailable, Unsupported]
+
+  - name: connectors.runtime.AuthenticationNeed
+    kind: enum
+    variants: [AuthorizeConfigured, ReauthorizeExisting]
+
+  - name: connectors.runtime.AuthenticationAttemptState
+    kind: enum
+    variants: [NotAttempted]
+
+  - name: connectors.runtime.AuthenticationNextAction
+    kind: enum
+    variants: [StartTrustedRemediation]
+
+  # Typed authentication coordinates; there is no dedicated URL, session capability,
+  # registration or input field. A valid reference String is not itself trusted output:
+  # the receiver must bind it to actual metadata and the public presenter must omit it
+  # or bind it to the exact trusted request. Do not copy arbitrary daemon text into public output.
+  - name: connectors.runtime.AuthenticationRequired
+    kind: struct
+    fields:
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: need
+        type: connectors.runtime.AuthenticationNeed
+      - name: attempt
+        type: connectors.runtime.AuthenticationAttemptState
+      - name: next_action
+        type: connectors.runtime.AuthenticationNextAction
+
+  # Rust admission/preflight owners: `crates/server/src/hosted/remediation.rs` and
+  # `crates/server/src/local.rs`; the actual ordering controls live in
+  # `crates/server/src/hosted/tests/remediation.rs`. Closed public projections belong to
+  # `crates/connectors-console/src/output.rs` and `crates/server/src/hosted/mcp/toolset.rs`.
+  # UNMAPPED: only an authenticated, grant-admitted configured binding may yield this
+  # response, before provider dispatch or approval/event-claim consumption. Unknown,
+  # unadmitted, transport-failed and outcome-unknown paths do not manufacture remediation.
+  # UNMAPPED: strict error-code/payload co-presence, non-retriable downgrade, output
+  # allowlisting and no automatic resend are new-version reader/adapter obligations.
+
   - name: connectors.runtime.ConditionalRateAdvice
     kind: struct
     fields:

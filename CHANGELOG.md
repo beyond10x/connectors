@@ -11,16 +11,33 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
-- Catalog write descriptions now use any admitting connection instead of being hidden by an
-  earlier read-only connection. Search and describe report required approval for writes, matching
-  the operation protocol; invocation still validates the explicitly selected connection.
-- Add ConnectorOperation v0alpha2 with structured `rate_limited` refusals, optional trusted
-  `retry_after_seconds`, and source-grounded rate advice. Continue serving v0alpha1 with explicit
-  loss of the new fields; neither a delay nor version negotiation triggers an invocation resend.
-- Move the canonical catalog producer, schema, pack reader and resolver together to schema 3.
-  Explicit request-semantics profiles preserve supported source constraints and omission versus
-  null for migrated operations; conditional rate metadata stays advisory. Keep the schema-2
-  artifact frozen and require matching readers before loading a schema-3 pack.
+- Catalog write discovery now considers every admitting Connection, so an earlier read-only
+  placement cannot hide a writable one. Search and describe report required approval; invoke
+  still checks the explicitly selected Connection.
+- Default operation, Connection and event commands to the local target regardless of saved hosted
+  login. Use `--target hosted` explicitly; incompatible local configuration flags are refused.
+- Run bounded operation search, describe, invoke and Connection metadata reads without a daemon
+  when its socket is absent. Stateful sessions, activation and event flows still require
+  `connectors serve local`; uncertain transport outcomes never trigger a fallback invocation.
+- Add `kubernetes.namespace.list` and `kubernetes.workload.list` for activated Connections,
+  returning admitted namespaces and Deployments with container images and desired/ready replicas.
+- Expose personal GitLab Connections and four source-grounded pipeline-schedule operations:
+  list, create, update and delete. Preserve the official request schemas, including inputs and
+  omitted versus null fields; mutations require the selected Connection's write admission.
+- Treat a consumer closing a successful output pipe as normal completion across output formats.
+  Protocol refusals and other output failures remain failures.
+- Add Operation v0alpha2 structured `rate_limited` refusals, optional trusted retry delay and
+  source-grounded advisory rate metadata. Retain v1 with explicit loss of the new fields;
+  neither advice nor version selection resends an invocation.
+- Advance the canonical catalog and matching readers to schema 4 for personal OAuth declarations,
+  retaining schema 3 request-semantics/rate behavior and frozen schema 2 and 3 artifacts.
+- Add explicitly configured GitLab public PKCE and device authorization, token-info verification,
+  refresh and durable recovery through one dedicated OAuth store. This initial personal custody
+  is unsealed and development-only; private instructions use a terminal or owner-only file.
+- **Auth review pending:** default operations to v0alpha3 with typed `authentication_required`
+  refusals. Trusted local setup binds remediation to the intended operation and Connection, then
+  stops ready for a separate explicit invocation. `operation --protocol-version v2` retains
+  explicit interoperability; no negotiation, automatic session creation or invocation replay.
 
 ## 0.6.5 — 2026-09-05
 

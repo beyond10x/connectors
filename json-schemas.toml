@@ -15,6 +15,9 @@ path = "catalog/connector-document.schema.json"
 path = "catalog/connector-document-v3.schema.json"
 
 [[schema]]
+path = "catalog/connector-document-v4.schema.json"
+
+[[schema]]
 path = "crates/connector-spec/schema/provider-toml.schema.json"
 
 [[schema]]
@@ -70,7 +73,7 @@ path = "crates/server/src/hosted/docs/openapi.schema.json"
 
 [[document]]
 pattern = "catalog/*.catalog.json"
-schema = "catalog/connector-document-v3.schema.json"
+schema = "catalog/connector-document-v4.schema.json"
 
 [[document]]
 path = "fixtures/substrate-wire-0.1.0-axis-projection.json"
@@ -295,4 +298,32 @@ schema = "contracts/connector-operation/v0alpha2/vectors.schema.json"
 
 [[document]]
 path = "contracts/connector-operation/v0alpha2/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha3/connector-operation.schema.json"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha3/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha3/vectors.json"
+schema = "contracts/connector-operation/v0alpha3/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha3/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[schema]]
+path = "contracts/connector-connection/v0alpha2/connector-connection.schema.json"
+
+[[schema]]
+path = "contracts/connector-connection/v0alpha2/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-connection/v0alpha2/vectors.json"
+schema = "contracts/connector-connection/v0alpha2/vectors.schema.json"
+
+[[document]]
+path = "contracts/connector-connection/v0alpha2/bundle.json"
 schema = "contracts/artifact-bundle.schema.json"

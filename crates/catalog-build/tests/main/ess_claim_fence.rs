@@ -634,19 +634,17 @@ fn hosted_failed_writers() -> Vec<String> {
 
 /// **The hosted registry never reaches `Failed`, and the document says so in those words.**
 ///
-/// `ess/system/domains/connection.yaml` states, of the `ConnectSession` marker, that "nothing
-/// under `crates/integration-catalog/src` ever assigns `ConnectSessionState::Failed`" and that
-/// `Failed` "is written only by the other registry, at
-/// crates/service/src/connect_session.rs:233". Both halves are asserted, and the sentence itself
+/// `ess/system/domains/connection.yaml` states that the hosted registry does not assign
+/// `ConnectSessionState::Failed`, while the service lifecycle owns that assignment. Both halves
+/// are asserted against the named service function, and the sentence itself
 /// is asserted to be there: an earlier revision of this check read
 /// `!declared.contains(claim) || !writers.is_empty()`, which was vacuous once the claim left the
 /// document and, had the guard been dropped, would have asserted the *opposite* of what the
 /// corrected document says.
 fn hosted_failed_refusals(declared: &str, writers: &[String], other_registry: &str) -> Vec<String> {
-    const CLAIM: &str = "nothing under `crates/integration-catalog/src` ever assigns \
-                         `ConnectSessionState::Failed`";
-    const ELSEWHERE: &str = "`Failed` is written only by the other registry, at \
-                             crates/service/src/connect_session.rs:233";
+    const CLAIM: &str = "The hosted registry does not assign `ConnectSessionState::Failed`";
+    const ELSEWHERE: &str =
+        "by the service lifecycle's `finish` and `fail_pending` over its own map";
     let prose = prose(declared);
     let mut refusals = Vec::new();
     if !prose.contains(CLAIM) {
@@ -671,8 +669,8 @@ fn hosted_failed_refusals(declared: &str, writers: &[String], other_registry: &s
     }
     if !other_registry.contains("state = ConnectSessionState::Failed") {
         refusals.push(
-            "crates/service/src/connect_session.rs:233 no longer assigns \
-             `ConnectSessionState::Failed`, so the document cites a line that does not write it"
+            "crates/service/src/connect_session.rs fail_pending no longer assigns \
+             `ConnectSessionState::Failed`, so the document cites an owner that does not write it"
                 .to_owned(),
         );
     }
@@ -684,7 +682,8 @@ fn the_hosted_registry_never_reaches_the_state_its_marker_says_it_cannot() {
     let root = workspace_root();
     let declared = read(&root, "ess/system/domains/connection.yaml");
     let other = read(&root, "crates/service/src/connect_session.rs");
-    let line = other.lines().nth(232).unwrap_or("").to_owned();
+    let (_, _, line) = item(&other, "pub fn fail_pending(&mut self) -> Vec<String> {")
+        .expect("named service lifecycle owner");
     let refusals = hosted_failed_refusals(&declared, &hosted_failed_writers(), &line);
     assert!(refusals.is_empty(), "{}", refusals.join("\n  "));
 }
@@ -696,7 +695,8 @@ fn the_hosted_failed_claim_is_refused_from_either_side() {
     let root = workspace_root();
     let declared = read(&root, "ess/system/domains/connection.yaml");
     let other = read(&root, "crates/service/src/connect_session.rs");
-    let line = other.lines().nth(232).unwrap_or("").to_owned();
+    let (_, _, line) = item(&other, "pub fn fail_pending(&mut self) -> Vec<String> {")
+        .expect("named service lifecycle owner");
 
     let writer = vec!["crates/integration-catalog/src/hosted.rs:900".to_owned()];
     assert!(
@@ -705,11 +705,15 @@ fn the_hosted_failed_claim_is_refused_from_either_side() {
          says nothing writes one, and the fence raised nothing"
     );
 
-    let silent = declared.replace("ever assigns `ConnectSessionState::Failed`", "");
+    let silent = declared.replace("does not assign `ConnectSessionState::Failed`", "");
     assert_ne!(silent, declared, "the deletion has to change the text");
     assert!(
         !hosted_failed_refusals(&silent, &[], &line).is_empty(),
         "the sentence this check exists for was deleted from the document and the fence raised \
          nothing, which is exactly how the shipped assertion passed"
+    );
+    assert!(
+        !hosted_failed_refusals(&declared, &[], "").is_empty(),
+        "a missing service Failed assignment must refuse even when the model prose remains"
     );
 }

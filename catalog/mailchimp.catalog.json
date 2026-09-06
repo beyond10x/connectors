@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "Mailchimp Marketing API key, granting whatever the account that issued it can do. Travels as `Authorization: Bearer <key>`, the alternative Mailchimp documents beside its Basic form. The key's trailing `-us14`-style suffix names the account's datacentre; that value is asked for separately as configuration and is never read back out of this credential",
@@ -1096,7 +1096,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "3.0",

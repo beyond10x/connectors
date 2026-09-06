@@ -6,6 +6,127 @@ domain: connectors.connection
 summary: An authorized instance of an integration, the channel it supervises, and the connect sessions, candidates and observations that produce one.
 
 types:
+
+  # Connection v0alpha2 values from `crates/protocol/src/connection_v2.rs`, with the
+  # private RemediationBinding in `crates/service/src/remediation.rs`. The existing
+  # ConnectSession identity/lifecycle remains; there is no durable remediation entity.
+  - name: connectors.connection.RemediationResumeState
+    kind: enum
+    variants: [Pending, Ready, Consumed, Expired, Failed]
+
+  - name: connectors.connection.RemediationNextAction
+    kind: enum
+    variants: [FreshDescriptionThenExplicitInvoke]
+
+  # Private bounded value associated with an existing session; never an authority token.
+  - name: connectors.connection.RemediationBinding
+    kind: struct
+    fields:
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: need
+        type: connectors.runtime.AuthenticationNeed
+      - name: canonical_input_sha256
+        type: String
+      - name: stable_authority_sha256
+        type: String
+      - name: grant_ref
+        type: connectors.runtime.GrantRef
+      - name: grant_revision
+        type: Optional<Integer>
+      - name: admission_policy_sha256
+        type: String
+      - name: expires_at_unix_ms
+        type: Integer
+
+  # Value-only part of a trusted control-plane response; the reused ConnectSessionStatus
+  # endpoint projection is intentionally not replicated as arbitrary String URL fields.
+  - name: connectors.connection.BoundRemediationStatus
+    kind: struct
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: need
+        type: connectors.runtime.AuthenticationNeed
+      - name: session_state
+        type: connectors.connection.ConnectSession.State
+      - name: expires_at_unix_ms
+        type: Integer
+      - name: resume_state
+        type: connectors.connection.RemediationResumeState
+
+  - name: connectors.connection.RemediationAcknowledgement
+    kind: struct
+    fields:
+      - name: connect_session_ref
+        type: connectors.connection.ConnectSessionRef
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: next_action
+        type: connectors.connection.RemediationNextAction
+
+  # Rust session/custody binding owner: `crates/integration-catalog/src/oauth_remediation.rs`,
+  # exercised by `crates/integration-catalog/src/oauth_remediation_tests.rs` and the actual
+  # local transport in `crates/connectors-runtime/tests/personal_oauth.rs`. The status-only
+  # policy check does not grant acquisition, publication or acknowledgement after expiry.
+  # UNMAPPED: existing session state plus a one-time acknowledgement bit derives resume
+  # state; these enum variants add no ConnectSession lifecycle transition. Completion,
+  # acknowledgement and request races need Rust tests, not invented ESS causation.
+  # UNMAPPED: exact authenticated owner/realm/binding/profile and current Grant checks;
+  # one-integration completion; descriptor/evidence freshness; expiry and capacity bounds;
+  # no saved raw inputs, token material or ambient authority; trusted-only endpoint access.
+  # UNMAPPED: v1 can select only one unambiguous configured owner/integration/profile
+  # binding. v2 explicit target selection is a distinct migration, not label authority.
+  # UNMAPPED: RemediationAdmission and RemediationAuthority are process-local Rust
+  # admission capabilities, not serializable domain records or dispatch proofs. Their
+  # actual policy owner must admit and recheck operation plus management authority;
+  # an exported digest or these typed values cannot represent that executable capability.
+
+
+  # Proposed transient value vocabulary, design 21 (2026-09-06). Existing ConnectSession
+  # identity, Pending/Completed/Expired/Failed lifecycle and Connection wire are reused.
+  - name: connectors.connection.OAuthInstructionKind
+    kind: enum
+    variants: [BrowserAuthorization, DeviceAuthorization]
+
+  - name: connectors.connection.PersonalOAuthSessionPolicy
+    kind: struct
+    fields:
+      - name: flow
+        type: connectors.catalog.PersonalOAuthFlow
+      - name: browser_placement
+        type: connectors.deployment.OAuthBrowserPlacement
+      - name: instruction_kind
+        type: connectors.connection.OAuthInstructionKind
+
+  # Safe internal classifications, not new protocol error codes or model-tool payloads.
+  - name: connectors.connection.OAuthCompletionRefusal
+    kind: enum
+    variants: [FlowNotAdmitted, BrowserPlacementMismatch, PortInUse, StateMismatch, HostMismatch, OriginRefused, MalformedCallback, PkceBindingMismatch, CodeExchangeRefused, DeviceDenied, DeviceExpired, CustodyUnavailable]
+
+  # UNMAPPED: one-shot state consumption, bounded callback/device work, expiry versus
+  # durable commit-decision linearization, recovery, task/listener cancellation and
+  # terminal instruction removal. Existing lifecycle owners must enforce these in Rust.
+  # UNMAPPED: trusted outer-control URL access versus model/inner-tool redaction and
+  # remediation only for an already resolved/admitted stable Connection. No new wire
+  # field, endpoint, durable session entity, or unknown-Connection creation is asserted.
+
   # Every identity below is an opaque `String` reference in the protocol; the wire names are the
   # field names of the value-free summaries in `crates/protocol/src/connection.rs`.
   - name: connectors.connection.ConnectionRef
@@ -196,20 +317,19 @@ entities:
   # States: crates/protocol/src/connection.rs:259-263 (`ConnectSessionState`).
   # Two registries perform these moves, not one, and the transitions below are the union of what
   # both do:
-  #   `crates/service/src/connect_session.rs` — created `Pending` (line 154), `Completed`
-  #   (line 209), `Expired` (line 214), `Failed` (line 215 in `finish`, line 233 in
-  #   `fail_pending`). Both movers guard on `Pending` first: `finish` at line 204, `fail_pending`
-  #   at line 228.
-  #   `crates/integration-catalog/src/hosted.rs` — `Expired` (guarded on `Pending`) and `Completed`,
-  #   reached from
-  #   `crates/connectors-runtime/src/registry.rs:514`.
+  #   `crates/service/src/connect_session.rs` — `reserve_endpoints` creates `Pending` at312;
+  #   `finish` at358 maps `Completed` at372, `Expired` at377 and `Failed` at378. It requires
+  #   `Pending` and no unresolved completion at367. `fail_pending` at388 applies the same guard
+  #   at391 before assigning `Failed` at396. Guarded completion resolves through the same owner.
+  #   `crates/integration-catalog/src/hosted.rs` — `Expired` at388 (guarded on `Pending` at387)
+  #   and `Completed` at771, through `complete_hosted_session` at729 and the runtime registry.
   # `complete_hosted_session` guards on `Pending` before it releases the session lock and re-checks
   # that state after credential verification and custody have awaited, immediately before writing
   # `Completed`. A concurrent expiry therefore remains terminal instead of being overwritten.
-  # `Failed` is not part of this: nothing under `crates/integration-catalog/src`
-  # ever assigns `ConnectSessionState::Failed`, and the hosted map is built empty at
-  # crates/integration-catalog/src/hosted.rs:181 — `Failed` is written only by the other registry,
-  # at crates/service/src/connect_session.rs:233, over its own map.
+  # The hosted registry does not assign `ConnectSessionState::Failed`; that state is assigned
+  # by the service lifecycle's `finish` and `fail_pending` over its own map. These citations
+  # were refreshed against integrated source9c6ce892 after the private custody lifecycle moved
+  # the earlier service line anchors; no transition or lifecycle identity changed.
   # Fields: `ConnectSessionStatus`, crates/protocol/src/connection.rs:272-284.
   - name: connectors.connection.ConnectSession
 
@@ -505,14 +625,16 @@ commands:
         payload:
           connectors.connection.ConnectSessionCreated:
             integration_ref: input.integration_ref
-        summary: A single-purpose acquisition session is open (crates/service/src/connect_session.rs:150-160).
+        summary: A single-purpose acquisition session is open (crates/service/src/connect_session.rs:308-322).
       - name: at-capacity
         external: the bounded pending set is already at `maximum_pending`
         error: connectors.connection.ConnectSessionCapacity
-        summary: The bounded pending set is full and nothing was created (crates/service/src/connect_session.rs:141-149).
+        summary: The bounded pending set is full and nothing was created (crates/service/src/connect_session.rs:299-306).
 
-  # `finish` at crates/service/src/connect_session.rs:195-222 is the one function that performs
-  # every terminal move, and `fail_pending` (lines 225-236) reaches the same `fail`.
+  # `finish` at crates/service/src/connect_session.rs:358-384 applies terminal moves after
+  # checking Pending and unresolved completion. `resolve_completion` (lines 190-221) delegates
+  # to it after the custody decision; `fail_pending` (lines 388-399) selects the same fail state
+  # only when no completion decision remains unresolved.
   # UNMAPPED: the command name is this document's. No `ConnectionRequest` variant
   # (crates/protocol/src/connection.rs:35-48) finishes a session; the caller-visible surface is
   # `ConnectSessionStatus` (line 47), which reads and does not move. Settled by the completion
@@ -538,7 +660,7 @@ commands:
         payload:
           connectors.connection.ConnectSessionExpired:
             connect_session_ref: input.connect_session_ref
-        summary: The session expired without acquiring anything (crates/service/src/connect_session.rs:214).
+        summary: The session expired without acquiring anything (crates/service/src/connect_session.rs:377).
       - name: failed
         external: the acquisition attempt failed, or the process shut down with the session still pending
         moves: connectors.connection.ConnectSession.fail
@@ -547,11 +669,11 @@ commands:
         payload:
           connectors.connection.ConnectSessionFailed:
             connect_session_ref: input.connect_session_ref
-        summary: The session failed (crates/service/src/connect_session.rs:215, 225-236).
+        summary: The session failed (crates/service/src/connect_session.rs:378, 388-399).
       - name: not-pending
         wrong_state: true
         error: connectors.connection.ConnectSessionNotPending
-        summary: The session is already terminal and nothing moved (crates/service/src/connect_session.rs:204-205).
+        summary: The session is already terminal and nothing moved (crates/service/src/connect_session.rs:367-368).
 
   # crates/protocol/src/connection.rs:38-39 (`ConnectionRequest::CandidateActivate`) and its
   # request shape at crates/protocol/src/connection.rs:60-64.

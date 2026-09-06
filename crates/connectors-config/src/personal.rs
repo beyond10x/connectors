@@ -134,6 +134,9 @@ pub struct CatalogIntegrationConfig {
     /// file is never read again, so it can be deleted afterwards.
     #[serde(default)]
     pub credential_file: Option<PathBuf>,
+    /// Explicit personal OAuth acquisition into the dedicated prepared store.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth: Option<crate::personal_oauth::PersonalOAuthRegistration>,
 }
 
 impl CatalogIntegrationConfig {
@@ -149,28 +152,6 @@ impl CatalogIntegrationConfig {
         self.label
             .clone()
             .unwrap_or_else(|| self.instance().to_owned())
-    }
-
-    pub(crate) fn validate(&self) -> Result<(), ConfigError> {
-        if self.provider.is_empty()
-            || !config_ref(&self.grant_ref, 512)
-            || matches!(self.initiation, InitiationConfig::Provider)
-            || self
-                .credential_file
-                .as_deref()
-                .is_some_and(|path| !path.is_absolute())
-        {
-            return Err(ConfigError::Invalid);
-        }
-        // A user half is a credential *name* and a printable account identifier, both bounded.
-        // Refused here rather than at assembly time so a configuration that cannot work is a
-        // configuration the daemon never starts on.
-        for (credential, user) in &self.usernames {
-            if !config_ref(credential, 256) || !config_ref(user, 512) {
-                return Err(ConfigError::Invalid);
-            }
-        }
-        Ok(())
     }
 }
 
@@ -1305,7 +1286,7 @@ fn signaling_target(value: &str) -> Result<SipSignalingTarget, ConfigError> {
     })
 }
 
-fn config_ref(value: &str, maximum: usize) -> bool {
+pub(super) fn config_ref(value: &str, maximum: usize) -> bool {
     !value.is_empty() && value.len() <= maximum && value.bytes().all(|byte| byte.is_ascii_graphic())
 }
 

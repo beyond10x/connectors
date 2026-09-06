@@ -218,6 +218,122 @@ pub enum OAuthGrant {
     RefreshToken,
     /// Two-legged client-credentials grant (no user).
     ClientCredentials,
+    /// RFC 8628 device authorization. Token exchange uses its full standardized grant URN.
+    DeviceAuthorization,
+}
+
+/// A personal acquisition explicitly admitted by the provider; absence admits no personal flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PersonalOAuthFlow {
+    /// Authorization code with PKCE S256.
+    AuthorizationCodePkce,
+    /// RFC 8628 device authorization.
+    DeviceAuthorization,
+}
+
+/// Authentication at the token endpoint, stated independently for each flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthClientAuthentication {
+    /// No client secret is issued or used.
+    Public,
+    /// A deployment-owned client secret is posted to the token endpoint.
+    ClientSecretPost,
+}
+
+/// Provider-supported redirect shape; this is not a deployment redirect value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthRedirectShape {
+    /// Fixed numeric IPv4 loopback over HTTP.
+    LoopbackIpv4Http,
+    /// A vendor's literal localhost exception.
+    LocalhostHttp,
+    /// An exactly registered HTTPS callback.
+    RegisteredHttps,
+}
+
+/// Whether the provider permits this registration shape in production.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthRegistrationUse {
+    /// Development only; custody may impose additional restrictions.
+    DevelopmentOnly,
+    /// Provider permits development and production registrations.
+    ProductionAllowed,
+}
+
+/// Whether a successful acquisition must issue a refresh token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthRefreshPolicy {
+    /// Missing refresh issuance refuses publication.
+    Required,
+    /// Access-only acquisition is valid until its finite expiry.
+    IfIssued,
+}
+
+/// Auth-flow endpoint resolved through a declared service and its admitted destination policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OAuthEndpoint {
+    /// Declared service name, never a URL.
+    pub service: String,
+    /// Absolute endpoint path; no origin, query or fragment.
+    pub path: String,
+}
+
+/// Shape of observed scopes in an authenticated token-info response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthScopeEncoding {
+    /// A space-separated string.
+    SpaceDelimited,
+    /// A comma-separated string.
+    CommaDelimited,
+    /// An array of strings.
+    StringArray,
+}
+
+/// Authenticated capability evidence; never inferred from requested scopes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OAuthTokenEvidence {
+    /// GET endpoint authenticated with the newly acquired Bearer token.
+    pub endpoint: OAuthEndpoint,
+    /// JSON Pointer to granted scopes.
+    pub scopes_pointer: String,
+    /// Declared representation of those scopes.
+    pub scope_encoding: OAuthScopeEncoding,
+    /// Optional JSON Pointer to the effective provider subject.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_pointer: Option<String>,
+    /// Optional JSON Pointer checked against the deployment's client id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id_pointer: Option<String>,
+}
+
+/// Provider facts admitting one personal OAuth flow. Registration values remain deployment data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PersonalOAuthAdmission {
+    /// Unique flow within the credential purpose.
+    pub flow: PersonalOAuthFlow,
+    /// Per-flow token endpoint authentication.
+    pub client_authentication: OAuthClientAuthentication,
+    /// Required for authorization code, forbidden for device authorization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redirect_shape: Option<OAuthRedirectShape>,
+    /// Provider restriction on registration use.
+    pub registration_use: OAuthRegistrationUse,
+    /// Required for device authorization, forbidden for authorization code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_authorization_endpoint: Option<OAuthEndpoint>,
+    /// Refresh issuance requirement.
+    pub refresh_policy: OAuthRefreshPolicy,
+    /// Authenticated observation required before custody publication.
+    pub token_evidence: OAuthTokenEvidence,
 }
 
 /// How a provider separates multiple OAuth scopes on the authorization request and in the
@@ -264,6 +380,13 @@ pub struct OAuthRedirect {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OAuth2Spec {
+    /// Explicit personal admissions; the legacy public-client flag never supplies a default.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_personal_flows",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub personal_flows: Vec<PersonalOAuthAdmission>,
     /// The declared endpoint name whose base URL the paths below resolve against — its host
     /// allow-list is what admits the token exchange through flux's egress gate.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -340,6 +463,22 @@ pub struct OAuth2Spec {
     /// axis, independent of grant, placement and subject.
     #[serde(default, skip_serializing_if = "is_false")]
     pub public_client: bool,
+}
+
+// Serde applies the field default only on omission, so an explicit empty list stays a refusal.
+fn deserialize_personal_flows<'de, D>(
+    deserializer: D,
+) -> Result<Vec<PersonalOAuthAdmission>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let flows = Vec::<PersonalOAuthAdmission>::deserialize(deserializer)?;
+    if flows.is_empty() {
+        return Err(serde::de::Error::custom(
+            "personal_flows must not be empty when supplied",
+        ));
+    }
+    Ok(flows)
 }
 
 impl OAuth2Spec {

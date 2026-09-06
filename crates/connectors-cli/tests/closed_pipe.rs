@@ -681,6 +681,9 @@ fn search_output(group: &str, format: &str, refused: bool, sink: Option<OwnedFd>
         .arg(fixture.root.join("connectors.toml"))
         .arg("--state-root")
         .arg(&fixture.root);
+    if group == "operation" {
+        command.args(["--protocol-version", "v2"]);
+    }
     if let Some(sink) = sink {
         command.stdout(sink);
     }

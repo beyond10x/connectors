@@ -1,8 +1,11 @@
 //! Versioned credential-free operation protocol.
 //!
-//! The current API is v0alpha2. Transport boundaries explicitly decode both supported versions
-//! and project responses to the requested identity; frozen v0alpha1 artifacts stay unchanged.
+//! The internal API remains v0alpha2. Additive v3 contracts and three-version adapters are
+//! explicit modules; all predecessor readers and artifacts stay unchanged.
 pub mod legacy;
 pub mod schema;
+pub mod schema_v3;
+pub mod v3;
+pub mod versions;
 pub mod wire;
 pub use wire::*;

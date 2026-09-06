@@ -17,7 +17,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 use connectors_client::{AuthenticatedHostedClient, IdentityError, LocalClient, LoginOptions};
 use connectors_runtime::{
     default_config_path, default_state_root, local_socket_absent, validate_state_root,
-    HostedRuntime, PersonalConfig, PersonalRuntime, RuntimeError,
+    HostedRuntime, OneShotOperationV3Outcome, PersonalConfig, PersonalRuntime, RuntimeError,
 };
 use protocol::connection::{
     CandidateActivateRequest, CandidateSearchRequest, ConnectionRequest, MaterializeRequest,
@@ -32,7 +32,7 @@ use protocol::operation::{
 };
 
 use connectors_console::{
-    admin, auth, connect, doctor, enrol, init, input, output, reduce_envelope, Format,
+    admin, auth, connect, doctor, enrol, init, input, output, reduce_envelope, remediation, Format,
 };
 
 #[derive(Debug, Parser)]
@@ -98,11 +98,20 @@ enum Command {
         /// Deployment to reach. A saved login never changes the local default.
         #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
         target: Target,
+        /// Exact operation contract to send. There is no negotiation or fallback.
+        #[arg(long, value_enum, default_value_t = OperationVersion::V3, global = true)]
+        protocol_version: OperationVersion,
         #[command(subcommand)]
         command: OperationCommand,
     },
     /// Operate an Identity-protected hosted Connectors instance.
     Admin(admin::CommandOptions),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum OperationVersion {
+    V2,
+    V3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -150,7 +159,8 @@ enum SetupCommand {
     /// Add a provider through one guided, secret-safe flow.
     Connect {
         /// Provider to add. `connectors inspect providers` lists every one the catalogue declares.
-        provider: String,
+        #[arg(required_unless_present = "operation", conflicts_with = "operation")]
+        provider: Option<String>,
         /// Strict value-free deployment configuration.
         #[arg(long)]
         config: Option<PathBuf>,
@@ -166,6 +176,8 @@ enum SetupCommand {
         /// Which declared credential to supply.
         #[arg(long = "as")]
         credential: Option<String>,
+        #[command(flatten)]
+        oauth: Box<PersonalOAuthArgs>,
         /// A declared configuration value, as `field=value`. Repeatable.
         #[arg(long = "set", value_parser = enrol::parse_setting)]
         settings: Vec<(String, String)>,
@@ -192,6 +204,31 @@ enum SetupCommand {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+}
+
+#[derive(Debug, clap::Args)]
+struct PersonalOAuthArgs {
+    /// Start the configured personal OAuth credential purpose.
+    #[arg(long, conflicts_with = "credential")]
+    auth_profile: Option<String>,
+    /// Private OAuth instructions in a new owner-only file; otherwise use the controlling terminal.
+    #[arg(long)]
+    instruction_file: Option<PathBuf>,
+    /// Repair the configured Connection for this admitted operation; never invoke it automatically.
+    #[arg(long, requires_all = ["connection", "remediation-input"], conflicts_with_all = ["provider", "label", "context", "credential", "auth_profile", "settings", "allow", "operator_network", "credential_file", "instance"])]
+    operation: Option<String>,
+    /// Exact configured Connection to repair, paired with --operation.
+    #[arg(long, requires = "operation")]
+    connection: Option<String>,
+    /// Intended input, checked again against the fresh operation schema after acknowledgement.
+    #[arg(long, group = "remediation-input", requires = "operation")]
+    input_json: Option<String>,
+    /// Read the bounded intended input from a file.
+    #[arg(long, group = "remediation-input", requires = "operation")]
+    input_file: Option<PathBuf>,
+    /// Read bounded intended input from stdin; the only accepted value is `-`.
+    #[arg(long, group = "remediation-input", requires = "operation", value_parser = ["-"])]
+    input: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -821,6 +858,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 context,
                 state_root,
                 credential,
+                oauth,
                 settings,
                 allow,
                 operator_network,
@@ -831,6 +869,29 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 let state_root = state_root.map_or_else(default_state_root, Ok)?;
                 validate_state_root(&state_root)?;
                 let personal = PersonalConfig::read(&config_path)?;
+                if let (Some(operation_ref), Some(connection_ref)) =
+                    (oauth.operation, oauth.connection)
+                {
+                    if local_socket_absent(&state_root)? {
+                        return Err(remediation::RemediationError::DaemonRequired.into());
+                    }
+                    let input =
+                        remediation::read_input(oauth.input_json, oauth.input_file, oauth.input)?;
+                    let outcome = remediation::run(
+                        &personal,
+                        &state_root,
+                        protocol::connection_v2::RemediationStartRequest {
+                            operation_ref,
+                            connection_ref,
+                            input,
+                        },
+                        oauth.instruction_file.as_deref(),
+                    )
+                    .await?;
+                    emit(format, &outcome)?;
+                    return Ok(());
+                }
+                let provider = provider.ok_or(remediation::RemediationError::Configuration)?;
                 let options = enrol::Options {
                     credential,
                     values: settings.into_iter().collect(),
@@ -842,14 +903,18 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     acquire: enrol::acquires(&provider)
                         .then(|| connectors_runtime::argocd_acquisition(operator_network)),
                 };
-                let outcome = connect::dispatch(
+                let outcome = connect::dispatch_with_personal_oauth(
                     &provider,
                     &personal,
                     &config_path,
                     &state_root,
                     label,
                     context,
-                    options,
+                    connect::PersonalOAuthOptions {
+                        enrol: options,
+                        auth_profile: oauth.auth_profile,
+                        instruction_file: oauth.instruction_file,
+                    },
                 )
                 .await?;
                 emit(format, &outcome)?;
@@ -918,7 +983,11 @@ async fn run(cli: Cli) -> Result<(), MainError> {
         },
         Command::Connection { target, command } => connection(format, target, command).await,
         Command::Event { target, command } => event(format, target, command).await,
-        Command::Operation { target, command } => operation(format, target, command).await,
+        Command::Operation {
+            target,
+            protocol_version,
+            command,
+        } => operation(format, target, protocol_version, command).await,
         Command::Admin(command) => {
             complete_output(admin::run(format, command).await.map_err(Into::into))
         }
@@ -1086,7 +1155,11 @@ async fn connection(
         let response = AuthenticatedHostedClient::active()?
             .connection(request)
             .await?;
-        emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        emit_targeted(
+            format,
+            &reduce_envelope!(response, connection)?,
+            target.as_str(),
+        )?;
         return Ok(());
     }
     let config_path = config_path.map_or_else(default_config_path, Ok)?;
@@ -1106,7 +1179,11 @@ async fn connection(
             .connection(&config.owner_context(), request)
             .await?
     };
-    emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+    emit_targeted(
+        format,
+        &reduce_envelope!(response, connection)?,
+        target.as_str(),
+    )?;
     Ok(())
 }
 
@@ -1171,6 +1248,7 @@ async fn event(format: Format, target: Target, command: EventCommand) -> Result<
 async fn operation(
     format: Format,
     target: Target,
+    version: OperationVersion,
     command: OperationCommand,
 ) -> Result<(), MainError> {
     // Resolve conflicting placement options before any branch can acquire caller input. This
@@ -1251,38 +1329,70 @@ async fn operation(
         }
     };
     if target == Target::Hosted {
-        let response = AuthenticatedHostedClient::active()?
-            .operation(request)
-            .await?;
-        emit_targeted(
-            format,
-            &reduce_envelope!(response, operation)?,
-            target.as_str(),
-        )?;
+        let client = AuthenticatedHostedClient::active()?;
+        let value = match version {
+            OperationVersion::V2 => {
+                reduce_envelope!(client.operation_v2(request).await?, operation)?
+            }
+            OperationVersion::V3 => reduce_envelope!(client.operation(request).await?, operation)?,
+        };
+        emit_targeted(format, &value, target.as_str())?;
         return Ok(());
     }
     let config_path = config_path.map_or_else(default_config_path, Ok)?;
     let config = PersonalConfig::read(&config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    let response = if local_socket_absent(&state_root)? {
-        PersonalRuntime::one_shot_operation(
-            &config_path,
-            state_root,
-            config.owner_context(),
-            request,
-        )
-        .await?
+    let value = if local_socket_absent(&state_root)? {
+        match version {
+            OperationVersion::V2 => reduce_envelope!(
+                PersonalRuntime::one_shot_operation(
+                    &config_path,
+                    state_root,
+                    config.owner_context(),
+                    request,
+                )
+                .await?,
+                operation
+            )?,
+            OperationVersion::V3 => match PersonalRuntime::one_shot_operation_v3_outcome(
+                &config_path,
+                state_root,
+                config.owner_context(),
+                request,
+            )
+            .await?
+            {
+                OneShotOperationV3Outcome::Reply(response) => {
+                    reduce_envelope!(response, operation)?
+                }
+                OneShotOperationV3Outcome::RequiresDaemon(_) => {
+                    return Err(connectors_console::envelope::ReducedError {
+                        code: "unavailable".into(),
+                        message: "this operation requires a persistent daemon; run `connectors serve local` with the same --config and --state-root".into(),
+                        retriable: false,
+                        retry_after_seconds: None,
+                        authentication: None,
+                    }.into());
+                }
+            },
+        }
     } else {
         validate_state_root(&state_root)?;
-        LocalClient::new(state_root.join("connectors.sock"))
-            .operation(&config.owner_context(), request)
-            .await?
+        let client = LocalClient::new(state_root.join("connectors.sock"));
+        match version {
+            OperationVersion::V2 => reduce_envelope!(
+                client
+                    .operation_v2(&config.owner_context(), request)
+                    .await?,
+                operation
+            )?,
+            OperationVersion::V3 => reduce_envelope!(
+                client.operation(&config.owner_context(), request).await?,
+                operation
+            )?,
+        }
     };
-    emit_targeted(
-        format,
-        &reduce_envelope!(response, operation)?,
-        target.as_str(),
-    )?;
+    emit_targeted(format, &value, target.as_str())?;
     Ok(())
 }
 
@@ -1297,150 +1407,4 @@ fn read_config(path: Option<PathBuf>) -> Result<PersonalConfig, MainError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use clap::ValueEnum as _;
-
-    #[test]
-    fn normal_help_exposes_the_guided_flow_and_hides_acquisition_plumbing() {
-        let mut command = Cli::command();
-        for (group, leaf) in [("setup", "connect"), ("session", "login"), ("serve", "mcp")] {
-            let help = command
-                .find_subcommand_mut(group)
-                .unwrap()
-                .render_long_help()
-                .to_string();
-            assert!(help.contains(leaf), "`connectors {group}` hides `{leaf}`");
-            assert!(!help.contains("connect-complete"));
-        }
-
-        let connection = command.find_subcommand_mut("connection").unwrap();
-        let connection_help = connection.render_long_help().to_string();
-        assert!(connection_help.contains("list"));
-        assert!(!connection_help.contains("create"));
-        assert!(!connection_help.contains("status"));
-    }
-
-    /// The tree with every subcommand, at every depth, renamed to a probe that can come from
-    /// nowhere but the subcommand's own name — `probe_serve_hosted_end` — and the probes.
-    ///
-    /// Asserting that a script contains the *word* `hosted` proved nothing: the `serve` group's own
-    /// about-text carries it, and `connect` is a substring of the binary's name, so a deleted
-    /// variant left the assertion green. A probe is in the script only if the generator wrote that
-    /// node's name, and every node has a different one.
-    fn probed(tree: clap::Command, path: &[&str], probes: &mut Vec<String>) -> clap::Command {
-        let names: Vec<String> = tree
-            .get_subcommands()
-            .map(|subcommand| subcommand.get_name().to_owned())
-            .collect();
-        let mut tree = tree;
-        for name in names {
-            let mut here: Vec<&str> = path.to_vec();
-            here.push(&name);
-            let probe = format!("probe_{}_end", here.join("_"));
-            probes.push(probe.clone());
-            // `Command::name` takes a `&'static str`; a leaked probe is fine for a test.
-            let probe: &'static str = Box::leak(probe.into_boxed_str());
-            tree = tree.mut_subcommand(&name, |subcommand| {
-                probed(subcommand.name(probe), &here, probes)
-            });
-        }
-        tree
-    }
-
-    #[test]
-    fn every_supported_shell_gets_a_script_naming_the_whole_surface() {
-        let mut probes = Vec::new();
-        let tree = probed(Cli::command(), &[], &mut probes);
-        assert!(
-            probes.iter().any(|probe| probe == "probe_serve_hosted_end")
-                && probes.iter().any(|probe| probe == "probe_setup_connect_end")
-                && probes.len() >= 30,
-            "the tree was read as {probes:?}; it moved, so read it again before believing this test"
-        );
-        for shell in clap_complete::Shell::value_variants() {
-            let mut script = Vec::new();
-            clap_complete::generate(*shell, &mut tree.clone(), "connectors", &mut script);
-            let script = String::from_utf8(script).unwrap();
-            let missing: Vec<&String> = probes
-                .iter()
-                .filter(|probe| !script.contains(probe.as_str()))
-                .collect();
-            assert!(
-                missing.is_empty(),
-                "{shell} script does not name these subcommands: {missing:?}"
-            );
-        }
-        let cli = Cli::try_parse_from(["connectors", "setup", "completions", "fish"]).unwrap();
-        assert!(matches!(
-            cli.command,
-            Command::Setup {
-                command: SetupCommand::Completions {
-                    shell: clap_complete::Shell::Fish
-                }
-            }
-        ));
-    }
-
-    #[test]
-    fn slack_connect_needs_no_internal_reference_or_path_argument() {
-        let cli = Cli::try_parse_from(["connectors", "setup", "connect", "slack"]).unwrap();
-        let Command::Setup {
-            command:
-                SetupCommand::Connect {
-                    provider,
-                    config,
-                    label,
-                    context,
-                    state_root,
-                    ..
-                },
-        } = cli.command
-        else {
-            panic!("guided connect command was not parsed");
-        };
-        assert_eq!(provider, "slack");
-        assert!(label.is_none());
-        assert!(context.is_none());
-        assert!(config.is_none());
-        assert!(state_root.is_none());
-    }
-
-    #[test]
-    fn grafana_connect_uses_the_same_guided_surface() {
-        let cli = Cli::try_parse_from(["connectors", "setup", "connect", "grafana"]).unwrap();
-        let Command::Setup {
-            command: SetupCommand::Connect {
-                provider, label, ..
-            },
-        } = cli.command
-        else {
-            panic!("guided connect command was not parsed");
-        };
-        assert_eq!(provider, "grafana");
-        assert!(label.is_none());
-    }
-
-    #[test]
-    fn kubernetes_connect_accepts_an_exact_context_selection() {
-        let cli = Cli::try_parse_from([
-            "connectors",
-            "setup",
-            "connect",
-            "kubernetes",
-            "--context",
-            "dev-cluster",
-        ])
-        .unwrap();
-        let Command::Setup {
-            command: SetupCommand::Connect {
-                provider, context, ..
-            },
-        } = cli.command
-        else {
-            panic!("guided connect command was not parsed");
-        };
-        assert_eq!(provider, "kubernetes");
-        assert_eq!(context.as_deref(), Some("dev-cluster"));
-    }
-}
+mod tests;

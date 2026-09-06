@@ -172,6 +172,8 @@ struct RawScheme {
 #[derive(Deserialize)]
 struct RawOAuth2 {
     #[serde(default)]
+    personal_flows: Vec<crate::PersonalOAuthAdmission>,
+    #[serde(default)]
     endpoint: String,
     #[serde(default)]
     token_endpoint: String,
@@ -241,6 +243,8 @@ struct RawChoice {
 
 #[derive(Deserialize)]
 struct RawOperation {
+    #[serde(default)]
+    auth_requirements: Vec<crate::AuthRequirement>,
     #[serde(default)]
     rate_limit: Option<crate::RateLimit>,
     #[serde(default)]
@@ -647,6 +651,7 @@ fn build_operation(
                 .collect(),
         ),
         credentials: leak_requirements(raw.auth.clone()),
+        auth_requirements: leak_slice(raw.auth_requirements.clone()),
         credential_requirement: credential_requirement(raw),
         // HTTP reaches the operation's service host. A native driver has no HTTP destination: SIP's
         // exact signaling/media apertures and audio's exact device are selected from the Connection
@@ -746,6 +751,7 @@ fn acquisition(name: &str, raw: &RawAuth, mint: Option<&(&str, &str)>) -> Acquis
             );
         }
         return Acquisition::OAuth2(Box::leak(Box::new(OAuth2 {
+            personal_flows: leak_slice(oauth2.personal_flows.clone()),
             endpoint: leak_str(oauth2.endpoint.clone()),
             token_endpoint: leak_str(oauth2.token_endpoint.clone()),
             authorize_path: leak_str(oauth2.authorize_path.clone()),
@@ -806,6 +812,7 @@ fn oauth_grant(credential: &str, word: &str) -> OAuthGrant {
         "password" => OAuthGrant::Password,
         "refresh_token" => OAuthGrant::RefreshToken,
         "client_credentials" => OAuthGrant::ClientCredentials,
+        "device_authorization" => OAuthGrant::DeviceAuthorization,
         other => panic!("credential `{credential}` declares unknown OAuth2 grant `{other}`"),
     }
 }
