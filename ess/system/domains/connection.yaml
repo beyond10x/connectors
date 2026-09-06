@@ -308,20 +308,19 @@ entities:
   # States: crates/protocol/src/connection.rs:259-263 (`ConnectSessionState`).
   # Two registries perform these moves, not one, and the transitions below are the union of what
   # both do:
-  #   `crates/service/src/connect_session.rs` — created `Pending` (line 154), `Completed`
-  #   (line 209), `Expired` (line 214), `Failed` (line 215 in `finish`, line 233 in
-  #   `fail_pending`). Both movers guard on `Pending` first: `finish` at line 204, `fail_pending`
-  #   at line 228.
-  #   `crates/integration-catalog/src/hosted.rs` — `Expired` (guarded on `Pending`) and `Completed`,
-  #   reached from
-  #   `crates/connectors-runtime/src/registry.rs:514`.
+  #   `crates/service/src/connect_session.rs` — `reserve_endpoints` creates `Pending` at312;
+  #   `finish` at358 maps `Completed` at372, `Expired` at377 and `Failed` at378. It requires
+  #   `Pending` and no unresolved completion at367. `fail_pending` at388 applies the same guard
+  #   at391 before assigning `Failed` at396. Guarded completion resolves through the same owner.
+  #   `crates/integration-catalog/src/hosted.rs` — `Expired` at388 (guarded on `Pending` at387)
+  #   and `Completed` at771, through `complete_hosted_session` at729 and the runtime registry.
   # `complete_hosted_session` guards on `Pending` before it releases the session lock and re-checks
   # that state after credential verification and custody have awaited, immediately before writing
   # `Completed`. A concurrent expiry therefore remains terminal instead of being overwritten.
-  # `Failed` is not part of this: nothing under `crates/integration-catalog/src`
-  # ever assigns `ConnectSessionState::Failed`, and the hosted map is built empty at
-  # crates/integration-catalog/src/hosted.rs:181 — `Failed` is written only by the other registry,
-  # at crates/service/src/connect_session.rs:233, over its own map.
+  # The hosted registry does not assign `ConnectSessionState::Failed`; that state is assigned
+  # by the service lifecycle's `finish` and `fail_pending` over its own map. These citations
+  # were refreshed against integrated source9c6ce892 after the private custody lifecycle moved
+  # the earlier service line anchors; no transition or lifecycle identity changed.
   # Fields: `ConnectSessionStatus`, crates/protocol/src/connection.rs:272-284.
   - name: connectors.connection.ConnectSession
 
