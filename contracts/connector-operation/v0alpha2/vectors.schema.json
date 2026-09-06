@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://b10x.dev/contracts/connector-operation/v0alpha2/vectors.schema.json",
+  "title": "ConnectorOperation v0alpha2 independent reader expectations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "cases"],
+  "properties": {
+    "contract": {"const": "b10x.connector-operation.v0alpha2"},
+    "cases": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "kind", "valid", "schema_valid", "note", "frame"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "kind": {"enum": ["request", "response"]},
+          "valid": {"type": "boolean"},
+          "schema_valid": {"type": "boolean"},
+          "note": {"type": "string"},
+          "frame": {"type": "object"}
+        }
+      }
+    }
+  }
+}

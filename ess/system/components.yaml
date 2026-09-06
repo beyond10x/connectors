@@ -61,7 +61,7 @@ components:
     # UNMAPPED: this surface is the write half only. The read verbs of the three protocols —
     # `CandidateSearch`, `Search`, `Describe`, `ObservationSearch`, `ConnectSessionStatus`
     # (crates/protocol/src/connection.rs:35-48), `SessionStatus`, `SessionReconcile`
-    # (crates/protocol/src/operation.rs:49-56), `Receive`, `Replay`
+    # (crates/protocol/src/operation/legacy.rs:49-56), `Receive`, `Replay`
     # (crates/protocol/src/event.rs:36-39) — change no entity, and ESS models a read as a `views:`
     # declaration carrying a consistency claim (`read_your_writes` or `eventual`). Nothing in the
     # tree states that claim for any of them, so declaring one would invent it. Settled by the
@@ -69,7 +69,7 @@ components:
     # (docs/design/04-the-callers-contract.md) is where it would go.
     #
     # Neither an accepted command nor a read — `SessionSignal`
-    # (crates/protocol/src/operation.rs:56) — sends DTMF into a live call. It moves no entity this
+    # (crates/protocol/src/operation/legacy.rs:56) — sends DTMF into a live call. It moves no entity this
     # document declares and no command above names it, so it is in neither half of the sentence
     # before this one, and `connectors operation signal` is excused as `unmodelled` below.
     #

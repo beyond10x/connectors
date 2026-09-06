@@ -1,0 +1,32 @@
+{
+  "bundle": "b10x.connector-operation",
+  "files": [
+    {
+      "bytes": 1013,
+      "path": "contracts/artifact-bundle.schema.json",
+      "sha256": "5e6fbffee97d998df53c94394de1c53c75a6066f2807c9c00374b6ea15ea969b"
+    },
+    {
+      "bytes": 3328,
+      "path": "contracts/connector-operation/v0alpha2/README.md",
+      "sha256": "251faf24aa0cc5bde7ed99850b4634606b6c450d9e069ab570af97566515c685"
+    },
+    {
+      "bytes": 28482,
+      "path": "contracts/connector-operation/v0alpha2/connector-operation.schema.json",
+      "sha256": "0239e0ad226ac3905aa9373309bc6a72b819c51cda899542225c8785fa3c3ed9"
+    },
+    {
+      "bytes": 928,
+      "path": "contracts/connector-operation/v0alpha2/vectors.schema.json",
+      "sha256": "ff17bdea4b6100f8669db076ecfa12188a629ebd7f706fe86a4c91449f357c03"
+    },
+    {
+      "bytes": 174496,
+      "path": "contracts/connector-operation/v0alpha2/vectors.json",
+      "sha256": "9244045b3eb449b2dfbc4ad83b201d6ec4bc35bb4f6ff0cf8d897dfb9e2dfee1"
+    }
+  ],
+  "stability": "alpha",
+  "version": "v0alpha2"
+}
