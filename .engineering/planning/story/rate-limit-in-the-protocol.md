@@ -8,6 +8,8 @@ tags:
 - ready
 - wave-cli
 scope:
+- confidence: inferred
+  path: Cargo.lock
 - confidence: cited
   path: catalog/connector-document-v3.schema.json
 - confidence: inferred
@@ -50,6 +52,8 @@ scope:
   path: crates/connector-spec/tests/main/ir_roundtrip.rs
 - confidence: cited
   path: crates/connector-spec/tests/main/service_partition.rs
+- confidence: inferred
+  path: crates/connectors-cli/Cargo.lock
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
@@ -58,14 +62,28 @@ scope:
   path: crates/connectors-client/src/lib.rs
 - confidence: cited
   path: crates/connectors-client/src/response.rs
+- confidence: inferred
+  path: crates/connectors-console/Cargo.lock
 - confidence: cited
   path: crates/connectors-console/src/envelope.rs
 - confidence: cited
   path: crates/connectors-console/src/output.rs
+- confidence: inferred
+  path: crates/connectors-runtime/Cargo.lock
 - confidence: cited
   path: crates/connectors-runtime/src/registry.rs
 - confidence: cited
   path: crates/connectors-runtime/src/service_bundle.rs
+- confidence: inferred
+  path: crates/driver-audio/Cargo.lock
+- confidence: inferred
+  path: crates/driver-cdp/Cargo.lock
+- confidence: inferred
+  path: crates/driver-sip/Cargo.lock
+- confidence: inferred
+  path: crates/driver-speech/Cargo.lock
+- confidence: inferred
+  path: crates/driver-sql/Cargo.lock
 - confidence: cited
   path: crates/integration-catalog/src/lib.rs
 - confidence: cited
@@ -93,13 +111,21 @@ scope:
 - confidence: cited
   path: crates/integration-slack/src/backend/api_runtime.rs
 - confidence: cited
+  path: crates/protocol/Cargo.toml
+- confidence: inferred
+  path: crates/protocol/examples/operation_v2_bundle.rs
+- confidence: cited
   path: crates/protocol/src/operation.rs
 - confidence: inferred
   path: crates/protocol/src/operation/legacy.rs
 - confidence: inferred
+  path: crates/protocol/src/operation/schema.rs
+- confidence: inferred
   path: crates/protocol/src/operation/wire.rs
 - confidence: cited
   path: crates/protocol/tests/bundles.rs
+- confidence: inferred
+  path: crates/rtvbp-voice-endpoint/Cargo.lock
 - confidence: cited
   path: crates/server/src/egress.rs
 - confidence: cited
@@ -121,6 +147,12 @@ scope:
 - confidence: cited
   path: crates/service/src/egress.rs
 - confidence: cited
+  path: crates/service/src/lib.rs
+- confidence: inferred
+  path: crates/voice-local-audio/Cargo.lock
+- confidence: inferred
+  path: crates/voice-runtime/Cargo.lock
+- confidence: cited
   path: ess/system/domains/catalog.yaml
 - confidence: cited
   path: ess/system/domains/runtime.yaml
@@ -128,7 +160,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 103
+revision: 120
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -311,3 +343,7 @@ Only retry-after is newly admitted from provider responses. A single unsigned de
 Atlas proposal0040 requires a new operation contract while freezing all v0alpha1 bundle bytes. Snapshot deployed legacy DTOs, strictly decode each supported version at local/hosted boundaries, convert through the same admission/backend owner, and reply in the requested version. V1 receives Unavailable with no v2 delay/advice. Preserve and separately test already-deployed purpose/session_signal behavior; it remains distinct from conformity to the frozen v1 schema. No automatic invoke resend or silent version fallback. New v2 includes complete request/response schema and positive/adversarial vectors; client/CLI/MCP preserve optional delay, retriable and nonzero refusal status. Datasource keeps its current representation.
 
 Stage protocol/egress work first. Catalog/spec/typed-reader/schema files remain owned by the GitLab fidelity stage until coordinator handoff; its schema3 may incorporate the proposed conditional metadata before that migration freezes, otherwise version it separately. Local transport and CLI source receive one-shot integration before their stage. Do not borrow the failed multi-credential unit, reserve auth fields, change consumer pins or deploy/release under this unit.
+
+## Stage1 generator and lock scope
+
+Stage1 inspection found no existing ConnectorOperation bundle generator. Add a deterministic Rust example `crates/protocol/examples/operation_v2_bundle.rs` with clap-derived explicit check/write modes, schema projection `crates/protocol/src/operation/schema.rs`, and protocol manifest dev-dependencies on the already-pinned workspace clap/jsonschema versions. These paths and all twelve gate workspace lockfiles are recorded before edits. Refresh lock metadata offline after the manifest change and report exact changed lock rows; do not update dependency versions. Both schema and Rust readers must independently exercise complete v2 request/response positive and adversarial vectors. Frozen v1 files remain byte-identical. This extends stage1 tooling ownership, not any held runtime/catalog/CLI owner.
