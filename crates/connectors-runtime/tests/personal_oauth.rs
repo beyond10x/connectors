@@ -764,3 +764,204 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
     assert!(!socket.exists());
     completed.unwrap().unwrap();
 }
+
+#[tokio::test]
+async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exact() {
+    use protocol::connection_v2 as v2;
+    let root = tempfile::tempdir().unwrap();
+    let other = registration();
+    let other_connection =
+        integration_catalog::personal_oauth_admitted_connection_ref(&principal(), &other).unwrap();
+    let mut configured = registration();
+    configured.instance = Some("adversary-second".into());
+    configured.grant_ref = "grant:adversary-second".into();
+    let connection =
+        integration_catalog::personal_oauth_admitted_connection_ref(&principal(), &configured)
+            .unwrap();
+    let egress = Arc::new(Egress::default());
+    egress.reply(serde_json::json!({"access_token":"bound-local-access", "refresh_token":"bound-local-refresh", "token_type":"Bearer", "expires_in":60}));
+    egress.reply(serde_json::json!({"resource_owner_id":42,"scope":["read_api"],"application":{"uid":"fixture-client"}}));
+    let backend = Arc::new(
+        PersonalOAuthBackend::open(
+            principal(),
+            &[other, configured],
+            root.path(),
+            egress.clone(),
+            true,
+        )
+        .await
+        .unwrap(),
+    );
+    let registry = Arc::new(BackendRegistry::new(vec![backend]));
+    let socket = root.path().join("local/connectors.sock");
+    let daemon = server::local::LocalOperationDaemon::bind(&socket, registry)
+        .await
+        .unwrap();
+    let (stop, stopped) = tokio::sync::oneshot::channel();
+    let serving = tokio::spawn(daemon.serve_until(async {
+        let _ = stopped.await;
+    }));
+    let wire_socket = socket.clone();
+    // Always join daemon shutdown, including a failed scenario assertion or timeout.
+    let mut scenario = tokio::spawn(async move {
+        let socket = wire_socket.as_path();
+        let frame = |request| v2::RequestEnvelope {
+            protocol: v2::CONTRACT.into(),
+            request_id: "remediation:paired".into(),
+            context: owner(),
+            request,
+        };
+        let start = frame(v2::ConnectionRequest::RemediationStart(
+            v2::RemediationStartRequest {
+                operation_ref: "gitlab-project-list".into(),
+                connection_ref: connection.clone(),
+                input: serde_json::json!({}),
+            },
+        ));
+        let (_, response) =
+            v2::decode_response(&connection_v2_frame(socket, &start).await).unwrap();
+        let Some(v2::ConnectionResult::RemediationStart(start)) = response.response else {
+            panic!("bound start: {:?}", response.error)
+        };
+        assert_eq!(start.resume_state, v2::RemediationResumeState::Pending);
+        assert_eq!(egress.count(), 0);
+        let url =
+            url::Url::parse(start.session.browser_completion_url.as_deref().unwrap()).unwrap();
+        let authority = format!("127.0.0.1:{}", url.port().unwrap());
+        let capability = url.fragment().unwrap().strip_prefix("token=").unwrap();
+        let private = http(
+            &authority,
+            "/instructions",
+            &format!("X-Connect-Session: {capability}\r\n"),
+        )
+        .await;
+        let private: serde_json::Value =
+            serde_json::from_str(private.split_once("\r\n\r\n").unwrap().1).unwrap();
+        let authorization =
+            url::Url::parse(private["authorization_url"].as_str().unwrap()).unwrap();
+        let state = authorization
+            .query_pairs()
+            .find(|(key, _)| key == "state")
+            .unwrap()
+            .1
+            .into_owned();
+        assert!(http(
+            &authority,
+            &format!("/oauth/callback?state={state}&code=fixture-code"),
+            ""
+        )
+        .await
+        .starts_with("HTTP/1.1 200"));
+        let status_request = frame(v2::ConnectionRequest::RemediationStatus(
+            v2::RemediationStatusRequest {
+                connect_session_ref: start.connect_session_ref.clone(),
+            },
+        ));
+        loop {
+            let (_, response) =
+                v2::decode_response(&connection_v2_frame(socket, &status_request).await).unwrap();
+            let Some(v2::ConnectionResult::RemediationStatus(status)) = response.response else {
+                panic!("bound status: {:?}", response.error)
+            };
+            if status.resume_state == v2::RemediationResumeState::Ready {
+                break;
+            }
+            assert_eq!(status.resume_state, v2::RemediationResumeState::Pending);
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(
+            egress.count(),
+            2,
+            "completion made only token and evidence requests"
+        );
+        let mut wrong_owner = status_request.clone();
+        wrong_owner.context.agent_id = "other-owner".into();
+        let (_, refused) =
+            v2::decode_response(&connection_v2_frame(socket, &wrong_owner).await).unwrap();
+        assert!(refused.response.is_none());
+        let wrong_ack = frame(v2::ConnectionRequest::RemediationAcknowledge(
+            v2::RemediationAcknowledgeRequest {
+                connect_session_ref: start.connect_session_ref.clone(),
+                operation_ref: "gitlab-project-list".into(),
+                connection_ref: other_connection.clone(),
+            },
+        ));
+        let (_, refused) =
+            v2::decode_response(&connection_v2_frame(socket, &wrong_ack).await).unwrap();
+        assert!(
+            refused.response.is_none(),
+            "another configured same-profile binding cannot acknowledge this session"
+        );
+        let acknowledgement = frame(v2::ConnectionRequest::RemediationAcknowledge(
+            v2::RemediationAcknowledgeRequest {
+                connect_session_ref: start.connect_session_ref.clone(),
+                operation_ref: "gitlab-project-list".into(),
+                connection_ref: connection.clone(),
+            },
+        ));
+        let (_, response) =
+            v2::decode_response(&connection_v2_frame(socket, &acknowledgement).await).unwrap();
+        assert!(matches!(
+            response.response,
+            Some(v2::ConnectionResult::RemediationAcknowledge(_))
+        ));
+        let (_, response) =
+            v2::decode_response(&connection_v2_frame(socket, &status_request).await).unwrap();
+        let Some(v2::ConnectionResult::RemediationStatus(status)) = response.response else {
+            panic!("consumed status")
+        };
+        assert_eq!(status.resume_state, v2::RemediationResumeState::Consumed);
+        assert_eq!(
+            egress.count(),
+            2,
+            "acknowledgement/status never dispatch the intended operation"
+        );
+        let response = operation_v3_frame(
+            socket,
+            operation::OperationRequest::Describe(operation::DescribeRequest {
+                operation_ref: "gitlab-project-list".into(),
+            }),
+        )
+        .await;
+        let Some(operation::OperationResult::Describe(description)) = response.response else {
+            panic!("fresh description: {:?}", response.error)
+        };
+        assert!(description
+            .connections
+            .iter()
+            .any(|candidate| candidate.connection_ref == connection));
+        assert_eq!(
+            egress.count(),
+            2,
+            "fresh description still never dispatches"
+        );
+        assert!(
+            !description
+                .connections
+                .iter()
+                .any(|candidate| candidate.connection_ref == other_connection),
+            "the uncompleted configured peer stays out of callable discovery"
+        );
+        assert_eq!(
+            egress.count(),
+            2,
+            "only the exact bound credential was acquired; no invocation"
+        );
+        assert!(egress
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|request| request.0 == connection));
+        assert!(tokio::net::TcpStream::connect(authority).await.is_err());
+    });
+    let completed = tokio::time::timeout(Duration::from_secs(10), &mut scenario).await;
+    if completed.is_err() {
+        scenario.abort();
+        let _ = scenario.await;
+    }
+    stop.send(()).unwrap();
+    serving.await.unwrap().unwrap();
+    assert!(!socket.exists());
+    completed.unwrap().unwrap();
+}

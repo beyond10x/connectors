@@ -875,3 +875,108 @@ fn unix_time_ms() -> u64 {
         .unwrap()
         .as_millis() as u64
 }
+
+#[tokio::test]
+async fn auth_adversary_fresh_operation_binding_rejects_conflicting_purpose() {
+    use protocol::connection_v2 as v2;
+    let mut observations = Vec::new();
+    for case in ["matching", "legacy-absent", "conflicting", "split-pair"] {
+        let temporary = tempdir().unwrap();
+        let socket = temporary.path().join("purpose.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let serving = tokio::spawn(async move {
+            let deadline = unix_time_ms() + 60_000;
+            let mut methods = Vec::new();
+            for step in 0..5 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut line = String::new();
+                BufReader::new(&mut stream)
+                    .read_line(&mut line)
+                    .await
+                    .unwrap();
+                let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+                let method = request["request"]["method"].as_str().unwrap();
+                methods.push(method.to_owned());
+                let value = match step {
+                    0 => auth_stage2_bound_status(deadline, false),
+                    1 => auth_stage2_bound_status(deadline, true),
+                    2 => {
+                        serde_json::json!({"connect_session_ref":"session:fixture","operation_ref":"fixture.write","connection_ref":"connection:fixture","next_action":"fresh_description_then_explicit_invoke"})
+                    }
+                    3 => {
+                        serde_json::json!({"connection_ref":"connection:fixture","integration_ref":"fixture","label":"fixture","state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]})
+                    }
+                    4 => {
+                        let mut binding = serde_json::json!({"connection_ref":"connection:fixture","label":"fixture","provider":"fixture","audiences":[]});
+                        if case != "legacy-absent" {
+                            binding["purpose"] = serde_json::json!(if case == "matching" {
+                                "fixture.user"
+                            } else {
+                                "fixture.other"
+                            });
+                        }
+                        let mut connections = vec![binding];
+                        if case == "split-pair" {
+                            connections.push(serde_json::json!({"connection_ref":"connection:other","label":"other","provider":"fixture","purpose":"fixture.user","audiences":[]}));
+                        }
+                        serde_json::json!({"operation_ref":"fixture.write","title":"fixture","description":"fixture","input_schema":{"type":"object","additionalProperties":false},"output_schema":{},"effect":"read_only","approval":"not_required","connections":connections,"description_ref":"description:fresh"})
+                    }
+                    _ => unreachable!(),
+                };
+                let response = serde_json::json!({"protocol":request["protocol"],"request_id":request["request_id"],"status":"ok","response":{"result":method,"value":value}});
+                let bytes = serde_json::to_vec(&response).unwrap();
+                if step == 4 {
+                    operation::versions::decode_response(&bytes).unwrap();
+                } else {
+                    v2::decode_response(&bytes).unwrap();
+                }
+                stream.write_all(&bytes).await.unwrap();
+                stream.write_all(b"\n").await.unwrap();
+            }
+            methods
+        });
+        let client = LocalClient::new(&socket);
+        let result = async {
+            let pending = client
+                .begin_remediation(
+                    &context(),
+                    v2::RemediationStartRequest {
+                        operation_ref: "fixture.write".into(),
+                        connection_ref: "connection:fixture".into(),
+                        input: serde_json::json!({}),
+                    },
+                    "fixture",
+                    "fixture.user",
+                )
+                .await?;
+            client.finish_remediation(&context(), pending).await
+        }
+        .await;
+        let methods = tokio::time::timeout(Duration::from_secs(3), serving)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            methods,
+            [
+                "remediation_start",
+                "remediation_status",
+                "remediation_acknowledge",
+                "describe",
+                "describe"
+            ]
+        );
+        observations.push((case, result.is_ok()));
+    }
+    eprintln!("valid DTO purpose observations after exactly five exchanges each: {observations:?}");
+    assert_eq!(
+        observations,
+        [
+            ("matching", true),
+            ("legacy-absent", true),
+            ("conflicting", false),
+            ("split-pair", false)
+        ],
+        "an explicitly conflicting purpose must not be accepted as fresh matching binding"
+    );
+}

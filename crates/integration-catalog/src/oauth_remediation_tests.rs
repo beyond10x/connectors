@@ -630,3 +630,78 @@ async fn remediation_expired_status_never_swallows_an_opaque_receiver_rejection(
         backend.shutdown().await;
     }
 }
+
+#[tokio::test]
+async fn auth_adversary_owner_readiness_tracks_deleted_credentials_and_revoked_authority() {
+    let mut observed = Vec::new();
+    for case in ["access-missing", "refresh-missing", "authority-revoked"] {
+        let directory = tempfile::tempdir().unwrap();
+        let egress = Arc::new(Egress::default());
+        let clock = Arc::new(Clock::new());
+        egress.token(
+            "fixture-adversary-access",
+            Some("fixture-adversary-refresh"),
+            1,
+        );
+        egress.info("fixture-client", 42, &["read_api"]);
+        let backend = open(
+            directory.path(),
+            &[configuration()],
+            egress.clone(),
+            clock.clone(),
+        )
+        .await;
+        authorize(&backend).await;
+        let connection = backend.inner.bindings[0]
+            .custody
+            .identity
+            .connection
+            .clone();
+        let target = RemediationTarget {
+            operation_ref: "gitlab-project-list",
+            connection_ref: &connection,
+        };
+        assert_eq!(
+            backend.credential_readiness(&owner(), target).await,
+            CredentialReadiness::Ready
+        );
+        match case {
+            "access-missing" => backend
+                .inner
+                .store
+                .delete(&access_address(&backend))
+                .await
+                .unwrap(),
+            "refresh-missing" => {
+                backend
+                    .inner
+                    .store
+                    .delete(&backend.inner.bindings[0].refresh_address)
+                    .await
+                    .unwrap();
+                clock.advance(1_001);
+            }
+            "authority-revoked" => {
+                backend.inner.bindings[0].authority.lock().unwrap().active = false
+            }
+            _ => unreachable!(),
+        }
+        let readiness = backend.credential_readiness(&owner(), target).await;
+        observed.push((case, readiness));
+        let count = egress.count();
+        backend.shutdown().await;
+        assert_eq!(
+            count, 2,
+            "readiness must not refresh, start acquisition or invoke"
+        );
+    }
+    eprintln!("actual personal owner readiness after custody/authority changes: {observed:?}");
+    assert_eq!(
+        observed,
+        [
+            ("access-missing", CredentialReadiness::CredentialDegraded),
+            ("refresh-missing", CredentialReadiness::CredentialDegraded),
+            ("authority-revoked", CredentialReadiness::Unsupported),
+        ]
+    );
+}
