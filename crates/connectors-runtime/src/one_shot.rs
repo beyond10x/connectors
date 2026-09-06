@@ -4,7 +4,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use protocol::{connection, operation};
-use server::local::{validate_one_shot_connection, validate_one_shot_operation, LocalOneShot};
+use server::local::{
+    preflight_one_shot_operation_v3, validate_one_shot_connection, validate_one_shot_operation,
+    LocalOneShot, OneShotOperationV3Outcome,
+};
 
 use crate::{PersonalRuntime, RuntimeError};
 
@@ -27,21 +30,30 @@ impl PersonalRuntime {
         context: operation::OwnerContext,
         request: operation::OperationRequest,
     ) -> Result<operation::v3::ResponseEnvelope, RuntimeError> {
+        Self::one_shot_operation_v3_outcome(config_path, state_root, context, request)
+            .await
+            .map(OneShotOperationV3Outcome::into_response)
+    }
+
+    /// Preserve receiver-owned daemon requirements without trusting backend error text.
+    pub async fn one_shot_operation_v3_outcome(
+        config_path: &Path,
+        state_root: impl Into<PathBuf>,
+        context: operation::OwnerContext,
+        request: operation::OperationRequest,
+    ) -> Result<OneShotOperationV3Outcome, RuntimeError> {
         let envelope = operation::v3::RequestEnvelope {
             protocol: operation::v3::CONTRACT.to_owned(),
             request_id: "local-one-shot".to_owned(),
             context,
             request,
         };
-        if let Err(error) = validate_one_shot_operation(&envelope.clone().into_v2()) {
-            return Ok(operation::v3::ResponseEnvelope::failure(
-                &envelope.request_id,
-                error.into(),
-            ));
+        if let Some(outcome) = preflight_one_shot_operation_v3(&envelope) {
+            return Ok(outcome);
         }
         let composed = Self::compose(Some(config_path), state_root.into(), None, false).await?;
         Ok(LocalOneShot::new(composed.ownership, composed.registry)?
-            .operation_v3(envelope)
+            .operation_v3_outcome(envelope)
             .await?)
     }
 

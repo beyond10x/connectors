@@ -158,6 +158,21 @@ pub struct LocalOneShot<B: ?Sized> {
     _ownership: LocalStateOwnership,
 }
 
+/// Local presentation provenance, never accepted from a wire or backend error message.
+#[derive(Debug)]
+pub enum OneShotOperationV3Outcome {
+    Reply(protocol::operation::v3::ResponseEnvelope),
+    RequiresDaemon(protocol::operation::v3::ResponseEnvelope),
+}
+impl OneShotOperationV3Outcome {
+    /// Preserve the existing envelope-only API without changing its wire response.
+    pub fn into_response(self) -> protocol::operation::v3::ResponseEnvelope {
+        match self {
+            Self::Reply(response) | Self::RequiresDaemon(response) => response,
+        }
+    }
+}
+
 impl<B: ConnectorBackend + ?Sized> LocalOneShot<B> {
     pub fn new(ownership: LocalStateOwnership, backend: Arc<B>) -> Result<Self, LocalDaemonError> {
         ownership.require_absent_socket()?;
@@ -199,23 +214,29 @@ impl<B: ConnectorBackend + ?Sized> LocalOneShot<B> {
         self,
         request: protocol::operation::v3::RequestEnvelope,
     ) -> Result<protocol::operation::v3::ResponseEnvelope, LocalDaemonError> {
+        self.operation_v3_outcome(request)
+            .await
+            .map(OneShotOperationV3Outcome::into_response)
+    }
+
+    /// Retain only receiver-owned daemon requirements for trusted local presentation.
+    pub async fn operation_v3_outcome(
+        self,
+        request: protocol::operation::v3::RequestEnvelope,
+    ) -> Result<OneShotOperationV3Outcome, LocalDaemonError> {
         use protocol::operation::v3;
 
         let result = async {
-            if let Err(error) = request.validate() {
-                return Ok(v3::ResponseEnvelope::failure(&request.request_id, error));
-            }
-            if let Err(error) = validate_one_shot_operation(&request.clone().into_v2()) {
-                return Ok(v3::ResponseEnvelope::failure(
-                    &request.request_id,
-                    error.into(),
-                ));
+            if let Some(outcome) = preflight_one_shot_operation_v3(&request) {
+                return Ok(outcome);
             }
             if let protocol::operation::OperationRequest::Invoke(invoke) = &request.request {
                 if !self.backend.supports_ephemeral_invocation(invoke) {
-                    return Ok(v3::ResponseEnvelope::failure(
-                        &request.request_id,
-                        daemon_required("operation invoke").into(),
+                    return Ok(OneShotOperationV3Outcome::RequiresDaemon(
+                        v3::ResponseEnvelope::failure(
+                            &request.request_id,
+                            daemon_required("operation invoke").into(),
+                        ),
                     ));
                 }
             }
@@ -230,7 +251,7 @@ impl<B: ConnectorBackend + ?Sized> LocalOneShot<B> {
             {
                 return Err(io::Error::other("uncorrelated one-shot operation response").into());
             }
-            Ok(response)
+            Ok(OneShotOperationV3Outcome::Reply(response))
         }
         .await;
         self.backend.shutdown().await;
@@ -270,17 +291,48 @@ fn daemon_required(method: &str) -> protocol::operation::OperationError {
 pub fn validate_one_shot_operation(
     request: &RequestEnvelope,
 ) -> Result<(), protocol::operation::OperationError> {
-    use protocol::operation::OperationRequest;
     request.validate()?;
-    match &request.request {
+    persistent_operation_refusal(&request.request).map_or(Ok(()), Err)
+}
+
+fn persistent_operation_refusal(
+    request: &protocol::operation::OperationRequest,
+) -> Option<protocol::operation::OperationError> {
+    use protocol::operation::OperationRequest;
+    match request {
         OperationRequest::Search(_)
         | OperationRequest::Describe(_)
-        | OperationRequest::Invoke(_) => Ok(()),
+        | OperationRequest::Invoke(_) => None,
         OperationRequest::SessionStatus(_)
         | OperationRequest::SessionTerminate(_)
         | OperationRequest::SessionReconcile(_)
-        | OperationRequest::SessionSignal(_) => Err(daemon_required("operation session control")),
+        | OperationRequest::SessionSignal(_) => Some(daemon_required("operation session control")),
     }
+}
+
+/// Validate before composition and identify only the shared persistent-command decision.
+pub fn preflight_one_shot_operation_v3(
+    request: &protocol::operation::v3::RequestEnvelope,
+) -> Option<OneShotOperationV3Outcome> {
+    use protocol::operation::v3::ResponseEnvelope;
+    if let Err(error) = request.validate() {
+        return Some(OneShotOperationV3Outcome::Reply(ResponseEnvelope::failure(
+            &request.request_id,
+            error,
+        )));
+    }
+    if let Err(error) = request.clone().into_v2().validate() {
+        return Some(OneShotOperationV3Outcome::Reply(ResponseEnvelope::failure(
+            &request.request_id,
+            error.into(),
+        )));
+    }
+    persistent_operation_refusal(&request.request).map(|error| {
+        OneShotOperationV3Outcome::RequiresDaemon(ResponseEnvelope::failure(
+            &request.request_id,
+            error.into(),
+        ))
+    })
 }
 
 /// Connection metadata is bounded. Activation, materialization and credential acquisition require
@@ -347,6 +399,9 @@ async fn local_auth_preflight<B: ConnectorBackend + ?Sized>(
         operation_ref: &invoke.operation_ref,
         connection_ref: &invoke.connection_ref,
     };
+    if !backend.owns_remediation(service::RemediationRoute::Target(target)) {
+        return Ok(None);
+    }
     let metadata = match backend.remediation_metadata(context, target) {
         Ok(value) => value,
         Err(RemediationError::Unsupported) => return Ok(None),
@@ -1045,6 +1100,11 @@ mod tests {
     }
     #[async_trait::async_trait]
     impl ConnectorBackend for AuthenticationBackend {
+        fn owns_remediation(&self, route: service::RemediationRoute<'_>) -> bool {
+            matches!(route, service::RemediationRoute::Target(target)
+                if target.operation_ref == "slack-conversations-history"
+                    && target.connection_ref == "connection:local-fixture")
+        }
         async fn ready(&self) -> Result<(), service::BackendReadinessError> {
             Ok(())
         }
