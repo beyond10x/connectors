@@ -159,3 +159,32 @@ cases cover the original deadline across exchange/token-info/prepare, expiry and
 before the claim, a timely decision held past expiry, uncertain writes and real store reopening,
 clock failures, cancellation, and concurrent operation callers. These are implementation
 obligations; this decision records no executed refresh or operational OAuth result.
+
+## Durable marker before refresh egress — 2026-09-06
+
+A provider can rotate a refresh credential before token-info succeeds or local credential
+prepare begins. The old custody publication alone cannot distinguish that uncertainty after
+restart. Before any refresh egress, under the same binding gate and after opening the real
+refresh authorization window, confirm a private marker through the existing FULL SQLite store.
+An uncertain marker write permits no provider request.
+
+Use the key `oauth.refresh.v1.<digest>`, where `digest` is the 64-character lowercase hexadecimal
+SHA256 of the canonical custody Identity. The closed JSON value contains only `version: 1`,
+`connection_ref`, `binding_sha256` as 32 octets, and `previous_generation`. The digest binds the
+existing owner, integration, Connection, purpose, fixed store and credential-address digest.
+No token, code, provider response, grant, caller time, endpoint URL or attestation belongs in it.
+This value has a typed home as `connectors.deployment.OAuthRefreshAttempt`; bounded decoding,
+digest construction, exact version and generation checks remain runtime obligations.
+
+Recover custody first. Clear the marker only after confirming a publication with a generation
+greater than `previous_generation` for the exact same binding, with evidence that passes the
+current authority, client, origin and scope ceiling. A durably decided custody transaction can
+recover into that publication. Preparing without a decision may abort local work but cannot
+clear the marker or claim that remote rotation rolled back. Until that confirmation, refuse reuse
+of the old credential across store reopening. Explicit reauthorization of the same binding may
+establish the newer publication; it must satisfy the same checks.
+
+Unknown marker reads or deletion remain unavailable. Keep one shared FileStore instance and the
+existing FULL SQLite path; this is neither another credential store nor a custody journal image
+version change. Actual pre-egress failure, post-rotation failure, cancellation and reopen tests
+must establish these rules before operational OAuth completion is claimed.
