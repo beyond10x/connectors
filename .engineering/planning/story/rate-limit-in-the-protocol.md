@@ -59,6 +59,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-cli/tests/cli_surface.rs
 - confidence: cited
+  path: crates/connectors-cli/tests/one_shot_operations.rs
+- confidence: cited
   path: crates/connectors-client/src/lib.rs
 - confidence: cited
   path: crates/connectors-client/src/response.rs
@@ -111,6 +113,8 @@ scope:
 - confidence: cited
   path: crates/integration-slack/src/backend/api_runtime.rs
 - confidence: cited
+  path: crates/integration-slack/src/backend_tests.rs
+- confidence: cited
   path: crates/protocol/Cargo.toml
 - confidence: inferred
   path: crates/protocol/examples/operation_v2_bundle.rs
@@ -153,14 +157,18 @@ scope:
 - confidence: inferred
   path: crates/voice-runtime/Cargo.lock
 - confidence: cited
+  path: ess/system/components.yaml
+- confidence: cited
   path: ess/system/domains/catalog.yaml
 - confidence: cited
   path: ess/system/domains/runtime.yaml
 - confidence: cited
+  path: ess/system/system.yaml
+- confidence: cited
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 120
+revision: 121
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
