@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 37
+revision: 38
 ---
 ## Authorization and objective
 
@@ -3395,3 +3395,19 @@ The first authentication reviewer preserved a console-format preflight refusal a
 For the remaining first-pass review commands only, the coordinator prospectively allocates an 8 GiB disk reserve (8,589,934,592 bytes), while keeping the same private tmpfs target, 12 GiB target cap, 8 GiB tmpfs reserve and 16 GiB MemAvailable reserve. The numeric disk reserve is a coordinator scheduling choice; neither the operator nor the wave skill prescribed 12 GiB. This exception is limited to the already populated tmpfs target and does not authorize an ordinary disk target or another compiler.
 
 The reviewer confirmed one job, no incremental compilation or debug information, no compiler wrapper, and the identical target. The assigned temporary directory measured 4,096 bytes. Existing CLI fixtures use bounded small files; prior runs did not measure a hard temporary-size cap, so no such prior guarantee is claimed. The continuation must additionally enforce a prospective 128 MiB temporary-directory cap, checking all reserves each second and stopping only its owned process group on a violation. Preserve all old runners and outputs; record a distinct continuation runner and command prefixes. Source, tests, ordinary review count, validation requirements, publication controls and all other units' resource policies remain unchanged.
+
+
+## Authentication review1 correction handoff — 2026-09-07
+
+The complete first auth review is preserved in review-result:cli-auth-adversary-1-20260906 before routing. The coordinator verified all209sealed evidence members,1229current source hashes,10originaltestprefixes and20405target hashes. Root's first patch comparison omitted --full-index and therefore differed only in the8Gitindex header abbreviations; the exact full-index comparison passed. This bookkeeping observation remains in scratch and is not a source mismatch.
+
+| Owner | Managed worktree | Private build directory | New correction scratch |
+| --- | --- | --- | --- |
+| Runtime/server implementor | ~/.local/state/worktree/trees/b10x/connectors/wt-78f189927231 | /dev/shm/b10x-cli-wave-wt-78f189927231-urhrmq5y/runtime-target | ~/.cache/connectors-cli-wave-20260906/auth-as-tool-result/stage2-runtime-implementation/review1-correction |
+| Client/CLI implementor | ~/.local/state/worktree/trees/b10x/connectors/wt-38354a193753 | Existing root/console/CLI targets inside this same managed worktree | ~/.cache/connectors-cli-wave-20260906/auth-as-tool-result/stage2-client-implementation/review1-correction |
+
+Runtime/server starts from8815dea4with exactly8known additive reviewed test files dirty; only the hosted projection and its assigned test owner may change. Client/CLI starts from498d3618with exactly3reviewed test files transferred from that source after byte-identical preimage checks. Its3productionfiles and3testowners are disjoint from the server assignment. Both briefs are frozen under their new scratch. Their temporary roots are ~/.cache/cw6/ac1 and ~/.cache/cw6/bc1.
+
+Only runtime/server initially owns the compiler; client/CLI may edit while waiting for explicit slot transfer. Both use one job, no incremental/debug output and their existing private targets. The prospective8GiBdisk exception ended with the first review. Restore12GiBdisk,8GiBtmpfs and16GiBavailable-memory reserves, with12GiBtargetcap for the tmpfs owner and8GiBaggregate targetcap for the disk owner. No cleanup or target sharing is authorized by this correction.
+
+Manual release rehearsal34063924916 passed on exact public0ac093be: all12workspaces, shared checks and4native builds succeeded; the publish job was skipped. This is pre-correction source evidence and is not reused as a final corrected-candidate verdict.
