@@ -187,7 +187,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 60
+revision: 61
 ---
 ## Acceptance
 
@@ -343,3 +343,13 @@ The separately frozen service-port proposal has 45 evidence members, all indepen
 Measured module sizes at the OAuth source are registry 1,489 lines, client lib 1,500, hosted 1,452, composition 1,463 and CLI lib 1,471. Additional extraction owners require an exact minimal proposal and coordinator scope before edits; this note grants no size waiver or broad refactor. Preserve original test bodies and source preimages in any later explicitly assigned extraction.
 
 The personal authority seam uses the actual immutable configuration for that process, its real configured grant_ref with no fabricated revision, and the existing mutable CurrentAuthority/generation/evidence checks. Restart forgets ephemeral sessions. Hosted wire/grant tests must truthfully keep production acquisition Unsupported until a supported adapter is composed. A valid DTO or an allowed field name alone does not make arbitrary daemon references or messages safe output; the later client/console/MCP paths require closed or exact request-bound projections and actual hostile-envelope cases.
+
+## Independent service-port slice released — 2026-09-06
+
+Release only the frozen service-port proposal over auth protocol source 05c94ac457938d2f9a8059f7f905dd8a87ec4dca: crates/service/src/remediation.rs, crates/service/src/runtime.rs and crates/service/src/lib.rs, including the three proposed contract cases appended to runtime.rs. All three paths already have typed scope. Proposal SHA256 9be64beef0bbe92b8b9be8211352299e31af8f77debad98d4c20e3af8d1c0d2f and its 45-member manifest 74233b129a3e8b8133a970008d39322895fafff51d3b98502648ef23d99437b1 were independently rehashed by the coordinator; exact patch application checks pass without changes.
+
+This is a narrow prospective exception to the preceding broad implementation hold. Source inspection establishes that these ports depend on the already committed protocol types and existing catalog/domain/service APIs, and introduce only closed values, redacted diagnostics and Unsupported defaults. They implement no OAuth acquisition, grant evaluation, readiness classification, routing, transport or client behavior. Their three source owners are disjoint from the eleven test-only owners of the ongoing OAuth review. That review's source commit and checkout remain unchanged. All actual auth runtime/server/client/CLI wiring still waits for the reviewed OAuth handoff; it is not released by this slice.
+
+The implementor applies the separate contract cases first and retains the initial selected command's actual result. Missing API/compiler diagnostics are not executable product failures; never manufacture a broken scaffold to obtain a red count. Then apply the three-path implementation proposal, execute the actual selected cases and the complete service suite with no-fail-fast, and run strict all-target Clippy plus affected formatting. Preserve every old assertion, existing API/default, frozen protocol bundle, manifest and lock. The constructor-only stable-authority seed hypothesis is not assigned; do not apply its patch or change seed encoding. No hosted proposal, scope extraction, model, Git, AEP, provider, operator or daemon action is delegated.
+
+The whole-OAuth reviewer reported no active Cargo process and explicitly released the sole compiling slot while it continues source/test preparation. Assign that slot temporarily to auth worktree wt-78f189927231 and its ordinary root target, with CARGO_TARGET_DIR unset, /usr/bin/sccache, jobs 1, incremental disabled and dev/test debug disabled. Continuously retain the 12 GiB disk, 8 GiB free tmpfs and 16 GiB MemAvailable reserves, plus an 8 GiB cap on this auth root target. Stop only the owned process group if a guard is crossed and preserve the interruption. No concurrent compilation or target sharing. Freeze source/evidence and release the slot promptly on completion; no cleanup is delegated. The coordinator returns the slot to OAuth review afterward.
