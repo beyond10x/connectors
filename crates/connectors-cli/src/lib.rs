@@ -800,18 +800,33 @@ where
     };
     match run(cli).await {
         Ok(()) => std::process::ExitCode::SUCCESS,
-        // A consumer that stops reading has received all it wanted. Restrict this to result
-        // output: a transport failure must still reach the caller as a failure.
-        Err(MainError::Output(output::OutputError::Io(error)))
-            if error.kind() == io::ErrorKind::BrokenPipe =>
-        {
-            std::process::ExitCode::SUCCESS
-        }
         Err(error) => {
             output::emit_error_with_target(format, error.code(), &error.to_string(), target);
             std::process::ExitCode::FAILURE
         }
     }
+}
+
+/// Finish result delivery without deciding the command's semantic status. In particular,
+/// doctor must still evaluate its health report after a consumer stops reading that report.
+fn complete_output(result: Result<(), MainError>) -> Result<(), MainError> {
+    match result {
+        Err(MainError::Output(output::OutputError::Io(error)))
+        | Err(MainError::Admin(admin::AdminError::Output(output::OutputError::Io(error))))
+            if error.kind() == io::ErrorKind::BrokenPipe =>
+        {
+            Ok(())
+        }
+        result => result,
+    }
+}
+
+fn emit(format: Format, value: &serde_json::Value) -> Result<(), MainError> {
+    complete_output(output::emit(format, value).map_err(Into::into))
+}
+
+fn emit_targeted(format: Format, value: &serde_json::Value, target: &str) -> Result<(), MainError> {
+    complete_output(output::emit_targeted(format, value, target).map_err(Into::into))
 }
 
 async fn run(cli: Cli) -> Result<(), MainError> {
@@ -881,20 +896,20 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     options,
                 )
                 .await?;
-                output::emit(format, &outcome)?;
+                emit(format, &outcome)?;
                 Ok(())
             }
         },
         Command::Inspect { command } => match command {
             InspectCommand::Doctor { config, state_root } => diagnose(format, config, state_root),
             InspectCommand::Providers { query } => {
-                output::emit(format, &connectors_console::providers::run(&query))?;
+                emit(format, &connectors_console::providers::run(&query))?;
                 Ok(())
             }
             InspectCommand::Auth { config, state_root } => {
                 let config = read_config(config)?;
                 let state_root = state_root.map_or_else(default_state_root, Ok)?;
-                output::emit(format, &auth::status(&config, &state_root).await?)?;
+                emit(format, &auth::status(&config, &state_root).await?)?;
                 Ok(())
             }
         },
@@ -910,7 +925,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     timeout: std::time::Duration::from_secs(timeout_seconds),
                 })
                 .await?;
-                output::emit(
+                emit(
                     format,
                     &serde_json::json!({
                         "signed_in_as": session.display_identity(),
@@ -925,7 +940,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             }
             SessionCommand::Logout => {
                 let session = connectors_client::logout()?;
-                output::emit(
+                emit(
                     format,
                     &serde_json::json!({
                         "logged_out": session.as_ref().map(|session| session.connectors_base.as_str())
@@ -948,7 +963,9 @@ async fn run(cli: Cli) -> Result<(), MainError> {
         Command::Connection { target, command } => connection(format, target, command).await,
         Command::Event { target, command } => event(format, target, command).await,
         Command::Operation { target, command } => operation(format, target, command).await,
-        Command::Admin(command) => admin::run(format, command).await.map_err(Into::into),
+        Command::Admin(command) => {
+            complete_output(admin::run(format, command).await.map_err(Into::into))
+        }
     }
 }
 
@@ -961,7 +978,7 @@ fn diagnose(
     let config_path = config.map_or_else(default_config_path, Ok)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
     let report = doctor::run(&config_path, &state_root);
-    output::emit(format, &report.to_value())?;
+    emit(format, &report.to_value())?;
     if report.healthy() {
         Ok(())
     } else {
@@ -988,7 +1005,7 @@ fn initialize(
         allow_exec_auth,
         force,
     )?;
-    output::emit(
+    emit(
         format,
         &serde_json::json!({
             "config": written.config_path.display().to_string(),
@@ -1113,7 +1130,7 @@ async fn connection(
         let response = AuthenticatedHostedClient::active()?
             .connection(request)
             .await?;
-        output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
         return Ok(());
     }
     let config = read_config(config_path)?;
@@ -1122,7 +1139,7 @@ async fn connection(
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .connection(&config.owner_context(), request)
         .await?;
-    output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+    emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }
 
@@ -1168,7 +1185,7 @@ async fn event(format: Format, target: Target, command: EventCommand) -> Result<
     target.validate(&config_path, &state_root)?;
     if target == Target::Hosted {
         let response = AuthenticatedHostedClient::active()?.event(request).await?;
-        output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
         return Ok(());
     }
     let config = read_config(config_path)?;
@@ -1177,7 +1194,7 @@ async fn event(format: Format, target: Target, command: EventCommand) -> Result<
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .event(&config.owner_context(), request)
         .await?;
-    output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+    emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }
 
@@ -1267,7 +1284,7 @@ async fn operation(
         let response = AuthenticatedHostedClient::active()?
             .operation(request)
             .await?;
-        output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
         return Ok(());
     }
     let config = read_config(config_path)?;
@@ -1276,7 +1293,7 @@ async fn operation(
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .operation(&config.owner_context(), request)
         .await?;
-    output::emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+    emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }
 
