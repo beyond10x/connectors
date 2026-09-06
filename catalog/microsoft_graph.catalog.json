@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "Microsoft Entra ID OAuth2 access token sent as a bearer; short-lived, minted outside flux (delegated sign-in or application client-credentials), and refreshed by the host rather than by generated Flux",
@@ -9690,7 +9690,7 @@
       "service": "calendar"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "v1.0",

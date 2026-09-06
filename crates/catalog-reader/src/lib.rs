@@ -64,7 +64,7 @@ pub const FORMAT_VERSION: u32 = 1;
 
 /// The canonical-document schema version this reader serves. A pack carrying a different one is
 /// refused before any record is served — see [`Error::UnsupportedSchema`].
-pub const SUPPORTED_SCHEMA: u32 = 3;
+pub const SUPPORTED_SCHEMA: u32 = 4;
 
 /// The magic word every pack opens with.
 const MAGIC: &str = "connectors-catalog-pack";

@@ -123,7 +123,10 @@ pub use connector_address::{
 
 pub use auth::{
     AuthHazard, AuthMethod, AuthRequirement, AuthScheme, AuthWorkarounds, CredentialEntry,
-    OAuth2Spec, OAuthGrant, OAuthRedirect, OAuthScopeSeparator, Subject, TokenEndpointWorkaround,
+    OAuth2Spec, OAuthClientAuthentication, OAuthEndpoint, OAuthGrant, OAuthRedirect,
+    OAuthRedirectShape, OAuthRefreshPolicy, OAuthRegistrationUse, OAuthScopeEncoding,
+    OAuthScopeSeparator, OAuthTokenEvidence, PersonalOAuthAdmission, PersonalOAuthFlow, Subject,
+    TokenEndpointWorkaround,
 };
 pub use config::{Approval, Binding, Choice, ConfigField, Format, Level, Pin, Position};
 pub use credential::{CredentialRef, InstanceId, Layout, TenantInstances, TenantLayout};
