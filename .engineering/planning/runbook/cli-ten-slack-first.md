@@ -6,10 +6,8 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 31
+revision: 32
 ---
-
-
 ## Authorization and objective
 
 Interactive run, preapproved by the operator on 2026-09-06: "commit and push (planning artifacts) ... the next 10 stories ahead, with highest prio the slack bug ... dispatch the stories with up to 5 agents". The operator then confirmed an unlimited subscription budget. aep-drive:wave skill version 0.8.0. O1 governed reach and O5 generic platform, using existing typed owners; Atlas ADR 0038 keeps extension-host responsibility independent of the platform core.
@@ -3340,3 +3338,17 @@ Published reviewed one-shot unit HEADd86716fb was finished and removed by worktr
 review-result:cli-gitlab-adversary-1-20260906 records the first whole-unit attack of6e655168. Six first-run deciding cases passed, with no findings. Source lanes784->789, runtime/catalog80->81, CLI88->88 and service57->57 passed with strict clippy/fmt. All1847pinned source operations were checked against actual importability/coverage classification; frozen schema2 bytes remain unchanged. Source/test commitseafffa88,6e655168 and50256e4b preserve all selected schemas and source provenance. This is a bounded schedule slice with explicit remaining coverage, not complete GitLab operation coverage.
 
 Independent tests were authorized in affected test directories; the new resolver test file is now recorded as an exact cited machine scope. Coordinator merges this green source after conflict-free dry merge; final combined gate remains required for lifecycle closure. Rate stage2 receives this source and the reviewed one-shot integration as prerequisites. Schema3 is still this unpublished migration's active new schema; optional conditional rate metadata may join it before final publication/freeze, preserving schema2 and literal vendor schemas. OAuth acquisition interpretation will be a separate subsequent schema4 migration and requires its own Atlas reliance/rollout update.
+
+## Prospective build reserve adjustment — 2026-09-06
+
+The coordinator checked the original and resumed session's user instructions. They require a measured disk floor but specify no numeric reserve; 20 GiB was a coordinator scheduling choice. Earlier wording that called it agreed was imprecise. All prior 20 GiB observations, interruptions and reports remain unchanged. Every inactive target in the wave's owned checkouts has now been cleaned after source/evidence verification; the active Atlas review target remains reserved for that reviewer. Shared free space currently fluctuates near 20 GiB, with no other Cargo/rustc process observed at the check.
+
+For subsequent wave commands, set a prospective reserve of 16 GiB (17179869184 bytes), permit exactly one compiling workspace target across the wave at a time, and retain jobs 1, no shared target, source/evidence freeze and completed-lane cleanup. Measured prior targets were approximately 0.67 GiB for Atlas and up to about 3.4 GB for the affected Connectors lanes with these profiles. The current roughly 21.5 GB free leaves room for one measured lane plus reserve; a new larger lane must be assessed before launch. Monitor free bytes during compilation, interrupt the active owned process gracefully if the reserve is crossed, preserve that interrupted command, and resume only after capacity is restored. Do not remove another session's targets, shared caches, primary data or immutable evidence.
+
+This is a coordinator resource allocation change within the approved implementation, not a relaxation of tests, review counts, source publication gates or the held credential decision. It supersedes earlier numeric 20 GiB instructions only for future commands; no historical result is relabeled. The Atlas final review runs first using its existing target. Schema 3 publication gates and OAuth deciding/build lanes receive explicit successive ownership.
+
+## Schema 3 publication candidate — 2026-09-06
+
+This branch contains final reviewed rate source/test head 0c026610, exact published Git framing imported from main 4b32397d with all thirteen events replayed, twenty-five selected rate scope/review events replayed through AEP, the four reviewed public guidance files, and the deterministic ESS projection regenerated from this branch's own schema 3 model. Source candidate ee7cd07255322464891451a87b35a7946f6554c0 contains no uncalled OAuth kernel or schema 4 writer. It is separate from the broader local integration head, where OAuth implementation continues. Both complete rate review artifacts and the rate story match the integration records at the replay boundary.
+
+The final affected review passed 1779 tests with no findings; the complete twelve-workspace repository gate is still pending. Assign its serialized test, strict check and final check execution to the rate implementor as verification, not another adversary pass. The exact authoritative workspace list comes from scripts/gate.sh. Keep source and all old tests immutable; write commands, actual exits, counts, source inventories and resource observations only in assigned rate scratch stage2-publication-gate. Run root final catalog/JSON/link/story/ESS and bundle checks before root target cleanup, both runtime feature configurations, the release local-identity refusal and complete-history secret scan. Preserve every required gate even if another lane already passed. The new single-lane 16 GiB resource policy above governs future commands. Coordinator owns source corrections, AEP, publication and slot handoffs; a verifier may not edit source to make a check pass.
