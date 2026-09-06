@@ -137,12 +137,14 @@ pub fn validate(
     policy: &TokenPolicy<'_>,
 ) -> Result<ValidatedToken, OauthError> {
     let scopes = parse_scopes(&response.scope, &policy.scopes);
-    let refresh = response.refresh_token.unwrap_or_default();
+    let refresh = Zeroizing::new(response.refresh_token.unwrap_or_default());
+    let access = Zeroizing::new(response.access_token);
     let refresh_unusable = refresh.is_empty() || refresh.len() > policy.max_secret_len;
     if response.token_type != policy.expect_token_type
-        || response.access_token.is_empty()
-        || response.access_token.len() > policy.max_secret_len
+        || access.is_empty()
+        || access.len() > policy.max_secret_len
         || (policy.require_expires_in && response.expires_in == 0)
+        || refresh.len() > policy.max_secret_len
         || (policy.require_refresh_token && refresh_unusable)
         || (policy.require_created_at && response.created_at.unwrap_or(0) == 0)
         || !policy
@@ -153,12 +155,37 @@ pub fn validate(
         return Err(OauthError::TokenResponse);
     }
     Ok(ValidatedToken {
-        access_token: Zeroizing::new(response.access_token),
-        refresh_token: (!refresh.is_empty()).then(|| Zeroizing::new(refresh)),
+        access_token: access,
+        refresh_token: (!refresh.is_empty()).then_some(refresh),
         scopes,
         expires_in: response.expires_in,
         created_at: response.created_at,
     })
+}
+
+/// Validate a bounded, finite-lived standardized Bearer response for a personal flow.
+pub fn validate_bearer(
+    mut response: TokenResponse,
+    policy: &TokenPolicy<'_>,
+    now_unix_ms: u64,
+) -> Result<ValidatedToken, OauthError> {
+    if !policy.expect_token_type.eq_ignore_ascii_case("Bearer")
+        || !response.token_type.eq_ignore_ascii_case("Bearer")
+        || response.scope.len() > 8 * 1024
+        || response.expires_in == 0
+        || response
+            .expires_in
+            .checked_mul(1_000)
+            .and_then(|lifetime| now_unix_ms.checked_add(lifetime))
+            .is_none()
+    {
+        // Even a rejected response owns its secrets until they are zeroized here.
+        let _access = Zeroizing::new(response.access_token);
+        let _refresh = response.refresh_token.map(Zeroizing::new);
+        return Err(OauthError::TokenResponse);
+    }
+    response.token_type = policy.expect_token_type.to_owned();
+    validate(response, policy)
 }
 
 /// Whether a credential expiring at `expires_at_unix_ms` should be refreshed now.
@@ -204,6 +231,51 @@ mod tests {
             scope: "api read_api sudo".to_owned(),
             token_type: "Bearer".to_owned(),
         }
+    }
+
+    #[test]
+    fn optional_refresh_is_bounded_even_when_issuance_is_not_required() {
+        let policy = TokenPolicy {
+            require_refresh_token: false,
+            ..gitlab_policy()
+        };
+        let mut response = gitlab_response();
+        response.refresh_token = Some("r".repeat(4_097));
+        assert_eq!(
+            validate(response, &policy).err(),
+            Some(OauthError::TokenResponse)
+        );
+        for refresh in [None, Some(String::new()), Some("r".repeat(4_096))] {
+            let mut response = gitlab_response();
+            response.refresh_token = refresh;
+            assert!(validate(response, &policy).is_ok());
+        }
+    }
+
+    #[test]
+    fn personal_bearer_accepts_case_and_requires_bounded_finite_expiry() {
+        let policy = TokenPolicy {
+            require_refresh_token: false,
+            ..gitlab_policy()
+        };
+        for spelling in ["Bearer", "bearer", "bEaReR"] {
+            let mut response = gitlab_response();
+            response.token_type = spelling.to_owned();
+            response.refresh_token = None;
+            assert!(validate_bearer(response, &policy, 1_000).is_ok());
+        }
+        let mut legacy = gitlab_response();
+        legacy.token_type = "bearer".to_owned();
+        assert!(validate(legacy, &policy).is_err());
+        for lifetime in [0, u64::MAX, u64::MAX / 1_000 + 1] {
+            let mut response = gitlab_response();
+            response.expires_in = lifetime;
+            assert!(validate_bearer(response, &policy, 0).is_err());
+        }
+        let mut response = gitlab_response();
+        response.scope = "a".repeat(8_193);
+        assert!(validate_bearer(response, &policy, 0).is_err());
+        assert!(validate_bearer(gitlab_response(), &policy, u64::MAX).is_err());
     }
 
     #[test]

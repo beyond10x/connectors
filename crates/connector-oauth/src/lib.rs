@@ -37,6 +37,7 @@
 //! [`Debug`] on any type that carries one. Callers wrap it in their own secret type on the way to
 //! the store.
 
+pub mod device;
 mod pkce;
 mod state;
 mod token;
@@ -44,8 +45,8 @@ mod token;
 pub use pkce::{authorize_url, random_token, AuthorizeParams, Pkce};
 pub use state::{Pending, PendingStates, DEFAULT_PENDING_CAPACITY};
 pub use token::{
-    parse_scopes, refresh_due, validate, ScopePolicy, ScopeSeparator, TokenPolicy, TokenResponse,
-    ValidatedToken,
+    parse_scopes, refresh_due, validate, validate_bearer, ScopePolicy, ScopeSeparator, TokenPolicy,
+    TokenResponse, ValidatedToken,
 };
 
 /// Why an OAuth step refused.
@@ -65,6 +66,9 @@ pub enum OauthError {
     /// The token response parsed but does not meet the caller's [`TokenPolicy`].
     #[error("oauth-exchange")]
     TokenResponse,
+    /// A device response failed its bounded origin or lifetime policy.
+    #[error("oauth-device-response")]
+    DeviceResponse,
     /// The pending-state table is full of live entries.
     #[error("oauth-state-capacity")]
     StateCapacity,
@@ -81,6 +85,7 @@ impl OauthError {
             Self::Randomness => "randomness",
             Self::AuthorizeUrl => "authorize-url",
             Self::TokenResponse => "oauth-exchange",
+            Self::DeviceResponse => "oauth-device-response",
             Self::StateCapacity => "oauth-state-capacity",
             Self::Clock => "clock",
         }
