@@ -117,6 +117,12 @@ scope:
 - confidence: inferred
   path: crates/driver-sql/Cargo.lock
 - confidence: cited
+  path: crates/driver-sql/src/credentials.rs
+- confidence: cited
+  path: crates/driver-sql/src/lib.rs
+- confidence: cited
+  path: crates/driver-sql/tests/live.rs
+- confidence: cited
   path: crates/integration-catalog/src/lib.rs
 - confidence: inferred
   path: crates/integration-catalog/src/tests.rs
@@ -224,7 +230,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 141
+revision: 144
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -451,3 +457,11 @@ Immutable review-result cli-rate-adversary-2-20260906 retains the complete final
 The final ordinary parallel affected suites passed root 1214, runtime 347, CLI 131 and console 87: 1779 total, zero failures and six unchanged ignored cases. Strict Clippy/formatting pass in every lane. The seven independent new cases and two retained URL countercases each executed exactly once in their deciding selections and passed. Findings are empty; no third pass is needed. The initial zero-test selector miss and shared-disk floor incident remain explicitly recorded in the immutable report. Whole canonical/vendor fidelity, schema 2 and v1 byte preservation, all old case names and existing assertions remain verified.
 
 The source is now released for the coordinator's local integration and downstream implementation. This acceptance does not publish schema 3 or complete the twelve-workspace gate. Assemble the exact published Git framing source, selected planning evidence, current deterministic ESS projection and bounded public guidance without the uncalled private OAuth kernel; run the complete repository and publication gates before source publication. Schema 4 writer publication remains later. Full-wave integration, installation and external consumer adoption remain separate outcomes.
+
+## Existing SQL formatting gate correction — 2026-09-06
+
+## Existing SQL formatting gate correction — 2026-09-06
+
+The complete schema 3 publication preflight found driver-sql formatting failures in crates/driver-sql/src/credentials.rs, crates/driver-sql/src/lib.rs and crates/driver-sql/tests/live.rs. All three files are byte-identical to published main 4b32397df2cc2f5bd5ee1c5737891163fb750957; the exact baseline blobs and initial failed formatter output remain in the publication-gate evidence. This is a pre-existing gate failure, not an introduced rate behavior defect.
+
+Assign those three exact cited paths only for cargo fmt's mechanical correction, including its closure/block and trailing-comma formatting. Preserve all tests, assertions and production behavior. The coordinator records this small prerequisite before the authoritative twelve-workspace source freeze; the gate implementor still owns no source, AEP or Git writes. Complete the SQL workspace's normal tests and strict checks as part of that existing full gate, without inventing tests for formatting. Preserve the original failure and both source inventories. The first scope wording said to preserve all tokens; this clarification accounts for the actual formatter output without authorizing a semantic change.
