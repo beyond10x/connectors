@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 47
+revision: 48
 ---
 ## Authorization and objective
 
@@ -3484,3 +3484,11 @@ Verification-report:cli-auth-service-port-checkpoint-20260906 preserves the full
 The auth tree remains wt-78f189927231 with its recorded ordinary root target; the worker released compilation before sealing and is idle. Root explicitly returned the sole slot to review_one_shot_final in OAuth wt-4f1de73d0685. Its actual published-reader probe loaded the old schema 3 pack with 65 providers and refused the full current schema 4 pack, one passing witness and no resource interruption. The same first review continues; its preliminary empty-personal-flows mismatch remains open. A harness usage-limit error interrupted the reviewer's turn, and the operator then said the usage issue was fixed and to continue. The reviewer resumed that same pass and its already-running CLI full-workspace command; no new pass or product verdict was inferred from the harness error.
 
 Auth story revision 67 prospectively scopes only the exact five possible test extractions. Actual runtime wiring and extraction edits still wait for the reviewed OAuth handoff. A read-only merge-tree of frozen OAuth 6fae9df0 and auth ae53a930 produced 88574985438ffece4a3a6181bd6c30e9ff1292e9 without textual conflict; no compilation, integration-branch movement or publication occurred. Existing review budgets, held credential decision and final delivery/install obligations remain unchanged.
+
+## OAuth reviewed; final authentication implementation released — 2026-09-06
+
+OAuth is integrated at6c0af27fd65fa69ef8b16c60146fc6670f8c1a16 after its final ordinary review, with1,563affected passes,zero failures,one existing ignore and all strict checks green. The immutable second report contains all17complete outputs and an explicit empty findings block. The findings ledger resolves the first authoring finding and lists no new/carried findings. AEP's validator nevertheless counts this empty block among its no-findings warnings; the original report stays unchanged. The whole combined gate and publication/install remain pending.
+
+Auth revision69 releases the verified31/21disjoint implementation split on the existing frozen protocol/service interfaces. Runtime/server stays in wt-78f189927231 with private target /dev/shm/b10x-cli-wave-wt-78f189927231-urhrmq5y/runtime-target,12GiBcap, scratch auth-as-tool-result/stage2-runtime-implementation and TMPDIR under the assigned coordinator scratch at auth-runtime-tmp. Client/console/CLI is in new managed wt-38354a193753, branch impl/auth-client-remediation-resumed, with its own ordinary root/console/CLI targets under aggregate8GiBcap, scratch auth-as-tool-result/stage2-client-implementation and separate auth-client-tmp. The only serial source handoff is the runtime-owned actual one-shot result API before the client-side CLI branch. One compiling slot and the12GiB/8GiB/16GiB reserves remain in force. Original OAuth targets/evidence are retained, with no cleanup delegated.
+
+Current clean Atlas authority is managed wt-c0c0df82001d atb89e5b835b384965818eccf0703c8a548ebdbe47; AGENTS, bot wrappers, Rust sources and fence machinery are unchanged. Local draft reconciliation8c9172ca retains both parents and imports314published events viaAEP, then renumbers the four proposed Connector migrations0042–0045. The full Atlas fence finished18:53:36Z with149Rust tests and catalog/livePages/projection/Markdown/brand green, retaining the same three external failures: AgentIDE's unsupported v4 collector, primary Website's Docs System pin and Widgets' missing Serves. Exit1 and all raw output remain under coordinator scratch atlas-b89-fence. No global-green or publication claim is made. Its own target peaked523,005,952bytes with no resource interruption and is retained. Root has released that compiling slot for the upcoming auth deciding cases.
