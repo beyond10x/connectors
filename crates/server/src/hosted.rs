@@ -41,6 +41,7 @@ mod health;
 mod mcp;
 mod operation_transport;
 mod principal;
+pub(crate) mod remediation;
 use operation_transport::operation;
 mod routing;
 mod subscription;
@@ -333,6 +334,12 @@ async fn operation_decided(
     let mut admitted = None;
     let mut redeemed = None;
     if let OperationRequest::Invoke(invoke) = &request.request {
+        if let Some(response) =
+            remediation::operation_preflight(state, principal, &owner, &request.request_id, invoke)
+                .await
+        {
+            return response;
+        }
         let description =
             match redescribe(state, &owner, &request.request_id, &invoke.operation_ref).await {
                 Ok(description) => description,
@@ -623,6 +630,7 @@ mod tests {
     mod enforcement;
     mod mcp;
     mod mcp_monitoring;
+    mod remediation;
     mod signal;
 
     #[tokio::test]

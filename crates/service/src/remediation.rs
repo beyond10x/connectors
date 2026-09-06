@@ -147,6 +147,37 @@ pub trait RemediationAuthority: Send + Sync + 'static {
         binding: &RemediationBinding,
         now_unix_ms: u64,
     ) -> Result<(), RemediationError>;
+
+    /// Recheck current policy for observing an existing session, never for acquisition or
+    /// publication. The default retains every strict check at the actual current time.
+    /// An authoritative owner may separate expired session capability from still-current
+    /// identity/grant/management admission so status can report Expired. It must preserve
+    /// every current admission check; callers must propagate every rejection unchanged.
+    fn recheck_status(
+        &self,
+        context: &PrincipalContext,
+        binding: &RemediationBinding,
+        now_unix_ms: u64,
+    ) -> Result<(), RemediationError> {
+        self.recheck(context, binding, now_unix_ms)
+    }
+}
+
+/// Current personal-policy capability supplied by the actual configured owner.
+/// The receiver still validates input and derives the exact private binding. This is neither
+/// a dispatch proof nor hosted Grant authority; no input, bearer or credential is retained.
+pub struct RemediationAdmission {
+    pub grant_ref: String,
+    pub grant_revision: Option<u64>,
+    pub admission_policy_sha256: String,
+    pub expires_at_unix_ms: u64,
+    pub authority: std::sync::Arc<dyn RemediationAuthority>,
+}
+
+impl fmt::Debug for RemediationAdmission {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("RemediationAdmission(<redacted>)")
+    }
 }
 
 /// Bound-only requests. Start carries admitted facts, never a raw input or v1 target selector.
