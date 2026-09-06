@@ -6,6 +6,50 @@ domain: connectors.runtime
 summary: The unit of authority, the granted executions that run under it, the live sessions those executions open, and the record every one of them leaves.
 
 types:
+
+  # Proposed values, design 22 (2026-09-06); intended Operation v0alpha3 behavior.
+  # This does not extend the pending rate v0alpha2 identity or assert implementation.
+  - name: connectors.runtime.CredentialReadiness
+    kind: enum
+    variants: [Ready, MissingCredential, CredentialDegraded, DependencyUnavailable, Unsupported]
+
+  - name: connectors.runtime.AuthenticationNeed
+    kind: enum
+    variants: [AuthorizeConfigured, ReauthorizeExisting]
+
+  - name: connectors.runtime.AuthenticationAttemptState
+    kind: enum
+    variants: [NotAttempted]
+
+  - name: connectors.runtime.AuthenticationNextAction
+    kind: enum
+    variants: [StartTrustedRemediation]
+
+  # Safe structured operation refusal. No URL, session capability, registration or input.
+  - name: connectors.runtime.AuthenticationRequired
+    kind: struct
+    fields:
+      - name: operation_ref
+        type: connectors.runtime.OperationRef
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: integration_ref
+        type: connectors.connection.IntegrationRef
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: need
+        type: connectors.runtime.AuthenticationNeed
+      - name: attempt
+        type: connectors.runtime.AuthenticationAttemptState
+      - name: next_action
+        type: connectors.runtime.AuthenticationNextAction
+
+  # UNMAPPED: only an authenticated, grant-admitted configured binding may yield this
+  # response, before provider dispatch or approval/event-claim consumption. Unknown,
+  # unadmitted, transport-failed and outcome-unknown paths do not manufacture remediation.
+  # UNMAPPED: strict error-code/payload co-presence, non-retriable downgrade, output
+  # allowlisting and no automatic resend are new-version reader/adapter obligations.
+
   - name: connectors.runtime.ConditionalRateAdvice
     kind: struct
     fields:

@@ -261,6 +261,8 @@ scope:
   path: crates/server/src/hosted/tests/mcp.rs
 - confidence: inferred
   path: crates/service/src/connect_session.rs
+- confidence: inferred
+  path: crates/state-sqlite/src/lib.rs
 - confidence: cited
   path: docs/design/07-credential-custody-topologies.md
 - confidence: inferred
@@ -281,7 +283,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 37
+revision: 39
 ---
 ## Acceptance
 
@@ -381,3 +383,11 @@ The session must capture that exact immutable Binding/Connection reference inter
 Story 21 stage2 should enforce and test this limit before advertising its setup profile. Its helper-only stage1 needs no change. The held multi-credential branch is not a prerequisite and must not be imported.
 
 The later auth-result design proposes ConnectorConnection v0alpha2 bound-remediation commands carrying an explicit existing connection_ref alongside operation_ref. The receiver resolves and admits that pair, derives integration/profile from its owner, then creates or acknowledges a session bound to it. It never trusts label/profile as a target, never creates a missing placement, and never treats a session as an operation grant. This is a new contract migration; rate v2 and unchanged Connection v1 do not reserve or authorize those fields.
+
+## Helper stage handoff and custody decision — 2026-09-06
+
+Stage1 source fc26525efaf2ca86ff4e4b003ecbcfe0751bf561 adds pure device polling/token validation and isolated owner-bound local OAuth instructions. The seven assigned source files and three allowed nested locks match the frozen source manifest. Complete package counts rose29 to58, including five compile-fail checks;18 distinct actual deciding failures are retained. Full affected Clippy and formatting passed. Existing locked versions/checksums remain unchanged; the console lock additionally closes the inherited GitLab connector-resolve/jsonschema graph. This is helper evidence, not completed acquisition/custody or independent whole-unit review. Raw commands, results, source hashes and lock deltas remain in `~/.cache/connectors-cli-wave-20260906/connect-session-oauth-custody-in-personal-posture/stage1-*`.
+
+The stage2 read-only plan identified that the existing SQLite NORMAL durability cannot support ordering a recoverable decision before an fsynced credential commit. Add an explicit FULL-durability constructor in state-sqlite; retain existing callers. Design21 now defines the serialized completion claim as the authorization cutoff: after prepare, capture internal trusted authorized_at before the deadline while rechecking the same session/grant/generation. Persist that exact value-free decision before committing credentials. I/O can finish later. Before-claim expiry aborts; after-claim expiry cannot publish Expired; uncertain decision writes remain RecoveryRequired. Recovery aborts without a durable decision and finishes only a valid decision whose authorized_at precedes its captured deadline. No caller supplies or backdates time.
+
+Connection v1 cannot represent endpoint-free Pending. After instructions retire, Committing/RecoveryRequired therefore uses the existing safe Unavailable refusal while internal recovery continues; only coherent publication produces Completed. Trusted bounded status polling repeats neither provider authorization nor operation execution. Barrier and restart cases must prove these boundaries in stage2. Runtime edits still await the rate unit's shared-owner handoff.
