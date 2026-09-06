@@ -19,10 +19,10 @@ use protocol::datasource::{
     RequestEnvelope as DatasourceRequestEnvelope, ResponseEnvelope as DatasourceResponseEnvelope,
     MAX_RESULTS,
 };
+use protocol::operation::v3::{OperationError, OperationErrorCode};
 use protocol::operation::{
-    ApprovalPosture, DescribeRequest, InvokeRequest, OperationDescription, OperationError,
-    OperationErrorCode, OperationRequest, OperationResult, OwnerContext, RequestEnvelope,
-    ResponseEnvelope, SearchRequest,
+    ApprovalPosture, DescribeRequest, InvokeRequest, OperationDescription, OperationRequest,
+    OperationResult, OwnerContext, RequestEnvelope, SearchRequest,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -1167,8 +1167,11 @@ async fn operation_seam(
     let body = axum::body::to_bytes(response.into_body(), protocol::operation::MAX_FRAME_BYTES)
         .await
         .map_err(|_| operation_seam_gap())?;
-    let envelope: ResponseEnvelope =
-        serde_json::from_slice(&body).map_err(|_| operation_seam_gap())?;
+    let (_, envelope) =
+        protocol::operation::versions::decode_response(&body).map_err(|_| operation_seam_gap())?;
+    if envelope.request_id != request_id {
+        return Err(operation_seam_gap());
+    }
     match (envelope.response, envelope.error) {
         (Some(result), None) => Ok(result),
         (None, Some(refusal)) => Err(refusal),
@@ -1251,6 +1254,22 @@ fn refusal(code: &Value, message: &str, retriable: bool) -> Value {
 }
 
 fn operation_refusal(error: &OperationError) -> Value {
+    if error.code == OperationErrorCode::AuthenticationRequired {
+        // DTO validity is not output authority. This public projection contains no backend
+        // message or reference; only the closed admitted state can reach a model.
+        let mut result = refusal(
+            &json!("authentication_required"),
+            "authentication is required before this operation can be attempted",
+            false,
+        );
+        if let Some(auth) = &error.authentication {
+            result["structuredContent"]["authentication"] = json!({
+                "need": auth.need, "attempt": auth.attempt,
+                "next_action": auth.next_action,
+            });
+        }
+        return result;
+    }
     let mut result = refusal(
         &serde_json::to_value(error.code).expect("closed error vocabulary serializes"),
         &error.message,
@@ -1260,6 +1279,49 @@ fn operation_refusal(error: &OperationError) -> Value {
         result["structuredContent"]["retry_after_seconds"] = json!(delay);
     }
     result
+}
+
+#[test]
+fn authentication_projection_closes_valid_private_reference_and_message_fields() {
+    use protocol::operation::{v3, versions};
+    let private = "https://private.example.test/SYNTHETIC_AUTH_INSTRUCTION";
+    let mut error = v3::OperationError::authentication_required(v3::AuthenticationRequired {
+        operation_ref: "grafana-dashboards-list".into(),
+        connection_ref: private.into(),
+        integration_ref: private.into(),
+        auth_profile: "synthetic_private_instruction".into(),
+        need: v3::AuthenticationNeed::ReauthorizeExisting,
+        attempt: v3::AuthenticationAttemptState::NotAttempted,
+        next_action: v3::AuthenticationNextAction::StartTrustedRemediation,
+    });
+    error.message = private.into();
+    let wire = serde_json::to_vec(&v3::ResponseEnvelope::failure("mcp:auth", error)).unwrap();
+    let (version, response) = versions::decode_response(&wire).unwrap();
+    assert_eq!(version, versions::Version::V0Alpha3);
+    let output = operation_refusal(&response.error.unwrap());
+    assert_eq!(output["isError"], true);
+    assert_eq!(
+        output["structuredContent"]["code"],
+        "authentication_required"
+    );
+    assert_eq!(output["structuredContent"]["retriable"], false);
+    assert_eq!(
+        output["structuredContent"]["authentication"],
+        json!({
+            "need": "reauthorize_existing", "attempt": "not_attempted",
+            "next_action": "start_trusted_remediation",
+        })
+    );
+    assert!(!output.to_string().contains(private));
+    assert!(!output.to_string().contains("synthetic_private_instruction"));
+    for reference in [
+        "operation_ref",
+        "connection_ref",
+        "integration_ref",
+        "auth_profile",
+    ] {
+        assert!(!output.to_string().contains(reference));
+    }
 }
 
 fn datasource_refusal(error: &DatasourceError) -> Value {
