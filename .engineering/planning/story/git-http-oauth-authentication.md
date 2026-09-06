@@ -14,7 +14,7 @@ scope:
   path: crates/connectors-runtime/Cargo.lock
 - confidence: cited
   path: crates/integration-gitlab
-revision: 5
+revision: 6
 ---
 ## Outcome
 
@@ -45,3 +45,11 @@ The strengthened real HTTP fixture refused the predecessor's Bearer authenticati
 All 40 integration-gitlab tests pass, with no ignored tests. Formatting and strict all-target Clippy pass. Offline metadata succeeds for all twelve declared workspaces; only the runtime and CLI locks require the already-resolved base64 0.22 dependency edge. The production change is confined to the Git transport header helper and call site; REST remains Bearer and the existing authority, byte, request, depth and protocol limits are unchanged.
 
 The full sharded repository gate, immutable consumer publication, deployment and authenticated headless file/Agent acceptance are still pending. This story remains active until its required delivery evidence is recorded.
+
+## Full source and deployed-client compatibility evidence
+
+Source CI34002384974 completed successfully at fe3541a6d866e84855dfdc19ec4d22a7e779b1e5: all twelve workspace shards, final catalog/documentation/ESS checks, secret scan, local-identity refusal and all four Unix release-build targets passed. The reviewed repair is on the default branch through PR15. No standalone CLI release tag was created for this source-consumption repair.
+
+The existing optional interoperability lane also executed the production Git materialization code from the exact deployed Substrate 0.7.5 source, 64ae2ed5a888663b036cbe06515cbfd277369d58. A release-profile host test executable built with its pinned Rust toolchain passed git::materialization_tests::external_connectors_proxy_v2_fixture through the repaired Connectors router/broker: the admitted commit, 50 shallow-history entries, absent tags, no transient authority in stored Git configuration and spent broker session were verified. Both inner and outer tests actually ran and passed. The enabled branch asserts six v2 provider exchanges across native Git and gix; its unchanged final log label describes the original three-exchange native-only lane.
+
+This fixture uses synthetic credentials, loopback TLS and real Git HTTP bytes. It establishes client compatibility, not hosted end-to-end timing, quota lifecycle or authenticated browser acceptance. Devcenter PR50 owns the composed image and delivery. Immutable publication, downstream rollout and authenticated file/Agent checks remain required, so the story stays active. Temporary build outputs and the managed read-only Substrate checkout were retired after retaining commands, hashes and logs.
