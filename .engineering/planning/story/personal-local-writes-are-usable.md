@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:personal-local-writes-are-usable
 kind: story
-status: active
+status: implemented
 title: Local write fixes reach ordinary CLI sessions
 summary: Deliver the existing mixed-grant discovery and approval-metadata fix, then verify Slack writes through the ordinary local CLI and daemon.
 tags:
@@ -25,7 +25,7 @@ scope:
   path: docs/architecture/deployment.md
 - confidence: cited
   path: docs/guides/connect-slack.md
-revision: 31
+revision: 33
 ---
 
 ## Objective
@@ -94,3 +94,13 @@ Installed published reviewed integration5600867e2c3e1d2a710fcdcfbee6067fe34f3b70
 The two previously authorized ordinary personal daemons were gracefully replaced at their exact saved argv/cwd. Both serving executable hashes equal the installed hash. Both read-only Slack write-search and describe commands exit0 through their persistent local sockets and show local target, nonempty admitted Connections and required approval metadata. The independently built brain-fresh process was not part of this authorized replacement set. Fixture provider invocation and selected-readonly refusal remain covered by retained tests; no live provider invocation or Slack post was sent.
 
 Exact source/install/restart/hash/read-only outputs and previous executable are retained in the assigned reviewed-installation scratch directory. Logs for running daemons live in their existing persistent state roots. The previous opening-install evidence is historical; these are the newly reviewed installed bytes. Whole-wave source publication to main and documentation delivery remain outstanding.
+
+## Delivery complete — 2026-09-06
+
+The reviewed installed revision 5600867e is an ancestor of published Connectors main 4b32397df2cc2f5bd5ee1c5737891163fb750957, merged through PR17. The complete first-batch CI 34022162900 passed all twelve workspace gates, repository checks and four platform builds; its release job was skipped. The later Git framing fix in 4b32397d is not in the installed executable, and no installed-byte equality with that newer main tip is claimed. The reviewed Slack delivery fix and its retained fixture/adversary tests are in both installed and published source.
+
+Both authorized ordinary daemons and the CLI still use the previously recorded identical reviewed binary hash. Their successful local search/description observations and fake-provider invocation/selected-read-only refusal evidence satisfy this story without another live Slack post. No other daemon was replaced.
+
+The passive bundle for exact 4b32397d succeeded in producer34023890652. Live Website provenance then names that exact source and artifact9986420081 under immutable source-set v2 e68b6b02e92ce94126fc0ecee7540772472e25ad386183305b6f53565ddc94f2. Atlas's live delivery gate passed all52 routes,26 Pages repositories and37 repository states with one Website commit. Website PR5 separately merged the deterministic retained-lock/snapshot update at7600eaf61952b7896f1e196881427dd5e84d4be4 after99 tests and portal/CI gates passed.
+
+Publication and documentation obligations for this priority delivery story are complete. Other rate, OAuth, authentication and held credential work remains separately governed; finishing it will require a later combined installation and validation. No release or version bump is implied. Delivery evidence is indexed in `~/.cache/cw6/p/website-cli-delivery-evidence-inventory.json`; source/install/daemon evidence remains in the retained reviewed-installation scratch.
