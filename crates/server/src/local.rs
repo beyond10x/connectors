@@ -29,7 +29,42 @@ pub struct LocalOperationDaemon<B: ?Sized> {
     socket_path: PathBuf,
     owner_uid: u32,
     backend: Arc<B>,
+    _ownership: LocalStateOwnership,
+}
+
+/// Exclusive owner-only state capability. Acquire before constructing any backend or journal.
+pub struct LocalStateOwnership {
+    socket_path: PathBuf,
+    owner_uid: u32,
     _state_lock: File,
+}
+
+impl LocalStateOwnership {
+    pub fn acquire(socket_path: impl Into<PathBuf>) -> Result<Self, LocalDaemonError> {
+        let socket_path = socket_path.into();
+        let parent = socket_path
+            .parent()
+            .ok_or(LocalDaemonError::MissingParent)?;
+        let owner_uid = rustix::process::geteuid().as_raw();
+        prepare_parent(parent, owner_uid)?;
+        let state_lock = acquire_state_lock(parent, owner_uid)?;
+        validate_owned_socket(&socket_path, owner_uid)?;
+        Ok(Self {
+            socket_path,
+            owner_uid,
+            _state_lock: state_lock,
+        })
+    }
+
+    /// An ephemeral runtime requires absence even after acquiring the state lock. A socket that
+    /// appeared after the caller's probe is never removed or treated as permission to retry.
+    pub fn require_absent_socket(&self) -> Result<(), LocalDaemonError> {
+        match std::fs::symlink_metadata(&self.socket_path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Ok(_) => Err(LocalDaemonError::AlreadyRunning),
+            Err(error) => Err(error.into()),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -42,7 +77,7 @@ pub enum LocalDaemonError {
     UnsafeExistingSocket,
     #[error("local Connector state lock is unsafe")]
     UnsafeStateLock,
-    #[error("another Connector daemon owns this state root")]
+    #[error("another Connector process owns this state root; use its daemon or wait for its command to finish")]
     AlreadyRunning,
     #[error("local Connector socket I/O failed: {0}")]
     Io(#[from] io::Error),
@@ -55,13 +90,16 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
         socket_path: impl Into<PathBuf>,
         backend: Arc<B>,
     ) -> Result<Self, LocalDaemonError> {
-        let socket_path = socket_path.into();
-        let parent = socket_path
-            .parent()
-            .ok_or(LocalDaemonError::MissingParent)?;
-        let owner_uid = rustix::process::geteuid().as_raw();
-        prepare_parent(parent, owner_uid)?;
-        let state_lock = acquire_state_lock(parent, owner_uid)?;
+        Self::bind_owned(LocalStateOwnership::acquire(socket_path)?, backend).await
+    }
+
+    /// Bind using ownership acquired by runtime composition before adapter initialization.
+    pub async fn bind_owned(
+        ownership: LocalStateOwnership,
+        backend: Arc<B>,
+    ) -> Result<Self, LocalDaemonError> {
+        let socket_path = ownership.socket_path.clone();
+        let owner_uid = ownership.owner_uid;
         remove_owned_stale_socket(&socket_path, owner_uid)?;
         let listener = UnixListener::bind(&socket_path)?;
         std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600))?;
@@ -70,7 +108,7 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
             socket_path,
             owner_uid,
             backend,
-            _state_lock: state_lock,
+            _ownership: ownership,
         })
     }
 
@@ -111,6 +149,111 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
         drop(self.listener);
         remove_owned_stale_socket(&self.socket_path, self.owner_uid)?;
         Ok(())
+    }
+}
+
+/// One bounded request using exactly the daemon's framing, principal and dispatch owners.
+pub struct LocalOneShot<B: ?Sized> {
+    backend: Arc<B>,
+    _ownership: LocalStateOwnership,
+}
+
+impl<B: ConnectorBackend + ?Sized> LocalOneShot<B> {
+    pub fn new(ownership: LocalStateOwnership, backend: Arc<B>) -> Result<Self, LocalDaemonError> {
+        ownership.require_absent_socket()?;
+        Ok(Self {
+            backend,
+            _ownership: ownership,
+        })
+    }
+
+    pub async fn operation(
+        self,
+        request: RequestEnvelope,
+    ) -> Result<ResponseEnvelope, LocalDaemonError> {
+        let result = async {
+            if let Err(error) = validate_one_shot_operation(&request) {
+                return Ok(ResponseEnvelope::failure(&request.request_id, error));
+            }
+            if let protocol::operation::OperationRequest::Invoke(invoke) = &request.request {
+                if !self.backend.supports_ephemeral_invocation(invoke) {
+                    return Ok(ResponseEnvelope::failure(
+                        &request.request_id,
+                        daemon_required("operation invoke"),
+                    ));
+                }
+            }
+            let frame = serde_json::to_vec(&request).map_err(io::Error::other)?;
+            let bytes = dispatch_frame(&frame, protocol::operation::CONTRACT, self.backend.clone())
+                .await?
+                .ok_or_else(|| io::Error::other("invalid one-shot operation frame"))?;
+            serde_json::from_slice(&bytes).map_err(|error| io::Error::other(error).into())
+        }
+        .await;
+        self.backend.shutdown().await;
+        result
+    }
+
+    pub async fn connection(
+        self,
+        request: protocol::connection::RequestEnvelope,
+    ) -> Result<protocol::connection::ResponseEnvelope, LocalDaemonError> {
+        let result = async {
+            if let Err(error) = validate_one_shot_connection(&request) {
+                return Ok(protocol::connection::ResponseEnvelope::failure(
+                    &request.request_id,
+                    error,
+                ));
+            }
+            let frame = serde_json::to_vec(&request).map_err(io::Error::other)?;
+            let bytes =
+                dispatch_frame(&frame, protocol::connection::CONTRACT, self.backend.clone())
+                    .await?
+                    .ok_or_else(|| io::Error::other("invalid one-shot connection frame"))?;
+            serde_json::from_slice(&bytes).map_err(|error| io::Error::other(error).into())
+        }
+        .await;
+        self.backend.shutdown().await;
+        result
+    }
+}
+
+fn daemon_required(method: &str) -> protocol::operation::OperationError {
+    protocol::operation::OperationError::new(protocol::operation::OperationErrorCode::Unavailable,
+        format!("{method} requires a persistent daemon for this operation; run `connectors serve local` with the same --config and --state-root"), false)
+}
+
+/// Check before runtime composition, so known persistent commands cannot initialize adapters.
+pub fn validate_one_shot_operation(
+    request: &RequestEnvelope,
+) -> Result<(), protocol::operation::OperationError> {
+    use protocol::operation::OperationRequest;
+    request.validate()?;
+    match &request.request {
+        OperationRequest::Search(_)
+        | OperationRequest::Describe(_)
+        | OperationRequest::Invoke(_) => Ok(()),
+        OperationRequest::SessionStatus(_)
+        | OperationRequest::SessionTerminate(_)
+        | OperationRequest::SessionReconcile(_)
+        | OperationRequest::SessionSignal(_) => Err(daemon_required("operation session control")),
+    }
+}
+
+/// Connection metadata is bounded. Activation, materialization and credential acquisition require
+/// the daemon until each adapter can prove custody and continuation survive process exit.
+pub fn validate_one_shot_connection(
+    request: &protocol::connection::RequestEnvelope,
+) -> Result<(), protocol::connection::ConnectionError> {
+    use protocol::connection::{ConnectionError, ConnectionErrorCode, ConnectionRequest};
+    request.validate()?;
+    match &request.request {
+        ConnectionRequest::Search(_) | ConnectionRequest::Describe(_) | ConnectionRequest::CandidateSearch(_)
+        | ConnectionRequest::ObservationSearch(_) => Ok(()),
+        ConnectionRequest::CandidateActivate(_) | ConnectionRequest::Materialize(_)
+        | ConnectionRequest::ConnectSessionCreate(_) | ConnectionRequest::ConnectSessionStatus(_) =>
+            Err(ConnectionError::new(ConnectionErrorCode::Unavailable,
+                "connection activation, materialization and connect sessions require a persistent daemon; run `connectors serve local` with the same --config and --state-root", false)),
     }
 }
 
@@ -362,9 +505,16 @@ fn prepare_parent(parent: &Path, owner_uid: u32) -> Result<(), LocalDaemonError>
 }
 
 fn remove_owned_stale_socket(path: &Path, owner_uid: u32) -> Result<(), LocalDaemonError> {
+    if validate_owned_socket(path, owner_uid)? {
+        std::fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+fn validate_owned_socket(path: &Path, owner_uid: u32) -> Result<bool, LocalDaemonError> {
     let metadata = match std::fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
         Err(error) => return Err(error.into()),
     };
     if !metadata.file_type().is_socket()
@@ -373,8 +523,7 @@ fn remove_owned_stale_socket(path: &Path, owner_uid: u32) -> Result<(), LocalDae
     {
         return Err(LocalDaemonError::UnsafeExistingSocket);
     }
-    std::fs::remove_file(path)?;
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]

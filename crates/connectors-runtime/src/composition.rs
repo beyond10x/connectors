@@ -32,7 +32,7 @@ use integration_sip::{
 use integration_slack::SlackBackend;
 use serde_json::{json, Value};
 use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
-use server::local::LocalOperationDaemon;
+use server::local::{LocalOperationDaemon, LocalStateOwnership};
 #[cfg(feature = "sip")]
 use service::CredentialSet;
 use service::{AdminIntegration, AdminRegistry, ConnectorBackend, EgressTransport, GitFetchBroker};
@@ -181,6 +181,12 @@ pub struct PersonalRuntime {
     readiness: Value,
 }
 
+pub(crate) struct PersonalComposition {
+    pub(crate) registry: Arc<BackendRegistry>,
+    pub(crate) ownership: LocalStateOwnership,
+    readiness: Value,
+}
+
 /// Credential capabilities supplied by an embedding personal runtime.
 #[derive(Clone)]
 pub struct PersonalCredentialStores {
@@ -221,7 +227,34 @@ impl PersonalRuntime {
         state_root: PathBuf,
         supplied_stores: Option<PersonalCredentialStores>,
     ) -> Result<Self, RuntimeError> {
+        let composed = Self::compose(config_path, state_root, supplied_stores, true).await?;
+        let daemon =
+            match LocalOperationDaemon::bind_owned(composed.ownership, composed.registry.clone())
+                .await
+            {
+                Ok(daemon) => daemon,
+                Err(error) => {
+                    composed.registry.shutdown().await;
+                    return Err(error.into());
+                }
+            };
+        Ok(Self {
+            daemon,
+            readiness: composed.readiness,
+        })
+    }
+
+    pub(crate) async fn compose(
+        config_path: Option<&Path>,
+        state_root: PathBuf,
+        supplied_stores: Option<PersonalCredentialStores>,
+        persistent: bool,
+    ) -> Result<PersonalComposition, RuntimeError> {
         validate_state_root(&state_root)?;
+        let ownership = LocalStateOwnership::acquire(state_root.join("connectors.sock"))?;
+        if !persistent {
+            ownership.require_absent_socket()?;
+        }
         // The local dispatch seam's one-time claim (S-048): an approval-demanding invocation
         // presenting an `event:` reference spends it exactly once, durably, before any
         // Integration is reached. Wired for every personal placement — the journal exists from
@@ -438,8 +471,18 @@ impl PersonalRuntime {
                     .expect("credential consumer selected the shared store")
                     .prepared
                     .clone();
-                let backend =
-                    SlackBackend::open(owner, slack, &state_root, store, slack_egress()?).await?;
+                let backend = if persistent {
+                    SlackBackend::open(owner, slack, &state_root, store, slack_egress()?).await?
+                } else {
+                    SlackBackend::open_without_supervision(
+                        owner,
+                        slack,
+                        &state_root,
+                        store,
+                        slack_egress()?,
+                    )
+                    .await?
+                };
                 slack_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
             }
@@ -449,16 +492,6 @@ impl PersonalRuntime {
             backends,
             event_reply_claims,
         ));
-        let daemon =
-            match LocalOperationDaemon::bind(state_root.join("connectors.sock"), registry.clone())
-                .await
-            {
-                Ok(daemon) => daemon,
-                Err(error) => {
-                    registry.shutdown().await;
-                    return Err(error.into());
-                }
-            };
         let readiness = json!({
             "ready": true,
             "protocol": protocol::operation::CONTRACT,
@@ -467,7 +500,7 @@ impl PersonalRuntime {
                 protocol::connection::CONTRACT,
                 protocol::event::CONTRACT,
             ],
-            "socket": daemon.socket_path(),
+            "socket": persistent.then(|| state_root.join("connectors.sock")),
             "event_reply_claims": true,
             "sip_dial_configured": sip_dial_configured,
             "voice_authority_verifying_key": verifying_key,
@@ -483,7 +516,11 @@ impl PersonalRuntime {
             "catalog_connections": catalog_connections,
             "credential_store": credential_backend,
         });
-        Ok(Self { daemon, readiness })
+        Ok(PersonalComposition {
+            registry,
+            ownership,
+            readiness,
+        })
     }
 
     #[must_use]
