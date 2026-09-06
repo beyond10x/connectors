@@ -2515,3 +2515,49 @@ fn rate_stage2_conditional_history_advice_is_metadata_without_schema_edits() {
         assert_eq!(operation["contract"], original["contract"]);
     }
 }
+// Independent rate declaration/schema comparison; prior invariants are unchanged.
+#[test]
+fn rate_adversary_canonical_source_urls_match_authoring_reader() {
+    let (workspace, plan) = full_plan();
+    let mut document = documents(&workspace, &plan)["slack"].clone();
+    let index = document["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|operation| operation["id"] == "slack-conversations-history")
+        .unwrap();
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../catalog/connector-document-v3.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(&schema)
+        .unwrap();
+    assert!(validator.is_valid(&document));
+    let mut mismatches = Vec::new();
+    for source in [
+        "https://docs.example.test/rate",
+        "HTTPS://docs.example.test/rate",
+        "https://docs.example.test:65536/rate",
+        "https://docs.example.test/a b",
+    ] {
+        let declaration = &mut document["operations"][index]["conditional_rate_limits"][0];
+        declaration["source_url"] = json!(source);
+        let authoring =
+            serde_json::from_value::<connector_spec::ConditionalRateLimit>(declaration.clone())
+                .is_ok();
+        let canonical = validator.is_valid(&document);
+        if authoring != canonical {
+            mismatches.push(format!(
+                "{source:?}: authoring={authoring}, schema3={canonical}"
+            ));
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "the public authoring reader and generated schema3 disagree:\n{}",
+        mismatches.join("\n")
+    );
+}
