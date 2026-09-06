@@ -19,6 +19,10 @@ scope:
 - confidence: inferred
   path: crates/connectors-config/src/personal/catalog.rs
 - confidence: cited
+  path: crates/connectors-console/Cargo.lock
+- confidence: cited
+  path: crates/connectors-console/Cargo.toml
+- confidence: cited
   path: crates/connectors-console/src/auth.rs
 - confidence: cited
   path: crates/connectors-console/src/enrol.rs
@@ -42,7 +46,7 @@ scope:
   path: ess/system/domains/connection.yaml
 - confidence: inferred
   path: ess/system/domains/deployment.yaml
-revision: 37
+revision: 39
 ---
 
 # Story: one placement, several credentials, a Connection per identity
