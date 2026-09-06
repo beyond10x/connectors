@@ -156,6 +156,10 @@ scope:
 - confidence: inferred
   path: crates/catalog-build/src/document_tests.rs
 - confidence: inferred
+  path: crates/catalog-build/src/workspace.rs
+- confidence: inferred
+  path: crates/catalog-build/tests/main/catalog_invariants.rs
+- confidence: inferred
   path: crates/catalog-reader/catalog.pack
 - confidence: inferred
   path: crates/catalog-reader/src/lib.rs
@@ -226,6 +230,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-console/src/doctor.rs
 - confidence: inferred
+  path: crates/connectors-console/src/enrol.rs
+- confidence: inferred
   path: crates/connectors-console/src/envelope.rs
 - confidence: inferred
   path: crates/connectors-console/tests/personal_oauth.rs
@@ -237,6 +243,10 @@ scope:
   path: crates/connectors-runtime/src/registry.rs
 - confidence: inferred
   path: crates/connectors-runtime/src/registry_claims_tests.rs
+- confidence: inferred
+  path: crates/connectors-runtime/tests/local_catalog_writes.rs
+- confidence: inferred
+  path: crates/connectors-runtime/tests/local_gitlab_schedules.rs
 - confidence: inferred
   path: crates/connectors-runtime/tests/one_shot_runtime.rs
 - confidence: inferred
@@ -283,7 +293,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 39
+revision: 40
 ---
 ## Acceptance
 

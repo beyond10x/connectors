@@ -37,6 +37,8 @@ scope:
 - confidence: inferred
   path: crates/catalog/tests/main/consumer_api.rs
 - confidence: inferred
+  path: crates/catalog/tests/main/pack_table.rs
+- confidence: inferred
   path: crates/connector-spec/Cargo.toml
 - confidence: inferred
   path: crates/connector-spec/schema/provider-toml.schema.json
@@ -60,7 +62,7 @@ scope:
   path: crates/connector-spec/tests/golden/operation-auth-typo.error
 - confidence: cited
   path: crates/connector-spec/tests/main/determinism.rs
-- confidence: cited
+- confidence: inferred
   path: crates/connector-spec/tests/main/ir_roundtrip.rs
 - confidence: cited
   path: crates/connector-spec/tests/main/service_partition.rs
@@ -73,7 +75,13 @@ scope:
 - confidence: inferred
   path: crates/connectors-cli/tests/adversary_fence_probe.rs
 - confidence: inferred
+  path: crates/connectors-cli/tests/adversary_fence_probe_pass2.rs
+- confidence: inferred
   path: crates/connectors-cli/tests/cli_surface.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/cli_surface_drift.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/cli_surface_pass_two.rs
 - confidence: cited
   path: crates/connectors-cli/tests/one_shot_operations.rs
 - confidence: cited
@@ -92,6 +100,8 @@ scope:
   path: crates/connectors-runtime/src/registry.rs
 - confidence: cited
   path: crates/connectors-runtime/src/service_bundle.rs
+- confidence: inferred
+  path: crates/connectors-runtime/tests/rate_adversary_registry.rs
 - confidence: inferred
   path: crates/driver-audio/Cargo.lock
 - confidence: inferred
@@ -149,9 +159,13 @@ scope:
 - confidence: cited
   path: crates/protocol/tests/bundles.rs
 - confidence: inferred
+  path: crates/protocol/tests/rate_adversary.rs
+- confidence: inferred
   path: crates/rtvbp-voice-endpoint/Cargo.lock
 - confidence: cited
   path: crates/server/src/egress.rs
+- confidence: inferred
+  path: crates/server/src/egress_rate_adversary_tests.rs
 - confidence: cited
   path: crates/server/src/hosted.rs
 - confidence: cited
@@ -172,6 +186,8 @@ scope:
   path: crates/server/src/hosted/tests/signal.rs
 - confidence: cited
   path: crates/server/src/local.rs
+- confidence: inferred
+  path: crates/server/tests/rate_adversary_local.rs
 - confidence: inferred
   path: crates/service/Cargo.toml
 - confidence: cited
@@ -198,7 +214,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 129
+revision: 131
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
