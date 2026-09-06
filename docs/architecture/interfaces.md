@@ -69,6 +69,7 @@ caller-supplied approval string looks sufficient.
 | D1 no longer matches the current description | Describe again and review the resulting request before seeking approval. |
 | Authority, Grant, approval binding, expiry, or one-time redemption refuses | The hosted write is not admitted. Missing, mismatched, expired, and replayed approvals do not become distinct public authorization disclosures. |
 | The authority store is unavailable | Admission cannot answer. The effect must not proceed through that failed admission. |
+| The provider returns a definite HTTP 429 | The request was refused for rate limiting. A trusted retry delay may be supplied; it does not authorize another invocation. |
 | The provider may have accepted the write, but no terminal outcome is durable | The outcome is uncertain. Inspect the recorded result and provider state before deciding on another action. |
 
 The [hosted enforcement implementation](../../crates/server/src/hosted/enforcement.rs) distinguishes
@@ -78,6 +79,51 @@ cover spent approvals whose final outcome is absent.
 An operation can finish in one request or establish a session. Session methods inspect, terminate,
 reconcile, or signal an existing execution. A daemon restart can leave an old execution's outcome
 unknown; a missing in-memory record does not prove that no effect occurred.
+
+## Operation versions and rate advice
+
+Local and hosted operation boundaries accept `b10x.connector-operation.v0alpha1` and
+`b10x.connector-operation.v0alpha2`. Both use the same admission and backend path. The declared
+identity and request are validated before dispatch; unknown versions are refused. Operation
+replies use the requested supported identity. Upgrade a local CLI and daemon together, and check
+provider support before adopting v2 in an independently pinned client.
+
+In v2, a definite provider HTTP 429 produces an error with `code: rate_limited` and
+`retriable: true`. An optional `retry_after_seconds` gives an unsigned delay in seconds, including
+zero. Connectors trusts only one admitted numeric Retry-After header, with surrounding ASCII spaces
+or tabs removed. Missing, duplicate, malformed, overflowing or HTTP-date values leave the delay
+absent. The provider's raw headers and error body are not exposed as the error message. A received
+429 remains a definite refusal even if its error body is oversized or incomplete; uncertainty
+about an attempted write remains `outcome_unknown`.
+
+CLI JSON/YAML errors and MCP structured errors retain the code, retriable flag and optional delay;
+the CLI still exits nonzero. A delay is advice for the caller's next decision. Neither the delay,
+the retriable flag, a protocol mismatch nor an uncertain result triggers an automatic invocation
+resend or a fallback to another protocol version. A fresh invocation must pass normal Connection,
+Grant, description and approval checks.
+
+V2 descriptions may include `rate_advice`, carrying fixed limits and conditional alternatives.
+Each alternative preserves its applicability, source URL and any published numeric rate. A
+`minimum_allowance` is a minimum tier allowance; a `ceiling` is a maximum. If the source establishes
+no numeric rate, none is invented. Numeric alternatives include suggested spacing in milliseconds,
+computed as `ceil(per_seconds * 1000 / requests)`. All alternatives remain visible so the caller
+can assess its application category; Connectors does not infer that category from credentials or
+pace requests from the metadata.
+
+V1 continues to receive its existing error shape: throttling becomes `unavailable`, preserving
+the message and retriable flag while omitting retry delay and description rate advice. Its frozen
+bundle bytes remain unchanged. Existing deployed-v1 `purpose` and `session_signal` extensions are
+tracked separately from that older schema. The [operation contract](../../contracts/connector-operation/v0alpha2/README.md)
+documents the complete v2 shape and exact compatibility loss.
+
+Catalog schema 3 introduces a separate compatibility requirement. Its explicit request-semantics
+profiles preserve supported vendor constraints, whole JSON bodies and omission versus null for
+migrated operations. Legacy operations keep their declared legacy profile. Publish a matching
+producer, schema, documents/pack, reader and resolver together; an external pack consumer must
+upgrade its reader/resolver before loading schema 3. An older executable may retain its matching
+older pack. Changing the catalog version alone does not establish source fidelity for every
+provider. The [domain amendment](../design/01-domain-model.md#2026-09-06-amendment-source-request-semantics)
+describes the distinction.
 
 ## The CLI at a glance
 
