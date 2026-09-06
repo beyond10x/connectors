@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Personal access token entered once through a protected Connect Session. Acts as the person who created it; choose read_api for reads or api for writes",
@@ -62,7 +62,8 @@
   "config": [
     {
       "also_services": [
-        "login"
+        "login",
+        "rest"
       ],
       "approval": "operator",
       "binds": "endpoint.origin",
@@ -215,7 +216,7 @@
       }
     }
   ],
-  "description": "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only",
+  "description": "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; manage project pipeline schedules; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only",
   "generator": "connectors 0.6.5",
   "operations": [
     {
@@ -344,6 +345,7 @@
         "method": "GET",
         "url": "{base}/user"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -560,6 +562,7 @@
         ],
         "url": "{base}/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -748,6 +751,7 @@
         "method": "GET",
         "url": "{base}/users/{user_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1006,6 +1010,7 @@
         ],
         "url": "{base}/groups"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1197,6 +1202,7 @@
         "method": "GET",
         "url": "{base}/groups/{group_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1493,6 +1499,7 @@
         ],
         "url": "{base}/projects"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1695,6 +1702,7 @@
         "method": "GET",
         "url": "{base}/projects/{project_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1952,6 +1960,7 @@
         ],
         "url": "{base}/projects/{project_id}/issues"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2207,6 +2216,7 @@
         "method": "GET",
         "url": "{base}/projects/{project_id}/issues/{issue_iid}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2486,6 +2496,7 @@
         "method": "POST",
         "url": "{base}/projects/{project_id}/issues"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2759,6 +2770,7 @@
         ],
         "url": "{base}/projects/{project_id}/merge_requests"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3009,6 +3021,7 @@
         "method": "GET",
         "url": "{base}/projects/{project_id}/merge_requests/{merge_request_iid}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3310,6 +3323,7 @@
         "method": "POST",
         "url": "{base}/projects/{project_id}/merge_requests"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3565,6 +3579,7 @@
         "method": "PUT",
         "url": "{base}/projects/{project_id}/merge_requests/{merge_request_iid}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3790,6 +3805,7 @@
         "method": "GET",
         "url": "{base}/projects/{project_id}/pipelines/{pipeline_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4061,6 +4077,7 @@
         ],
         "url": "{base}/projects/{project_id}/repository/branches"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4287,6 +4304,7 @@
         ],
         "url": "{base}/projects/{project_id}/repository/branches"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4589,6 +4607,7 @@
         "method": "POST",
         "url": "{base}/projects/{project_id}/repository/commits"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4881,6 +4900,7 @@
         ],
         "url": "{base}/projects/{project_id}/repository/tree"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5108,6 +5128,7 @@
         ],
         "url": "{base}/projects/{project_id}/repository/files/{file_path}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5169,9 +5190,1971 @@
       "risk": "low",
       "semantic_effects": [],
       "service": "default"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ],
+              [
+                "read_api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "List all pipeline schedules",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "page": {
+              "default": 1,
+              "type": "integer"
+            },
+            "per_page": {
+              "default": 20,
+              "type": "integer"
+            },
+            "scope": {
+              "enum": [
+                "active",
+                "inactive"
+              ],
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "output_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "active": {
+              "type": "boolean"
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "cron": {
+              "type": "string"
+            },
+            "cron_timezone": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "inputs": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "next_run_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "owner": {
+              "properties": {
+                "avatar_path": {
+                  "type": "string"
+                },
+                "avatar_url": {
+                  "type": "string"
+                },
+                "custom_attributes": {
+                  "items": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "public_email": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "web_url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "List all pipeline schedules",
+      "direction": "read",
+      "effects": [
+        "read",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": true,
+      "id": "gitlab-pipeline-schedule-list",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "pagination": {
+        "page": {
+          "max_pages": 1,
+          "page_param": "page",
+          "page_size": 20,
+          "size_param": "per_page"
+        }
+      },
+      "params": [
+        {
+          "description": "The ID or URL-encoded path of the project",
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "symbol": "id"
+        },
+        {
+          "description": "Current page number",
+          "name": "page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "default": 1,
+            "type": "integer"
+          },
+          "symbol": "page"
+        },
+        {
+          "description": "Number of items per page",
+          "name": "per_page",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "default": 20,
+            "type": "integer"
+          },
+          "symbol": "per_page"
+        },
+        {
+          "description": "The scope of pipeline schedules",
+          "name": "scope",
+          "position": "query",
+          "required": false,
+          "schema": {
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "symbol": "scope"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "GET",
+        "query": [
+          {
+            "name": "page",
+            "value": {
+              "$param": "page"
+            }
+          },
+          {
+            "name": "per_page",
+            "value": {
+              "$param": "per_page"
+            }
+          },
+          {
+            "name": "scope",
+            "value": {
+              "$param": "scope"
+            }
+          }
+        ],
+        "url": "{base}/api/v4/projects/{id}/pipeline_schedules"
+      },
+      "request_semantics": "openapi_3_0_json_v1",
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "cron_timezone": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "inputs": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "next_run_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "owner": {
+            "properties": {
+              "avatar_path": {
+                "type": "string"
+              },
+              "avatar_url": {
+                "type": "string"
+              },
+              "custom_attributes": {
+                "items": {
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "id": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "locked": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "public_email": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              },
+              "web_url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "low",
+      "semantic_effects": [],
+      "service": "rest"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Create a pipeline schedule",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "properties": {
+                "active": {
+                  "default": true,
+                  "description": "The activation of pipeline schedule",
+                  "type": "boolean"
+                },
+                "cron": {
+                  "description": "The cron",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cron_timezone": {
+                  "default": "UTC",
+                  "description": "The timezone",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "The description of pipeline schedule",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "inputs": {
+                  "description": "Inputs for the pipeline schedule",
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "description": "The name of the input",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "value": {
+                        "description": "The value of the input",
+                        "oneOf": [
+                          {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "array",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "ref": {
+                  "description": "The branch/tag name will be triggered",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "description",
+                "ref",
+                "cron"
+              ],
+              "type": "object"
+            },
+            "id": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "body"
+          ],
+          "type": "object"
+        },
+        "output_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "active": {
+              "type": "boolean"
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "cron": {
+              "type": "string"
+            },
+            "cron_timezone": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "inputs": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "last_pipeline": {
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "iid": {
+                  "type": "integer"
+                },
+                "project_id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "sha": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "web_url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "next_run_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "owner": {
+              "properties": {
+                "avatar_path": {
+                  "type": "string"
+                },
+                "avatar_url": {
+                  "type": "string"
+                },
+                "custom_attributes": {
+                  "items": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "public_email": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "web_url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "variables": {
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "environment_scope": {
+                  "type": "string"
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "masked": {
+                  "type": "boolean"
+                },
+                "protected": {
+                  "type": "boolean"
+                },
+                "raw": {
+                  "type": "boolean"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "variable_type": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Create a pipeline schedule",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-pipeline-schedule-create",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The ID or URL-encoded path of the project",
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "symbol": "id"
+        },
+        {
+          "name": "body",
+          "position": "body",
+          "required": true,
+          "schema": {
+            "properties": {
+              "active": {
+                "default": true,
+                "description": "The activation of pipeline schedule",
+                "type": "boolean"
+              },
+              "cron": {
+                "description": "The cron",
+                "nullable": true,
+                "type": "string"
+              },
+              "cron_timezone": {
+                "default": "UTC",
+                "description": "The timezone",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of pipeline schedule",
+                "nullable": true,
+                "type": "string"
+              },
+              "inputs": {
+                "description": "Inputs for the pipeline schedule",
+                "items": {
+                  "properties": {
+                    "name": {
+                      "description": "The name of the input",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "The value of the input",
+                      "oneOf": [
+                        {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        {
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        {
+                          "nullable": true,
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "nullable": true,
+                "type": "array"
+              },
+              "ref": {
+                "description": "The branch/tag name will be triggered",
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "description",
+              "ref",
+              "cron"
+            ],
+            "type": "object"
+          },
+          "symbol": "body"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "$param": "body"
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "url": "{base}/api/v4/projects/{id}/pipeline_schedules"
+      },
+      "request_semantics": "openapi_3_0_json_v1",
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "cron_timezone": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "inputs": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "last_pipeline": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "iid": {
+                "type": "integer"
+              },
+              "project_id": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "web_url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "next_run_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "owner": {
+            "properties": {
+              "avatar_path": {
+                "type": "string"
+              },
+              "avatar_url": {
+                "type": "string"
+              },
+              "custom_attributes": {
+                "items": {
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "id": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "locked": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "public_email": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              },
+              "web_url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variables": {
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "environment_scope": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "key": {
+                "type": "string"
+              },
+              "masked": {
+                "type": "boolean"
+              },
+              "protected": {
+                "type": "boolean"
+              },
+              "raw": {
+                "type": "boolean"
+              },
+              "value": {
+                "type": "string"
+              },
+              "variable_type": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "rest"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Update a pipeline schedule",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "properties": {
+                "active": {
+                  "description": "The activation of pipeline schedule",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "cron": {
+                  "description": "The cron",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cron_timezone": {
+                  "description": "The timezone",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "description": "The description of pipeline schedule",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "inputs": {
+                  "description": "Inputs for the pipeline schedule",
+                  "items": {
+                    "properties": {
+                      "destroy": {
+                        "description": "Whether to delete the input",
+                        "type": [
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "name": {
+                        "description": "The name of the input",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "value": {
+                        "description": "The value of the input",
+                        "oneOf": [
+                          {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "array",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "ref": {
+                  "description": "The branch/tag name will be triggered",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "type": "object"
+            },
+            "id": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "pipeline_schedule_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "pipeline_schedule_id"
+          ],
+          "type": "object"
+        },
+        "output_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "active": {
+              "type": "boolean"
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "cron": {
+              "type": "string"
+            },
+            "cron_timezone": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "inputs": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "last_pipeline": {
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "iid": {
+                  "type": "integer"
+                },
+                "project_id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "sha": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "web_url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "next_run_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "owner": {
+              "properties": {
+                "avatar_path": {
+                  "type": "string"
+                },
+                "avatar_url": {
+                  "type": "string"
+                },
+                "custom_attributes": {
+                  "items": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "locked": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "public_email": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "web_url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "variables": {
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "environment_scope": {
+                  "type": "string"
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "masked": {
+                  "type": "boolean"
+                },
+                "protected": {
+                  "type": "boolean"
+                },
+                "raw": {
+                  "type": "boolean"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "variable_type": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Update a pipeline schedule",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-pipeline-schedule-update",
+      "idempotency": "non_idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The ID or URL-encoded path of the project",
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "symbol": "id"
+        },
+        {
+          "description": "The pipeline schedule id",
+          "name": "pipeline_schedule_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          },
+          "symbol": "pipeline_schedule_id"
+        },
+        {
+          "name": "body",
+          "position": "body",
+          "required": false,
+          "schema": {
+            "properties": {
+              "active": {
+                "description": "The activation of pipeline schedule",
+                "nullable": true,
+                "type": "boolean"
+              },
+              "cron": {
+                "description": "The cron",
+                "nullable": true,
+                "type": "string"
+              },
+              "cron_timezone": {
+                "description": "The timezone",
+                "nullable": true,
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of pipeline schedule",
+                "nullable": true,
+                "type": "string"
+              },
+              "inputs": {
+                "description": "Inputs for the pipeline schedule",
+                "items": {
+                  "properties": {
+                    "destroy": {
+                      "description": "Whether to delete the input",
+                      "nullable": true,
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "The name of the input",
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "The value of the input",
+                      "oneOf": [
+                        {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        {
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        {
+                          "nullable": true,
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "nullable": true,
+                "type": "array"
+              },
+              "ref": {
+                "description": "The branch/tag name will be triggered",
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "symbol": "body"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "body": {
+          "encoding": "json",
+          "template": {
+            "$param": "body"
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "PUT",
+        "url": "{base}/api/v4/projects/{id}/pipeline_schedules/{pipeline_schedule_id}"
+      },
+      "request_semantics": "openapi_3_0_json_v1",
+      "required_capabilities": [
+        "public_network"
+      ],
+      "response_schema": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "cron_timezone": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "inputs": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "last_pipeline": {
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "iid": {
+                "type": "integer"
+              },
+              "project_id": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "web_url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "next_run_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "owner": {
+            "properties": {
+              "avatar_path": {
+                "type": "string"
+              },
+              "avatar_url": {
+                "type": "string"
+              },
+              "custom_attributes": {
+                "items": {
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "id": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "locked": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "public_email": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              },
+              "web_url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variables": {
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "environment_scope": {
+                "type": "string"
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "key": {
+                "type": "string"
+              },
+              "masked": {
+                "type": "boolean"
+              },
+              "protected": {
+                "type": "boolean"
+              },
+              "raw": {
+                "type": "boolean"
+              },
+              "value": {
+                "type": "string"
+              },
+              "variable_type": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "risk": "high",
+      "semantic_effects": [],
+      "service": "rest"
+    },
+    {
+      "auth": [
+        [
+          "gitlab.oauth_token"
+        ],
+        [
+          "gitlab.token"
+        ],
+        [
+          "gitlab.service_account_token"
+        ],
+        [
+          "gitlab.group_access_token"
+        ],
+        [
+          "gitlab.project_access_token"
+        ]
+      ],
+      "auth_requirements": [
+        {
+          "credentials": [
+            "gitlab.oauth_token"
+          ],
+          "scopes": {
+            "gitlab.oauth_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.token"
+          ],
+          "scopes": {
+            "gitlab.token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.service_account_token"
+          ],
+          "scopes": {
+            "gitlab.service_account_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.group_access_token"
+          ],
+          "scopes": {
+            "gitlab.group_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        },
+        {
+          "credentials": [
+            "gitlab.project_access_token"
+          ],
+          "scopes": {
+            "gitlab.project_access_token": [
+              [
+                "api"
+              ]
+            ]
+          }
+        }
+      ],
+      "contract": {
+        "description": "Delete a pipeline schedule",
+        "input_schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "pipeline_schedule_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "pipeline_schedule_id"
+          ],
+          "type": "object"
+        }
+      },
+      "credential_requirement": "declared",
+      "description": "Delete a pipeline schedule",
+      "direction": "write",
+      "effects": [
+        "write",
+        "network"
+      ],
+      "endpoint": {
+        "origin": [
+          "origin"
+        ]
+      },
+      "expose": false,
+      "id": "gitlab-pipeline-schedule-delete",
+      "idempotency": "idempotent",
+      "implementation_form": "built_in",
+      "interaction_shape": "unary",
+      "params": [
+        {
+          "description": "The ID or URL-encoded path of the project",
+          "name": "id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "symbol": "id"
+        },
+        {
+          "description": "The pipeline schedule id",
+          "name": "pipeline_schedule_id",
+          "position": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          },
+          "symbol": "pipeline_schedule_id"
+        }
+      ],
+      "placement_requirement": "connectors_deployment",
+      "protocol_driver": "http_v1",
+      "request": {
+        "method": "DELETE",
+        "url": "{base}/api/v4/projects/{id}/pipeline_schedules/{pipeline_schedule_id}"
+      },
+      "request_semantics": "openapi_3_0_json_v1",
+      "required_capabilities": [
+        "public_network"
+      ],
+      "risk": "destructive",
+      "semantic_effects": [],
+      "service": "rest"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v4",
@@ -5193,6 +7176,20 @@
       "description": "GitLab's OAuth2 authorize and token endpoints, at the instance origin.",
       "gid": "com.gitlab.api/login:v4",
       "name": "login"
+    },
+    {
+      "api_version": "v4",
+      "audiences": [
+        "developer"
+      ],
+      "base_url": "{origin}",
+      "description": "Official GitLab REST API operation projections",
+      "gid": "com.gitlab.api/rest:v4",
+      "name": "rest",
+      "tags": [
+        "source-control",
+        "issue-tracking"
+      ]
     }
   ],
   "vendor": "GitLab",

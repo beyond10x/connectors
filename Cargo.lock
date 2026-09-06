@@ -426,6 +426,7 @@ dependencies = [
  "jsonschema",
  "serde",
  "serde_json",
+ "serde_norway",
  "toml",
 ]
 
@@ -436,6 +437,12 @@ dependencies = [
  "anyhow",
  "catalog-build",
  "clap",
+ "connector-spec",
+ "serde",
+ "serde_json",
+ "serde_norway",
+ "sha2 0.10.9",
+ "toml",
 ]
 
 [[package]]
@@ -586,6 +593,7 @@ dependencies = [
  "catalog-reader",
  "connector-address",
  "connector-secrets",
+ "jsonschema",
  "serde",
  "serde_json",
  "thiserror",

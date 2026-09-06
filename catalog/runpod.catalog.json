@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Runpod API key, created in the Runpod console under Settings → API Keys with the minimum permission the connection needs",
@@ -104,6 +104,7 @@
         "method": "POST",
         "url": "{base}/v2/pods/{id}/action"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -681,6 +682,7 @@
         ],
         "url": "{base}/v2/pods"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1262,6 +1264,7 @@
         "method": "GET",
         "url": "{base}/v2/pods/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1814,6 +1817,7 @@
         "method": "GET",
         "url": "{base}/v2/serverless"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2259,6 +2263,7 @@
         "method": "GET",
         "url": "{base}/v2/network-volumes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2356,6 +2361,7 @@
         "method": "GET",
         "url": "{base}/v2/catalog/gpus"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2669,6 +2675,7 @@
         ],
         "url": "{base}/v2/billing"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3013,6 +3020,7 @@
         "method": "GET",
         "url": "{base}/v2/catalog/gpus/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3211,6 +3219,7 @@
         "method": "GET",
         "url": "{base}/v2/catalog/cpus"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3384,6 +3393,7 @@
         "method": "GET",
         "url": "{base}/v2/catalog/cpus/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3553,6 +3563,7 @@
         ],
         "url": "{base}/v2/catalog/datacenters"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3756,6 +3767,7 @@
         "method": "GET",
         "url": "{base}/v2/catalog/datacenters/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3931,6 +3943,7 @@
         "method": "GET",
         "url": "{base}/v2/account/ssh-keys"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4022,6 +4035,7 @@
         "method": "PUT",
         "url": "{base}/v2/account/ssh-keys"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4195,6 +4209,7 @@
         ],
         "url": "{base}/v2/billing/clusters"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4535,6 +4550,7 @@
         ],
         "url": "{base}/v2/billing/endpoints"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4824,6 +4840,7 @@
         ],
         "url": "{base}/v2/billing/network-volumes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5171,6 +5188,7 @@
         ],
         "url": "{base}/v2/billing/pods"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5530,6 +5548,7 @@
         ],
         "url": "{base}/v2/billing/serverless"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -5812,6 +5831,7 @@
         ],
         "url": "{base}/v2/catalog/templates"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6003,6 +6023,7 @@
         "method": "GET",
         "url": "{base}/v2/clusters"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6387,6 +6408,7 @@
         "method": "POST",
         "url": "{base}/v2/clusters"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6599,6 +6621,7 @@
         "method": "GET",
         "url": "{base}/v2/clusters/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6835,6 +6858,7 @@
         "method": "PATCH",
         "url": "{base}/v2/clusters/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7047,6 +7071,7 @@
         "method": "DELETE",
         "url": "{base}/v2/clusters/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7104,6 +7129,7 @@
         "method": "GET",
         "url": "{base}/v2/clusters/{id}/pods"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7757,6 +7783,7 @@
         "method": "POST",
         "url": "{base}/v2/network-volumes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7857,6 +7884,7 @@
         "method": "GET",
         "url": "{base}/v2/network-volumes/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8002,6 +8030,7 @@
         "method": "PATCH",
         "url": "{base}/v2/network-volumes/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8102,6 +8131,7 @@
         "method": "DELETE",
         "url": "{base}/v2/network-volumes/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8399,6 +8429,7 @@
         "method": "POST",
         "url": "{base}/v2/pods"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9108,6 +9139,7 @@
         "method": "PATCH",
         "url": "{base}/v2/pods/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9674,6 +9706,7 @@
         "method": "DELETE",
         "url": "{base}/v2/pods/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9713,6 +9746,7 @@
         "method": "GET",
         "url": "{base}/v2/registries"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9845,6 +9879,7 @@
         "method": "POST",
         "url": "{base}/v2/registries"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9899,6 +9934,7 @@
         "method": "GET",
         "url": "{base}/v2/registries/delegations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10051,6 +10087,7 @@
         "method": "POST",
         "url": "{base}/v2/registries/delegations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10161,6 +10198,7 @@
         "method": "DELETE",
         "url": "{base}/v2/registries/delegations/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10217,6 +10255,7 @@
         "method": "GET",
         "url": "{base}/v2/registries/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10288,6 +10327,7 @@
         "method": "DELETE",
         "url": "{base}/v2/registries/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10705,6 +10745,7 @@
         "method": "POST",
         "url": "{base}/v2/serverless"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -11153,6 +11194,7 @@
         "method": "GET",
         "url": "{base}/v2/serverless/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -11880,6 +11922,7 @@
         "method": "PATCH",
         "url": "{base}/v2/serverless/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12328,6 +12371,7 @@
         "method": "DELETE",
         "url": "{base}/v2/serverless/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12385,6 +12429,7 @@
         "method": "GET",
         "url": "{base}/v2/serverless/{id}/releases"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12574,6 +12619,7 @@
         "method": "GET",
         "url": "{base}/v2/serverless/{id}/workers"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12761,6 +12807,7 @@
         "method": "GET",
         "url": "{base}/v2/templates"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13109,6 +13156,7 @@
         "method": "POST",
         "url": "{base}/v2/templates"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13306,6 +13354,7 @@
         "method": "GET",
         "url": "{base}/v2/templates/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13642,6 +13691,7 @@
         "method": "PATCH",
         "url": "{base}/v2/templates/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13839,6 +13889,7 @@
         "method": "DELETE",
         "url": "{base}/v2/templates/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13847,7 +13898,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2",

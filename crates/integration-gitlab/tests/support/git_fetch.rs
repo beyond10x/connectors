@@ -43,6 +43,14 @@ impl EgressTransport for GitEgress {
         _authority_ref: &str,
         request: EgressHttpRequest,
     ) -> Result<EgressHttpResponse, EgressTransportError> {
+        assert_eq!(
+            request
+                .request
+                .headers
+                .get("authorization")
+                .map(String::as_str),
+            Some("Bearer synthetic-gitlab-token")
+        );
         let url = url::Url::parse(&request.request.url).unwrap();
         let body = if url.path() == "/api/v4/projects/42" {
             let project_call = self.project_calls.fetch_add(1, Ordering::SeqCst);
@@ -550,7 +558,7 @@ async fn upload_pack_stream_is_bounded_and_spends_the_session() {
         let headers = egress.seen_headers.lock().unwrap();
         assert_eq!(
             headers[0].get("authorization").map(String::as_str),
-            Some("Bearer synthetic-gitlab-token")
+            Some("Basic b2F1dGgyOnN5bnRoZXRpYy1naXRsYWItdG9rZW4=")
         );
         assert!(!headers[0].contains_key("x-b10x-git-source-authorization"));
     }

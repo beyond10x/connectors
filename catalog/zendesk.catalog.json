@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Zendesk API token; the user half is the agent email with Zendesk's /token marker",
@@ -233,6 +233,7 @@
         "method": "GET",
         "url": "{base}/api/v2/tickets/{ticket_id}/audits"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -417,6 +418,7 @@
         ],
         "url": "{base}/api/v2/incremental/tickets"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2104,6 +2106,7 @@
         ],
         "url": "{base}/api/v2/incremental/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2682,6 +2685,7 @@
         ],
         "url": "{base}/api/v2/incremental/organizations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2921,6 +2925,7 @@
         ],
         "url": "{base}/api/v2/incremental/ticket_events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3098,6 +3103,7 @@
         ],
         "url": "{base}/api/v2/custom_objects"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -3229,6 +3235,7 @@
         "method": "GET",
         "url": "{base}/api/v2/tickets/recent"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -4816,6 +4823,7 @@
         "method": "GET",
         "url": "{base}/api/v2/views/{view_id}/tickets"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6399,6 +6407,7 @@
         "method": "GET",
         "url": "{base}/api/v2/users/{user_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -6870,6 +6879,7 @@
         "method": "GET",
         "url": "{base}/api/v2/organizations/{organization_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7034,6 +7044,7 @@
         "method": "GET",
         "url": "{base}/api/v2/groups"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7150,6 +7161,7 @@
         "method": "GET",
         "url": "{base}/api/v2/ticket_fields"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7489,6 +7501,7 @@
         "method": "GET",
         "url": "{base}/api/v2/ticket_forms"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7751,6 +7764,7 @@
         "method": "GET",
         "url": "{base}/api/v2/custom_statuses"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -7885,6 +7899,7 @@
         "method": "GET",
         "url": "{base}/api/v2/users/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8377,6 +8392,7 @@
         ],
         "url": "{base}/api/v2/search"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8534,6 +8550,7 @@
         "method": "GET",
         "url": "{base}/api/v2/tickets/{ticket_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -10155,6 +10172,7 @@
         ],
         "url": "{base}/api/v2/tickets/{ticket_id}/comments"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -12069,6 +12087,7 @@
         "method": "PUT",
         "url": "{base}/api/v2/tickets/{ticket_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13768,6 +13787,7 @@
         "method": "GET",
         "url": "{base}/api/v2/help_center/categories"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -13892,6 +13912,7 @@
         "method": "GET",
         "url": "{base}/api/v2/help_center/sections"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -14049,6 +14070,7 @@
         ],
         "url": "{base}/api/v2/help_center/articles"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -14263,6 +14285,7 @@
         "method": "GET",
         "url": "{base}/api/v2/help_center/articles/{article_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -14474,6 +14497,7 @@
         "method": "GET",
         "url": "{base}/api/v2/help_center/articles/{article_id}/translations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -14632,6 +14656,7 @@
         ],
         "url": "{base}/api/v2/help_center/incremental/articles"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -14896,6 +14921,7 @@
         "method": "POST",
         "url": "{base}/api/v2/help_center/sections/{section_id}/articles"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -15101,6 +15127,7 @@
         "method": "POST",
         "url": "{base}/v2/apps/{appId}/conversations"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -15331,6 +15358,7 @@
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -15588,6 +15616,7 @@
         "method": "PATCH",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -15818,6 +15847,7 @@
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}/participants"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -18035,6 +18065,7 @@
         "method": "POST",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}/messages"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -20555,6 +20586,7 @@
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/conversations/{conversationId}/messages"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -23126,6 +23158,7 @@
         "method": "POST",
         "url": "{base}/v2/apps/{appId}/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -23357,6 +23390,7 @@
         "method": "GET",
         "url": "{base}/v2/apps/{appId}/users/{userIdOrExternalId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -23612,6 +23646,7 @@
         "method": "PATCH",
         "url": "{base}/v2/apps/{appId}/users/{userIdOrExternalId}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -23785,7 +23820,7 @@
       "service": "messaging"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2",

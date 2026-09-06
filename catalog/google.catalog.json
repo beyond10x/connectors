@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Google OAuth2 access token sent as a bearer; short-lived, and refreshed by the host rather than by generated Flux",
@@ -97,6 +97,7 @@
         "method": "GET",
         "url": "{base}/gmail/v1/users/{user_id}/messages/{message_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -232,6 +233,7 @@
         "method": "POST",
         "url": "{base}/gmail/v1/users/{user_id}/messages/send"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -319,6 +321,7 @@
         "method": "GET",
         "url": "{base}/gmail/v1/users/{user_id}/labels"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -452,6 +455,7 @@
         "method": "GET",
         "url": "{base}/calendar/v3/calendars/{calendar_id}/events/{event_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -673,6 +677,7 @@
         "method": "POST",
         "url": "{base}/calendar/v3/calendars/{calendar_id}/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -813,6 +818,7 @@
         "method": "GET",
         "url": "{base}/calendar/v3/calendars/{calendar_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -915,6 +921,7 @@
         "method": "GET",
         "url": "{base}/drive/v3/files/{file_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1005,6 +1012,7 @@
         "method": "PATCH",
         "url": "{base}/drive/v3/files/{file_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1013,7 +1021,7 @@
       "service": "drive"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v1",

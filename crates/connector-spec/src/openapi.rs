@@ -269,6 +269,15 @@ impl Ingested {
 /// this ingest reads. Everything narrower than "this is not a document I can read" is a
 /// [`Diagnostic`] instead.
 pub fn ingest(document: &str) -> crate::Result<Ingested> {
+    ingest_with_semantics(document, crate::RequestSemantics::LegacyV1)
+}
+
+/// Ingest under an explicit, versioned request-semantics profile. Unsupported source constructs
+/// remain operation diagnostics; this does not claim complete OpenAPI structural validation.
+pub fn ingest_with_semantics(
+    document: &str,
+    semantics: crate::RequestSemantics,
+) -> crate::Result<Ingested> {
     let root = parse(document)?;
     let root = root
         .as_object()
@@ -290,6 +299,12 @@ pub fn ingest(document: &str) -> crate::Result<Ingested> {
             READABLE_VERSIONS.join(" and ")
         )));
     }
+    if !semantics.is_legacy() && !version.starts_with("3.0.") {
+        return Err(invalid(format!(
+            "request semantics {} requires OpenAPI 3.0, found {version}",
+            semantics.word()
+        )));
+    }
 
     let info = root.get("info").and_then(Value::as_object);
     let mut ingested = Ingested {
@@ -306,7 +321,7 @@ pub fn ingest(document: &str) -> crate::Result<Ingested> {
     };
 
     read_servers(root, &mut ingested);
-    read_paths(root, &mut ingested);
+    read_paths(root, &mut ingested, semantics);
     Ok(ingested)
 }
 
@@ -477,7 +492,11 @@ fn read_server_variables(server: &Map<String, Value>) -> BTreeMap<String, Server
 }
 
 /// Every operation under `paths`, walked in sorted path order and then in [`METHODS`] order.
-fn read_paths(root: &Map<String, Value>, ingested: &mut Ingested) {
+fn read_paths(
+    root: &Map<String, Value>,
+    ingested: &mut Ingested,
+    semantics: crate::RequestSemantics,
+) {
     let Some(paths) = root.get("paths") else {
         ingested.diagnostics.push(Diagnostic {
             location: "paths".to_owned(),
@@ -495,7 +514,7 @@ fn read_paths(root: &Map<String, Value>, ingested: &mut Ingested) {
 
     // `serde_json::Map` is a `BTreeMap`, so this is sorted by path and stable across runs — the
     // determinism `connectors.lock` rests on, obtained without sorting anything here.
-    let resolver = Resolver { root };
+    let resolver = Resolver { root, semantics };
     let mut seen: BTreeSet<String> = BTreeSet::new();
     for (path, item) in paths {
         let item = match resolver.resolve(item) {
@@ -600,7 +619,10 @@ fn read_operation(
         return;
     }
 
-    let mut params = ParamSet::default();
+    let mut params = ParamSet {
+        request_semantics: resolver.semantics,
+        ..ParamSet::default()
+    };
     if let Err(problem) = read_parameters(resolver, &at, operation, &mut params) {
         ingested.diagnostics.push(Diagnostic { location, problem });
         return;
@@ -633,9 +655,9 @@ fn read_operation(
     // Zero shipped operations were affected when this landed — the gate was green — so this changes
     // no existing provider's output. What it changes is the direction a future one can drift.
     let response_schema = match response_schema {
-        Some(schema) if crate::constrains_nothing(&schema) => {
+        Some(schema) if resolver.semantics.is_legacy() && crate::constrains_nothing(&schema) => {
             ingested.diagnostics.push(Diagnostic {
-                location,
+                location: location.clone(),
                 problem: format!(
                     "the lowest 2xx response declares `{schema}`, which admits every document and \
                      so states nothing the absence of a schema does not. It was dropped rather \
@@ -647,6 +669,35 @@ fn read_operation(
         }
         schema => schema,
     };
+
+    if !resolver.semantics.is_legacy() {
+        let mut names = BTreeSet::new();
+        for param in params.iter() {
+            if !names.insert(param.name.as_str())
+                || (params.body_schema.is_some() && param.name == crate::FREE_FORM_BODY)
+            {
+                ingested.diagnostics.push(Diagnostic { location, problem: format!("parameter {:?} has a cross-position/body symbol collision unsupported by source-faithful request semantics", param.name) });
+                return;
+            }
+        }
+        for schema in params
+            .iter()
+            .map(|param| &param.schema)
+            .chain(params.body_schema.iter())
+            .chain(response_schema.iter())
+        {
+            if let Err(problem) = crate::schema_translation::openapi30(schema) {
+                ingested.diagnostics.push(Diagnostic { location, problem });
+                return;
+            }
+            for problem in crate::schema_translation::source_diagnostics(schema) {
+                ingested.diagnostics.push(Diagnostic {
+                    location: location.clone(),
+                    problem,
+                });
+            }
+        }
+    }
 
     ingested.operations.push(SpecOperation {
         operation_id: operation_id.to_owned(),
@@ -731,6 +782,29 @@ fn read_parameters(
         };
         let schema = schema?;
 
+        if !resolver.semantics.is_legacy() {
+            let expected_style = if position == "path" { "simple" } else { "form" };
+            if position == "header"
+                || entry.contains_key("content")
+                || entry
+                    .get("style")
+                    .is_some_and(|value| value.as_str() != Some(expected_style))
+                || entry
+                    .get("explode")
+                    .is_some_and(|value| value.as_bool() != Some(position == "query"))
+                || entry
+                    .get("allowReserved")
+                    .is_some_and(|value| value != &Value::Bool(false))
+                || entry
+                    .get("allowEmptyValue")
+                    .is_some_and(|value| value != &Value::Bool(false))
+                || !source_scalar(&schema)
+                || source_nullable_parameter(&schema)
+            {
+                return Err(format!("parameter {name:?} in {position} has unsupported source-faithful serialization (style/explode/content/nullable or nonscalar schema)"));
+            }
+        }
+
         let param = Param {
             name: name.clone(),
             wire: None,
@@ -782,6 +856,35 @@ fn parameter_schema(
     let (_, media) = content.iter().next()?;
     let schema = media.as_object()?.get("schema")?;
     Some(resolver.expand(schema))
+}
+
+fn source_scalar(schema: &Value) -> bool {
+    if let Some(kind) = schema.get("type").and_then(Value::as_str) {
+        return matches!(kind, "string" | "integer" | "number" | "boolean");
+    }
+    ["oneOf", "anyOf", "allOf"].iter().any(|key| {
+        schema
+            .get(key)
+            .and_then(Value::as_array)
+            .is_some_and(|branches| !branches.is_empty() && branches.iter().all(source_scalar))
+    })
+}
+
+fn source_nullable_parameter(schema: &Value) -> bool {
+    if schema
+        .get("enum")
+        .and_then(Value::as_array)
+        .is_some_and(|values| !values.contains(&Value::Null))
+    {
+        return false;
+    }
+    schema.get("nullable") == Some(&Value::Bool(true))
+        || ["oneOf", "anyOf", "allOf"].iter().any(|key| {
+            schema
+                .get(key)
+                .and_then(Value::as_array)
+                .is_some_and(|branches| branches.iter().any(source_nullable_parameter))
+        })
 }
 
 /// The request body, as named fields when the vendor describes an object and as a whole schema
@@ -837,6 +940,19 @@ fn read_request_body(
     let schema = resolver.expand(schema)?;
     params.body_encoding = encoding;
 
+    if !resolver.semantics.is_legacy() {
+        if encoding != BodyEncoding::Json || content.len() != 1 {
+            return Err("source-faithful request semantics supports one application/json body media type; other encodings are importer gaps".to_owned());
+        }
+        params.body_required = Some(
+            body.get("required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        );
+        params.body_schema = Some(schema);
+        return Ok(());
+    }
+
     let object = schema.as_object().filter(|schema| {
         schema.get("type").and_then(Value::as_str) == Some("object")
             && schema
@@ -890,6 +1006,22 @@ fn read_response(
     let Some(responses) = operation.get("responses").and_then(Value::as_object) else {
         return Ok(None);
     };
+    if !resolver.semantics.is_legacy()
+        && responses
+            .keys()
+            .filter(|status| status.starts_with('2') && status.len() == 3)
+            .count()
+            > 1
+    {
+        return Err("multiple successful response statuses are outside the source-faithful response profile; none was silently selected".to_owned());
+    }
+    if !resolver.semantics.is_legacy() {
+        for (status, response) in responses {
+            if !status.starts_with('2') && resolver.resolve(response)?.get("content").is_some() {
+                return Err(format!("response {status} declares content outside the supported successful-response source profile; no error schema was silently omitted"));
+            }
+        }
+    }
     let Some(status) = responses
         .keys()
         .filter(|status| status.starts_with('2') && status.len() == 3)
@@ -899,6 +1031,18 @@ fn read_response(
     };
 
     let response = resolver.resolve(&responses[status])?;
+    if !resolver.semantics.is_legacy() {
+        if let Some(content) = response.get("content").and_then(Value::as_object) {
+            if content.len() != 1
+                || content
+                    .get(RESPONSE_BODY)
+                    .and_then(|media| media.get("schema"))
+                    .is_none()
+            {
+                return Err("successful response media types or absent schema are unsupported by source-faithful response semantics".to_owned());
+            }
+        }
+    }
     let Some(schema) = response
         .as_object()
         .and_then(|response| response.get("content"))
@@ -926,6 +1070,7 @@ fn read_response(
 /// gains them as *services*, not as a resolution scope.
 struct Resolver<'a> {
     root: &'a Map<String, Value>,
+    semantics: crate::RequestSemantics,
 }
 
 impl Resolver<'_> {
@@ -945,6 +1090,9 @@ impl Resolver<'_> {
     fn expand(&self, value: &Value) -> Result<JsonSchema, String> {
         let mut seen = Vec::new();
         let mut budget = 0;
+        if !self.semantics.is_legacy() {
+            return self.walk_source_schema(value, &mut seen, &mut budget);
+        }
         self.walk(value, &mut seen, &mut budget, CyclePolicy::Reject)
     }
 
@@ -954,6 +1102,9 @@ impl Resolver<'_> {
     /// models therefore remain useful when their repeated tail is admitted by `true`, the JSON
     /// Schema spelling of any value. The ordinary node budget still applies to the retained prefix.
     fn expand_response(&self, value: &Value) -> Result<JsonSchema, String> {
+        if !self.semantics.is_legacy() {
+            return self.expand(value);
+        }
         let mut seen = Vec::new();
         let mut budget = 0;
         self.walk(value, &mut seen, &mut budget, CyclePolicy::BoundResponse)
@@ -970,10 +1121,76 @@ impl Resolver<'_> {
         let Some(pointer) = reference(value) else {
             return Ok(value.clone());
         };
+        if !self.semantics.is_legacy() && value.as_object().is_some_and(|object| object.len() != 1)
+        {
+            return Err("source-faithful OpenAPI 3.0 reference siblings are unsupported; no sibling constraint was merged or discarded".to_owned());
+        }
         let target = self.target(pointer, seen)?;
         let resolved = self.follow(&target, seen)?;
         seen.pop();
         Ok(merge_siblings(value, resolved))
+    }
+
+    fn walk_source_schema(
+        &self,
+        value: &Value,
+        seen: &mut Vec<String>,
+        budget: &mut usize,
+    ) -> Result<Value, String> {
+        *budget += 1;
+        if *budget > EXPANSION_BUDGET {
+            return Err(format!(
+                "source-faithful schema reference expansion exceeds {EXPANSION_BUDGET} nodes"
+            ));
+        }
+        let Some(object) = value.as_object() else {
+            return Ok(value.clone());
+        };
+        if let Some(pointer) = reference(value) {
+            if object.len() != 1 {
+                return Err(
+                    "source-faithful OpenAPI 3.0 reference siblings are unsupported".to_owned(),
+                );
+            }
+            let target = self.target(pointer, seen)?;
+            let expanded = self.walk_source_schema(&target, seen, budget)?;
+            seen.pop();
+            return Ok(expanded);
+        }
+        let mut out = object.clone();
+        for (key, child) in object {
+            let expanded = match key.as_str() {
+                "properties" => {
+                    let properties = child
+                        .as_object()
+                        .ok_or("schema properties is not an object")?;
+                    Value::Object(
+                        properties
+                            .iter()
+                            .map(|(name, schema)| {
+                                self.walk_source_schema(schema, seen, budget)
+                                    .map(|schema| (name.clone(), schema))
+                            })
+                            .collect::<Result<_, _>>()?,
+                    )
+                }
+                "items" | "not" | "additionalProperties" => {
+                    self.walk_source_schema(child, seen, budget)?
+                }
+                "allOf" | "anyOf" | "oneOf" => {
+                    let branches = child.as_array().ok_or("schema composition is not a list")?;
+                    Value::Array(
+                        branches
+                            .iter()
+                            .map(|schema| self.walk_source_schema(schema, seen, budget))
+                            .collect::<Result<_, _>>()?,
+                    )
+                }
+                _ => continue,
+            };
+            out.insert(key.clone(), expanded);
+        }
+        Ok(Value::Object(out))
     }
 
     /// Walks a value, expanding every `$ref` it meets at any depth.

@@ -450,6 +450,11 @@ impl ConnectorBackend for MonitoringBackend {
         }
     }
 
+    fn supports_ephemeral_invocation(&self, request: &InvokeRequest) -> bool {
+        // The existing closed supported surface performs bounded HTTP exchanges only.
+        supported_operation(&request.operation_ref)
+    }
+
     async fn handle(
         &self,
         context: &PrincipalContext,

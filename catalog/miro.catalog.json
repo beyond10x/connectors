@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Miro access token (a personal access token or an OAuth2 access token), sent as a bearer token, scoped to read and write boards, board items and sticky notes",
@@ -70,6 +70,7 @@
         "method": "GET",
         "url": "{base}/boards"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -171,6 +172,7 @@
         "method": "GET",
         "url": "{base}/boards/{board_id}/items"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -486,6 +488,7 @@
         "method": "GET",
         "url": "{base}/boards/{board_id}/items/{item_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -796,6 +799,7 @@
         "method": "POST",
         "url": "{base}/boards/{board_id}/sticky_notes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -953,6 +957,7 @@
         "method": "PATCH",
         "url": "{base}/boards/{board_id}/sticky_notes/{item_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1081,6 +1086,7 @@
         "method": "DELETE",
         "url": "{base}/boards/{board_id}/sticky_notes/{item_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1089,7 +1095,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2",
