@@ -223,6 +223,7 @@ impl ConnectorBackend for MonitoringBackend {
                     })?;
                 let (operation_ref, title, connections) = described;
                 Ok(OperationResult::Describe(OperationDescription {
+                    rate_advice: None,
                     operation_ref: (*operation_ref).to_owned(),
                     title: (*title).to_owned(),
                     description: "One catalogued read-only monitoring operation.".to_owned(),

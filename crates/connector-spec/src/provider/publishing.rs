@@ -134,6 +134,9 @@ pub(super) fn publish(
             if block.pagination.is_some() {
                 incompatible.push("pagination");
             }
+            if !block.conditional_rate_limits.is_empty() {
+                incompatible.push("conditional_rate_limits");
+            }
             if block.rate_limit.is_some() {
                 incompatible.push("rate_limit");
             }
@@ -830,6 +833,9 @@ fn compose(
         produces_credential: None,
         pagination: patch.and_then(|patch| patch.pagination.clone()),
         rate_limit: patch.and_then(|patch| patch.rate_limit.clone()),
+        conditional_rate_limits: patch
+            .map(|patch| patch.conditional_rate_limits.clone())
+            .unwrap_or_default(),
         error_envelope: patch.and_then(|patch| patch.error_envelope.clone()),
         // **The block, then the selector, then the field's own default** — which is exposed, so a
         // connector nobody said anything about behaves exactly as it did before C-413. `exposed()`

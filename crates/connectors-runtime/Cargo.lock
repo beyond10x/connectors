@@ -3333,6 +3333,7 @@ name = "protocol"
 version = "0.6.5"
 dependencies = [
  "domain",
+ "fluent-uri 0.4.1",
  "schemars",
  "serde",
  "serde_json",
@@ -4193,6 +4194,7 @@ version = "0.6.5"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "catalog",
  "connector-resolve",
  "connector-secrets",
  "connector-state",

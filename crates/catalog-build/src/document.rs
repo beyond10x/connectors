@@ -336,6 +336,8 @@ struct DocOperation<'a> {
     pagination: Option<&'a Pagination>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rate_limit: Option<&'a RateLimit>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    conditional_rate_limits: &'a Vec<connector_spec::ConditionalRateLimit>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error_envelope: Option<&'a ErrorEnvelope>,
 }
@@ -1026,6 +1028,7 @@ fn doc_operation<'a>(
         endpoint,
         pagination: operation.pagination.as_ref(),
         rate_limit: operation.rate_limit.as_ref(),
+        conditional_rate_limits: &operation.conditional_rate_limits,
         error_envelope: operation.error_envelope.as_ref(),
     })
 }

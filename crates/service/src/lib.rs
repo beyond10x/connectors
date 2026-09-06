@@ -9,6 +9,8 @@ mod browser;
 mod connect_session;
 mod dispatch;
 mod egress;
+mod rate_limit;
+pub use rate_limit::operation_rate_advice;
 mod factory;
 mod git_fetch;
 mod planning;
@@ -38,9 +40,9 @@ pub use dispatch::{
     Dispatcher, SensitiveValue,
 };
 pub use egress::{
-    EgressByteStream, EgressHttpRequest, EgressHttpResponse, EgressStreamingHttpRequest,
-    EgressStreamingHttpResponse, EgressTransport, EgressTransportError, EgressTransportFailure,
-    EgressWebSocket, EgressWebSocketFrame,
+    retry_after_seconds, EgressByteStream, EgressHttpRequest, EgressHttpResponse,
+    EgressStreamingHttpRequest, EgressStreamingHttpResponse, EgressTransport, EgressTransportError,
+    EgressTransportFailure, EgressWebSocket, EgressWebSocketFrame,
 };
 pub use factory::{
     ConnectorServiceFactory, DeploymentApproval, DeploymentRisk, OperationDeployment,

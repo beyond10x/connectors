@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 3
-sha256 = "74652182ddcbe21efb88010f1521e8e6c10c1f11d7febd11902d9d32d1a3b78f"
+sha256 = "e2c1c72e1a93b5286a0f28895e61827d78caa67264355344632448a1cca5765d"
 
 [[provider]]
 id = "airtable"
@@ -675,8 +675,8 @@ ir_sha256 = "f3c4aa8d851678564f424fdbdbfa47559f7a4a79a340ff02a6d491e3f0fd2478"
 [[provider]]
 id = "slack"
 generator = "connectors 0.6.5"
-toml_sha256 = "de2e171c1b896afb4b1b357b06a22935a4527774cbe13b41ff268be55426cf25"
-ir_sha256 = "cad77ed4e4ec6fd0f1eba25183c285adb113f65107db321a822a7635cb158da0"
+toml_sha256 = "7919b53cca32b4f5ad3f75ec7ec7181468cf2e482ffbd0819e334e00eea93c10"
+ir_sha256 = "ce963f64309a19cc84f3c91234f510750c369a530b2b0519712cc8d9515fd3fb"
 
 [[provider.specs]]
 path = "specs/slack/web-api-selected-1.7.0-2026-08-15.openapi.json"
@@ -699,7 +699,7 @@ upstream_version = "2026-08-15"
 sha256 = "43e1b4ecf8ea8393fa8d759bdad4629a29042299ce69d85384169c970f031e69"
 
 [provider.artifacts]
-"catalog/slack.catalog.json" = "a0ea647e46de4cb5203840500c41b35909bfc9495c582ee2d762eb0cbe3e5737"
+"catalog/slack.catalog.json" = "010318007d3b2177a834b03df3c471780392086eba4cb1964b8ce634849dc757"
 
 [[provider]]
 id = "statuspage"

@@ -149,6 +149,30 @@ pub fn emit_error_with_target(format: Format, code: &str, message: &str, target:
     eprintln!("{code}: {message}");
 }
 
+/// Preserve the operation contract's refusal details in structured CLI output.
+pub fn emit_refusal_with_target(
+    format: Format,
+    error: &crate::envelope::ReducedError,
+    target: Option<&str>,
+) {
+    if !format.errors_on_stdout() {
+        return emit_error_with_target(format, &error.code, &error.message, target);
+    }
+    let mut value = serde_json::json!({"error": {
+        "code": error.code, "message": error.message, "retriable": error.retriable
+    }});
+    if let Some(delay) = error.retry_after_seconds {
+        value["error"]["retry_after_seconds"] = Value::from(delay);
+    }
+    if let Some(target) = target {
+        value["target"] = Value::from(target);
+    }
+    match render(format, &value) {
+        Ok(rendered) => println!("{}", rendered.trim_end()),
+        Err(_) => eprintln!("{}: {}", error.code, error.message),
+    }
+}
+
 /// Strip the result-discriminant wrapper the three protocols tag their results with.
 ///
 /// Every result serializes as `{"result": "<variant>", "value": {…}}` — an internally tagged enum,

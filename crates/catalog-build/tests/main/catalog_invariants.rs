@@ -1750,7 +1750,7 @@ const OPERATION_REQUEST_VARIANTS: &[&str] = &[
 #[test]
 fn a_session_signal_reaches_a_backend_only_through_the_admission_seam() {
     let root = repo_root();
-    let protocol_source = root.join("crates/protocol/src/operation.rs");
+    let protocol_source = root.join("crates/protocol/src/operation/legacy.rs");
     let protocol = std::fs::read_to_string(&protocol_source)
         .unwrap_or_else(|error| panic!("read {}: {error}", protocol_source.display()));
     let declared = operation_request_variants(&protocol);
@@ -2457,4 +2457,342 @@ fn adversary_gitlab_pass1_translation_preserves_composed_constraint_truth_tables
         accepted.len(),
         refused.len()
     );
+}
+
+#[test]
+fn rate_stage2_conditional_history_advice_is_metadata_without_schema_edits() {
+    let (workspace, plan) = full_plan();
+    let documents = documents(&workspace, &plan);
+    let slack = &documents["slack"];
+    let history = slack["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|operation| operation["id"] == "slack-conversations-history")
+        .unwrap();
+    let alternatives = history["conditional_rate_limits"]
+        .as_array()
+        .expect("history must publish explicit conditional alternatives");
+    assert_eq!(alternatives.len(), 3);
+    assert_eq!(
+        alternatives[0]["rate"],
+        json!({"requests":50,"per_seconds":60,"basis":"minimum_allowance"})
+    );
+    assert_eq!(
+        alternatives[1]["rate"],
+        json!({"requests":1,"per_seconds":60,"basis":"ceiling"})
+    );
+    assert!(alternatives[2].get("rate").is_none());
+    assert!(alternatives[0]["applies_when"]
+        .as_str()
+        .unwrap()
+        .contains("cursor"));
+    assert!(alternatives[1]["applies_when"]
+        .as_str()
+        .unwrap()
+        .contains("2025-05-29"));
+    for alternative in alternatives {
+        assert!(alternative["source_url"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://docs.slack.dev/"));
+    }
+    assert!(
+        history.get("rate_limit").is_none(),
+        "no invented universal tier"
+    );
+    let committed: Value =
+        serde_json::from_str(include_str!("../../../../catalog/slack.catalog.json")).unwrap();
+    for operation in slack["operations"].as_array().unwrap() {
+        let original = committed["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|before| before["id"] == operation["id"])
+            .unwrap();
+        assert_eq!(operation["params"], original["params"]);
+        assert_eq!(operation["response_schema"], original["response_schema"]);
+        assert_eq!(operation["contract"], original["contract"]);
+    }
+}
+// Independent rate declaration/schema comparison; prior invariants are unchanged.
+#[test]
+fn rate_adversary_canonical_source_urls_match_authoring_reader() {
+    let (workspace, plan) = full_plan();
+    let mut document = documents(&workspace, &plan)["slack"].clone();
+    let index = document["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|operation| operation["id"] == "slack-conversations-history")
+        .unwrap();
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../catalog/connector-document-v3.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(&schema)
+        .unwrap();
+    assert!(validator.is_valid(&document));
+    let mut mismatches = Vec::new();
+    for source in [
+        "https://docs.example.test/rate",
+        "HTTPS://docs.example.test/rate",
+        "https://docs.example.test:65536/rate",
+        "https://docs.example.test/a b",
+    ] {
+        let declaration = &mut document["operations"][index]["conditional_rate_limits"][0];
+        declaration["source_url"] = json!(source);
+        let authoring =
+            serde_json::from_value::<connector_spec::ConditionalRateLimit>(declaration.clone())
+                .is_ok();
+        let canonical = validator.is_valid(&document);
+        if authoring != canonical {
+            mismatches.push(format!(
+                "{source:?}: authoring={authoring}, schema3={canonical}"
+            ));
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "the public authoring reader and generated schema3 disagree:\n{}",
+        mismatches.join("\n")
+    );
+}
+
+#[test]
+fn rate_repair_source_uri_grammar_matches_authoring_and_both_schemas() {
+    let canonical: Value = serde_json::from_str(include_str!(
+        "../../../../catalog/connector-document-v3.schema.json"
+    ))
+    .unwrap();
+    let provider: Value = serde_json::from_str(connector_spec::PROVIDER_TOML_JSON_SCHEMA).unwrap();
+    let canonical_source =
+        &canonical["$defs"]["conditional_rate_limit"]["properties"]["source_url"];
+    let provider_source = &provider["$defs"]["conditionalRateLimit"]["properties"]["source_url"];
+    let wire: Value = serde_json::from_str(include_str!(
+        "../../../../contracts/connector-operation/v0alpha2/connector-operation.schema.json"
+    ))
+    .unwrap();
+    let wire_source = &wire["$defs"]["ConditionalRateLimit"]["properties"]["source_url"];
+    assert_eq!(
+        canonical_source,
+        &connector_spec::ConditionalRateLimit::source_url_schema()
+    );
+    assert_eq!(
+        canonical_source, provider_source,
+        "hand-authored provider schema stays synchronized"
+    );
+    assert_eq!(
+        canonical_source, wire_source,
+        "all three URL projections declare one profile"
+    );
+    let canonical_validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(canonical_source)
+        .unwrap();
+    let provider_validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(provider_source)
+        .unwrap();
+    let check = |source: &str, expected: bool| {
+        let declaration = json!({"applies_when":"a documented category","source_url":source});
+        let decoded = serde_json::from_value::<connector_spec::ConditionalRateLimit>(declaration);
+        if let Ok(ref decoded) = decoded {
+            assert_eq!(decoded.source_url, source, "URI spelling is preserved");
+        }
+        let authoring = decoded.is_ok();
+        let canonical = canonical_validator.is_valid(&json!(source));
+        let provider = provider_validator.is_valid(&json!(source));
+        assert_eq!(
+            (authoring, canonical, provider),
+            (expected, expected, expected),
+            "{source:?}: authoring/canonical/provider URL grammar"
+        );
+    };
+    for (source, expected) in [
+        ("https://docs.example.test", true),
+        ("https://DOCS.example.test/rate", true),
+        ("https://docs.example.test:443/rate", true),
+        ("https://docs.example.test:/rate", true),
+        ("https://127.0.0.1:443/rate", true),
+        ("https://[2001:db8::1]:443/rate", true),
+        ("https://docs.example.test/a%20b?category=a/b?c", true),
+        ("https://docs.example.test/%E2%82%AC", true),
+        ("https://docs.example.test/rate?email=a@b", true),
+        ("HTTPS://docs.example.test/rate", false),
+        ("hTtPs://docs.example.test/rate", false),
+        ("http://docs.example.test/rate", false),
+        ("https:/docs.example.test/rate", false),
+        ("https:///rate", false),
+        ("https://:443/rate", false),
+        ("https://user@docs.example.test/rate", false),
+        ("https://user:pass@docs.example.test/rate", false),
+        ("https://@docs.example.test/rate", false),
+        ("https://docs.example.test/rate#", false),
+        ("https://docs.example.test/rate#part", false),
+        (" https://docs.example.test/rate", false),
+        ("https://docs.example.test/a b", false),
+        ("https://docs.example.test/rate?x=a b", false),
+        ("https://docs.example.test/rate\n", false),
+        ("https://docs.example.test/a\\b", false),
+        ("https://docs.example.test/a%", false),
+        ("https://docs.example.test/a%2", false),
+        ("https://docs.example.test/a%GG", false),
+        ("https://docs.example.test/€", false),
+        ("https://döcs.example.test/rate", false),
+        ("https://[2001:db8::zz]/rate", false),
+        ("https://[2001:db8::1/rate", false),
+    ] {
+        check(source, expected);
+    }
+
+    for port in [
+        0_u32, 9, 10, 99, 100, 999, 1000, 9999, 10000, 59999, 60000, 64999, 65000, 65499, 65500,
+        65529, 65530, 65535, 65536, 99999, 100000,
+    ] {
+        for spelling in [port.to_string(), format!("000{port}")] {
+            check(
+                &format!("https://docs.example.test:{spelling}/rate"),
+                port <= u32::from(u16::MAX),
+            );
+        }
+    }
+    for port in ["-1", "+1", "1.0", "1e2", "18446744073709551616"] {
+        check(&format!("https://docs.example.test:{port}/rate"), false);
+    }
+    for source in [
+        "https://%64ocs.example.test/a%2fb",
+        "https://[v1.fe80]/rate",
+        "https://docs.example.test/a%23b?x=%40",
+    ] {
+        check(source, true);
+    }
+    let prefix = "https://docs.example.test/";
+    check(
+        &format!("{prefix}{}", "a".repeat(2048 - prefix.len())),
+        true,
+    );
+    check(
+        &format!("{prefix}{}", "a".repeat(2049 - prefix.len())),
+        false,
+    );
+    check("", false);
+}
+
+#[test]
+fn rate_final_actual_provider_loading_preserves_uri_and_vendor_contract() {
+    let original = std::fs::read_to_string(repo_root().join("providers/slack.toml")).unwrap();
+    let parsed: toml::Value = toml::from_str(&original).unwrap();
+    let cache: Vec<(String, String)> = parsed["spec"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            let path = entry["path"].as_str().unwrap().to_owned();
+            let bytes = std::fs::read_to_string(repo_root().join(&path)).unwrap();
+            (path, bytes)
+        })
+        .collect();
+    let documents: Vec<_> = cache
+        .iter()
+        .map(|(path, document)| connector_spec::provider::SpecDocument { path, document })
+        .collect();
+    let load = |source: &str| connector_spec::provider::load_with_spec("slack", source, &documents);
+    let baseline = load(&original).unwrap();
+    let baseline: Value =
+        serde_json::from_str(&catalog_build::document::render(&baseline.connector).unwrap())
+            .unwrap();
+    let find = |document: &Value| {
+        document["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|op| op["id"] == "slack-conversations-history")
+            .unwrap()
+            .clone()
+    };
+    let baseline_operation = find(&baseline);
+    let source_schema: Value = serde_json::from_str(include_str!(
+        "../../../../catalog/connector-document-v3.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(&source_schema)
+        .unwrap();
+    for (sources, valid) in [
+        (
+            [
+                "https://%41.example.test:00065535/a%2fb?x=%23%40",
+                "https://[v1.a:b]:/category?cursor=a/b?c",
+                "https://docs.example.test/%00%7F?x=%ff",
+            ],
+            true,
+        ),
+        (
+            [
+                "https://docs.example.test/",
+                "https://docs.example.test:00065536/",
+                "https://docs.example.test/",
+            ],
+            false,
+        ),
+    ] {
+        let mut authored = parsed.clone();
+        let operation = authored["patch"]["operations"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|op| {
+                op.get("rename").and_then(toml::Value::as_str)
+                    == Some("slack-conversations-history")
+            })
+            .unwrap();
+        for (alternative, source) in operation["conditional_rate_limits"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(sources)
+        {
+            alternative["source_url"] = toml::Value::String(source.into());
+        }
+        let loaded = load(&toml::to_string(&authored).unwrap());
+        assert_eq!(
+            loaded.is_ok(),
+            valid,
+            "real provider loader must enforce the published profile"
+        );
+        if let Ok(loaded) = loaded {
+            let document: Value =
+                serde_json::from_str(&catalog_build::document::render(&loaded.connector).unwrap())
+                    .unwrap();
+            assert!(validator.is_valid(&document));
+            let mut operation = find(&document);
+            assert_eq!(
+                operation["conditional_rate_limits"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                3
+            );
+            for (i, source) in sources.into_iter().enumerate() {
+                assert_eq!(
+                    operation["conditional_rate_limits"][i]["source_url"],
+                    source
+                );
+                operation["conditional_rate_limits"][i]["source_url"] =
+                    baseline_operation["conditional_rate_limits"][i]["source_url"].clone();
+            }
+            assert_eq!(
+                operation, baseline_operation,
+                "source URI edits must not rewrite any vendor contract or select a category"
+            );
+        }
+    }
 }

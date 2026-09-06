@@ -61,6 +61,7 @@ fn operation(id: &str, service: &str) -> Operation {
         pagination: None,
 
         rate_limit: None,
+        conditional_rate_limits: Vec::new(),
 
         error_envelope: None,
     }
