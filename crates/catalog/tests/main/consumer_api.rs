@@ -524,3 +524,22 @@ fn the_caller_contract_is_document_data_alone() {
         );
     }
 }
+#[test]
+fn rate_stage2_typed_history_advice_preserves_all_application_categories() {
+    let operation =
+        catalog::operation(catalog::OperationKey::id("slack-conversations-history")).unwrap();
+    assert!(operation.rate_limit.is_none());
+    let alternatives = operation.conditional_rate_limits;
+    assert_eq!(alternatives.len(), 3);
+    let minimum = alternatives[0].rate.as_ref().unwrap();
+    assert_eq!(
+        (minimum.requests, minimum.per_seconds, minimum.basis),
+        (50, 60, catalog::RateLimitBasis::MinimumAllowance)
+    );
+    let ceiling = alternatives[1].rate.as_ref().unwrap();
+    assert_eq!(
+        (ceiling.requests, ceiling.per_seconds, ceiling.basis),
+        (1, 60, catalog::RateLimitBasis::Ceiling)
+    );
+    assert!(alternatives[2].rate.is_none());
+}

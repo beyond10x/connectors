@@ -93,11 +93,12 @@ fn connector_operation_vectors_match_the_strict_reader() {
     let vectors: OperationVectors =
         serde_json::from_slice(&fs::read(path).expect("vectors are readable"))
             .expect("vectors parse");
-    assert_eq!(vectors.contract, protocol::operation::CONTRACT);
+    assert_eq!(vectors.contract, protocol::operation::legacy::CONTRACT);
     for vector in vectors.cases {
-        let result = serde_json::from_value::<protocol::operation::RequestEnvelope>(vector.frame)
-            .map_err(|error| error.to_string())
-            .and_then(|request| request.validate().map_err(|error| error.to_string()));
+        let result =
+            serde_json::from_value::<protocol::operation::legacy::RequestEnvelope>(vector.frame)
+                .map_err(|error| error.to_string())
+                .and_then(|request| request.validate().map_err(|error| error.to_string()));
         assert_eq!(
             result.is_ok(),
             vector.valid,
@@ -272,10 +273,12 @@ fn operation_v2_projects_throttling_to_v1_without_optional_extensions() {
         .unwrap()
         .validate()
         .unwrap();
-    serde_json::from_slice::<protocol::operation::ResponseEnvelope>(&bytes)
-        .unwrap()
-        .validate()
-        .unwrap();
+    assert!(
+        serde_json::from_slice::<protocol::operation::ResponseEnvelope>(&bytes)
+            .unwrap()
+            .validate()
+            .is_err()
+    );
 }
 
 #[test]

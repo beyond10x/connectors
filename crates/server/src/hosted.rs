@@ -39,7 +39,9 @@ mod enforcement;
 mod git_fetch;
 mod health;
 mod mcp;
+mod operation_transport;
 mod principal;
+use operation_transport::operation;
 mod routing;
 mod subscription;
 
@@ -268,29 +270,6 @@ struct HostedState {
 #[serde(deny_unknown_fields)]
 struct ErrorBody {
     error: &'static str,
-}
-
-async fn operation(
-    State(state): State<HostedState>,
-    headers: HeaderMap,
-    Json(request): Json<RequestEnvelope>,
-) -> Response {
-    if let Err(error) = request.validate() {
-        return operation_failure(&request.request_id, error, StatusCode::BAD_REQUEST);
-    }
-    let Some(credential) = bearer(&headers) else {
-        return error(StatusCode::UNAUTHORIZED, "identity-access-token-required");
-    };
-    let principal = match state.verifier.verify(credential, CONNECTORS_AUDIENCE).await {
-        Ok(principal) => principal,
-        Err(IdentityVerificationError::Refused) => {
-            return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused");
-        }
-        Err(IdentityVerificationError::Unavailable) => {
-            return error(StatusCode::SERVICE_UNAVAILABLE, "identity-unavailable");
-        }
-    };
-    operation_decided(&state, &principal, request).await
 }
 
 /// The decide half of the `/operations` route: the scope map, the receiver policy, the S-047
@@ -798,6 +777,7 @@ mod tests {
                     if request.operation_ref == APPROVAL_OPERATION =>
                 {
                     Ok(OperationResult::Describe(OperationDescription {
+                        rate_advice: None,
                         operation_ref: request.operation_ref,
                         title: "Create todo list".to_owned(),
                         description: "Create one todo list".to_owned(),

@@ -11,6 +11,27 @@ pub fn schema() -> &'static Value {
         schema["$defs"]["operation"]["required"].as_array_mut().expect("operation required fields").push(json!("request_semantics"));
         schema["$defs"]["contract"]["description"] = json!("The stored caller contract under the explicit request-semantics profile; source profiles preserve the vendor constraints through deterministic dialect translation.");
         schema["$defs"]["contract"]["properties"]["output_schema"] = json!({"$ref":"#/$defs/json_schema"});
+        schema["$defs"]["operation"]["properties"]["conditional_rate_limits"] = json!({
+            "type":"array", "maxItems":16, "items":{"$ref":"#/$defs/conditional_rate_limit"}
+        });
+        schema["$defs"]["conditional_rate_limit"] = json!({
+            "type":"object", "additionalProperties":false,
+            "required":["applies_when","source_url"],
+            "properties":{
+                "applies_when":{"type":"string","minLength":1,"maxLength":4096,"pattern":"^[^\\u0000-\\u001f\\u007f-\\u009f]+$"},
+                "source_url":{"type":"string","minLength":1,"maxLength":2048,"format":"uri","pattern":"^https://[^/?#@\\s]+(?:[/?][^#\\s]*)?$"},
+                "rate":{"$ref":"#/$defs/published_rate"}
+            }
+        });
+        schema["$defs"]["published_rate"] = json!({
+            "type":"object", "additionalProperties":false,
+            "required":["requests","per_seconds","basis"],
+            "properties":{
+                "requests":{"type":"integer","minimum":1,"maximum":4294967295_u64},
+                "per_seconds":{"type":"integer","minimum":1,"maximum":4294967295_u64},
+                "basis":{"enum":["minimum_allowance","ceiling"]}
+            }
+        });
         schema
     })
 }

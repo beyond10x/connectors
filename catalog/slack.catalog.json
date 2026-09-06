@@ -1704,6 +1704,30 @@
           }
         }
       ],
+      "conditional_rate_limits": [
+        {
+          "applies_when": "Slack Marketplace-approved or internal customer-built applications, per method, per workspace, per application, when using cursor-based pagination. Tier 3 supplies at least 50 requests per minute; this minimum allowance does not establish a burst ceiling.",
+          "rate": {
+            "basis": "minimum_allowance",
+            "per_seconds": 60,
+            "requests": 50
+          },
+          "source_url": "https://docs.slack.dev/apis/web-api/rate-limits/"
+        },
+        {
+          "applies_when": "From 2025-05-29, newly created commercially distributed applications and new installations of existing applications outside the Slack Marketplace: conversations.history per method, per workspace, per application. The posted limit is 1 request per minute; the source also states a 15-object page restriction.",
+          "rate": {
+            "basis": "ceiling",
+            "per_seconds": 60,
+            "requests": 1
+          },
+          "source_url": "https://docs.slack.dev/reference/methods/conversations.history/"
+        },
+        {
+          "applies_when": "Existing installations of externally distributed applications outside the Slack Marketplace are exempt from the new posted conversations.history limit. That exemption establishes no numeric allowance here; applicability must be checked independently of stored credentials.",
+          "source_url": "https://docs.slack.dev/reference/methods/conversations.history/"
+        }
+      ],
       "contract": {
         "description": "Read a bounded page of recent public-channel messages, newest first. Inspect `ok` because Slack reports API failures inside HTTP 200 responses. A non-2xx response is returned as data, not a failure: the vendor's error message is at `/error` in the response body.",
         "input_schema": {

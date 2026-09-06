@@ -41,6 +41,7 @@ use crate::auth::{AuthMethod, AuthRequirement};
 use crate::config::ConfigField;
 use crate::graph::Graph;
 use crate::inbound::{ChannelBinding, EventDecl};
+use crate::{ConditionalRateLimit, RateLimit};
 
 /// A JSON Schema, carried verbatim.
 ///
@@ -579,20 +580,6 @@ pub enum Pagination {
         /// The hard cap on pages fetched.
         max_pages: u32,
     },
-}
-
-/// A vendor's published rate limit, compiled into a Flux `throttle` by C-12.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RateLimit {
-    /// Requests allowed per window.
-    pub requests: u32,
-    /// The window, in seconds.
-    pub per_seconds: u32,
-    /// The throttle bucket name. Buckets collide if they are not unique within a session, so when
-    /// this is `None` codegen derives one from the connector and operation ids.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bucket: Option<String>,
 }
 
 /// Where a vendor hides the real error inside a non-2xx response body.
@@ -1462,6 +1449,8 @@ pub struct Operation {
     pub pagination: Option<Pagination>,
     /// The endpoint's published rate limit.
     pub rate_limit: Option<RateLimit>,
+    /// Source-grounded alternatives; no credential silently selects a category.
+    pub conditional_rate_limits: Vec<ConditionalRateLimit>,
     /// Where structured vendor errors carry their code and message.
     pub error_envelope: Option<ErrorEnvelope>,
 }
@@ -1526,6 +1515,9 @@ impl Serialize for Operation {
         if let Some(value) = &self.pagination {
             map.serialize_entry("pagination", value)?;
         }
+        if !self.conditional_rate_limits.is_empty() {
+            map.serialize_entry("conditional_rate_limits", &self.conditional_rate_limits)?;
+        }
         if let Some(value) = &self.rate_limit {
             map.serialize_entry("rate_limit", value)?;
         }
@@ -1580,6 +1572,8 @@ struct OperationWire {
     pagination: Option<Pagination>,
     #[serde(default)]
     rate_limit: Option<RateLimit>,
+    #[serde(default, deserialize_with = "crate::rate_limit::alternatives")]
+    conditional_rate_limits: Vec<ConditionalRateLimit>,
     #[serde(default)]
     error_envelope: Option<ErrorEnvelope>,
 }
@@ -1648,6 +1642,7 @@ impl<'de> Deserialize<'de> for Operation {
             produces_credential: wire.produces_credential,
             pagination: wire.pagination,
             rate_limit: wire.rate_limit,
+            conditional_rate_limits: wire.conditional_rate_limits,
             error_envelope: wire.error_envelope,
         })
     }

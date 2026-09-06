@@ -96,10 +96,10 @@ fn assert_request_example_accepted(path: &str, name: &str, value: Value) {
             .unwrap_or_else(|error| refused("type", error.to_string()))
             .validate()
             .unwrap_or_else(|error| refused("validation", error.to_string())),
-        "/operations" => serde_json::from_value::<RequestEnvelope>(value)
-            .unwrap_or_else(|error| refused("type", error.to_string()))
-            .validate()
-            .unwrap_or_else(|error| refused("validation", error.to_string())),
+        "/operations" => {
+            protocol::operation::decode_request(&serde_json::to_vec(&value).unwrap())
+                .unwrap_or_else(|error| refused("validation", error.to_string()));
+        }
         "/connections" => serde_json::from_value::<ConnectionRequestEnvelope>(value)
             .unwrap_or_else(|error| refused("type", error.to_string()))
             .validate()

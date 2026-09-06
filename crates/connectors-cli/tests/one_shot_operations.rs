@@ -55,9 +55,13 @@ impl Fixture {
     }
 
     fn command(&self, arguments: &[&str]) -> Command {
+        self.command_format(arguments, "json")
+    }
+
+    fn command_format(&self, arguments: &[&str], format: &str) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_connectors"));
         command
-            .args(["--output", "json"])
+            .args(["--output", format])
             .args(arguments)
             .env("HOME", &self.root)
             .env("XDG_CONFIG_HOME", self.root.join("config"))
@@ -896,5 +900,102 @@ fn final_adversary_kubernetes_candidates_never_publish_a_dead_connection_or_run_
         .as_str()
         .unwrap()
         .contains("connectors serve local"));
+    assert!(!fixture.state.join("connectors.sock").exists());
+}
+
+#[test]
+fn rate_stage2_cli_json_and_yaml_preserve_delay_and_never_resend_an_invoke() {
+    for format in ["json", "yaml"] {
+        for delay in [Some(30_u64), None] {
+            let fixture = Fixture::new();
+            fs::create_dir(&fixture.state).unwrap();
+            fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+            let socket = fixture.state.join("connectors.sock");
+            let listener = UnixListener::bind(&socket).unwrap();
+            fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&mut stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(request["request"]["method"], "invoke");
+                let mut error = json!({"code":"rate_limited","message":"provider refused request","retriable":true});
+                if let Some(delay) = delay {
+                    error["retry_after_seconds"] = json!(delay);
+                }
+                let response = json!({"protocol":"b10x.connector-operation.v0alpha2","request_id":request["request_id"],"status":"error","error":error});
+                writeln!(stream, "{response}").unwrap();
+                drop(stream);
+                listener.set_nonblocking(true).unwrap();
+                thread::sleep(Duration::from_millis(100));
+                assert!(
+                    matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+                );
+                request
+            });
+            let output = fixture
+                .command_format(
+                    &[
+                        "operation",
+                        "invoke",
+                        "--operation",
+                        "fixture.read",
+                        "--connection",
+                        "connection:fixture",
+                        "--description-ref",
+                        "description:fixture",
+                        "--input-json",
+                        "{}",
+                    ],
+                    format,
+                )
+                .arg("--config")
+                .arg(&fixture.config)
+                .arg("--state-root")
+                .arg(&fixture.state)
+                .output()
+                .unwrap();
+            let request = server.join().unwrap();
+            assert_eq!(request["protocol"], "b10x.connector-operation.v0alpha2");
+            assert!(!output.status.success());
+            let value: Value = if format == "json" {
+                serde_json::from_slice(&output.stdout).unwrap()
+            } else {
+                serde_norway::from_slice(&output.stdout).unwrap()
+            };
+            assert_eq!(value["target"], "local");
+            assert_eq!(value["error"]["code"], "rate_limited");
+            assert_eq!(value["error"]["retriable"], true);
+            assert_eq!(
+                value["error"]
+                    .get("retry_after_seconds")
+                    .and_then(Value::as_u64),
+                delay
+            );
+        }
+    }
+}
+
+#[test]
+fn rate_stage2_one_shot_refusals_preserve_retriable_without_inventing_delay() {
+    let fixture = Fixture::new();
+    let output = fixture.run(&[
+        "operation",
+        "invoke",
+        "--operation",
+        "slack-conversations-history",
+        "--connection",
+        "connection:unknown",
+        "--description-ref",
+        "description:unknown",
+        "--input-json",
+        "{}",
+    ]);
+    assert!(!output.status.success());
+    let value = value(&output);
+    assert!(value["error"]["retriable"].is_boolean());
+    assert!(value["error"].get("retry_after_seconds").is_none());
     assert!(!fixture.state.join("connectors.sock").exists());
 }

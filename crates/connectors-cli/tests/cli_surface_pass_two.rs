@@ -357,7 +357,12 @@ fn the_target_countdown_candidates_are_derived_from_every_protocol_a_deployment_
         if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
             continue;
         }
-        let source = std::fs::read_to_string(&path).expect("read a protocol module");
+        let owner = if path.file_stem().and_then(|stem| stem.to_str()) == Some("operation") {
+            directory.join("operation/legacy.rs")
+        } else {
+            path.clone()
+        };
+        let source = std::fs::read_to_string(&owner).expect("read a protocol module");
         let carries_a_request = source.lines().any(|line| {
             line.strip_prefix("pub enum ").is_some_and(|rest| {
                 rest.split(|character: char| !character.is_alphanumeric())

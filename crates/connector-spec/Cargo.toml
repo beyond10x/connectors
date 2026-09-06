@@ -36,3 +36,4 @@ serde_norway.workspace = true
 toml.workspace = true
 sha2.workspace = true
 indexmap.workspace = true
+url.workspace = true

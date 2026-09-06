@@ -204,6 +204,7 @@ impl super::PlatformBackend {
             .operation(&request.operation_ref)
             .ok_or_else(super::not_found)?;
         Ok(OperationResult::Describe(OperationDescription {
+            rate_advice: None,
             operation_ref: request.operation_ref,
             title: title.to_owned(),
             description: operation.contract_description().to_owned(),
