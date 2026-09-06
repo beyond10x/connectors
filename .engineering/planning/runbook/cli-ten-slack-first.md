@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 32
+revision: 33
 ---
 ## Authorization and objective
 
@@ -3352,3 +3352,13 @@ This is a coordinator resource allocation change within the approved implementat
 This branch contains final reviewed rate source/test head 0c026610, exact published Git framing imported from main 4b32397d with all thirteen events replayed, twenty-five selected rate scope/review events replayed through AEP, the four reviewed public guidance files, and the deterministic ESS projection regenerated from this branch's own schema 3 model. Source candidate ee7cd07255322464891451a87b35a7946f6554c0 contains no uncalled OAuth kernel or schema 4 writer. It is separate from the broader local integration head, where OAuth implementation continues. Both complete rate review artifacts and the rate story match the integration records at the replay boundary.
 
 The final affected review passed 1779 tests with no findings; the complete twelve-workspace repository gate is still pending. Assign its serialized test, strict check and final check execution to the rate implementor as verification, not another adversary pass. The exact authoritative workspace list comes from scripts/gate.sh. Keep source and all old tests immutable; write commands, actual exits, counts, source inventories and resource observations only in assigned rate scratch stage2-publication-gate. Run root final catalog/JSON/link/story/ESS and bundle checks before root target cleanup, both runtime feature configurations, the release local-identity refusal and complete-history secret scan. Preserve every required gate even if another lane already passed. The new single-lane 16 GiB resource policy above governs future commands. Coordinator owns source corrections, AEP, publication and slot handoffs; a verifier may not edit source to make a check pass.
+
+## Prospective serial-build reserve adjustment — 2026-09-06
+
+The coordinator changes the reserve for subsequent wave builds from 16 GiB to 12 GiB (12,884,901,888 bytes). This numeric reserve is an agent operating choice; the original user instructions supplied no numeric disk floor. The wave skill requires a measured floor and bounded concurrency, without prescribing its size. This record changes no historical observation or result.
+
+Eight of twelve publication workspace gates have passed and their completed owned targets are absent. Measured completed targets included root 1.8 GiB and runtime 3.0 GiB. CLI tests and strict Clippy completed before its separate release check hit the 16 GiB floor; after the process stopped and evidence was frozen, an authorized dev-profile cleanup preserved partial release files and the original command completed successfully. The full CLI target was then cleaned. The merged and activated Atlas target was also cleaned, reclaiming 667.3 MiB with all 1,477 source hashes and the installed binary unchanged.
+
+The subsequent SQL compile stopped before tests at 17,021,902,848 free bytes, exit 143, with only about 191 MB in its partial target. A later coordinator sample was 16,816,013,312 free bytes while no wave compiler ran; other-workspace compilers were observed. The entire shared-space change was not attributed. There is no completed wave target left to reclaim. A 12 GiB reserve leaves several times the measured ordinary target size protected while allowing one further build phase from the available capacity.
+
+Keep exactly one compiling workspace in this wave, jobs 1, per-tree targets, compiler caching and no incremental/debug information. Measure immediately before each command and continuously while it runs; gracefully stop its own process group below 12 GiB and preserve the actual exit, time, sample and logs. Freeze evidence/source before cleaning completed owned targets. Profile cleanup is limited to completed debug outputs after the active release process has stopped and its partial output has been frozen. Do not clean another session's targets, shared caches or primary checkouts. This adjustment is prospective; all earlier 20 GiB and 16 GiB pauses, including the two publication interruptions, remain intact.
