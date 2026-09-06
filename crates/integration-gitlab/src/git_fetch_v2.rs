@@ -155,13 +155,16 @@ pub(super) async fn capabilities(
     inner: Box<dyn EgressByteStream>,
 ) -> Result<Vec<u8>, EgressTransportError> {
     let mut reader = PacketReader::new(inner);
-    if reader
-        .next()
-        .await?
-        .as_ref()
-        .and_then(|packet| packet.line())
-        != Some(b"version 2")
+    let mut version = reader.next().await?;
+    // Some smart HTTP servers retain the upload-pack service preamble for v2 discovery.
+    if matches!(&version, Some(OwnedPacket::Data(payload)) if payload == b"# service=git-upload-pack\n")
     {
+        if !matches!(reader.next().await?, Some(OwnedPacket::Flush)) {
+            return Err(EgressTransportError::Refused);
+        }
+        version = reader.next().await?;
+    }
+    if version.as_ref().and_then(|packet| packet.line()) != Some(b"version 2") {
         return Err(EgressTransportError::Refused);
     }
     let mut seen = BTreeSet::new();
@@ -547,6 +550,13 @@ mod tests {
         result
     }
 
+    fn service_preamble(advertisement: &[u8]) -> Vec<u8> {
+        let mut result = packet(b"# service=git-upload-pack\n");
+        result.extend_from_slice(b"0000");
+        result.extend_from_slice(advertisement);
+        result
+    }
+
     fn command(name: &str, capabilities: &[&str], arguments: &[&str]) -> Vec<u8> {
         let mut result = packet(format!("command={name}\n").as_bytes());
         for capability in capabilities {
@@ -685,6 +695,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn capabilities_accept_optional_upload_pack_preamble_across_chunk_boundaries() {
+        let bare = lines(&["version 2", "ls-refs", "fetch=shallow"]);
+        let expected = capabilities(stream(&bare, 1)).await.unwrap();
+        let upstream = service_preamble(&bare);
+        for chunk_size in [1, 3, 4, 11, 29, 30, 31, 34, upstream.len()] {
+            assert_eq!(
+                capabilities(stream(&upstream, chunk_size)).await.unwrap(),
+                expected,
+                "chunk size {chunk_size}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn capabilities_refuse_malformed_or_repeated_service_preambles() {
+        let bare = lines(&["version 2", "ls-refs", "fetch=shallow"]);
+        for service in [
+            "# service=git-receive-pack\n",
+            "# service=git-upload-archive\n",
+            "# service=git-upload-pack",
+            "# service=git-upload-pack\r\n",
+            "# service=git-upload-pack \n",
+            " # service=git-upload-pack\n",
+            "# service=git-upload-pack\nversion 2\n",
+        ] {
+            let mut upstream = packet(service.as_bytes());
+            upstream.extend_from_slice(b"0000");
+            upstream.extend_from_slice(&bare);
+            assert!(
+                capabilities(stream(&upstream, 1)).await.is_err(),
+                "{service:?}"
+            );
+        }
+        for separator in [b"".as_slice(), b"0001", b"0002", b"00000000"] {
+            let mut upstream = packet(b"# service=git-upload-pack\n");
+            upstream.extend_from_slice(separator);
+            upstream.extend_from_slice(&bare);
+            assert!(
+                capabilities(stream(&upstream, 1)).await.is_err(),
+                "separator {separator:?}"
+            );
+        }
+        let upstream = service_preamble(&bare);
+        assert!(capabilities(stream(&service_preamble(&upstream), 1))
+            .await
+            .is_err());
+        for size in 0..upstream.len() {
+            assert!(
+                capabilities(stream(&upstream[..size], 1)).await.is_err(),
+                "truncation at {size}"
+            );
+        }
+        for suffix in [b"0000".as_slice(), b"0001", b"00020002", &bare] {
+            let mut trailing = upstream.clone();
+            trailing.extend_from_slice(suffix);
+            assert!(capabilities(stream(&trailing, 1)).await.is_err());
+        }
+    }
+
+    #[tokio::test]
     async fn capabilities_require_v2_shallow_sha1_and_strip_expanding_features() {
         let upstream = lines(&[
             "version 2",
@@ -725,6 +795,9 @@ mod tests {
             lines(&["version 2", "ls-refs", "ls-refs", "fetch=shallow"]),
         ] {
             assert!(capabilities(stream(&bad, 1)).await.is_err());
+            assert!(capabilities(stream(&service_preamble(&bad), 1))
+                .await
+                .is_err());
         }
         let large = lines(&[
             "version 2",
@@ -734,6 +807,10 @@ mod tests {
         ]);
         assert!(matches!(
             capabilities(stream(&large, 4096)).await,
+            Err(EgressTransportError::ResponseTooLarge)
+        ));
+        assert!(matches!(
+            capabilities(stream(&service_preamble(&large), 4096)).await,
             Err(EgressTransportError::ResponseTooLarge)
         ));
     }
