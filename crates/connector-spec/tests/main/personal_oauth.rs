@@ -168,3 +168,57 @@ fn oauth_pass1_explicit_empty_personal_admission_obeys_the_authoring_contract() 
         "the published minItems=1 contract rejects explicit empty admission; the actual provider loader must retain that presence distinction"
     );
 }
+
+#[test]
+fn oauth_pass2_presence_round_trips_across_formats_without_changing_legacy_arrays() {
+    use connector_spec::OAuth2Spec;
+    for admission in ["", PKCE, DEVICE] {
+        let loaded = load(&provider(
+            admission,
+            "\"authorization_code\", \"device_authorization\", \"refresh_token\"",
+        ))
+        .unwrap();
+        let original = loaded.auth[0].oauth2.as_ref().unwrap();
+        let json = serde_json::to_string(original).unwrap();
+        let toml = toml::to_string(original).unwrap();
+        let yaml = serde_norway::to_string(original).unwrap();
+        assert_eq!(
+            &serde_json::from_str::<OAuth2Spec>(&json).unwrap(),
+            original
+        );
+        assert_eq!(&toml::from_str::<OAuth2Spec>(&toml).unwrap(), original);
+        assert_eq!(
+            &serde_norway::from_str::<OAuth2Spec>(&yaml).unwrap(),
+            original
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&json)
+                .unwrap()
+                .get("personal_flows")
+                .is_none(),
+            admission.is_empty()
+        );
+    }
+    for empty in [
+        "personal_flows = []",
+        "'personal_flows' = [\n# explicitly supplied\n]",
+        "personal_flows = [ ]\nscopes = []",
+    ] {
+        assert!(load(&provider(empty, "\"authorization_code\"")).is_err());
+    }
+    let legacy: OAuth2Spec =
+        serde_json::from_str(r#"{"grants":[],"scopes":[],"public_client":true}"#).unwrap();
+    assert!(legacy.personal_flows.is_empty());
+    assert_eq!(
+        serde_json::to_value(&legacy).unwrap(),
+        serde_json::json!({"public_client":true})
+    );
+    for bad in ["[]", "null", "{}", "true", "\"[]\"", "[null]", "[{}]"] {
+        let json = format!(r#"{{"personal_flows":{bad}}}"#);
+        assert!(serde_json::from_str::<OAuth2Spec>(&json).is_err(), "{bad}");
+        assert!(
+            serde_norway::from_str::<OAuth2Spec>(&json).is_err(),
+            "{bad}"
+        );
+    }
+}

@@ -228,3 +228,102 @@ async fn oauth_pass1_device_slowdown_and_denial_keep_one_authorization_and_origi
     }
     backend.shutdown().await;
 }
+
+#[tokio::test]
+async fn oauth_pass2_shutdown_after_token_before_evidence_never_publishes_or_restarts() {
+    for device in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let configured = if device {
+            device_configuration()
+        } else {
+            configuration()
+        };
+        let egress = Arc::new(Egress::default());
+        let clock = Arc::new(Clock::new());
+        if device {
+            device_response(&egress);
+        }
+        egress.token(
+            "OAUTH-PASS2-UNPROVEN-ACCESS",
+            Some("OAUTH-PASS2-UNPROVEN-REFRESH"),
+            60,
+        );
+        let expected_requests = if device { 3 } else { 2 };
+        *egress.hold_request.lock().unwrap() = Some(expected_requests);
+        let backend = open(
+            directory.path(),
+            std::slice::from_ref(&configured),
+            egress.clone(),
+            clock.clone(),
+        )
+        .await;
+        let status = if device {
+            let connection_api::ConnectionResult::ConnectSessionCreate(status) =
+                backend.handle_connection(&owner(), create()).await.unwrap()
+            else {
+                panic!("device create");
+            };
+            clock.advance(1_010);
+            status
+        } else {
+            deliver_code(&backend).await
+        };
+        tokio::time::timeout(Duration::from_secs(5), egress.entered.notified())
+            .await
+            .unwrap();
+        assert_eq!(egress.count(), expected_requests);
+        assert!(!egress.dropped.load(Ordering::SeqCst));
+        let address = access_address(&backend);
+        let identity = backend.inner.bindings[0].custody.identity.clone();
+        tokio::time::timeout(Duration::from_secs(5), backend.shutdown())
+            .await
+            .unwrap();
+        assert!(
+            egress.dropped.load(Ordering::SeqCst),
+            "shutdown drops the actual token-info future"
+        );
+        assert!(backend.inner.custody.snapshot(&identity).unwrap().is_none());
+        assert!(backend
+            .inner
+            .store
+            .get(&address)
+            .await
+            .unwrap_err()
+            .is_not_found());
+        assert!(
+            !backend.inner.sessions.lock().unwrap()[&status.connect_session_ref]
+                .liveness
+                .is_live()
+        );
+        drop(backend);
+        clock.advance(600_000);
+        let reopened = open(directory.path(), &[configured], egress.clone(), clock).await;
+        assert!(reopened.inner.sessions.lock().unwrap().is_empty());
+        assert!(reopened
+            .inner
+            .custody
+            .snapshot(&identity)
+            .unwrap()
+            .is_none());
+        assert!(reopened
+            .inner
+            .store
+            .get(&address)
+            .await
+            .unwrap_err()
+            .is_not_found());
+        assert!(reopened
+            .handle(
+                &owner(),
+                operation_api::OperationRequest::Invoke(invocation(&reopened).await)
+            )
+            .await
+            .is_err());
+        assert_eq!(
+            egress.count(),
+            expected_requests,
+            "no token reuse, operation send or automatic acquisition after reopen"
+        );
+        reopened.shutdown().await;
+    }
+}

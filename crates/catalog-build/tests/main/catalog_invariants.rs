@@ -3027,3 +3027,51 @@ fn personal_acquisition_schema_four_preserves_actual_provider_uri_vectors_and_co
         }
     }
 }
+
+#[test]
+fn oauth_pass2_nearby_authoring_array_shapes_agree_with_the_active_schema() {
+    let authoring: Value = serde_json::from_str(include_str!(
+        "../../../connector-spec/schema/provider-toml.schema.json"
+    ))
+    .unwrap();
+    let selected = json!({"$schema":authoring["$schema"], "$defs":authoring["$defs"], "$ref":"#/$defs/oauth2"});
+    let validator = jsonschema::validator_for(&selected).unwrap();
+    let gitlab: Value =
+        serde_json::from_str(include_str!("../../../../catalog/gitlab.catalog.json")).unwrap();
+    let current = gitlab["auth"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|auth| auth.get("oauth2"))
+        .unwrap();
+    assert!(validator.is_valid(current));
+    assert!(serde_json::from_value::<connector_spec::OAuth2Spec>(current.clone()).is_ok());
+    for field in ["personal_flows", "grants", "scopes"] {
+        for value in [
+            None,
+            Some(json!([])),
+            Some(Value::Null),
+            Some(json!({})),
+            Some(json!(false)),
+        ] {
+            let mut candidate = current.clone();
+            if field != "personal_flows" {
+                // Legacy arrays have defaults only outside personal admission's
+                // cross-field grant requirements, which run after deserialization.
+                candidate.as_object_mut().unwrap().remove("personal_flows");
+            }
+            if let Some(value) = value {
+                candidate[field] = value;
+            } else {
+                candidate.as_object_mut().unwrap().remove(field);
+            }
+            let schema_accepts = validator.is_valid(&candidate);
+            let rust_accepts =
+                serde_json::from_value::<connector_spec::OAuth2Spec>(candidate.clone()).is_ok();
+            assert_eq!(rust_accepts, schema_accepts, "{field}: {candidate}");
+            let expected = candidate.get(field).is_none()
+                || field != "personal_flows" && candidate[field] == json!([]);
+            assert_eq!(schema_accepts, expected, "{field}: {candidate}");
+        }
+    }
+}
