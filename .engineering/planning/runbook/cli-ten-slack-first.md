@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 39
+revision: 40
 ---
 ## Authorization and objective
 
@@ -3406,3 +3406,13 @@ The complete Atlas fence at that same commit ran149passing Rust tests, with cata
 Verification-report cli-schema3-publication-gate-20260906 retains the complete implementor report at900fac0a. All12workspaces and13test configurations passed:2244test executions,0failures,27existing ignored. All13strict Clippy configurations,12fmt/metadata lanes, deterministic catalog/bundle checks, final link/story/ESS/projection, release identity refusal and exactcandidate/public-ref history scan passed. Root verified all719immutable evidence files and exact raw-to-portable prefix-only equality. Portable report SHA256840c6cde65142a54a72c633dddc6bed119a732d3d25138d0560bc5b5a0837b8c; manifest SHA256774a4d4e5a950e7d66a10530cc6163f492f55d95af0be6d77a60685e3b1413fb.
 
 GitLab schedules and rate-limit stories now record their named test_result and implemented transition. Retained review counts, original red observations, exact SQL formatter correction and both resource interruptions remain intact. The only subsequent candidate edits are planning closure and current Atlas citation records; all998nonplanning source bytes remain frozen. The final planning HEAD needs its own unchanged history/link/story refresh before publication. Actual sourcePR/CI/main merge, deterministic documentation delivery and final supported-source installation remain coordinator work. Schema4/OAuth/auth-remediation are separate unfinished units, and the credentials unit stays held after two red reviews.
+
+## Prospective private runtime build storage — 2026-09-06
+
+Root found 14,649,503,744 available disk bytes, 33,368,485,888 available bytes on executable /dev/shm, and 49,533,710,336 MemAvailable bytes. The completed OAuth root target is absent after its source and evidence freeze. Its next cold runtime target was previously measured at about 3 GiB, which cannot fit safely above the existing 12 GiB disk reserve. No completed wave target remains to reclaim and no other session's storage is a cleanup target.
+
+For the next OAuth runtime lane only, the coordinator explicitly replaces the earlier default in-worktree target recipe with CARGO_TARGET_DIR=/dev/shm/b10x-cli-wave-wt-4f1de73d0685-nr00xjox/runtime-target. The parent /dev/shm/b10x-cli-wave-wt-4f1de73d0685-nr00xjox is a newly created private mode-0700 directory assigned solely to managed worktree wt-4f1de73d0685. A temporary executable probe returned 0 and was removed. The ordinary worktree target remains absent. Do not symlink or share this target, move existing targets, or change any other worker's current command. Logs, source inventories, exact commands and evidence remain on persistent storage under the existing assigned scratch directory.
+
+This exception preserves one compiling workspace at a time and jobs 1, with incremental and dev/test debug information disabled. Unset RUSTC_WRAPPER for this new cold lane so it does not expand or reconfigure the shared compiler cache; no shared cache daemon is stopped or cleaned. Dependency versions and lockfiles remain unchanged. The worker must measure before launch and sample disk availability, tmpfs availability, MemAvailable and its exact target usage continuously. Gracefully stop only its own process group if disk approaches or falls below 12 GiB (12,884,901,888 bytes), tmpfs availability falls below 8 GiB, MemAvailable falls below 16 GiB, or the owned target exceeds 8 GiB. Treat swap capacity as no extra allowance. Preserve every actual interruption and process exit before any cleanup.
+
+The OAuth worker may use this target only after Huygens releases the compile slot and the coordinator transfers it. Freeze source hashes, executable evidence and target inventory before cleaning this exact assigned target; then verify persistent source and evidence bytes are unchanged. Memory-backed compiler outputs are disposable and do not substitute for durable test evidence. The earlier default-target runs, numeric reserve changes and failed or interrupted results stay intact. This is a prospective coordinator resource choice, not a new user approval or a product-contract change.
