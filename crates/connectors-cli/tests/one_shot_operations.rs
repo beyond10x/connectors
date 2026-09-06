@@ -999,3 +999,112 @@ fn rate_stage2_one_shot_refusals_preserve_retriable_without_inventing_delay() {
     assert!(value["error"].get("retry_after_seconds").is_none());
     assert!(!fixture.state.join("connectors.sock").exists());
 }
+#[test]
+fn rate_adversary_cli_keeps_integer_extremes_and_never_resends_before_exit() {
+    use std::sync::{atomic::AtomicBool, Arc};
+    for format in ["json", "yaml"] {
+        for (code, delay, wrong) in [
+            ("rate_limited", Some(0_u64), ""),
+            ("rate_limited", Some(u64::MAX), ""),
+            ("rate_limited", None, ""),
+            ("protocol", None, ""),
+            ("outcome_unknown", None, ""),
+            ("unavailable", None, "version"),
+            ("rate_limited", Some(30), "correlation"),
+        ] {
+            let fixture = Fixture::new();
+            fs::create_dir(&fixture.state).unwrap();
+            fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+            let listener = UnixListener::bind(fixture.state.join("connectors.sock")).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let done = Arc::new(AtomicBool::new(false));
+            let finished = done.clone();
+            let server = thread::spawn(move || {
+                let mut calls = 0;
+                loop {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            stream
+                                .set_read_timeout(Some(Duration::from_secs(2)))
+                                .unwrap();
+                            let mut line = String::new();
+                            std::io::BufReader::new(&mut stream)
+                                .read_line(&mut line)
+                                .unwrap();
+                            let request: Value = serde_json::from_str(&line).unwrap();
+                            calls += 1;
+                            assert_eq!(request["request"]["method"], "invoke");
+                            let mut error = json!({"code":code,"message":"fixture refusal","retriable":code=="rate_limited"});
+                            if let Some(delay) = delay {
+                                error["retry_after_seconds"] = json!(delay);
+                            }
+                            let reply = json!({"protocol":if wrong=="version" {"b10x.connector-operation.v0alpha1"}else{"b10x.connector-operation.v0alpha2"},"request_id":if wrong=="correlation" {json!("other-request")}else{request["request_id"].clone()},"status":"error","error":error});
+                            writeln!(stream, "{reply}").unwrap();
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if finished.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                }
+                calls
+            });
+            let mut child = fixture
+                .command_format(
+                    &[
+                        "operation",
+                        "invoke",
+                        "--operation",
+                        "fixture.read",
+                        "--connection",
+                        "connection:fixture",
+                        "--description-ref",
+                        "description:fixture",
+                        "--input-json",
+                        "{}",
+                    ],
+                    format,
+                )
+                .arg("--config")
+                .arg(&fixture.config)
+                .arg("--state-root")
+                .arg(&fixture.state)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while child.try_wait().unwrap().is_none() {
+                if Instant::now() >= deadline {
+                    child.kill().unwrap();
+                    break;
+                }
+                thread::sleep(Duration::from_millis(2));
+            }
+            let output = child.wait_with_output().unwrap();
+            done.store(true, Ordering::SeqCst);
+            assert_eq!(server.join().unwrap(), 1, "{format} {code} {wrong}");
+            assert!(!output.status.success());
+            let value: Value = if format == "json" {
+                serde_json::from_slice(&output.stdout).unwrap()
+            } else {
+                serde_norway::from_slice(&output.stdout).unwrap()
+            };
+            if wrong.is_empty() {
+                assert_eq!(value["error"]["code"], code, "{value}");
+                assert_eq!(value["error"]["retriable"], code == "rate_limited");
+                assert_eq!(
+                    value["error"]
+                        .get("retry_after_seconds")
+                        .and_then(Value::as_u64),
+                    delay
+                );
+            } else {
+                assert_ne!(value["error"]["code"], code);
+            }
+        }
+    }
+}

@@ -946,3 +946,76 @@ async fn transport_refusals_carry_the_designed_statuses_and_codes() {
         StatusCode::PAYLOAD_TOO_LARGE
     );
 }
+struct RateAdversarySequence {
+    inner: McpBackend,
+    invokes: AtomicUsize,
+    stale_first: bool,
+    terminal: OperationError,
+}
+#[async_trait]
+impl ConnectorBackend for RateAdversarySequence {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        Ok(())
+    }
+    async fn handle(
+        &self,
+        context: &PrincipalContext,
+        request: OperationRequest,
+    ) -> Result<OperationResult, OperationError> {
+        if matches!(request, OperationRequest::Invoke(_)) {
+            let before = self.invokes.fetch_add(1, Ordering::SeqCst);
+            if self.stale_first && before == 0 {
+                return Err(OperationError::new(
+                    OperationErrorCode::StaleAuthority,
+                    "authority rotated",
+                    false,
+                ));
+            }
+            return Err(self.terminal.clone());
+        }
+        self.inner.handle(context, request).await
+    }
+}
+#[tokio::test]
+async fn rate_adversary_mcp_stale_then_rate_stops_without_losing_large_delay() {
+    for stale_first in [false, true] {
+        for delay in [None, Some(0), Some(u64::MAX)] {
+            let backend = Arc::new(RateAdversarySequence {
+                inner: McpBackend::default(),
+                invokes: AtomicUsize::new(0),
+                stale_first,
+                terminal: OperationError::rate_limited("definite refusal", delay),
+            });
+            let application = router(
+                Arc::new(McpVerifier),
+                backend.clone(),
+                HostedAdmissionPolicy::new(["operator".into()])
+                    .with_kubernetes_groups(["sre".into()], Vec::<String>::new()),
+                HostedAuthority::unbound(),
+            );
+            let result = call_tool(
+                application,
+                "sre-token",
+                "tool_invoke",
+                json!({"name":"k8s_deployment_status","args":{"namespace":"dev","name":"web"}}),
+            )
+            .await;
+            assert_eq!(result["isError"], true, "{result}");
+            assert_eq!(
+                result["structuredContent"]["code"], "rate_limited",
+                "{result}"
+            );
+            assert_eq!(result["structuredContent"]["retriable"], true);
+            assert_eq!(
+                result["structuredContent"]
+                    .get("retry_after_seconds")
+                    .and_then(Value::as_u64),
+                delay
+            );
+            assert_eq!(
+                backend.invokes.load(Ordering::SeqCst),
+                if stale_first { 2 } else { 1 }
+            );
+        }
+    }
+}

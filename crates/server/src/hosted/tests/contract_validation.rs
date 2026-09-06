@@ -216,3 +216,153 @@ async fn rate_stage2_invalid_http_correlation_is_a_bounded_versioned_client_refu
     }
     assert_eq!(backend.calls.load(std::sync::atomic::Ordering::SeqCst), 0);
 }
+struct RateAdversaryAdmissionBackend(std::sync::atomic::AtomicUsize);
+#[async_trait]
+impl ConnectorBackend for RateAdversaryAdmissionBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        Ok(())
+    }
+    async fn handle(
+        &self,
+        context: &PrincipalContext,
+        request: OperationRequest,
+    ) -> Result<OperationResult, OperationError> {
+        if matches!(request, OperationRequest::Invoke(_)) {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Err(OperationError::rate_limited(
+                "definite refusal",
+                Some(u64::MAX),
+            ))
+        } else {
+            ApprovalBackend.handle(context, request).await
+        }
+    }
+}
+
+#[tokio::test]
+async fn rate_adversary_hosted_grant_and_approval_refusals_keep_requested_version() {
+    for version in [
+        protocol::operation::CONTRACT,
+        protocol::operation::legacy::CONTRACT,
+    ] {
+        for case in [
+            "unbound",
+            "empty-grant",
+            "missing-approval",
+            "admitted",
+            "tenant",
+            "unknown-version",
+        ] {
+            let store = Arc::new(connector_state::MemoryState::new());
+            if case != "empty-grant" {
+                domain::GrantSet {
+                    revision: 1,
+                    grants: vec![domain::Grant {
+                        grant: "grant:todo".into(),
+                        provider: "provider:todo".into(),
+                        connection: "connection:todo".into(),
+                        selector: None,
+                        allow: BTreeSet::from([APPROVAL_OPERATION.to_owned()]),
+                        deny: BTreeSet::new(),
+                        inbound_events: BTreeSet::new(),
+                    }],
+                }
+                .write(&*store, "tenant-dev")
+                .unwrap();
+            }
+            if case == "admitted" {
+                issue_approval(
+                    &*store,
+                    &domain::ApprovalRecord {
+                        reference: "approval:rate".into(),
+                        issuer: "https://identity.example.test".into(),
+                        subject: "person:test".into(),
+                        operation: APPROVAL_OPERATION.into(),
+                        connection: "connection:todo".into(),
+                        input_digest: canonical_input_digest(&serde_json::json!({})),
+                        expires_at_seconds: u64::MAX,
+                    },
+                )
+                .unwrap();
+            }
+            let backend = Arc::new(RateAdversaryAdmissionBackend(
+                std::sync::atomic::AtomicUsize::new(0),
+            ));
+            let authority = if case == "unbound" {
+                HostedAuthority::unbound()
+            } else {
+                HostedAuthority::bound(store, "https://identity.example.test")
+            };
+            let app = router(
+                Arc::new(Verifier),
+                backend.clone(),
+                HostedAdmissionPolicy::new(["operator".into()])
+                    .with_generated_service_operations([APPROVAL_OPERATION.into()]),
+                authority,
+            );
+            let mut request = invocation_envelope(
+                APPROVAL_OPERATION,
+                if case == "admitted" {
+                    Some("approval:rate")
+                } else {
+                    None
+                },
+            );
+            request.protocol = if case == "unknown-version" {
+                "b10x.connector-operation.v9".into()
+            } else {
+                version.into()
+            };
+            if case == "tenant" {
+                request.context.tenant_id = "other-tenant".into();
+            }
+            let OperationRequest::Invoke(invoke) = &mut request.request else {
+                panic!()
+            };
+            invoke.connection_ref = "connection:todo".into();
+            invoke.description_ref = "description:todo-create-list".into();
+            let response = app.oneshot(operation_http_request(&request)).await.unwrap();
+            let expected = match case {
+                "admitted" => StatusCode::OK,
+                "unbound" => StatusCode::SERVICE_UNAVAILABLE,
+                "unknown-version" => StatusCode::BAD_REQUEST,
+                _ => StatusCode::FORBIDDEN,
+            };
+            assert_eq!(response.status(), expected, "{case}");
+            let bytes = axum::body::to_bytes(response.into_body(), OPERATION_MAX_FRAME_BYTES)
+                .await
+                .unwrap();
+            let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            if case != "unknown-version" {
+                assert_eq!(value["protocol"], version, "{case}");
+            }
+            assert_eq!(value["request_id"], "request-1");
+            assert_eq!(
+                backend.0.load(std::sync::atomic::Ordering::SeqCst),
+                usize::from(case == "admitted")
+            );
+            let expected_delay = if case == "admitted" && version == protocol::operation::CONTRACT {
+                Some(u64::MAX)
+            } else {
+                None
+            };
+            assert_eq!(
+                value["error"]
+                    .get("retry_after_seconds")
+                    .and_then(serde_json::Value::as_u64),
+                expected_delay
+            );
+            if case == "admitted" {
+                assert_eq!(
+                    value["error"]["code"],
+                    if version == protocol::operation::CONTRACT {
+                        "rate_limited"
+                    } else {
+                        "unavailable"
+                    }
+                );
+                assert_eq!(value["error"]["retriable"], true);
+            }
+        }
+    }
+}

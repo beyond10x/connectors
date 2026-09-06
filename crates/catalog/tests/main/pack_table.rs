@@ -239,3 +239,43 @@ fn grafana_discovery_is_available_as_closed_catalog_data() {
         ]
     );
 }
+// Rate metadata is compared to the whole packed source, not a hand-built table.
+#[test]
+fn rate_adversary_pack_and_table_preserve_every_declared_rate() {
+    let mut compared = 0;
+    for provider in catalog::reader::providers() {
+        let document: serde_json::Value = serde_json::from_str(provider.document()).unwrap();
+        for raw in document["operations"].as_array().unwrap() {
+            let operation =
+                catalog::operation(OperationKey::id(raw["id"].as_str().unwrap())).unwrap();
+            let fixed = raw
+                .get("rate_limit")
+                .filter(|value| !value.is_null())
+                .map(|value| serde_json::from_value::<catalog::RateLimit>(value.clone()).unwrap());
+            assert_eq!(
+                operation.rate_limit,
+                fixed.as_ref(),
+                "{} fixed",
+                operation.id
+            );
+            let alternatives = raw
+                .get("conditional_rate_limits")
+                .map_or_else(Vec::new, |value| {
+                    serde_json::from_value::<Vec<catalog::ConditionalRateLimit>>(value.clone())
+                        .unwrap()
+                });
+            assert_eq!(
+                operation.conditional_rate_limits, alternatives,
+                "{} alternatives",
+                operation.id
+            );
+            compared += 1;
+        }
+    }
+    assert!(compared >= 835, "the complete pack was traversed");
+    let history = catalog::operation(OperationKey::id("slack-conversations-history")).unwrap();
+    assert_eq!(history.conditional_rate_limits.len(), 3);
+    assert!(history.rate_limit.is_none());
+    assert!(history.conditional_rate_limits[2].rate.is_none());
+    println!("compared {compared} packed operations");
+}

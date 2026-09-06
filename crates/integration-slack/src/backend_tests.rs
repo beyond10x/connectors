@@ -1194,4 +1194,89 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn rate_adversary_slack_zero_delay_settles_each_explicit_write_refusal() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let egress = Arc::new(RateEgress {
+            retry: Some("0"),
+            uncertain: false,
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let backend = SlackBackend::open_without_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            egress.clone(),
+        )
+        .await
+        .unwrap();
+        let connection = StoredConnection {
+            connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".into(),
+            instance_id: "00000000-0000-4000-8000-000000000001".into(),
+            label: "Fixture".into(),
+            grant_ref: policy().grant_for_profile(PROFILE_COMPANION_BOT).into(),
+            initiation: InitiationConfig::Provider,
+            allowed_events: policy().allowed_events,
+            owner_subject: String::new(),
+            team_id: "T012345".into(),
+            profile: SlackConnectionProfile::CompanionBot,
+            external_subject_id: "U012345".into(),
+            scopes: vec!["chat:write".into()],
+            purpose: String::new(),
+            carries_operations: true,
+        };
+        let credential = backend
+            .inner
+            .operation_credential_ref(&connection, BOT_TOKEN_CREDENTIAL)
+            .unwrap();
+        backend
+            .inner
+            .credential_store
+            .put(&credential, &connector_secrets::Secret::new(SENTINEL))
+            .await
+            .unwrap();
+        lock(&backend.inner.metadata)
+            .connections
+            .push(connection.clone());
+        for expected in [1, 2] {
+            let operation = "slack-chat-post-message";
+            let error = backend
+                .inner
+                .invoke(
+                    &owner(),
+                    InvokeRequest {
+                        operation_ref: operation.into(),
+                        connection_ref: connection.connection_ref.clone(),
+                        description_ref: backend.inner.description_ref(&owner(), operation),
+                        input: serde_json::json!({"channel":"C012345","text":"explicit attempt"}),
+                        approval_evidence_ref: None,
+                    },
+                )
+                .await
+                .unwrap_err();
+            assert_eq!(error.code, OperationErrorCode::RateLimited);
+            assert_eq!(error.retry_after_seconds, Some(0));
+            assert!(error.retriable);
+            assert_eq!(
+                egress.calls.load(std::sync::atomic::Ordering::SeqCst),
+                expected
+            );
+        }
+        let audit = fs::read_to_string(root.path().join("slack-operation-audit.jsonl")).unwrap();
+        let outcomes: Vec<_> = audit
+            .lines()
+            .map(|line| {
+                serde_json::from_str::<serde_json::Value>(line).unwrap()["event"]["outcome"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+        assert_eq!(outcomes, ["attempted", "refused", "attempted", "refused"]);
+        assert!(!audit.contains(SENTINEL));
+        backend.shutdown().await;
+    }
+
 }
