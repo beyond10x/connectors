@@ -173,6 +173,24 @@ publication candidate `0c69450921ab1794c81dadec915b717a61bf0983`: all twelve wor
 strict checks pass. That supplies the exact v2 freeze for one independent additive protocol slice:
 new strict DTOs, explicit pure adapters, schema generators and conformance bundles. It keeps the
 internal `operation::wire` v2 API and every existing frozen bundle/reader/generator byte unchanged.
+
+## Current migration proposal numbers — 2026-09-06
+
+Atlas draft PR23 now publishes `b95b84c8fdae634447e57bd8eafea5871f8ce46f`, based on
+accepted main `b89e5b835b384965818eccf0703c8a548ebdbe47`. Main allocated ADR0041 to
+shared Eventlog persistence. The four Connector proposals consequently use these numbers:
+
+- ADR0042: Operation v0alpha2 rate limits, including its dated subsequent-authentication section.
+- ADR0043: source-fidelity catalog schema3.
+- ADR0044: personal OAuth catalog schema4.
+- ADR0045: Operation v0alpha3 and Connection v0alpha2 authentication remediation.
+
+The current authentication migration is
+`architecture/adr/0045-connector-authentication-remediation.md`; its prerequisite rate decision is
+`architecture/adr/0042-connector-operation-rate-limit-version.md`. Earlier numbered references in
+this design describe their explicitly pinned historical proposals. Contract versions, relying-party
+order and proposed status are unchanged. Publishing the reconciled draft grants no architecture
+acceptance, external consumer adoption or release, and schedules no Eventlog conversion here.
 Original-byte decoding must retain duplicate-key refusal; bound Connection commands have a typed
 refusal when projected to v1. Pure types and vectors cannot establish grant, custody, session or
 acknowledgement behavior.

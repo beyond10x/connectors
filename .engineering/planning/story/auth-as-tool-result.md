@@ -197,7 +197,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 69
+revision: 70
 ---
 ## Acceptance
 
@@ -389,3 +389,9 @@ Runtime/server uses managed wt-78f189927231 and its new stage2-runtime-implement
 Apply meaningful cases before implementation, retaining actual compiler/fixture observations and every old assertion. Use only the five prospectively scoped extraction owners when needed, preserving original bodies/test identities before separately inspected formatting. Runtime/server takes the frozen real hosted/grant/approval cases; client/console/CLI takes the hostile daemon fixture through actual decoders/presenters. Preserve grant-before-readiness/approval, current exact binding at publication and acknowledgement, no saved raw input or auto replay, trusted endpoint isolation and closed/request-bound public output. Production hosted acquisition remains Unsupported until an actual admitted adapter exists. Keep personal policy/current authority provenance and existing custody/session/refresh owners; no parallel map, journal, credential owner or policy subsystem.
 
 Root retains all AEP/ESS, source citation, schema inventory, generated projections, whole-unit review/gates and publication/install duties. setup connect remains an unspecified forwarded flow in the actual ESS boundary; no invented frontend handler is needed for projection completeness. Atlas main b89e5b83 accepted Eventlog ADR0041; local proposal reconciliation8c9172ca retains those records and moves this wave's still-proposed migrations to0042–0045. Its draft publication and later public design citation update remain root work. This does not schedule the separate Connectors Eventlog conversion contract. Credentials stay held after their two red reviews, with no additional cycle authorized.
+
+## Current published Atlas proposal references — 2026-09-06
+
+Atlas draft PR23 was read back OPEN and draft at exactb95b84c8fdae634447e57bd8eafea5871f8ce46f, a normal fast-forward of the correct plan/connector-cli-migrations-resumed branch. The earlier checked unsuffixed branch was an older separate branch, not an advancement of this PR. Current accepted mainb89e5b83 allocated0041 to Eventlog. This wave's proposed migrations are now0042rate v2,0043schema3,0044OAuth schema4 and0045auth Operationv3/Connectionv2. Design22 appends that current mapping while retaining all pinned historical sections. Architecture acceptance, consumer adoption, Eventlog conversion and release are not claimed.
+
+The full Atlas source fence at8c9172ca passed149Rust cases and repository-owned catalog/livePages/projection/Markdown/brand checks, with the same three external failures retained. A mutable verification-report projection later exposed one checkout-local prefix in the captured refusal; its first failed Markdown output, initial report commit/event, raw logs and seal remain preserved. AEP body corrected only that presentation prefix and appended the explicit erratum. The corrected123artifact AEP validation and219file Markdown check pass; no source test was repeated. The exact published-tip Gate run34054300291 is in progress, without a CI-success claim. Auth source implementation remains in the two assigned trees at the common95fad7c7handoff.
