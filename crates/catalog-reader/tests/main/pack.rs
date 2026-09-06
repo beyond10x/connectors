@@ -9,6 +9,21 @@
 
 use catalog_reader::{Error, Pack};
 
+#[test]
+fn oauth_pass1_full_published_pack_version_is_checked_before_nonempty_records() {
+    let text = std::fs::read_to_string(committed_pack_path()).unwrap();
+    let body = text.splitn(3, '\n').nth(2).unwrap();
+    assert!(body.starts_with("schema 4\n"));
+    let actual = Pack::from_bytes(with_digest(body)).unwrap();
+    assert_eq!(actual.providers().len(), 65);
+    assert!(actual.operations().len() > 0);
+    for version in [2, 3, 5, u32::MAX] {
+        let replacement = body.replacen("schema 4\n", &format!("schema {version}\n"), 1);
+        assert!(matches!(Pack::from_bytes(with_digest(&replacement)),
+            Err(Error::UnsupportedSchema { found }) if found == version));
+    }
+}
+
 /// The committed pack, resolved from Cargo's package-root test working directory.
 ///
 /// Resolve this at runtime: a shared target directory can reuse a test binary across Git
@@ -27,6 +42,15 @@ fn with_digest(body: &str) -> Vec<u8> {
         hex.push_str(&format!("{byte:02x}"));
     }
     format!("connectors-catalog-pack 1\ndigest sha256 {hex}\n{body}").into_bytes()
+}
+
+#[test]
+fn personal_acquisition_schema_four_is_admitted_before_any_record_is_served() {
+    let bytes = with_digest("schema 4\nproviders 0\noperations 0\npayload 0\n");
+    let pack =
+        Pack::from_bytes(bytes).expect("the matching personal-acquisition reader admits schema 4");
+    assert_eq!(pack.schema_version(), 4);
+    assert_eq!(pack.providers().len(), 0);
 }
 
 #[test]
@@ -161,11 +185,20 @@ fn something_that_is_not_a_pack_is_refused() {
 /// verified, well-formed pack that is refused anyway — fail closed, by name.
 #[test]
 fn a_newer_schema_version_is_refused_by_name() {
-    let bytes = with_digest("schema 4\nproviders 0\noperations 0\npayload 0\n");
+    let bytes = with_digest("schema 5\nproviders 0\noperations 0\npayload 0\n");
     match Pack::from_bytes(bytes) {
-        Err(Error::UnsupportedSchema { found }) => assert_eq!(found, 4),
+        Err(Error::UnsupportedSchema { found }) => assert_eq!(found, 5),
         other => panic!("a newer schema must refuse with UnsupportedSchema, got {other:?}"),
     }
+}
+
+#[test]
+fn personal_acquisition_does_not_reinterpret_schema_three_packs() {
+    let bytes = with_digest("schema 3\nproviders 0\noperations 0\npayload 0\n");
+    assert!(matches!(
+        Pack::from_bytes(bytes),
+        Err(Error::UnsupportedSchema { found: 3 })
+    ));
 }
 
 #[test]
@@ -184,7 +217,7 @@ fn source_fidelity_does_not_reinterpret_schema_two_packs() {
 fn additive_growth_is_tolerated() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 3\nflavor experimental\nproviders 1\noperations 1\n\
+        "schema 4\nflavor experimental\nproviders 1\noperations 1\n\
          p acme 0 {len}\no acme-thing-get acme default 0 {len}\n\
          e acme-event acme 7 4\npayload {len}\n{payload}",
         len = payload.len()
@@ -206,7 +239,7 @@ fn additive_growth_is_tolerated() {
 fn a_span_outside_the_payload_is_refused() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 3\nproviders 1\noperations 0\np acme 0 {}\npayload {}\n{payload}",
+        "schema 4\nproviders 1\noperations 0\np acme 0 {}\npayload {}\n{payload}",
         payload.len() + 7,
         payload.len()
     );
@@ -220,7 +253,7 @@ fn a_span_outside_the_payload_is_refused() {
 fn an_operation_naming_an_absent_provider_is_refused() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 3\nproviders 1\noperations 1\np acme 0 {len}\n\
+        "schema 4\nproviders 1\noperations 1\np acme 0 {len}\n\
          o ghost-op ghost default 0 {len}\npayload {len}\n{payload}",
         len = payload.len()
     );
@@ -238,7 +271,7 @@ fn an_operation_naming_an_absent_provider_is_refused() {
 fn a_payload_length_disagreement_is_refused() {
     let payload = "{\"id\":\"acme\"}\n";
     let body = format!(
-        "schema 3\nproviders 0\noperations 0\npayload {}\n{payload}",
+        "schema 4\nproviders 0\noperations 0\npayload {}\n{payload}",
         payload.len() + 3
     );
     match Pack::from_bytes(with_digest(&body)) {
@@ -260,7 +293,7 @@ fn the_vendored_sha256_agrees_with_sha2_across_padding_boundaries() {
     for len in (0..=130).chain([1000, 4096, 100_000]) {
         let payload: String = (0..len).map(|i| char::from((i % 79 + 33) as u8)).collect();
         let body = format!(
-            "schema 3\nproviders 0\noperations 0\npayload {}\n{payload}",
+            "schema 4\nproviders 0\noperations 0\npayload {}\n{payload}",
             payload.len()
         );
         Pack::from_bytes(with_digest(&body))

@@ -221,6 +221,7 @@ fn connection(root: &Path, name: &str, allow_writes: bool) -> CatalogIntegration
         network: NetworkScopeConfig::Public,
         credential: Some("slack.bot_token".to_owned()),
         credential_file: Some(credential_file),
+        oauth: None,
     }
 }
 

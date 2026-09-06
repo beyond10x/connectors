@@ -166,6 +166,8 @@ scope:
 - confidence: inferred
   path: crates/catalog-build/tests/main/catalog_invariants.rs
 - confidence: cited
+  path: crates/catalog-build/tests/main/ess_claim_fence.rs
+- confidence: cited
   path: crates/catalog-build/tests/main/no_network.rs
 - confidence: inferred
   path: crates/catalog-reader/catalog.pack
@@ -238,6 +240,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-client/src/personal_oauth.rs
 - confidence: inferred
+  path: crates/connectors-client/tests/personal_oauth_adversary.rs
+- confidence: inferred
   path: crates/connectors-config/examples/gitlab-personal-oauth.example.toml
 - confidence: inferred
   path: crates/connectors-config/src/lib.rs
@@ -298,6 +302,8 @@ scope:
 - confidence: inferred
   path: crates/integration-catalog/src/oauth_acquisition.rs
 - confidence: inferred
+  path: crates/integration-catalog/src/oauth_adversary_tests.rs
+- confidence: inferred
   path: crates/integration-catalog/src/oauth_tests.rs
 - confidence: cited
   path: crates/integration-catalog/src/tests.rs
@@ -309,6 +315,8 @@ scope:
   path: crates/server/src/hosted/tests/mcp.rs
 - confidence: inferred
   path: crates/service/src/connect_session.rs
+- confidence: cited
+  path: crates/service/src/planning.rs
 - confidence: inferred
   path: crates/state-sqlite/src/lib.rs
 - confidence: inferred
@@ -335,7 +343,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 65
+revision: 76
 ---
 ## Acceptance
 
@@ -563,3 +571,57 @@ Assign connector-resolve/tests/adversary_gitlab_pass1.rs solely for a versioned 
 For the measured1500-line fence, allow only cohesive new OAuth extraction: connectors-config/src/personal_oauth.rs and personal_oauth_tests.rs own the new declarations/validation/tests. All preexisting config tests remain in personal.rs. The existing CatalogIntegrationConfig::validate method may move intact alongside its new OAuth check to keep that existing owner below the limit; preserve its old validation branches, messages and public API. connectors-client/src/personal_oauth.rs owns only the new client implementation/helpers/tests; original lib APIs/tests remain intact via registration/reexports. If the measured split still exceeds the limit, connectors-client/src/completion.rs may receive only the existing dedicated CompletionEndpoint type/implementation, unchanged, with its existing tests and API preserved. integration-catalog/src/oauth_acquisition.rs receives only the cohesive new acquisition implementation, keeping private state and authority with the existing OAuth owner. Record exact formatted sizes and moved-byte preservation. No broad refactor, line-limit waiver, assertion deletion or production policy relaxation is assigned.
 
 Coordinator refreshed the stale service lifecycle evidence comments in ess/system/domains/connection.yaml against integrated9c6ce892 and regenerates existing ESS derivatives. No entity, lifecycle, command, auth authority or transition changes. All root/source/backend/config/client closures remain preparation for actual operational tests and independent whole-unit review; schema3 publication is a separate verified candidate.
+
+## Lifecycle prose fence closure — 2026-09-06
+
+Measured root fixture failure: crates/catalog-build/tests/main/ess_claim_fence.rs still requires the earlier lifecycle prose and reads lines().nth(232) as the service Failed writer after stage2B moved that code. Add only this exact test owner for a bounded fixture update to the current explicit ESS claim and named service lifecycle owner. Reuse its existing brace-counted item helper to locate fail_pending and its actual Failed assignment instead of a moving absolute line. Keep the non-vacuous requirements that the document states both halves, the hosted writer scan is empty, and the other registry really writes Failed. Preserve planted-hosted-writer, removed-claim and missing-other-writer refusal behavior and every unrelated ESS claim case. No conditional skip, weakened implication or production/model edit is delegated. The coordinator owns the refreshed comments; the implementor owns only these assertions and actual test evidence.
+
+Formatted module previews fit the existing fence: config personal1479/new OAuth162/new tests84; client lib1500/new OAuth367; backend OAuth1402/acquisition626. No CompletionEndpoint move or size waiver is needed. The existing private config_ref helper may become pub(super) solely for the new sibling validation owner; no public API or caller authority changes. Preserve the existing validation method's old branches/messages and all old config/client tests.
+
+## Current service planning fixture closure — 2026-09-06
+
+The first OAuth root/client regression execution retains five service failures at the same synthetic document helper: crates/service/src/planning.rs declares schema_version 3 in the cfg(test) document function, while the implemented current reader requires schema4. Its remaining59service cases, catalog-build148, client30, protocol64 and server103 passed in that actual execution. The unmodified command, exit and failures remain in stage2c-root-client-regression-tests-1 evidence; this record does not relabel the run green.
+
+Add crates/service/src/planning.rs only for that one current-document fixture literal3to4. Preserve every production byte, existing test, assertion and other fixture field; retain the exact original preimage and disclose the change in whole-unit OAuth review. This is the current synthetic source fixture, not a frozen-version contract case. Reexecute the affected service checks and complete the remaining owner validations. No reader widening, legacy document rewrite, independent authentication scope or test skip is assigned.
+
+## Prospective whole-unit review test owner — 2026-09-06
+
+The read-only whole-unit checklist is prepared at SHA256 78f3b2af0490335ded1abaa310a94f10e892f0339b4b76c3aa295e9fc9fdef8b. Its two-member manifest and observation index are retained in the assigned OAuth scratch; source observations were provisional, and the checklist is neither an executed attack nor a verdict. Both ordinary whole-unit review passes remain unstarted until the coordinator supplies a frozen complete implementation, full report and explicit review assignment.
+
+Add the inferred test owner crates/connectors-client/tests/personal_oauth_adversary.rs for public-API Unix/HTTP fixtures proving the trusted client handoff and its closed output/error boundaries. Cargo's normal integration-test discovery and the existing dependencies suffice; no production hook, manifest change or public protocol edit is assigned. The other ten proposed test files are already machine-scoped by this story. Keep existing test assertions and original reports, with only the earlier explicitly recorded fixture-version/citation exceptions. This exact new file is for the later independent reviewer; the implementor continues its already scoped inline client/console cases.
+
+The review must cover real controlling-terminal and private-file behavior, interrupted private delivery, exact owner/profile/Connection checks, callback/device bounds, actual FULL-store reopen recovery, refresh uncertainty and no operation resend, frozen/current schema compatibility, and mixed raw/OAuth custody. The coordinator has separately identified unexecuted client completion checks: Callable state, exact pending/status/Describe correlation, and successful daemon labels/references containing a synthetic private marker. Their actual deciding evidence and narrow implementation remain the implementor's responsibility before freeze. Preserve the meaning of the daemon ConnectionDescription and use trusted local display data plus the existing receiver-derived expected Connection reference for the console's public summary; no new wire target or CLI selection authority is introduced.
+
+## Additional first-pass test owner for the existing size fence — 2026-09-06
+
+The reviewer reports the completed first root full command exited 101. Alongside the measured personal_flows authoring-contract mismatch, the existing size fence rejected its appended cases because crates/integration-catalog/src/oauth_tests.rs grew from 1,470 to 1,699 lines. Root independently compared the current file to 6fae9df000986f39d009a2e8503bdff03db41762 and verified all original bytes remain an exact prefix, with 229 added lines. This size failure is the reviewer's test placement, not an introduced product defect or a resource interruption; retain the original output and the two already passing deciding runs.
+
+Prospectively add exactly crates/integration-catalog/src/oauth_adversary_tests.rs as an inferred test owner. Move only the reviewer's two new cases, oauth_pass1_explicit_reauthorization_repairs_only_coherent_subject_after_rotation and oauth_pass1_device_slowdown_and_denial_keep_one_authorization_and_original_deadline, verbatim to that file under use super::*;. The already assigned oauth_tests.rs receives only an appended path/module registration, preserving all original bytes. Its parent is already cfg(test), so no production module or hook is required. Preserve all assertions, literals and function names; only the new cases' module qualification changes. Keep the 1,500-line fence unchanged.
+
+The additional owner and exact validation assignment are in whole-unit-adversary-1/oauth-test-owner-assignment.md. Root preimage proof is oauth-pass1-test-owner-preimage.json under the coordinator scratch. After placement, execute both exact new cases and rerun the affected root full command with no-fail-fast; remaining strict/fmt checks see final source. Preserve every original deciding/compiler/full-run observation and report the scope exception. The complete first-pass review is still pending and production correction remains held until its immutable report is recorded. This does not add an attack or widen implementation scope.
+
+## Completed first review and first correction routing — 2026-09-06
+
+Review-result:cli-oauth-adversary-1-20260906 holds the complete returned public report unchanged, including its findings block. Report SHA256 is 9dffb196779d9b7e2d0ccd7ba4ea1284daca9f1e0294c9368f80361413cbead5; raw SHA256 is 4455c529c5d33f4b0f4d88ad157e3f98a1e2a43d52af94717803a1ae7fd1bc55. Root verified all 227 evidence members and all 1,193 source hashes, plus prefix-only public/raw equality and every old test line in order. The exact eleven test-only paths are locally committed at 22e4d11ee1aad753d379e59f407cba3fc88bf6e2, parent 6fae9df0. Both identities are the organization bot and source hashes remain exact after commit. This preserves the real red case on a private branch; no red unit was integrated or published.
+
+The operational cohort grew 1,496 to 1,509 executed: 1,508 passed, one failed, one preexisting reader measurement ignored. Fifty existing helper/SQLite cases and one actual published-reader witness passed separately. Final strict Clippy and formatting passed in all four owning workspaces. The completed report preserves the actual fixture/compiler/size failures and usage-limit continuation; they are not additional product findings or review passes. Full command logs are held in its manifest; the returned report gives the first red verbatim and final-suite summaries with exact log references. Root preserves that reporting form unchanged rather than representing the summaries as full output quotations.
+
+The single CONFIRMED warning is the public provider loader accepting personal_flows = [] despite the new authoring schema's minItems 1. The report's origin remains undecided because no old-loader execution occurred. Coordinator routing inference: this complete unit introduced the field, schema constraint and empty validation guard, verified byte-for-byte between published 0c69450921ab1794c81dadec915b717a61bf0983 and frozen 6fae9df000986f39d009a2e8503bdff03db41762. Current reachability is test helper personal_oauth.rs:73 through provider::load and loading.rs:135; OAuth2Spec at auth.rs:384 erases presence and auth_validation.rs:300 returns early. The schema requirement is at provider-toml.schema.json:1447. Catalog loading reaches the same loading implementation through catalog-build/src/seam.rs:188. Root's oauth-authoring-origin-root-analysis.json pins the source hashes and explicitly labels this inference. Route it as an introduced authoring-contract correction, without claiming baseline execution or credential exposure.
+
+The same original implementor, resume_gitlab, receives only the already scoped auth.rs production correction in whole-unit-correction-1/brief.md: reject explicit empty admission while preserving omission, serialization, valid admissions, all old/new assertions and generated/frozen bytes. No schema weakening or wider implementation is assigned. The reviewer has finished every command and relinquished compilation. Transfer the sole slot to this correction in the same OAuth worktree/private target under the existing 12 GiB cap and 12/8/16 GiB reserves. Its new assigned scratch is the whole-unit-correction-1 directory and TMPDIR is ~/.cache/cw6/oc1. Execute the retained failing case, affected root full package set, strict Clippy and formatting as specified; freeze outcomes and release the slot before sealing. Outcome fixed is recorded only after the actual correction lands. Second whole-unit review, integration/publication/delivery and the supported installation remain outstanding; auth runtime and the credential decision remain held.
+
+## First correction committed and final ordinary review assigned — 2026-09-06
+
+Verification-report:cli-oauth-correction-one-20260906 preserves the complete first correction report, its separately sealed path erratum and root hash audit. Exact regression passes; the same ten-package root command changed 1,103pass/1fail to 1,104pass/0fail, with one preexisting ignore. Strict Clippy and root formatting pass. Root verified all 53 evidence, 1,193 source and 354 executable hashes plus the erratum, inspected the sole auth.rs change, and committed it at f9bf1d6a2e00b53711ef99473b7556b9e3743f25 over 22e4d11e. Both identities are the organization bot; all source hashes match after commit. The other 1,192 sources, every assertion, schema and generated/frozen artifact remain unchanged. The first review's one finding receives outcome fixed on this actual correction. Its original undecided origin and root's separately labeled source inference remain intact.
+
+The corrector released all compilation and is idle. Dispatch review_one_shot_final for the second and final ordinary whole-unit pass using whole-unit-adversary-2/brief.md, exact candidate f9bf1d6a and published base 0c69450921ab1794c81dadec915b717a61bf0983. Its twelve existing additive test owners include the already scoped oauth_adversary_tests.rs child; no new test owner or production scope is added. This pass still covers the whole helper/FULL/custody/refresh/operational OAuth unit, with the corrected presence contract and all first-pass cases retained. Actual auth protocol/service/runtime work stays separate, and auth runtime implementation remains held for the reviewed handoff.
+
+Assign its new scratch whole-unit-adversary-2 and TMPDIR ~/.cache/cw6/oa2. Transfer the sole compiling slot to that reviewer under the existing private 12 GiB and ordinary CLI 8 GiB target caps and continuous 12/8/16 GiB reserves. Root's oauth-pass2-resource-observation.json records fresh adequate headroom. Follow the bounded deciding-before-full ordering and same four affected full/strict/fmt lanes; the historical-reader witness is retained, not needlessly rerun. Complete raw/portable reports include actual outputs, all failures and a structured findings block. No third ordinary attack is authorized. Full integration/publication/delivery and the supported installation still remain after review.
+
+## Final ordinary OAuth review and integration routing — 2026-09-06
+
+Immutable review-result cli-oauth-adversary-2-20260906 contains the complete second/final report exactly returned, including all 17 actual command outputs and its empty findings block. Report SHA256 f6e776e336a5d2111257fcdd9a09f704c3d3ac62e102ae7ff8afa74daa991e2a; 134-member manifest SHA256 3a3e2306af8c5de9d1678dc2a3e4ba7d09870f43e20c66174cb9c1eedfbbb8cc. Root independently verified all members, all 1,193 source hashes, four exact additive test paths, twelve unchanged old test prefixes, public/raw prefix-only equality and all 17 complete output embeddings. Source is f9bf1d6a plus tests.patch b4b0f459f8ef6d4b42cac24dd67f248e21df869056720b50a449c84e5e0602fb.
+
+The second review found no product defect. All four full suites pass: root 1,106 with one existing ignore, runtime 222, console 102 and CLI 133; zero failures. The operational cohort is 1,509 to 1,513, plus 50 helper/SQLite cases counted separately. All four strict Clippy and formatting lanes exit zero. The historical published-reader witness remains separately retained first-pass evidence and was not rerun. The first review's authoring finding, undecided origin and recorded fixed disposition remain unchanged. The review's incorrect edition-format precheck and initial schema-fixture failure remain preserved; they are not product findings or additional passes. No resource guard interrupted any command.
+
+Route this green reviewed source and its four additive cases to integration. The final combined twelve-workspace gate, source publication, documentation delivery and supported installation remain later coordinator work. No third ordinary attack is opened and the story remains active until its required assembled gate closes. Credentials remain held under their separate two-review blocker.
