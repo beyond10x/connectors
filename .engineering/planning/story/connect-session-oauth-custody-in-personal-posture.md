@@ -252,6 +252,12 @@ scope:
 - confidence: inferred
   path: crates/connectors-runtime/tests/personal_oauth.rs
 - confidence: inferred
+  path: crates/driver-cdp/Cargo.lock
+- confidence: inferred
+  path: crates/driver-sip/Cargo.lock
+- confidence: inferred
+  path: crates/driver-speech/Cargo.lock
+- confidence: inferred
   path: crates/integration-catalog/Cargo.toml
 - confidence: inferred
   path: crates/integration-catalog/src/custody.rs
@@ -268,11 +274,15 @@ scope:
 - confidence: inferred
   path: crates/protocol/src/connection.rs
 - confidence: inferred
+  path: crates/rtvbp-voice-endpoint/Cargo.lock
+- confidence: inferred
   path: crates/server/src/hosted/tests/mcp.rs
 - confidence: inferred
   path: crates/service/src/connect_session.rs
 - confidence: inferred
   path: crates/state-sqlite/src/lib.rs
+- confidence: inferred
+  path: crates/voice-runtime/Cargo.lock
 - confidence: cited
   path: docs/design/07-credential-custody-topologies.md
 - confidence: inferred
@@ -293,7 +303,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 42
+revision: 44
 ---
 ## Acceptance
 
@@ -417,3 +427,7 @@ Use the receiver-owned private Preparing guard to prevent a false terminal sessi
 The kernel remains normally compiled but privately uncalled until actual OAuth acquisition wiring. One explicitly temporary module-scoped non-test expect(dead_code) is permitted for that intermediate state and must be removed by the later wiring before whole-story completion/publication. It is not permission to suppress other diagnostics, change existing assertions, expose a fake backend or claim runtime OAuth behavior. No credential/address secrets enter serialized journal or errors. The prepared-store port does not expose independent digest readback; recovery claims must respect that limit.
 
 The retained stage2b-plan.md in the assigned OAuth scratch specifies the complete transaction/recovery matrix and decisive barriers, clock and real FULL SQLite/FileStore fixtures. Preserve actual pre-fix failures and existing tests. Full affected service/catalog tests, strict Clippy/format checks and exact lock closure are required for this slice. Whole OAuth runtime wiring, its independent review and complete gate remain outstanding; complete schema3 publication still precedes schema4 publication.
+
+## Satellite lock closure observed before stage2B edits
+
+All twelve locked/offline metadata checks were run on the assigned pre-edit eef5ccb6 tree. Seven passed; driver-speech, driver-cdp, driver-sip, rtvbp-voice-endpoint and voice-runtime refused their inherited stale Cargo.lock before any stage2B dependency/source change. Exact errors and argv are retained in stage2b-metadata-before.json and its indexed logs in the OAuth scratch. These five exact locks are assigned for metadata-only closure, preserving existing package versions/checksums. The completed rate branch independently refreshes the same inherited graph; the coordinator will reconcile the final combined dependency graph through Cargo rather than text-splicing lockfiles. Do not attribute preexisting closure drift to the new FULL-journal dependency.
