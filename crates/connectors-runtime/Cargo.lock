@@ -2092,6 +2092,7 @@ version = "0.6.5"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
  "catalog",
  "connector-oauth",
  "connector-resolve",
