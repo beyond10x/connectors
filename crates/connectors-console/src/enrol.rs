@@ -272,6 +272,7 @@ pub async fn run(
         network: connectors_config::NetworkScopeConfig::Public,
         credential: Some(credential.name.to_owned()),
         credential_file: None,
+        oauth: None,
     };
     let reference = integration_catalog::credential_address(
         existing.owner.tenant_id.as_str(),

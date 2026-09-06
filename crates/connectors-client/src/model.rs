@@ -10,6 +10,10 @@ use zeroize::Zeroizing;
 /// A transport, framing, or protocol validation failure.
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
+    #[error("personal OAuth instructions are unavailable or invalid")]
+    PersonalOAuthInstructions,
+    #[error("personal OAuth authorization expired or was refused")]
+    PersonalOAuthRefused,
     #[error("Connector request was invalid: {0}")]
     InvalidRequest(String),
     #[error("Connector returned an invalid response")]
@@ -300,4 +304,65 @@ pub(crate) struct RedeemSubscriptionLeaseRequest<'a> {
 pub(crate) struct RedeemedSubscriptionResponse {
     pub credential: String,
     pub kind: String,
+}
+
+/// Trusted local OAuth handoff. Deliberately neither Debug nor Serialize; it carries a capability.
+/// Stopping the client does not cancel Connection v1 acquisition; daemon expiry/shutdown cleans it.
+///
+/// ```compile_fail
+/// fn debug<T: std::fmt::Debug>() {}
+/// debug::<connectors_client::PendingPersonalOAuth>();
+/// ```
+pub struct PendingPersonalOAuth {
+    pub(crate) expected_connection_ref: String,
+    pub(crate) integration_ref: String,
+    pub(crate) auth_profile: String,
+    pub(crate) session_ref: String,
+    pub(crate) expires_at_unix_ms: u64,
+    pub(crate) browser_url: Zeroizing<String>,
+    pub(crate) deadline: tokio::time::Instant,
+}
+impl PendingPersonalOAuth {
+    #[must_use]
+    pub fn session_ref(&self) -> &str {
+        &self.session_ref
+    }
+    #[must_use]
+    pub fn expires_at_unix_ms(&self) -> u64 {
+        self.expires_at_unix_ms
+    }
+}
+
+/// Human-only OAuth instructions, held in zeroizing buffers and never serialized as command data.
+///
+/// ```compile_fail
+/// fn serializable<T: serde::Serialize>() {}
+/// serializable::<connectors_client::PersonalOAuthInstructions>();
+/// ```
+pub struct PersonalOAuthInstructions {
+    pub(crate) url: Zeroizing<String>,
+    pub(crate) user_code: Option<Zeroizing<String>>,
+}
+impl PersonalOAuthInstructions {
+    /// The trusted console must select a controlling terminal or an owner-only file before
+    /// starting a session. This writes only to that explicitly selected private destination.
+    pub fn write_human(&self, destination: &mut impl io::Write) -> io::Result<()> {
+        writeln!(
+            destination,
+            "Open this URL to authorize the configured connection:\n{}",
+            *self.url
+        )?;
+        if let Some(code) = &self.user_code {
+            writeln!(destination, "Enter this code: {}", **code)?;
+        }
+        destination.flush()
+    }
+}
+
+impl PendingPersonalOAuth {
+    /// Retire a private human handoff at the admitted session deadline even when a previously
+    /// authorized commit is still settling. This timer sends no cancellation request.
+    pub async fn instruction_expiry(&self) {
+        tokio::time::sleep_until(self.deadline).await;
+    }
 }

@@ -317,6 +317,8 @@ pub struct Operation {
     ///
     /// [`credential_requirement`]: Self::credential_requirement
     pub credentials: &'static [&'static [&'static str]],
+    /// Complete credential-local scope alternatives from the canonical operation record.
+    pub auth_requirements: &'static [AuthRequirement],
     /// **Why [`credentials`](Self::credentials) is what it is** — and, when it is empty, which of
     /// the two opposite reasons that is (C-235). See [`CredentialRequirement`].
     ///
@@ -553,6 +555,8 @@ pub enum Acquisition {
 /// mistakenly trust.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OAuth2 {
+    /// Explicit personal admissions. Legacy `public_client` never supplies an implicit flow.
+    pub personal_flows: &'static [PersonalOAuthAdmission],
     /// The declared endpoint name whose base URL [`authorize_path`](Self::authorize_path) and
     /// [`token_path`](Self::token_path) resolve against. Empty means the connector's own base URL.
     ///
@@ -619,6 +623,133 @@ pub enum OAuthGrant {
     RefreshToken,
     /// The two-legged client-credentials grant, with no user.
     ClientCredentials,
+    /// RFC 8628 device authorization; token exchange uses its full grant URN.
+    DeviceAuthorization,
+}
+
+/// One credential mechanism and its credential-local OR-of-AND scope requirements.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthRequirement {
+    /// Every listed credential is required; another mechanism is a separate alternative.
+    pub credentials: Vec<String>,
+    /// Each credential's scope alternatives, never pooled across credentials.
+    #[serde(default)]
+    pub scopes: std::collections::BTreeMap<String, Vec<Vec<String>>>,
+}
+
+/// Explicit provider admission, mirrored from the canonical schema's per-flow vocabulary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PersonalOAuthFlow {
+    /// Authorization code and PKCE S256.
+    AuthorizationCodePkce,
+    /// RFC 8628 device authorization.
+    DeviceAuthorization,
+}
+
+/// Per-flow token endpoint authentication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthClientAuthentication {
+    /// No client secret is issued or used.
+    Public,
+    /// The deployment supplies a secret in the token POST.
+    ClientSecretPost,
+}
+
+/// Provider-supported callback shape, without a registration value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthRedirectShape {
+    /// Numeric IPv4 loopback over HTTP.
+    LoopbackIpv4Http,
+    /// The literal localhost hostname over HTTP.
+    LocalhostHttp,
+    /// An exactly registered HTTPS callback.
+    RegisteredHttps,
+}
+
+/// Provider admission for development or production registration use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthRegistrationUse {
+    /// Development only.
+    DevelopmentOnly,
+    /// Development and production, subject to independent custody restrictions.
+    ProductionAllowed,
+}
+
+/// Refresh issuance requirement for one acquisition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthRefreshPolicy {
+    /// A refresh token must be issued.
+    Required,
+    /// Access-only acquisition remains valid until finite expiry.
+    IfIssued,
+}
+
+/// An authentication endpoint through a declared service, never a callable operation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OAuthEndpoint {
+    /// Declared service name.
+    pub service: String,
+    /// Fixed absolute path, without origin, query or fragment.
+    pub path: String,
+}
+
+/// Representation of the authenticated scope observation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthScopeEncoding {
+    /// Space-separated string.
+    SpaceDelimited,
+    /// Comma-separated string.
+    CommaDelimited,
+    /// Array of scope strings.
+    StringArray,
+}
+
+/// Provider-declared token-info observation, independent of requested scopes.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OAuthTokenEvidence {
+    /// GET endpoint authenticated with the acquired Bearer token.
+    pub endpoint: OAuthEndpoint,
+    /// JSON Pointer to granted scopes.
+    pub scopes_pointer: String,
+    /// Encoding of that observed value.
+    pub scope_encoding: OAuthScopeEncoding,
+    /// Optional effective subject observation.
+    #[serde(default)]
+    pub subject_pointer: Option<String>,
+    /// Optional deployment-client check.
+    #[serde(default)]
+    pub client_id_pointer: Option<String>,
+}
+
+/// Complete personal admission with no client id, secret, or deployment redirect value.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PersonalOAuthAdmission {
+    /// Unique acquisition flow.
+    pub flow: PersonalOAuthFlow,
+    /// Explicit per-flow authentication.
+    pub client_authentication: OAuthClientAuthentication,
+    /// Callback shape for authorization code only.
+    #[serde(default)]
+    pub redirect_shape: Option<OAuthRedirectShape>,
+    /// Provider restriction on registration use.
+    pub registration_use: OAuthRegistrationUse,
+    /// Device authorization endpoint for the device flow only.
+    #[serde(default)]
+    pub device_authorization_endpoint: Option<OAuthEndpoint>,
+    /// Whether refresh issuance is mandatory.
+    pub refresh_policy: OAuthRefreshPolicy,
+    /// Authenticated evidence needed for publication.
+    pub token_evidence: OAuthTokenEvidence,
 }
 
 /// The loopback redirect an `authorization_code` login binds. Mirrors

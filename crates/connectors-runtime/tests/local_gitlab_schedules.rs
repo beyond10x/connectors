@@ -144,6 +144,7 @@ impl Fixture {
             network: NetworkScopeConfig::Public,
             credential: Some("gitlab.token".to_owned()),
             credential_file,
+            oauth: None,
         };
         let mut configured = vec![entry];
         if include_reader {

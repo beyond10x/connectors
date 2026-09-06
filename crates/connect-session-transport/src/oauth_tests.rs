@@ -536,3 +536,47 @@ async fn already_expired_instruction_request_refuses_before_reading_or_writing()
         Some(OAuthTransportError::Expired)
     );
 }
+
+#[tokio::test]
+async fn liveness_observer_is_retired_after_matching_callback() {
+    let uri = redirect();
+    let mut endpoint = BoundOAuthEndpoint::bind_pkce(config(&uri)).unwrap();
+    let observer = endpoint.liveness();
+    assert!(observer.is_live());
+    let state = endpoint.pending.as_ref().unwrap().state.to_string();
+    let authority = endpoint.authority.clone();
+    let mut client = TcpStream::connect(&authority).await.unwrap();
+    let (mut server, _) = endpoint.listener.as_ref().unwrap().accept().await.unwrap();
+    client.write_all(format!("GET /oauth/callback?state={state}&code=private-code HTTP/1.1\r\nHost: {authority}\r\n\r\n").as_bytes()).await.unwrap();
+    let claimed = endpoint.handle(&mut server).await.unwrap().unwrap();
+    assert!(!observer.is_live());
+    assert_eq!(&*claimed.code, "private-code");
+    assert!(endpoint.listener.is_none());
+}
+
+#[tokio::test]
+async fn liveness_observer_drop_and_rebind_cannot_revive_old_receiver() {
+    let uri = redirect();
+    let endpoint = BoundOAuthEndpoint::bind_pkce(config(&uri)).unwrap();
+    let observer = endpoint.liveness();
+    let cloned = observer.clone();
+    assert!(observer.is_live());
+    drop(endpoint);
+    assert!(!observer.is_live());
+    let replacement = BoundOAuthEndpoint::bind_pkce(config(&uri)).unwrap();
+    assert!(replacement.liveness().is_live());
+    assert!(!cloned.is_live());
+}
+
+#[tokio::test(start_paused = true)]
+async fn liveness_observer_uses_original_receiver_deadline_without_polling_receive() {
+    let uri = redirect();
+    let mut policy = config(&uri);
+    policy.deadline = Instant::now() + Duration::from_secs(1);
+    let endpoint = BoundOAuthEndpoint::bind_pkce(policy).unwrap();
+    let observer = endpoint.liveness();
+    assert!(observer.is_live());
+    tokio::time::advance(Duration::from_secs(1)).await;
+    assert!(!observer.is_live());
+    assert!(!endpoint.liveness().is_live());
+}
