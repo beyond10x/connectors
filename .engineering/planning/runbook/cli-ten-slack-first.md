@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 19
+revision: 21
 ---
 
 
@@ -2567,3 +2567,697 @@ Credential review2 is immutable in review-result:cli-credentials-adversary-2-202
 GitLab compiler/contract fallout is now explicitly scoped: catalog-build/src/scaffold.rs retains LegacyV1 for existing scaffolding; shipped_providers.rs checks whole-body requiredness against its explicit source value while preserving all other checks. One-shot's existing target fixture is updated to the now-intended missing-daemon behavior, retaining target selection and invalid hosted-login isolation. Coordinator applied that patch and formatted its additive CatalogBackend capability hunk.
 
 Read-only OAuth runtime scoping is dispatched to scope_oauth, using the plugin story-scoper charter through an ordinary agent (same declared harness deviation). The existing schema/doc-only scope is insufficient for the recorded runtime acceptance. No OAuth implementation or new entity is dispatched before the model and exact scope are recorded. Scratch brief is under the wave's connect-session-oauth-custody-in-personal-posture directory; the scoper writes no files.
+
+## Current authority and one-shot review
+
+Fresh clean Atlas authority is3f0dbbf7701ce636df510316282d1c96a917df01 in managed tree wt-09ac7303c4aa. Its latest accepted ADR is0039, the ESS conformance-count reader-before-writer migration. The Connectors wave still aligns with accepted ADR0038's generic platform/independent extension boundary; ADR0039 does not change Connector provider selection, schema fidelity, grant or custody rules.
+
+Our unpublished migration drafts were replayed through AEP on a branch from that exact remote commit, reusing clean managed tree wt-19c8158c5cae as plan/connector-cli-migrations. Rate-limit protocol proposal is now ADR0040; source-fidelity catalog proposal is ADR0041. The prior local5e3a327 proposal branch remains a recovery reference; its0039/0040 numbering is superseded and not published. No planning journal was textually merged or copied.
+
+Atlas's full fences.sh exited1. Catalog, live Pages, projections and brand passed. Shared primary state fails documentation collection (AgentIDE b10x-docs/v4 unsupported by the pinned collector), Website Docs System pin, and map grounding (widgets lacks Serves). A bot-observer test also failed its error-message assertion; the exact focused rerun passed, and a full Rust rerun follows. Coordinator fixed one newly introduced relative ADR link; the managed Markdown checker now reports158files and0findings. The full gate remains red; the draft is not pushed and none of these observations claims delivery.
+
+Pipe worktree wt-55b6348b9982 GC completed through exact reviewed-id application. The manager recorded remote recovery through origin:refs/heads/wave/cli-ten-slack-first and origin:refs/pull/14/head before non-forced removal. No other tree was selected.
+
+One-shot source970e4af56f7a4ca1b9689c885fabd3a519bbe0ca is bot-authored and bot-committed after618 passing affected tests (2existing ignored), strict clippy/fmt/module fence. First tests-only attack is dispatched to adversary_one_shot_1 in the same owned tree; no AEP/Git writes delegated. Full base for its review remains3df1cd2df32472a4afc8feeaac8c46c9de8d1b55. The implementation report and original red fixtures remain under the recorded scratch triple.
+
+## Rate-limit staged dispatch
+
+Continuation of the operator-approved ten-story CLI wave; aep-drive:wave skill0.8.0. Dispatch uses the ordinary agent harness with the full aep-drive:implementor charter because this harness has no plugin subagent_type selector, as recorded at wave opening. The user authorized up to five workers and an unlimited subscription budget; this harness has three worker slots beside its coordinator.
+
+Select only story:rate-limit-in-the-protocol from computed proposed wave2. The full computed output below is retained unchanged; no other newly listed story is selected. Active GitLab and one-shot work are absent from this proposed-only query, so it does not establish whole-unit disjointness against them. Exact path and directory-containment inspection requires staged ownership: stage1 is additive protocol version modules/contracts/tests and the service/server egress parser/header extraction. No current public DTO field changes, catalog/spec/schema changes, local dispatch, CLI, or provider adapters until coordinator handoff after the relevant source units land. Stage1 must remain compilable with existing callers. The complete story remains one unit and receives adversarial review only after all stages.
+
+The complete decision and acceptance live on the rate-limit story, with validated catalog/runtime ESS value types. Preserve existing fixed RateLimit serialization, expose conditional source-grounded Slack advice without guessing app category, and retain frozen v1 bytes behind an explicit v2 compatibility boundary. Atlas authority is clean remote f686fe034bc3f1c7c5d276476b814ee05c2bca9f; its new ADR0039 concerns ESS count evidence. Proposed Connector migration ADR0040 and source-fidelity ADR0041 remain reviewable drafts in the owned Atlas tree. No acceptance, consumer migration, release or deployment is claimed.
+
+Preflight: the integration tree contains only coordinator-owned planning/model changes being committed before tree creation. Unit branches already present belong to this same wave; the held credential tree remains outside the merge set after two red reviews. Pipe tree was finished and removed through reviewed exact-id manager GC after publication. Free disk measured24GB against20GB floor; sccache is configured, incremental/debug output disabled, build jobs3 per worker, and each tree owns its targets. Start the additive rate work after one-shot root compilation is idle; monitor the floor before another build. Exact rate tree/base/build/scratch triple is appended on creation before dispatch. Existing wave commit/push authorization applies; no tag/release.
+
+Computed selection command: aep plan artifact waves --kind story --status proposed --format json; exit0, output recorded before rate moved active.
+
+```json
+{
+  "waves": [
+    {
+      "wave": 1,
+      "artifacts": [
+        {
+          "id": "story:auth-as-tool-result",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "contracts"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/client/src/identity.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/client/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/client/src/response.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-cli/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-runtime/src/registry.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/domain/src/grant.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-gitlab/src/backend.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-slack/src/backend/api_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-slack/src/backend/connection_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/src/connection.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/src/operation.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/tests/bundles.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/admission.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/connection_route.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/enforcement.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/server/src/hosted/tests"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/local.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/service/src/connect_session.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/service/src/runtime.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/connection.yaml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/system/domains/runtime.yaml"
+            }
+          ]
+        },
+        {
+          "id": "story:connect-session-oauth-custody-in-personal-posture",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build/src/document.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog/src/table.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog/tests/main/consumer_api.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec/schema/provider-toml.schema.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/auth.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec/src/provider/auth_validation.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec/tests/main/oauth2_acquisition.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/design/07-credential-custody-topologies.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/design/21-personal-oauth-callback-custody.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/gitlab.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/jira.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/slack.toml"
+            }
+          ]
+        },
+        {
+          "id": "story:deployment-catalogs-are-external-packs",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-build"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-reader"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-config"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-runtime"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/design"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "artifacts": [
+        {
+          "id": "story:deployment-declared-destination-aperture",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-config"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/domain"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/server"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/service"
+            }
+          ]
+        },
+        {
+          "id": "story:rate-limit-in-the-protocol",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "catalog/connector-document-v3.schema.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "catalog/slack.catalog.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "connectors.lock"
+            },
+            {
+              "confidence": "inferred",
+              "path": "contracts/connector-operation/v0alpha2"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build/src/document.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build/src/document_schema.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build/tests/main/catalog_invariants.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-reader/catalog.pack"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/catalog/src/table.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog/tests/main/consumer_api.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec/schema/provider-toml.schema.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/ir.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/provider.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/provider/declaration.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/provider/publishing.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/src/provider/schema_sync.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/tests/main/determinism.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/tests/main/ir_roundtrip.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec/tests/main/service_partition.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-cli/src/lib.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-cli/tests/cli_surface.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-client/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-client/src/response.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-console/src/envelope.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-console/src/output.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-runtime/src/registry.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-runtime/src/service_bundle.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-gitlab/src/backend.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-jira/src/backend/operations.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-kubernetes/src/hosted.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-kubernetes/src/local.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-kubernetes/src/local_inventory.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-kubernetes/src/workloads.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-mcp/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-monitoring/src/backend.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-platform/src/datasource.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-platform/src/surface.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-sip/src/backend/mod.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/integration-slack/src/backend/api_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/src/operation.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/protocol/src/operation/legacy.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/protocol/src/operation/wire.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/protocol/tests/bundles.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/egress.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/mcp/toolset.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/server/src/hosted/tests/contract_validation.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/tests/enforcement.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/tests/mcp.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/tests/mcp_monitoring.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/hosted/tests/signal.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/server/src/local.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/service/src/egress.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "ess/system/domains/catalog.yaml"
+            },
+            {
+              "confidence": "cited",
+              "path": "ess/system/domains/runtime.yaml"
+            },
+            {
+              "confidence": "cited",
+              "path": "json-schemas.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers/slack.toml"
+            }
+          ]
+        },
+        {
+          "id": "story:sources-are-processed-by-code",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "crates/catalog-build"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connector-spec"
+            }
+          ]
+        },
+        {
+          "id": "story:the-claims-journal-survives-a-full-life",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-runtime"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/design/13-grant-evaluation-and-approval-redemption.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "artifacts": [
+        {
+          "id": "story:per-service-verification-probes",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/catalog-build"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-resolve"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connector-spec"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-console"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/service"
+            },
+            {
+              "confidence": "inferred",
+              "path": "providers"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "collisions": [
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-cli/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connectors-runtime/src/registry.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/integration-gitlab/src/backend.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/integration-slack/src/backend/api_runtime.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/protocol/src/operation.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/protocol/tests/bundles.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/server/src/hosted.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/server/src/local.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:auth-as-tool-result",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "ess/system/domains/runtime.yaml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/catalog-build/src/document.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/catalog/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/catalog/src/table.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/catalog/tests/main/consumer_api.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "crates/connector-spec/schema/provider-toml.schema.json",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:connect-session-oauth-custody-in-personal-posture",
+      "b": "story:rate-limit-in-the-protocol",
+      "path": "providers/slack.toml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:deployment-declared-destination-aperture",
+      "path": "crates/connectors-config",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:per-service-verification-probes",
+      "path": "crates/catalog-build",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:sources-are-processed-by-code",
+      "path": "crates/catalog-build",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-catalogs-are-external-packs",
+      "b": "story:the-claims-journal-survives-a-full-life",
+      "path": "crates/connectors-runtime",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:deployment-declared-destination-aperture",
+      "b": "story:per-service-verification-probes",
+      "path": "crates/service",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:per-service-verification-probes",
+      "b": "story:sources-are-processed-by-code",
+      "path": "crates/catalog-build",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:per-service-verification-probes",
+      "b": "story:sources-are-processed-by-code",
+      "path": "crates/connector-spec",
+      "confidence": "inferred"
+    }
+  ],
+  "unassessed": [],
+  "cycles": []
+}
+```

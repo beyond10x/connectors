@@ -6,6 +6,33 @@ domain: connectors.runtime
 summary: The unit of authority, the granted executions that run under it, the live sessions those executions open, and the record every one of them leaves.
 
 types:
+  - name: connectors.runtime.ConditionalRateAdvice
+    kind: struct
+    fields:
+      - name: declaration
+        type: connectors.catalog.ConditionalRateLimit
+      - name: suggested_interval_ms
+        type: Optional<Integer>
+
+  - name: connectors.runtime.OperationRateAdvice
+    kind: struct
+    fields:
+      - name: fixed
+        type: Optional<connectors.catalog.FixedRateLimit>
+      - name: alternatives
+        type: List<connectors.runtime.ConditionalRateAdvice>
+
+  # Proposed ConnectorOperation v0alpha2 rate-limit observation. A definite HTTP429
+  # refusal is distinct from ambiguous write execution. No automatic retry is implied.
+  - name: connectors.runtime.RateLimitObservation
+    kind: struct
+    fields:
+      - name: retry_after_seconds
+        type: Optional<Integer>
+
+  # UNMAPPED: the protocol enforces u64 range and permits the delay only on RateLimited.
+  # ESS Integer is the value-only projection here; no new lifecycle is invented.
+
   - name: connectors.runtime.GrantRef
     kind: newtype
     of: String
