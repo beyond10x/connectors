@@ -8,6 +8,8 @@ tags:
 - ready
 - wave-cli
 scope:
+- confidence: cited
+  path: CHANGELOG.md
 - confidence: inferred
   path: Cargo.lock
 - confidence: cited
@@ -148,6 +150,8 @@ scope:
   path: crates/integration-slack/src/backend_tests.rs
 - confidence: cited
   path: crates/protocol/Cargo.toml
+- confidence: cited
+  path: crates/protocol/README.md
 - confidence: inferred
   path: crates/protocol/examples/operation_v2_bundle.rs
 - confidence: cited
@@ -203,6 +207,10 @@ scope:
 - confidence: inferred
   path: crates/voice-runtime/Cargo.lock
 - confidence: cited
+  path: docs/architecture/interfaces.md
+- confidence: cited
+  path: docs/design/04-the-callers-contract.md
+- confidence: cited
   path: ess/system/components.yaml
 - confidence: cited
   path: ess/system/domains/catalog.yaml
@@ -216,7 +224,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 135
+revision: 140
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -429,3 +437,9 @@ Full affected suites measured1770→1772 executed: root1209, runtime346, CLI130 
 Complete immutable handoff is in `~/.cache/connectors-cli-wave-20260906/rate-limit-in-the-protocol/stage2-repair-*`. Raw report SHA256eeb4522f474113e47b75749a9893c34685afc80217ed2b6e5444aac36c872e54; portable report SHA256b87e68a1b80f2580839238603877363ec99a08b70357c85dfd313d04bae95fc6; evidence manifest SHA25682ac97a1f2147542558ad39bf13e790d9f7cbadacb30d43b78be02b94f9edad9; source patch SHA2561589d34a9fc3d390cc101e754512a6c3d2d31cb232ab9821982e8454e4c6d622. Every existing version/source/checksum is preserved across the10changed locks; the driver-sql closure adds only two already-pinned root packages.
 
 The second/final ordinary adversary pass is assigned against the complete frozen unit in wt-af054beacfba. At most seven additive parameterized attacks use the existing12test owners; preserve all source/earlier cases and report actual caller reachability/origin. Full four-workspace ordinary-parallel suites and strict checks follow the deciding cases. Completed exact owned targets may be cleaned only after outside-evidence/source verification to preserve the20GiBfloor. No third ordinary attack or production repair by the adversary is authorized if the final pass is red. Complete schema3 publication and full integration gates remain pending; shared runtime owners are not released yet.
+
+## Publication guidance assignment — 2026-09-06
+
+The read-only schema 3 preflight identifies missing public explanation of the completed rate source. Assign CHANGELOG.md, crates/protocol/README.md, docs/architecture/interfaces.md and docs/design/04-the-callers-contract.md solely for concise publication guidance grounded in frozen source 2f89a6fccf9878ed8275565d68667cbd1fc08d43 and Atlas proposed migration records 0040/0041. The implementor may edit these four paths in the coordinator's managed integration checkout; no source, generated output, planning, manifest, lock, release identity, provider data or remote write is assigned. The adversary's separate rate checkout remains untouched.
+
+Explain Operation v2 and strict v1 compatibility, advisory rate metadata, definite 429 and trusted delay, no automatic resend, and schema 3's required reader/producer migration with preserved source semantics. Keep the unreleased entry under Unreleased. Mark proposed external migration and source-versus-release/install status accurately; do not claim OAuth schema 4, Operation v3, consumer adoption or a completed final review. Preserve the design's existing text and append its dated conditional-metadata note. Validate links/text without a new Cargo build, freeze a four-path patch and short report, then return source to the coordinator for the accepted schema 3 assembly.
