@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 29
+revision: 30
 ---
 
 
@@ -3311,3 +3311,26 @@ Stage2 fixture closure adds existing Slack backend and one-shot CLI test files. 
 The exact published integration84ccd024 ran all12workspace lanes with2133passing executions,0failures and27existing ignored, including both runtime feature sets. Final catalog/link/story/ESS validation checks passed before generated-clap comparison failed. The stale generated projection predates the added request-semantics and rate-advice model values; source additions were modeled before implementation but their derivative was not refreshed. Current model/source evidence is retained in the final gate log.
 
 Coordinator owns regeneration of ess/generated/clap from the complete validated ess/system through ESS0.18.0, with no manual generated edits. Only the already committed emitted crate/notes are copied; unclassified plan.json/target.json stay scratch as the gate requires. Shared model projection refresh is serialized in integration. Report full gate green only after the exact final check reruns successfully.
+
+## Reviewed one-shot and closed-pipe gate closure
+
+Source84ccd024 completed every declared workspace lane, including both runtime feature sets. Generated-only commitc08c4728 refreshes six exact ESS derivatives; the final gate rerun is green:65providers,68artifacts verified, portable Markdown,73legacy story records consistent,10ESSfiles valid and generated clap byte-identity confirmed. Complete raw runner logs, exits and counts are retained in the assigned one-shot-integration-gate scratch directory. The first final-gate refusal remains retained; no test was skipped or changed to obtain the final result.
+
+| Workspace | Passed | Failed | Existing ignored |
+|---|---:|---:|---:|
+| . | 1141 | 0 | 4 |
+| crates/connectors-runtime | 668 | 0 | 4 |
+| crates/connectors-cli | 123 | 0 | 0 |
+| crates/connectors-console | 87 | 0 | 0 |
+| crates/driver-audio | 15 | 0 | 0 |
+| crates/driver-speech | 22 | 0 | 2 |
+| crates/driver-cdp | 29 | 0 | 2 |
+| crates/driver-sip | 5 | 0 | 0 |
+| crates/driver-sql | 28 | 0 | 14 |
+| crates/rtvbp-voice-endpoint | 7 | 0 | 0 |
+| crates/voice-local-audio | 4 | 0 | 1 |
+| crates/voice-runtime | 4 | 0 | 0 |
+
+Total2133passing executions,0failures,27existing ignored. These are executions, including the two declared runtime variants, not a count of unique assertions. One-shot and closed-pipe acceptance have their retained two-pass review records and are eligible for implemented. Final installed-byte verification still owns the urgent delivery story. GitLab, rate-limit and OAuth/auth-remediation remain separate incomplete units.
+
+Published reviewed one-shot unit HEADd86716fb was finished and removed by worktree after exact-id dry-run, with remote recovery through origin/wave/cli-ten-slack-first-resumed. Its scratch reports and all test logs remain retained.
