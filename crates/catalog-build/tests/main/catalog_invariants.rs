@@ -497,6 +497,22 @@ fn promoted_operation_traits_equal_the_pre_migration_inventory() {
             fact["id"].as_str().unwrap()
         )
     });
+    assert_eq!(facts.len(), 177);
+    let schedule = facts
+        .iter()
+        .position(|fact| {
+            fact["provider"] == "gitlab" && fact["id"] == "gitlab-pipeline-schedule-list"
+        })
+        .expect("the new schedule read declares page pagination");
+    assert_eq!(
+        facts.remove(schedule),
+        serde_json::json!({
+            "provider": "gitlab", "id": "gitlab-pipeline-schedule-list",
+            "pagination": {"page": {"page_param": "page", "size_param": "per_page", "page_size": 20, "max_pages": 1}},
+            "rate_limit": null, "error_envelope": null
+        })
+    );
+    // The new declaration above is explicit; every historical trait remains byte-identical.
     assert_eq!(facts.len(), 176);
     let digest = connector_spec::sha256_hex(&serde_json::to_vec(&facts).unwrap());
     assert_eq!(
@@ -665,7 +681,11 @@ fn two_plans_over_the_same_inputs_are_byte_identical() {
 fn every_canonical_document_validates_against_the_committed_schema() {
     let (workspace, plan) = full_plan();
 
-    let schema_text = planned(&workspace, &plan, "catalog/connector-document.schema.json");
+    let schema_text = planned(
+        &workspace,
+        &plan,
+        "catalog/connector-document-v3.schema.json",
+    );
     let schema: Value = serde_json::from_str(schema_text).expect("the schema is JSON");
     let validator = jsonschema::validator_for(&schema).expect("the schema compiles");
 
@@ -2031,5 +2051,299 @@ fn a_custody_only_provider_publishes_no_surface_and_every_other_provider_does() 
     assert!(
         custody.len() <= documents.len(),
         "custody-only providers in the committed tree: {custody:?}"
+    );
+}
+
+#[test]
+fn gitlab_schedule_slice_is_generated_and_preserves_legacy_contracts() {
+    let workspace = Workspace::new(repo_root());
+    let provider = catalog_build::discovery::discover(&workspace, Some("gitlab"))
+        .expect("discover GitLab")
+        .remove(0);
+    let inputs = catalog_build::seam::ProviderInputs::read(&provider).expect("read GitLab");
+    let loaded = catalog_build::seam::load_full(&inputs).expect("load GitLab");
+    let expected = [
+        (
+            "gitlab-pipeline-schedule-list",
+            "GET",
+            "read",
+            "low",
+            "idempotent",
+        ),
+        (
+            "gitlab-pipeline-schedule-create",
+            "POST",
+            "write",
+            "high",
+            "non_idempotent",
+        ),
+        (
+            "gitlab-pipeline-schedule-update",
+            "PUT",
+            "write",
+            "high",
+            "non_idempotent",
+        ),
+        (
+            "gitlab-pipeline-schedule-delete",
+            "DELETE",
+            "write",
+            "destructive",
+            "idempotent",
+        ),
+    ];
+    let (_, plan) = full_plan();
+    let all = documents(&workspace, &plan);
+    let gitlab = &all["gitlab"];
+    for (id, method, direction, risk, idempotency) in expected {
+        let operation = gitlab["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|operation| operation["id"] == id)
+            .unwrap_or_else(|| panic!("missing {id}"));
+        assert!(
+            loaded.connector.provenance.operation_specs.contains_key(id),
+            "{id} must derive from the official source"
+        );
+        assert_eq!(operation["direction"], direction);
+        assert_eq!(operation["risk"], risk);
+        assert_eq!(operation["idempotency"], idempotency);
+        let ir = loaded
+            .connector
+            .operations
+            .iter()
+            .find(|operation| operation.id == id)
+            .unwrap();
+        assert_eq!(method_word(ir.request.http_method().unwrap()), method);
+        assert!(ir
+            .request
+            .http_path()
+            .unwrap()
+            .starts_with("/api/v4/projects/{id}/pipeline_schedules"));
+        assert_eq!(
+            ir.params
+                .path
+                .iter()
+                .find(|param| param.name == "id")
+                .unwrap()
+                .schema,
+            serde_json::json!({"oneOf":[{"type":"string"},{"type":"integer"}]})
+        );
+        assert!(ir.params.body.is_empty());
+        if method == "POST" || method == "PUT" {
+            assert!(ir
+                .params
+                .body_schema
+                .as_ref()
+                .unwrap()
+                .pointer("/properties/inputs")
+                .is_some());
+        }
+        if direction == "write" {
+            assert_eq!(operation["expose"], false);
+        }
+    }
+    let list = loaded
+        .connector
+        .operations
+        .iter()
+        .find(|op| op.id == expected[0].0)
+        .unwrap();
+    assert_eq!(list.response_schema.as_ref().unwrap()["type"], "object");
+    assert_eq!(
+        list.response_schema.as_ref().unwrap()["properties"]["inputs"]["type"],
+        "object"
+    );
+    assert!(
+        !loaded
+            .connector
+            .provenance
+            .operation_specs
+            .contains_key("gitlab-user-get"),
+        "legacy inline provenance stays truthful"
+    );
+}
+
+#[test]
+fn source_fidelity_gitlab_preserves_every_selected_vendor_schema() {
+    // Independent resolution of these pinned, acyclic source closures. Expected schemas never
+    // pass through the production importer or dialect translator.
+    fn resolve(root: &Value, value: &Value) -> Value {
+        if let Some(reference) = value.get("$ref").and_then(Value::as_str) {
+            return resolve(
+                root,
+                root.pointer(reference.strip_prefix('#').expect("local reference"))
+                    .expect("source reference exists"),
+            );
+        }
+        match value {
+            Value::Object(fields) => Value::Object(
+                fields
+                    .iter()
+                    .map(|(key, child)| (key.clone(), resolve(root, child)))
+                    .collect(),
+            ),
+            Value::Array(values) => {
+                Value::Array(values.iter().map(|value| resolve(root, value)).collect())
+            }
+            value => value.clone(),
+        }
+    }
+    let root: Value = serde_norway::from_str(
+        &std::fs::read_to_string(repo_root().join("specs/gitlab/openapi-19.4.yaml")).unwrap(),
+    )
+    .unwrap();
+    let workspace = Workspace::new(repo_root());
+    let provider = catalog_build::discovery::discover(&workspace, Some("gitlab"))
+        .unwrap()
+        .remove(0);
+    let inputs = catalog_build::seam::ProviderInputs::read(&provider).unwrap();
+    let loaded = catalog_build::seam::load_full(&inputs).unwrap();
+    let mut checked = 0;
+    for op in loaded
+        .connector
+        .operations
+        .iter()
+        .filter(|op| op.id.starts_with("gitlab-pipeline-schedule-"))
+    {
+        let source_id = &loaded.connector.provenance.operation_specs[&op.id].operation_id;
+        let source = root["paths"]
+            .as_object()
+            .unwrap()
+            .values()
+            .flat_map(|path| path.as_object().unwrap().values())
+            .find(|value| value["operationId"] == *source_id)
+            .unwrap();
+        let parameters = source["parameters"].as_array().unwrap();
+        assert_eq!(
+            op.params.iter().count(),
+            parameters.len(),
+            "{} complete parameters",
+            op.id
+        );
+        for parameter in parameters {
+            let name = parameter["name"].as_str().unwrap();
+            let group = match parameter["in"].as_str().unwrap() {
+                "path" => &op.params.path,
+                "query" => &op.params.query,
+                position => panic!("unexpected selected position {position}"),
+            };
+            let actual = group.iter().find(|param| param.name == name).unwrap();
+            assert_eq!(
+                actual.schema,
+                resolve(&root, &parameter["schema"]),
+                "{} {name}",
+                op.id
+            );
+            assert_eq!(
+                actual.required,
+                parameter["required"].as_bool().unwrap_or(false)
+            );
+        }
+        if let Some(body) = source.get("requestBody") {
+            let body = resolve(&root, body);
+            assert_eq!(
+                op.params.body_schema.as_ref(),
+                Some(&body["content"]["application/json"]["schema"])
+            );
+            assert_eq!(
+                op.params.body_required,
+                Some(body["required"].as_bool().unwrap_or(false))
+            );
+        } else {
+            assert!(op.params.body_schema.is_none());
+        }
+        let success = source["responses"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .find(|(status, _)| status.starts_with('2'))
+            .unwrap()
+            .1;
+        let expected = success
+            .pointer("/content/application~1json/schema")
+            .map(|schema| resolve(&root, schema));
+        assert_eq!(op.response_schema, expected, "{} source response", op.id);
+        checked += 1;
+    }
+    assert_eq!(checked, 4);
+    let diagnostics = loaded.diagnostics();
+    for method in ["POST", "PUT"] {
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.location.starts_with(method)
+                    && diagnostic.problem.contains("array without items")),
+            "source defect must remain visible for {method}"
+        );
+    }
+}
+
+#[test]
+fn gitlab_official_source_inventory_accounts_for_every_operation() {
+    let document: Value = serde_norway::from_str(
+        &std::fs::read_to_string(repo_root().join("specs/gitlab/openapi-19.4.yaml"))
+            .expect("full official source"),
+    )
+    .unwrap();
+    let inventory: toml::Value = toml::from_str(
+        &std::fs::read_to_string(repo_root().join("specs/gitlab/coverage-19.4.toml"))
+            .expect("complete coverage inventory"),
+    )
+    .unwrap();
+    let mut declared = BTreeSet::new();
+    for (path, item) in document["paths"].as_object().unwrap() {
+        for (method, operation) in item.as_object().unwrap() {
+            if [
+                "get", "post", "put", "patch", "delete", "head", "options", "trace",
+            ]
+            .contains(&method.as_str())
+            {
+                declared.insert((
+                    method.to_uppercase(),
+                    path.clone(),
+                    operation["operationId"].as_str().unwrap().to_owned(),
+                ));
+            }
+        }
+    }
+    let rows = inventory["operation"].as_array().unwrap();
+    let accounted: BTreeSet<_> = rows
+        .iter()
+        .map(|row| {
+            (
+                row["method"].as_str().unwrap().to_owned(),
+                row["path"].as_str().unwrap().to_owned(),
+                row["operation_id"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(declared.len(), 1847);
+    assert_eq!(rows.len(), declared.len());
+    assert_eq!(accounted, declared);
+    assert!(rows
+        .iter()
+        .all(|row| row["status"].as_str().is_some_and(|s| [
+            "catalogued_generated",
+            "catalogued_legacy",
+            "platform_auth_flow",
+            "coverage_gap",
+            "importer_gap"
+        ]
+        .contains(&s))));
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row["status"].as_str() == Some("catalogued_generated"))
+            .count(),
+        4
+    );
+    assert!(rows
+        .iter()
+        .filter(|row| row["status"].as_str().unwrap().ends_with("gap"))
+        .all(|row| !row["reason"].as_str().unwrap().is_empty()));
+    assert_eq!(
+        inventory["authority"].as_str(),
+        Some("credentials_and_grants")
     );
 }

@@ -102,6 +102,7 @@ pub mod lock;
 pub mod names;
 pub mod openapi;
 pub mod provider;
+pub mod schema_translation;
 
 // **The address vocabulary lives in `connector-address` and is re-exported here whole** (C-407).
 //
@@ -137,9 +138,9 @@ pub use ir::{
     Connector, Discovery, DiscoveryDriver, DiscoveryMapping, ErrorEnvelope, HostEffect, HttpMethod,
     Idempotency, ImplementationForm, InteractionShape, JsonSchema, Operation, OperationDirection,
     OperationRequest, OperationSpecSource, Pagination, Param, ParamSet, PlacementRequirement,
-    ProducedCredential, ProtocolDriver, Provenance, RateLimit, RequiredCapability, Risk, Role,
-    RouteAdapter, SemanticEffect, Service, Tag, CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY,
-    MIN_REPEATABILITY_CONDITION,
+    ProducedCredential, ProtocolDriver, Provenance, RateLimit, RequestSemantics,
+    RequiredCapability, Risk, Role, RouteAdapter, SemanticEffect, Service, Tag,
+    CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY, MIN_REPEATABILITY_CONDITION,
 };
 pub use lock::{
     sha256_hex, LockEntry, LockPack, LockSpec, Lockfile, LOCKFILE_NAME, LOCKFILE_VERSION,

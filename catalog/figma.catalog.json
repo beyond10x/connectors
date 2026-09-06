@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Figma personal access token, sent as the whole value of X-Figma-Token. Grants read access to whatever files, projects and comments the token's account can see",
@@ -74,6 +74,7 @@
         "method": "GET",
         "url": "{base}/v1/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -160,6 +161,7 @@
         "method": "GET",
         "url": "{base}/v1/files/{file_key}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -292,6 +294,7 @@
         ],
         "url": "{base}/v1/files/{file_key}/nodes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -400,6 +403,7 @@
         ],
         "url": "{base}/v1/images/{file_key}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -478,6 +482,7 @@
         "method": "GET",
         "url": "{base}/v1/projects/{project_id}/files"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -579,6 +584,7 @@
         "method": "GET",
         "url": "{base}/v1/files/{file_key}/comments"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -643,7 +649,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v1",

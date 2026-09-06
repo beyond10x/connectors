@@ -745,6 +745,12 @@ fn compose(
 
     let mut params = spec.params.clone();
     if let Some(patch) = patch {
+        if !params.request_semantics.is_legacy()
+            && (!patch.params.is_empty() || !patch.omit.is_empty())
+        {
+            problems.push(format!("patch for {select:?} changes source-faithful parameter schemas or omits source parameters; select policy metadata separately from the source contract"));
+            return None;
+        }
         for correction in &patch.params {
             correct(&mut params, correction, select, problems);
         }
@@ -765,6 +771,8 @@ fn compose(
             );
         }
     }
+
+    let response_schema = spec.response_schema.clone();
 
     let request = match protocol_driver {
         ProtocolDriver::HttpV1 => OperationRequest::HttpV1 {
@@ -805,7 +813,7 @@ fn compose(
         repeatable_because: None,
         auth: patch.and_then(|patch| patch.auth.clone()),
         params,
-        response_schema: spec.response_schema.clone(),
+        response_schema,
         // **A vendor document cannot make this claim, and no `[[patch.operations]]` key writes it
         // either** (C-430). "This response field is a credential" is a judgement about what a value
         // *is*; a document that returns a token describes it as a string like any other, which is

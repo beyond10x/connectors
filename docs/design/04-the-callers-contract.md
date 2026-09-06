@@ -69,3 +69,43 @@ data with a closed vocabulary. Every existing HTTP operation explicitly states i
 effect plus `network`; no consumer derives that pair. The separate `semantic_effects` tier remains
 required and unchanged. S-002 is still blocked only on M2's grant-admission consumer and its
 non-vacuous no-derivation test in `crates/domain`.
+
+## 2026-09-06 amendment: source fidelity and catalog schema 3
+
+The operator's source-fidelity requirement supersedes the historical projection choice for newly
+migrated operations. The compiler retains literal vendor schemas and translates the supported
+OpenAPI 3.0 Schema Object vocabulary into Draft 2020-12 caller schemas. Integer types, enums,
+defaults, nullable values, unions, required fields and object constraints survive. Translation
+does not apply defaults or replace an unsupported schema with `{}`. For example `nullable: true`
+adds null only to an explicitly declared type; it does not add null to an enum or change `oneOf`
+into `anyOf`. The [OpenAPI Schema Object rules](https://spec.openapis.org/oas/v3.0.3.html#schema-object)
+govern this translation.
+
+Schema 3 requires the closed `request_semantics` value on every operation. `legacy_v1` retains the
+previous contract and request interpretation. `openapi_3_0_json_v1` supports complete JSON bodies,
+default scalar path/query serialization and the explicitly supported schema subset. Missing or
+unknown profiles are refusals. Unsupported source constructs remain diagnosed importer gaps,
+including recursive response schemas rather than broadening their recursive tails.
+
+A source body stays one `body` parameter carrying its whole schema. Request-body presence is
+independent of required properties inside it. Omitted optional values stay absent, explicit null
+is checked against the source contract, and JSON-looking strings remain strings. Logical path
+parameter values are percent-encoded as data, separately from endpoint configuration validation.
+The retained parameter position/name/symbol mapping makes this transport projection reversible;
+body properties are not flattened or omitted. The build also stores translated `contract.output_schema`
+when the source declares a supported successful response, leaving the literal `response_schema`
+available as source evidence.
+
+These are semantics a consumer must act on, so the producer, schema, pack reader and resolver move
+together to schema 3. The new generated schema is `catalog/connector-document-v3.schema.json` with
+its own identity. The old `catalog/connector-document.schema.json` remains byte-identical under
+its schema-2 identity. Existing ConnectorOperation input/output schema fields already carry JSON
+values; this change does not alter that frozen protocol's DTO shape.
+
+The first source migration is the four GitLab pipeline-schedule operations. The complete pinned
+1,847-operation source remains inventoried, including legacy and importer gaps. The official
+OpenAPI describes objects where endpoint documentation shows arrays; those source schemas remain
+objects. Its heterogeneous input array branch omits `items`, contrary to OpenAPI 3.0 structural
+requirements. Both the literal and caller schemas retain the missing constraint, with an
+operation-level source diagnostic. Preserving stated constraints does not certify source validity.
+Credentials, selected Connections, grants and egress continue to enforce authority independently.

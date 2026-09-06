@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Intercom access token sent as a bearer — an OAuth app token or a workspace access token",
@@ -113,6 +113,7 @@
         "method": "GET",
         "url": "{base}/contacts/{contact_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -320,6 +321,7 @@
         "method": "POST",
         "url": "{base}/contacts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -461,6 +463,7 @@
         "method": "GET",
         "url": "{base}/conversations/{conversation_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -695,6 +698,7 @@
         "method": "POST",
         "url": "{base}/conversations/{conversation_id}/reply"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -884,6 +888,7 @@
         "method": "POST",
         "url": "{base}/contacts/{contact_id}/notes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -924,7 +929,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [
