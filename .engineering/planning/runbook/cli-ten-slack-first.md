@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 40
+revision: 41
 ---
 ## Authorization and objective
 
@@ -3416,3 +3416,15 @@ For the next OAuth runtime lane only, the coordinator explicitly replaces the ea
 This exception preserves one compiling workspace at a time and jobs 1, with incremental and dev/test debug information disabled. Unset RUSTC_WRAPPER for this new cold lane so it does not expand or reconfigure the shared compiler cache; no shared cache daemon is stopped or cleaned. Dependency versions and lockfiles remain unchanged. The worker must measure before launch and sample disk availability, tmpfs availability, MemAvailable and its exact target usage continuously. Gracefully stop only its own process group if disk approaches or falls below 12 GiB (12,884,901,888 bytes), tmpfs availability falls below 8 GiB, MemAvailable falls below 16 GiB, or the owned target exceeds 8 GiB. Treat swap capacity as no extra allowance. Preserve every actual interruption and process exit before any cleanup.
 
 The OAuth worker may use this target only after Huygens releases the compile slot and the coordinator transfers it. Freeze source hashes, executable evidence and target inventory before cleaning this exact assigned target; then verify persistent source and evidence bytes are unchanged. Memory-backed compiler outputs are disposable and do not substitute for durable test evidence. The earlier default-target runs, numeric reserve changes and failed or interrupted results stay intact. This is a prospective coordinator resource choice, not a new user approval or a product-contract change.
+
+## Prospective serial OAuth workspace target handoff — 2026-09-06
+
+The existing runtime-only private build-target exception is extended prospectively to the remaining affected OAuth workspaces in the same managed tree wt-4f1de73d0685: the owning root for trusted-client and current catalog/schema checks, crates/connectors-console, and crates/connectors-cli. These are already assigned product source owners. This note changes build storage and scheduling only; it creates no protocol/runtime scope or permission for another worker. The runtime phase must finish its final combined command and freeze its source, exact commands, raw/portable reports and target inventory before the first workspace transition.
+
+Reuse exactly /dev/shm/b10x-cli-wave-wt-4f1de73d0685-nr00xjox/runtime-target, one workspace command at a time, for this one worktree. The historical directory name is retained; it is now a serial shared Cargo output cache within this OAuth checkout, not a target shared with the auth-protocol worker or another tree. Explicit CARGO_TARGET_DIR is recorded for each command alongside its exact working directory and manifest. Cargo's normal package, source, feature, toolchain and profile fingerprints govern reuse. Do not copy artifacts, symlink targets, bypass Cargo or infer that an earlier package execution tested later source. Preserve the warm starting inventory and each actual deciding failure before implementing that owner. Earlier default-target and runtime-only observations remain unchanged.
+
+Keep jobs 1, incremental 0 and dev/test debug 0, with RUSTC_WRAPPER unset. All four guards remain: root disk reserve 12 GiB, tmpfs free reserve 8 GiB, MemAvailable reserve 16 GiB, and an 8 GiB maximum for this entire owned target. The aggregate cap applies to retained outputs across these workspaces, not separately to each command. Sample continuously and gracefully stop only the running process group before a reserve is crossed; preserve every exit and interruption. Swap is not added to the allowance. At 2026-09-06T14:59:59.239139+00:00, root measured 15,220,940,800 available disk bytes, 28,881,121,280 available tmpfs bytes and 44,384,137,216 MemAvailable bytes. These are a dated observation, not a promised future capacity.
+
+Do not clean this warm target while any command uses it. If space reclamation becomes necessary, freeze source and complete execution evidence before cleaning only this exact owned target; preserve all durable logs outside tmpfs and verify source bytes afterward. No other session's targets, shared caches or primary checkouts are cleanup candidates. The auth-protocol worker keeps its separate default root target and scheduling.
+
+The next runtime-to-client transition waits for the coordinator's explicit build-slot transfer after the auth-protocol worker's already proposed four-package validation. Website and Atlas's noncompiling collection/verification may continue independently. Full client/console/CLI verification, final root schema-4 cases and whole-unit OAuth review remain unexecuted obligations until their actual results are recorded.
