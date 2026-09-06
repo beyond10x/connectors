@@ -13,6 +13,8 @@ refs:
 relations:
 - derived_from: epic:carried-constraints
 scope:
+- confidence: cited
+  path: .gitleaksignore
 - confidence: inferred
   path: Cargo.lock
 - confidence: inferred
@@ -293,6 +295,8 @@ scope:
   path: docs/design/07-credential-custody-topologies.md
 - confidence: inferred
   path: docs/design/21-personal-oauth-callback-custody.md
+- confidence: cited
+  path: docs/security/secret-scan-baseline.md
 - confidence: inferred
   path: ess/generated/clap
 - confidence: inferred
@@ -309,7 +313,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 56
+revision: 58
 ---
 ## Acceptance
 
@@ -452,7 +456,7 @@ The stage2C read-only supplement identified the actual kernel seam: completion c
 
 Authorize the private custody Session/Refresh claim adapter within the existing custody.rs owner, preserving its session completion API. Add exactly crates/integration-catalog/src/custody_refresh_tests.rs through a test-only registration in custody.rs; keep the1441-line existing custody_tests.rs bytes and assertions intact. Runtime/acquisition witnesses stay in their already assigned owners. These changes wait for the exact accepted rate source handoff; this record alone starts no runtime edits.
 
-Read-only plans remain immutable in the assigned OAuth scratch: stage2c-plan-supplement.md SHA256fbf5d12f88049f82d207b55e60e4443cb98fcfc84f97355bcb0faefdf7b9dd72; stage2c-refresh-window-supplement.md SHA256264313aff8886943a4728fd88cd6c7c71623cf41045661a496530aa160f3a6d2. The coordinator records the local bounded-time choice; no additional contract field, entity, public session state, live provider compatibility, or executed refresh result is claimed.
+Read-only plans remain immutable in the assigned OAuth scratch. The files are stage2c-plan-supplement.md SHA256fbf5d12f88049f82d207b55e60e4443cb98fcfc84f97355bcb0faefdf7b9dd72; stage2c-refresh-window-supplement.md SHA256264313aff8886943a4728fd88cd6c7c71623cf41045661a496530aa160f3a6d2. The coordinator records the local bounded-time choice; no additional contract field, entity, public session state, live provider compatibility, or executed refresh result is claimed.
 
 ## Recording-actor correction — 2026-09-06
 
@@ -505,3 +509,9 @@ The stage 2C implementor identified a recovery gap before credential prepare: a 
 Add crates/connector-resolve/src/document.rs to this story's cited scope only for four test-fixture schema-version literals at the current lines 754, 811, 847 and 873. They describe the currently emitted canonical document and may use schema 4 or the supported-version constant after the writer changes. Preserve all production resolver bytes and every existing assertion. Also permit the already scoped crates/catalog-build/tests/main/catalog_invariants.rs active planned-schema lookup at the current line 687 to follow schema 4/the current constant. This is an explicit narrow exception to shared tests' additive-only rule. Preserve its full original preimage and all existing assertions; the frozen schema 3 rate adversary cases at current lines 2530, 2568 and 2721 remain byte-exact, with separate schema 4 coverage added.
 
 The marker's version/key/digest shape, bounded decoding, FULL durability, authority checks and recovery behavior remain explicit implementation and adversarial-test obligations, not claims established by ESS. The current one-workspace compilation slot and prospective 16 GiB reserve apply. Whole-unit OAuth review and publication remain pending.
+
+## Historical evidence-reference scan closure — 2026-09-06
+
+The pinned scanner identified an evidence basename immediately following the wording about the scratch directory as a generic API key. All 15 observed matches at 8 distinct historical fingerprints were reconstructed value-free and proved equal to an existing non-secret evidence basename, not either adjacent SHA256 citation. The complete original red and proof remain in the rate publication scratch; proof SHA256 a1aa8ab682786c0305b6d076fca776c7b0e3958ccb52da9549b1655b32320287. The current mutable prose now uses a sentence boundary to keep the same file references without the misleading key/value shape. The historical journal and commits remain unchanged.
+
+Assign only .gitleaksignore and docs/security/secret-scan-baseline.md to record exact newly confirmed historical fingerprints under the existing baseline policy. Regenerate from the complete scan with the ignore file absent, retain and reclassify the newly observed matches, preserve existing detector rules and all prior exact fingerprints, and run the unchanged pinned gate afterward. No credential rotation, rule/path exemption, history rewrite, implementation success or completed OAuth review is implied by this reference-only classification.
