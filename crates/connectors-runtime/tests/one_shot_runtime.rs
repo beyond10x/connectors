@@ -275,3 +275,248 @@ async fn unknown_backend_lifetime_is_refused_and_shutdown_releases_ownership() {
     assert!(backend.shutdown.load(std::sync::atomic::Ordering::SeqCst));
     assert!(LocalStateOwnership::acquire(socket).is_ok());
 }
+
+#[tokio::test]
+async fn adversary_socket_publication_after_absence_probe_is_preserved_and_refused() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let socket = root.path().join("connectors.sock");
+    assert!(connectors_runtime::local_socket_absent(root.path()).unwrap());
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let result = PersonalRuntime::one_shot_operation(
+        &root.path().join("missing-config"),
+        root.path(),
+        context(),
+        OperationRequest::Search(operation::SearchRequest {
+            query: String::new(),
+            limit: 1,
+        }),
+    )
+    .await;
+    assert!(result.is_err());
+    assert!(
+        socket.exists(),
+        "the new socket must never be removed by a one-shot contender"
+    );
+    assert!(!root.path().join("event-reply-claims.sqlite").exists());
+    drop(listener);
+}
+
+struct ShutdownBarrierBackend {
+    started: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+    refuse: bool,
+    dispatched: std::sync::atomic::AtomicUsize,
+}
+
+#[async_trait::async_trait]
+impl ConnectorBackend for ShutdownBarrierBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        Ok(())
+    }
+    async fn handle(
+        &self,
+        _: &PrincipalContext,
+        _: OperationRequest,
+    ) -> Result<OperationResult, operation::OperationError> {
+        self.dispatched
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.refuse {
+            Err(operation::OperationError::new(
+                operation::OperationErrorCode::NotGranted,
+                "fixture policy refusal",
+                false,
+            ))
+        } else {
+            Ok(OperationResult::Search {
+                operations: Vec::new(),
+            })
+        }
+    }
+    async fn shutdown(&self) {
+        self.started.notify_one();
+        self.release.notified().await;
+    }
+}
+
+#[tokio::test]
+async fn adversary_state_lock_outlives_async_shutdown_on_success_and_refusal() {
+    for refuse in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let socket = root.path().join("connectors.sock");
+        let backend = Arc::new(ShutdownBarrierBackend {
+            started: tokio::sync::Notify::new(),
+            release: tokio::sync::Notify::new(),
+            refuse,
+            dispatched: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let runtime = LocalOneShot::new(
+            LocalStateOwnership::acquire(&socket).unwrap(),
+            backend.clone(),
+        )
+        .unwrap();
+        let task = tokio::spawn(runtime.operation(envelope(OperationRequest::Search(
+            operation::SearchRequest {
+                query: String::new(),
+                limit: 1,
+            },
+        ))));
+        tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            backend.started.notified(),
+        )
+        .await
+        .unwrap();
+        assert!(
+            LocalStateOwnership::acquire(&socket).is_err(),
+            "lock released during shutdown"
+        );
+        assert_eq!(
+            backend.dispatched.load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        assert!(
+            !task.is_finished(),
+            "one-shot returned before backend teardown"
+        );
+        backend.release.notify_one();
+        let response = task.await.unwrap().unwrap();
+        assert_eq!(response.error.is_some(), refuse);
+        assert!(LocalStateOwnership::acquire(&socket).is_ok());
+        assert!(!socket.exists());
+    }
+}
+
+struct ClaimedLifetimeBackend {
+    claims: bool,
+    shutdown: std::sync::atomic::AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl ConnectorBackend for ClaimedLifetimeBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        Ok(())
+    }
+    fn owns_operation(&self, _: &OperationRequest) -> bool {
+        self.claims
+    }
+    fn supports_ephemeral_invocation(&self, _: &operation::InvokeRequest) -> bool {
+        true
+    }
+    async fn handle(
+        &self,
+        _: &PrincipalContext,
+        _: OperationRequest,
+    ) -> Result<OperationResult, operation::OperationError> {
+        panic!("lifetime capability cannot replace a unique invocation owner")
+    }
+    async fn shutdown(&self) {
+        self.shutdown
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[tokio::test]
+async fn adversary_lifetime_capability_never_admits_unknown_or_ambiguous_owners() {
+    for claims in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let backends = (0..2)
+            .map(|_| {
+                Arc::new(ClaimedLifetimeBackend {
+                    claims,
+                    shutdown: std::sync::atomic::AtomicBool::new(false),
+                })
+            })
+            .collect::<Vec<_>>();
+        let registry = Arc::new(BackendRegistry::new(
+            backends
+                .iter()
+                .cloned()
+                .map(|backend| backend as Arc<dyn ConnectorBackend>)
+                .collect(),
+        ));
+        let response = LocalOneShot::new(
+            LocalStateOwnership::acquire(root.path().join("connectors.sock")).unwrap(),
+            registry,
+        )
+        .unwrap()
+        .operation(envelope(OperationRequest::Invoke(
+            operation::InvokeRequest {
+                operation_ref: "fixture-operation".into(),
+                connection_ref: "fixture-connection".into(),
+                description_ref: "fixture-description".into(),
+                input: serde_json::json!({}),
+                approval_evidence_ref: None,
+            },
+        )))
+        .await
+        .unwrap();
+        assert!(response
+            .error
+            .unwrap()
+            .message
+            .contains("connectors serve local"));
+        assert!(backends
+            .iter()
+            .all(|backend| backend.shutdown.load(std::sync::atomic::Ordering::SeqCst)));
+    }
+}
+
+#[tokio::test]
+async fn adversary_every_persistent_request_class_refuses_before_configuration_or_state() {
+    use protocol::connection;
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("state");
+    let missing = root.path().join("missing-config");
+    for request in [
+        serde_json::json!({"method":"session_status","params":{"execution_ref":"fixture"}}),
+        serde_json::json!({"method":"session_reconcile","params":{"execution_ref":"fixture"}}),
+        serde_json::json!({"method":"session_terminate","params":{"execution_ref":"fixture","reason":"cancelled"}}),
+        serde_json::json!({"method":"session_signal","params":{"execution_ref":"fixture","signal":{"kind":"dtmf","digits":"1"}}}),
+    ] {
+        let request: OperationRequest = serde_json::from_value(request).unwrap();
+        let response = PersonalRuntime::one_shot_operation(&missing, &state, context(), request)
+            .await
+            .unwrap();
+        assert!(response
+            .error
+            .unwrap()
+            .message
+            .contains("connectors serve local"));
+        assert!(!state.exists());
+    }
+    for request in [
+        connection::ConnectionRequest::CandidateActivate(connection::CandidateActivateRequest {
+            candidate_ref: "fixture".into(),
+            label: "fixture".into(),
+        }),
+        connection::ConnectionRequest::Materialize(connection::MaterializeRequest {
+            observation_ref: "fixture".into(),
+        }),
+        connection::ConnectionRequest::ConnectSessionCreate(
+            connection::ConnectSessionCreateRequest {
+                integration_ref: "fixture".into(),
+                label: "fixture".into(),
+                auth_profile: None,
+            },
+        ),
+        connection::ConnectionRequest::ConnectSessionStatus(
+            connection::ConnectSessionStatusRequest {
+                connect_session_ref: "fixture".into(),
+            },
+        ),
+    ] {
+        let response = PersonalRuntime::one_shot_connection(&missing, &state, context(), request)
+            .await
+            .unwrap();
+        assert!(response
+            .error
+            .unwrap()
+            .message
+            .contains("connectors serve local"));
+        assert!(!state.exists());
+    }
+}
