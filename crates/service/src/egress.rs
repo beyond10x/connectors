@@ -8,6 +8,20 @@ use std::collections::BTreeMap;
 use async_trait::async_trait;
 use connector_resolve::Request;
 
+/// Read a single provider Retry-After delta in seconds, without accepting dates or signs.
+///
+/// Only ASCII space and horizontal tab are optional whitespace. A transport that stores headers
+/// in a single-value map must discard duplicate Retry-After values before calling this parser;
+/// choosing one duplicate would invent trustworthy advice from an ambiguous response.
+#[must_use]
+pub fn retry_after_seconds(value: Option<&str>) -> Option<u64> {
+    let value = value?.trim_matches([' ', '\t']);
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    value.parse().ok()
+}
+
 /// One bounded HTTP exchange. Response headers are an explicit allowlist because returning every
 /// provider header would create an accidental credential and cookie projection.
 pub struct EgressHttpRequest {
@@ -153,6 +167,37 @@ impl EgressTransportFailure {
             Self::Tls => "tls",
             Self::BodyRead => "body-read",
             Self::Other => "other",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retry_after_seconds;
+
+    #[test]
+    fn retry_delay_is_one_unsigned_decimal_with_only_http_whitespace() {
+        for (value, expected) in [
+            (None, None),
+            (Some("30"), Some(30)),
+            (Some(" 00030\t"), Some(30)),
+            (Some("0"), Some(0)),
+            (Some("18446744073709551615"), Some(u64::MAX)),
+            (Some(""), None),
+            (Some(" \t"), None),
+            (Some("+30"), None),
+            (Some("-30"), None),
+            (Some("30.0"), None),
+            (Some("30,30"), None),
+            (Some("18446744073709551616"), None),
+            (Some("Wed, 21 Oct 2015 07:28:00 GMT"), None),
+            (Some("\n30"), None),
+            (Some("30\r"), None),
+            (Some("\u{00a0}30"), None),
+            (Some("３０"), None),
+            (Some("3 0"), None),
+        ] {
+            assert_eq!(retry_after_seconds(value), expected, "{value:?}");
         }
     }
 }

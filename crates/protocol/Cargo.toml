@@ -19,3 +19,5 @@ url.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true
+clap.workspace = true
+jsonschema.workspace = true

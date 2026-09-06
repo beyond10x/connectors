@@ -65,17 +65,17 @@ types:
     kind: newtype
     of: String
 
-  # crates/protocol/src/operation.rs:131-135.
+  # crates/protocol/src/operation/legacy.rs:131-135.
   - name: connectors.runtime.EffectClass
     kind: enum
     variants: [ReadOnly, Mutating, Destructive]
 
-  # crates/protocol/src/operation.rs:139-142.
+  # crates/protocol/src/operation/legacy.rs:139-142.
   - name: connectors.runtime.ApprovalPosture
     kind: enum
     variants: [NotRequired, Required]
 
-  # crates/protocol/src/operation.rs:204-212.
+  # crates/protocol/src/operation/legacy.rs:204-212.
   - name: connectors.runtime.SessionTermination
     kind: enum
     variants: [Completed, Cancelled, Revoked, LeaseExpired, RemoteEnded, Failed, OutcomeUnknown]
@@ -110,7 +110,7 @@ entities:
   # description of one step, not of states an invocation rests in. Settled by an invocation state
   # enum in `crates/protocol/src/`.
   # UNMAPPED: the invocation has no identity of its own. `InvocationResult`
-  # (crates/protocol/src/operation.rs:184-190) carries `operation_ref`, `connector_audit_ref` and
+  # (crates/protocol/src/operation/legacy.rs:184-190) carries `operation_ref`, `connector_audit_ref` and
   # an *optional* `execution_ref`, so the audit reference is the only always-present handle and is
   # used as the identity here. Settled by an invocation id on the result projection.
   - name: connectors.runtime.Invocation
@@ -146,24 +146,24 @@ entities:
       states: [Deferred]
       terminal: [Deferred]
 
-  # States: crates/protocol/src/operation.rs:194-199 (`SessionState`).
+  # States: crates/protocol/src/operation/legacy.rs:194-199 (`SessionState`).
   # Transitions read from the code that performs them,
   # `crates/integration-sip/src/backend/sessions.rs:148-156`: `Terminated` when the completion is
   # set (lines 150-151), `Terminating` while the record is marked terminating (lines 152-153),
   # `Established` otherwise (lines 154-155). The two moves a caller asks for are
   # `OperationRequest::SessionTerminate` and `SessionReconcile`
-  # (crates/protocol/src/operation.rs:54-55).
-  # UNMAPPED: `Establishing` (crates/protocol/src/operation.rs:195) is declared and read — the
-  # coherence rule at crates/protocol/src/operation.rs:484-487 groups it with the states that
+  # (crates/protocol/src/operation/legacy.rs:54-55).
+  # UNMAPPED: `Establishing` (crates/protocol/src/operation/legacy.rs:195) is declared and read — the
+  # coherence rule at crates/protocol/src/operation/legacy.rs:484-487 groups it with the states that
   # carry no termination — but nothing in the tree ever assigns it, because
   # `crates/integration-sip/src/backend/sessions.rs:148` only projects a record that already
   # exists. It is modelled as the initial state on that reading. Settled by the establishment path
   # assigning it, or by the enum losing it.
-  # UNMAPPED: `OutcomeUnknown` (crates/protocol/src/operation.rs:199) is absent below because
+  # UNMAPPED: `OutcomeUnknown` (crates/protocol/src/operation/legacy.rs:199) is absent below because
   # nothing assigns it either; the only mention outside the enum is the coherence rule at
-  # crates/protocol/src/operation.rs:491-492. The same word exists as an `OperationErrorCode`
-  # (crates/protocol/src/operation.rs:255) and as a `SessionTermination`
-  # (crates/protocol/src/operation.rs:211), and those two *are* produced — for example at
+  # crates/protocol/src/operation/legacy.rs:491-492. The same word exists as an `OperationErrorCode`
+  # (crates/protocol/src/operation/legacy.rs:255) and as a `SessionTermination`
+  # (crates/protocol/src/operation/legacy.rs:211), and those two *are* produced — for example at
   # crates/integration-sip/src/backend/mod.rs:640 — which is what makes the session state look
   # reachable when it is not. Settled by a reconcile path that sets the session state as well as
   # the error code (`crates/integration-kubernetes/src/local_workloads.rs:106` states the rule it
@@ -240,7 +240,7 @@ entities:
       terminal: [Recorded]
 
 commands:
-  # crates/protocol/src/operation.rs:52 (`OperationRequest::Invoke`). The successful branch of a
+  # crates/protocol/src/operation/legacy.rs:52 (`OperationRequest::Invoke`). The successful branch of a
   # session-shaped operation is `sip.dial` returning `established`
   # (crates/protocol/src/sip.rs:119-124).
   - name: connectors.runtime.InvokeOperation
@@ -261,9 +261,9 @@ commands:
       - name: refused
         external: the grant, the approval gate or the provider refuses the call
         error: connectors.runtime.OperationRefused
-        summary: The invocation was refused and no session exists (crates/protocol/src/operation.rs:245-256).
+        summary: The invocation was refused and no session exists (crates/protocol/src/operation/legacy.rs:245-256).
 
-  # crates/protocol/src/operation.rs:54 (`OperationRequest::SessionTerminate`); the record is
+  # crates/protocol/src/operation/legacy.rs:54 (`OperationRequest::SessionTerminate`); the record is
   # marked terminating at crates/integration-sip/src/backend/sessions.rs:152-153.
   - name: connectors.runtime.TerminateSession
     naming:
@@ -283,7 +283,7 @@ commands:
       # `fn session_terminate` (crates/integration-sip/src/backend/sessions.rs:45) refuses in two
       # places, and both are declared:
       #   :50-52 `not_found`, an unknown `execution_ref`, which is `OperationErrorCode::NotFound`
-      #          (crates/protocol/src/operation.rs:247);
+      #          (crates/protocol/src/operation/legacy.rs:247);
       #   :65    `unavailable()`, when the audit append fails — `OperationErrorCode::Unavailable`
       #          (crates/integration-sip/src/backend/mod.rs:733-739), and it is `retriable`.
       # The audit append is ordered before the terminate, so a session whose termination cannot be
@@ -302,7 +302,7 @@ commands:
       # termination when a completion is already set, and line 70 returns `Ok(status(...))`
       # regardless — so the call is accepted and nothing moves. This document has no way to say
       # "accepted, and nothing moved" without emitting a fact the tree does not produce, and the
-      # closed code set the same document cites (crates/protocol/src/operation.rs:245-256) has no
+      # closed code set the same document cites (crates/protocol/src/operation/legacy.rs:245-256) has no
       # state-conflict code to name. Settled by an outcome shape for a no-op, or by that path
       # refusing.
 
@@ -317,7 +317,7 @@ commands:
   # document's, taken from the field that carries it. Settled by the same surface work as the
   # channel supervisor steps in `connectors.connection`, if a settlement is ever something a
   # caller can ask for.
-  # UNMAPPED: `OperationRequest::SessionReconcile` (crates/protocol/src/operation.rs:55) is
+  # UNMAPPED: `OperationRequest::SessionReconcile` (crates/protocol/src/operation/legacy.rs:55) is
   # deliberately not modelled as the cause, and not modelled at all. Its handler
   # (crates/integration-sip/src/backend/mod.rs:636-648) calls `session_status`, which is a pure
   # read (crates/integration-sip/src/backend/sessions.rs:40-43): reconciliation *observes* the
@@ -339,15 +339,15 @@ commands:
         payload:
           connectors.runtime.SessionTerminated:
             execution_ref: input.execution_ref
-        summary: A termination reason was published on the session's completion channel, so the session is terminated (crates/integration-sip/src/backend/sessions.rs:149-151, crates/protocol/src/operation.rs:488-490).
+        summary: A termination reason was published on the session's completion channel, so the session is terminated (crates/integration-sip/src/backend/sessions.rs:149-151, crates/protocol/src/operation/legacy.rs:488-490).
 
 errors:
-  # `OperationError` and its closed code set, crates/protocol/src/operation.rs:245-267.
+  # `OperationError` and its closed code set, crates/protocol/src/operation/legacy.rs:245-267.
   - name: connectors.runtime.OperationRefused
     summary: The invocation was refused; the refusal never names the axis that refused it (docs/design/01-domain-model.md:299-300).
 
   # `unavailable()`, which is `OperationErrorCode::Unavailable`
-  # (crates/protocol/src/operation.rs:246), built at
+  # (crates/protocol/src/operation/legacy.rs:246), built at
   # crates/integration-sip/src/backend/mod.rs:733-739 and raised at
   # crates/integration-sip/src/backend/sessions.rs:65. Retriable, and it says so
   # (crates/integration-sip/src/backend/mod.rs:737).
@@ -355,12 +355,12 @@ errors:
     summary: The connector runtime is unavailable, and the request may be retried.
 
   # `not_found`, which is `OperationErrorCode::NotFound`
-  # (crates/protocol/src/operation.rs:247), raised at
+  # (crates/protocol/src/operation/legacy.rs:247), raised at
   # crates/integration-sip/src/backend/sessions.rs:41 and :52.
   - name: connectors.runtime.SessionNotFound
     summary: No session is held under this execution reference.
 
-  # `OperationErrorCode::OutcomeUnknown` (crates/protocol/src/operation.rs:255), raised at
+  # `OperationErrorCode::OutcomeUnknown` (crates/protocol/src/operation/legacy.rs:255), raised at
   # crates/integration-sip/src/backend/mod.rs:636-642 with the message
   # "session outcome is unknown to this daemon generation".
   - name: connectors.runtime.SessionOutcomeUnknown
