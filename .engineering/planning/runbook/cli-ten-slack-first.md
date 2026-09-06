@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 50
+revision: 51
 ---
 ## Authorization and objective
 
@@ -3508,3 +3508,13 @@ B identified a concrete dependency gap for validating the same intended input ag
 Root verified all six frozen one-shot handoff entries and read the actual API patch. B may implement against PersonalRuntime::one_shot_operation_v3 with the actual v3 response envelope, while root remains responsible for assembling A source before integration checks. The frozen checkpoint was source-only; A's later deciding results belong to their own logs and must not be retroactively attributed to it.
 
 Atlas draft PR23 at b95b84c8fdae634447e57bd8eafea5871f8ce46f completed Gate run 34054300291 successfully. The readback reports typed catalog, public portal Markdown and live Pages delivery completed. This is draft CI evidence, without architecture acceptance or a main-merge claim. The source fence's three external workspace failures remain separately recorded.
+
+## Actual personal admission factory and server schema-validation closure — 2026-09-06
+
+The local transports carry only the backend port. Frozen static RemediationMetadata does not carry the configured personal grant or policy capability, which belongs to the actual OAuthBinding. Root reviewed the two-file admission-factory-proposal and verified manifest SHA256 410eaadd3a2620d7dedc5e13e1f41e852a6cff1c6f973518cbd567f9e856a26b. This concrete implementation gap is closed through one additive, synchronous, default-refusing ConnectorBackend::personal_remediation_admission factory and a redacted RemediationAdmission value. A owns the necessary edits in crates/service/src/remediation.rs, crates/service/src/runtime.rs and crates/service/src/lib.rs, including default-refusal tests in the existing runtime test owner. The earlier service source checkpoint and its evidence remain preserved as predecessor evidence.
+
+The factory resolves the exact real personal OAuth policy owner and admits the current operation plus management/self policy without credential, provider or session work. It returns the actual grant reference, only an actual grant revision (None for current unrevisioned personal policy), the owner-derived policy/catalog binding digest, real owner-clock deadline ceiling and the existing RemediationAuthority capability. The receiver validates and discards bounded raw input, derives the canonical input and stable authority digests using their current owners, caps the deadline, constructs the exact binding and rechecks authority before start. The OAuth owner re-evaluates actual policy and mutable CurrentAuthority at every use and publication; digest equality alone is insufficient. No hosted personal-policy fallback, new state map, wire metadata field, protocol identity change or durable entity is introduced. Production hosted acquisition remains Unsupported.
+
+A also owns crates/server/Cargo.toml to add the existing workspace jsonschema dependency for non-consuming canonical input validation before readiness. Its resolved validator already exists at version 0.49.9 in all affected lock graphs; keep all versions/checksums and unrelated edges unchanged. Exact A lock closure is Cargo.lock, crates/connectors-runtime/Cargo.lock and crates/connectors-cli/Cargo.lock, generated through offline Cargo metadata after the active source/compile batch ends. Refuse external retrieval and retain closed errors without schema/input/reference echoes. The root and CLI lock paths overlap B only across isolated worktrees: A changes the server edge and B the connectors-client edge. Root alone reconciles both changes on assembly and verifies their exact union. Agents do not merge one another's files or share targets.
+
+These seven additional A paths supplement its previous 31 paths. Actual deciding tests precede the factory implementation, preserve all old assertions, and distinguish missing API/compiler observations from executable product results. The held credential story and the approved OAuth review result are unchanged.
