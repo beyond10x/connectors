@@ -262,6 +262,8 @@ scope:
 - confidence: inferred
   path: crates/integration-catalog/src/custody.rs
 - confidence: inferred
+  path: crates/integration-catalog/src/custody_refresh_tests.rs
+- confidence: inferred
   path: crates/integration-catalog/src/custody_tests.rs
 - confidence: inferred
   path: crates/integration-catalog/src/hosted.rs
@@ -303,7 +305,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 45
+revision: 47
 ---
 ## Acceptance
 
@@ -439,3 +441,11 @@ Source3b6c72d31b1a4f197314eb295ce0ed6ba1f250cd is integrated at8af3acdb. The exa
 The coordinator verified90 frozen evidence artifacts and all13 source/lock hashes, then retained source unchanged while cargo-cleaning the completed owned root/runtime targets for the20GiBfloor. Outside evidence remains in `~/.cache/connectors-cli-wave-20260906/connect-session-oauth-custody-in-personal-posture/stage2b-*`. Raw full report SHA256 2feda44c7cf55af9e371d3f8c2efa924a1d313adbec5caf8a1df2d23826b8a51; the complete portable copy replaces only the home-directory prefix and has SHA256 cca8d45e974e9d7c9374090074c80fc6ab658d88744fab107ce7855d464b7057. The separate short public report is a summary, not that complete copy.
 
 The normally compiled private kernel is still uncalled. Actual daemon acquisition must remove its explicitly temporary dead-code expectation, supply the admitted unique binding and same dedicated store instance, enforce operation-read/recovery gates, and own instruction tasks and cancellation. Full operational OAuth wiring, whole-unit independent review and combined gate remain outstanding. Schema4 publication follows complete schema3 publication. No live OAuth or power-loss test is claimed.
+
+## Bounded refresh adapter decision — 2026-09-06
+
+The stage2C read-only supplement identified the actual kernel seam: completion currently requires a live ConnectSession, whereas on-demand refresh must use the same custody transaction without creating a session. Design21 now records a single receiver-owned30-second window captured under the binding gate before refresh egress. The current invoke/backend context has no admitted outer deadline. Use checked Unix-millisecond timing and a matching monotonic elapsed budget across token exchange, token-info and prepare, with no reset. The final short authority claim rechecks the same binding/grant/client/origin/generation and new evidence strictly before the original deadline. A timely claim permits later FULL-decision/commit I/O; uncertainty follows the same durable recovery rules, with no fake session or caller time.
+
+Authorize the private custody Session/Refresh claim adapter within the existing custody.rs owner, preserving its session completion API. Add exactly crates/integration-catalog/src/custody_refresh_tests.rs through a test-only registration in custody.rs; keep the1441-line existing custody_tests.rs bytes and assertions intact. Runtime/acquisition witnesses stay in their already assigned owners. These changes wait for the exact accepted rate source handoff; this record alone starts no runtime edits.
+
+Read-only plans remain immutable in the assigned OAuth scratch: stage2c-plan-supplement.md SHA256fbf5d12f88049f82d207b55e60e4443cb98fcfc84f97355bcb0faefdf7b9dd72; stage2c-refresh-window-supplement.md SHA256264313aff8886943a4728fd88cd6c7c71623cf41045661a496530aa160f3a6d2. The coordinator records the local bounded-time choice; no additional contract field, entity, public session state, live provider compatibility, or executed refresh result is claimed.
