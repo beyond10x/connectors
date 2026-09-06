@@ -31,7 +31,9 @@ pub(super) async fn operation(
         Some(legacy::CONTRACT) => Version::V0Alpha1,
         Some(protocol::operation::wire::CONTRACT) => Version::V0Alpha2,
         Some(v3::CONTRACT) => Version::V0Alpha3,
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        // Retain the existing v2 protocol-refusal envelope for unknown identities. The
+        // original-byte reader below still rejects them before authentication or dispatch.
+        _ => Version::V0Alpha2,
     };
     let request = match decode_request(&body) {
         Ok((_, request)) => request,
