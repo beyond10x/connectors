@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 32
+revision: 33
 ---
 
 
@@ -3358,3 +3358,17 @@ Rate stage2 sourceb4dcc815 contains81 coordinator-verified scoped files;90735eac
 OAuth story revision44 permits the independent private custody kernel fromeef5ccb6: service lifecycle, private custody/tests, registration-only catalog lib hunk, SQLite dependency and exact metadata locks. The worker's pre-edit locked checks found five inherited satellite lock failures, recorded separately from the new dependency. Actual runtime acquisition, shared rate owners, schema4 publication and independent whole-unit review remain later. The explicitly temporary private-module unused-code expectation must disappear with actual wiring before completion/publication. Design22's Operationv3/Connectionv2 authentication remediation remains proposed and downstream of completed rate/OAuth owners.
 
 The credential story remains held after two red reviews. The pending request for a further cycle has no explicit answer; the generic continuation has not been recorded as a third-pass approval. No release/tag/version bump is authorized. Final combined source gates, consumer documentation delivery and a matched CLI/two-daemon installation remain required for the remaining completed product work.
+
+## Continuation checkpoint: isolated custody and final repair reviews
+
+Published delivery remains the verified first batch: Connectors main4b32397d/PR17 and its successful twelve-workspace/four-platform CI; installed5600867e executable and both authorized daemons share SHA2562db5607c8f99da4d7169b7ce1befaa47c07e35529b1ef5b1cd415ac71bcda01c. Website delivery/provenance remains verified as recorded in the preceding checkpoint. No new live Slack send, release/tag/version bump or incomplete schema3 publication occurred.
+
+Current integration67e60406 contains staged OAuth kernel3b6c72d3 (merge8af3acdb), exact119-test evidence and its private unused-module boundary. Design21 now records the receiver-owned30-second refresh claim window, and ESS0.18.0 regenerated the unchanged CLI command tree/digests at3a56ab2e (10valid files,206capabilities/16obligations/0refused). OAuth storyrev49 releases only custody.rs/new custody_refresh_tests.rs for an independent private adapter; actual acquisition/config/runtime/client/console/schema4 stays behind the rate source handoff. OAuth treewt-4f1de73d0685 was cleanly fast-forwarded to67e60406 before that assignment. Existing custody_tests.rs must remain byte-identical.
+
+Rate treewt-af054beacfba is frozen atcc143696 plus a24-file URI repair patch SHA2561589d34a9fc3d390cc101e754512a6c3d2d31cb232ab9821982e8454e4c6d622; final commit awaits the complete report. Its root1209/runtime346/CLI130/console87 tests allpass with6retainedignored, allstrictchecks pass. Twelve metadata graphs,85vectors, provider-schema3/wire grammar agreement and repeated deterministic generation pass. All65vendor documents/1011operation schemas and frozenv1/schema2bytes remain preserved. Firstpass report remains immutable. Final adversary preparation is in rate/adversary-2/preparation.md; edits/tests await exact frozen commit and report. No third ordinary rate attack is authorized if this second complete pass is red.
+
+Atlas authority remains clean exactremote mainf3b9f99 inwt-679b510698e5. Guard treewt-f0cc2831ff5a now holds repair3e50ce07 and evidence/planningdfef22e8. First independent report is recorded verbatim; introduced noncommit tag compatibility and pre-existing fake-viewer ETXTBSY were repaired. The unsupported raw delimiter-byte oracle was corrected only after its INFEASIBLE semantic-policy disposition, retaining every actual mismatching identity rejection and original report/test commit. One ordinary-parallel full run nowpasses143unchanged case names; strictchecks pass. Immutable reports/49evidence hashes and separate redaction-wording erratum remain in p/atlas-guard-repair. Final independent review, remainingfences/publication/officialworkspaceactivation remain outstanding; PR23 remote stillb1b292a while local60601765contains allfour proposed ADRs.
+
+Six coordinator planning events accidentally inherited the configured human recording actor because AEP_ACTOR was omitted: three OAuth updatesrev45–47 and three Atlas first-review/assignment events. ExacteventIDs/hashes are in p/coordinator-actor-correction-inventory.json. Append-only corrections were recorded in both stories with agent:cli-ten-slack-first; no immutable history was rewritten and no human approval/status/test_result was among the mistaken events. All subsequent coordinator writes explicitly set the agent actor.
+
+Disk was temporarily below the conservative20GiBfloor because another session consumed space. Workers paused new lanes and retained exactobservations; completed owned OAuth/guard/rate targets were cleaned only after outsideevidence verification and sourcehash preservation. Rate now builds one workspace target at a time, freezing evidence before cleanup. No unrelated targets/caches/primary sources or managed trees were removed. Existing root integration/Atlas/draft leases were refreshed through the manager. The held credential unit stillawaits explicit authorization beyond its two red attacks; allits source/evidence remains retained.
