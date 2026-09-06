@@ -305,7 +305,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 49
+revision: 50
 ---
 ## Acceptance
 
@@ -463,3 +463,13 @@ The full stage2C runtime handoff still waits for reviewed rate source. A bounded
 Implement the recorded Design21 thirty-second receiver-owned refresh window and private claim adapter using the existing session API and FULL custody sequence. Preserve the complete current custody_tests.rs bytes, every session case, durable journal compatibility and the currently recorded absence of independent prepared-store digest readback. A real refresh claim must bind the admitted operation/current authority, same connection and previous generation before any later egress; tests may supply explicit private receiver seams, never a permissive production default or synthetic ConnectSession. The later acquisition backend still owns actual provider requests and the monotonic remaining-budget wrapper around them.
 
 Retain actual deciding failures against executable pre-fix behavior before implementation, then run full affected integration-catalog tests and strict checks with the existing per-tree target and20GiBfloor. This slice adds no dependency and needs no unrelated cold workspace builds. Freeze source, exact command/results, case preservation and complete raw/portable reports in stage2b-refresh-* under the existing OAuth scratch. It remains uncalled private support under the already authorized temporary module expectation; actual wiring must remove that expectation. Operational refresh/OAuth, shared-owner handoff, whole-unit independent review and publication remain pending.
+
+## Private refresh adapter integrated — 2026-09-06
+
+Source 9d1cef375ade657d1fbca24cc25097e3bdd09b9d is integrated at 30f8f522bee4d59976bfc1485ad8f96b0fb6b6a4. Only custody.rs and new custody_refresh_tests.rs changed. All 73 frozen evidence hashes and all three source/preserved-test hashes were verified, as was the complete prefix-only portable report. Its SHA256 is dce8878e31f7a1593b89d0eeafbf8af8a4cb4eaf9ce57fb54188b7e13d52cccf; source patch SHA256 fd38e515c216eed1c53d496c049a9952506b5a9dcb9e751e8bd01b81daf07e49. Exact commands, results, raw/portable reports and source snapshots remain in `~/.cache/connectors-cli-wave-20260906/connect-session-oauth-custody-in-personal-posture/stage2b-refresh-*`.
+
+The full integration-catalog suite passes 56 to 66 cases, with no failures or ignored cases, and strict Clippy/formatting pass. Four actual unimplemented-entry failures and one injected monotonic-clock rollback failure were retained; compiler/supertrait and enum-size Clippy failures are disclosed separately. The original 1441-line custody_tests.rs, existing complete signature and journal/type definition block remain byte-identical. The session and refresh variants share the same FULL custody transaction, and refresh creates no ConnectSession.
+
+Actual runtime composition must share one RefreshOwner and binding gate across acquisition, read and refresh, install the real current-authority receiver, and wrap token/token-info egress using the handle's original remaining budget. It must retain that gate through operation dispatch, remove the temporary unused-module expectation, and keep remote rotation uncertainty unavailable. These are still pending runtime obligations; private support tests do not prove operational OAuth, shared registry ownership or live provider compatibility. Whole-unit independent review and combined publication remain pending.
+
+After the freeze, shared disk dropped below the 20 GiB reserve due to concurrent workspace consumption. The coordinator paused new builds, reverified all refresh evidence and source hashes, and cargo-cleaned only this completed runtime target. All 1157 tracked source hashes remained identical; exact cleanup evidence is retained in `~/.cache/cw6/p/completed-oauth-observer-target-clean.json`. No claim is made that shared free space remained above the floor throughout the session.
