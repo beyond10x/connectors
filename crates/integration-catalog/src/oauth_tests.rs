@@ -1468,3 +1468,6 @@ async fn admitted_response_reference_is_the_actual_configured_backend_identity()
     assert_eq!(egress.count(), 0);
     backend.shutdown().await;
 }
+
+#[path = "oauth_adversary_tests.rs"]
+mod adversary;

@@ -580,3 +580,60 @@ async fn liveness_observer_uses_original_receiver_deadline_without_polling_recei
     assert!(!observer.is_live());
     assert!(!endpoint.liveness().is_live());
 }
+
+#[tokio::test]
+async fn oauth_pass1_last_callback_slot_survives_invalid_duplicates_and_closes_once() {
+    for denied in [false, true] {
+        let redirect = redirect();
+        let endpoint = BoundOAuthEndpoint::bind_pkce(config(&redirect)).unwrap();
+        let liveness = endpoint.liveness();
+        let (authority, capability) = browser_parts(&endpoint);
+        let task = tokio::spawn(endpoint.receive());
+        let private = instructions(&authority, &capability).await;
+        let authorization =
+            url::Url::parse(private["authorization_url"].as_str().unwrap()).unwrap();
+        let state = authorization
+            .query_pairs()
+            .find(|(key, _)| key == "state")
+            .unwrap()
+            .1
+            .into_owned();
+        for turn in 0..62 {
+            let target = if turn % 2 == 0 {
+                format!("/oauth/callback?state={state}&st%61te={state}&code=OAUTH-PASS1-PRIVATE")
+            } else {
+                format!(
+                    "/oauth/callback?state={state}&code=OAUTH-PASS1-PRIVATE&error=access_denied"
+                )
+            };
+            let refusal = request(&authority, &target, "").await;
+            assert!(refusal.starts_with("HTTP/1.1 403"));
+            assert!(!refusal.contains("OAUTH-PASS1-PRIVATE"));
+            assert!(!refusal.contains(&state));
+            assert!(liveness.is_live());
+        }
+        let final_target = if denied {
+            format!("/oauth/callback?state={state}&error=access_denied")
+        } else {
+            format!("/oauth/callback?state={state}&code=final%2Bcode")
+        };
+        let response = request(
+            &authority,
+            &final_target,
+            "Origin: https://gitlab.example\r\n",
+        )
+        .await;
+        let result = task.await.unwrap();
+        if denied {
+            assert_eq!(result.err(), Some(OAuthTransportError::CodeExchangeRefused));
+            assert!(response.starts_with("HTTP/1.1 403"));
+        } else {
+            let callback = result.unwrap();
+            assert_eq!(callback.code.as_str(), "final+code");
+            assert_eq!(callback.redirect_uri, redirect);
+            assert!(response.starts_with("HTTP/1.1 200"));
+        }
+        assert!(!liveness.is_live());
+        assert!(TcpStream::connect(&authority).await.is_err());
+    }
+}

@@ -82,3 +82,30 @@ fn personal_oauth_configuration_refuses_nonlocal_redirects_and_implicit_custody(
         assert!(!valid(&malformed));
     }
 }
+
+#[test]
+fn oauth_pass1_scope_ceiling_and_ttl_boundaries_survive_real_config_loading() {
+    for ttl in [30, 600] {
+        let source = format!("{PKCE}\nsession_ttl_seconds = {ttl}");
+        assert!(valid(&source));
+    }
+    for scopes in [
+        vec!["read_api".to_owned(), "read_api".to_owned()],
+        vec!["read api".to_owned()],
+        vec!["read,api".to_owned()],
+        vec!["r".repeat(257)],
+        (0..65).map(|n| format!("scope{n}")).collect(),
+    ] {
+        let mut parsed: toml::Value = toml::from_str(PKCE).unwrap();
+        parsed["oauth"]["allowed_scopes"] =
+            toml::Value::Array(scopes.into_iter().map(toml::Value::String).collect());
+        assert!(!valid(&toml::to_string(&parsed).unwrap()));
+    }
+    let mut parsed: toml::Value = toml::from_str(PKCE).unwrap();
+    parsed["oauth"]["allowed_scopes"] = toml::Value::Array(
+        (0..64)
+            .map(|n| toml::Value::String(format!("scope{n}")))
+            .collect(),
+    );
+    assert!(valid(&toml::to_string(&parsed).unwrap()));
+}
