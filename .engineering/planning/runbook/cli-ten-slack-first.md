@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 21
+revision: 24
 ---
 
 
@@ -3261,3 +3261,27 @@ Computed selection command: aep plan artifact waves --kind story --status propos
   "cycles": []
 }
 ```
+
+## Rate-limit managed triple
+
+Rate unit created before dispatch as manager id wt-af054beacfba at `~/.local/state/worktree/trees/b10x/connectors/wt-af054beacfba`, branch `impl/rate-limit-in-the-protocol`, exact base/head `e101a24e73fe22a58cb67e0a2e7ac95a7b83b688`. Build roots are this tree's root `target/` and satellite crate `target/` directories only. Scratch `~/.cache/connectors-cli-wave-20260906/rate-limit-in-the-protocol`; TMPDIR `~/.cache/cw6/r`. Brief is scratch `brief.md`, source-only aep-drive:implementor charter in ordinary harness. Stage1 released owners and holds are the preceding staged-dispatch decision; no whole-unit independence or readiness claim before its handoffs. Opening cheap checks after bot commit: portable Markdown links,73legacy story records,10ESS files valid, diff whitespace clear. One-shot root compilation idle before rate stage1 begins.
+
+## One-shot final attack
+
+First attack review-result:cli-one-shot-adversary-1-20260906 is retained verbatim. The coordinator classifies its stale Monitoring citation finding as introduced: the unit added five lines before every cited function; exact base/source comparison and the first batch gate establish that change, without claiming a new base execution. The invalid extra-input-key probe remains INFEASIBLE and its original red and exact coordinator correction are retained.
+
+Correction committed as17763bbc1552fcda2b9a323bfdd04f5fcef9bd22, bot author and committer verified. It retains eight adversary cases and changes37 model lines only in numeric source citations: introduced Monitoring/Registry shifts plus ten separately identified pre-existing Kubernetes offsets. The static audit inspected32 direct citations reaching four of19 changed unit paths; no lifecycle, fields, refusal vocabulary or test assertions were weakened.
+
+After Monitoring correction the complete root workspace passed1141,0failed,4ignored (exit0), versus the first attack's1140pass/1fail. After the final Registry/Kubernetes citation-only corrections, all15 targeted ESS citation/claim fences passed,58nonselected (exit0); the expected ESS0.18.0 binary validated all10files. The shell's older PATH-first ESS refused the newer command/model; use the expected installed binary for final checks, do not alter the model to fit an older CLI. Affected full lanes from attack1 remain626passed,2ignored; final full attack must add its own cases and rerun the affected lanes.
+
+Reports and exact patches are under `~/.cache/connectors-cli-wave-20260906/one-shot-operations-without-a-daemon/`; root correction logs under `~/.cache/cw6/p/`. Second/final test-only adversary receives the complete unit base3df1cd2df32472a4afc8feeaac8c46c9de8d1b55 to corrected17763bbc, preserved reports, and existing managed triple. No third attack or whole-wave closure is implied.
+
+## Session recovery 2026-09-06
+
+Recovered the operator-approved session 01a0737b-6eb5-79f1-9bd4-87292c6a8743 after its usage-limit interruption. The recovered ten-story scope and standing official-source/schema-fidelity instructions remain unchanged. This is an interactive continuation with three workers beside the coordinator, using the saved implementor/adversary charters through ordinary agents. No new release authorization is inferred.
+
+Inspected integration HEAD e101a24e and its four coordinator-owned dirty planning files. Preserved their pending rate-limit generator scope and one-shot final-review records. AEP validation reports 161 artifacts, historical assertion/findings notices, and valid. Source state: one-shot corrected HEAD17763bbc awaits its second/final attack; GitLab source-fidelity HEAD50256e4b has three pending stage2 files; rate-limit stage1 retains five interrupted source/lock changes. Credential HEAD9f15c108 remains held by decision-blocker:cli-credentials-final-review, with its final tests preserved.
+
+Atlas primary is dirty and stale; new managed authority wt-679b510698e5 is clean at exact advertised main f686fe034bc3f1c7c5d276476b814ee05c2bca9f. Its path is ~/.local/state/worktree/trees/b10x/atlas/wt-679b510698e5. Current Connectors remote main is a61e0a748be58ad03cf1907a48f9fefbb4423434 and wave remote50f0ab5107de9f07f42d9f2b73df80bcfe978e89. Both are observations, not merged-source claims.
+
+Workers resume the existing one-shot final review, GitLab stage2, and additive rate-limit stage1. They retain their original managed tree/build/scratch triples and short TMPDIRs. No Git, AEP, model, service or live-provider mutations are delegated. Free space measured26GiB against20GiB floor; only the one-shot reviewer initially has the build slot. Connectors doctor is healthy, but operation search exposes no GitHub operation, so Atlas bot tooling remains the declared GitHub path.
