@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 33
+revision: 34
 ---
 
 
@@ -3365,7 +3365,7 @@ Published delivery remains the verified first batch: Connectors main4b32397d/PR1
 
 Current integration67e60406 contains staged OAuth kernel3b6c72d3 (merge8af3acdb), exact119-test evidence and its private unused-module boundary. Design21 now records the receiver-owned30-second refresh claim window, and ESS0.18.0 regenerated the unchanged CLI command tree/digests at3a56ab2e (10valid files,206capabilities/16obligations/0refused). OAuth storyrev49 releases only custody.rs/new custody_refresh_tests.rs for an independent private adapter; actual acquisition/config/runtime/client/console/schema4 stays behind the rate source handoff. OAuth treewt-4f1de73d0685 was cleanly fast-forwarded to67e60406 before that assignment. Existing custody_tests.rs must remain byte-identical.
 
-Rate treewt-af054beacfba is frozen atcc143696 plus a24-file URI repair patch SHA2561589d34a9fc3d390cc101e754512a6c3d2d31cb232ab9821982e8454e4c6d622; final commit awaits the complete report. Its root1209/runtime346/CLI130/console87 tests allpass with6retainedignored, allstrictchecks pass. Twelve metadata graphs,85vectors, provider-schema3/wire grammar agreement and repeated deterministic generation pass. All65vendor documents/1011operation schemas and frozenv1/schema2bytes remain preserved. Firstpass report remains immutable. Final adversary preparation is in rate/adversary-2/preparation.md; edits/tests await exact frozen commit and report. No third ordinary rate attack is authorized if this second complete pass is red.
+Rate treewt-af054beacfba is frozen atcc143696 plus a24-file URI repair patch SHA2561589d34a9fc3d390cc101e754512a6c3d2d31cb232ab9821982e8454e4c6d622; final commit awaits the complete report. Its root1209/runtime346/CLI130/console87 tests allpass with6retainedignored, allstrictchecks pass. Twelve metadata graphs,85vectors, provider-schema3/wire grammar agreement and repeated deterministic generation pass. All65canonical provider documents/1011operation schemas, vendored source bytes and frozenv1/schema2bytes remain preserved. Firstpass report remains immutable. Final adversary preparation is in rate/adversary-2/preparation.md; edits/tests await exact frozen commit and report. No third ordinary rate attack is authorized if this second complete pass is red.
 
 Atlas authority remains clean exactremote mainf3b9f99 inwt-679b510698e5. Guard treewt-f0cc2831ff5a now holds repair3e50ce07 and evidence/planningdfef22e8. First independent report is recorded verbatim; introduced noncommit tag compatibility and pre-existing fake-viewer ETXTBSY were repaired. The unsupported raw delimiter-byte oracle was corrected only after its INFEASIBLE semantic-policy disposition, retaining every actual mismatching identity rejection and original report/test commit. One ordinary-parallel full run nowpasses143unchanged case names; strictchecks pass. Immutable reports/49evidence hashes and separate redaction-wording erratum remain in p/atlas-guard-repair. Final independent review, remainingfences/publication/officialworkspaceactivation remain outstanding; PR23 remote stillb1b292a while local60601765contains allfour proposed ADRs.
 
