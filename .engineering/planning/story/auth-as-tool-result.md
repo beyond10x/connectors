@@ -229,7 +229,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 42
+revision: 43
 ---
 ## Acceptance
 
@@ -351,3 +351,16 @@ Seven selected stories already reached published main. Personal OAuth passed its
 Current source includes Operation v3 default with explicit operation-only v2, Connection v2 bound remediation, schema4 with matching readers, and development-only GitLab public PKCE/device authorization through a dedicated unsealed store. Hosted remediation remains Unsupported after admission where no acquisition owner exists. Protected instructions stay outside model output; completion ends with fresh validation and an explicit new invocation. Full affected local gates pass: server115, runtime455 per default/no-default configuration with two existing PostgreSQL ignores, console107, CLI140, strict affected checks and the final catalog/Markdown/story/ESS gate. Initial root1301pass/2fail/4oldignores was closed by full affected server115 and catalog-cli14 rechecks. Complete sharded CI and auth review remain pending.
 
 Exact runtime final seal: eba21e5f93152eb0aacd01dadf31a19569401421c8a8397f3b09216d11ed7b04 (179 members). Exact client final seal:334ab4c9adf141862dcb9a701e930f80dcdf909dfb3a1c1142dc75af3c8fcae7 (95 members). All first failures remain in those records. Counts describe executed cases per command, not a unique aggregate. Future review results are recorded in full before any findings are routed.
+
+
+## First authentication review routing — 2026-09-07
+
+Immutable review-result:cli-auth-adversary-1-20260906 records the complete first ordinary attack, byte-identical portable report SHA25626e7d555104dd56fc062c2e1d0579511c571862b7b0be70d5ba89c837e14aeed. The 209-member evidence seal is verified. Eight additive cases raised the unique affected executed count1008 to1016, with three failures; runtime alternate-feature repetitions are separate. All affected strict/fmt commands completed, and the sole compiler slot was released. No review finding is marked fixed yet.
+
+The coordinator routes all three rows to their original source owners. This origin decision is an inference from the bounded source history, not a claimed base execution: client/console remediation and hosted remediation were absent at95fad7c7 and were introduced by auth commits d7e7a673 and1156626a.
+
+- Client completion accepts a conflicting purpose or split pair in canonically valid hostile daemon Operation summaries. The real console/CLI calls this client. Fix the matching-binding predicate while preserving the legacy absent-purpose control and all five existing exchanges; no invocation or credential-bypass finding is claimed.
+- Legacy HTTP projection returns409 for the synthetic hosted authentication-required scenario even after v1/v2 projection produces neutral Unavailable. The served409schema is v3-only. Correct this narrow transport-contract mismatch while preserving v3 and unrelated statuses; no reachable production hosted OAuth acquisition is claimed or added.
+- Bound setup reads stdin before rejecting regular-file/symlink socket objects. The actual CLI reproduces the ordering defect and opens no private destination. Move the existing shared socket safety validation ahead of input while retaining later validation and existing protocol behavior.
+
+Runtime/server implementor resumes in its existing managed tree with the review's eight known additive test files. Client/console/CLI implementor receives exact copies of its three affected reviewed test files in its existing managed tree. Each retains its private target and assigned scratch; the coordinator serializes compilers and is the only planning writer. Original execution branches and raw records stay local. Corrected source/test deltas are transferred to the clean publication lineage by verified bytes, never by merging or publishing the old raw planning ancestry.
