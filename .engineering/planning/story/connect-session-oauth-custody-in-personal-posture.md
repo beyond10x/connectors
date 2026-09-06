@@ -303,7 +303,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 44
+revision: 45
 ---
 ## Acceptance
 
@@ -431,3 +431,11 @@ The retained stage2b-plan.md in the assigned OAuth scratch specifies the complet
 ## Satellite lock closure observed before stage2B edits
 
 All twelve locked/offline metadata checks were run on the assigned pre-edit eef5ccb6 tree. Seven passed; driver-speech, driver-cdp, driver-sip, rtvbp-voice-endpoint and voice-runtime refused their inherited stale Cargo.lock before any stage2B dependency/source change. Exact errors and argv are retained in stage2b-metadata-before.json and its indexed logs in the OAuth scratch. These five exact locks are assigned for metadata-only closure, preserving existing package versions/checksums. The completed rate branch independently refreshes the same inherited graph; the coordinator will reconcile the final combined dependency graph through Cargo rather than text-splicing lockfiles. Do not attribute preexisting closure drift to the new FULL-journal dependency.
+
+## Private completion kernel integrated — 2026-09-06
+
+Source3b6c72d31b1a4f197314eb295ce0ed6ba1f250cd is integrated at8af3acdb. The exact five source owners and eight authorized dependency locks match the frozen manifest. Service57→63 and integration-catalog35→56 yield119 passing tests, with13 distinct deciding failures retained. Strict affected Clippy, formatting and all12 locked/offline dependency graphs passed; existing versions and checksums were preserved. This is implementor evidence for the private kernel, not whole-unit independent review or operational OAuth completion.
+
+The coordinator verified90 frozen evidence artifacts and all13 source/lock hashes, then retained source unchanged while cargo-cleaning the completed owned root/runtime targets for the20GiBfloor. Outside evidence remains in `~/.cache/connectors-cli-wave-20260906/connect-session-oauth-custody-in-personal-posture/stage2b-*`. Raw full report SHA256 2feda44c7cf55af9e371d3f8c2efa924a1d313adbec5caf8a1df2d23826b8a51; the complete portable copy replaces only the home-directory prefix and has SHA256 cca8d45e974e9d7c9374090074c80fc6ab658d88744fab107ce7855d464b7057. The separate short public report is a summary, not that complete copy.
+
+The normally compiled private kernel is still uncalled. Actual daemon acquisition must remove its explicitly temporary dead-code expectation, supply the admitted unique binding and same dedicated store instance, enforce operation-read/recovery gates, and own instruction tasks and cancellation. Full operational OAuth wiring, whole-unit independent review and combined gate remain outstanding. Schema4 publication follows complete schema3 publication. No live OAuth or power-loss test is claimed.
