@@ -188,3 +188,18 @@ Unknown marker reads or deletion remain unavailable. Keep one shared FileStore i
 existing FULL SQLite path; this is neither another credential store nor a custody journal image
 version change. Actual pre-egress failure, post-rotation failure, cancellation and reopen tests
 must establish these rules before operational OAuth completion is claimed.
+
+## Trusted setup entry — 2026-09-06
+
+Use `connectors setup connect <provider> --auth-profile <declared purpose>` to request the
+configured personal OAuth flow. Optional `--instruction-file <owner-only path>` selects private
+instruction delivery to a file. Without that file, acquire a controlling terminal before creating
+a session, listener or provider request. Machine-readable output never carries the private human
+instruction. The frontend must select the already configured unique OAuth binding and refuse
+enrollment flags that would change it; a label remains display text. The existing raw `--as`
+enrollment flow remains available where no personal OAuth flow is selected.
+
+The current ESS component records `setup connect` as an unspecified guided flow
+(`ess/system/components.yaml:170`). Its command projection has no representation for these options
+on a forwarded multi-step flow. Preserve that explicit limitation; the real Rust Clap parser and
+console tests own these arguments rather than a fabricated domain command or generated handler.

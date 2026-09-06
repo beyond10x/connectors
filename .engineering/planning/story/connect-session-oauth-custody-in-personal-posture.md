@@ -157,6 +157,8 @@ scope:
   path: crates/catalog-build/src/document_schema.rs
 - confidence: inferred
   path: crates/catalog-build/src/document_tests.rs
+- confidence: cited
+  path: crates/catalog-build/src/pipeline.rs
 - confidence: inferred
   path: crates/catalog-build/src/workspace.rs
 - confidence: inferred
@@ -313,7 +315,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 58
+revision: 60
 ---
 ## Acceptance
 
@@ -515,3 +517,13 @@ The marker's version/key/digest shape, bounded decoding, FULL durability, author
 The pinned scanner identified an evidence basename immediately following the wording about the scratch directory as a generic API key. All 15 observed matches at 8 distinct historical fingerprints were reconstructed value-free and proved equal to an existing non-secret evidence basename, not either adjacent SHA256 citation. The complete original red and proof remain in the rate publication scratch; proof SHA256 a1aa8ab682786c0305b6d076fca776c7b0e3958ccb52da9549b1655b32320287. The current mutable prose now uses a sentence boundary to keep the same file references without the misleading key/value shape. The historical journal and commits remain unchanged.
 
 Assign only .gitleaksignore and docs/security/secret-scan-baseline.md to record exact newly confirmed historical fingerprints under the existing baseline policy. Regenerate from the complete scan with the ignore file absent, retain and reclassify the newly observed matches, preserve existing detector rules and all prior exact fingerprints, and run the unchanged pinned gate afterward. No credential rotation, rule/path exemption, history rewrite, implementation success or completed OAuth review is implied by this reference-only classification.
+
+## Retain frozen schema 3 during schema 4 planning — 2026-09-06
+
+Assign crates/catalog-build/src/pipeline.rs only for the additional planned frozen schema 3 artifact. Its current plan emits frozen schema 2 plus the current schema; advancing the current writer to schema 4 would otherwise treat the required schema 3 artifact as an orphan. Use the already scoped document/workspace owners to return and place the exact frozen schema 3 bytes. Do not reconstruct that frozen schema from schema 4 or change its validators, identity or semantics. The full planned artifact inventory must retain both older schemas alongside current schema 4.
+
+The two rate URI cases in the already scoped catalog_invariants.rs currently validate freshly rendered Slack documents against the frozen v3 validator (functions rate_adversary_canonical_source_urls_match_authoring_reader and rate_final_actual_provider_loading_preserves_uri_and_vendor_contract). The schema 4 writer changes their top-level document identity. Permit a narrow fixture-only exception to their previous byte-preservation assignment: make only those generated test documents mutable as needed and set only their top-level schema_version/$schema identities to the exact frozen v3 identities before the existing v3 assertions. Keep all operation bytes, original URI vectors, validator configuration and assertions unchanged. The definition-only middle v3 case remains byte-exact. Retain complete original preimages and add separate v4 producer/schema coverage over these same URI vectors.
+
+This authorizes v3-compatible test fixtures, not a production downgrade or removal of schema 4 fields to fit an old reader. If any field beyond those two top-level identities is incompatible with the frozen validator, stop this adaptation and report that concrete field; do not strip it or weaken the validator. The independent schema 3 publication candidate and its reviewed tests remain unchanged. These bounded fixture edits belong to the subsequent whole-OAuth/schema 4 unit and must be disclosed in its implementation and independent review evidence.
+
+The trusted frontend uses setup connect <provider>, with --auth-profile naming the declared purpose and optional --instruction-file naming an owner-only output file. Design 21 records these exact spellings. Existing ESS components.yaml explicitly classifies setup connect as an unspecified flow, because this frontend forwards multiple acts rather than owning a domain command. Its current Clap projection cannot declare these flow options; do not invent a service command or handler ownership to make it emit them. The actual Rust parser, guided-flow owner and their tests enforce the options and pre-session terminal/file admission. The existing ESS exception and generated group tree remain accurate.
