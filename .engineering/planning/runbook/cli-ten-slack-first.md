@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 45
+revision: 46
 ---
 ## Authorization and objective
 
@@ -3468,3 +3468,11 @@ Atlas main advanced to 78d96cc706f735c3a160369e3ce2f2133f4b1d41. The coordinator
 Verification-report:cli-oauth-operational-implementation-20260906 retains the full implementor report unchanged and the root hash audit. Local source 6fae9df000986f39d009a2e8503bdff03db41762 is clean, bot-authored and bot-committed over planning 789525f3. The report records 1,496 passing affected-package cases plus one preexisting ignored reader measurement, with final strict Clippy/formatting and all actual earlier failures preserved. Source/evidence manifests contain 1,188 and 608 entries, respectively; after the planning-only handoff all 1,017 nonplanning source bytes remain exact. This is not full integration or publication evidence.
 
 Dispatch the first formal tests-only whole-unit attack to the existing reviewer, review_one_shot_final, using the same managed OAuth tree and whole-unit-adversary-1-brief.md at SHA256 4b4b29bbbf958d88166c0ef5291dfe8f493eaffbfa675d15b5b6b835aa4b8fab. The full published base is 0c69450921ab1794c81dadec915b717a61bf0983. Prior helper, FULL SQLite, custody and refresh stages are all included; unrelated Design 22/model-only preparation is identified separately. The preceding prospective resource assignment governs the serial build slot. The implementor is idle and the auth worker has no compiling assignment. No review verdict exists yet; both ordinary pass limits and exact test owners remain.
+
+## Serial service implementation and published-reader witness — 2026-09-06
+
+Auth story revision 61 at 538b0081e1a5ce2b0c19dc1d457fe1f5006b0871 released only its independent three-file service-port slice, with closed values and Unsupported defaults. The OAuth reviewer explicitly lent the sole compiling slot while preparing its remaining cases. The auth worker now owns that slot and its ordinary auth root target under the recorded 8 GiB cap and 12/8/16 GiB disk/tmpfs/memory reserves. Actual authentication runtime/server/client/CLI wiring remains held for the reviewed OAuth handoff. Root returns the slot explicitly when service checks stop; ownership does not change merely because a process is momentarily absent.
+
+The whole-OAuth first pass has an actual introduced authoring-contract mismatch: its explicit-empty personal_flows case failed once because the loader accepts an empty list while the new schema requires at least one item. The omission control loaded. This is a preliminary observation, not the completed review report or a credential-exposure finding. A separate new reader test stopped at its own unstable iterator is_empty compiler error with zero cases executed; the reviewer is correcting only that new case. Original evidence is preserved, and production source remains frozen at 6fae9df0.
+
+Prospectively assign the exact published-reader-probe outputs under the already assigned whole-unit-adversary-1 scratch: libpublished_catalog_reader.rlib and witness, with the entire probe directory capped at 256 MiB and the same continuous reserves. The reviewer waits for explicit slot return. Root compared the three old source/pack copies byte for byte with published 0c69450921ab1794c81dadec915b717a61bf0983. The three exact commands and new witness are preserved in commands.json and witness.rs; the resource supplement published-reader-resource-assignment.md and root oauth-published-reader-root-provenance.json retain their hashes. This uses unmodified historical source to test actual new-pack refusal, not a changed reader fixture, and creates no new Cargo workspace or shared target. The completed pass will retain its actual result.
