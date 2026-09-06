@@ -121,15 +121,3 @@ d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.ya
 d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:private-key:9914
 d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:private-key:9915
 d4e22858b46e98a326012f6529bcc60cf4a002e4:docs/research/vendor/nango-providers.yaml:stripe-access-token:5003
-
-# Historical planning evidence basenames, verified value-free on 2026-09-06.
-# Exact source locations only; see the dated baseline note.
-0321347160ff0ec29194d502e97d0f8ff2adac39:.engineering/planning/journal.jsonl:generic-api-key:1390
-5121b33f0c096bb3d119e5049c18e6e70a42d095:.engineering/planning/journal.jsonl:generic-api-key:1371
-595f255bb1eda0fdb2891ac0ba33777ded1a00a5:.engineering/planning/journal.jsonl:generic-api-key:1388
-67e60406c395d6ff2afa5c70d36246db24e28a5a:.engineering/planning/journal.jsonl:generic-api-key:1372
-87149e7d5181ce5dff1ccdeceefd1e0bd34e9e30:.engineering/planning/journal.jsonl:generic-api-key:1386
-ac28bbace6c4ba34387a5053c762e4ad9dcc9f6c:.engineering/planning/journal.jsonl:generic-api-key:1392
-bc647c33893ecca1729f50cdcbfa6c365e09978a:.engineering/planning/journal.jsonl:generic-api-key:1370
-bc647c33893ecca1729f50cdcbfa6c365e09978a:.engineering/planning/story/connect-session-oauth-custody-in-personal-posture.md:generic-api-key:451
-f7530037987fdf0451bdac93250670ed15cb175d:.engineering/planning/journal.jsonl:generic-api-key:1377
