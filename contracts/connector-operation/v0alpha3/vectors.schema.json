@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/beyond10x/connectors/blob/main/contracts/connector-operation/v0alpha3/vectors.schema.json",
+  "title": "b10x.connector-operation.v0alpha3 conformance vectors",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "cases"
+  ],
+  "properties": {
+    "contract": {
+      "const": "b10x.connector-operation.v0alpha3"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "kind",
+          "valid",
+          "schema_valid",
+          "note",
+          "frame"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "request",
+              "response"
+            ]
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "schema_valid": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          },
+          "frame": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

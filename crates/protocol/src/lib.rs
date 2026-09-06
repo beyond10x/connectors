@@ -8,6 +8,8 @@ pub mod audio;
 pub mod browser;
 pub mod catalog;
 pub mod connection;
+pub mod connection_v2;
+pub mod connection_v2_schema;
 pub mod datasource;
 pub mod event;
 pub mod git_fetch;

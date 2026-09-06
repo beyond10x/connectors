@@ -51,3 +51,45 @@ before loading a newer pack. Richer input/output schemas do not alone change an 
 identity. See the [caller-contract amendment](../../docs/design/04-the-callers-contract.md#2026-09-06-amendment-source-fidelity-and-catalog-schema-3)
 for source fidelity and the [public interface guidance](../../docs/architecture/interfaces.md#operation-versions-and-rate-advice)
 for caller behavior.
+
+## Additive authentication contract slice
+
+[Operation v0alpha3](../../contracts/connector-operation/v0alpha3/README.md) adds the
+strict, safe `authentication_required` error. Its typed payload identifies the admitted
+operation, Connection, integration and profile, states `not_attempted`, and names the
+trusted remediation action. It requires a non-retriable error response with no retry
+delay or result. It has no URL, session capability or credential field. The internal
+`operation::*` API remains the frozen wire-v2 reexport; new three-version adapters live
+in `operation::versions` and parse each selected strict DTO from the original bytes.
+Auth downgrade to requested v1/v2 emits only neutral bounded `unavailable`, drops the
+original message and all auth/delay fields, and never retries. Ordinary rate behavior
+and every inherited v2 schema constraint remain unchanged.
+
+[Connection v0alpha2](../../contracts/connector-connection/v0alpha2/README.md) adds
+explicit bound start/status/acknowledge commands. Start accepts at most 64 KiB of
+serialized input within a 128 KiB request frame; v1 retains its 64 KiB frame. Bound
+commands cannot downgrade to unbound session creation. Trusted status wraps the
+existing session projection and checks duplicated identities, state and expiry.
+Only pending trusted responses can carry the existing human completion endpoint;
+terminal responses cannot. Acknowledgement names a fresh-description-then-explicit-
+invoke action and carries no input or execution authority.
+
+These DTOs and pure adapters implement [design 22's contract slice](../../docs/design/22-authentication-remediation.md).
+Service admission, credential preflight, live expiry, one-use completion, trusted
+client handling and model-output reduction remain separate wiring obligations.
+Reader support precedes producer adoption, and SDK support precedes embedding
+consumers. Adding these modules establishes no runtime or external adoption.
+
+Both new typed projections have separate deterministic write/check generators:
+
+```text
+cargo run --locked -p protocol --example operation_v3_bundle -- check
+cargo run --locked -p protocol --example connection_v2_bundle -- check
+```
+
+The new bundle READMEs document exact schema expressibility limits and independent
+schema/reader vector outcomes. Connection retains the frozen v1 WHATWG URL validator;
+its route/capability checks, duplicated instance-value equality and UTF-8 byte budgets
+remain reader checks. Operation retains v2's exact RFC URI constraints, byte budgets
+and derived-interval arithmetic. All predecessor bundles, readers, assertions and
+the existing v2 generator remain unchanged.
