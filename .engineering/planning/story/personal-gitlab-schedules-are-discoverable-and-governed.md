@@ -72,6 +72,8 @@ scope:
   path: crates/connector-resolve/src/document.rs
 - confidence: cited
   path: crates/connector-resolve/src/resolve.rs
+- confidence: cited
+  path: crates/connector-resolve/tests/adversary_gitlab_pass1.rs
 - confidence: inferred
   path: crates/connector-spec/schema/provider-toml.schema.json
 - confidence: cited
@@ -148,7 +150,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 95
+revision: 96
 ---
 
 
