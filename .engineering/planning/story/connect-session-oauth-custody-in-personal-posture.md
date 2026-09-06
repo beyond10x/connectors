@@ -166,6 +166,8 @@ scope:
 - confidence: inferred
   path: crates/catalog-build/tests/main/catalog_invariants.rs
 - confidence: cited
+  path: crates/catalog-build/tests/main/ess_claim_fence.rs
+- confidence: cited
   path: crates/catalog-build/tests/main/no_network.rs
 - confidence: inferred
   path: crates/catalog-reader/catalog.pack
@@ -335,7 +337,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 65
+revision: 67
 ---
 ## Acceptance
 
@@ -563,3 +565,9 @@ Assign connector-resolve/tests/adversary_gitlab_pass1.rs solely for a versioned 
 For the measured1500-line fence, allow only cohesive new OAuth extraction: connectors-config/src/personal_oauth.rs and personal_oauth_tests.rs own the new declarations/validation/tests. All preexisting config tests remain in personal.rs. The existing CatalogIntegrationConfig::validate method may move intact alongside its new OAuth check to keep that existing owner below the limit; preserve its old validation branches, messages and public API. connectors-client/src/personal_oauth.rs owns only the new client implementation/helpers/tests; original lib APIs/tests remain intact via registration/reexports. If the measured split still exceeds the limit, connectors-client/src/completion.rs may receive only the existing dedicated CompletionEndpoint type/implementation, unchanged, with its existing tests and API preserved. integration-catalog/src/oauth_acquisition.rs receives only the cohesive new acquisition implementation, keeping private state and authority with the existing OAuth owner. Record exact formatted sizes and moved-byte preservation. No broad refactor, line-limit waiver, assertion deletion or production policy relaxation is assigned.
 
 Coordinator refreshed the stale service lifecycle evidence comments in ess/system/domains/connection.yaml against integrated9c6ce892 and regenerates existing ESS derivatives. No entity, lifecycle, command, auth authority or transition changes. All root/source/backend/config/client closures remain preparation for actual operational tests and independent whole-unit review; schema3 publication is a separate verified candidate.
+
+## Lifecycle prose fence closure — 2026-09-06
+
+Measured root fixture failure: crates/catalog-build/tests/main/ess_claim_fence.rs still requires the earlier lifecycle prose and reads lines().nth(232) as the service Failed writer after stage2B moved that code. Add only this exact test owner for a bounded fixture update to the current explicit ESS claim and named service lifecycle owner. Reuse its existing brace-counted item helper to locate fail_pending and its actual Failed assignment instead of a moving absolute line. Keep the non-vacuous requirements that the document states both halves, the hosted writer scan is empty, and the other registry really writes Failed. Preserve planted-hosted-writer, removed-claim and missing-other-writer refusal behavior and every unrelated ESS claim case. No conditional skip, weakened implication or production/model edit is delegated. The coordinator owns the refreshed comments; the implementor owns only these assertions and actual test evidence.
+
+Formatted module previews fit the existing fence: config personal1479/new OAuth162/new tests84; client lib1500/new OAuth367; backend OAuth1402/acquisition626. No CompletionEndpoint move or size waiver is needed. The existing private config_ref helper may become pub(super) solely for the new sibling validation owner; no public API or caller authority changes. Preserve the existing validation method's old branches/messages and all old config/client tests.
