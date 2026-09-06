@@ -725,3 +725,176 @@ fn adversary_caller_input_cannot_rebind_routes_or_revoked_grants() {
     assert!(matches!(egress.accept(), Err(error)
         if error.kind() == std::io::ErrorKind::WouldBlock));
 }
+
+fn final_http_replies(
+    listener: UnixListener,
+    bodies: Vec<&'static str>,
+) -> thread::JoinHandle<Vec<String>> {
+    listener.set_nonblocking(true).unwrap();
+    thread::spawn(move || {
+        let mut requests = Vec::new();
+        for body in bodies {
+            let deadline = Instant::now() + Duration::from_secs(15);
+            let mut stream = loop {
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::WouldBlock
+                            && Instant::now() < deadline =>
+                    {
+                        thread::sleep(Duration::from_millis(10))
+                    }
+                    Err(error) => panic!("fixture request did not arrive: {error}"),
+                }
+            };
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let mut reader = std::io::BufReader::new(&mut stream);
+            let mut request = String::new();
+            loop {
+                let mut line = String::new();
+                assert!(reader.read_line(&mut line).unwrap() > 0);
+                request.push_str(&line);
+                if line == "\r\n" {
+                    break;
+                }
+            }
+            requests.push(request);
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+        }
+        thread::sleep(Duration::from_millis(50));
+        assert!(
+            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+            "unexpected repeat provider request"
+        );
+        requests
+    })
+}
+
+#[test]
+fn final_adversary_invalid_provider_output_is_not_resent_and_releases_the_state_root() {
+    let fixture = Fixture::new();
+    let listener = fixture.platform();
+    let description =
+        success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
+    let serving = final_http_replies(listener, vec!["{}"]);
+    let refused = fixture.run(&[
+        "operation",
+        "invoke",
+        "--operation",
+        "work.requests.list",
+        "--connection",
+        "connection-fixture",
+        "--description-ref",
+        description["description_ref"].as_str().unwrap(),
+        "--input-json",
+        r#"{"cursor":"","limit":1}"#,
+    ]);
+    assert!(!refused.status.success(), "{refused:?}");
+    assert_eq!(value(&refused)["error"]["code"], "unavailable");
+    assert_eq!(serving.join().unwrap().len(), 1);
+    let audit = fs::read_to_string(fixture.state.join("b10x-operation-audit.jsonl")).unwrap();
+    let outcomes = audit
+        .lines()
+        .map(|line| {
+            serde_json::from_str::<Value>(line).unwrap()["event"]["outcome"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(outcomes, ["attempted", "indeterminate"]);
+    success(&fixture.run(&["operation", "search"]));
+    assert!(!fixture.state.join("connectors.sock").exists());
+}
+
+#[test]
+fn final_adversary_provider_cursor_survives_two_distinct_one_shot_processes() {
+    let fixture = Fixture::new();
+    let listener = fixture.platform();
+    let description =
+        success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
+    let serving = final_http_replies(
+        listener,
+        vec![
+            r#"{"items":[],"next_cursor":"provider-page-two"}"#,
+            r#"{"items":[],"next_cursor":null}"#,
+        ],
+    );
+    let invoke = |input: &str| {
+        success(&fixture.run(&[
+            "operation",
+            "invoke",
+            "--operation",
+            "work.requests.list",
+            "--connection",
+            "connection-fixture",
+            "--description-ref",
+            description["description_ref"].as_str().unwrap(),
+            "--input-json",
+            input,
+        ]))
+    };
+    let first = invoke(r#"{"cursor":"","limit":1}"#);
+    assert!(!fixture.state.join("connectors.sock").exists());
+    let cursor = first["output"]["next_cursor"].as_str().unwrap();
+    assert_eq!(cursor, "provider-page-two");
+    let second = invoke(&json!({"cursor":cursor,"limit":1}).to_string());
+    assert!(second["output"]["next_cursor"].is_null());
+    let requests = serving.join().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert!(!requests[0].contains("provider-page-two"));
+    assert!(requests[1]
+        .lines()
+        .next()
+        .unwrap()
+        .contains("cursor=provider-page-two"));
+    assert!(!fixture.state.join("connectors.sock").exists());
+}
+
+#[test]
+fn final_adversary_kubernetes_candidates_never_publish_a_dead_connection_or_run_auth_exec() {
+    let fixture = Fixture::new();
+    fixture.configure("[kubernetes]\ngrant_ref = 'grant:kubernetes'\ninitiation = 'platform'\ntarget_grants = { prometheus = 'grant:prometheus' }\nallow_exec_auth = true\n");
+    let kubeconfig = fixture.root.join("synthetic-kubeconfig");
+    fs::write(&kubeconfig, "apiVersion: v1\nkind: Config\ncurrent-context: fixture\nclusters:\n- name: fixture\n  cluster:\n    server: https://cluster.invalid\ncontexts:\n- name: fixture\n  context:\n    cluster: fixture\n    user: fixture\nusers:\n- name: fixture\n  user:\n    exec:\n      apiVersion: client.authentication.k8s.io/v1\n      command: nonexistent-fixture-auth-helper\n      interactiveMode: Never\n").unwrap();
+    let run = |arguments: &[&str]| {
+        fixture
+            .command(arguments)
+            .arg("--config")
+            .arg(&fixture.config)
+            .arg("--state-root")
+            .arg(&fixture.state)
+            .env("KUBECONFIG", &kubeconfig)
+            .output()
+            .unwrap()
+    };
+    let arguments = ["connection", "candidates", "--integration", "kubernetes"];
+    let first = success(&run(&arguments));
+    let second = success(&run(&arguments));
+    let candidates = first["candidates"].as_array().unwrap();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(
+        first, second,
+        "passive candidate identity changed between processes"
+    );
+    assert_eq!(candidates[0]["state"], "detected");
+    assert!(candidates[0]["connection_ref"].is_null());
+    let listed = success(&run(&["connection", "list"]));
+    assert_eq!(listed["connections"], json!([]));
+    let refused = run(&[
+        "connection",
+        "activate",
+        "--candidate",
+        candidates[0]["candidate_ref"].as_str().unwrap(),
+        "--label",
+        "fixture",
+    ]);
+    assert!(!refused.status.success());
+    assert!(value(&refused)["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("connectors serve local"));
+    assert!(!fixture.state.join("connectors.sock").exists());
+}

@@ -520,3 +520,104 @@ async fn adversary_every_persistent_request_class_refuses_before_configuration_o
         assert!(!state.exists());
     }
 }
+
+#[tokio::test]
+async fn final_adversary_invalid_envelopes_refuse_before_reading_config_or_creating_state() {
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("never-created");
+    let missing_config = root.path().join("missing-config");
+    let search = OperationRequest::Search(operation::SearchRequest {
+        query: String::new(),
+        limit: 1,
+    });
+    let mut malformed_owner = context();
+    malformed_owner.authority_snapshot_sha256 = "invalid".into();
+    for (owner, request) in [
+        (malformed_owner, search),
+        (
+            context(),
+            OperationRequest::Search(operation::SearchRequest {
+                query: "x".repeat(513),
+                limit: 1,
+            }),
+        ),
+        (
+            context(),
+            OperationRequest::Invoke(operation::InvokeRequest {
+                operation_ref: "fixture".into(),
+                connection_ref: "fixture".into(),
+                description_ref: "fixture".into(),
+                input: serde_json::json!({"value":"x".repeat(65_536)}),
+                approval_evidence_ref: None,
+            }),
+        ),
+    ] {
+        let response = PersonalRuntime::one_shot_operation(&missing_config, &state, owner, request)
+            .await
+            .unwrap();
+        assert!(response.error.is_some());
+        assert!(response.response.is_none());
+        assert!(!state.exists());
+    }
+}
+
+#[derive(Default)]
+struct MalformedReplyBackend {
+    shutdown: std::sync::atomic::AtomicUsize,
+}
+
+#[async_trait::async_trait]
+impl ConnectorBackend for MalformedReplyBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        Ok(())
+    }
+    async fn handle(
+        &self,
+        _: &PrincipalContext,
+        _: OperationRequest,
+    ) -> Result<OperationResult, operation::OperationError> {
+        Ok(OperationResult::Invoke(operation::InvocationResult {
+            operation_ref: String::new(),
+            output: serde_json::json!({}),
+            connector_audit_ref: String::new(),
+            execution_ref: None,
+        }))
+    }
+    async fn shutdown(&self) {
+        self.shutdown
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[tokio::test]
+async fn final_adversary_malformed_backend_reply_is_reduced_before_shutdown_and_lock_release() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let socket = root.path().join("connectors.sock");
+    let backend = Arc::new(MalformedReplyBackend::default());
+    let runtime = LocalOneShot::new(
+        LocalStateOwnership::acquire(&socket).unwrap(),
+        backend.clone(),
+    )
+    .unwrap();
+    let response = runtime
+        .operation(envelope(OperationRequest::Search(
+            operation::SearchRequest {
+                query: String::new(),
+                limit: 1,
+            },
+        )))
+        .await
+        .unwrap();
+    assert!(
+        response.error.is_some(),
+        "malformed backend response escaped: {response:?}"
+    );
+    assert!(response.response.is_none());
+    assert!(response.validate().is_ok());
+    assert_eq!(
+        backend.shutdown.load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    assert!(LocalStateOwnership::acquire(socket).is_ok());
+}
