@@ -197,7 +197,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 67
+revision: 68
 ---
 ## Acceptance
 
@@ -371,3 +371,9 @@ The source-only extraction proposal in stage2-hosted-test-proposal/extraction-re
 Prospectively record five inferred new test owners for the later runtime handoff: crates/connectors-runtime/src/registry_tests.rs, crates/connectors-client/src/tests.rs, crates/server/src/hosted/tests.rs, crates/connectors-runtime/src/composition_tests.rs and crates/connectors-cli/src/tests.rs. The registry and client extractions are expected to make room for their assigned additions. Hosted, composition and CLI extractions remain conditional on actual edits exceeding the remaining margin; do not create a file only because it is scoped. All five existing production owners are already recorded. This note assigns scope only; it does not release runtime implementation before the reviewed OAuth source handoff or change the independent three-file service slice.
 
 For each selected extraction, move only the complete existing final test body. First preserve that body byte for byte, along with all helpers, nested modules, includes, assertions and string literals; do not blindly dedent raw strings. Replace its inline wrapper with the exact cfg/module or cfg/path/module registration specified in the proposal. Inspect formatting separately, preserve module identities and all existing test names, and keep the pre-test production prefix exact until the separately assigned behavior change. Registry's included registry_claims_tests.rs stays at its current path. Hosted's seven submodules stay under hosted/tests/, and its existing proposed remediation registration goes in the selected test owner once. Keep old line-citation evidence and record coordinator-owned ESS/planning citation closure where movement requires it. No production refactor, manifest, dependency, lock, or new test family is authorized by this space provision.
+
+## Remaining authentication ownership preparation — 2026-09-06
+
+While OAuth candidate f9bf1d6a is in its final ordinary review, the auth implementor may prepare a concrete split of the already planned remaining source work between runtime/server and client/console/CLI owners. Its exact auth base is clean ae53a93092453266cd5b40a5c6f9cee484478310. This is source-reading preparation only: no repository implementation, branch merge or compilation is released, and the OAuth reviewer retains the sole compiling slot.
+
+The assigned scratch is auth-as-tool-result/stage2-implementation-split under the existing wave scratch. Its brief.md requires exact disjoint path lists and real frozen protocol/service interfaces, plus existing patch ownership, minimum verification order and any actual shared owner/dependency. Coordinator-only model/generation/citation closure stays explicit. If the current interfaces require a serial step, the report names it rather than inventing an API. No new story, wave, model, scope, review pass, worktree or sub-agent is created by this preparation. Implementation still waits for the reviewed OAuth source handoff.
