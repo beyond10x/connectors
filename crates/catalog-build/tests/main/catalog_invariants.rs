@@ -2347,3 +2347,114 @@ fn gitlab_official_source_inventory_accounts_for_every_operation() {
         Some("credentials_and_grants")
     );
 }
+
+#[test]
+fn adversary_gitlab_pass1_coverage_statuses_match_actual_importer_results() {
+    let source =
+        std::fs::read_to_string(repo_root().join("specs/gitlab/openapi-19.4.yaml")).unwrap();
+    let ingested = connector_spec::openapi::ingest_with_semantics(
+        &source,
+        connector_spec::RequestSemantics::OpenApi30JsonV1,
+    )
+    .unwrap();
+    let available: BTreeSet<_> = ingested.operation_ids().into_iter().collect();
+    let inventory: toml::Value = toml::from_str(
+        &std::fs::read_to_string(repo_root().join("specs/gitlab/coverage-19.4.toml")).unwrap(),
+    )
+    .unwrap();
+    let mut counts = BTreeMap::<&str, usize>::new();
+    for row in inventory["operation"].as_array().unwrap() {
+        let id = row["operation_id"].as_str().unwrap();
+        let status = row["status"].as_str().unwrap();
+        *counts.entry(status).or_default() += 1;
+        match status {
+            "coverage_gap" | "catalogued_generated" => {
+                assert!(
+                    available.contains(id),
+                    "{id} claims {status} but ingest refuses it"
+                );
+            }
+            "importer_gap" => {
+                assert!(
+                    !available.contains(id),
+                    "{id} is readable but inventoried as unsupported"
+                );
+                let location = format!(
+                    "{} {}",
+                    row["method"].as_str().unwrap(),
+                    row["path"].as_str().unwrap()
+                );
+                assert!(
+                    ingested
+                        .diagnostics
+                        .iter()
+                        .any(|diagnostic| diagnostic.location == location),
+                    "{id} has no importer diagnostic"
+                );
+            }
+            "catalogued_legacy" | "platform_auth_flow" => {}
+            other => panic!("unreviewed coverage status {other}"),
+        }
+    }
+    assert_eq!(counts.get("catalogued_generated"), Some(&4));
+    assert_eq!(counts.get("catalogued_legacy"), Some(&20));
+    assert_eq!(counts.get("coverage_gap"), Some(&1510));
+    assert_eq!(counts.get("importer_gap"), Some(&313));
+    println!("coverage decisions checked for 1847 source operations: {counts:?}");
+}
+
+#[test]
+fn adversary_gitlab_pass1_translation_preserves_composed_constraint_truth_tables() {
+    let source = json!({
+        "type":"object", "required":["choice"], "additionalProperties":false,
+        "properties":{
+            "choice":{"oneOf":[{"type":"string","nullable":true,"enum":["fixed",null]},{"type":"integer","minimum":0,"exclusiveMinimum":true,"maximum":4,"exclusiveMaximum":true}]},
+            "both":{"allOf":[{"type":"integer","nullable":true},{"type":"integer","minimum":2}]},
+            "literal":{"type":"object","enum":[{"$ref":"literal","example":"kept"}],"default":{"$ref":"literal","example":"kept"}},
+            "values":{"type":"array","items":{"anyOf":[{"type":"boolean"},{"type":"string"}]},"minItems":1,"uniqueItems":true}
+        }
+    });
+    let translated = connector_spec::schema_translation::openapi30(&source).unwrap();
+    assert_eq!(
+        translated["properties"]["literal"],
+        source["properties"]["literal"]
+    );
+    let validator = jsonschema::validator_for(&translated).unwrap();
+    let accepted = [
+        json!({"choice":null}),
+        json!({"choice":"fixed"}),
+        json!({"choice":1}),
+        json!({"choice":3,"both":2,"values":[false,"false"],"literal":{"$ref":"literal","example":"kept"}}),
+    ];
+    let refused = [
+        json!({}),
+        json!({"choice":0}),
+        json!({"choice":4}),
+        json!({"choice":1.5}),
+        json!({"choice":"other"}),
+        json!({"choice":false}),
+        json!({"choice":1,"both":null}),
+        json!({"choice":1,"values":[]}),
+        json!({"choice":1,"values":[false,false]}),
+        json!({"choice":1,"values":[0]}),
+        json!({"choice":1,"invented":true}),
+        json!({"choice":1,"literal":{"$ref":"literal"}}),
+    ];
+    for value in &accepted {
+        assert!(
+            validator.is_valid(value),
+            "lost accepted source value {value}"
+        );
+    }
+    for value in &refused {
+        assert!(
+            !validator.is_valid(value),
+            "broadened source constraint for {value}"
+        );
+    }
+    println!(
+        "independent truth table: {} accepted and {} refused values",
+        accepted.len(),
+        refused.len()
+    );
+}
