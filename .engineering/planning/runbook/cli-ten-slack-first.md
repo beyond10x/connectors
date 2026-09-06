@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 42
+revision: 43
 ---
 ## Authorization and objective
 
@@ -3438,3 +3438,15 @@ Verification-report:cli-oauth-runtime-checkpoint-20260906 records the frozen 201
 Verification-report:cli-auth-protocol-checkpoint-20260906 preserves the 77 pass additive protocol slice, the actual separate 328 pass/2fail broader result, and completed owned-target cleanup. Root verified the 261 original,21 broader and 12 cleanup evidence members. The two broader failures have byte-identical baseline inputs; they remain red until the existing OAuth-owned claim-fence correction is assembled and tested. Runtime/transport/CLI authentication wiring remains a source-only plan pending the reviewed OAuth handoff and exact coordinator scope.
 
 No partial report admits a whole story as implemented. All original red/compiler/no-start/resource observations, historical scope exceptions and the credential unit's held two-review decision remain intact. Final combined gates, later source publication/documentation and supported-source installation with the two authorized daemon restarts remain outstanding.
+
+## Prospective OAuth CLI return to ordinary target storage — 2026-09-06
+
+The actual CLI parser deciding run completed with zero passes, one failure and 34 filtered cases, exit 101, because the unchanged parser rejects the new explicit authentication profile and instruction-file options. It was not interrupted. The private target reached 8,217,505,792 allocated bytes, leaving only 372,428,800 bytes under its 8 GiB aggregate cap. The implementor identified fourteen remaining CLI test executables plus strict Clippy that cannot fit in that allowance. No compiler remains running. The deciding source/logs and earlier target observations remain unchanged.
+
+Shared disk capacity has since recovered without this wave deleting another session's files. At 2026-09-06T15:46:25.639485+00:00 root observed 42672754688 disk bytes available, 25393082368 tmpfs bytes available and 41945276416 MemAvailable bytes. The ordinary CLI target is absent. This dated recovery makes the original per-worktree target policy feasible again.
+
+For subsequent CLI workspace commands in wt-4f1de73d0685 only, after freezing the completed deciding source, command evidence and full private target inventory, unset CARGO_TARGET_DIR and use the ordinary crates/connectors-cli/target directory. Do not move/copy/symlink compiler artifacts. The earlier private target remains capped at 8 GiB and untouched for the remaining assigned root/console checks; this note does not authorize another worker to use it. Preserve all earlier private-target, default-target and no-start/interrupt observations.
+
+For the fresh CLI target, require at least 24 GiB free disk before the initial cold command and continuously retain the 12 GiB disk reserve. Keep one compiling workspace across the wave, jobs 1, incremental 0, dev/test debug 0 and the existing /usr/bin/sccache wrapper. Record the exact manifest, cwd, environment and target path for every command. Bound this new CLI target itself to 8 GiB, and retain the existing MemAvailable 16 GiB and tmpfs 8 GiB monitoring while the frozen private target remains resident. Gracefully stop only this command's process group on a guard crossing and preserve its actual result. A larger target requires a separately measured coordinator decision, not a silent cap increase.
+
+Freeze completed source, executable hashes and full execution evidence before any later cargo clean of this owned CLI target, then reverify persistent source/evidence. No shared-cache cleaning, other-session target cleanup, primary mutation, compilation overlap, scope expansion or test/review waiver is authorized. Whole-unit OAuth verification and independent review remain outstanding.
