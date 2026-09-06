@@ -140,12 +140,11 @@ impl CredentialSource for FileEnvCredentialSource {
                 Ok(ResolvedSecret::new(trimmed.to_owned()))
             }
             CredentialReference::Env { variable } => {
-                let value = std::env::var(variable).map_err(|error| {
-                    CredentialError::Unreadable {
+                let value =
+                    std::env::var(variable).map_err(|error| CredentialError::Unreadable {
                         reference: reference.describe(),
                         detail: error.to_string(),
-                    }
-                })?;
+                    })?;
                 if value.trim().is_empty() {
                     return Err(CredentialError::Empty {
                         reference: reference.describe(),
@@ -195,7 +194,10 @@ mod tests {
             })
             .expect_err("must refuse");
         let rendered = error.to_string();
-        assert!(rendered.contains("/nonexistent/driver-sql-credential"), "{rendered}");
+        assert!(
+            rendered.contains("/nonexistent/driver-sql-credential"),
+            "{rendered}"
+        );
     }
 
     #[test]

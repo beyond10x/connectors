@@ -30,7 +30,9 @@ fn postgres_config() -> SqlConnectionConfig {
     SqlConnectionConfig {
         engine: SqlEngine::Postgres,
         host: env_or("B10X_SQL_TEST_PG_HOST", "127.0.0.1"),
-        port: env_or("B10X_SQL_TEST_PG_PORT", "15432").parse().expect("port"),
+        port: env_or("B10X_SQL_TEST_PG_PORT", "15432")
+            .parse()
+            .expect("port"),
         database: env_or("B10X_SQL_TEST_PG_DB", "postgres"),
         user: env_or("B10X_SQL_TEST_PG_USER", "postgres"),
         credential: CredentialReference::Env {
@@ -81,11 +83,7 @@ async fn postgres_small_result_returns_untruncated() {
     assert_eq!(page.rows_returned, 1);
     assert_eq!(
         page.rows,
-        [vec![
-            Some("1".to_owned()),
-            Some("two".to_owned()),
-            None
-        ]]
+        [vec![Some("1".to_owned()), Some("two".to_owned()), None]]
     );
     assert!(!page.truncated);
     assert_eq!(page.truncation_cause, None);
@@ -155,11 +153,20 @@ async fn postgres_inventory_reads_work() {
     let tables = list_tables(&config, &FileEnvCredentialSource, "information_schema")
         .await
         .expect("tables list");
-    assert!(tables.tables.iter().any(|t| t == "tables"), "{:?}", tables.tables);
+    assert!(
+        tables.tables.iter().any(|t| t == "tables"),
+        "{:?}",
+        tables.tables
+    );
 
-    let description = describe_table(&config, &FileEnvCredentialSource, "information_schema", "tables")
-        .await
-        .expect("table describe");
+    let description = describe_table(
+        &config,
+        &FileEnvCredentialSource,
+        "information_schema",
+        "tables",
+    )
+    .await
+    .expect("table describe");
     assert!(
         description.columns.iter().any(|c| c.name == "table_name"),
         "{:?}",
@@ -214,11 +221,7 @@ async fn mysql_small_result_returns_untruncated() {
     assert_eq!(page.rows_returned, 1);
     assert_eq!(
         page.rows,
-        [vec![
-            Some("1".to_owned()),
-            Some("two".to_owned()),
-            None
-        ]]
+        [vec![Some("1".to_owned()), Some("two".to_owned()), None]]
     );
     assert!(!page.truncated);
 }
@@ -263,9 +266,13 @@ async fn mysql_byte_cap_truncates_honestly() {
 #[tokio::test]
 #[ignore = "needs a live MySQL; see the module docs"]
 async fn mysql_show_and_describe_run() {
-    let page = run_query(&mysql_config(), &FileEnvCredentialSource, &query("SHOW DATABASES"))
-        .await
-        .expect("SHOW DATABASES runs");
+    let page = run_query(
+        &mysql_config(),
+        &FileEnvCredentialSource,
+        &query("SHOW DATABASES"),
+    )
+    .await
+    .expect("SHOW DATABASES runs");
     assert!(page.rows_returned >= 1);
 
     let page = run_query(
@@ -300,9 +307,14 @@ async fn mysql_inventory_reads_work() {
         tables.tables
     );
 
-    let description = describe_table(&config, &FileEnvCredentialSource, "information_schema", "TABLES")
-        .await
-        .expect("table describe");
+    let description = describe_table(
+        &config,
+        &FileEnvCredentialSource,
+        "information_schema",
+        "TABLES",
+    )
+    .await
+    .expect("table describe");
     assert!(
         description.columns.iter().any(|c| c.name == "TABLE_NAME"),
         "{:?}",
