@@ -244,7 +244,14 @@ async fn provider(State(state): State<Provider>, request: Request) -> Response<B
             response = response.header(name, value);
         }
     }
-    let body = output[header_end + 4..].to_vec();
+    let mut body = output[header_end + 4..].to_vec();
+    if discovery && observed_protocol.as_deref() == Some("version=2") {
+        assert!(body.starts_with(b"000eversion 2\n"));
+        // GitLab's smart HTTP boundary retains this service preamble for v2 discovery.
+        let mut advertisement = b"001e# service=git-upload-pack\n0000".to_vec();
+        advertisement.extend(body);
+        body = advertisement;
+    }
     state.observations.lock().unwrap().push(Observation {
         protocol: observed_protocol,
         request: observed_body,
