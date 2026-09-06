@@ -16,8 +16,8 @@ mod git_fetch;
 mod planning;
 mod remediation;
 pub use remediation::{
-    CredentialReadiness, RemediationAuthority, RemediationBinding, RemediationError,
-    RemediationMetadata, RemediationRequest, RemediationResult, RemediationRoute,
+    CredentialReadiness, RemediationAdmission, RemediationAuthority, RemediationBinding,
+    RemediationError, RemediationMetadata, RemediationRequest, RemediationResult, RemediationRoute,
     RemediationTarget,
 };
 mod runtime;

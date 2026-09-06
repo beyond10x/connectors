@@ -570,6 +570,17 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         Err(crate::RemediationError::Unsupported)
     }
 
+    /// Supply current personal operation/self-management admission from the actual policy owner.
+    /// Does not validate raw input, observe a credential, allocate a session or dispatch work.
+    /// Hosted receivers use their real Grant store and never fall back to this personal policy.
+    fn personal_remediation_admission(
+        &self,
+        _context: &PrincipalContext,
+        _target: crate::RemediationTarget<'_>,
+    ) -> Result<crate::RemediationAdmission, crate::RemediationError> {
+        Err(crate::RemediationError::Unsupported)
+    }
+
     /// Observe the exact generation only after non-consuming current grant/input admission.
     /// Never spend approval/event evidence, start acquisition, refresh, or dispatch here.
     /// Unsupported preserves the ordinary v2 path and does not manufacture an auth outcome.
@@ -964,6 +975,23 @@ mod remediation_contract_tests {
             admission_policy_sha256: "c".repeat(64),
             expires_at_unix_ms: 10_000,
         }
+    }
+
+    #[test]
+    fn personal_remediation_factory_defaults_to_refusal_without_backend_work() {
+        let work = Arc::new(AtomicUsize::new(0));
+        let backend: Arc<dyn ConnectorBackend> = Arc::new(OrdinaryBackend(work.clone()));
+        for (operation_ref, connection_ref) in [("unknown", "unknown"), (PRIVATE, PRIVATE)] {
+            let result = backend.personal_remediation_admission(
+                &context(),
+                RemediationTarget {
+                    operation_ref,
+                    connection_ref,
+                },
+            );
+            assert_eq!(result.unwrap_err(), RemediationError::Unsupported);
+        }
+        assert_eq!(work.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]

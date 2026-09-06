@@ -197,10 +197,19 @@ impl OAuthInner {
             return Err(PersonalOAuthError::Unavailable);
         }
         let index = self.select_binding(&request)?;
-        if request.label.trim().is_empty()
-            || request.label.len() > 256
-            || request.label.chars().any(char::is_control)
-        {
+        self.create_for_binding(index, request.label, None).await
+    }
+
+    pub(super) async fn create_for_binding(
+        self: &Arc<Self>,
+        index: usize,
+        label: String,
+        remediation: Option<Arc<Mutex<remediation::BoundSession>>>,
+    ) -> Result<connection_api::ConnectSessionStatus> {
+        if !self.persistent || *self.stopping.borrow() {
+            return Err(PersonalOAuthError::Unavailable);
+        }
+        if label.trim().is_empty() || label.len() > 256 || label.chars().any(char::is_control) {
             return Err(PersonalOAuthError::Invalid);
         }
         self.custody
@@ -209,6 +218,27 @@ impl OAuthInner {
             .map_err(|_| PersonalOAuthError::Unavailable)?;
         let binding = &self.bindings[index];
         let _guard = binding.gate.lock().await;
+        if let Some(bound) = &remediation {
+            remediation::recheck_bound(bound, self.now()?)?;
+            let operation_ref = remediation::bound_operation(bound)?;
+            let operation = catalog::operation(catalog::OperationKey::id(&operation_ref))
+                .ok_or(PersonalOAuthError::Refused)?;
+            let need = match self.readiness_locked(binding, operation).await {
+                service::CredentialReadiness::MissingCredential => {
+                    protocol::operation::v3::AuthenticationNeed::AuthorizeConfigured
+                }
+                service::CredentialReadiness::CredentialDegraded => {
+                    protocol::operation::v3::AuthenticationNeed::ReauthorizeExisting
+                }
+                service::CredentialReadiness::DependencyUnavailable => {
+                    return Err(PersonalOAuthError::Unavailable)
+                }
+                _ => return Err(PersonalOAuthError::Refused),
+            };
+            if need != remediation::bound_need(bound)? {
+                return Err(PersonalOAuthError::Refused);
+            }
+        }
         let previous = self
             .synchronize(binding)?
             .as_ref()
@@ -241,6 +271,9 @@ impl OAuthInner {
             self.clock.as_ref(),
             binding.policy.registration.session_ttl_seconds,
         )?;
+        if let Some(bound) = &remediation {
+            deadline.cap(remediation::bound_deadline(bound)?)?;
+        }
         let (endpoint, device) = match binding.policy.registration.flow {
             PersonalOAuthFlow::AuthorizationCodePkce => {
                 let scope = binding
@@ -344,7 +377,7 @@ impl OAuthInner {
         let status = lifecycle
             .reserve_browser(
                 reference.clone(),
-                request.label,
+                label,
                 deadline.expires,
                 endpoint.browser_url().to_string(),
             )
@@ -361,11 +394,13 @@ impl OAuthInner {
         let owned = self.clone();
         let task_reference = reference.clone();
         let task_lifecycle = lifecycle.clone();
+        let task_remediation = remediation.clone();
         let task = tokio::spawn(async move {
             let result = owned
                 .acquire(
                     SessionTarget {
                         binding: index,
+                        remediation: task_remediation,
                         previous,
                         reference: task_reference.clone(),
                         lifecycle: task_lifecycle.clone(),
@@ -397,6 +432,7 @@ impl OAuthInner {
                 lifecycle,
                 liveness,
                 task: Some(task),
+                remediation,
             },
         );
         Ok(status)
@@ -536,7 +572,10 @@ impl OAuthInner {
                 evidence,
                 proposal,
                 live,
-                &SessionAuthority(binding.authority.clone()),
+                &remediation::BoundCompletionAuthority {
+                    ordinary: SessionAuthority(binding.authority.clone()),
+                    bound: target.remediation.as_ref(),
+                },
             )
             .await
             .map_err(|_| PersonalOAuthError::Unavailable)?;

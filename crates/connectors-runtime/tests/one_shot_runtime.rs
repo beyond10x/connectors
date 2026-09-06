@@ -29,6 +29,30 @@ fn envelope(request: OperationRequest) -> RequestEnvelope {
 }
 
 #[tokio::test]
+async fn auth_one_shot_v3_refuses_persistent_control_before_configuration_or_state() {
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("uncreated-state");
+    let response = PersonalRuntime::one_shot_operation_v3(
+        &root.path().join("absent-configuration.toml"),
+        &state,
+        context(),
+        OperationRequest::SessionStatus(operation::SessionRequest {
+            execution_ref: "execution:fixture".into(),
+        }),
+    )
+    .await
+    .unwrap();
+    response.validate().unwrap();
+    assert_eq!(response.protocol, operation::v3::CONTRACT);
+    assert!(response.response.is_none());
+    let error = response.error.unwrap();
+    assert_eq!(error.code, operation::v3::OperationErrorCode::Unavailable);
+    assert!(!error.retriable);
+    assert!(error.authentication.is_none());
+    assert!(!state.exists());
+}
+
+#[tokio::test]
 async fn an_existing_owner_refuses_before_opening_the_reply_claim_journal() {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
