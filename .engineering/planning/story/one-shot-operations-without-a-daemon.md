@@ -46,9 +46,11 @@ scope:
   path: crates/server/src/local.rs
 - confidence: cited
   path: crates/service/src/runtime.rs
+- confidence: inferred
+  path: ess/generated/clap
 - confidence: cited
   path: ess/system/domains/connection.yaml
-revision: 34
+revision: 35
 ---
 # Story: one-shot operations without a daemon
 

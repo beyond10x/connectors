@@ -1,14 +1,14 @@
 <!--
   generated from connectors v1
-  model digest 0aa2d494f51c4ba02a1b005bbb6a0bd20b873d70223617df699bda747e61ec61
-  contract digest fe12c35666d3635d4130f4f24409f23b955f206748d8be7c978d35362b9490b0
+  model digest 2fd5f99b916aa6ca537502a896a61e8f12156a6a9d50bd424358064d02ad2460
+  contract digest 32999c00640bb37fee55df6cd00d8d4e5f142973980a29d158841d0e59524e59
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — connectors v1
 
 Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synthesize`.
 
-171 capabilities: **155 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
+180 capabilities: **164 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
 
 ## Generated
 
@@ -18,10 +18,16 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.catalog.Authority` |
 | domain type | `connectors.catalog.Catalog.State` |
 | domain type | `connectors.catalog.CatalogRef` |
+| domain type | `connectors.catalog.ConditionalRateLimit` |
+| domain type | `connectors.catalog.FixedRateLimit` |
 | domain type | `connectors.catalog.Operation.State` |
 | domain type | `connectors.catalog.OperationRef` |
 | domain type | `connectors.catalog.Provider.State` |
 | domain type | `connectors.catalog.ProviderRef` |
+| domain type | `connectors.catalog.PublishedRate` |
+| domain type | `connectors.catalog.RateLimitBasis` |
+| domain type | `connectors.catalog.RequestParameterSemantics` |
+| domain type | `connectors.catalog.RequestSemantics` |
 | domain type | `connectors.catalog.RiskToken` |
 | domain type | `connectors.catalog.ServiceName` |
 | domain type | `connectors.catalog.SetupProfileActor` |
@@ -86,15 +92,18 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.runtime.Audit.State` |
 | domain type | `connectors.runtime.AuditRef` |
 | domain type | `connectors.runtime.CallRef` |
+| domain type | `connectors.runtime.ConditionalRateAdvice` |
 | domain type | `connectors.runtime.ConnectionRef` |
 | domain type | `connectors.runtime.EffectClass` |
 | domain type | `connectors.runtime.ExecutionRef` |
 | domain type | `connectors.runtime.Grant.State` |
 | domain type | `connectors.runtime.GrantRef` |
 | domain type | `connectors.runtime.Invocation.State` |
+| domain type | `connectors.runtime.OperationRateAdvice` |
 | domain type | `connectors.runtime.OperationRef` |
 | domain type | `connectors.runtime.Proxy.State` |
 | domain type | `connectors.runtime.ProxyRef` |
+| domain type | `connectors.runtime.RateLimitObservation` |
 | domain type | `connectors.runtime.Session.State` |
 | domain type | `connectors.runtime.SessionTermination` |
 | domain type | `connectors.runtime.SipDial.State` |
