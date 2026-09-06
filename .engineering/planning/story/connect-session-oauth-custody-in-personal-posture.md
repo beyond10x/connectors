@@ -305,7 +305,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 50
+revision: 51
 ---
 ## Acceptance
 
@@ -473,3 +473,15 @@ The full integration-catalog suite passes 56 to 66 cases, with no failures or ig
 Actual runtime composition must share one RefreshOwner and binding gate across acquisition, read and refresh, install the real current-authority receiver, and wrap token/token-info egress using the handle's original remaining budget. It must retain that gate through operation dispatch, remove the temporary unused-module expectation, and keep remote rotation uncertainty unavailable. These are still pending runtime obligations; private support tests do not prove operational OAuth, shared registry ownership or live provider compatibility. Whole-unit independent review and combined publication remain pending.
 
 After the freeze, shared disk dropped below the 20 GiB reserve due to concurrent workspace consumption. The coordinator paused new builds, reverified all refresh evidence and source hashes, and cargo-cleaned only this completed runtime target. All 1157 tracked source hashes remained identical; exact cleanup evidence is retained in `~/.cache/cw6/p/completed-oauth-observer-target-clean.json`. No claim is made that shared free space remained above the floor throughout the session.
+
+## Stage 2C source handoff after final rate review — 2026-09-06
+
+The rate final adversary is green with no findings: reviewed test/source head 0c026610e67f3ec6da0a8014813f3d88c4e72799 is integrated at a222c138b5b61ce3251f95fe54422b48ed696ee2 alongside private OAuth kernel and refresh source 9d1cef37. The sole console lock conflict preserves all package versions, sources and checksums from both parents. All twelve locked/offline metadata graphs pass unchanged locks; ESS validates, its six outputs are regenerated, and all documentation links pass after assembly. These are integration checks, not a combined full-suite claim.
+
+Release the already scoped stage 2C source owners to the OAuth implementor in its existing managed checkout after coordinator fast-forward. Implement the source/declaration/config/schema-4 and actual acquisition/runtime/trusted-client work recorded in stage2-plan.md and stage2c-plan-supplement.md, using the now-completed private refresh adapter instead of repeating that old missing-seam refactor. Preserve all 12 rate adversary file preimages and all original custody/session/refresh cases. Shared-file tests are additive only. Existing Connection v1 and Operation v1/v2 bundle bytes remain frozen; no Design 22 Operation v3 or Connection v2 runtime work is assigned.
+
+The same receiver-owned binding gate must serialize acquisition, coherent reads, refresh and operation dispatch. Install real current-authority/clock receivers and one dedicated FileStore instance; use the FULL journal before preparing credentials, retire/join acquisition tasks before claiming completion, and retain guarded uncertainty and original timing through recovery. Wrap actual refresh egress with the fixed original remaining budget; do not fake a session or assert rollback restored a rotated remote token. Remove the temporary private-module dead-code expectation as actual backend calls land. Keep production/development custody refusals, exact preconfigured target selection, observed token-info scope/client evidence, private instruction delivery, one-shot limits and no operation replay.
+
+AEP, ESS models/projections, Git, worktree lifecycle, source publication, installation and live provider/operator actions remain coordinator-owned. The implementor may change only current machine-scoped source/dependency/provider/schema/config/document paths required by this stage, preserving existing versions/checksums and acquiring any evidenced additional exact path before writing it. Schema 3 source publication remains a prerequisite for later schema 4 writer publication, not for isolated implementation. The held multi-credential unit supplies no source or authorization.
+
+Retain actual deciding failures through runnable baseline/scaffold callers, then complete affected suites and strict checks before the whole-OAuth independent review. Missing symbols/fixture/compiler errors are separate evidence. Start with source and test preparation; acquire the coordinator's build slot before Cargo compilation because the shared disk reserve is narrow and schema 3 publication gates are also queued. Use jobs 1, one target at a time and the strict 20 GiB floor. Freeze complete raw/portable stage2c-* reports, source inventory and command/results outside targets; no operational success or completed story is claimed until composed behavior and whole-unit review/gates establish it.
