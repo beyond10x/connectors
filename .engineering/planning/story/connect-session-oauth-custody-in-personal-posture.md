@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:connect-session-oauth-custody-in-personal-posture
 kind: story
-status: proposed
+status: active
 title: Decide the connect-session ↔ OAuth-callback custody chain in personal posture
 tags:
 - ready
@@ -13,33 +13,275 @@ refs:
 relations:
 - derived_from: epic:carried-constraints
 scope:
-- confidence: cited
+- confidence: inferred
+  path: Cargo.lock
+- confidence: inferred
+  path: catalog/airtable.catalog.json
+- confidence: inferred
+  path: catalog/alertmanager.catalog.json
+- confidence: inferred
+  path: catalog/algolia.catalog.json
+- confidence: inferred
+  path: catalog/anthropic.catalog.json
+- confidence: inferred
+  path: catalog/argocd.catalog.json
+- confidence: inferred
+  path: catalog/asana.catalog.json
+- confidence: inferred
+  path: catalog/asterisk.catalog.json
+- confidence: inferred
+  path: catalog/b10x.catalog.json
+- confidence: inferred
+  path: catalog/babelforce.catalog.json
+- confidence: inferred
+  path: catalog/bitbucket.catalog.json
+- confidence: inferred
+  path: catalog/box.catalog.json
+- confidence: inferred
+  path: catalog/calendly.catalog.json
+- confidence: inferred
+  path: catalog/claude-code.catalog.json
+- confidence: inferred
+  path: catalog/clickup.catalog.json
+- confidence: inferred
+  path: catalog/cloudflare.catalog.json
+- confidence: inferred
+  path: catalog/confluence.catalog.json
+- confidence: inferred
+  path: catalog/connector-document-v4.schema.json
+- confidence: inferred
+  path: catalog/contentful.catalog.json
+- confidence: inferred
+  path: catalog/datadog.catalog.json
+- confidence: inferred
+  path: catalog/discord.catalog.json
+- confidence: inferred
+  path: catalog/docusign.catalog.json
+- confidence: inferred
+  path: catalog/dropbox.catalog.json
+- confidence: inferred
+  path: catalog/figma.catalog.json
+- confidence: inferred
+  path: catalog/fly.catalog.json
+- confidence: inferred
+  path: catalog/freshdesk.catalog.json
+- confidence: inferred
+  path: catalog/front.catalog.json
+- confidence: inferred
+  path: catalog/github.catalog.json
+- confidence: inferred
+  path: catalog/gitlab.catalog.json
+- confidence: inferred
+  path: catalog/google.catalog.json
+- confidence: inferred
+  path: catalog/grafana.catalog.json
+- confidence: inferred
+  path: catalog/hubspot.catalog.json
+- confidence: inferred
+  path: catalog/intercom.catalog.json
+- confidence: inferred
+  path: catalog/jira.catalog.json
+- confidence: inferred
+  path: catalog/klaviyo.catalog.json
+- confidence: inferred
+  path: catalog/launchdarkly.catalog.json
+- confidence: inferred
+  path: catalog/loki.catalog.json
+- confidence: inferred
+  path: catalog/mailchimp.catalog.json
+- confidence: inferred
+  path: catalog/microsoft_graph.catalog.json
+- confidence: inferred
+  path: catalog/miro.catalog.json
+- confidence: inferred
+  path: catalog/mysql.catalog.json
+- confidence: inferred
+  path: catalog/newrelic.catalog.json
+- confidence: inferred
+  path: catalog/notion.catalog.json
+- confidence: inferred
+  path: catalog/okta.catalog.json
+- confidence: inferred
+  path: catalog/openai.catalog.json
+- confidence: inferred
+  path: catalog/openrouter.catalog.json
+- confidence: inferred
+  path: catalog/pagerduty.catalog.json
+- confidence: inferred
+  path: catalog/postgresql.catalog.json
+- confidence: inferred
+  path: catalog/postmark.catalog.json
+- confidence: inferred
+  path: catalog/prometheus.catalog.json
+- confidence: inferred
+  path: catalog/resend.catalog.json
+- confidence: inferred
+  path: catalog/runpod.catalog.json
+- confidence: inferred
+  path: catalog/salesforce.catalog.json
+- confidence: inferred
+  path: catalog/sendgrid.catalog.json
+- confidence: inferred
+  path: catalog/sentry.catalog.json
+- confidence: inferred
+  path: catalog/shopify.catalog.json
+- confidence: inferred
+  path: catalog/slack.catalog.json
+- confidence: inferred
+  path: catalog/statuspage.catalog.json
+- confidence: inferred
+  path: catalog/stripe.catalog.json
+- confidence: inferred
+  path: catalog/supabase.catalog.json
+- confidence: inferred
+  path: catalog/trello.catalog.json
+- confidence: inferred
+  path: catalog/twilio.catalog.json
+- confidence: inferred
+  path: catalog/typeform.catalog.json
+- confidence: inferred
+  path: catalog/vercel.catalog.json
+- confidence: inferred
+  path: catalog/webflow.catalog.json
+- confidence: inferred
+  path: catalog/zendesk.catalog.json
+- confidence: inferred
+  path: catalog/zoom.catalog.json
+- confidence: inferred
+  path: connectors.lock
+- confidence: inferred
   path: crates/catalog-build/src/document.rs
-- confidence: cited
+- confidence: inferred
+  path: crates/catalog-build/src/document_schema.rs
+- confidence: inferred
+  path: crates/catalog-build/src/document_tests.rs
+- confidence: inferred
+  path: crates/catalog-reader/catalog.pack
+- confidence: inferred
+  path: crates/catalog-reader/src/lib.rs
+- confidence: inferred
+  path: crates/catalog-reader/tests/main/pack.rs
+- confidence: inferred
   path: crates/catalog/src/lib.rs
-- confidence: cited
+- confidence: inferred
   path: crates/catalog/src/table.rs
 - confidence: inferred
   path: crates/catalog/tests/main/consumer_api.rs
 - confidence: inferred
+  path: crates/connect-session-transport/Cargo.toml
+- confidence: inferred
+  path: crates/connect-session-transport/src/lib.rs
+- confidence: inferred
+  path: crates/connect-session-transport/src/oauth.rs
+- confidence: inferred
+  path: crates/connect-session-transport/src/oauth_tests.rs
+- confidence: inferred
+  path: crates/connector-oauth/src/device.rs
+- confidence: inferred
+  path: crates/connector-oauth/src/lib.rs
+- confidence: inferred
+  path: crates/connector-oauth/src/token.rs
+- confidence: inferred
   path: crates/connector-spec/schema/provider-toml.schema.json
-- confidence: cited
+- confidence: inferred
   path: crates/connector-spec/src/auth.rs
 - confidence: inferred
   path: crates/connector-spec/src/provider/auth_validation.rs
 - confidence: inferred
+  path: crates/connector-spec/src/provider/schema_sync.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/main.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/main/ir_roundtrip.rs
+- confidence: inferred
   path: crates/connector-spec/tests/main/oauth2_acquisition.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/main/oauth_token_endpoint.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/main/personal_oauth.rs
+- confidence: inferred
+  path: crates/connector-spec/tests/main/provider_schema.rs
+- confidence: inferred
+  path: crates/connectors-cli/Cargo.lock
+- confidence: inferred
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/cli_surface.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/one_shot_operations.rs
+- confidence: inferred
+  path: crates/connectors-client/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-client/src/model.rs
+- confidence: inferred
+  path: crates/connectors-config/examples/gitlab-personal-oauth.example.toml
+- confidence: inferred
+  path: crates/connectors-config/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-config/src/personal.rs
+- confidence: inferred
+  path: crates/connectors-console/Cargo.lock
+- confidence: inferred
+  path: crates/connectors-console/src/connect.rs
+- confidence: inferred
+  path: crates/connectors-console/src/doctor.rs
+- confidence: inferred
+  path: crates/connectors-console/src/envelope.rs
+- confidence: inferred
+  path: crates/connectors-console/tests/personal_oauth.rs
+- confidence: inferred
+  path: crates/connectors-runtime/Cargo.lock
+- confidence: inferred
+  path: crates/connectors-runtime/src/composition.rs
+- confidence: inferred
+  path: crates/connectors-runtime/src/registry.rs
+- confidence: inferred
+  path: crates/connectors-runtime/src/registry_claims_tests.rs
+- confidence: inferred
+  path: crates/connectors-runtime/tests/one_shot_runtime.rs
+- confidence: inferred
+  path: crates/connectors-runtime/tests/personal_oauth.rs
+- confidence: inferred
+  path: crates/integration-catalog/Cargo.toml
+- confidence: inferred
+  path: crates/integration-catalog/src/custody.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/custody_tests.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/hosted.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/lib.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/oauth.rs
+- confidence: inferred
+  path: crates/integration-catalog/src/oauth_tests.rs
+- confidence: inferred
+  path: crates/protocol/src/connection.rs
+- confidence: inferred
+  path: crates/server/src/hosted/tests/mcp.rs
+- confidence: inferred
+  path: crates/service/src/connect_session.rs
 - confidence: cited
   path: docs/design/07-credential-custody-topologies.md
 - confidence: inferred
   path: docs/design/21-personal-oauth-callback-custody.md
+- confidence: inferred
+  path: ess/generated/clap
+- confidence: inferred
+  path: ess/system/domains/catalog.yaml
+- confidence: inferred
+  path: ess/system/domains/connection.yaml
+- confidence: inferred
+  path: ess/system/domains/deployment.yaml
+- confidence: inferred
+  path: json-schemas.toml
 - confidence: inferred
   path: providers/gitlab.toml
 - confidence: inferred
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 33
+revision: 36
 ---
 ## Acceptance
 
@@ -125,3 +367,9 @@ Would collide with any unit editing these files; directory entries require an ad
 ## Execution queue
 
 CLI execution queue 2026-09-06: 9 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
+
+## Personal OAuth implementation decision and staged ownership
+
+Design21 and sixteen additive ESS value types record the concrete development-scoped GitLab PKCE/device custody decision. Complete ESS0.18.0 validation reports10files valid; existing Connection/ConnectSession entities and lifecycles remain unchanged. Dedicated explicitly selected DevelopmentFile uses PreparedSecretStore with matching reads/writes and truthful unsealed readiness; it does not claim production custody. Legacy keyring credentials are unchanged. Provider facts are source-grounded; Slack/Jira remain measured compatibility gaps, not invented support.
+
+Coordinator authorizes stage1 pure connector-oauth lib/token/device helpers and connect-session-transport lib/manifest/newoauth modules only. Stage1 has no provider/spec/catalog/runtime/CLI owner and no operator/provider I/O. Per-tree metadata-only locks may refresh after a necessary dependency; generated schema/pack/ESS and all AEP are coordinator-owned. Full operational stage follows rate source handoff. OAuth schema4 needs its own Atlas migration decision extension before canonical implementation. No frozen Connection wire change, implicit Connection creation authority, or model-tool URL disclosure is authorized.
