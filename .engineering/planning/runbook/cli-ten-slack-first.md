@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 48
+revision: 49
 ---
 ## Authorization and objective
 
@@ -3492,3 +3492,9 @@ OAuth is integrated at6c0af27fd65fa69ef8b16c60146fc6670f8c1a16 after its final o
 Auth revision69 releases the verified31/21disjoint implementation split on the existing frozen protocol/service interfaces. Runtime/server stays in wt-78f189927231 with private target /dev/shm/b10x-cli-wave-wt-78f189927231-urhrmq5y/runtime-target,12GiBcap, scratch auth-as-tool-result/stage2-runtime-implementation and TMPDIR under the assigned coordinator scratch at auth-runtime-tmp. Client/console/CLI is in new managed wt-38354a193753, branch impl/auth-client-remediation-resumed, with its own ordinary root/console/CLI targets under aggregate8GiBcap, scratch auth-as-tool-result/stage2-client-implementation and separate auth-client-tmp. The only serial source handoff is the runtime-owned actual one-shot result API before the client-side CLI branch. One compiling slot and the12GiB/8GiB/16GiB reserves remain in force. Original OAuth targets/evidence are retained, with no cleanup delegated.
 
 Current clean Atlas authority is managed wt-c0c0df82001d atb89e5b835b384965818eccf0703c8a548ebdbe47; AGENTS, bot wrappers, Rust sources and fence machinery are unchanged. Local draft reconciliation8c9172ca retains both parents and imports314published events viaAEP, then renumbers the four proposed Connector migrations0042–0045. The full Atlas fence finished18:53:36Z with149Rust tests and catalog/livePages/projection/Markdown/brand green, retaining the same three external failures: AgentIDE's unsupported v4 collector, primary Website's Docs System pin and Widgets' missing Serves. Exit1 and all raw output remain under coordinator scratch atlas-b89-fence. No global-green or publication claim is made. Its own target peaked523,005,952bytes with no resource interruption and is retained. Root has released that compiling slot for the upcoming auth deciding cases.
+
+## Current published Atlas proposal references — 2026-09-06
+
+Atlas draft PR23 was read back OPEN and draft at exactb95b84c8fdae634447e57bd8eafea5871f8ce46f, a normal fast-forward of the correct plan/connector-cli-migrations-resumed branch. The earlier checked unsuffixed branch was an older separate branch, not an advancement of this PR. Current accepted mainb89e5b83 allocated0041 to Eventlog. This wave's proposed migrations are now0042rate v2,0043schema3,0044OAuth schema4 and0045auth Operationv3/Connectionv2. Design22 appends that current mapping while retaining all pinned historical sections. Architecture acceptance, consumer adoption, Eventlog conversion and release are not claimed.
+
+The full Atlas source fence at8c9172ca passed149Rust cases and repository-owned catalog/livePages/projection/Markdown/brand checks, with the same three external failures retained. A mutable verification-report projection later exposed one checkout-local prefix in the captured refusal; its first failed Markdown output, initial report commit/event, raw logs and seal remain preserved. AEP body corrected only that presentation prefix and appended the explicit erratum. The corrected123artifact AEP validation and219file Markdown check pass; no source test was repeated. The exact published-tip Gate run34054300291 is in progress, without a CI-success claim. Auth source implementation remains in the two assigned trees at the common95fad7c7handoff.
