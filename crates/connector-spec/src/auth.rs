@@ -381,7 +381,11 @@ pub struct OAuthRedirect {
 #[serde(deny_unknown_fields)]
 pub struct OAuth2Spec {
     /// Explicit personal admissions; the legacy public-client flag never supplies a default.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_personal_flows",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub personal_flows: Vec<PersonalOAuthAdmission>,
     /// The declared endpoint name whose base URL the paths below resolve against — its host
     /// allow-list is what admits the token exchange through flux's egress gate.
@@ -459,6 +463,22 @@ pub struct OAuth2Spec {
     /// axis, independent of grant, placement and subject.
     #[serde(default, skip_serializing_if = "is_false")]
     pub public_client: bool,
+}
+
+// Serde applies the field default only on omission, so an explicit empty list stays a refusal.
+fn deserialize_personal_flows<'de, D>(
+    deserializer: D,
+) -> Result<Vec<PersonalOAuthAdmission>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let flows = Vec::<PersonalOAuthAdmission>::deserialize(deserializer)?;
+    if flows.is_empty() {
+        return Err(serde::de::Error::custom(
+            "personal_flows must not be empty when supplied",
+        ));
+    }
+    Ok(flows)
 }
 
 impl OAuth2Spec {
