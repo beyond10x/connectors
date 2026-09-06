@@ -63,6 +63,29 @@ types:
       - name: observation_endpoint
         type: connectors.catalog.OAuthEndpoint
 
+  # Private pre-egress marker, design 21 (2026-09-06). Stored beside the custody
+  # journal in its existing FULL SQLite store; it is not a public protocol value.
+  - name: connectors.deployment.OAuthRefreshAttempt
+    kind: struct
+    fields:
+      - name: version
+        type: Integer
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: binding_sha256
+        type: List<Integer>
+      - name: previous_generation
+        type: Integer
+
+  # UNMAPPED: marker version exactly 1, exactly 32 octets in binding_sha256, key
+  # oauth.refresh.v1.<64 lowercase hex SHA256 of canonical custody Identity>,
+  # bounded closed decoding and checked generation arithmetic. Runtime owns the
+  # canonical identity digest and FULL confirmation before any refresh egress.
+  # UNMAPPED: recovery clears this marker only after a confirmed newer same-binding
+  # publication passes current authority and evidence checks. Preparing abort does
+  # not prove remote rollback; unknown marker reads/writes/deletes stay unavailable.
+  # These runtime obligations do not change the custody journal envelope or lifecycle.
+
   # UNMAPPED: secret custody, no Debug/serialization of private token material, positive
   # bounded TTL/generation/time arithmetic, exact configured URI/Host/Origin validation,
   # keyring/file routing, and production refusal for DevelopmentFile. Deployment policy

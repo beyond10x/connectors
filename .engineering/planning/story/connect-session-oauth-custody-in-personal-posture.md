@@ -185,6 +185,8 @@ scope:
   path: crates/connector-oauth/src/lib.rs
 - confidence: inferred
   path: crates/connector-oauth/src/token.rs
+- confidence: cited
+  path: crates/connector-resolve/src/document.rs
 - confidence: inferred
   path: crates/connector-spec/schema/provider-toml.schema.json
 - confidence: inferred
@@ -307,7 +309,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 54
+revision: 56
 ---
 ## Acceptance
 
@@ -495,3 +497,11 @@ The stage 2C implementor identified crates/connector-spec/src/lib.rs as the expl
 ## Typed registration scope ceiling closure — 2026-09-06
 
 Design 21 names allowed scopes among deployment-owned registration values at its deployment registration paragraph. The proposed source PersonalOAuthRegistration correctly requires allowed_scopes, but the existing ESS struct omitted it. Add the required field as List<connectors.deployment.Scope> in the already scoped deployment domain, using the existing Scope type. This records the deployment ceiling; it does not grant scopes or replace observed token-info evidence and the existing Connection grant. ESS validates and its six deterministic CLI outputs are regenerated with report JSON retained outside source. Runtime/config admission, scope grammar and authorization enforcement remain implementation/test obligations.
+
+## Durable pre-egress refresh marker and schema fixture closure — 2026-09-06
+
+The stage 2C implementor identified a recovery gap before credential prepare: a provider may rotate the refresh credential before token-info succeeds, while the custody journal still contains only the old publication. Record the private OAuthRefreshAttempt value in the already scoped deployment domain and the dated Design 21 decision before implementing persistence. Its version, exact Connection reference, canonical binding SHA256 and previous generation contain no secret or provider response. The existing FULL SQLite path must confirm this marker before refresh egress; recovery keeps the old generation unavailable until a newer coherent publication for the same binding passes current authority and evidence checks. Unknown marker writes permit zero egress; unknown reads or deletion remain unavailable. This does not change the custody journal envelope, public protocols, Connection lifecycle, or the single FileStore instance.
+
+Add crates/connector-resolve/src/document.rs to this story's cited scope only for four test-fixture schema-version literals at the current lines 754, 811, 847 and 873. They describe the currently emitted canonical document and may use schema 4 or the supported-version constant after the writer changes. Preserve all production resolver bytes and every existing assertion. Also permit the already scoped crates/catalog-build/tests/main/catalog_invariants.rs active planned-schema lookup at the current line 687 to follow schema 4/the current constant. This is an explicit narrow exception to shared tests' additive-only rule. Preserve its full original preimage and all existing assertions; the frozen schema 3 rate adversary cases at current lines 2530, 2568 and 2721 remain byte-exact, with separate schema 4 coverage added.
+
+The marker's version/key/digest shape, bounded decoding, FULL durability, authority checks and recovery behavior remain explicit implementation and adversarial-test obligations, not claims established by ESS. The current one-workspace compilation slot and prospective 16 GiB reserve apply. Whole-unit OAuth review and publication remain pending.
