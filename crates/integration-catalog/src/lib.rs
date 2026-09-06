@@ -617,6 +617,12 @@ impl Inner {
 
 #[async_trait]
 impl ConnectorBackend for CatalogBackend {
+    fn supports_ephemeral_invocation(&self, request: &protocol::operation::InvokeRequest) -> bool {
+        catalog::operation(catalog::OperationKey::id(&request.operation_ref)).is_some_and(
+            |operation| operation.interaction_shape == catalog::InteractionShape::Unary,
+        )
+    }
+
     async fn ready(&self) -> Result<(), service::BackendReadinessError> {
         Ok(())
     }

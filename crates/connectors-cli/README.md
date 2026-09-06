@@ -1,4 +1,4 @@
-# `connectors` personal-local daemon
+# `connectors` personal-local commands and daemon
 
 This nested workspace builds a thin product frontend without feature-unifying the runtime closure
 into the deterministic catalog compiler. Reusable wire behavior lives in `connectors-client` and
@@ -32,6 +32,29 @@ stale socket is removed only when it is an owner-owned Unix socket.
 
 The deployment file must be a real owner-owned file and cannot be writable by group or other. Its
 size and field set are bounded. It carries references and routes but no credential value.
+
+## Run a bounded command without a daemon
+
+`operation search`, `operation describe`, bounded `operation invoke`, and Connection metadata reads
+compose the configured personal runtime for one command when `connectors.sock` is absent. The normal
+config and state defaults work, as do explicit `--config` and `--state-root` paths. A saved hosted login
+does not change this local target; `--target hosted` selects the hosted service explicitly.
+
+Describe an operation, then use its returned `description_ref` and selected `connection_ref` in a
+separate invocation. Both commands use the same catalog, owner, credential custody and Grant checks.
+They publish no control socket and leave no daemon or background child behind. Concurrent commands
+refuse while another process owns the state root; rerun after that command finishes, or start
+`connectors serve local` for concurrent clients.
+
+An existing daemon is used directly. An unsafe or stale socket, invalid response, reset connection,
+or uncertain invocation outcome never causes a local retry. Restart a stale daemon explicitly with
+`connectors serve local --config <file> --state-root <dir>`.
+
+All event commands, SIP/browser session operations, Connection activation, materialization, and
+Connect Session flows require that persistent daemon. Kubernetes activated Connections and workload
+pagination cursors also belong to its process generation. These commands refuse with the daemon
+command instead of returning a handle that dies on exit. `connectors inspect doctor` names this
+distinction.
 
 ## Administer a hosted Integration
 
