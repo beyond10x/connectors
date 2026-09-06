@@ -905,6 +905,13 @@ impl ConnectorBackend for KubernetesLocalBackend {
         WorkloadSurface::owns(request)
     }
 
+    fn supports_ephemeral_invocation(&self, request: &InvokeRequest) -> bool {
+        // Deployment pages carry a process-owned cursor and therefore require the daemon even
+        // though their provider exchange is unary. Other reviewed members have no continuation.
+        request.operation_ref != WORKLOAD_OPERATION
+            && local_operations().contains(&request.operation_ref.as_str())
+    }
+
     fn owns_connection(&self, request: &ConnectionRequest) -> bool {
         match request {
             ConnectionRequest::CandidateSearch(request) => request.integration_ref == KUBERNETES,

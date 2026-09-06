@@ -541,6 +541,13 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         false
     }
 
+    /// Whether this invocation finishes without a process-owned session, stream or subscription.
+    /// This is lifetime metadata only: all ordinary ownership, Grant and approval gates still run.
+    /// An embedding or new adapter that has not established this property requires a daemon.
+    fn supports_ephemeral_invocation(&self, _request: &protocol::operation::InvokeRequest) -> bool {
+        false
+    }
+
     fn owns_connection(&self, _request: &ConnectionRequest) -> bool {
         false
     }

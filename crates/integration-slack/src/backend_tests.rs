@@ -317,6 +317,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ephemeral_open_never_starts_a_socket_mode_supervisor() {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = SlackBackend::open_without_supervision(
+            owner(),
+            policy(),
+            root.path(),
+            Arc::new(MemoryStore::new()),
+            test_egress(),
+        )
+        .await
+        .unwrap();
+        backend.inner.start_supervisor(StoredConnection {
+            connection_ref: "connection:fixture".to_owned(),
+            instance_id: "fixture".to_owned(),
+            label: "fixture".to_owned(),
+            grant_ref: "grant:fixture".to_owned(),
+            initiation: InitiationConfig::Provider,
+            allowed_events: vec!["app_mention".to_owned()],
+            owner_subject: String::new(),
+            team_id: "T012345".to_owned(),
+            profile: SlackConnectionProfile::OrgBot,
+            external_subject_id: "U012345".to_owned(),
+            scopes: vec!["app_mentions:read".to_owned()],
+            purpose: String::new(),
+            carries_operations: true,
+        });
+        assert!(lock(&backend.inner.tasks).is_empty());
+        assert!(lock(&backend.inner.supervisors_started).is_empty());
+        for operation in SLACK_OPERATIONS {
+            assert!(backend.supports_ephemeral_invocation(&InvokeRequest {
+                operation_ref: operation.to_owned(),
+                connection_ref: "connection:fixture".to_owned(),
+                description_ref: "description:fixture".to_owned(),
+                input: serde_json::json!({}),
+                approval_evidence_ref: None,
+            }));
+        }
+        backend.shutdown().await;
+        assert!(lock(&backend.inner.tasks).is_empty());
+    }
+
+    #[tokio::test]
     async fn organization_bot_is_admitted_for_reads_without_an_event_channel() {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
