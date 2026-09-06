@@ -165,16 +165,17 @@ pub async fn run_query(
     source: &dyn CredentialSource,
     input: &SqlQueryInput,
 ) -> Result<QueryResultPage, SqlDriverError> {
-    let admitted =
-        admit_read_statement(config.engine, &input.statement).map_err(|refusal| {
-            SqlDriverError::InvalidInput {
-                reason: refusal.reason,
-            }
-        })?;
+    let admitted = admit_read_statement(config.engine, &input.statement).map_err(|refusal| {
+        SqlDriverError::InvalidInput {
+            reason: refusal.reason,
+        }
+    })?;
     let max_rows = effective_max_rows(input.max_rows)?;
     let secret = resolve(config, source)?;
     match config.engine {
-        SqlEngine::Postgres => postgres::run_query(config, &secret, admitted.text(), max_rows).await,
+        SqlEngine::Postgres => {
+            postgres::run_query(config, &secret, admitted.text(), max_rows).await
+        }
         SqlEngine::MySql => mysql::run_query(config, &secret, admitted.text(), max_rows).await,
     }
 }
