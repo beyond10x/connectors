@@ -343,3 +343,100 @@ async fn auth_stage2_bound_presenter_clears_written_inode_on_success_expiry_and_
         daemon.abort();
     }
 }
+
+#[tokio::test]
+async fn auth_adversary_presenter_error_clears_original_inode_after_path_replacement() {
+    use protocol::connection_v2 as v2;
+    use std::os::unix::fs::PermissionsExt as _;
+    use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
+    for replacement in [false, true] {
+        let root = private_root();
+        let path = root.path().join("instructions");
+        let retained = root.path().join("original-inode");
+        let socket = root.path().join("connectors.sock");
+        let listener = tokio::net::UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let instruction_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = instruction_listener.local_addr().unwrap();
+        let human = tokio::spawn(async move {
+            let (mut stream, _) = instruction_listener.accept().await.unwrap();
+            let mut headers = Vec::new();
+            while !headers.ends_with(b"\r\n\r\n") {
+                headers.push(stream.read_u8().await.unwrap());
+                assert!(headers.len() < 8192);
+            }
+            assert!(String::from_utf8(headers)
+                .unwrap()
+                .to_ascii_lowercase()
+                .contains(&format!("x-connect-session: {}", "p".repeat(43))));
+            let body = r#"{"kind":"device_authorization","verification_uri":"https://gitlab.example/oauth/device","verification_uri_complete":null,"user_code":"SYNTHETIC_PRIVATE_INSTRUCTION"}"#;
+            stream.write_all(format!("HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+        });
+        let private_path = path.clone();
+        let old_path = retained.clone();
+        let expected = bound_request().connection_ref;
+        let daemon = tokio::spawn(async move {
+            let deadline = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64
+                + 60_000;
+            let mut methods = Vec::new();
+            for turn in 0..2 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut line = String::new();
+                BufReader::new(&mut stream)
+                    .read_line(&mut line)
+                    .await
+                    .unwrap();
+                let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+                methods.push(request["request"]["method"].as_str().unwrap().to_owned());
+                let response = if turn == 0 {
+                    assert!(
+                        std::fs::read(&private_path).unwrap().is_empty(),
+                        "destination reserved before Start"
+                    );
+                    serde_json::json!({"protocol":v2::CONTRACT,"request_id":request["request_id"],"status":"ok","response":{"result":"remediation_start","value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","connection_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":"pending","resume_state":"pending","expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":"pending","expires_at_unix_ms":deadline,"browser_completion_url":format!("http://{address}/#token={}","p".repeat(43))}}}})
+                } else {
+                    assert!(std::fs::read_to_string(&private_path)
+                        .unwrap()
+                        .contains(PRIVATE));
+                    std::fs::rename(&private_path, &old_path).unwrap();
+                    if replacement {
+                        std::fs::write(&private_path, "retain-replacement").unwrap();
+                    }
+                    serde_json::json!({"protocol":v2::CONTRACT,"request_id":request["request_id"],"status":"error","error":{"code":"unavailable","message":PRIVATE,"retriable":false}})
+                };
+                let bytes = serde_json::to_vec(&response).unwrap();
+                v2::decode_response(&bytes).unwrap();
+                stream.write_all(&bytes).await.unwrap();
+                stream.write_all(b"\n").await.unwrap();
+            }
+            methods
+        });
+        let result = connectors_console::remediation::run(
+            &bound_config(),
+            root.path(),
+            bound_request(),
+            Some(&path),
+        )
+        .await;
+        let methods = daemon.await.unwrap();
+        human.await.unwrap();
+        assert_eq!(methods, ["remediation_start", "remediation_status"]);
+        assert!(!result.unwrap_err().to_string().contains(PRIVATE));
+        assert_eq!(
+            std::fs::metadata(&retained).unwrap().len(),
+            0,
+            "the original private inode is cleared even when its pathname changed"
+        );
+        if replacement {
+            assert_eq!(
+                std::fs::read_to_string(&path).unwrap(),
+                "retain-replacement"
+            );
+        } else {
+            assert!(!path.exists());
+        }
+    }
+}

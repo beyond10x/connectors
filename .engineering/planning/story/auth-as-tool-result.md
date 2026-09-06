@@ -229,7 +229,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 43
+revision: 44
 ---
 ## Acceptance
 
@@ -364,3 +364,12 @@ The coordinator routes all three rows to their original source owners. This orig
 - Bound setup reads stdin before rejecting regular-file/symlink socket objects. The actual CLI reproduces the ordering defect and opens no private destination. Move the existing shared socket safety validation ahead of input while retaining later validation and existing protocol behavior.
 
 Runtime/server implementor resumes in its existing managed tree with the review's eight known additive test files. Client/console/CLI implementor receives exact copies of its three affected reviewed test files in its existing managed tree. Each retains its private target and assigned scratch; the coordinator serializes compilers and is the only planning writer. Original execution branches and raw records stay local. Corrected source/test deltas are transferred to the clean publication lineage by verified bytes, never by merging or publishing the old raw planning ancestry.
+
+
+## First correction compatibility completion — 2026-09-07
+
+The server implementor's retained hosted-after execution still exited101 after the narrow typed transport correction: v1 returned503/schema=false, v2 returned503/schema=true, and v3 retained409/schema=true. This is the same first review correction, not another adversary pass. The 503 Operation response schema omits existing v1/v3 response roots; its Connection counterpart statically omits the existing v2 root. Neither omission requires changing a frozen protocol schema.
+
+The coordinator reviewed the exact proposed-docs-503.patch, SHA2568f219e9c3e1cda60a93078c5a4cacfd19c3d58d0a4be7305455bbab2c993b051. Extend the server correction assignment to the already typed crates/server/src/hosted/docs/openapi.json and additive coverage in crates/server/src/hosted/tests/docs.rs. Add only these three existing response references, preserve every old503alternative and the v3-only409schema, and validate each retained unavailable response identity against the served503schema plus the plain error-body control. The Connection omission is a static observation until the added deciding test executes; do not label it an already measured product failure.
+
+Client/CLI owns the compiler while this source/test preparation proceeds. The server owner receives it back explicitly for the retained hosted regression, new served-doc deciding case, full server suite and strict/fmt. All original and first-review test assertions remain intact.

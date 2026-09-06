@@ -87,6 +87,17 @@ async fn project(version: Version, response: Response) -> Response {
         Ok((_, envelope)) => envelope,
         Err(_) => return Response::from_parts(parts, Body::from(bytes)),
     };
+    // Predecessors project authentication needs to neutral Unavailable bodies;
+    // keep their HTTP status aligned with that defined loss.
+    if version != Version::V0Alpha3
+        && parts.status == StatusCode::CONFLICT
+        && envelope
+            .error
+            .as_ref()
+            .is_some_and(|error| error.code == v3::OperationErrorCode::AuthenticationRequired)
+    {
+        parts.status = StatusCode::SERVICE_UNAVAILABLE;
+    }
     match version.encode_response(envelope) {
         Ok(bytes) => {
             parts.headers.remove(header::CONTENT_LENGTH);

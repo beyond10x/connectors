@@ -1286,3 +1286,68 @@ fn authentication_predecessor_artifacts_and_readers_stay_frozen() {
         );
     }
 }
+
+#[test]
+fn auth_adversary_original_vector_bytes_reject_escaped_duplicates_and_padded_overflow() {
+    use protocol::{
+        connection_v2,
+        operation::{self, versions},
+    };
+    let mut reached = 0;
+    for (directory, connection) in [
+        ("contracts/connector-operation/v0alpha3", false),
+        ("contracts/connector-connection/v0alpha2", true),
+    ] {
+        for vector in authentication_vectors(directory)
+            .cases
+            .into_iter()
+            .filter(|v| v.valid)
+        {
+            let request = vector.kind == "request";
+            let relevant = if connection {
+                let side = if request { "request" } else { "response" };
+                let tag = if request { "method" } else { "result" };
+                vector.frame[side][tag]
+                    .as_str()
+                    .is_some_and(|v| v.starts_with("remediation_"))
+            } else {
+                request || vector.frame["error"]["code"] == "authentication_required"
+            };
+            if !relevant {
+                continue;
+            }
+            let accepts = |bytes: &[u8]| match (connection, request) {
+                (true, true) => connection_v2::decode_request(bytes).is_ok(),
+                (true, false) => connection_v2::decode_response(bytes).is_ok(),
+                (false, true) => versions::decode_request(bytes).is_ok(),
+                (false, false) => versions::decode_response(bytes).is_ok(),
+            };
+            let original = serde_json::to_string(&vector.frame).unwrap();
+            assert!(accepts(original.as_bytes()), "{}", vector.name);
+            for (plain, escaped) in [
+                ("protocol", r#"pro\u0074ocol"#),
+                ("request_id", r#"request_\u0069d"#),
+            ] {
+                let value = serde_json::to_string(&vector.frame[plain]).unwrap();
+                let key = format!("\"{plain}\":");
+                let duplicate = original.replacen(&key, &format!("\"{escaped}\":{value},{key}"), 1);
+                assert_ne!(duplicate, original);
+                assert!(!accepts(duplicate.as_bytes()), "{} / {plain}", vector.name);
+            }
+            let maximum = match (connection, request) {
+                (true, true) => connection_v2::MAX_FRAME_BYTES,
+                (true, false) => connection_v2::MAX_RESPONSE_BYTES,
+                (false, true) => operation::MAX_FRAME_BYTES,
+                (false, false) => operation::MAX_RESULT_BYTES,
+            };
+            let mut padded = original.into_bytes();
+            assert!(padded.len() < maximum);
+            padded.resize(maximum, b' ');
+            assert!(accepts(&padded), "exact byte ceiling: {}", vector.name);
+            padded.push(b' ');
+            assert!(!accepts(&padded), "original byte overflow: {}", vector.name);
+            reached += 1;
+        }
+    }
+    assert!(reached >= 10, "actual positive vectors selected: {reached}");
+}

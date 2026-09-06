@@ -687,6 +687,12 @@
                 "schema": {
                   "oneOf": [
                     {
+                      "$ref": "#/components/schemas/operation.v1.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.v3.responseEnvelope"
+                    },
+                    {
                       "$ref": "#/components/schemas/operation.responseEnvelope"
                     },
                     {
@@ -1154,6 +1160,9 @@
               "application/json": {
                 "schema": {
                   "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/connection.v2.response_envelope"
+                    },
                     {
                       "$ref": "#/components/schemas/connection.response_envelope"
                     },
