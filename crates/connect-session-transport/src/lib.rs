@@ -3,6 +3,8 @@
 //! Owner-authenticated Unix and capability-authenticated loopback transports for one-use Connect
 //! Session credential submission.
 
+pub mod oauth;
+
 use std::fs;
 use std::io::Read as _;
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _};

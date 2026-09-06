@@ -622,11 +622,14 @@ name = "connect-session-transport"
 version = "0.6.5"
 dependencies = [
  "base64 0.22.1",
+ "connector-oauth",
  "connector-secrets",
  "rustix",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "url",
  "zeroize",
 ]
 
