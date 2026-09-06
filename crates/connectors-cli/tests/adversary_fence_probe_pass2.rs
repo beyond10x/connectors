@@ -170,7 +170,12 @@ fn requests_built_by(body: &str) -> BTreeSet<String> {
 
 /// The variants of the `pub enum …Request` of one `crates/protocol/src` module.
 fn request_variants_of(module: &str) -> BTreeSet<String> {
-    let source = read(&repository_root().join(format!("crates/protocol/src/{module}.rs")));
+    let owner = if module == "operation" {
+        "operation/legacy"
+    } else {
+        module
+    };
+    let source = read(&repository_root().join(format!("crates/protocol/src/{owner}.rs")));
     let lines: Vec<&str> = source.lines().collect();
     let open = lines
         .iter()

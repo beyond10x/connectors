@@ -757,6 +757,7 @@ mod tests {
                 }),
                 OperationRequest::Describe(request) => {
                     Ok(OperationResult::Describe(OperationDescription {
+                        rate_advice: None,
                         operation_ref: request.operation_ref,
                         title: "backend title is replaced".to_owned(),
                         description: "backend description is replaced".to_owned(),

@@ -91,9 +91,65 @@ fn op(id: &str, auth: Option<Vec<AuthRequirement>>) -> Operation {
         pagination: None,
 
         rate_limit: None,
+        conditional_rate_limits: Vec::new(),
 
         error_envelope: None,
     }
+}
+
+#[test]
+fn rate_stage2_conditional_declarations_are_bounded_without_extending_fixed_rates() {
+    let fixed = connector_spec::RateLimit {
+        requests: 50,
+        per_seconds: 60,
+        bucket: None,
+    };
+    assert_eq!(
+        serde_json::to_value(fixed).unwrap(),
+        json!({"requests":50,"per_seconds":60})
+    );
+    let base = serde_json::to_value(op("fixture", None)).unwrap();
+    assert!(base.get("conditional_rate_limits").is_none());
+    let declaration = json!({"applies_when":"documented category","source_url":"https://docs.example.test/rates","rate":{"requests":50,"per_seconds":60,"basis":"minimum_allowance"}});
+    let mut valid = base.clone();
+    valid["conditional_rate_limits"] = json!([declaration.clone()]);
+    let decoded: Operation = serde_json::from_value(valid.clone()).unwrap();
+    assert_eq!(serde_json::to_value(decoded).unwrap(), valid);
+    for invalid in [
+        json!({"requests":0,"per_seconds":60,"basis":"ceiling"}),
+        json!({"requests":1,"per_seconds":0,"basis":"ceiling"}),
+        json!({"requests":4294967296_u64,"per_seconds":60,"basis":"ceiling"}),
+        json!({"requests":1,"per_seconds":60,"basis":"unknown"}),
+        serde_json::Value::Null,
+    ] {
+        let mut bad = valid.clone();
+        bad["conditional_rate_limits"][0]["rate"] = invalid;
+        assert!(serde_json::from_value::<Operation>(bad).is_err());
+    }
+    for url in [
+        "http://example.test/rates",
+        "https://user:pass@example.test/rates",
+        "https://example.test/rates#fragment",
+        "https://",
+    ] {
+        let mut bad = valid.clone();
+        bad["conditional_rate_limits"][0]["source_url"] = json!(url);
+        assert!(serde_json::from_value::<Operation>(bad).is_err());
+    }
+    for applicability in [String::new(), "x".repeat(4097), "bad\ncategory".to_owned()] {
+        let mut bad = valid.clone();
+        bad["conditional_rate_limits"][0]["applies_when"] = json!(applicability);
+        assert!(serde_json::from_value::<Operation>(bad).is_err());
+    }
+    let mut many = base;
+    many["conditional_rate_limits"] = json!(vec![declaration; 17]);
+    assert!(serde_json::from_value::<Operation>(many).is_err());
+    let mut unknown_rate = valid;
+    unknown_rate["conditional_rate_limits"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("rate");
+    assert!(serde_json::from_value::<Operation>(unknown_rate).is_ok());
 }
 
 fn babelforce() -> Connector {

@@ -60,6 +60,11 @@ pub fn accepted_keys() -> Vec<(&'static str, Vec<String>)> {
         ("param", probe::<Param>()),
         ("pagination", probe::<Pagination>()),
         ("rateLimit", probe::<crate::RateLimit>()),
+        (
+            "conditionalRateLimit",
+            probe::<crate::ConditionalRateLimit>(),
+        ),
+        ("publishedRate", probe::<crate::PublishedRate>()),
         ("errorEnvelope", probe::<crate::ErrorEnvelope>()),
         ("provenance", probe::<Provenance>()),
         ("operationSpecSource", probe::<OperationSpecSource>()),

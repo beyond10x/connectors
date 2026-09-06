@@ -98,6 +98,8 @@ pub mod config;
 pub mod graph;
 pub mod inbound;
 mod ir;
+mod rate_limit;
+pub use rate_limit::{ConditionalRateLimit, PublishedRate, RateLimit, RateLimitBasis};
 pub mod lock;
 pub mod names;
 pub mod openapi;
@@ -138,9 +140,9 @@ pub use ir::{
     Connector, Discovery, DiscoveryDriver, DiscoveryMapping, ErrorEnvelope, HostEffect, HttpMethod,
     Idempotency, ImplementationForm, InteractionShape, JsonSchema, Operation, OperationDirection,
     OperationRequest, OperationSpecSource, Pagination, Param, ParamSet, PlacementRequirement,
-    ProducedCredential, ProtocolDriver, Provenance, RateLimit, RequestSemantics,
-    RequiredCapability, Risk, Role, RouteAdapter, SemanticEffect, Service, Tag,
-    CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY, MIN_REPEATABILITY_CONDITION,
+    ProducedCredential, ProtocolDriver, Provenance, RequestSemantics, RequiredCapability, Risk,
+    Role, RouteAdapter, SemanticEffect, Service, Tag, CREDENTIAL_HANDLE_FIELD, FREE_FORM_BODY,
+    MIN_REPEATABILITY_CONDITION,
 };
 pub use lock::{
     sha256_hex, LockEntry, LockPack, LockSpec, Lockfile, LOCKFILE_NAME, LOCKFILE_VERSION,

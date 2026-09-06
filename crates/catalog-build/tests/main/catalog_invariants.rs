@@ -1750,7 +1750,7 @@ const OPERATION_REQUEST_VARIANTS: &[&str] = &[
 #[test]
 fn a_session_signal_reaches_a_backend_only_through_the_admission_seam() {
     let root = repo_root();
-    let protocol_source = root.join("crates/protocol/src/operation.rs");
+    let protocol_source = root.join("crates/protocol/src/operation/legacy.rs");
     let protocol = std::fs::read_to_string(&protocol_source)
         .unwrap_or_else(|error| panic!("read {}: {error}", protocol_source.display()));
     let declared = operation_request_variants(&protocol);
@@ -2457,4 +2457,61 @@ fn adversary_gitlab_pass1_translation_preserves_composed_constraint_truth_tables
         accepted.len(),
         refused.len()
     );
+}
+
+#[test]
+fn rate_stage2_conditional_history_advice_is_metadata_without_schema_edits() {
+    let (workspace, plan) = full_plan();
+    let documents = documents(&workspace, &plan);
+    let slack = &documents["slack"];
+    let history = slack["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|operation| operation["id"] == "slack-conversations-history")
+        .unwrap();
+    let alternatives = history["conditional_rate_limits"]
+        .as_array()
+        .expect("history must publish explicit conditional alternatives");
+    assert_eq!(alternatives.len(), 3);
+    assert_eq!(
+        alternatives[0]["rate"],
+        json!({"requests":50,"per_seconds":60,"basis":"minimum_allowance"})
+    );
+    assert_eq!(
+        alternatives[1]["rate"],
+        json!({"requests":1,"per_seconds":60,"basis":"ceiling"})
+    );
+    assert!(alternatives[2].get("rate").is_none());
+    assert!(alternatives[0]["applies_when"]
+        .as_str()
+        .unwrap()
+        .contains("cursor"));
+    assert!(alternatives[1]["applies_when"]
+        .as_str()
+        .unwrap()
+        .contains("2025-05-29"));
+    for alternative in alternatives {
+        assert!(alternative["source_url"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://docs.slack.dev/"));
+    }
+    assert!(
+        history.get("rate_limit").is_none(),
+        "no invented universal tier"
+    );
+    let committed: Value =
+        serde_json::from_str(include_str!("../../../../catalog/slack.catalog.json")).unwrap();
+    for operation in slack["operations"].as_array().unwrap() {
+        let original = committed["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|before| before["id"] == operation["id"])
+            .unwrap();
+        assert_eq!(operation["params"], original["params"]);
+        assert_eq!(operation["response_schema"], original["response_schema"]);
+        assert_eq!(operation["contract"], original["contract"]);
+    }
 }

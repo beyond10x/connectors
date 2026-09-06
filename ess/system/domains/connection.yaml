@@ -603,7 +603,7 @@ commands:
           connectors.connection.ObservationMaterialized:
             observation_ref: input.observation_ref
         summary: The observation now has its mediated Connection (crates/integration-kubernetes/src/local.rs:658-668).
-      # `fn materialize` (crates/integration-monitoring/src/backend.rs:1182) refuses in six
+      # `fn materialize` (crates/integration-monitoring/src/backend.rs:1183) refuses in six
       # places. Three of them are refusals a caller can be told apart and are declared here:
       #   :1188      `connection_not_found` — no observation under this reference;
       #   :1189-1194 `Conflict`, "discovery observation is no longer current";

@@ -74,6 +74,7 @@ impl IdentityVerifier for McpVerifier {
 /// proves the seam flow: it refuses any lease other than the one its describe served, and
 /// optionally answers `stale_authority` a configured number of times first.
 struct McpBackend {
+    terminal_refusal: Option<Value>,
     /// Describe the operation as `Mutating` + `Required` instead of the read shape.
     demand_approval: bool,
     /// How many leading invokes answer `stale_authority` despite a fresh lease.
@@ -91,6 +92,7 @@ struct McpBackend {
 impl Default for McpBackend {
     fn default() -> Self {
         Self {
+            terminal_refusal: None,
             demand_approval: false,
             stale_invokes: AtomicUsize::new(0),
             describes: AtomicUsize::new(0),
@@ -161,6 +163,7 @@ impl ConnectorBackend for McpBackend {
                 self.describes.fetch_add(1, Ordering::SeqCst);
                 let (effect, approval) = self.posture();
                 Ok(OperationResult::Describe(OperationDescription {
+                    rate_advice: None,
                     operation_ref: K8S_OPERATION.to_owned(),
                     title: "Read one deployment's status".to_owned(),
                     description: "Rollout status for one deployment.".to_owned(),
@@ -179,6 +182,11 @@ impl ConnectorBackend for McpBackend {
             )),
             OperationRequest::Invoke(request) => {
                 self.invokes.fetch_add(1, Ordering::SeqCst);
+                if let Some(refusal) = &self.terminal_refusal {
+                    return Err(
+                        serde_json::from_value(refusal.clone()).expect("current operation error")
+                    );
+                }
                 assert_eq!(request.operation_ref, K8S_OPERATION);
                 assert_eq!(request.connection_ref, K8S_CONNECTION);
                 if request.description_ref != OPERATION_LEASE {
@@ -834,6 +842,35 @@ async fn a_stale_authority_refusal_is_retried_exactly_once_with_a_fresh_lease() 
         2,
         "stale authority is retried exactly once"
     );
+}
+
+#[tokio::test]
+async fn rate_stage2_mcp_preserves_refusal_details_without_entering_stale_retry() {
+    for error in [
+        json!({"code":"rate_limited","message":"provider refused request","retriable":true,"retry_after_seconds":30}),
+        json!({"code":"rate_limited","message":"provider refused request","retriable":true}),
+        json!({"code":"protocol","message":"invalid protocol","retriable":false}),
+        json!({"code":"outcome_unknown","message":"provider outcome is unknown","retriable":false}),
+    ] {
+        let backend = Arc::new(McpBackend {
+            terminal_refusal: Some(error.clone()),
+            ..Default::default()
+        });
+        let result = call_tool(
+            app(backend.clone(), HostedAuthority::unbound()),
+            "sre-token",
+            "tool_invoke",
+            json!({"name":"k8s_deployment_status","args":{"namespace":"dev","name":"web"}}),
+        )
+        .await;
+        assert_eq!(result["isError"], true);
+        assert_eq!(result["structuredContent"], error);
+        assert_eq!(
+            backend.invokes.load(Ordering::SeqCst),
+            1,
+            "no invoke resend for {error}"
+        );
+    }
 }
 
 #[tokio::test]

@@ -1229,6 +1229,7 @@ impl GitlabInner {
             return Err(operation_not_found());
         }
         Ok(OperationResult::Describe(OperationDescription {
+            rate_advice: None,
             operation_ref: operation_ref.to_owned(),
             title: operation_ref.replace('-', " "),
             description: operation.contract_description().to_owned(),

@@ -22,6 +22,7 @@ fn described(operation_ref: String) -> OperationDescription {
         _ => (EffectClass::Mutating, ApprovalPosture::Required),
     };
     OperationDescription {
+        rate_advice: None,
         operation_ref,
         title: "test".to_owned(),
         description: "test".to_owned(),

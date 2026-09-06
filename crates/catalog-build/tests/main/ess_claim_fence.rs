@@ -361,7 +361,7 @@ fn every_declared_wire_name_is_a_method_the_protocol_accepts() {
     let root = workspace_root();
 
     let connection = read(&root, "crates/protocol/src/connection.rs");
-    let operation = read(&root, "crates/protocol/src/operation.rs");
+    let operation = read(&root, "crates/protocol/src/operation/legacy.rs");
     let mut accepted = variants(&connection, "ConnectionRequest")
         .iter()
         .chain(variants(&operation, "OperationRequest").iter())

@@ -1203,6 +1203,7 @@
         },
         "pagination": { "$ref": "#/$defs/pagination" },
         "rate_limit": { "$ref": "#/$defs/rateLimit" },
+        "conditional_rate_limits": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/conditionalRateLimit" } },
         "error_envelope": { "$ref": "#/$defs/errorEnvelope" },
         "params": {
           "type": "array",
@@ -1663,6 +1664,7 @@
         },
         "pagination": { "$ref": "#/$defs/pagination" },
         "rate_limit": { "$ref": "#/$defs/rateLimit" },
+        "conditional_rate_limits": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/conditionalRateLimit" } },
         "error_envelope": { "$ref": "#/$defs/errorEnvelope" }
       },
       "allOf": [
@@ -1824,6 +1826,27 @@
           "type": "string",
           "description": "The throttle bucket name. Omitted, codegen derives one from the connector and operation ids."
         }
+      }
+    },
+
+    "publishedRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "per_seconds", "basis"],
+      "properties": {
+        "requests": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "per_seconds": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "basis": { "enum": ["minimum_allowance", "ceiling"] }
+      }
+    },
+    "conditionalRateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applies_when", "source_url"],
+      "properties": {
+        "applies_when": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$" },
+        "source_url": { "type": "string", "minLength": 1, "maxLength": 2048, "format": "uri", "pattern": "^https://[^/?#@\\s]+(?:[/?][^#\\s]*)?$" },
+        "rate": { "$ref": "#/$defs/publishedRate" }
       }
     },
 

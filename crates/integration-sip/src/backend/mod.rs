@@ -349,6 +349,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             .operation(SIP_DIAL_OPERATION)
             .expect("validated canonical operation");
         Ok(OperationResult::Describe(OperationDescription {
+            rate_advice: None,
             operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
             title: "Dial a SIP voice session".to_owned(),
             description: operation.contract_description().to_owned(),
