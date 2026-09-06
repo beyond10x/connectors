@@ -71,15 +71,23 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    current official API sources for a published OpenAPI document; an old repository comment is
    not evidence that none exists. When available, fetch and pin that document and derive endpoint,
    parameter and schema definitions through the existing deterministic OpenAPI projection. Aim for
-   **all operations in the official API** and account for every source operation. Do not retype
+   **all operations in the official API** unless the operator selects a practical provider-specific
+   scope, and account explicitly for the selected coverage. Do not retype
    definitions from API documentation or
    hand-author a replacement specification. If the importer cannot handle the official spec,
    extend the importer; record the capability gap as implementation work, not permission to replace
    the spec. Apply the same rule to other official machine-readable formats. Record operations
    absent from the official spec as coverage gaps before proposing an
-   extension. Keep documented source
-   discrepancies and decisions such as permissions, risk, effects and model exposure in reviewed,
-   source-grounded overlays; preserve the vendor source and its provenance.
+   extension. Keep decisions such as permissions, risk, effects and model exposure in reviewed,
+   source-grounded overlays; preserve the vendor source and its provenance. Record source defects
+   separately instead of silently correcting schema semantics in an overlay.
+   **Schema fidelity is mandatory.** Each selected operation's request and response schemas must
+   preserve the official spec's fields, types, requiredness, nullability, constraints, defaults and
+   composition semantics one for one. Deterministic reference resolution and a reversible transport
+   envelope are allowed; dropping fields or enum values, widening integer to number, narrowing
+   accepted values, or changing object/array shape is not. Unsupported semantics require importer
+   work or an explicit gap, never a permissive or hand-authored substitute. Consumer projections
+   may select operations without rewriting the canonical provider schemas.
 2. **Specs are authoritative and truthfully owned.** Every connector begins in `specs/`. A spec is
    either the vendor's published artifact (`origin = "vendor"`) or a b10x-authored artifact
    (`origin = "repository-authored"`). The latter must say that it is ours, cite the exact official
@@ -127,6 +135,9 @@ principles 1–3 and the Provider/Operation sections of the domain model first.
    coverage. A bounded delivery slice must retain an explicit coverage inventory and backlog for
    the remaining operations; the slice is not a complete connector. Account separately for
    authentication-flow endpoints handled by the platform and source/importer coverage gaps.
+   The operator explicitly chose a practical useful operation set for Slack; exhaustive Slack
+   operation coverage is not required for that selected scope. Choose scope by use case, preserve
+   schema fidelity for every selected operation, and keep omitted operations visible as omissions.
    Consumers may define their own projections, and Connectors may ship prebuilt projections for
    targeted use cases. Separate administrative and regular-user surfaces where the provider's
    permissions distinguish them; a projection selects a surface, while credentials and grants

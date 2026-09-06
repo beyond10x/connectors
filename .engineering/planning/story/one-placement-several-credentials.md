@@ -9,6 +9,10 @@ tags:
 - wave-cli
 scope:
 - confidence: cited
+  path: crates/connector-resolve/src/credentials.rs
+- confidence: cited
+  path: crates/connector-resolve/src/lib.rs
+- confidence: cited
   path: crates/connectors-config/src/lib.rs
 - confidence: cited
   path: crates/connectors-config/src/personal.rs
@@ -18,6 +22,8 @@ scope:
   path: crates/connectors-console/src/auth.rs
 - confidence: cited
   path: crates/connectors-console/src/enrol.rs
+- confidence: cited
+  path: crates/connectors-console/src/enrol_adversary_tests.rs
 - confidence: inferred
   path: crates/connectors-console/src/output_tests.rs
 - confidence: cited
@@ -36,7 +42,7 @@ scope:
   path: ess/system/domains/connection.yaml
 - confidence: inferred
   path: ess/system/domains/deployment.yaml
-revision: 34
+revision: 37
 ---
 
 # Story: one placement, several credentials, a Connection per identity

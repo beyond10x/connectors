@@ -66,7 +66,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 51
+revision: 52
 ---
 
 
@@ -183,3 +183,13 @@ The operator further clarified on 2026-09-06: connector definitions should norma
 Measured stage 1: official GitLab commit eaeb4b8b88fdee3fe9b1d1a54397226cf191c201 reproduces raw SHA f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530. The complete document contains 1,847 operations, no duplicate/missing operation IDs, and no authentication-flow operation endpoints (OAuth appears in security definitions). This is source coverage, not a claim all operations are callable yet.
 
 Additional inferred implementation scope, authorized before edits: crates/connector-spec/src/provider/declaration.rs, publishing.rs, patch_validation.rs, schema_sync.rs; crates/connector-spec/tests/main/operation_selection.rs. The extension supports a reviewed generated-schema array wrapper for vendor/documentation response discrepancies, retaining vendor-generated properties. Actual schema file path and any measured request-importer gap must be named before further scope extension. This follows the operator's rule to build importer capability rather than hand-author a replacement specification.
+
+## Schema fidelity decision
+
+Operator steering on 2026-09-06 requires selected request and response schemas to be one for one with the official specification. The bounded four-operation schedule slice remains selected. Full GitLab operation coverage remains inventoried separately; the practical Slack scope exception does not silently redefine GitLab's coverage inventory.
+
+The pinned complete source is the official OpenAPI at commit eaeb4b8b88fdee3fe9b1d1a54397226cf191c201. Source defects must be named separately; do not repair object/array shape, narrow accepted parameter types, discard constraints, or invent missing schemas in handwritten overlays. Policy metadata such as risk, effects, scope and model exposure stays explicit and separate.
+
+The earlier stage-1 response-array and parameter-schema correction proposal is superseded. Read-only inspection also measured existing generic contract loss: integer becomes number, enum/constraints disappear from the model-facing contract, object request-body semantics can be lost during flattening, and absent optional fields can be emitted as null. Fix the actual generic owners, with end-to-end fixtures for requiredness, omission/null, full object schemas and literal source equality. A green source/catalog stage alone cannot close runtime/CLI acceptance.
+
+The new source retains all 1,847 operations, with four generated schedule operations, 20 legacy inline operations, 1,772 unreviewed coverage gaps and 51 importer-gap rows. Actual multipart import refusals affect 52 operations total: those 51 gap rows and one legacy operation. Keep existing inline provenance truthful. Recompute this measured inventory if source or admission changes.
