@@ -625,3 +625,150 @@ fn admin_authentication_failures_remain_unsuccessful_with_a_closed_reader() {
         assert!(!output.status.success(), "{format}: {output:?}");
     }
 }
+
+fn search_output(group: &str, format: &str, refused: bool, sink: Option<OwnedFd>) -> Output {
+    let fixture = Fixture::new();
+    let (verb, field) = match group {
+        "connection" => ("list", "connections"),
+        "event" => ("search", "channels"),
+        "operation" => ("search", "operations"),
+        _ => unreachable!(),
+    };
+    let listener = UnixListener::bind(fixture.root.join("connectors.sock")).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let server = thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut stream = loop {
+            match listener.accept() {
+                Ok((stream, _)) => break stream,
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::WouldBlock
+                        && Instant::now() < deadline =>
+                {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                result => panic!("search fixture not reached: {result:?}"),
+            }
+        };
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        let mut line = String::new();
+        std::io::BufReader::new(&stream)
+            .read_line(&mut line)
+            .unwrap();
+        let request: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(request["request"]["method"], "search");
+        let mut response = json!({
+            "protocol": request["protocol"], "request_id": request["request_id"],
+            "status": if refused { "error" } else { "ok" },
+        });
+        if refused {
+            response["error"] = json!({
+                "code": "not_found", "message": "fixture refusal", "retriable": false
+            });
+        } else {
+            response["response"] = json!({"result": "search", "value": {(field): []}});
+        }
+        writeln!(stream, "{response}").unwrap();
+    });
+    let mut command = fixture.command(format);
+    command
+        .args([group, verb, "--config"])
+        .arg(fixture.root.join("connectors.toml"))
+        .arg("--state-root")
+        .arg(&fixture.root);
+    if let Some(sink) = sink {
+        command.stdout(sink);
+    }
+    let output = command.output().unwrap();
+    server.join().unwrap();
+    output
+}
+
+#[test]
+fn protocol_refusals_keep_their_failure_when_a_result_reader_closes() {
+    for group in ["connection", "event", "operation"] {
+        for format in FORMATS {
+            let control = search_output(group, format, true, None);
+            assert!(!control.status.success(), "{group} {format}: {control:?}");
+            let diagnostic = format!(
+                "{}{}",
+                String::from_utf8_lossy(&control.stdout),
+                String::from_utf8_lossy(&control.stderr)
+            );
+            assert!(diagnostic.contains("fixture refusal"), "{diagnostic}");
+            let closed = search_output(group, format, true, Some(already_closed_stdout()));
+            println!(
+                "protocol refusal {group} {format}: open {}, closed {}",
+                control.status, closed.status
+            );
+            assert!(!closed.status.success(), "{group} {format}: {closed:?}");
+        }
+    }
+}
+
+#[test]
+fn each_protocol_search_distinguishes_closed_readers_from_other_write_failures() {
+    for group in ["connection", "event", "operation"] {
+        for format in FORMATS {
+            let control = search_output(group, format, false, None);
+            assert_success(&control);
+            let closed = search_output(group, format, false, Some(already_closed_stdout()));
+            assert_success(&closed);
+            // An empty compact listing has no bytes to write; the other three formats do.
+            if !control.stdout.is_empty() {
+                let sink = UnixDatagram::unbound().unwrap();
+                assert_ne!(
+                    sink.send(b"probe").unwrap_err().kind(),
+                    std::io::ErrorKind::BrokenPipe
+                );
+                let failed = search_output(group, format, false, Some(sink.into()));
+                assert!(!failed.status.success(), "{group} {format}: {failed:?}");
+            }
+            println!("protocol search {group} {format}: closed {}", closed.status);
+        }
+    }
+}
+
+#[test]
+fn setup_init_commits_its_result_before_a_reader_close_but_keeps_repeat_refusal() {
+    for format in FORMATS {
+        let fixture = Fixture::new();
+        let config = fixture.root.join("initialized.toml");
+        let kubeconfig = fixture.root.join("synthetic-kubeconfig");
+        fs::write(&kubeconfig, "apiVersion: v1\nkind: Config\ncontexts: []\n").unwrap();
+        let initialize = || {
+            let mut command = fixture.command(format);
+            command
+                .args(["setup", "init", "--integration", "kubernetes", "--config"])
+                .arg(&config)
+                .arg("--state-root")
+                .arg(&fixture.root)
+                .env("KUBECONFIG", &kubeconfig);
+            command
+        };
+        let closed = initialize()
+            .stdout(already_closed_stdout())
+            .output()
+            .unwrap();
+        assert_success(&closed);
+        let bytes = fs::read(&config).unwrap();
+        assert!(!bytes.is_empty());
+        let mode = fs::metadata(&config).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        let repeated = initialize()
+            .stdout(already_closed_stdout())
+            .output()
+            .unwrap();
+        assert!(!repeated.status.success(), "{format}: {repeated:?}");
+        assert_eq!(fs::read(&config).unwrap(), bytes);
+        println!(
+            "setup init {format}: created {}, repeated {}",
+            closed.status, repeated.status
+        );
+    }
+}
