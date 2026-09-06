@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:one-shot-operations-without-a-daemon
 kind: story
-status: active
+status: implemented
 title: One-shot operations without a daemon
 tags:
 - ready
@@ -50,7 +50,7 @@ scope:
   path: ess/generated/clap
 - confidence: cited
   path: ess/system/domains/connection.yaml
-revision: 35
+revision: 36
 ---
 # Story: one-shot operations without a daemon
 
