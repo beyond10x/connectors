@@ -59,6 +59,18 @@ pub struct ConditionalRateLimit {
     pub source_url: String,
 }
 
+impl ConditionalRateLimit {
+    /// The source URI profile shared by authoring and generated catalog schemas.
+    #[must_use]
+    pub fn source_url_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "string", "minLength": 1, "maxLength": 2048, "format": "uri",
+            "description": "RFC 3986 ASCII URI with literal lowercase https, a nonempty host, no userinfo or fragment, and an optional decimal port from 0 through 65535. Empty ports denote the default; leading zeros and percent-encoded spelling are preserved.",
+            "pattern": r"^https://(?:\[[^\]]+\]|[^:/?#@\[\]]+)(?::(?:0*(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?)?(?:[/?][^#]*)?$"
+        })
+    }
+}
+
 fn positive<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
     let value = u32::deserialize(deserializer)?;
     if value == 0 {
@@ -88,12 +100,14 @@ fn applicability<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D
 fn source<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
     let value = String::deserialize(deserializer)?;
     if !bounded(&value, 2048)
-        || !url::Url::parse(&value).is_ok_and(|url| {
-            url.scheme() == "https"
-                && url.has_host()
-                && url.username().is_empty()
-                && url.password().is_none()
-                && url.fragment().is_none()
+        || !fluent_uri::Uri::parse(value.as_str()).is_ok_and(|uri| {
+            uri.scheme().as_str() == "https"
+                && uri.fragment().is_none()
+                && uri.authority().is_some_and(|authority| {
+                    !authority.host().is_empty()
+                        && authority.userinfo().is_none()
+                        && authority.port_to_u16().is_ok()
+                })
         })
     {
         return Err(serde::de::Error::custom("invalid public rate source URL"));

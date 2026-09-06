@@ -7,14 +7,14 @@
       "sha256": "5e6fbffee97d998df53c94394de1c53c75a6066f2807c9c00374b6ea15ea969b"
     },
     {
-      "bytes": 3328,
+      "bytes": 3689,
       "path": "contracts/connector-operation/v0alpha2/README.md",
-      "sha256": "251faf24aa0cc5bde7ed99850b4634606b6c450d9e069ab570af97566515c685"
+      "sha256": "ac3076100daddcab6e18a6be7bcfa97bd4804f4231ec5da898c75479c6f8830e"
     },
     {
-      "bytes": 28482,
+      "bytes": 28857,
       "path": "contracts/connector-operation/v0alpha2/connector-operation.schema.json",
-      "sha256": "0239e0ad226ac3905aa9373309bc6a72b819c51cda899542225c8785fa3c3ed9"
+      "sha256": "e961d094eb82c4fbb825f7109d904c210d42ac5bcb34a033ba17db58a42f6d79"
     },
     {
       "bytes": 928,
