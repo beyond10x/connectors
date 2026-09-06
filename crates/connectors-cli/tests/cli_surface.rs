@@ -2583,12 +2583,26 @@ fn an_omitted_target_ignores_a_saved_login_for_every_dual_target_group() {
         ("operation", "search"),
     ] {
         let (success, value) = fixture.json(&["-o", "json", group, verb]);
-        assert!(!success);
-        assert_eq!(value["target"], "local", "{group}: {value}");
+        let (explicit_success, explicit_value) =
+            fixture.json(&["-o", "json", group, verb, "--target", "local"]);
+        assert_eq!(success, explicit_success, "{group}");
         assert_eq!(
-            value["error"]["code"], "connector-unreachable",
-            "{group}: {value}"
+            value, explicit_value,
+            "saved login must not change {group} routing"
         );
+        assert_eq!(value["target"], "local", "{group}: {value}");
+        if group == "event" {
+            assert!(!success);
+            assert_eq!(value["error"]["code"], "daemon-required", "{value}");
+        } else {
+            assert!(success, "{group}: {value}");
+            let field = if group == "operation" {
+                "operations"
+            } else {
+                "connections"
+            };
+            assert!(value[field].is_array(), "{group}: {value}");
+        }
     }
 }
 
