@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:auth-as-tool-result
 kind: story
-status: proposed
+status: active
 title: An admitted Connection has a structured authentication next step
 tags:
 - ready
@@ -14,6 +14,8 @@ relations:
 - derived_from: epic:carried-constraints
 scope:
 - confidence: inferred
+  path: contracts/connector-connection/v0alpha2
+- confidence: inferred
   path: contracts/connector-connection/v0alpha2/README.md
 - confidence: inferred
   path: contracts/connector-connection/v0alpha2/bundle.json
@@ -23,6 +25,8 @@ scope:
   path: contracts/connector-connection/v0alpha2/vectors.json
 - confidence: inferred
   path: contracts/connector-connection/v0alpha2/vectors.schema.json
+- confidence: inferred
+  path: contracts/connector-operation/v0alpha3
 - confidence: inferred
   path: contracts/connector-operation/v0alpha3/README.md
 - confidence: inferred
@@ -77,7 +81,7 @@ scope:
   path: crates/integration-catalog/src/lib.rs
 - confidence: inferred
   path: crates/integration-catalog/src/remediation_tests.rs
-- confidence: inferred
+- confidence: cited
   path: crates/protocol/README.md
 - confidence: inferred
   path: crates/protocol/examples/connection_v2_bundle.rs
@@ -87,7 +91,7 @@ scope:
   path: crates/protocol/src/connection_v2.rs
 - confidence: inferred
   path: crates/protocol/src/connection_v2_schema.rs
-- confidence: inferred
+- confidence: cited
   path: crates/protocol/src/lib.rs
 - confidence: cited
   path: crates/protocol/src/operation.rs
@@ -151,9 +155,9 @@ scope:
   path: ess/system/domains/connection.yaml
 - confidence: inferred
   path: ess/system/domains/runtime.yaml
-- confidence: inferred
+- confidence: cited
   path: json-schemas.toml
-revision: 40
+revision: 44
 ---
 ## Acceptance
 
@@ -265,3 +269,15 @@ These changes resolve two conflicts in the legacy acceptance: grants do not auth
 
 
 Design22 and ten additive ESS value types are recorded as implementation preparation. The complete model validates and compiles; these checks prove no runtime behavior. Rate v2 and personal OAuth runtime remain prerequisites for shared-source changes. Changed wire implementation waits for a separately recorded Atlas auth migration, preserving the rate decision and its acceptance independently.
+
+## Independent additive protocol slice — 2026-09-06
+
+Published Atlas proposal bfb731377a448ab89443c44852d622601f6c1363 contains the required dated authentication extension to current ADR0041 and separate ADR0044 for Operationv3/Connectionv2. Design22 now records that current citation, the fresh consumer audit and proposed status, retaining earlier0040 paragraphs as history. Complete reviewed rate source/test0c026610 and locally gated schema3 publication candidate0c694509 are retained in this integration history. The full12gate and immutable first/final reviews establish the exact v2 prerequisite; they establish no OAuth runtime completion.
+
+Assign one independent managed protocol slice to the rate implementor after its publication verification handoff. Exact new Rust owners: crates/protocol/src/operation/v3.rs, operation/schema_v3.rs, operation/versions.rs, connection_v2.rs, connection_v2_schema.rs, and examples/operation_v3_bundle.rs plus connection_v2_bundle.rs. Existing hooks are limited to module registrations/API documentation in operation.rs/lib.rs, additive tests in tests/bundles.rs, protocol/README.md and json-schemas.toml. Add exactly README.md,bundle.json,protocol schema,vectors.json,vectors.schema.json under each new Operationv0alpha3 and Connectionv0alpha2 bundle. Root owns AEP/ESS/Git/publication; the implementor owns this exact source/test/generator output scope and its scratch evidence.
+
+Freeze byte-for-byte all existing complete Operationv1/v2 and Connectionv1 bundle files, contracts/artifact-bundle.schema.json, operation/legacy.rs, operation/wire.rs, operation/schema.rs, examples/operation_v2_bundle.rs and connection.rs against the provided baseline. Preserve the internal wire v2 reexport, every previous assertion and rate URI grammar/vector class. No dependency/manifest/lock update is assigned. The prepared stage1-protocol-plan.md is the bounded technical brief; its older ADR0040 and prerequisite pointers are historical, superseded by the exact current citations above.
+
+Use selected original request/response bytes for strict decoding so duplicate fields cannot disappear through a Value intermediate. Operationv3 auth payload is mandatory exactly for authentication_required, non-null, non-retriable and not_attempted with exact safe references; reject incompatible payload/code/success/retry-delay combinations and unknown fields. Pure downgrade to v1/v2 is neutral bounded Unavailable with no URL/capability/auth payload/delay. Preserve ordinary/rate projection behavior and reject unknown identities with no fallback/resend. Connectionv2 input is bounded64KiB inside a128KiB frame; v1 remains64KiB. Bound-to-v1 conversion is a typed refusal, never unbound session creation. Validate nested trusted status and duplicate identities consistently, without claiming a DTO performs real-time expiry, grants or one-use acknowledgement.
+
+Prepare meaningful deciding cases before implementation, retaining actual first executions and compiler/fixture failures separately. Exercise complete ordinary/bound variants, malformed references, profile fields, boundaries, duplicate keys, all unknown/mismatched versions, exact auth downgrade, frozen artifacts and independent Rust/Draft2020-12 vector checks. Prove deterministic regeneration twice and manifest hashes. Compile only with the coordinator's explicit slot, jobs1, own target and prospective12GiB reserve; preserve source/evidence before completed-target cleanup. The OAuth implementor owns the current compile slot, so begin with noncompiling inspection/fixtures. Return complete source/evidence report for independent review. No server/runtime/registry/client/CLI/console/config/custody/session/grant/helper wiring, external consumer changes, live provider actions, release or tag is assigned.
