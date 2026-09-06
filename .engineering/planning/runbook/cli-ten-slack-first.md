@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 28
+revision: 29
 ---
 
 
@@ -3305,3 +3305,9 @@ Unpublished recording transactionad5a75a49cdb69fcadd6258fcda3263f10b2c0d4 is ret
 Recovered stage1 now passes194->209 affected cases, strict clippy/fmt and deterministic85-vector checks. Exact original baseline argv was recovered from the predecessor transcript, not reconstructed. Existing public DTOs still re-export the byte-identical legacy snapshot; actual default transport/catalog/CLI migration remains held for the reviewed GitLab source handoff. Coordinator applies the source relocation citation patch to runtime/system/components only. Historical review citations retain their original context.
 
 Stage2 fixture closure adds existing Slack backend and one-shot CLI test files. GitLab source remains unpublished and schema3 has not frozen; the rate stage may add its optional conditional declarations under this same migration after the independent GitLab review and handoff. No v1/v2 frozen schema is changed. One-shot reviewed source integrated at7a2de67bd291f719115d6094b995004c60ee956e; dry combined GitLab merge at6e655168 is conflict-free. This scope record authorizes preparation, not concurrent edits to GitLab's review tree.
+
+## One-shot integration gate projection refresh
+
+The exact published integration84ccd024 ran all12workspace lanes with2133passing executions,0failures and27existing ignored, including both runtime feature sets. Final catalog/link/story/ESS validation checks passed before generated-clap comparison failed. The stale generated projection predates the added request-semantics and rate-advice model values; source additions were modeled before implementation but their derivative was not refreshed. Current model/source evidence is retained in the final gate log.
+
+Coordinator owns regeneration of ess/generated/clap from the complete validated ess/system through ESS0.18.0, with no manual generated edits. Only the already committed emitted crate/notes are copied; unclassified plan.json/target.json stay scratch as the gate requires. Shared model projection refresh is serialized in integration. Report full gate green only after the exact final check reruns successfully.
