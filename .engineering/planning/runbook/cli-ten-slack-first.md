@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 33
+revision: 35
 ---
 ## Authorization and objective
 
@@ -3362,3 +3362,17 @@ Eight of twelve publication workspace gates have passed and their completed owne
 The subsequent SQL compile stopped before tests at 17,021,902,848 free bytes, exit 143, with only about 191 MB in its partial target. A later coordinator sample was 16,816,013,312 free bytes while no wave compiler ran; other-workspace compilers were observed. The entire shared-space change was not attributed. There is no completed wave target left to reclaim. A 12 GiB reserve leaves several times the measured ordinary target size protected while allowing one further build phase from the available capacity.
 
 Keep exactly one compiling workspace in this wave, jobs 1, per-tree targets, compiler caching and no incremental/debug information. Measure immediately before each command and continuously while it runs; gracefully stop its own process group below 12 GiB and preserve the actual exit, time, sample and logs. Freeze evidence/source before cleaning completed owned targets. Profile cleanup is limited to completed debug outputs after the active release process has stopped and its partial output has been frozen. Do not clean another session's targets, shared caches or primary checkouts. This adjustment is prospective; all earlier 20 GiB and 16 GiB pauses, including the two publication interruptions, remain intact.
+
+## Published migration proposals — 2026-09-06
+
+Atlas draft PR23 now publishes exact commit bfb731377a448ab89443c44852d622601f6c1363. ADR0041 is the Operation v2 rate migration; ADR0042 is canonical schema3 source fidelity; ADR0043 is later schema4 personal OAuth; ADR0044 is later Operationv3/Connectionv2 authentication remediation. Atlas main's accepted ESS decision owns0040. Earlier number references above describe their historical proposal snapshots; this dated mapping is current and those earlier records remain unchanged.
+
+All four proposals and the full published-consumer pin audit were read back as exact remote Git blobs. The proposals remain proposed on a draft PR; publishing them records neither architecture acceptance nor external adoption. ADR0041's dated authentication section and separate ADR0044 name the subsequent migration and limit the earlier Connection/auth exclusions to the rate unit. SDK-before-embedded-host ordering, separate Devcenter locks, Agent Platform digest coupling, Org Brain's unknown deployed executable and Zwirn's legacy namespace/audience are explicitly recorded. This wave changes no external consumer repository.
+
+The complete Atlas fence at that same commit ran149passing Rust tests, with catalog, live Pages, projection, Markdown and brand green. It exited1 for three existing primary-workspace failures: AgentIDE's unsupported v4 manifest, Website's stale Docs System package pin and Widgets' missing Serves section. The normal bot-wrapper update of the existing PR23 branch succeeded through the corrected installed guard; no hook bypass or attestation commit was used. Publication does not claim those unrelated organization fences are green.
+
+## Complete schema3 local implementation verification — 2026-09-06
+
+Verification-report cli-schema3-publication-gate-20260906 retains the complete implementor report at900fac0a. All12workspaces and13test configurations passed:2244test executions,0failures,27existing ignored. All13strict Clippy configurations,12fmt/metadata lanes, deterministic catalog/bundle checks, final link/story/ESS/projection, release identity refusal and exactcandidate/public-ref history scan passed. Root verified all719immutable evidence files and exact raw-to-portable prefix-only equality. Portable report SHA256840c6cde65142a54a72c633dddc6bed119a732d3d25138d0560bc5b5a0837b8c; manifest SHA256774a4d4e5a950e7d66a10530cc6163f492f55d95af0be6d77a60685e3b1413fb.
+
+GitLab schedules and rate-limit stories now record their named test_result and implemented transition. Retained review counts, original red observations, exact SQL formatter correction and both resource interruptions remain intact. The only subsequent candidate edits are planning closure and current Atlas citation records; all998nonplanning source bytes remain frozen. The final planning HEAD needs its own unchanged history/link/story refresh before publication. Actual sourcePR/CI/main merge, deterministic documentation delivery and final supported-source installation remain coordinator work. Schema4/OAuth/auth-remediation are separate unfinished units, and the credentials unit stays held after two red reviews.

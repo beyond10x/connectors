@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:personal-gitlab-schedules-are-discoverable-and-governed
 kind: story
-status: active
+status: implemented
 title: Personal GitLab schedules are discoverable and governed
 summary: Close the CLI discovery and validation gaps, then add write-gated GitLab pipeline-schedule operations.
 tags:
@@ -150,7 +150,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 96
+revision: 99
 ---
 
 
@@ -299,3 +299,19 @@ Atlas's full fences.sh exited1. Catalog, live Pages, projections and brand passe
 Pipe worktree wt-55b6348b9982 GC completed through exact reviewed-id application. The manager recorded remote recovery through origin:refs/heads/wave/cli-ten-slack-first and origin:refs/pull/14/head before non-forced removal. No other tree was selected.
 
 One-shot source970e4af56f7a4ca1b9689c885fabd3a519bbe0ca is bot-authored and bot-committed after618 passing affected tests (2existing ignored), strict clippy/fmt/module fence. First tests-only attack is dispatched to adversary_one_shot_1 in the same owned tree; no AEP/Git writes delegated. Full base for its review remains3df1cd2df32472a4afc8feeaac8c46c9de8d1b55. The implementation report and original red fixtures remain under the recorded scratch triple.
+
+## Complete schema 3 implementation gate — 2026-09-06
+
+The complete publication candidate 900fac0a435b6e0d2922825f366e0c9607150400 retains reviewed GitLab source/tests and the independently reviewed structured-rate unit, plus published main 4b32397df2cc2f5bd5ee1c5737891163fb750957. All twelve declared workspace gates pass, including both runtime feature configurations: 2,244 passing executions, zero failures and 27 existing ignored tests. All thirteen strict all-target Clippy configurations, twelve formatting and locked/offline metadata checks, deterministic 65-provider/69-artifact catalog checks, 85 rate-v2 conformance vectors, final links/stories/ESS/generated projection and the deployment-identity refusal guard pass. The complete report is [verification-report:cli-schema3-publication-gate-20260906](../verification-report/cli-schema3-publication-gate-20260906.md).
+
+The first whole-unit GitLab adversary remains green and immutable at review-result:cli-gitlab-adversary-1-20260906. It independently covered the four complete selected source schema closures, resolver behavior, runtime authority and CLI discovery. The official complete 1,847-operation source inventory remains explicit; this implementation makes the selected schedule slice faithful and callable under existing admission, not every GitLab operation. The later rate integration preserves the source and frozen schema 2 while completing canonical schema 3 as one producer/reader/executable unit.
+
+The measured initial SQL formatting failure was byte-identical to published main; its separately recorded three-file formatter correction is the only publication-gate source change after final rate review. Both disk interruptions, the original all-local-ref scan findings and exact scoped-history/public-ref verification remain retained in the complete report. Current nonplanning source matches all 998 frozen files. This records implementation and full local verification; source publication/CI, documentation delivery and the matching final installed client/daemon update remain delivery steps. No live GitLab operation, external consumer upgrade, release or tag is claimed.
+
+## Published migration proposals — 2026-09-06
+
+Atlas draft PR23 now publishes exact commit bfb731377a448ab89443c44852d622601f6c1363. ADR0041 is the Operation v2 rate migration; ADR0042 is canonical schema3 source fidelity; ADR0043 is later schema4 personal OAuth; ADR0044 is later Operationv3/Connectionv2 authentication remediation. Atlas main's accepted ESS decision owns0040. Earlier number references above describe their historical proposal snapshots; this dated mapping is current and those earlier records remain unchanged.
+
+All four proposals and the full published-consumer pin audit were read back as exact remote Git blobs. The proposals remain proposed on a draft PR; publishing them records neither architecture acceptance nor external adoption. ADR0041's dated authentication section and separate ADR0044 name the subsequent migration and limit the earlier Connection/auth exclusions to the rate unit. SDK-before-embedded-host ordering, separate Devcenter locks, Agent Platform digest coupling, Org Brain's unknown deployed executable and Zwirn's legacy namespace/audience are explicitly recorded. This wave changes no external consumer repository.
+
+The complete Atlas fence at that same commit ran149passing Rust tests, with catalog, live Pages, projection, Markdown and brand green. It exited1 for three existing primary-workspace failures: AgentIDE's unsupported v4 manifest, Website's stale Docs System package pin and Widgets' missing Serves section. The normal bot-wrapper update of the existing PR23 branch succeeded through the corrected installed guard; no hook bypass or attestation commit was used. Publication does not claim those unrelated organization fences are green.

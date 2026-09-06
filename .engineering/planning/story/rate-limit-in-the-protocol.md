@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:rate-limit-in-the-protocol
 kind: story
-status: active
+status: implemented
 title: A provider's rate limit is a protocol fact, not a sentence
 tags:
 - ready
@@ -230,7 +230,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 145
+revision: 148
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -463,3 +463,19 @@ The source is now released for the coordinator's local integration and downstrea
 The complete schema 3 publication preflight found driver-sql formatting failures in crates/driver-sql/src/credentials.rs, crates/driver-sql/src/lib.rs and crates/driver-sql/tests/live.rs. All three files are byte-identical to published main 4b32397df2cc2f5bd5ee1c5737891163fb750957; the exact baseline blobs and initial failed formatter output remain in the publication-gate evidence. This is a pre-existing gate failure, not an introduced rate behavior defect.
 
 Assign those three exact cited paths only for cargo fmt's mechanical correction, including its closure/block and trailing-comma formatting. Preserve all tests, assertions and production behavior. The coordinator records this small prerequisite before the authoritative twelve-workspace source freeze; the gate implementor still owns no source, AEP or Git writes. Complete the SQL workspace's normal tests and strict checks as part of that existing full gate, without inventing tests for formatting. Preserve the original failure and both source inventories. The first scope wording said to preserve all tokens; this clarification accounts for the actual formatter output without authorizing a semantic change.
+
+## Complete schema 3 publication gate — 2026-09-06
+
+Candidate 900fac0a435b6e0d2922825f366e0c9607150400 completed every declared workspace gate: 2,244 passing test executions, zero failures, 27 existing ignored tests, all thirteen strict Clippy configurations, all twelve formatting and locked/offline metadata checks. The root final gate validates the 65-provider/69-artifact catalog, 85 v2 vectors, links, legacy story consistency, ten-file ESS model and deterministic generated CLI projection. The release identity negative check and unchanged deployment guard pass. The complete report and preserved first failures are in [verification-report:cli-schema3-publication-gate-20260906](../verification-report/cli-schema3-publication-gate-20260906.md).
+
+The two whole-unit adversary reports remain immutable. The final pass is green at reviewed rate source/test commit 0c026610e67f3ec6da0a8014813f3d88c4e72799; no third pass or source reimplementation followed. The candidate retains published Git framing and its two additional runtime tests. Only the scoped, main-identical SQL formatter correction changed nonplanning source during the full publication gate; all 998 resulting source files remained fixed through every subsequent lane and cleanup. The original URI disagreement and its measured parser/schema repair, original all-local-ref scan result, CLI release interruption and SQL interruption are preserved.
+
+The full-history scanner for this exact candidate plus stable advertised public heads/tags passed with the unchanged script, flags, rules and ignore file. This records only that inspected history, not future refs or an uncreated merge. Operation v2 is the complete new rate contract; complete Operation v1 and catalog schema 2 stay frozen. Canonical schema 3 is ready for coordinated source publication before a later schema 4 writer. No OAuth runtime, auth-remediation protocol, external consumer adoption, release, tag or installed update is claimed by this implementation closure.
+
+## Published migration proposals — 2026-09-06
+
+Atlas draft PR23 now publishes exact commit bfb731377a448ab89443c44852d622601f6c1363. ADR0041 is the Operation v2 rate migration; ADR0042 is canonical schema3 source fidelity; ADR0043 is later schema4 personal OAuth; ADR0044 is later Operationv3/Connectionv2 authentication remediation. Atlas main's accepted ESS decision owns0040. Earlier number references above describe their historical proposal snapshots; this dated mapping is current and those earlier records remain unchanged.
+
+All four proposals and the full published-consumer pin audit were read back as exact remote Git blobs. The proposals remain proposed on a draft PR; publishing them records neither architecture acceptance nor external adoption. ADR0041's dated authentication section and separate ADR0044 name the subsequent migration and limit the earlier Connection/auth exclusions to the rate unit. SDK-before-embedded-host ordering, separate Devcenter locks, Agent Platform digest coupling, Org Brain's unknown deployed executable and Zwirn's legacy namespace/audience are explicitly recorded. This wave changes no external consumer repository.
+
+The complete Atlas fence at that same commit ran149passing Rust tests, with catalog, live Pages, projection, Markdown and brand green. It exited1 for three existing primary-workspace failures: AgentIDE's unsupported v4 manifest, Website's stale Docs System package pin and Widgets' missing Serves section. The normal bot-wrapper update of the existing PR23 branch succeeded through the corrected installed guard; no hook bypass or attestation commit was used. Publication does not claim those unrelated organization fences are green.
