@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Twilio Account SID and Auth Token, sent as HTTP Basic credentials",
@@ -308,6 +308,7 @@
         "method": "GET",
         "url": "{base}/Accounts/{account_sid}.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -468,6 +469,7 @@
         ],
         "url": "{base}/Accounts/{account_sid}/Messages.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -669,6 +671,7 @@
         "method": "GET",
         "url": "{base}/Accounts/{account_sid}/Messages/{message_sid}.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -912,6 +915,7 @@
         ],
         "url": "{base}/Accounts/{account_sid}/Calls.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1110,6 +1114,7 @@
         "method": "GET",
         "url": "{base}/Accounts/{account_sid}/Calls/{call_sid}.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1316,6 +1321,7 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Recordings.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1573,6 +1579,7 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Recordings/{Sid}.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1815,6 +1822,7 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Usage/Records.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2032,6 +2040,7 @@
         ],
         "url": "{base}/Accounts/{username.twilio.basic_auth}/Conferences.json"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2166,7 +2175,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "2010-04-01",

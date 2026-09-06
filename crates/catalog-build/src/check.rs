@@ -702,7 +702,7 @@ required_capabilities = ["public_network"]
             fixture.check().expect("a clean lock verifies"),
             Report {
                 providers: 1,
-                artifacts: 4,
+                artifacts: 5,
             }
         );
         let invocation = Invocation {
@@ -714,7 +714,7 @@ required_capabilities = ["public_network"]
         crate::run(&invocation, &mut output).expect("the CLI check succeeds");
         assert_eq!(
             String::from_utf8(output).expect("CLI output is UTF-8"),
-            "1 provider, 4 artifacts verified\n"
+            "1 provider, 5 artifacts verified\n"
         );
         assert_eq!(before, snapshot(&fixture.root), "check wrote to the tree");
     }

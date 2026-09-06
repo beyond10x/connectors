@@ -933,6 +933,7 @@
       "additionalProperties": false,
       "required": ["path"],
       "properties": {
+        "request_semantics": { "enum": ["legacy_v1", "openapi_3_0_json_v1"], "default": "legacy_v1", "description": "Versioned source interpretation; new official OpenAPI 3.0 JSON sources use the source-faithful profile." },
         "path": {
           "type": "string",
           "description": "The vendored spec file relative to the repository root, e.g. `specs/babelforce/manager-2026-07-10.openapi.yaml`."
@@ -1702,7 +1703,10 @@
       "type": "object",
       "title": "Parameters by request position",
       "additionalProperties": false,
+      "dependentRequired": { "body_required": ["body_schema"] },
       "properties": {
+        "request_semantics": { "enum": ["legacy_v1", "openapi_3_0_json_v1"], "default": "legacy_v1" },
+        "body_required": { "type": "boolean", "description": "Presence of the whole body, independent of required inner fields. Valid only with body_schema; absent preserves legacy requiredness." },
         "path": {
           "type": "array",
           "description": "Interpolated into the path template.",

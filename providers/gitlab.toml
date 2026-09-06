@@ -1,16 +1,19 @@
-# GitLab REST API (`/api/v4`) — hand-authored, no vendor spec vendored.
+# GitLab REST API: complete official OpenAPI source plus reviewed operation projections.
 #
-# GitLab does not publish one canonical machine-readable OpenAPI document for its whole REST API the
-# way Stripe or GitHub do, so this is authored the same way zendesk, freshdesk, github and notion
-# already are: by reading `docs.gitlab.com/ee/api/*` directly. When ingest (C-4) and the overlay
-# (C-6) exist and GitLab's own description becomes usable, this file becomes `[spec]` plus a
-# `[[patch.operations]]` selection reproducing the nine operations below. Until then, drift is
-# undetectable by machine (`docs/designs/provider-operation-inventory.md` §6.7).
+# The complete immutable vendor document is pinned below. Four schedule operations now derive
+# from it; existing inline operations retain their original authored provenance and stable ids.
+# specs/gitlab/coverage-19.4.toml accounts for every source operation, including importer gaps and
+# the remaining permission/effect review. The goal is complete API coverage, independent of
+# focused consumer projections; a projection never grants administrative or regular-user access.
+# Refresh through the offline Rust vendor_gitlab example registered in SOURCES.toml.
 #
 # ---------------------------------------------------------------------------------------------
 # THE CONSTRAINT THAT SHAPED THE WHOLE SELECTION: A PROJECT HAS TWO ADDRESSES, AND ONLY ONE SURVIVES
 # THIS PIPELINE.
 # ---------------------------------------------------------------------------------------------
+#
+# The following historical numeric-only rationale applies to the twenty legacy inline operations.
+# The four source-derived schedule operations use safe path encoding and accept namespaced IDs.
 #
 # Every project-scoped GitLab endpoint takes its subject as `:id` in the path, and GitLab's own
 # reference states plainly that `:id` "can be either the project ID or the URL-encoded path of the
@@ -84,11 +87,11 @@ api_version = "v4"
 # vendor's REST prefix after policy has selected either the reviewed default or an approved pin.
 base_url = "{origin}/api/v4"
 
-description = "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only"
+description = "GitLab for people and automation identities: discover reachable groups and projects; read and create project issues; inspect repositories, merge requests, and pipelines; manage project pipeline schedules; and perform approval-gated AgentIDE branch, commit, and merge-request publication — every project addressed by its numeric id only"
 
 # One Connection chooses exactly one effective actor. OAuth and a personal access token carry a
 # person's authority; service-account, group, and project access tokens carry automation authority.
-# The alternatives are never combined. Read operations accept `read_api` or `api`; the one selected
+# The alternatives are never combined. Read operations accept `read_api` or `api`; each selected
 # write below replaces this default with `api` only.
 default_auth = [
   { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["read_api"], ["api"]] } },
@@ -103,6 +106,15 @@ default_auth = [
 # would show as "connected as ...". A `verify` operation must be a read; the loader refuses a `high`
 # or `destructive` one.
 verify = "gitlab-user-get"
+
+[[spec]]
+request_semantics = "openapi_3_0_json_v1"
+service = "rest"
+path = "specs/gitlab/openapi-19.4.yaml"
+source_url = "https://gitlab.com/gitlab-org/gitlab/-/raw/eaeb4b8b88fdee3fe9b1d1a54397226cf191c201/doc/api/openapi/openapi_v3.yaml"
+upstream_version = "19.4"
+fetched_at = "2026-09-06T00:00:00Z"
+sha256 = "435fa94969a44a8baf0e8d8cb4d6cf82186a19adc3ad449e378f54cf80d0b7f2"
 
 # ---------------------------------------------------------------------------------------------
 # Credentials
@@ -209,6 +221,14 @@ audiences = ["developer"]
 name = "login"
 description = "GitLab's OAuth2 authorize and token endpoints, at the instance origin."
 base_url = "{origin}"
+
+[[services]]
+# Full source paths already include /api/v4; preserve them without changing legacy addresses.
+name = "rest"
+description = "Official GitLab REST API operation projections"
+base_url = "{origin}"
+tags = ["source-control", "issue-tracking"]
+audiences = ["developer"]
 
 [[operations]]
 effects = ["read", "network"]
@@ -1098,7 +1118,7 @@ service = "default"
 # must agree and are not forced to is how a token exchange gets pointed at a host the API never
 # approved, which is the whole reason `approval = "operator"` is below. The head service keeps the
 # address; `login` resolves `{origin}` from this same value, under this same approval.
-also_services = ["login"]
+also_services = ["login", "rest"]
 label = "GitLab origin"
 help = "The HTTPS origin only, without `/api/v4` or another path. Leave the default for GitLab.com; a self-managed origin requires deployment/operator approval before it becomes active"
 example = "https://gitlab.company.example"
@@ -1153,3 +1173,94 @@ secret = true
 required = false
 docs_url = "https://docs.gitlab.com/integration/oauth_provider/"
 binds = "oauth.client_secret"
+
+# ---------------------------------------------------------------------------------------------
+# First official-source projection: project pipeline schedules.
+# Official OpenAPI schemas remain literal source evidence. The source-faithful profile preserves
+# the full input body, nullability and constraints through deterministic dialect translation.
+# https://docs.gitlab.com/api/pipeline_schedules/ shows response arrays where the pinned source
+# says objects. That source discrepancy is recorded in provenance; it does not rewrite schemas.
+# https://docs.gitlab.com/api/rest/authentication/ and the source OAuth scope definitions ground
+# read_api/api reads and api writes. The selected Connection's GitLab role still limits access.
+# Update reschedules automatically, so it makes no idempotency promise. Delete removes a trigger
+# and is destructive even though repeating it cannot remove a different schedule. Mutations stay
+# unexposed to models; callability still requires the selected Connection's explicit write grant.
+
+[[patch.operations]]
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "rest"
+select = "getApiV4ProjectsIdPipelineSchedules"
+rename = "gitlab-pipeline-schedule-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+expose = true
+pagination = { page = { page_param = "page", size_param = "per_page", page_size = 20, max_pages = 1 } }
+[[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "rest"
+select = "postApiV4ProjectsIdPipelineSchedules"
+rename = "gitlab-pipeline-schedule-create"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+expose = false
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]
+[[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "rest"
+select = "putApiV4ProjectsIdPipelineSchedulesPipelineScheduleId"
+rename = "gitlab-pipeline-schedule-update"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+expose = false
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]
+[[patch.operations]]
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+service = "rest"
+select = "deleteApiV4ProjectsIdPipelineSchedulesPipelineScheduleId"
+rename = "gitlab-pipeline-schedule-delete"
+direction = "write"
+risk = "destructive"
+idempotency = "idempotent"
+expose = false
+auth = [
+  { credentials = ["gitlab.oauth_token"], scopes = { "gitlab.oauth_token" = [["api"]] } },
+  { credentials = ["gitlab.token"], scopes = { "gitlab.token" = [["api"]] } },
+  { credentials = ["gitlab.service_account_token"], scopes = { "gitlab.service_account_token" = [["api"]] } },
+  { credentials = ["gitlab.group_access_token"], scopes = { "gitlab.group_access_token" = [["api"]] } },
+  { credentials = ["gitlab.project_access_token"], scopes = { "gitlab.project_access_token" = [["api"]] } },
+]

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "authority": "io.b10x",
   "connector": "b10x",
   "description": "B10x-owned Connector capabilities implemented by closed built-in protocol drivers",
@@ -1081,6 +1081,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "sip_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -1166,6 +1167,7 @@
       "placement_requirement": "federated_satellite",
       "protocol_driver": "audio_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "device"
       ],
@@ -1232,6 +1234,7 @@
       "placement_requirement": "federated_satellite",
       "protocol_driver": "audio_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "device"
       ],
@@ -1321,6 +1324,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "cdp_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network",
         "process"
@@ -1448,6 +1452,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "cdp_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network",
         "process"
@@ -1553,6 +1558,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "cdp_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network",
         "process"
@@ -1657,6 +1663,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "cdp_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network",
         "process"
@@ -1724,6 +1731,7 @@
       "placement_requirement": "connectors_deployment",
       "protocol_driver": "cdp_v1",
       "request": {},
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network",
         "process"
@@ -1863,6 +1871,7 @@
         "method": "POST",
         "url": "{base}/v1/query"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -2470,6 +2479,7 @@
         "method": "GET",
         "url": "{base}/v1/branches/{branch}/claims/{claim}/explain"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -2673,6 +2683,7 @@
         "method": "POST",
         "url": "{base}/v1/snapshots"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -3263,6 +3274,7 @@
         "method": "GET",
         "url": "{base}/v1/branches"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -3497,6 +3509,7 @@
         "method": "POST",
         "url": "{base}/v1/branches"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -4238,6 +4251,7 @@
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/schema"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -4342,6 +4356,7 @@
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/claims"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -4459,6 +4474,7 @@
         "method": "POST",
         "url": "{base}/v1/branches/{branch}/claims/{claim}/retract"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -4979,6 +4995,7 @@
         "method": "POST",
         "url": "{base}/v1/packs/install"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -5929,6 +5946,7 @@
         "method": "POST",
         "url": "{base}/v1/proposals"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -5984,6 +6002,7 @@
         "method": "GET",
         "url": "{base}/v1/proposals/{proposal}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -6237,6 +6256,7 @@
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/evaluate"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -6491,6 +6511,7 @@
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/approve"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -6547,6 +6568,7 @@
         "method": "POST",
         "url": "{base}/v1/proposals/{proposal}/promote"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -6788,6 +6810,7 @@
         "method": "POST",
         "url": "{base}/v1/schemas"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -6924,6 +6947,7 @@
         "method": "POST",
         "url": "{base}/api/work/v2/requests"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -7097,6 +7121,7 @@
         "method": "GET",
         "url": "{base}/api/work/v2/requests/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -7296,6 +7321,7 @@
         ],
         "url": "{base}/api/work/v2/requests"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -7691,6 +7717,7 @@
         "method": "POST",
         "url": "{base}/api/work/v2/requests/{id}/tasks"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -7879,6 +7906,7 @@
         "method": "GET",
         "url": "{base}/api/work/v2/tasks/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -8093,6 +8121,7 @@
         ],
         "url": "{base}/api/work/v2/tasks"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -8472,6 +8501,7 @@
         "method": "PATCH",
         "url": "{base}/api/work/v2/tasks/{id}/status"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -8686,6 +8716,7 @@
         ],
         "url": "{base}/api/planner/v1/projects"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -8852,6 +8883,7 @@
         "method": "GET",
         "url": "{base}/api/planner/v1/projects/{project}/board"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -14603,6 +14635,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects/{project}/search"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -14899,6 +14932,7 @@
         "method": "GET",
         "url": "{base}/api/planner/v1/projects/{project}/entities/{kind}/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -19204,6 +19238,7 @@
         ],
         "url": "{base}/api/planner/v1/projects/{project}/entities"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -24674,6 +24709,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects/{project}/stories/{id}/transitions/explain"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -25060,6 +25096,7 @@
         ],
         "url": "{base}/api/planner/v1/projects/{project}/sync/conflicts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -35101,6 +35138,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/search"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -36641,6 +36679,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/sync/preview"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -57589,6 +57628,7 @@
         "method": "PUT",
         "url": "{base}/api/planner/v1/sync/sessions/{session}/documents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -57648,6 +57688,7 @@
         "method": "GET",
         "url": "{base}/api/workspaces/v2/workspaces"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -57821,6 +57862,7 @@
         "method": "POST",
         "url": "{base}/api/workspaces/v2/workspaces"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -57876,6 +57918,7 @@
         "method": "GET",
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -57953,6 +57996,7 @@
         "method": "DELETE",
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -58008,6 +58052,7 @@
         "method": "GET",
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -58123,6 +58168,7 @@
         "method": "POST",
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -58214,6 +58260,7 @@
         "method": "DELETE",
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -58346,6 +58393,7 @@
         ],
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/files"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -58456,6 +58504,7 @@
         ],
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/tree"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -58650,6 +58699,7 @@
         ],
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/files"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -58835,6 +58885,7 @@
         ],
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/file-edits"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59089,6 +59140,7 @@
         ],
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/file-patches"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59297,6 +59349,7 @@
         "method": "POST",
         "url": "{base}/api/workspaces/v2/workspaces/{workspace}/checkouts/{checkout}/execs"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59419,6 +59472,7 @@
         "method": "POST",
         "url": "{base}/api/colab/v2/rooms"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59474,6 +59528,7 @@
         "method": "GET",
         "url": "{base}/api/colab/v2/rooms/{room}/workspaces"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59619,6 +59674,7 @@
         "method": "POST",
         "url": "{base}/api/colab/v2/rooms/{room}/workspaces"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59725,6 +59781,7 @@
         "method": "PUT",
         "url": "{base}/api/colab/v2/rooms/{room}/workspaces/current"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59815,6 +59872,7 @@
         "method": "DELETE",
         "url": "{base}/api/colab/v2/rooms/{room}/workspaces/{checkout}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network",
         "file_secret"
@@ -59951,6 +60009,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -60177,6 +60236,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects/{project}/decisions/{id}/transitions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -65534,6 +65594,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects/{project}/entities"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -70946,6 +71007,7 @@
         "method": "PUT",
         "url": "{base}/api/planner/v1/projects/{project}/entities/{kind}/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -75241,6 +75303,7 @@
         "method": "DELETE",
         "url": "{base}/api/planner/v1/projects/{project}/entities/{kind}/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -79536,6 +79599,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects/{project}/entities/{kind}/{id}/restore"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -83840,6 +83904,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects/{project}/stories/{id}/gates"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -88127,6 +88192,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/projects/{project}/stories/{id}/transitions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -100064,6 +100130,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/sync/apply"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -111293,6 +111360,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/sync/confirm"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -111383,6 +111451,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/sync/conflicts/{id}/resolve"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -117933,6 +118002,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/sync/sessions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -118031,6 +118101,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/sync/sessions/{session}/apply"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -127981,6 +128052,7 @@
         "method": "POST",
         "url": "{base}/api/planner/v1/sync/sessions/{session}/confirm"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -128049,6 +128121,7 @@
         "method": "GET",
         "url": "{base}/api/planner/v1/sync/sessions/{session}/preview"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -138061,7 +138134,7 @@
       "service": "planning"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "base_url": "https://b10x.io",

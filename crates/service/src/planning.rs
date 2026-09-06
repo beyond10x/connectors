@@ -229,10 +229,11 @@ mod tests {
     fn document(driver: &str, shape: &str, request: &str) -> Document {
         Document::parse(&format!(
             r#"{{
-                "connector":"acme",
+                "schema_version":3,"connector":"acme",
                 "services":[{{"name":"default","base_url":"https://api.example"}}],
                 "operations":[{{
                     "id":"acme-call","service":"default","expose":false,"params":[],
+                    "request_semantics":"legacy_v1",
                     "{driver_key}":"{driver}","request":{request},"endpoint":{{}},
                     "risk":"high","idempotency":"non_idempotent","effects":["write","network"],
                     "interaction_shape":"{shape}","placement_requirement":"connectors_deployment",

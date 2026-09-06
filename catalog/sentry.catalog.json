@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Sentry auth token sent as a bearer — an organization, user or internal-integration token",
@@ -94,6 +94,7 @@
         "method": "GET",
         "url": "{base}/api/0/organizations/{organization_id_or_slug}/issues/{issue_id}/"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -312,6 +313,7 @@
         "method": "PUT",
         "url": "{base}/api/0/organizations/{organization_id_or_slug}/issues/{issue_id}/"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -483,6 +485,7 @@
         "method": "GET",
         "url": "{base}/api/0/projects/{organization_id_or_slug}/{project_id_or_slug}/"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -661,6 +664,7 @@
         "method": "GET",
         "url": "{base}/api/0/organizations/{organization_id_or_slug}/issues/{issue_id}/events/latest/"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -777,7 +781,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "0",
