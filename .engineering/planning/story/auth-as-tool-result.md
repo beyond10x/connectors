@@ -14,6 +14,8 @@ relations:
 - derived_from: epic:carried-constraints
 scope:
 - confidence: cited
+  path: .gitleaksignore
+- confidence: cited
   path: CHANGELOG.md
 - confidence: cited
   path: Cargo.lock
@@ -210,6 +212,8 @@ scope:
 - confidence: cited
   path: docs/design/22-authentication-remediation.md
 - confidence: cited
+  path: docs/security/secret-scan-baseline.md
+- confidence: cited
   path: ess/generated/clap/PLAN.md
 - confidence: cited
   path: ess/generated/clap/TARGET.md
@@ -229,7 +233,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 44
+revision: 47
 ---
 ## Acceptance
 
@@ -373,3 +377,11 @@ The server implementor's retained hosted-after execution still exited101 after t
 The coordinator reviewed the exact proposed-docs-503.patch, SHA2568f219e9c3e1cda60a93078c5a4cacfd19c3d58d0a4be7305455bbab2c993b051. Extend the server correction assignment to the already typed crates/server/src/hosted/docs/openapi.json and additive coverage in crates/server/src/hosted/tests/docs.rs. Add only these three existing response references, preserve every old503alternative and the v3-only409schema, and validate each retained unavailable response identity against the served503schema plus the plain error-body control. The Connection omission is a static observation until the added deciding test executes; do not label it an already measured product failure.
 
 Client/CLI owns the compiler while this source/test preparation proceeds. The server owner receives it back explicitly for the retained hosted regression, new served-doc deciding case, full server suite and strict/fmt. All original and first-review test assertions remain intact.
+
+## Publication source-digest match — 2026-09-07
+
+The expanded candidate 8243f6a7 public graph scan returned one new match in the complete immutable first-review correction report. The coordinator recomputed the cited OpenAPI file SHA-256 from committed source 77a5857c and confirmed it is a content digest. The exact match is verification-report/cli-auth-review1-corrections-20260907.md, line 66, generic-api-key. Auth scope now includes .gitleaksignore and docs/security/secret-scan-baseline.md. Product source and the second reviewer candidate remain unchanged.
+
+The initial empty-ignore-path attempt still suppressed historical matches and is not accepted as unignored evidence. Repeating with the repository .gitleaksignore physically absent yielded 56 findings with 55 unique fingerprints over 452 reachable commits, 42 public refs plus the candidate, 398 patch-bearing commits and 112,619,623 bytes. Exactly one fingerprint was outside the 91 existing entries. The original ignore bytes were restored after the scan. Both observations are retained. Add only that exact commit/path/rule/line fingerprint and its public explanation; retain all old entries, scanner configuration and script. Run the unchanged publication gate again on the committed result before pushing.
+
+The final reviewer also corrected a prior count label from the retained command logs: protocol 78 and service 68, the same 146 combined. The unique affected cohort remains 1,017 before its at-most-six new cases. This corrects the label without claiming any new execution.

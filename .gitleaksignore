@@ -1,4 +1,6 @@
 # Exact historical findings reviewed in docs/security/secret-scan-baseline.md.
+# Reviewed authentication verification-report source digest; see the dated baseline note.
+77a5857cb3cd37ebb6fd17886926029240338a01:.engineering/planning/verification-report/cli-auth-review1-corrections-20260907.md:generic-api-key:66
 # Fingerprint scoping ensures new findings, even under the same rule or path, still fail.
 #
 # Regenerate from a scan run with this file REMOVED. Scanning with it in place and asking which
