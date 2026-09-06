@@ -4,6 +4,46 @@ use protocol::{catalog, connection, datasource, event, operation};
 
 use crate::ClientError;
 
+pub(crate) fn validate_versioned_operation_response(
+    bytes: &[u8],
+    expected_version: operation::versions::Version,
+    request_id: &str,
+    request: &operation::OperationRequest,
+) -> Result<operation::v3::ResponseEnvelope, ClientError> {
+    let (version, response) =
+        operation::versions::decode_response(bytes).map_err(|_| ClientError::InvalidResponse)?;
+    if version != expected_version || response.request_id != request_id {
+        return Err(ClientError::InvalidResponse);
+    }
+    if let Some(auth) = response
+        .error
+        .as_ref()
+        .and_then(|error| error.authentication.as_ref())
+    {
+        let operation::OperationRequest::Invoke(invoke) = request else {
+            return Err(ClientError::InvalidResponse);
+        };
+        if auth.operation_ref != invoke.operation_ref
+            || auth.connection_ref != invoke.connection_ref
+        {
+            return Err(ClientError::InvalidResponse);
+        }
+    }
+    Ok(response)
+}
+
+pub(crate) fn validate_connection_v2_response(
+    bytes: &[u8],
+    request_id: &str,
+) -> Result<protocol::connection_v2::ResponseEnvelope, ClientError> {
+    let (version, response) = protocol::connection_v2::decode_response(bytes)
+        .map_err(|_| ClientError::InvalidResponse)?;
+    if version != protocol::connection_v2::Version::V0Alpha2 || response.request_id != request_id {
+        return Err(ClientError::InvalidResponse);
+    }
+    Ok(response)
+}
+
 pub(crate) fn validate_catalog_response(
     response: catalog::ResponseEnvelope,
     request_id: &str,
@@ -150,7 +190,7 @@ mod tests {
             check(
                 case,
                 LocalClient::new(&socket)
-                    .operation(&owner(), invoke())
+                    .operation_v2(&owner(), invoke())
                     .await,
             );
             serving.await.unwrap();
@@ -186,7 +226,7 @@ mod tests {
             check(
                 case,
                 client
-                    .operation("fixture-session", &owner(), invoke())
+                    .operation_v2("fixture-session", &owner(), invoke())
                     .await,
             );
             assert_eq!(calls.load(Ordering::SeqCst), 1);

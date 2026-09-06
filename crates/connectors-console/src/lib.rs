@@ -42,5 +42,6 @@ pub mod init;
 pub mod input;
 pub mod output;
 pub mod providers;
+pub mod remediation;
 
 pub use output::{emit, emit_error, payload, Format, OutputError};

@@ -21,6 +21,8 @@ pub(super) enum MainError {
     #[error(transparent)]
     Connect(#[from] connect::ConnectError),
     #[error(transparent)]
+    Remediation(#[from] remediation::RemediationError),
+    #[error(transparent)]
     Input(#[from] input::InputError),
     #[error(transparent)]
     Auth(#[from] auth::AuthError),
@@ -66,6 +68,7 @@ impl MainError {
             Self::Json(_) => "malformed-response",
             Self::Connect(connect::ConnectError::Unsupported(_)) => "unsupported-provider",
             Self::Connect(_) => "connect",
+            Self::Remediation(error) => error.code(),
             Self::Output(_) => "output",
             Self::Completions(_) => "output",
             Self::Refused(refusal) => &refusal.code,

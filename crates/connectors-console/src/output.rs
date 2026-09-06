@@ -156,13 +156,26 @@ pub fn emit_refusal_with_target(
     target: Option<&str>,
 ) {
     if !format.errors_on_stdout() {
-        return emit_error_with_target(format, &error.code, &error.message, target);
+        emit_error_with_target(format, &error.code, &error.message, target);
+        if let Some(authentication) = &error.authentication {
+            if let Ok(value) = serde_json::to_value(authentication) {
+                if let Ok(rendered) = render(format, &value) {
+                    eprintln!("{}", rendered.trim_end());
+                }
+            }
+        }
+        return;
     }
     let mut value = serde_json::json!({"error": {
         "code": error.code, "message": error.message, "retriable": error.retriable
     }});
     if let Some(delay) = error.retry_after_seconds {
         value["error"]["retry_after_seconds"] = Value::from(delay);
+    }
+    if let Some(authentication) = &error.authentication {
+        if let Ok(authentication) = serde_json::to_value(authentication) {
+            value["error"]["authentication"] = authentication;
+        }
     }
     if let Some(target) = target {
         value["target"] = Value::from(target);

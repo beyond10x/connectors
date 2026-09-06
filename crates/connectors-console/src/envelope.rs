@@ -28,15 +28,7 @@ macro_rules! reduce_envelope {
         $crate::reduce_envelope!(envelope)
     }};
     ($envelope:expr, operation) => {{
-        let envelope = $envelope;
-        let delay = envelope
-            .error
-            .as_ref()
-            .and_then(|error| error.retry_after_seconds);
-        $crate::reduce_envelope!(envelope).map_err(|mut error| {
-            error.retry_after_seconds = delay;
-            error
-        })
+        $crate::envelope::OperationEnvelope::reduce($envelope)
     }};
     ($envelope:expr) => {{
         let envelope = $envelope;
@@ -49,6 +41,7 @@ macro_rules! reduce_envelope {
                 message: error.message,
                 retriable: error.retriable,
                 retry_after_seconds: None,
+                authentication: None,
             }),
             (_, Some(result), None) => ::serde_json::to_value(result)
                 .map($crate::output::payload)
@@ -57,12 +50,14 @@ macro_rules! reduce_envelope {
                     message: error.to_string(),
                     retriable: false,
                     retry_after_seconds: None,
+                    authentication: None,
                 }),
             (_, None, None) => Err($crate::envelope::ReducedError {
                 code: "malformed-response".to_owned(),
                 message: "the Connector returned neither a result nor an error".to_owned(),
                 retriable: false,
                 retry_after_seconds: None,
+                authentication: None,
             }),
         }
     }};
@@ -97,6 +92,84 @@ pub struct ReducedError {
     pub message: String,
     pub retriable: bool,
     pub retry_after_seconds: Option<u64>,
+    pub authentication: Option<AuthenticationFacts>,
+}
+
+/// Reference-free model facts. No daemon string, private endpoint or caller input can fit here.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AuthenticationFacts {
+    need: protocol::operation::v3::AuthenticationNeed,
+    attempt: protocol::operation::v3::AuthenticationAttemptState,
+    next_action: protocol::operation::v3::AuthenticationNextAction,
+}
+
+/// Typed reduction keeps predecessor rate semantics separate from the v3 public projection.
+pub trait OperationEnvelope {
+    fn reduce(self) -> Result<serde_json::Value, ReducedError>;
+}
+
+impl OperationEnvelope for protocol::operation::ResponseEnvelope {
+    fn reduce(self) -> Result<serde_json::Value, ReducedError> {
+        let delay = self
+            .error
+            .as_ref()
+            .and_then(|error| error.retry_after_seconds);
+        crate::reduce_envelope!(self).map_err(|mut error| {
+            error.retry_after_seconds = delay;
+            error
+        })
+    }
+}
+
+impl OperationEnvelope for protocol::operation::v3::ResponseEnvelope {
+    fn reduce(self) -> Result<serde_json::Value, ReducedError> {
+        use protocol::operation::v3::OperationErrorCode as Code;
+        if self.validate().is_err() {
+            return Err(ReducedError {
+                code: "malformed-response".into(),
+                message: "the Connector returned an invalid operation response".into(),
+                retriable: false,
+                retry_after_seconds: None,
+                authentication: None,
+            });
+        }
+        if let Some(error) = self.error {
+            let message = match error.code {
+                Code::AuthenticationRequired => {
+                    "authentication is required; the operation was not attempted"
+                }
+                Code::OutcomeUnknown => {
+                    "the operation outcome is unknown; do not automatically repeat it"
+                }
+                Code::RateLimited => "the provider refused this operation because of a rate limit",
+                Code::ApprovalRequired => "the operation requires approval",
+                Code::ApprovalDenied => "operation approval was refused",
+                Code::NotGranted => "the operation was not granted",
+                Code::InvalidInput => "the operation input was invalid",
+                Code::StaleAuthority => "the operation description or authority is stale",
+                Code::NotFound => "the operation was not found",
+                Code::Unavailable => "the operation is unavailable",
+                Code::ResultTooLarge => "the operation result exceeded its bound",
+                Code::Protocol => "the operation protocol request was refused",
+            };
+            return Err(ReducedError {
+                code: serde_json::to_value(error.code)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| "refused".into()),
+                message: message.into(),
+                retriable: error.retriable,
+                retry_after_seconds: error.retry_after_seconds,
+                authentication: error.authentication.map(|value| AuthenticationFacts {
+                    need: value.need,
+                    attempt: value.attempt,
+                    next_action: value.next_action,
+                }),
+            });
+        }
+        // Ordinary successful operation results retain their existing contract.
+        crate::reduce_envelope!(self)
+    }
 }
 
 #[cfg(test)]
