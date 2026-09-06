@@ -1251,11 +1251,15 @@ fn refusal(code: &Value, message: &str, retriable: bool) -> Value {
 }
 
 fn operation_refusal(error: &OperationError) -> Value {
-    refusal(
+    let mut result = refusal(
         &serde_json::to_value(error.code).expect("closed error vocabulary serializes"),
         &error.message,
         error.retriable,
-    )
+    );
+    if let Some(delay) = error.retry_after_seconds {
+        result["structuredContent"]["retry_after_seconds"] = json!(delay);
+    }
+    result
 }
 
 fn datasource_refusal(error: &DatasourceError) -> Value {

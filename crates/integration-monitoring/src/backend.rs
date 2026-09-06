@@ -670,6 +670,7 @@ impl MonitoringInner {
             return Err(operation_not_found());
         }
         Ok(OperationResult::Describe(OperationDescription {
+            rate_advice: None,
             operation_ref: request.operation_ref.clone(),
             title: title(&request.operation_ref).to_owned(),
             description: operation.contract_description().to_owned(),

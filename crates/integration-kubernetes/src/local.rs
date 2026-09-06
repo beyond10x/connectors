@@ -542,6 +542,7 @@ impl KubernetesLocalBackend {
         let operation =
             monitoring_model::operation_document(operation_ref).ok_or_else(operation_not_found)?;
         Ok(OperationDescription {
+            rate_advice: None,
             operation_ref: operation_ref.to_owned(),
             title: monitoring_model::title(operation_ref).to_owned(),
             description: operation.contract_description().to_owned(),

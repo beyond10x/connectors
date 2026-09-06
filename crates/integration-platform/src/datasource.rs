@@ -461,9 +461,9 @@ fn datasource_from_operation(error: OperationError) -> DatasourceError {
         OperationErrorCode::StaleAuthority => DatasourceErrorCode::StaleAuthority,
         OperationErrorCode::ResultTooLarge => DatasourceErrorCode::ResultTooLarge,
         OperationErrorCode::Protocol => DatasourceErrorCode::Protocol,
-        OperationErrorCode::Unavailable | OperationErrorCode::OutcomeUnknown => {
-            DatasourceErrorCode::Unavailable
-        }
+        OperationErrorCode::Unavailable
+        | OperationErrorCode::OutcomeUnknown
+        | OperationErrorCode::RateLimited => DatasourceErrorCode::Unavailable,
     };
     datasource_error(code, "workspace owner read failed", error.retriable)
 }

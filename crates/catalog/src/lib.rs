@@ -243,6 +243,10 @@ pub enum RequiredCapability {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Operation {
+    /// Existing fixed vendor declaration, when published.
+    pub rate_limit: Option<&'static RateLimit>,
+    /// Every documented applicability category; consumers must not infer one from credentials.
+    pub conditional_rate_limits: &'static [ConditionalRateLimit],
     /// The versioned interpretation of its stored schemas and request template.
     pub request_semantics: RequestSemantics,
     /// The Flux symbol the operation is declared and called by, e.g. `zendesk-ticket-show`. Unique
@@ -346,6 +350,52 @@ pub struct Operation {
     /// Whether the operation is published to callers. An unexposed operation exists (its document
     /// entry is the audit trail) but is not offered.
     pub expose: bool,
+}
+
+/// The existing fixed declaration shape.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RateLimit {
+    /// Requests in the window.
+    pub requests: u32,
+    /// Window duration.
+    pub per_seconds: u32,
+    /// Optional published throttle bucket.
+    pub bucket: Option<String>,
+}
+
+/// Interpretation of a stated rate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RateLimitBasis {
+    /// At least this allowance.
+    MinimumAllowance,
+    /// The stated maximum.
+    Ceiling,
+}
+
+/// A numeric rate whose meaning is explicit.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublishedRate {
+    /// Requests in the window.
+    pub requests: u32,
+    /// Window in seconds.
+    pub per_seconds: u32,
+    /// Minimum allowance or ceiling.
+    pub basis: RateLimitBasis,
+}
+
+/// Source-grounded conditions, with no rate asserted when the source establishes none.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConditionalRateLimit {
+    /// Applicability conditions.
+    pub applies_when: String,
+    /// Optional established rate.
+    pub rate: Option<PublishedRate>,
+    /// Official HTTPS reference.
+    pub source_url: String,
 }
 
 /// Closed catalog request interpretation. Schema 3 readers must recognize this before dispatch.

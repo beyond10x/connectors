@@ -313,6 +313,7 @@ impl McpBackend {
             .tool(&reviewed.remote_tool)
             .ok_or_else(operation_not_found)?;
         Ok(OperationResult::Describe(OperationDescription {
+            rate_advice: None,
             operation_ref: reviewed.operation_ref.clone(),
             title: reviewed.title.clone(),
             description: reviewed.description.clone(),

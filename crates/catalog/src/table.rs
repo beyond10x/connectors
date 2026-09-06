@@ -241,6 +241,10 @@ struct RawChoice {
 
 #[derive(Deserialize)]
 struct RawOperation {
+    #[serde(default)]
+    rate_limit: Option<crate::RateLimit>,
+    #[serde(default)]
+    conditional_rate_limits: Vec<crate::ConditionalRateLimit>,
     request_semantics: crate::RequestSemantics,
     id: String,
     service: String,
@@ -612,6 +616,11 @@ fn build_operation(
             )
         });
     Operation {
+        rate_limit: raw
+            .rate_limit
+            .clone()
+            .map(|rate| &*Box::leak(Box::new(rate))),
+        conditional_rate_limits: leak_slice(raw.conditional_rate_limits.clone()),
         request_semantics: raw.request_semantics,
         id: leak_str(raw.id.clone()),
         provider: leak_str(document.connector.clone()),

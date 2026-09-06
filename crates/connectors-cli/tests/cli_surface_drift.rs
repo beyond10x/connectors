@@ -309,7 +309,12 @@ fn deployment_protocol_modules() -> BTreeSet<String> {
         if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
             continue;
         }
-        let carries_a_request = read(&path).lines().any(|line| {
+        let owner = if path.file_stem().and_then(|stem| stem.to_str()) == Some("operation") {
+            directory.join("operation/legacy.rs")
+        } else {
+            path.clone()
+        };
+        let carries_a_request = read(&owner).lines().any(|line| {
             line.strip_prefix("pub enum ").is_some_and(|rest| {
                 rest.split(|character: char| !character.is_alphanumeric())
                     .next()

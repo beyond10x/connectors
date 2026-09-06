@@ -1,7 +1,7 @@
 # **A `naming.wire` on a command is the `method` tag, and nothing else.**
 #
 # `ConnectionRequest` (crates/protocol/src/connection.rs:28-48), `OperationRequest`
-# (crates/protocol/src/operation.rs:42-56), `CatalogRequest` (crates/protocol/src/catalog.rs:34-46)
+# (crates/protocol/src/operation/legacy.rs:42-56), `CatalogRequest` (crates/protocol/src/catalog.rs:34-46)
 # and `EventRequest` (crates/protocol/src/event.rs:29-40) are each
 # `#[serde(tag = "method", content = "params", rename_all = "snake_case", deny_unknown_fields)]`,
 # so the word a caller writes is the variant identifier in **snake_case** — never kebab-case. The
