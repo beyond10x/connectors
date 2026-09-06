@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Fly access token, preferably scoped to the app or organization this connection manages",
@@ -59,6 +59,7 @@
         "method": "GET",
         "url": "{base}/platform/regions"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -135,6 +136,7 @@
         "method": "GET",
         "url": "{base}/apps/{app_name}/machines"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -235,6 +237,7 @@
         "method": "GET",
         "url": "{base}/apps/{app_name}/machines/{machine_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -341,6 +344,7 @@
         "method": "GET",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -455,6 +459,7 @@
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -555,6 +560,7 @@
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/start"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -632,6 +638,7 @@
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/stop"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -709,6 +716,7 @@
         "method": "POST",
         "url": "{base}/apps/{app_name}/machines/{machine_id}/restart"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -786,6 +794,7 @@
         "method": "DELETE",
         "url": "{base}/apps/{app_name}/machines/{machine_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -794,7 +803,7 @@
       "service": "machines"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v1",

@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use clap::{CommandFactory, Parser, Subcommand};
 use connectors_client::{AuthenticatedHostedClient, IdentityError, LocalClient, LoginOptions};
 use connectors_runtime::{
-    default_config_path, default_state_root, validate_state_root, HostedRuntime, PersonalConfig,
-    PersonalRuntime, RuntimeError,
+    default_config_path, default_state_root, local_socket_absent, validate_state_root,
+    HostedRuntime, PersonalConfig, PersonalRuntime, RuntimeError,
 };
 use protocol::connection::{
     CandidateActivateRequest, CandidateSearchRequest, ConnectionRequest, MaterializeRequest,
@@ -267,7 +267,12 @@ enum ConnectionCommand {
         integration: String,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -289,7 +294,12 @@ enum ConnectionCommand {
         config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -302,7 +312,12 @@ enum ConnectionCommand {
         source: String,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -326,7 +341,12 @@ enum OperationCommand {
         config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 25)]
+        #[arg(
+            long,
+            default_value_t = protocol::operation::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::operation::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::operation::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -387,7 +407,12 @@ enum EventCommand {
         config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::event::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::event::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::event::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -459,6 +484,8 @@ enum MainError {
     McpOutput,
     #[error("--target hosted cannot be combined with local-only --config or --state-root")]
     TargetConflict,
+    #[error("events require a persistent daemon; run `connectors serve local` with the same --config and --state-root")]
+    DaemonRequired,
 }
 
 impl MainError {
@@ -486,6 +513,7 @@ impl MainError {
             Self::Unhealthy => "unhealthy",
             Self::McpOutput => "invalid-argument",
             Self::TargetConflict => "target-conflict",
+            Self::DaemonRequired => "daemon-required",
             Self::Input(_) => "invalid-argument",
             Self::Auth(_) => "credential-store",
             Self::Admin(_) => "admin",
@@ -1133,12 +1161,23 @@ async fn connection(
         emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
         return Ok(());
     }
-    let config = read_config(config_path)?;
+    let config_path = config_path.map_or_else(default_config_path, Ok)?;
+    let config = PersonalConfig::read(&config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    validate_state_root(&state_root)?;
-    let response = LocalClient::new(state_root.join("connectors.sock"))
-        .connection(&config.owner_context(), request)
-        .await?;
+    let response = if local_socket_absent(&state_root)? {
+        PersonalRuntime::one_shot_connection(
+            &config_path,
+            state_root,
+            config.owner_context(),
+            request,
+        )
+        .await?
+    } else {
+        validate_state_root(&state_root)?;
+        LocalClient::new(state_root.join("connectors.sock"))
+            .connection(&config.owner_context(), request)
+            .await?
+    };
     emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }
@@ -1190,6 +1229,9 @@ async fn event(format: Format, target: Target, command: EventCommand) -> Result<
     }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
+    if local_socket_absent(&state_root)? {
+        return Err(MainError::DaemonRequired);
+    }
     validate_state_root(&state_root)?;
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .event(&config.owner_context(), request)
@@ -1287,12 +1329,23 @@ async fn operation(
         emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
         return Ok(());
     }
-    let config = read_config(config_path)?;
+    let config_path = config_path.map_or_else(default_config_path, Ok)?;
+    let config = PersonalConfig::read(&config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    validate_state_root(&state_root)?;
-    let response = LocalClient::new(state_root.join("connectors.sock"))
-        .operation(&config.owner_context(), request)
-        .await?;
+    let response = if local_socket_absent(&state_root)? {
+        PersonalRuntime::one_shot_operation(
+            &config_path,
+            state_root,
+            config.owner_context(),
+            request,
+        )
+        .await?
+    } else {
+        validate_state_root(&state_root)?;
+        LocalClient::new(state_root.join("connectors.sock"))
+            .operation(&config.owner_context(), request)
+            .await?
+    };
     emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
     Ok(())
 }

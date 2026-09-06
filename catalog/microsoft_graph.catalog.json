@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Microsoft Entra ID OAuth2 access token sent as a bearer; short-lived, minted outside flux (delegated sign-in or application client-credentials), and refreshed by the host rather than by generated Flux",
@@ -94,6 +94,7 @@
         "method": "GET",
         "url": "{base}/v1.0/me/messages/{message_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -284,6 +285,7 @@
         "method": "POST",
         "url": "{base}/v1.0/me/messages/{message_id}/reply"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -327,6 +329,7 @@
         "method": "GET",
         "url": "{base}/v1.0/me/mailFolders"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -433,6 +436,7 @@
         "method": "GET",
         "url": "{base}/v1.0/me/events/{event_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -719,6 +723,7 @@
         "method": "POST",
         "url": "{base}/v1.0/me/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -843,6 +848,7 @@
         "method": "GET",
         "url": "{base}/v1.0/me/calendar"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -969,6 +975,7 @@
         "method": "GET",
         "url": "{base}/v1.0/me/drive/items/{item_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1165,6 +1172,7 @@
         "method": "PATCH",
         "url": "{base}/v1.0/me/drive/items/{item_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1322,6 +1330,7 @@
         ],
         "url": "{base}/v1.0/me/messages"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -8149,6 +8158,7 @@
         ],
         "url": "{base}/v1.0/me/outlook/masterCategories"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9486,6 +9496,7 @@
         ],
         "url": "{base}/v1.0/me/outlook/supportedTimeZones()"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9620,6 +9631,7 @@
         ],
         "url": "{base}/v1.0/me/outlook/supportedLanguages()"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -9678,7 +9690,7 @@
       "service": "calendar"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v1.0",

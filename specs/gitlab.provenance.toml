@@ -1,0 +1,54 @@
+coverage_path = "specs/gitlab/coverage-19.4.toml"
+coverage_sha256 = "970c539470de4d9c8b2edbd6740f72794a633e5f1d3310349034b6647e64262a"
+origin = "vendor"
+path = "specs/gitlab/openapi-19.4.yaml"
+projection_notes = [
+    "Complete vendor source retained; the four schedule operations are a first delivery projection, not complete connector coverage.",
+    "Existing inline operations retain their original authored provenance and explicit legacy_v1 semantics until separately migrated.",
+    "Official schedule docs describe list, inputs and variables as arrays while the source references objects; literal source schemas are preserved without object-to-array corrections.",
+    "Selected schemas preserve requiredness, nullable, defaults, unions and constraints through standards-based OpenAPI 3.0 to JSON Schema translation. Project parameters retain string/integer alternatives and use safe path encoding.",
+    "Complete request bodies include heterogeneous inputs and preserve optional body/field omission separately from explicit null. The source inputs.value array alternative omits items, contrary to OpenAPI 3.0 structural requirements; its absent constraint remains absent and is diagnosed. No source-validity certification is claimed.",
+    "OAuth source metadata is not an operation or scope grant; established provider /oauth endpoints and reviewed read_api/api requirements remain authoritative for this connector.",
+    "Administrative versus regular-user surfaces remain unclassified until source-grounded permission review; a projection never grants authority.",
+]
+references = [
+    "https://docs.gitlab.com/api/openapi/",
+    "https://docs.gitlab.com/api/pipeline_schedules/",
+    "https://docs.gitlab.com/api/rest/authentication/",
+    "https://docs.gitlab.com/api/rest/",
+]
+refresh = "cargo run -p catalog-cli --locked --example vendor_gitlab -- --input <downloaded-immutable-openapi.yaml> --root ."
+retrieved = "2026-09-06"
+scrub = "Remove OpenAPI example/examples values and component Example Object value/externalValue only, preserving declaration names and all endpoint/schema structure; deterministic YAML serialization."
+scrubbed_values = 4390
+sha256 = "435fa94969a44a8baf0e8d8cb4d6cf82186a19adc3ad449e378f54cf80d0b7f2"
+source_operations = 1847
+source_paths = 1367
+upstream = "https://gitlab.com/gitlab-org/gitlab/-/raw/eaeb4b8b88fdee3fe9b1d1a54397226cf191c201/doc/api/openapi/openapi_v3.yaml"
+upstream_revision = "eaeb4b8b88fdee3fe9b1d1a54397226cf191c201"
+upstream_sha256 = "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+upstream_version = "19.4"
+
+[[selected_operation]]
+catalog_id = "gitlab-pipeline-schedule-list"
+method = "GET"
+operation_id = "getApiV4ProjectsIdPipelineSchedules"
+path = "/api/v4/projects/{id}/pipeline_schedules"
+
+[[selected_operation]]
+catalog_id = "gitlab-pipeline-schedule-create"
+method = "POST"
+operation_id = "postApiV4ProjectsIdPipelineSchedules"
+path = "/api/v4/projects/{id}/pipeline_schedules"
+
+[[selected_operation]]
+catalog_id = "gitlab-pipeline-schedule-update"
+method = "PUT"
+operation_id = "putApiV4ProjectsIdPipelineSchedulesPipelineScheduleId"
+path = "/api/v4/projects/{id}/pipeline_schedules/{pipeline_schedule_id}"
+
+[[selected_operation]]
+catalog_id = "gitlab-pipeline-schedule-delete"
+method = "DELETE"
+operation_id = "deleteApiV4ProjectsIdPipelineSchedulesPipelineScheduleId"
+path = "/api/v4/projects/{id}/pipeline_schedules/{pipeline_schedule_id}"

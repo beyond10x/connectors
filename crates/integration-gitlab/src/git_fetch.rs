@@ -14,6 +14,8 @@ use service::{
 use sha2::{Digest as _, Sha256};
 use zeroize::Zeroizing;
 
+use crate::transport::git_http_headers;
+
 #[path = "git_fetch_advertisement.rs"]
 mod advertisement;
 use advertisement::ExactAdvertisementStream;
@@ -427,7 +429,7 @@ impl GitFetchBroker for GitlabBackend {
                 .query_pairs_mut()
                 .append_pair("service", "git-upload-pack");
         }
-        let mut headers = bearer_headers(&token);
+        let mut headers = git_http_headers(&token);
         if version == GitVersion::V2 {
             headers.insert("git-protocol".to_owned(), "version=2".to_owned());
         }

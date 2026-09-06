@@ -12,6 +12,9 @@ version = 1
 path = "catalog/connector-document.schema.json"
 
 [[schema]]
+path = "catalog/connector-document-v3.schema.json"
+
+[[schema]]
 path = "crates/connector-spec/schema/provider-toml.schema.json"
 
 [[schema]]
@@ -67,7 +70,7 @@ path = "crates/server/src/hosted/docs/openapi.schema.json"
 
 [[document]]
 pattern = "catalog/*.catalog.json"
-schema = "catalog/connector-document.schema.json"
+schema = "catalog/connector-document-v3.schema.json"
 
 [[document]]
 path = "fixtures/substrate-wire-0.1.0-axis-projection.json"
