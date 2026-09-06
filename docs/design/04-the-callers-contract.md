@@ -109,3 +109,35 @@ objects. Its heterogeneous input array branch omits `items`, contrary to OpenAPI
 requirements. Both the literal and caller schemas retain the missing constraint, with an
 operation-level source diagnostic. Preserving stated constraints does not certify source validity.
 Credentials, selected Connections, grants and egress continue to enforce authority independently.
+
+## 2026-09-06 amendment: conditional rate metadata and publication order
+
+Complete the schema-3 migration with optional `conditional_rate_limits` alongside the existing
+fixed `rate_limit` shape. Each alternative retains applicability text, a source URL and an optional
+published rate with `requests`, `per_seconds` and the basis `minimum_allowance` or `ceiling`.
+An absent numeric rate states no quota. Source URLs follow the explicit lowercase-HTTPS RFC 3986
+ASCII URI profile shared by the authoring reader, canonical schema and operation protocol;
+percent-encoded spelling is preserved. The [v2 contract](../../contracts/connector-operation/v0alpha2/README.md)
+records the complete bounds and grammar. These metadata fields do not rewrite selected vendor
+request or response schemas, confer authority, or select an application category from credentials.
+
+Operation v0alpha2 descriptions project these declarations as `rate_advice`, adding suggested
+spacing `ceil(per_seconds * 1000 / requests)` milliseconds where a numeric rate exists. Expose all
+alternatives with their source and applicability; do not turn a minimum allowance into a universal
+ceiling or infer a quota for an exempt category. This is advice, with no automatic pacing or retry.
+A definite provider 429 uses `rate_limited` with an optional trusted unsigned Retry-After delta;
+malformed or ambiguous advice does not erase the refusal. An uncertain mutating outcome remains
+`outcome_unknown`. V1 projection omits the new metadata/delay and maps throttling to `unavailable`
+without changing its frozen bundle. Protocol mismatch does not authorize an invocation resend.
+
+Publish schema 3 only with its matching canonical writer, generated schema/documents/pack, typed
+reader and resolver. Readers must reject an unsupported schema or request-semantics profile before
+serving records or assembling requests. An external consumer upgrades its reader/resolver before
+loading the new pack; independently pinned executables may retain their complete older pair.
+Operation v2 support precedes a client opting into that identity, and local CLI/daemon upgrades
+stay aligned. Source publication does not establish external consumer adoption.
+
+The schema-2 artifact and operation-v1 bundle remain historical authorities with unchanged bytes.
+Retain deterministic generation, source-to-caller-schema and schema-to-request fixtures, explicit
+old-reader refusal, and complete repository-gate evidence for the assembled publication revision.
+The earlier schema-3 amendment's source-validity limits and legacy-profile distinction still apply.
