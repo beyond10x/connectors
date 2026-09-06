@@ -195,6 +195,47 @@ Original-byte decoding must retain duplicate-key refusal; bound Connection comma
 refusal when projected to v1. Pure types and vectors cannot establish grant, custody, session or
 acknowledgement behavior.
 
+## Assembled implementation checkpoint — 2026-09-06
+
+Source `df637dc00bd47ffc4f300c89d33b0853c913e257` assembles runtime/server
+`1156626a57bc3149bfd40264965d784be0138499`, client/console/CLI
+`d7e7a673600c868078659d6412a1f6ccb7aefca8`, and hosted documentation
+`9bac5f2f1466bff45404b146965b215fc91acf98`, retaining the frozen protocol/service
+and reviewed OAuth parents. Complete assembled gates and the whole-authentication review are
+pending at this checkpoint; these source observations do not claim protocol acceptance or external
+consumer adoption.
+
+The CLI selects Operation v3 by default and offers explicit operation-only
+`--protocol-version v2|v3`. Each path sends the selected identity once through its actual socket,
+hosted or one-shot API. The retained v2 rate tests explicitly select v2 and retain their original
+response and assertion bytes. Connection remediation independently selects v2. Identity 401 renewal
+retains its existing behavior; an admitted authentication-required 409 causes no renewal or resend.
+
+Personal remediation uses the configured grant reference, an absent revision for the current
+unrevisioned policy, and the actual policy/current-authority owner. The additive service admission
+factory defaults to Unsupported. Its status-only authority check defaults to the existing strict
+check; the personal owner can distinguish current policy admission from an expired session without
+ignoring an opaque receiver rejection. Start and FULL custody publication remain strict. Authorized
+expired status and unusable acknowledgement do not roll back already published credentials.
+
+Production acquisition is personal-local. Hosted v2 admission requires the real operation grant and
+management authority, then returns Unsupported where no acquisition adapter exists. The explicit
+bearer Connection v2 transport is available, but no authenticated hosted bound-acquisition helper
+invents a combined Identity scope. Bound CLI setup requires a persistent daemon, uses the protected
+human instruction destination, acknowledges once, validates fresh matching descriptions and input,
+and returns closed readiness facts for a separate explicit invocation. Public CLI and MCP
+authentication output omits arbitrary daemon references and messages.
+
+The deciding tests exercise actual Unix daemon/registry/OAuth composition, current-policy and
+receiver revocation, expiry, concurrent acknowledgement, private presentation, strict version
+selection, hosted grant/approval ordering and one-shot shutdown. The local completion case observes
+zero operation dispatch through remediation and exactly one operation request after a separate
+explicit v3 invocation. The served OpenAPI tests cover all retained versions and all 369 existing
+Operation v2/v3 and Connection v2 schema vectors. Original product failures, missing-API diagnostics
+and corrected new-fixture failures remain distinct evidence. ESS retains the same value types and
+lifecycle structure; Rust admission, expiry and output safety remain executable obligations rather
+than guarantees supplied by those field types.
+
 OAuth's actual runtime and trusted-client handoff remains unfinished. Its shared owners, service
 preflight, session binding, transports and default-client switch stay behind that completed source
 handoff. The independent protocol slice acquires no runtime files or credential/session authority;
