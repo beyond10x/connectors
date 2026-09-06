@@ -293,7 +293,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 41
+revision: 42
 ---
 ## Acceptance
 
@@ -407,3 +407,13 @@ Connection v1 cannot represent endpoint-free Pending. After instructions retire,
 Source81fac96b869c6f76a70ba3d15ab312269de2266d is integrated atec987d82. The additive SqliteState::open_full requires file-backed WAL with synchronous=FULL before schema creation and checks the effective mode. Existing NORMAL constructors and their callers retain their behavior. The package suite measured9 to14 passing tests, with3 deciding pre-fix failures retained; strict all-target Clippy and formatting pass. Tests cover effective PRAGMAs and real committed records observed from another connection and after reopening, not a simulated power loss.
 
 Exact source SHA256c18c8cc6cb575d5ae5ea82471c2cc88727844235939987be4de4e54b88c15af5 was checked before commit. Raw reports, source patch, manifest and command results are in `~/.cache/connectors-cli-wave-20260906/connect-session-oauth-custody-in-personal-posture/stage2a-*`. This port alone does not complete OAuth runtime custody or its independent whole-unit review. The completed rate schema3 source must be published before schema4 publication; shared consumer owners remain with rate until review handoff.
+
+## Independent private custody kernel slice — 2026-09-06
+
+Stage2B may proceed from8e3797dde4309f878b66668ef14735bc5ac3df65 while the completed rate source receives independent review in its own tree. The exact source owners are crates/service/src/connect_session.rs; new crates/integration-catalog/src/custody.rs and custody_tests.rs; a private module registration only in integration-catalog/src/lib.rs; and a state-sqlite dependency edge only in integration-catalog/Cargo.toml. Existing scoped locks may receive required metadata closure with unchanged existing versions; any further path requires coordinator assignment before writing. No rate source or test ownership transfers here.
+
+Use the receiver-owned private Preparing guard to prevent a false terminal session outcome after uncertain prepare/abort. It does not authorize credential commit. Only the later serialized current-authority claim sampled strictly before the original deadline, followed by confirmed FULL persistence of the captured decision, permits commit. Recovery never substitutes requested or backdated time. Preserve the original public Connection v1 states and raw-session behavior. The private kernel uses one unresolved transaction per dedicated prepared store and a contiguous safe reclamation watermark.
+
+The kernel remains normally compiled but privately uncalled until actual OAuth acquisition wiring. One explicitly temporary module-scoped non-test expect(dead_code) is permitted for that intermediate state and must be removed by the later wiring before whole-story completion/publication. It is not permission to suppress other diagnostics, change existing assertions, expose a fake backend or claim runtime OAuth behavior. No credential/address secrets enter serialized journal or errors. The prepared-store port does not expose independent digest readback; recovery claims must respect that limit.
+
+The retained stage2b-plan.md in the assigned OAuth scratch specifies the complete transaction/recovery matrix and decisive barriers, clock and real FULL SQLite/FileStore fixtures. Preserve actual pre-fix failures and existing tests. Full affected service/catalog tests, strict Clippy/format checks and exact lock closure are required for this slice. Whole OAuth runtime wiring, its independent review and complete gate remain outstanding; complete schema3 publication still precedes schema4 publication.
