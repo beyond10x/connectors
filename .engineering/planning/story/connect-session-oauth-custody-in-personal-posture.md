@@ -293,7 +293,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 40
+revision: 41
 ---
 ## Acceptance
 
@@ -401,3 +401,9 @@ Stage1 source fc26525efaf2ca86ff4e4b003ecbcfe0751bf561 adds pure device polling/
 The stage2 read-only plan identified that the existing SQLite NORMAL durability cannot support ordering a recoverable decision before an fsynced credential commit. Add an explicit FULL-durability constructor in state-sqlite; retain existing callers. Design21 now defines the serialized completion claim as the authorization cutoff: after prepare, capture internal trusted authorized_at before the deadline while rechecking the same session/grant/generation. Persist that exact value-free decision before committing credentials. I/O can finish later. Before-claim expiry aborts; after-claim expiry cannot publish Expired; uncertain decision writes remain RecoveryRequired. Recovery aborts without a durable decision and finishes only a valid decision whose authorized_at precedes its captured deadline. No caller supplies or backdates time.
 
 Connection v1 cannot represent endpoint-free Pending. After instructions retire, Committing/RecoveryRequired therefore uses the existing safe Unavailable refusal while internal recovery continues; only coherent publication produces Completed. Trusted bounded status polling repeats neither provider authorization nor operation execution. Barrier and restart cases must prove these boundaries in stage2. Runtime edits still await the rate unit's shared-owner handoff.
+
+## Durable journal port integrated — 2026-09-06
+
+Source81fac96b869c6f76a70ba3d15ab312269de2266d is integrated atec987d82. The additive SqliteState::open_full requires file-backed WAL with synchronous=FULL before schema creation and checks the effective mode. Existing NORMAL constructors and their callers retain their behavior. The package suite measured9 to14 passing tests, with3 deciding pre-fix failures retained; strict all-target Clippy and formatting pass. Tests cover effective PRAGMAs and real committed records observed from another connection and after reopening, not a simulated power loss.
+
+Exact source SHA256c18c8cc6cb575d5ae5ea82471c2cc88727844235939987be4de4e54b88c15af5 was checked before commit. Raw reports, source patch, manifest and command results are in `~/.cache/connectors-cli-wave-20260906/connect-session-oauth-custody-in-personal-posture/stage2a-*`. This port alone does not complete OAuth runtime custody or its independent whole-unit review. The completed rate schema3 source must be published before schema4 publication; shared consumer owners remain with rate until review handoff.
