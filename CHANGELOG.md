@@ -14,6 +14,13 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 - Catalog write descriptions now use any admitting connection instead of being hidden by an
   earlier read-only connection. Search and describe report required approval for writes, matching
   the operation protocol; invocation still validates the explicitly selected connection.
+- Add ConnectorOperation v0alpha2 with structured `rate_limited` refusals, optional trusted
+  `retry_after_seconds`, and source-grounded rate advice. Continue serving v0alpha1 with explicit
+  loss of the new fields; neither a delay nor version negotiation triggers an invocation resend.
+- Move the canonical catalog producer, schema, pack reader and resolver together to schema 3.
+  Explicit request-semantics profiles preserve supported source constraints and omission versus
+  null for migrated operations; conditional rate metadata stays advisory. Keep the schema-2
+  artifact frozen and require matching readers before loading a schema-3 pack.
 
 ## 0.6.5 — 2026-09-05
 
