@@ -75,65 +75,13 @@ impl LocalClient {
         pending: &PendingPersonalOAuth,
         expected_origin: &str,
     ) -> Result<PersonalOAuthInstructions, ClientError> {
-        let remaining = pending
-            .expires_at_unix_ms
-            .checked_sub(oauth_now()?)
-            .filter(|remaining| *remaining > 0)
-            .ok_or(ClientError::PersonalOAuthRefused)?;
-        let remaining = Duration::from_millis(remaining).min(
-            pending
-                .deadline
-                .saturating_duration_since(tokio::time::Instant::now()),
-        );
-        if remaining.is_zero() {
-            return Err(ClientError::PersonalOAuthRefused);
-        }
-        let (url, capability) = oauth_instruction_endpoint(&pending.browser_url)?;
-        let client = reqwest::Client::builder()
-            .no_proxy()
-            .redirect(reqwest::redirect::Policy::none())
-            .timeout(remaining.min(Duration::from_secs(5)))
-            .build()
-            .map_err(|_| ClientError::PersonalOAuthInstructions)?;
-        let mut response = client
-            .get(url)
-            .header("X-Connect-Session", capability.as_str())
-            .send()
-            .await
-            .map_err(|_| ClientError::PersonalOAuthInstructions)?;
-        if response.status() != reqwest::StatusCode::OK
-            || response
-                .content_length()
-                .is_some_and(|length| length > 64 * 1024)
-            || !response
-                .headers()
-                .get(reqwest::header::CACHE_CONTROL)
-                .and_then(|header| header.to_str().ok())
-                .is_some_and(|header| {
-                    header
-                        .split(',')
-                        .any(|part| part.trim().eq_ignore_ascii_case("no-store"))
-                })
-        {
-            return Err(ClientError::PersonalOAuthInstructions);
-        }
-        let mut bytes = Zeroizing::new(Vec::new());
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| ClientError::PersonalOAuthInstructions)?
-        {
-            if bytes.len().saturating_add(chunk.len()) > 64 * 1024 {
-                return Err(ClientError::PersonalOAuthInstructions);
-            }
-            bytes.extend_from_slice(&chunk);
-        }
-        if oauth_now()? >= pending.expires_at_unix_ms
-            || tokio::time::Instant::now() >= pending.deadline
-        {
-            return Err(ClientError::PersonalOAuthRefused);
-        }
-        parse_personal_oauth_instructions(&bytes, expected_origin)
+        fetch_personal_oauth_instructions(
+            &pending.browser_url,
+            pending.expires_at_unix_ms,
+            pending.deadline,
+            expected_origin,
+        )
+        .await
     }
 
     /// Poll unchanged Connection v1. Guarded completion may report Unavailable while durable I/O
@@ -224,7 +172,69 @@ impl LocalClient {
     }
 }
 
-fn oauth_now() -> Result<u64, ClientError> {
+/// Shared protected instruction retrieval; the caller supplies the captured receiver deadline.
+pub(super) async fn fetch_personal_oauth_instructions(
+    browser_url: &str,
+    expires_at_unix_ms: u64,
+    deadline: tokio::time::Instant,
+    expected_origin: &str,
+) -> Result<PersonalOAuthInstructions, ClientError> {
+    let remaining = expires_at_unix_ms
+        .checked_sub(oauth_now()?)
+        .filter(|remaining| *remaining > 0)
+        .ok_or(ClientError::PersonalOAuthRefused)?;
+    let remaining = Duration::from_millis(remaining)
+        .min(deadline.saturating_duration_since(tokio::time::Instant::now()));
+    if remaining.is_zero() {
+        return Err(ClientError::PersonalOAuthRefused);
+    }
+    let (url, capability) = oauth_instruction_endpoint(browser_url)?;
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(remaining.min(Duration::from_secs(5)))
+        .build()
+        .map_err(|_| ClientError::PersonalOAuthInstructions)?;
+    let mut response = client
+        .get(url)
+        .header("X-Connect-Session", capability.as_str())
+        .send()
+        .await
+        .map_err(|_| ClientError::PersonalOAuthInstructions)?;
+    if response.status() != reqwest::StatusCode::OK
+        || response
+            .content_length()
+            .is_some_and(|length| length > 64 * 1024)
+        || !response
+            .headers()
+            .get(reqwest::header::CACHE_CONTROL)
+            .and_then(|header| header.to_str().ok())
+            .is_some_and(|header| {
+                header
+                    .split(',')
+                    .any(|part| part.trim().eq_ignore_ascii_case("no-store"))
+            })
+    {
+        return Err(ClientError::PersonalOAuthInstructions);
+    }
+    let mut bytes = Zeroizing::new(Vec::new());
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| ClientError::PersonalOAuthInstructions)?
+    {
+        if bytes.len().saturating_add(chunk.len()) > 64 * 1024 {
+            return Err(ClientError::PersonalOAuthInstructions);
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if oauth_now()? >= expires_at_unix_ms || tokio::time::Instant::now() >= deadline {
+        return Err(ClientError::PersonalOAuthRefused);
+    }
+    parse_personal_oauth_instructions(&bytes, expected_origin)
+}
+
+pub(super) fn oauth_now() -> Result<u64, ClientError> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
@@ -232,7 +242,9 @@ fn oauth_now() -> Result<u64, ClientError> {
         .filter(|now| *now > 0)
         .ok_or(ClientError::PersonalOAuthRefused)
 }
-fn oauth_instruction_endpoint(raw: &str) -> Result<(Url, Zeroizing<String>), ClientError> {
+pub(super) fn oauth_instruction_endpoint(
+    raw: &str,
+) -> Result<(Url, Zeroizing<String>), ClientError> {
     let mut url = Url::parse(raw).map_err(|_| ClientError::PersonalOAuthInstructions)?;
     if raw.len() > 4096
         || url.as_str() != raw
