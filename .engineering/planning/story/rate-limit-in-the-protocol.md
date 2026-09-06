@@ -11,6 +11,8 @@ scope:
 - confidence: inferred
   path: Cargo.lock
 - confidence: cited
+  path: Cargo.toml
+- confidence: cited
   path: catalog/connector-document-v3.schema.json
 - confidence: inferred
   path: catalog/slack.catalog.json
@@ -214,7 +216,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 132
+revision: 134
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -411,3 +413,9 @@ The two introduced contract warnings share a URL-validation mismatch: uppercase 
 The original implementor owns a bounded repair fromcc143696. Establish one explicit URL spelling/range policy consistently across the existing wire reader/schema, authoring reader/provider-schema and canonical schema3 generator; preserve supported positive controls including ordinary lowercase HTTPS and valid explicit ports. Address the grammar classes rather than special-casing the three strings. Preserve all first-pass cases and all frozen v1/schema2/vendor bytes. Regenerate affected new v2/schema3 artifacts only through their owners and retain deterministic fixed-point, conformance and schema-fidelity evidence. No retry, grant, protocol-version retirement or runtime behavior expansion belongs to this repair.
 
 Current exact source owners already cover protocol operation wire/schema and bundle example/tests, connector-spec rate_limit/provider schema generation, catalog-build document_schema and schema invariants, new contract bundle and schema3 artifact. If a shared helper or dependency requires another path, request it before writing. ESS/AEP/Git/integration/operator actions stay coordinator-owned. Run the two retained failed cases first on the assigned base, then implement and rerun all affected suites, strict checks and regeneration gates. The second adversary pass is the final ordinary pass under the approved wave. No successful test_result or fixed review outcome is recorded before measured repair evidence exists.
+
+## URL parser and manifest closure for the measured repair
+
+Both retained URL cases were reproduced oncc143696 before edits, one failure each. The implementor identifies the normalization difference between WHATWG URL parsing and the RFC3986 URI parser used by the published schema validator. Use the already locked fluent-uri0.4.1 as a direct reader dependency so both sides interpret URI syntax consistently. Add the root Cargo.toml workspace dependency and the already scoped protocol/connector-spec manifest edges; connector-spec's now-unused url edge may be removed after verifying no other owner uses it. Preserve every existing dependency version/checksum and close all twelve metadata graphs through Cargo.
+
+The explicit citation spelling policy is literal lowercase https, ASCII RFC3986 URI, nonempty host, absent userinfo/fragment, and optional decimal port within u16. Preserve valid explicit443, leading zero spellings and an empty port where RFC3986 permits it; percent-encoded path/query text is retained exactly. Rust must not normalize a spelling that the schema rejects. No new helper file is assigned: existing rate_limit/wire/schema owners can define the property and validation helpers. The canonical schema3 property uses its owning spec helper; the existing hand-authored provider schema retains its ownership model with an explicit synchronization assertion. Additional tests should compare the grammar classes and all three schema projections, preserving the two adversary assertions and prior positive cases.
