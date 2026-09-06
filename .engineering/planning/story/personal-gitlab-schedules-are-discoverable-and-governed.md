@@ -110,6 +110,8 @@ scope:
   path: crates/connector-spec/tests/main/response_schema_coverage.rs
 - confidence: cited
   path: crates/connector-spec/tests/main/shipped_providers.rs
+- confidence: inferred
+  path: crates/connectors-cli/Cargo.lock
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
@@ -146,7 +148,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 94
+revision: 95
 ---
 
 
