@@ -1,7 +1,7 @@
 <!--
   generated from connectors v1
-  model digest 2fd5f99b916aa6ca537502a896a61e8f12156a6a9d50bd424358064d02ad2460
-  contract digest 32999c00640bb37fee55df6cd00d8d4e5f142973980a29d158841d0e59524e59
+  model digest ac9b84c2eccec357eb976d81eeb8dfdbf64fd211a4d1c5041cba9fc16aaae926
+  contract digest 8aa4ca77c6867708024a981f32eeb60a71b924b35238d873e582e86fbf6858f5
   do not edit: regenerate with `ess synthesize --target clap`
 -->
 # Target notes — clap
