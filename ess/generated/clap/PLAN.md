@@ -1,14 +1,14 @@
 <!--
   generated from connectors v1
-  model digest 2fd5f99b916aa6ca537502a896a61e8f12156a6a9d50bd424358064d02ad2460
-  contract digest 32999c00640bb37fee55df6cd00d8d4e5f142973980a29d158841d0e59524e59
+  model digest edcdeb9e3c69b7e0945e33038aca30a21a3bd820798f4456212af2a2a92768d7
+  contract digest 6d93f2582165bec21202010a97db5a41bf906e2c2d4f48ee99e13f716565def6
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — connectors v1
 
 Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synthesize`.
 
-180 capabilities: **164 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
+206 capabilities: **190 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
 
 ## Generated
 
@@ -20,8 +20,17 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.catalog.CatalogRef` |
 | domain type | `connectors.catalog.ConditionalRateLimit` |
 | domain type | `connectors.catalog.FixedRateLimit` |
+| domain type | `connectors.catalog.OAuthClientAuthentication` |
+| domain type | `connectors.catalog.OAuthEndpoint` |
+| domain type | `connectors.catalog.OAuthRedirectShape` |
+| domain type | `connectors.catalog.OAuthRefreshPolicy` |
+| domain type | `connectors.catalog.OAuthRegistrationUse` |
+| domain type | `connectors.catalog.OAuthScopeEncoding` |
+| domain type | `connectors.catalog.OAuthTokenEvidence` |
 | domain type | `connectors.catalog.Operation.State` |
 | domain type | `connectors.catalog.OperationRef` |
+| domain type | `connectors.catalog.PersonalOAuthAdmission` |
+| domain type | `connectors.catalog.PersonalOAuthFlow` |
 | domain type | `connectors.catalog.Provider.State` |
 | domain type | `connectors.catalog.ProviderRef` |
 | domain type | `connectors.catalog.PublishedRate` |
@@ -34,6 +43,7 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.catalog.SetupProfileSummary` |
 | domain type | `connectors.connection.AuthProfile` |
 | domain type | `connectors.connection.BindingRef` |
+| domain type | `connectors.connection.BoundRemediationStatus` |
 | domain type | `connectors.connection.CandidateRef` |
 | domain type | `connectors.connection.Channel.State` |
 | domain type | `connectors.connection.ChannelRef` |
@@ -51,8 +61,15 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.connection.EvidenceDigest` |
 | domain type | `connectors.connection.IntegrationRef` |
 | domain type | `connectors.connection.Label` |
+| domain type | `connectors.connection.OAuthCompletionRefusal` |
+| domain type | `connectors.connection.OAuthInstructionKind` |
 | domain type | `connectors.connection.ObservationRef` |
+| domain type | `connectors.connection.PersonalOAuthSessionPolicy` |
 | domain type | `connectors.connection.ProviderRef` |
+| domain type | `connectors.connection.RemediationAcknowledgement` |
+| domain type | `connectors.connection.RemediationBinding` |
+| domain type | `connectors.connection.RemediationNextAction` |
+| domain type | `connectors.connection.RemediationResumeState` |
 | domain type | `connectors.connection.RouteAdapter` |
 | domain type | `connectors.connection.Title` |
 | domain type | `connectors.deployment.Credential.State` |
@@ -61,6 +78,10 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.deployment.Integration.State` |
 | domain type | `connectors.deployment.IntegrationRef` |
 | domain type | `connectors.deployment.LocalCredentialSelection` |
+| domain type | `connectors.deployment.OAuthBrowserPlacement` |
+| domain type | `connectors.deployment.OAuthCredentialEvidence` |
+| domain type | `connectors.deployment.PersonalOAuthCustody` |
+| domain type | `connectors.deployment.PersonalOAuthRegistration` |
 | domain type | `connectors.deployment.ProviderRef` |
 | domain type | `connectors.deployment.Scope` |
 | domain type | `connectors.event.ChannelRef` |
@@ -91,9 +112,14 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.runtime.ApprovalPosture` |
 | domain type | `connectors.runtime.Audit.State` |
 | domain type | `connectors.runtime.AuditRef` |
+| domain type | `connectors.runtime.AuthenticationAttemptState` |
+| domain type | `connectors.runtime.AuthenticationNeed` |
+| domain type | `connectors.runtime.AuthenticationNextAction` |
+| domain type | `connectors.runtime.AuthenticationRequired` |
 | domain type | `connectors.runtime.CallRef` |
 | domain type | `connectors.runtime.ConditionalRateAdvice` |
 | domain type | `connectors.runtime.ConnectionRef` |
+| domain type | `connectors.runtime.CredentialReadiness` |
 | domain type | `connectors.runtime.EffectClass` |
 | domain type | `connectors.runtime.ExecutionRef` |
 | domain type | `connectors.runtime.Grant.State` |
