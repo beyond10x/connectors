@@ -185,6 +185,7 @@ struct Session {
     lifecycle: Arc<Mutex<ConnectSessionLifecycle>>,
     liveness: OAuthEndpointLiveness,
     task: Option<JoinHandle<()>>,
+    remediation: Option<Arc<Mutex<remediation::BoundSession>>>,
 }
 
 struct SessionTarget {
@@ -192,6 +193,7 @@ struct SessionTarget {
     previous: u64,
     reference: String,
     lifecycle: Arc<Mutex<ConnectSessionLifecycle>>,
+    remediation: Option<Arc<Mutex<remediation::BoundSession>>>,
 }
 
 impl Policy {
@@ -699,6 +701,9 @@ fn lock<T>(value: &Mutex<T>) -> Result<std::sync::MutexGuard<'_, T>> {
     value.lock().map_err(|_| PersonalOAuthError::Unavailable)
 }
 
+#[path = "oauth_remediation.rs"]
+mod remediation;
+
 #[path = "oauth_acquisition.rs"]
 mod acquisition;
 
@@ -1192,6 +1197,38 @@ impl OAuthInner {
 
 #[async_trait]
 impl ConnectorBackend for PersonalOAuthBackend {
+    fn owns_remediation(&self, route: service::RemediationRoute<'_>) -> bool {
+        self.owns_bound_remediation(route)
+    }
+    fn remediation_metadata<'a>(
+        &'a self,
+        context: &PrincipalContext,
+        target: service::RemediationTarget<'_>,
+    ) -> std::result::Result<service::RemediationMetadata<'a>, service::RemediationError> {
+        self.bound_metadata(context, target)
+    }
+    fn personal_remediation_admission(
+        &self,
+        context: &PrincipalContext,
+        target: service::RemediationTarget<'_>,
+    ) -> std::result::Result<service::RemediationAdmission, service::RemediationError> {
+        self.bound_admission(context, target)
+    }
+    async fn credential_readiness(
+        &self,
+        context: &PrincipalContext,
+        target: service::RemediationTarget<'_>,
+    ) -> service::CredentialReadiness {
+        self.bound_readiness(context, target).await
+    }
+    async fn handle_remediation(
+        &self,
+        context: &PrincipalContext,
+        request: service::RemediationRequest,
+        authority: Arc<dyn service::RemediationAuthority>,
+    ) -> std::result::Result<service::RemediationResult, service::RemediationError> {
+        self.bound_request(context, request, authority).await
+    }
     async fn ready(&self) -> std::result::Result<(), service::BackendReadinessError> {
         self.inner
             .custody

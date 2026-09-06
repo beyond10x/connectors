@@ -1471,3 +1471,6 @@ async fn admitted_response_reference_is_the_actual_configured_backend_identity()
 
 #[path = "oauth_adversary_tests.rs"]
 mod adversary;
+
+#[path = "oauth_remediation_tests.rs"]
+mod remediation;
