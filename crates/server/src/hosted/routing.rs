@@ -162,8 +162,9 @@ fn router_inner(
         )
         .route(
             "/connections",
-            post(connection_route::handle)
-                .layer(DefaultBodyLimit::max(protocol::connection::MAX_FRAME_BYTES)),
+            post(connection_route::handle).layer(DefaultBodyLimit::max(
+                protocol::connection_v2::MAX_FRAME_BYTES,
+            )),
         )
         .route(
             "/catalog",

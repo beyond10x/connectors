@@ -19,6 +19,32 @@ pub fn local_socket_absent(state_root: &Path) -> Result<bool, io::Error> {
 }
 
 impl PersonalRuntime {
+    /// Execute an explicitly selected v3 operation through the same bounded local runtime.
+    /// The existing v2 entry point remains available to predecessor callers.
+    pub async fn one_shot_operation_v3(
+        config_path: &Path,
+        state_root: impl Into<PathBuf>,
+        context: operation::OwnerContext,
+        request: operation::OperationRequest,
+    ) -> Result<operation::v3::ResponseEnvelope, RuntimeError> {
+        let envelope = operation::v3::RequestEnvelope {
+            protocol: operation::v3::CONTRACT.to_owned(),
+            request_id: "local-one-shot".to_owned(),
+            context,
+            request,
+        };
+        if let Err(error) = validate_one_shot_operation(&envelope.clone().into_v2()) {
+            return Ok(operation::v3::ResponseEnvelope::failure(
+                &envelope.request_id,
+                error.into(),
+            ));
+        }
+        let composed = Self::compose(Some(config_path), state_root.into(), None, false).await?;
+        Ok(LocalOneShot::new(composed.ownership, composed.registry)?
+            .operation_v3(envelope)
+            .await?)
+    }
+
     /// Execute one operation without binding a socket or creating a supervised child process.
     pub async fn one_shot_operation(
         config_path: &Path,
