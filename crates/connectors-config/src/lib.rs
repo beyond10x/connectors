@@ -6,6 +6,9 @@ mod file;
 mod hosted;
 mod hosted_git_fetch;
 mod personal;
+mod personal_oauth;
+#[cfg(test)]
+mod personal_oauth_tests;
 
 pub use hosted::{
     HostedAuthorityConfig, HostedCatalogConfig, HostedGrafanaConfig, HostedGrafanaTargetConfig,
@@ -21,4 +24,8 @@ pub use personal::{
     KubernetesIntegrationConfig, NetworkScopeConfig, OwnerConfig, PersonalConfig,
     PersonalVoiceConfig, PlatformConnectionConfig, PlatformIntegrationConfig, SlackInstanceConfig,
     SlackInstanceProfile, SlackIntegrationConfig,
+};
+pub use personal_oauth::{
+    OAuthBrowserPlacement, OAuthClientAuthentication, OAuthRegistrationUse, PersonalOAuthCustody,
+    PersonalOAuthFlow, PersonalOAuthRegistration,
 };

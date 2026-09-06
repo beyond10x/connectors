@@ -1,0 +1,39 @@
+# Development-only public GitLab OAuth application. Register the exact redirect below and
+# disable GitLab's Confidential option. Replace the public client identifier with your own.
+# Credential values are acquired later; this file carries no token or client secret.
+[owner]
+tenant_id = "local"
+agent_id = "personal-connectors"
+agent_revision = 1
+authority_snapshot_id = "replace-with-admitted-snapshot"
+authority_snapshot_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[[catalog]]
+provider = "gitlab"
+instance = "personal"
+label = "Personal GitLab"
+grant_ref = "grant:gitlab:personal"
+initiation = "platform"
+operator_approved = true
+allow_writes = false
+credential = "gitlab.oauth_token"
+
+[catalog.endpoints]
+origin = "https://gitlab.com"
+
+[catalog.oauth]
+auth_profile = "gitlab.oauth_token"
+flow = "authorization_code_pkce"
+client_authentication = "public"
+client_id = "replace-with-your-public-application-id"
+redirect_uri = "http://127.0.0.1:47193/oauth/callback"
+browser_placement = "same_machine"
+registration_use = "development_only"
+# Dedicated durable owner-only file storage, unsealed at rest. Never a production posture.
+custody = "development_file"
+session_ttl_seconds = 300
+allowed_scopes = ["read_api"]
+
+# For an explicitly registered public device application instead, select flow =
+# "device_authorization", browser_placement = "other_machine", and omit redirect_uri.
+# The daemon owns expiry and shutdown; exiting client polling does not send cancellation.

@@ -3,10 +3,42 @@
 pub fn schema() -> &'static Value {
     static SCHEMA: OnceLock<Value> = OnceLock::new();
     SCHEMA.get_or_init(|| {
-        let mut schema = schema_v2().clone();
+        let mut schema = schema_v3().clone();
         schema["$id"] = json!(SCHEMA_ID);
         schema["properties"]["$schema"]["const"] = json!(SCHEMA_ID);
         schema["properties"]["schema_version"]["const"] = json!(SCHEMA_VERSION);
+        // One authored, loader-checked admission schema supplies both declaration projections.
+        // Registration values remain absent from the canonical OAuth object.
+        let authoring: Value = serde_json::from_str(include_str!(
+            "../../connector-spec/schema/provider-toml.schema.json"
+        ))
+        .expect("provider authoring schema is checked JSON");
+        for name in [
+            "personalOAuthAdmission",
+            "oauthEndpoint",
+            "oauthTokenEvidence",
+            "oauthEvidencePointer",
+        ] {
+            schema["$defs"][name] = authoring["$defs"][name].clone();
+        }
+        schema["$defs"]["oauth2"]["properties"]["personal_flows"] =
+            authoring["$defs"]["oauth2"]["properties"]["personal_flows"].clone();
+        schema["$defs"]["oauth2"]["properties"]["grants"] =
+            authoring["$defs"]["oauth2"]["properties"]["grants"].clone();
+        schema["$defs"]["oauth2"]["allOf"] = authoring["$defs"]["oauth2"]["allOf"].clone();
+        schema
+    })
+}
+
+/// Frozen schema 3 interpretation, independent of the new personal-acquisition vocabulary.
+fn schema_v3() -> &'static Value {
+    static SCHEMA: OnceLock<Value> = OnceLock::new();
+    SCHEMA.get_or_init(|| {
+        let mut schema = schema_v2().clone();
+        let id = "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json";
+        schema["$id"] = json!(id);
+        schema["properties"]["$schema"]["const"] = json!(id);
+        schema["properties"]["schema_version"]["const"] = json!(3);
         schema["$defs"]["operation"]["properties"]["request_semantics"] = json!({"enum":["legacy_v1","openapi_3_0_json_v1"]});
         schema["$defs"]["operation"]["required"].as_array_mut().expect("operation required fields").push(json!("request_semantics"));
         schema["$defs"]["contract"]["description"] = json!("The stored caller contract under the explicit request-semantics profile; source profiles preserve the vendor constraints through deterministic dialect translation.");

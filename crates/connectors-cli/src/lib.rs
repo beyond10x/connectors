@@ -166,6 +166,8 @@ enum SetupCommand {
         /// Which declared credential to supply.
         #[arg(long = "as")]
         credential: Option<String>,
+        #[command(flatten)]
+        oauth: Box<PersonalOAuthArgs>,
         /// A declared configuration value, as `field=value`. Repeatable.
         #[arg(long = "set", value_parser = enrol::parse_setting)]
         settings: Vec<(String, String)>,
@@ -192,6 +194,16 @@ enum SetupCommand {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+}
+
+#[derive(Debug, clap::Args)]
+struct PersonalOAuthArgs {
+    /// Start the configured personal OAuth credential purpose.
+    #[arg(long, conflicts_with = "credential")]
+    auth_profile: Option<String>,
+    /// Private OAuth instructions in a new owner-only file; otherwise use the controlling terminal.
+    #[arg(long)]
+    instruction_file: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -821,6 +833,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 context,
                 state_root,
                 credential,
+                oauth,
                 settings,
                 allow,
                 operator_network,
@@ -842,14 +855,18 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     acquire: enrol::acquires(&provider)
                         .then(|| connectors_runtime::argocd_acquisition(operator_network)),
                 };
-                let outcome = connect::dispatch(
+                let outcome = connect::dispatch_with_personal_oauth(
                     &provider,
                     &personal,
                     &config_path,
                     &state_root,
                     label,
                     context,
-                    options,
+                    connect::PersonalOAuthOptions {
+                        enrol: options,
+                        auth_profile: oauth.auth_profile,
+                        instruction_file: oauth.instruction_file,
+                    },
                 )
                 .await?;
                 emit(format, &outcome)?;
@@ -1086,7 +1103,11 @@ async fn connection(
         let response = AuthenticatedHostedClient::active()?
             .connection(request)
             .await?;
-        emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        emit_targeted(
+            format,
+            &reduce_envelope!(response, connection)?,
+            target.as_str(),
+        )?;
         return Ok(());
     }
     let config_path = config_path.map_or_else(default_config_path, Ok)?;
@@ -1106,7 +1127,11 @@ async fn connection(
             .connection(&config.owner_context(), request)
             .await?
     };
-    emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+    emit_targeted(
+        format,
+        &reduce_envelope!(response, connection)?,
+        target.as_str(),
+    )?;
     Ok(())
 }
 
