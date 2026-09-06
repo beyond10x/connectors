@@ -25,15 +25,23 @@ scope:
 - confidence: cited
   path: crates/catalog-build/Cargo.toml
 - confidence: cited
+  path: crates/catalog-build/src/check.rs
+- confidence: cited
   path: crates/catalog-build/src/contract.rs
 - confidence: cited
   path: crates/catalog-build/src/document.rs
+- confidence: cited
+  path: crates/catalog-build/src/document_schema.rs
 - confidence: cited
   path: crates/catalog-build/src/document_tests.rs
 - confidence: cited
   path: crates/catalog-build/src/pack.rs
 - confidence: cited
   path: crates/catalog-build/src/pipeline.rs
+- confidence: cited
+  path: crates/catalog-build/src/scaffold.rs
+- confidence: cited
+  path: crates/catalog-build/src/scaffold_tests.rs
 - confidence: cited
   path: crates/catalog-build/src/workspace.rs
 - confidence: cited
@@ -65,6 +73,8 @@ scope:
 - confidence: cited
   path: crates/connector-spec/src/ir.rs
 - confidence: cited
+  path: crates/connector-spec/src/ir_parameters.rs
+- confidence: cited
   path: crates/connector-spec/src/lib.rs
 - confidence: cited
   path: crates/connector-spec/src/openapi.rs
@@ -94,6 +104,8 @@ scope:
   path: crates/connector-spec/tests/main/provider_schema.rs
 - confidence: cited
   path: crates/connector-spec/tests/main/response_schema_coverage.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/shipped_providers.rs
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
@@ -126,7 +138,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 83
+revision: 89
 ---
 
 
