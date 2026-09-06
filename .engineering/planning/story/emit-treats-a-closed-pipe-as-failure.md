@@ -13,7 +13,7 @@ scope:
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/closed_pipe.rs
-revision: 12
+revision: 13
 ---
 ## Context
 
@@ -48,14 +48,14 @@ Selected for implementation on 2026-09-06 at the operator's request. wave-cli: 1
 
 ## Scope
 
-Derived 2026-09-06 by aep-drive story-scoper; coordinator records the returned surfaces.
+Derived from the measured first-pass findings and retained correction on 2026-09-06.
 
 - `crates/connectors-cli/src/lib.rs` — cited.
-- `crates/connectors-cli/tests/closed_pipe.rs` — inferred.
+- `crates/connectors-cli/tests/closed_pipe.rs` — cited.
 
-High confidence. Restrict change to run_from output error handling: MainError::Output(OutputError::Io(BrokenPipe)) is successful termination. Socket/network BrokenPipe remains a failure. Existing renderer needs no change; prove every output format and another writer failure.
+High confidence. Normalize BrokenPipe at the result-output completion boundary, including the existing nested admin output wrapper, while allowing commands such as doctor to finish their semantic status decision. Socket/network/stdin and other writer failures remain failures. Prove every output format, healthy and unhealthy reports, nested admin output and non-BrokenPipe controls. Preserve retained first-pass cases. The existing JSON/YAML diagnostic renderer can exit 101 when a semantic failure's error envelope encounters closed stdout; this remains unsuccessful and is not a successful-result output path.
 
-Would collide with any unit editing these files; directory entries require an additional containment review because AEP compares scope strings exactly.
+Would collide with any unit editing these exact paths; directory scope entries additionally require containment review.
 
 ## Execution queue
 
