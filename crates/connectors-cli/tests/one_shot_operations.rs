@@ -939,6 +939,8 @@ fn rate_stage2_cli_json_and_yaml_preserve_delay_and_never_resend_an_invoke() {
                 .command_format(
                     &[
                         "operation",
+                        "--protocol-version",
+                        "v2",
                         "invoke",
                         "--operation",
                         "fixture.read",
@@ -1056,6 +1058,8 @@ fn rate_adversary_cli_keeps_integer_extremes_and_never_resends_before_exit() {
                 .command_format(
                     &[
                         "operation",
+                        "--protocol-version",
+                        "v2",
                         "invoke",
                         "--operation",
                         "fixture.read",
@@ -1161,7 +1165,14 @@ fn rate_final_cli_describe_spelling_and_invalid_advice_never_resend() {
             });
             let mut child = fixture
                 .command_format(
-                    &["operation", "describe", "--operation", "fixture.read"],
+                    &[
+                        "operation",
+                        "--protocol-version",
+                        "v2",
+                        "describe",
+                        "--operation",
+                        "fixture.read",
+                    ],
                     format,
                 )
                 .arg("--config")

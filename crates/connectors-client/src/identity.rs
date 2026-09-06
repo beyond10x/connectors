@@ -341,10 +341,31 @@ impl AuthenticatedHostedClient {
         })
     }
 
+    /// The coordinated default retains typed authentication needs without renewing on HTTP 409.
     pub async fn operation(
         &self,
         request: operation::OperationRequest,
+    ) -> Result<operation::v3::ResponseEnvelope, AuthenticatedHostedError> {
+        self.operation_versioned(operation::versions::Version::V0Alpha3, request)
+            .await
+    }
+
+    /// Select v2 explicitly; no version negotiation is performed.
+    pub async fn operation_v2(
+        &self,
+        request: operation::OperationRequest,
     ) -> Result<operation::ResponseEnvelope, AuthenticatedHostedError> {
+        Ok(self
+            .operation_versioned(operation::versions::Version::V0Alpha2, request)
+            .await?
+            .into_v2())
+    }
+
+    pub async fn operation_versioned(
+        &self,
+        version: operation::versions::Version,
+        request: operation::OperationRequest,
+    ) -> Result<operation::v3::ResponseEnvelope, AuthenticatedHostedError> {
         let scope = match request {
             operation::OperationRequest::Search(_) | operation::OperationRequest::Describe(_) => {
                 CATALOG_SCOPE
@@ -354,7 +375,7 @@ impl AuthenticatedHostedClient {
         let token = self.tokens.access_token(scope).await?;
         match self
             .hosted
-            .operation(&token, &self.context, request.clone())
+            .operation_versioned(version, &token, &self.context, request.clone())
             .await
         {
             Err(ClientError::HostedAuthentication) => {
@@ -362,7 +383,7 @@ impl AuthenticatedHostedClient {
                 let token = self.tokens.access_token(scope).await?;
                 Ok(self
                     .hosted
-                    .operation(&token, &self.context, request)
+                    .operation_versioned(version, &token, &self.context, request)
                     .await?)
             }
             result => Ok(result?),
@@ -1334,5 +1355,75 @@ mod tests {
                 "Bearer access-connectors.invoke-2",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn auth_stage2_identity_409_does_not_renew_or_resend() {
+        for identity_expired in [false, true] {
+            let fake = FakeIdentity::start().await;
+            let temporary = tempfile::tempdir().unwrap();
+            let store = Arc::new(MemoryStore::default());
+            let session = login_with(
+                &LoginOptions {
+                    connectors_base: fake.state.connectors_base.clone(),
+                    no_browser: true,
+                    timeout: Duration::from_secs(5),
+                },
+                &temporary.path().join("identity-sessions.json"),
+                store.clone(),
+                complete_browser,
+            )
+            .await
+            .unwrap();
+            let calls = Arc::new(AtomicU64::new(0));
+            let observed = calls.clone();
+            let app = Router::new().route("/operations", post(move |Json(request): Json<serde_json::Value>| {
+            let observed = observed.clone();
+            async move {
+                let attempt = observed.fetch_add(1, Ordering::SeqCst);
+                if identity_expired && attempt == 0 {
+                    return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"message":"SYNTHETIC_PRIVATE_INSTRUCTION"})));
+                }
+                (StatusCode::CONFLICT, Json(serde_json::json!({
+                    "protocol": operation::v3::CONTRACT, "request_id": request["request_id"],
+                    "status": "error", "error": {"code": "authentication_required", "message": "fixture refusal", "retriable": false,
+                    "authentication": {"operation_ref": "fixture.write", "connection_ref": "connection:fixture", "integration_ref": "fixture", "auth_profile": "fixture.user", "need": "reauthorize_existing", "attempt": "not_attempted", "next_action": "start_trusted_remediation"}}
+                })))
+            }
+        }));
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+            let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let mut client = AuthenticatedHostedClient::from_session(session, store).unwrap();
+            client.hosted = HostedClient::from_parts(url, reqwest::Client::new());
+            client.tokens.access_token(INVOKE_SCOPE).await.unwrap();
+            let reply = client
+                .operation(operation::OperationRequest::Invoke(
+                    operation::InvokeRequest {
+                        operation_ref: "fixture.write".into(),
+                        connection_ref: "connection:fixture".into(),
+                        description_ref: "description:fixture".into(),
+                        input: serde_json::json!({}),
+                        approval_evidence_ref: None,
+                    },
+                ))
+                .await;
+            serving.abort();
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                1 + u64::from(identity_expired),
+                "only the first Identity 401 may resend; provider authentication never does"
+            );
+            assert_eq!(
+                fake.state.access_issues.lock().unwrap().get(INVOKE_SCOPE),
+                Some(&(1 + u64::from(identity_expired))),
+                "only Identity 401 renews authority; HTTP 409 does not"
+            );
+            let reply =
+                serde_json::to_value(reply.expect("409 retains the typed authentication result"))
+                    .unwrap();
+            assert_eq!(reply["error"]["code"], "authentication_required");
+            assert_eq!(reply["error"]["authentication"]["attempt"], "not_attempted");
+        }
     }
 }
