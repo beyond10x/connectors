@@ -209,7 +209,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 74
+revision: 75
 ---
 ## Acceptance
 
@@ -427,3 +427,9 @@ The factory resolves the exact real personal OAuth policy owner and admits the c
 A also owns crates/server/Cargo.toml to add the existing workspace jsonschema dependency for non-consuming canonical input validation before readiness. Its resolved validator already exists at version 0.49.9 in all affected lock graphs; keep all versions/checksums and unrelated edges unchanged. Exact A lock closure is Cargo.lock, crates/connectors-runtime/Cargo.lock and crates/connectors-cli/Cargo.lock, generated through offline Cargo metadata after the active source/compile batch ends. Refuse external retrieval and retain closed errors without schema/input/reference echoes. The root and CLI lock paths overlap B only across isolated worktrees: A changes the server edge and B the connectors-client edge. Root alone reconciles both changes on assembly and verifies their exact union. Agents do not merge one another's files or share targets.
 
 These seven additional A paths supplement its previous 31 paths. Actual deciding tests precede the factory implementation, preserve all old assertions, and distinguish missing API/compiler observations from executable product results. The held credential story and the approved OAuth review result are unchanged.
+
+## Hosted documentation owner transfer — 2026-09-06
+
+Root takes the four still-untouched hosted documentation paths from A: crates/server/src/hosted/docs.rs, crates/server/src/hosted/docs/openapi.json, crates/server/src/hosted/docs/openapi.schema.json and crates/server/src/hosted/tests/docs.rs. A acknowledged the transfer and continues its remaining 34 paths; B keeps 25. Root prepares the versioned OpenAPI schemas, examples and actual documentation tests while the runtime and client owners finish implementation. The four paths remain in the same story's typed scope. No additional endpoint, authority scope, supported hosted acquisition or consumer adoption is introduced.
+
+Documentation must preserve every predecessor example and strict identity, name Operation v3 and Connection v2 separately, expose authentication_required only as the v3 pre-dispatch 409, and state the actual production hosted acquisition limitation. The served schema must match the exact version's strict protocol schema. Actual current document tests precede production changes; root uses only its own target with the shared compiler slot and existing resource guards. Complete runtime/OpenAPI route checks wait for the assembled source.
