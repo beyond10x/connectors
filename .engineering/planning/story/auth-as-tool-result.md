@@ -97,6 +97,8 @@ scope:
   path: crates/connectors-runtime/src/composition.rs
 - confidence: inferred
   path: crates/connectors-runtime/src/composition_tests.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/lib.rs
 - confidence: inferred
   path: crates/connectors-runtime/src/one_shot.rs
 - confidence: cited
@@ -223,7 +225,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 83
+revision: 85
 ---
 ## Acceptance
 
@@ -505,3 +507,17 @@ Two retained doctor cases encounter the actual Unix socket 107-byte path limit u
 The retained closed_pipe protocol-refusal case uses a literal old operation error fixture and expects its message. Root adds crates/connectors-cli/tests/closed_pipe.rs as an exact cited B-owned correction scope: only select --protocol-version v2 in the existing search_output helper for the retained operation controls, preserving every response byte and assertion. Add a separate current-v3 closed-pipe/privacy control in the already assigned crates/connectors-cli/tests/remediation.rs, using the actual canonical decoder and a valid hostile response. No silent wire fallback or resending is introduced.
 
 Two other preserved CLI cases expect actionable persistent-daemon guidance for session signals and browser operations. The new generic v3 closed Unavailable presentation suppresses that locally generated instruction. B continues source-only diagnosis and returns a concrete typed local-origin remedy before implementation. Arbitrary received error messages must remain closed; no message matching or daemon-string forwarding is authorized. Root will record the selected origin boundary after reading it. The compiler transfers to A only after B explicitly releases it; A completes queued catalog/root/runtime lanes and the repository final checks, and B awaits the next explicit grant for its correction checks.
+
+## Local one-shot origin and optional remediation routing — 2026-09-06
+
+A's actual affected root closure passes all fourteen catalog-cli cases, including the network namespace case without its skip message; root formatting and full all-target strict Clippy pass on unchanged 289da8a0bc9e1b6eb85fa302024d6d173734eb1e. Its initial full default runtime command records 445 passes, eight failures and two existing PostgreSQL ignores, exit 101. Full no-default, runtime strict and final gates are held before execution so the actual discovered corrections can land first. The eight retained failures show ordinary configured raw backends being refused by new remediation metadata routing before their established dispatch, stale-description or read-only outcomes. No old assertion is changed.
+
+Root accepts two precise implementation corrections after reading both actual callers. First, server/src/local.rs local_auth_preflight checks the existing exact owns_remediation(Target) capability before requesting optional remediation metadata. When no backend claims that route, normal operation dispatch remains authoritative; it still enforces its own grants and credentials. An ambiguous claimed owner or any actual Refused/Unavailable metadata error remains a refusal. Bound Connection remediation Start stays strict and does not gain this bypass. Only the newly authored direct AuthenticationBackend fixture gains the explicit route predicate its real OAuth and registry counterparts already implement. Preserve all eight old failed cases and all current admission/readiness/zero-dispatch assertions.
+
+Second, preserve the origin of a known local daemon requirement without trusting a received message. A owns an additive in-process OneShotOperationV3Outcome with Reply(v3::ResponseEnvelope) and RequiresDaemon(v3::ResponseEnvelope), declared by the existing server local owner. Only its two existing decisions create RequiresDaemon: validated persistent session controls before runtime composition, and supports_ephemeral_invocation false after composition but before operation dispatch. The latter still joins real shutdown. Shared local validation remains the authority; the CLI does not duplicate the request enumeration, and no arbitrary error code/message or backend outage can create this origin marker.
+
+A adds LocalOneShot::operation_v3_outcome and PersonalRuntime::one_shot_operation_v3_outcome. Existing operation_v3 and one_shot_operation_v3 remain available and strip the local outcome to the same correlated envelope. A narrow precomposition helper keeps the known persistent refusal before adapter initialization, using the same authoritative predicate and validation. There is no wire discriminant, schema change, durable entity, new dependency or remote sender assertion. This is local presentation provenance for an existing outcome, not a second operation or authorization path. The already scoped server/src/local.rs and runtime/src/one_shot.rs remain A-owned; add registration-only crates/connectors-runtime/src/lib.rs to A's exact scope for the public re-export.
+
+B's already scoped crates/connectors-cli/src/lib.rs selects the new runtime method only in the actual v3 direct branch. RequiresDaemon becomes a closed static unavailable/retriable-false instruction to run connectors serve local with the same config and state root. Reply retains normal closed v3 reduction. Actual local/provider Unavailable, even if its arbitrary message includes daemon-like instructions, stays Reply and cannot escape through this marker. Preserve the two existing actionable-guidance assertions and add this negative control in A's existing one-shot test owners. B's separately scoped v2 pipe control and new v3 closed-output case remain unchanged.
+
+A implements the three exact production owners and its existing server/runtime test owners, then runs deciding cases, affected server/runtime full suites and strict formatting checks under its retained compiler slot. B may prepare its already scoped CLI source concurrently against this exact signature but runs no compiler until explicit transfer. Retain every initial full output and any new fixture/compiler observations. Root will verify old assertion preservation, merge completed owner source, and refresh citation anchors only if actual owner lines moved. Whole-auth review remains pending complete affected gates; the completed OAuth review and held credential story are unchanged.
