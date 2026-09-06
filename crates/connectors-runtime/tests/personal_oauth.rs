@@ -377,3 +377,59 @@ async fn mixed_raw_and_oauth_bindings_have_exactly_one_invoke_owner_and_keep_agg
     }
     registry.shutdown().await;
 }
+
+#[tokio::test]
+async fn oauth_pass1_daemon_refuses_ambiguous_v1_profile_without_using_label_as_target() {
+    let root = tempfile::tempdir().unwrap();
+    let path = config_file(root.path(), "");
+    let source = std::fs::read_to_string(&path).unwrap();
+    let second = source
+        .split_once("[[catalog]]")
+        .unwrap()
+        .1
+        .replace("instance = \"oauth\"", "instance = \"another\"")
+        .replace(
+            "grant_ref = \"grant:oauth\"",
+            "grant_ref = \"grant:another\"",
+        );
+    std::fs::write(&path, format!("{source}\n[[catalog]]{second}")).unwrap();
+    let state = root.path().join("state");
+    let runtime = PersonalRuntime::bind(Some(&path), &state).await.unwrap();
+    assert_eq!(runtime.readiness()["personal_oauth_connections"], 2);
+    let (stop, stopped) = tokio::sync::oneshot::channel();
+    let serving = tokio::spawn(runtime.serve_until(async {
+        let _ = stopped.await;
+    }));
+    for profile in [None, Some("gitlab.oauth_token"), Some("gitlab.token")] {
+        let request = connection::RequestEnvelope {
+            protocol: connection::CONTRACT.into(),
+            request_id: "request:adversary".into(),
+            context: owner(),
+            request: connection::ConnectionRequest::ConnectSessionCreate(
+                connection::ConnectSessionCreateRequest {
+                    integration_ref: "gitlab".into(),
+                    label: "another".into(),
+                    auth_profile: profile.map(str::to_owned),
+                },
+            ),
+        };
+        let mut stream = tokio::net::UnixStream::connect(state.join("connectors.sock"))
+            .await
+            .unwrap();
+        stream
+            .write_all(format!("{}\n", serde_json::to_string(&request).unwrap()).as_bytes())
+            .await
+            .unwrap();
+        stream.shutdown().await.unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.unwrap();
+        let response: connection::ResponseEnvelope = serde_json::from_str(&response).unwrap();
+        response.validate().unwrap();
+        assert_eq!(response.status, connection::ResponseStatus::Error);
+        assert!(response.response.is_none());
+        assert!(!serde_json::to_string(&response).unwrap().contains("http"));
+    }
+    stop.send(()).unwrap();
+    serving.await.unwrap().unwrap();
+    assert!(!state.join("connectors.sock").exists());
+}

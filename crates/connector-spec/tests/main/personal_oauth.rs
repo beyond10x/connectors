@@ -145,3 +145,26 @@ fn legacy_public_client_does_not_invent_personal_admission() {
     let value = serde_json::to_value(connector.auth[0].oauth2.as_ref().unwrap()).unwrap();
     assert!(value.get("personal_flows").is_none());
 }
+
+#[test]
+fn oauth_pass1_explicit_empty_personal_admission_obeys_the_authoring_contract() {
+    let schema: serde_json::Value =
+        serde_json::from_str(include_str!("../../schema/provider-toml.schema.json")).unwrap();
+    assert_eq!(
+        schema["$defs"]["oauth2"]["properties"]["personal_flows"]["minItems"],
+        1
+    );
+    let omitted = provider("", "\"authorization_code\", \"refresh_token\"");
+    assert!(
+        load(&omitted).is_ok(),
+        "omission keeps the legacy acquisition"
+    );
+    let explicit = provider(
+        "personal_flows = []",
+        "\"authorization_code\", \"refresh_token\"",
+    );
+    assert!(
+        load(&explicit).is_err(),
+        "the published minItems=1 contract rejects explicit empty admission; the actual provider loader must retain that presence distinction"
+    );
+}

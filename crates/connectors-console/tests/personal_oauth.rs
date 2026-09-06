@@ -565,3 +565,263 @@ fn configured_reference() -> String {
     )
     .unwrap()
 }
+
+// Independent end-to-end handoff fixtures. HTTP and Unix traffic stays on synthetic local listeners.
+async fn oauth_pass1_servers(
+    root: &std::path::Path,
+    cancel: bool,
+) -> (
+    tokio::task::JoinHandle<()>,
+    tokio::task::JoinHandle<()>,
+    std::sync::Arc<tokio::sync::Notify>,
+) {
+    use protocol::connection::*;
+    use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
+    let unix = tokio::net::UnixListener::bind(root.join("connectors.sock")).unwrap();
+    let http = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let authority = http.local_addr().unwrap();
+    let instructions = tokio::spawn(async move {
+        let (mut stream, _) = http.accept().await.unwrap();
+        let mut header = Vec::new();
+        loop {
+            header.push(stream.read_u8().await.unwrap());
+            if header.ends_with(b"\r\n\r\n") {
+                break;
+            }
+            assert!(header.len() < 8192);
+        }
+        let header = String::from_utf8(header).unwrap();
+        assert!(header.starts_with("GET /instructions HTTP/1.1\r\n"));
+        assert!(header
+            .to_ascii_lowercase()
+            .contains(&format!("x-connect-session: {}\r\n", "q".repeat(43))));
+        assert!(!header.to_ascii_lowercase().contains("referer:"));
+        let body = r#"{"kind":"device_authorization","verification_uri":"https://gitlab.example/device","user_code":"OAUTH-PASS1-PRIVATE-HUMAN"}"#;
+        stream.write_all(format!("HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+    });
+    let status_entered = std::sync::Arc::new(tokio::sync::Notify::new());
+    let observed = status_entered.clone();
+    let reference = configured_reference();
+    let daemon = tokio::spawn(async move {
+        let deadline = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            + 30_000;
+        for turn in 0..3 {
+            let (mut stream, _) = unix.accept().await.unwrap();
+            let mut line = String::new();
+            tokio::io::BufReader::new(&mut stream)
+                .read_line(&mut line)
+                .await
+                .unwrap();
+            let request: RequestEnvelope = serde_json::from_str(&line).unwrap();
+            request.validate().unwrap();
+            let result = match (turn, request.request) {
+                (0, ConnectionRequest::ConnectSessionCreate(create)) => {
+                    assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
+                    ConnectionResult::ConnectSessionCreate(ConnectSessionStatus {
+                        connect_session_ref: "session:adversary".into(),
+                        integration_ref: "gitlab".into(),
+                        state: ConnectSessionState::Pending,
+                        expires_at_unix_ms: deadline,
+                        completion_endpoint: None,
+                        browser_completion_url: Some(format!(
+                            "http://{authority}/#token={}",
+                            "q".repeat(43)
+                        )),
+                        connection_ref: None,
+                    })
+                }
+                (1, ConnectionRequest::ConnectSessionStatus(status)) => {
+                    assert_eq!(status.connect_session_ref, "session:adversary");
+                    observed.notify_one();
+                    if cancel {
+                        std::future::pending::<()>().await;
+                    }
+                    ConnectionResult::ConnectSessionStatus(ConnectSessionStatus {
+                        connect_session_ref: "session:adversary".into(),
+                        integration_ref: "gitlab".into(),
+                        state: ConnectSessionState::Completed,
+                        expires_at_unix_ms: deadline,
+                        completion_endpoint: None,
+                        browser_completion_url: None,
+                        connection_ref: Some(reference.clone()),
+                    })
+                }
+                (2, ConnectionRequest::Describe(describe)) => {
+                    assert_eq!(describe.connection_ref, reference);
+                    ConnectionResult::Describe(ConnectionDescription {
+                        summary: ConnectionSummary {
+                            connection_ref: reference.clone(),
+                            integration_ref: "gitlab".into(),
+                            label: "OAUTH-PASS1-PRIVATE-DAEMON".into(),
+                            state: ConnectionState::Callable,
+                            initiation: vec![ConnectionInitiator::Platform],
+                            route: ConnectionRoute::Direct,
+                            scope: None,
+                            actor: None,
+                            auth_profile: Some("gitlab.oauth_token".into()),
+                        },
+                        channels: Vec::new(),
+                    })
+                }
+                _ => panic!("only Create, Status and Describe belong to the setup flow"),
+            };
+            let response = ResponseEnvelope::success(request.request_id, result);
+            response.validate().unwrap();
+            let mut bytes = serde_json::to_vec(&response).unwrap();
+            bytes.push(b'\n');
+            stream.write_all(&bytes).await.unwrap();
+        }
+    });
+    (daemon, instructions, status_entered)
+}
+
+#[test]
+fn oauth_pass1_real_controlling_pty_handoff_keeps_redirected_outputs_private() {
+    const CHILD: &str = "B10X_OAUTH_PASS1_PTY_CHILD";
+    let Some(format) = std::env::var_os(CHILD) else {
+        fn quote(value: &str) -> String {
+            format!("'{}'", value.replace('\'', "'\\''"))
+        }
+        for format in ["text", "json", "yaml"] {
+            let root = private_tempdir();
+            let stdout = root.path().join("stdout");
+            let stderr = root.path().join("stderr");
+            let command = format!("exec {} --exact oauth_pass1_real_controlling_pty_handoff_keeps_redirected_outputs_private --nocapture > {} 2> {}",
+                quote(std::env::current_exe().unwrap().to_str().unwrap()),
+                quote(stdout.to_str().unwrap()), quote(stderr.to_str().unwrap()));
+            let output = std::process::Command::new("/usr/bin/script")
+                .args(["--quiet", "--return", "--command", &command, "/dev/null"])
+                .env(CHILD, format)
+                .env("HTTP_PROXY", "http://127.0.0.1:1")
+                .env("HTTPS_PROXY", "http://127.0.0.1:1")
+                .env("ALL_PROXY", "http://127.0.0.1:1")
+                .env("NO_PROXY", "")
+                .stdin(std::process::Stdio::null())
+                .output()
+                .unwrap();
+            let public_stdout = std::fs::read_to_string(stdout).unwrap();
+            let public_stderr = std::fs::read_to_string(stderr).unwrap();
+            assert!(output.status.success(), "{public_stdout}\n{public_stderr}");
+            let terminal = String::from_utf8(output.stdout).unwrap();
+            assert!(
+                terminal.contains("OAUTH-PASS1-PRIVATE-HUMAN"),
+                "real controlling terminal must receive the human code"
+            );
+            assert!(terminal.contains("https://gitlab.example/device"));
+            assert!(!terminal.contains("OAUTH-PASS1-PRIVATE-DAEMON"));
+            for public in [&public_stdout, &public_stderr] {
+                assert!(!public.contains("OAUTH-PASS1-PRIVATE"));
+                assert!(!public.contains("https://gitlab.example"));
+                assert!(!public.contains(&"q".repeat(43)));
+            }
+            assert!(public_stdout.contains("connected"), "{format}");
+        }
+        return;
+    };
+    use std::io::IsTerminal as _;
+    assert!(std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+        .unwrap()
+        .is_terminal());
+    assert!(!std::io::stdout().is_terminal());
+    assert!(!std::io::stderr().is_terminal());
+    let value = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let root = private_tempdir();
+            let (daemon, instructions, _) = oauth_pass1_servers(root.path(), false).await;
+            let value = dispatch_with_personal_oauth(
+                "gitlab",
+                &config(),
+                &root.path().join("config.toml"),
+                root.path(),
+                Some("Trusted display".into()),
+                None,
+                PersonalOAuthOptions::default(),
+            )
+            .await
+            .unwrap();
+            daemon.await.unwrap();
+            instructions.await.unwrap();
+            assert_eq!(value["connection"], "Trusted display");
+            assert_eq!(value["connection_ref"], configured_reference());
+            value
+        });
+    let format = match format.to_str().unwrap() {
+        "text" => connectors_console::output::Format::Text,
+        "json" => connectors_console::output::Format::Json,
+        "yaml" => connectors_console::output::Format::Yaml,
+        _ => unreachable!(),
+    };
+    connectors_console::output::emit(format, &value).unwrap();
+}
+
+#[tokio::test]
+async fn oauth_pass1_cancellation_erases_already_written_private_inode_before_return() {
+    use std::io::Read as _;
+    tokio::task::LocalSet::new()
+        .run_until(async {
+            for rename in [false, true] {
+                let root = private_tempdir();
+                let destination = root.path().join("instructions");
+                let (daemon, instructions, entered) = oauth_pass1_servers(root.path(), true).await;
+                let owned_root = root.path().to_owned();
+                let owned_destination = destination.clone();
+                let acquisition = tokio::task::spawn_local(async move {
+                    dispatch_with_personal_oauth(
+                        "gitlab",
+                        &config(),
+                        &owned_root.join("config.toml"),
+                        &owned_root,
+                        None,
+                        None,
+                        PersonalOAuthOptions {
+                            instruction_file: Some(owned_destination),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                });
+                tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified())
+                    .await
+                    .unwrap();
+                assert!(std::fs::read_to_string(&destination)
+                    .unwrap()
+                    .contains("OAUTH-PASS1-PRIVATE-HUMAN"));
+                let mut held = std::fs::File::open(&destination).unwrap();
+                let moved = root.path().join("moved");
+                if rename {
+                    std::fs::rename(&destination, &moved).unwrap();
+                    std::fs::write(&destination, "unrelated replacement").unwrap();
+                }
+                acquisition.abort();
+                assert!(acquisition.await.unwrap_err().is_cancelled());
+                let mut retained = String::new();
+                held.read_to_string(&mut retained).unwrap();
+                assert!(
+                    retained.is_empty(),
+                    "cancellation truncates the original inode even through an open descriptor"
+                );
+                if rename {
+                    assert_eq!(
+                        std::fs::read_to_string(&destination).unwrap(),
+                        "unrelated replacement"
+                    );
+                    assert!(std::fs::read(moved).unwrap().is_empty());
+                } else {
+                    assert!(!destination.exists());
+                }
+                instructions.await.unwrap();
+                daemon.abort();
+                assert!(daemon.await.unwrap_err().is_cancelled());
+            }
+        })
+        .await;
+}

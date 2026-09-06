@@ -9,6 +9,21 @@
 
 use catalog_reader::{Error, Pack};
 
+#[test]
+fn oauth_pass1_full_published_pack_version_is_checked_before_nonempty_records() {
+    let text = std::fs::read_to_string(committed_pack_path()).unwrap();
+    let body = text.splitn(3, '\n').nth(2).unwrap();
+    assert!(body.starts_with("schema 4\n"));
+    let actual = Pack::from_bytes(with_digest(body)).unwrap();
+    assert_eq!(actual.providers().len(), 65);
+    assert!(actual.operations().len() > 0);
+    for version in [2, 3, 5, u32::MAX] {
+        let replacement = body.replacen("schema 4\n", &format!("schema {version}\n"), 1);
+        assert!(matches!(Pack::from_bytes(with_digest(&replacement)),
+            Err(Error::UnsupportedSchema { found }) if found == version));
+    }
+}
+
 /// The committed pack, resolved from Cargo's package-root test working directory.
 ///
 /// Resolve this at runtime: a shared target directory can reuse a test binary across Git

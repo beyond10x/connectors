@@ -67,6 +67,58 @@ use catalog_build::pipeline::{self, Plan};
 use catalog_build::workspace::Workspace;
 use serde_json::{json, Value};
 
+#[test]
+fn oauth_pass1_all_current_documents_retain_frozen_operation_meaning() {
+    let (workspace, plan) = full_plan();
+    let frozen: Value = serde_json::from_str(planned(
+        &workspace,
+        &plan,
+        "catalog/connector-document-v3.schema.json",
+    ))
+    .unwrap();
+    let validator = jsonschema::validator_for(&frozen).unwrap();
+    let mut seen = 0;
+    let mut admitted = 0;
+    for (provider, mut document) in documents(&workspace, &plan) {
+        assert_eq!(document["schema_version"], 4);
+        assert_eq!(
+            document["$schema"],
+            catalog_build::document::schema()["$id"]
+        );
+        let operations = document["operations"].clone();
+        for credential in document
+            .get_mut("auth")
+            .and_then(Value::as_array_mut)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(oauth) = credential.get_mut("oauth2").and_then(Value::as_object_mut) {
+                if let Some(flows) = oauth.remove("personal_flows") {
+                    admitted += 1;
+                    assert_eq!(provider, "gitlab");
+                    assert_eq!(flows.as_array().unwrap().len(), 2);
+                    oauth
+                        .get_mut("grants")
+                        .unwrap()
+                        .as_array_mut()
+                        .unwrap()
+                        .retain(|grant| grant != "device_authorization");
+                }
+            }
+        }
+        document["schema_version"] = json!(3);
+        document["$schema"] = frozen["$id"].clone();
+        assert!(
+            validator.is_valid(&document),
+            "{provider}: a non-OAuth schema change cannot hide in the version migration"
+        );
+        assert_eq!(document["operations"], operations);
+        seen += 1;
+    }
+    assert_eq!(seen, 65);
+    assert_eq!(admitted, 1);
+}
+
 // ---------------------------------------------------------------------------------------------
 // The subject
 // ---------------------------------------------------------------------------------------------
