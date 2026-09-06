@@ -96,7 +96,7 @@ entities:
   # references a parent Connection. The cardinality of that relation is not stated anywhere:
   # docs/design/01-domain-model.md:235-241 says every Connection has one immutable route but does
   # not say how many children one parent may carry. Settled by the storage or reconciliation code
-  # that indexes children by parent; `crates/integration-monitoring/src/backend.rs:1684-1690`
+  # that indexes children by parent; `crates/integration-monitoring/src/backend.rs:1689-1695`
   # walks `ChildConnection` records but does not bound them.
   - name: connectors.connection.Connection
 
@@ -202,7 +202,7 @@ entities:
   #   at line 228.
   #   `crates/integration-catalog/src/hosted.rs` — `Expired` (guarded on `Pending`) and `Completed`,
   #   reached from
-  #   `crates/connectors-runtime/src/registry.rs:509`.
+  #   `crates/connectors-runtime/src/registry.rs:514`.
   # `complete_hosted_session` guards on `Pending` before it releases the session lock and re-checks
   # that state after credential verification and custody have awaited, immediately before writing
   # `Completed`. A concurrent expiry therefore remains terminal instead of being overwritten.
@@ -249,8 +249,8 @@ entities:
 
   # States: crates/protocol/src/connection.rs:221-223 (`ConnectionCandidateState`).
   # Transition read from the code that performs it: `Detected` on discovery
-  # (crates/integration-kubernetes/src/local.rs:1112), `Activated` once the candidate has a
-  # Connection (crates/integration-kubernetes/src/local.rs:250-256), which
+  # (crates/integration-kubernetes/src/local.rs:1143), `Activated` once the candidate has a
+  # Connection (crates/integration-kubernetes/src/local.rs:254-260), which
   # `ConnectionRequest::CandidateActivate` (crates/protocol/src/connection.rs:38-39) asks for.
   # The protocol enforces the pairing at crates/protocol/src/connection.rs:495-496: `Detected`
   # exactly when `connection_ref` is absent, `Activated` exactly when it is present.
@@ -283,18 +283,18 @@ entities:
   # States: crates/protocol/src/connection.rs:212-216 (`DiscoveryObservationState`).
   # Transitions read from the code that performs each one:
   #   `Observed`   — crates/integration-kubernetes/src/local_services.rs:266,
-  #                  crates/integration-monitoring/src/backend.rs:1576 (`active: true`);
-  #   `materialize`— crates/integration-kubernetes/src/local.rs:644, asked for by
+  #                  crates/integration-monitoring/src/backend.rs:1581 (`active: true`);
+  #   `materialize`— crates/integration-kubernetes/src/local.rs:662, asked for by
   #                  `ConnectionRequest::Materialize` (crates/protocol/src/connection.rs:44-45);
-  #   `withdraw`   — crates/integration-monitoring/src/backend.rs:1546 and 1362
+  #   `withdraw`   — crates/integration-monitoring/src/backend.rs:1551 and 1367
   #                  (`observation.active = false`);
-  #   `reobserve`  — crates/integration-monitoring/src/backend.rs:1562
+  #   `reobserve`  — crates/integration-monitoring/src/backend.rs:1567
   #                  (`observation.active = true` on a re-seen observation).
   # UNMAPPED: `Unsupported` (crates/protocol/src/connection.rs:214) is absent here because
-  # nothing moves to it. crates/integration-monitoring/src/backend.rs:1661-1664 derives it from
+  # nothing moves to it. crates/integration-monitoring/src/backend.rs:1666-1669 derives it from
   # the *absence* of `target_provider`, so it classifies a newly observed resource rather than
   # naming a move out of `Observed`, and a lifecycle declares one `initial`. Settled by a code
-  # site that performs the change the way crates/integration-kubernetes/src/local.rs:644 performs
+  # site that performs the change the way crates/integration-kubernetes/src/local.rs:662 performs
   # `Materialized` — that is, by the observation state becoming stored rather than derived.
   # Fields: `DiscoveryObservationSummary`, crates/protocol/src/connection.rs:242-255.
   - name: connectors.connection.DiscoveryObservation
@@ -335,10 +335,10 @@ entities:
           from: [Withdrawn]
           to: Observed
         # The state is derived, not stored, and `observation_summary`
-        # (crates/integration-monitoring/src/backend.rs:1656-1665) tests `!active` first, then
+        # (crates/integration-monitoring/src/backend.rs:1661-1670) tests `!active` first, then
         # `connection_ref.is_some()` -> `Materialized`, and only then
         # `target_provider.is_some()` -> `Observed`. The re-activating branch
-        # (crates/integration-monitoring/src/backend.rs:1558-1565) sets `active = true` and never
+        # (crates/integration-monitoring/src/backend.rs:1563-1570) sets `active = true` and never
         # clears `connection_ref`, so a withdrawn observation that had been materialized comes
         # back as `Materialized`, not as `Observed`. That is a fourth move and it is declared.
         - name: rematerialize
@@ -571,16 +571,16 @@ commands:
         payload:
           connectors.connection.CandidateActivated:
             candidate_ref: input.candidate_ref
-        summary: The candidate now has its direct Connection (crates/integration-kubernetes/src/local.rs:250-256).
-      # crates/integration-kubernetes/src/local.rs:278-282: an unknown candidate_ref is
+        summary: The candidate now has its direct Connection (crates/integration-kubernetes/src/local.rs:254-260).
+      # crates/integration-kubernetes/src/local.rs:281-285: an unknown candidate_ref is
       # `connection_not_found`, which is `ConnectionErrorCode::NotFound`
       # (crates/protocol/src/connection.rs:314).
       - name: not-found
         external: no candidate is stored under this reference
         error: connectors.connection.CandidateNotFound
-        summary: No such candidate, so nothing was activated (crates/integration-kubernetes/src/local.rs:278-282).
+        summary: No such candidate, so nothing was activated (crates/integration-kubernetes/src/local.rs:281-285).
       # UNMAPPED: there is deliberately no wrong-state branch here. Activating an
-      # already-activated candidate is not refused: crates/integration-kubernetes/src/local.rs:286-296
+      # already-activated candidate is not refused: crates/integration-kubernetes/src/local.rs:289-299
       # returns the Connection the earlier activation produced, so the call is idempotent and
       # `Activated` is not a state this command refuses from. Declaring `wrong_state` would make a
       # consumer generate a test for a refusal the tree does not perform. Settled by that path
@@ -602,32 +602,32 @@ commands:
         payload:
           connectors.connection.ObservationMaterialized:
             observation_ref: input.observation_ref
-        summary: The observation now has its mediated Connection (crates/integration-kubernetes/src/local.rs:640-646).
-      # `fn materialize` (crates/integration-monitoring/src/backend.rs:1177) refuses in six
+        summary: The observation now has its mediated Connection (crates/integration-kubernetes/src/local.rs:658-668).
+      # `fn materialize` (crates/integration-monitoring/src/backend.rs:1182) refuses in six
       # places. Three of them are refusals a caller can be told apart and are declared here:
-      #   :1183      `connection_not_found` — no observation under this reference;
-      #   :1184-1189 `Conflict`, "discovery observation is no longer current";
-      #   :1208-1213 and :1218-1224 `NotGranted`, the observed type has no target Provider
+      #   :1188      `connection_not_found` — no observation under this reference;
+      #   :1189-1194 `Conflict`, "discovery observation is no longer current";
+      #   :1213-1218 and :1223-1229 `NotGranted`, the observed type has no target Provider
       #              contract, or that Provider has no independent Connector Grant. One outcome,
       #              because docs/design/01-domain-model.md:299-300 says a refusal never names the
       #              axis that refused it.
       - name: not-found
         external: no observation is stored under this reference
         error: connectors.connection.ObservationNotFound
-        summary: No such observation, so nothing was materialized (crates/integration-monitoring/src/backend.rs:1179-1183).
+        summary: No such observation, so nothing was materialized (crates/integration-monitoring/src/backend.rs:1184-1188).
       - name: no-longer-current
         external: the observation was deactivated by a later refresh pass
         error: connectors.connection.ObservationNoLongerCurrent
-        summary: The observation is no longer current, so nothing was materialized (crates/integration-monitoring/src/backend.rs:1184-1189).
+        summary: The observation is no longer current, so nothing was materialized (crates/integration-monitoring/src/backend.rs:1189-1194).
       - name: not-granted
         external: the observed type has no target Provider contract, or that Provider has no independent Connector Grant
         error: connectors.connection.MaterializationNotGranted
-        summary: Nothing admits a mediated Connection for this observation (crates/integration-monitoring/src/backend.rs:1208-1224).
+        summary: Nothing admits a mediated Connection for this observation (crates/integration-monitoring/src/backend.rs:1213-1229).
       # UNMAPPED: the other two refusal sites are not declared, and neither is a state change a
       # caller drives. Both are on the already-materialized branch
-      # (crates/integration-monitoring/src/backend.rs:1191-1206), which returns the existing child
-      # Connection rather than moving anything: :1195 is `connection_protocol`, an internal
-      # invariant failure when a `connection_ref` names no child, and :1197-1201 is `Conflict`
+      # (crates/integration-monitoring/src/backend.rs:1196-1211), which returns the existing child
+      # Connection rather than moving anything: :1200 is `connection_protocol`, an internal
+      # invariant failure when a `connection_ref` names no child, and :1202-1206 is `Conflict`
       # when the child no longer matches current discovery evidence. Modelling either would put a
       # move on an outcome that performs none. Settled by that branch becoming a declared move —
       # a re-materialization — rather than a read with two ways to fail.
@@ -637,11 +637,11 @@ commands:
       # says "refuses from this state" rather than "from every other".
 
   # One refresh pass over one observation. The pass
-  # (crates/integration-monitoring/src/backend.rs:1541-1584) deactivates every observation of a
+  # (crates/integration-monitoring/src/backend.rs:1546-1589) deactivates every observation of a
   # source and then re-activates the ones it sees again, so per observation it was seen
-  # (line 1562) or it was not (line 1546) — and a re-seen one lands in one of two states,
+  # (line 1567) or it was not (line 1551) — and a re-seen one lands in one of two states,
   # because the branch that re-activates it leaves `connection_ref` as it found it and the
-  # derivation at crates/integration-monitoring/src/backend.rs:1659-1662 reads that before it
+  # derivation at crates/integration-monitoring/src/backend.rs:1664-1667 reads that before it
   # reads `target_provider`.
   # UNMAPPED: the refresh has no `ConnectionRequest` variant of its own —
   # crates/protocol/src/connection.rs:42-43 says the stored read is the protocol surface and that
@@ -659,7 +659,7 @@ commands:
         payload:
           connectors.connection.ObservationReobserved:
             observation_ref: input.observation_ref
-        summary: The refresh saw the resource again and it carries no connection, so it is Observed (crates/integration-monitoring/src/backend.rs:1557-1564, 1661-1662).
+        summary: The refresh saw the resource again and it carries no connection, so it is Observed (crates/integration-monitoring/src/backend.rs:1562-1569, 1666-1667).
       - name: rematerialized
         external: the re-seen observation still carries the `connection_ref` a materialization set
         moves: connectors.connection.DiscoveryObservation.rematerialize
@@ -668,7 +668,7 @@ commands:
         payload:
           connectors.connection.ObservationReobserved:
             observation_ref: input.observation_ref
-        summary: The refresh saw the resource again and its connection reference survived withdrawal, so it derives as Materialized (crates/integration-monitoring/src/backend.rs:1558-1565, 1659-1660).
+        summary: The refresh saw the resource again and its connection reference survived withdrawal, so it derives as Materialized (crates/integration-monitoring/src/backend.rs:1563-1570, 1664-1665).
       - name: withdrawn
         external: the refresh pass no longer sees the resource this observation was read from
         moves: connectors.connection.DiscoveryObservation.withdraw
@@ -677,7 +677,7 @@ commands:
         payload:
           connectors.connection.ObservationWithdrawn:
             observation_ref: input.observation_ref
-        summary: The observation is no longer active (crates/integration-monitoring/src/backend.rs:1546, 1362).
+        summary: The observation is no longer active (crates/integration-monitoring/src/backend.rs:1551, 1367).
 
 errors:
   # `ConnectSessionLifecycleError::Capacity`, crates/service/src/connect_session.rs:29-30.
@@ -693,25 +693,25 @@ errors:
 
   # `connection_not_found`, which is `ConnectionErrorCode::NotFound`
   # (crates/protocol/src/connection.rs:314), raised at
-  # crates/integration-monitoring/src/backend.rs:1179-1183.
+  # crates/integration-monitoring/src/backend.rs:1184-1188.
   - name: connectors.connection.ObservationNotFound
     summary: No discovery observation is stored under this reference, so nothing was materialized.
 
   # `ConnectionErrorCode::NotGranted` (crates/protocol/src/connection.rs:315), raised at
-  # crates/integration-monitoring/src/backend.rs:1208-1213 and :1218-1224. One error for both,
+  # crates/integration-monitoring/src/backend.rs:1213-1218 and :1223-1229. One error for both,
   # because the refusal never names the axis that refused
   # (docs/design/01-domain-model.md:299-300).
   - name: connectors.connection.MaterializationNotGranted
     summary: Nothing admits a mediated Connection for this observation.
 
   # `ConnectionErrorCode::Conflict` with the message "discovery observation is no longer
-  # current", crates/integration-monitoring/src/backend.rs:1184-1189.
+  # current", crates/integration-monitoring/src/backend.rs:1189-1194.
   - name: connectors.connection.ObservationNoLongerCurrent
     summary: The discovery observation is no longer current, so nothing was materialized.
 
   # `connection_not_found`, which is `ConnectionErrorCode::NotFound`
   # (crates/protocol/src/connection.rs:314), raised at
-  # crates/integration-kubernetes/src/local.rs:278-282.
+  # crates/integration-kubernetes/src/local.rs:281-285.
   - name: connectors.connection.CandidateNotFound
     summary: No candidate is stored under this reference, so nothing was activated.
 

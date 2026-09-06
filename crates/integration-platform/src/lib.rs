@@ -1001,6 +1001,14 @@ impl ConnectorBackend for PlatformBackend {
         }
     }
 
+    fn supports_ephemeral_invocation(&self, request: &InvokeRequest) -> bool {
+        self.operation(&request.operation_ref)
+            .is_some_and(|resolved| {
+                resolved.contract.interaction_shape()
+                    == connector_resolve::document::InteractionShape::Unary
+            })
+    }
+
     fn owns_connection(&self, request: &ConnectionRequest) -> bool {
         matches!(request, ConnectionRequest::Describe(request)
             if request.connection_ref == self.config.connection.connection_ref)
