@@ -446,10 +446,10 @@ fn every_operation_composes_an_input_schema_covering_its_parameters() {
                         )
                     });
                 assert_eq!(property, body);
-                assert!(
+                assert_eq!(
                     required.contains(&connector_spec::FREE_FORM_BODY),
-                    "providers/{name}.toml: `{id}` composes an optional free-form body, but the \
-                     body is the request"
+                    operation.params.body_required.unwrap_or(true),
+                    "providers/{name}.toml: `{id}` must preserve whole-body requiredness independently of required properties"
                 );
             }
 
@@ -469,7 +469,10 @@ fn every_operation_composes_an_input_schema_covering_its_parameters() {
                 .iter()
                 .filter(|param| param.required)
                 .count()
-                + usize::from(operation.params.body_schema.is_some());
+                + usize::from(
+                    operation.params.body_schema.is_some()
+                        && operation.params.body_required.unwrap_or(true),
+                );
             assert_eq!(
                 required.len(),
                 expected_required,

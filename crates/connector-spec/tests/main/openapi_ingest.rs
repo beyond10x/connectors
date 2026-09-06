@@ -122,6 +122,86 @@ fn diagnostics(ingested: &Ingested) -> String {
         .join("\n")
 }
 
+fn source_fidelity_ingest(body: serde_json::Value) -> Ingested {
+    let source = serde_json::json!({"openapi":"3.0.0","info":{"title":"Fixture","version":"1"},"paths":{"/things":{"post":{
+        "operationId":"createThing","summary":"Create a thing",
+        "requestBody":{"content":{"application/json":{"schema":body}}},
+        "responses":{"204":{"description":"Done"}}
+    }}}});
+    openapi::ingest_with_semantics(
+        &source.to_string(),
+        connector_spec::RequestSemantics::OpenApi30JsonV1,
+    )
+    .unwrap()
+}
+
+#[test]
+fn source_fidelity_preserves_missing_item_constraints_and_literal_reference_data() {
+    let body = serde_json::json!({"type":"object","properties":{"values":{"type":"array","nullable":true}},"default":{"$ref":"literal caller data"}});
+    let ingested = source_fidelity_ingest(body.clone());
+    assert_eq!(
+        operation(&ingested, "createThing").params.body_schema,
+        Some(body)
+    );
+    assert!(ingested
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.location == "POST /things"
+            && diagnostic.problem.contains("array without items")));
+    assert_eq!(
+        operation(&ingested, "createThing").params.body_required,
+        Some(false)
+    );
+}
+
+#[test]
+fn source_fidelity_reports_unsupported_semantics_without_a_permissive_substitute() {
+    for body in [
+        serde_json::json!({"type":"object","discriminator":{"propertyName":"kind"}}),
+        serde_json::json!({"type":"object","properties":{"name":{"type":"string","readOnly":true}}}),
+        serde_json::json!({"type":"string","contentEncoding":"base64"}),
+    ] {
+        let ingested = source_fidelity_ingest(body);
+        assert!(ingested.operations.is_empty());
+        assert!(
+            diagnostics(&ingested).contains("unsupported"),
+            "{}",
+            diagnostics(&ingested)
+        );
+    }
+}
+
+#[test]
+fn source_fidelity_refuses_recursive_response_widening_and_nondefault_serialization() {
+    let original = serde_json::json!({"openapi":"3.0.0","info":{"title":"Fixture","version":"1"},
+        "components":{"schemas":{"Node":{"type":"object","properties":{"child":{"$ref":"#/components/schemas/Node"}}}}},
+        "paths":{"/things":{"get":{"operationId":"getThings","summary":"Get things","responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Node"}}}}}}}}});
+    let ingested = openapi::ingest_with_semantics(
+        &original.to_string(),
+        connector_spec::RequestSemantics::OpenApi30JsonV1,
+    )
+    .unwrap();
+    assert!(ingested.operations.is_empty());
+    assert!(diagnostics(&ingested).contains("$ref` cycle"));
+    for parameter in [
+        serde_json::json!({"in":"query","name":"filter","style":"deepObject","schema":{"type":"object"}}),
+        serde_json::json!({"in":"query","name":"ids","schema":{"type":"array","items":{"type":"integer"}}}),
+        serde_json::json!({"in":"query","name":"optional","schema":{"type":"string","nullable":true}}),
+    ] {
+        let mut source = original.clone();
+        source["paths"]["/things"]["get"]["responses"] =
+            serde_json::json!({"204":{"description":"Done"}});
+        source["paths"]["/things"]["get"]["parameters"] = serde_json::json!([parameter]);
+        let ingested = openapi::ingest_with_semantics(
+            &source.to_string(),
+            connector_spec::RequestSemantics::OpenApi30JsonV1,
+        )
+        .unwrap();
+        assert!(ingested.operations.is_empty());
+        assert!(diagnostics(&ingested).contains("unsupported source-faithful serialization"));
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // The happy path, over both excerpts
 // ---------------------------------------------------------------------------------------------

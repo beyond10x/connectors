@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Datadog API key. Identifies the organization; required on every request together with the Application Key — neither key alone authenticates a call",
@@ -98,6 +98,7 @@
         "method": "GET",
         "url": "{base}/api/v1/monitor"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -224,6 +225,7 @@
         "method": "GET",
         "url": "{base}/api/v1/monitor/{monitor_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -329,6 +331,7 @@
         "method": "GET",
         "url": "{base}/api/v2/incidents"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -387,6 +390,7 @@
         "method": "GET",
         "url": "{base}/api/v2/incidents/{incident_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -395,7 +399,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [

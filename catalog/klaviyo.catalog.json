@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Klaviyo private API key for one account. Travels as the whole Authorization header behind Klaviyo's own scheme word. Keys are scoped per key: one minted without the scopes the shipped operations need will authenticate, pass verification, and fail on exactly the call that needs the missing scope",
@@ -75,6 +75,7 @@
         "method": "GET",
         "url": "{base}/accounts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -190,6 +191,7 @@
         "method": "GET",
         "url": "{base}/profiles"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -358,6 +360,7 @@
         "method": "GET",
         "url": "{base}/profiles/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -634,6 +637,7 @@
         "method": "POST",
         "url": "{base}/profiles"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -767,6 +771,7 @@
         "method": "GET",
         "url": "{base}/lists"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1007,6 +1012,7 @@
         "method": "POST",
         "url": "{base}/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1015,7 +1021,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Webflow API token (a Site API token or an OAuth2 access token), sent as a bearer token, scoped to read sites, collections and items, and to publish",
@@ -70,6 +70,7 @@
         "method": "GET",
         "url": "{base}/sites"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -176,6 +177,7 @@
         "method": "GET",
         "url": "{base}/sites/{site_id}/collections"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -276,6 +278,7 @@
         "method": "GET",
         "url": "{base}/collections/{collection_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -399,6 +402,7 @@
         "method": "GET",
         "url": "{base}/collections/{collection_id}/items"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -526,6 +530,7 @@
         "method": "GET",
         "url": "{base}/collections/{collection_id}/items/{item_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -622,6 +627,7 @@
         "method": "POST",
         "url": "{base}/sites/{site_id}/publish"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -630,7 +636,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2",

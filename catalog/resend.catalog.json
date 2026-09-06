@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Resend API key, sent as a bearer token on every request. Minted in the Resend dashboard and scoped there to full access or sending only; this repository holds the reference, never the value",
@@ -149,6 +149,7 @@
         "method": "POST",
         "url": "{base}/emails"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -220,6 +221,7 @@
         "method": "GET",
         "url": "{base}/emails/{email_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -359,6 +361,7 @@
         "method": "GET",
         "url": "{base}/domains"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -473,6 +476,7 @@
         "method": "GET",
         "url": "{base}/domains/{domain_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -577,7 +581,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "base_url": "https://api.resend.com",

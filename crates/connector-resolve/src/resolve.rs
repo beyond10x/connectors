@@ -9,7 +9,9 @@
 //! changed is the *input*: the closed template the document publishes instead of a parsed module.
 //! Decision 0022's migration rule is that the two are proven byte-identical for every operation in
 //! the catalogue before either is deleted, which is
-//! `connector-pack/tests/main/catalogue_differential.rs`.
+//! `connector-pack/tests/main/catalogue_differential.rs`. Those historical semantics are identified
+//! as `legacy_v1`; the explicit source profile validates the faithful caller schema and preserves
+//! literal JSON values, omission, and safely encoded scalar path parameters.
 //!
 //! # The order the refusals happen in is part of the contract
 //!
@@ -110,10 +112,10 @@ struct Derivation<'a> {
 }
 
 impl Derivation<'_> {
-    fn unbuildable(&self, message: String) -> Error {
+    fn unbuildable(&self, message: impl Into<String>) -> Error {
         Error::Unbuildable {
             operation: self.operation.id.clone(),
-            message,
+            message: message.into(),
         }
     }
 
@@ -205,10 +207,24 @@ impl Derivation<'_> {
             ),
         })?;
 
+        if operation.source_faithful() {
+            let validator = jsonschema::validator_for(operation.input_schema()).map_err(|_| {
+                self.unbuildable("its source-faithful caller schema does not compile")
+            })?;
+            if let Err(error) = validator.validate(params) {
+                // Do not print the failing value: request inputs can contain confidential data.
+                return Err(self.unbuildable(format!(
+                    "input violates its source schema at {}",
+                    error.instance_path()
+                )));
+            }
+        }
+
         // A *path* parameter must be supplied: an absent one would leave `{ticket_id}` verbatim in
         // the URL, and a request to a literal `{ticket_id}` is worse than a refusal.
         //
-        // A parameter the document marks optional may simply be left out, and leaving it out
+        // Under legacy semantics a parameter the document marks optional may simply be left out,
+        // and leaving it out
         // means exactly what passing `null` means: do not send this one. A parameter it marks
         // required must be supplied wherever it sits. `param` already answers `Null` for an
         // absent name and the query builder already skips a null, so the two spellings produced
@@ -232,13 +248,21 @@ impl Derivation<'_> {
             };
             if operation.caller_path_parameters().contains(name) {
                 if let Value::String(text) = value {
-                    Slot::Path
-                        .validate(text)
-                        .map_err(|reason| Error::UnsafePathParameter {
-                            operation: operation.id.clone(),
-                            parameter: name.to_owned(),
-                            reason,
-                        })?;
+                    (if operation.source_faithful() {
+                        if matches!(text.as_str(), "." | "..") {
+                            Err("a relative path segment cannot identify a source resource"
+                                .to_owned())
+                        } else {
+                            Ok(())
+                        }
+                    } else {
+                        Slot::Path.validate(text).map(|_| ())
+                    })
+                    .map_err(|reason| Error::UnsafePathParameter {
+                        operation: operation.id.clone(),
+                        parameter: name.to_owned(),
+                        reason,
+                    })?;
                 }
             }
         }
@@ -261,7 +285,18 @@ impl Derivation<'_> {
                 }));
             }
             match operation.symbol(name) {
-                Some(symbol) => params.get(symbol).map(text),
+                Some(symbol) => params.get(symbol).map(|value| {
+                    let value = if operation.source_faithful() {
+                        source_scalar_text(value)
+                    } else {
+                        text(value)
+                    };
+                    if operation.source_faithful() {
+                        crate::auth::query_encode(&value)
+                    } else {
+                        value
+                    }
+                }),
                 None => None,
             }
         });
@@ -273,9 +308,27 @@ impl Derivation<'_> {
         // record has no wire spelling and is refused rather than flattened.
         let mut pairs = Vec::new();
         for entry in &template.query {
+            if operation.source_faithful() {
+                if let ValueTemplate::Splice { param } = &entry.value {
+                    if operation
+                        .symbol(param)
+                        .and_then(|symbol| params.get(symbol))
+                        .is_none()
+                    {
+                        continue;
+                    }
+                }
+            }
             let rendered = match self.value(&entry.value, params)? {
+                Value::Null if operation.source_faithful() => {
+                    return Err(self
+                        .unbuildable("explicit null has no supported source query serialization"))
+                }
                 Value::Null => continue,
                 Value::String(value) => value,
+                Value::Number(value) if operation.source_faithful() => {
+                    source_scalar_text(&Value::Number(value))
+                }
                 Value::Number(value) => value.to_string(),
                 Value::Bool(value) => value.to_string(),
                 Value::Array(_) => {
@@ -303,6 +356,17 @@ impl Derivation<'_> {
 
         let body = match &template.body {
             None => None,
+            Some(BodyTemplate::Json { template }) if operation.source_faithful() => {
+                let name = splice_of(template).ok_or_else(|| {
+                    self.unbuildable("source-faithful JSON requires a whole-body parameter splice")
+                })?;
+                let symbol = operation.symbol(name).ok_or_else(|| {
+                    self.unbuildable("source-faithful body splice has no declared parameter")
+                })?;
+                // Serialize exactly the supplied JSON value. Missing is not null, and a string
+                // containing JSON text remains a JSON string; no field/default is synthesized.
+                params.get(symbol).map(Value::to_string)
+            }
             Some(BodyTemplate::Json { template }) => {
                 let mut value = self.instantiate(template, params)?;
                 // A free-form body supplied as text travels through `parse(…, as: "json")`: it is
@@ -320,6 +384,11 @@ impl Derivation<'_> {
                 Some(value.to_string())
             }
             Some(BodyTemplate::Form { fields }) => {
+                if operation.source_faithful() {
+                    return Err(
+                        self.unbuildable("form encoding is outside source-faithful JSON semantics")
+                    );
+                }
                 let mut pairs = Vec::new();
                 for field in fields {
                     let value = self.value(&field.value, params)?;
@@ -381,11 +450,220 @@ impl Derivation<'_> {
     }
 }
 
+// JSON Schema's integer includes JSON numbers such as 12.0. The OpenAPI scalar serialization
+// carries their numeric value, independent of the caller's choice of JSON number spelling.
+fn source_scalar_text(value: &Value) -> String {
+    if let Value::Number(number) = value {
+        if number.is_f64() {
+            if let Some(number) = number.as_f64().filter(|number| number.fract() == 0.0) {
+                return if number == 0.0 {
+                    "0".to_owned()
+                } else {
+                    format!("{number:.0}")
+                };
+            }
+        }
+    }
+    text(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::document;
     use serde_json::json;
+
+    fn source_fidelity_document(schema: Value, required: bool) -> document::Document {
+        let mut required_names = vec!["id"];
+        if required {
+            required_names.push("body");
+        }
+        let value = json!({
+            "schema_version":3,"connector":"fixture",
+            "services":[{"name":"default","base_url":"https://api.example.com"}],
+            "operations":[{
+                "id":"fixture-write","service":"default","expose":false,
+                "request_semantics":"openapi_3_0_json_v1",
+                "effects":["write","network"],"interaction_shape":"unary","protocol_driver":"http_v1",
+                "placement_requirement":"connectors_deployment","implementation_form":"built_in","required_capabilities":["public_network"],
+                "params":[{"name":"id","symbol":"id","position":"path","required":true},
+                    {"name":"body","symbol":"body","position":"body","required":required}],
+                "contract":{"description":"Write fixture","input_schema":{"type":"object","required":required_names,"properties":{
+                    "id":{"oneOf":[{"type":"integer"},{"type":"string"}]},"body":schema
+                }}},
+                "request":{"method":"POST","url":"{base}/projects/{id}","body":{"encoding":"json","template":{"$param":"body"}}}
+            }]
+        });
+        document::Document::parse(&value.to_string()).expect("source-fidelity fixture parses")
+    }
+
+    #[test]
+    fn source_fidelity_preserves_body_omission_null_and_inner_requiredness() {
+        let doc = source_fidelity_document(
+            json!({"type":"object","required":["name"],"properties":{"name":{"type":["string","null"]},"enabled":{"type":"boolean","default":true}}}),
+            false,
+        );
+        let op = doc.operation("fixture-write").unwrap();
+        let build =
+            |input: Value| build_request(op, "https://api.example.com", &input, &BTreeMap::new());
+        assert_eq!(build(json!({"id":4})).unwrap().body, None);
+        let body = json!({"name":null,"extra":{"values":[false,0,""]}});
+        assert_eq!(
+            build(json!({"id":4,"body":body})).unwrap().body.as_deref(),
+            Some(body.to_string().as_str())
+        );
+        assert!(build(json!({"id":4,"body":{}})).is_err());
+        assert!(build(json!({"id":4,"body":null})).is_err());
+        assert!(build(json!({"id":4.5})).is_err());
+    }
+
+    #[test]
+    fn source_fidelity_keeps_json_string_values_and_explicit_null() {
+        let doc = source_fidelity_document(json!({"type":["string","null"]}), true);
+        let op = doc.operation("fixture-write").unwrap();
+        for value in [
+            json!("null"),
+            json!("[1]"),
+            json!("plain text"),
+            Value::Null,
+        ] {
+            let request = build_request(
+                op,
+                "https://api.example.com",
+                &json!({"id":4,"body":value}),
+                &BTreeMap::new(),
+            )
+            .unwrap();
+            assert_eq!(request.body.as_deref(), Some(value.to_string().as_str()));
+        }
+    }
+
+    #[test]
+    fn source_fidelity_encodes_path_values_without_changing_route_or_authority() {
+        let doc = source_fidelity_document(json!({"type":"object"}), false);
+        let op = doc.operation("fixture-write").unwrap();
+        for (value, encoded) in [
+            ("team/project", "team%2Fproject"),
+            ("a%b?c#d", "a%25b%3Fc%23d"),
+            ("über x", "%C3%BCber%20x"),
+        ] {
+            let request = build_request(
+                op,
+                "https://api.example.com",
+                &json!({"id":value}),
+                &BTreeMap::new(),
+            )
+            .unwrap();
+            assert_eq!(
+                request.url,
+                format!("https://api.example.com/projects/{encoded}")
+            );
+        }
+    }
+
+    #[test]
+    fn source_fidelity_gitlab_requests_preserve_complete_body_values_and_defaults() {
+        let create = document::operation("gitlab-pipeline-schedule-create")
+            .expect("generated create operation");
+        let minimum = json!({"description":"fixture","ref":"main","cron":"0 * * * *"});
+        let request = build_request(
+            create,
+            "https://gitlab.example",
+            &json!({"id":"group/project","body":minimum}),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            request.url,
+            "https://gitlab.example/api/v4/projects/group%2Fproject/pipeline_schedules"
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(request.body.as_deref().unwrap()).unwrap(),
+            minimum
+        );
+        let full = json!({"description":null,"ref":"main","cron":"0 * * * *","active":false,"inputs":[{"name":"toggle","value":false},{"name":"zero","value":0},{"name":"values","value":[1,"x",false]}],"extra":{"nested":"preserved"}});
+        let request = build_request(
+            create,
+            "https://gitlab.example",
+            &json!({"id":12,"body":full}),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(request.body.as_deref().unwrap()).unwrap(),
+            full
+        );
+        assert!(build_request(
+            create,
+            "https://gitlab.example",
+            &json!({"id":12,"body":{"description":"x","ref":"main"}}),
+            &BTreeMap::new()
+        )
+        .is_err());
+        let update = document::operation("gitlab-pipeline-schedule-update").unwrap();
+        assert_eq!(
+            build_request(
+                update,
+                "https://gitlab.example",
+                &json!({"id":12,"pipeline_schedule_id":3}),
+                &BTreeMap::new()
+            )
+            .unwrap()
+            .body,
+            None
+        );
+        assert_eq!(
+            build_request(
+                update,
+                "https://gitlab.example",
+                &json!({"id":12,"pipeline_schedule_id":3,"body":{}}),
+                &BTreeMap::new()
+            )
+            .unwrap()
+            .body
+            .as_deref(),
+            Some("{}")
+        );
+        let list = document::operation("gitlab-pipeline-schedule-list").unwrap();
+        let request = build_request(
+            list,
+            "https://gitlab.example",
+            &json!({"id":12,"per_page":101}),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert!(
+            request.url.ends_with("?per_page=101"),
+            "no invented maximum or default page: {}",
+            request.url
+        );
+        for invalid in [
+            json!({"id":12,"scope":null}),
+            json!({"id":12,"scope":"invented"}),
+            json!({"id":12,"page":1.5}),
+        ] {
+            assert!(
+                build_request(list, "https://gitlab.example", &invalid, &BTreeMap::new()).is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn source_fidelity_integer_parameters_accept_json_number_spellings_without_fractional_wire_text(
+    ) {
+        let list = document::operation("gitlab-pipeline-schedule-list").unwrap();
+        let request = build_request(
+            list,
+            "https://gitlab.example",
+            &json!({"id":12.0,"per_page":50.0}),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            request.url,
+            "https://gitlab.example/api/v4/projects/12/pipeline_schedules?per_page=50"
+        );
+    }
 
     fn endpoints(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs

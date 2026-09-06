@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Dropbox access token sent as a bearer — a scoped app access token or an OAuth2 access token",
@@ -73,6 +73,7 @@
         "method": "POST",
         "url": "{base}/2/users/get_current_account"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -175,6 +176,7 @@
         "method": "POST",
         "url": "{base}/2/files/list_folder"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -267,6 +269,7 @@
         "method": "POST",
         "url": "{base}/2/files/get_metadata"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -383,6 +386,7 @@
         "method": "POST",
         "url": "{base}/2/files/search_v2"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -475,6 +479,7 @@
         "method": "POST",
         "url": "{base}/2/files/create_folder_v2"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -571,6 +576,7 @@
         "method": "POST",
         "url": "{base}/2/files/get_temporary_link"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -592,7 +598,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "2",

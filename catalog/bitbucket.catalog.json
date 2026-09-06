@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Bitbucket Cloud Access Token, sent as a bearer token. A Workspace Access Token is valid for exactly one workspace, which is the same boundary this connector's pinned `workspace` describes; scope it to repository:read plus pullrequest:write for the writes below",
@@ -92,6 +92,7 @@
         "method": "GET",
         "url": "{base}/repositories/{workspace}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -263,6 +264,7 @@
         "method": "GET",
         "url": "{base}/repositories/{workspace}/{repo_slug}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -410,6 +412,7 @@
         "method": "GET",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -591,6 +594,7 @@
         "method": "GET",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -850,6 +854,7 @@
         "method": "POST",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1030,6 +1035,7 @@
         "method": "POST",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/comments"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1160,6 +1166,7 @@
         "method": "POST",
         "url": "{base}/repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/approve"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1197,7 +1204,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "2.0",

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "authority": "com.freshdesk.api",
   "config": [
     {
@@ -80,6 +80,7 @@
         ],
         "url": "{base}/contacts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -228,6 +229,7 @@
         ],
         "url": "{base}/tickets"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -378,6 +380,7 @@
         "method": "GET",
         "url": "{base}/tickets/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -874,6 +877,7 @@
         "method": "POST",
         "url": "{base}/tickets"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1315,6 +1319,7 @@
         "method": "PUT",
         "url": "{base}/tickets/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1563,6 +1568,7 @@
         "method": "POST",
         "url": "{base}/tickets/{id}/notes"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1776,6 +1782,7 @@
         ],
         "url": "{base}/contacts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1910,6 +1917,7 @@
         "method": "GET",
         "url": "{base}/contacts/{id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2110,6 +2118,7 @@
         "method": "POST",
         "url": "{base}/contacts"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -2199,7 +2208,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v2",

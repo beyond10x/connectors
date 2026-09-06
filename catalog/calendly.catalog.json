@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Calendly access token sent as a bearer — a personal access token or an OAuth-issued one",
@@ -70,6 +70,7 @@
         "method": "GET",
         "url": "{base}/users/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -207,6 +208,7 @@
         ],
         "url": "{base}/event_types"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -375,6 +377,7 @@
         ],
         "url": "{base}/scheduled_events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -515,6 +518,7 @@
         "method": "GET",
         "url": "{base}/scheduled_events/{uuid}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -694,6 +698,7 @@
         ],
         "url": "{base}/scheduled_events/{uuid}/invitees"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -759,7 +764,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "base_url": "https://api.calendly.com",

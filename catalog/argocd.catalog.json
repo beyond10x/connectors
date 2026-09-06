@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Argo CD JWT, from `argocd account generate-token` for a local account or from an AppProject role token. Its Argo CD RBAC policy is what bounds this Connection: a token with only `applications, get` cannot sync whatever this catalogue declares. Entered or resolved at the Connector placement and never returned to the caller",
@@ -178,6 +178,7 @@
         ],
         "url": "{base}/applications"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -425,6 +426,7 @@
         ],
         "url": "{base}/applications/{name}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -676,6 +678,7 @@
         ],
         "url": "{base}/applications/{applicationName}/resource-tree"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -955,6 +958,7 @@
         ],
         "url": "{base}/applications/{name}/events"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -1122,6 +1126,7 @@
         ],
         "url": "{base}/applications/{name}/syncwindows"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -1389,6 +1394,7 @@
         ],
         "url": "{base}/applications/{applicationName}/managed-resources"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -1515,6 +1521,7 @@
         ],
         "url": "{base}/projects"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -1623,6 +1630,7 @@
         "method": "GET",
         "url": "{base}/session/userinfo"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -1809,6 +1817,7 @@
         "method": "POST",
         "url": "{base}/applications/{name}/sync"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -2060,6 +2069,7 @@
         ],
         "url": "{base}/applications/{name}/operation"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -2226,6 +2236,7 @@
         "method": "POST",
         "url": "{base}/applications/{name}/rollback"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "private_network"
       ],
@@ -2373,7 +2384,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "audiences": [
