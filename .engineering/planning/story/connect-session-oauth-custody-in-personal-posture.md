@@ -189,6 +189,8 @@ scope:
   path: crates/connector-spec/schema/provider-toml.schema.json
 - confidence: inferred
   path: crates/connector-spec/src/auth.rs
+- confidence: cited
+  path: crates/connector-spec/src/lib.rs
 - confidence: inferred
   path: crates/connector-spec/src/provider/auth_validation.rs
 - confidence: inferred
@@ -305,7 +307,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 51
+revision: 53
 ---
 ## Acceptance
 
@@ -485,3 +487,7 @@ The same receiver-owned binding gate must serialize acquisition, coherent reads,
 AEP, ESS models/projections, Git, worktree lifecycle, source publication, installation and live provider/operator actions remain coordinator-owned. The implementor may change only current machine-scoped source/dependency/provider/schema/config/document paths required by this stage, preserving existing versions/checksums and acquiring any evidenced additional exact path before writing it. Schema 3 source publication remains a prerequisite for later schema 4 writer publication, not for isolated implementation. The held multi-credential unit supplies no source or authorization.
 
 Retain actual deciding failures through runnable baseline/scaffold callers, then complete affected suites and strict checks before the whole-OAuth independent review. Missing symbols/fixture/compiler errors are separate evidence. Start with source and test preparation; acquire the coordinator's build slot before Cargo compilation because the shared disk reserve is narrow and schema 3 publication gates are also queued. Use jobs 1, one target at a time and the strict 20 GiB floor. Freeze complete raw/portable stage2c-* reports, source inventory and command/results outside targets; no operational success or completed story is claimed until composed behavior and whole-unit review/gates establish it.
+
+## Declaration reexport closure — 2026-09-06
+
+The stage 2C implementor identified crates/connector-spec/src/lib.rs as the explicit public auth-type reexport owner. Assign that exact path only for the new Design 21 admission-type reexports required by catalog-build and tests. The typed vocabulary already exists in ESS; this is a declaration/consumer closure, not a new model, protocol or helper abstraction. Preserve all existing exports and rate behavior. Compilation remains subject to the shared build slot.
