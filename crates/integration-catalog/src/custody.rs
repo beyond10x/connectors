@@ -5,6 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use connector_secrets::{
     CredentialRef, CredentialScope, Layout as _, PreparedSecretStore, Secret, SecretBatch,
@@ -322,7 +323,7 @@ pub(super) trait CompletionAuthority: Send + Sync {
 struct OwnerState {
     image: Image,
     uncertain: bool,
-    live: Option<LiveCompletion>,
+    live: Option<CompletionClaim>,
 }
 pub(super) struct CustodyOwner {
     journal: Arc<dyn JournalIo>,
@@ -520,6 +521,26 @@ impl CustodyOwner {
         live: LiveCompletion,
         authority: &dyn CompletionAuthority,
     ) -> Result<Publication> {
+        self.complete_claim(
+            binding,
+            previous_generation,
+            evidence,
+            proposal,
+            CompletionClaim::Session(live),
+            Some(authority),
+        )
+        .await
+    }
+
+    async fn complete_claim(
+        &self,
+        binding: &Binding,
+        previous_generation: u64,
+        evidence: Evidence,
+        proposal: Proposal,
+        live: CompletionClaim,
+        authority: Option<&dyn CompletionAuthority>,
+    ) -> Result<Publication> {
         let _gate = self.transaction_gate.lock().await;
         let mut image = {
             let state = lock(&self.state)?;
@@ -530,7 +551,7 @@ impl CustodyOwner {
             state.image.clone()
         };
         if proposal.identity != binding.identity
-            || live.connection != binding.identity.connection
+            || live.connection() != binding.identity.connection
             || self
                 .bindings
                 .get(&binding.identity.connection)
@@ -630,7 +651,7 @@ impl CustodyOwner {
         &self,
         image: Image,
         proposal: Proposal,
-        authority: &dyn CompletionAuthority,
+        authority: Option<&dyn CompletionAuthority>,
     ) -> Result<()> {
         // The complete id/allocation is FULL-persisted before any recoverable secret staging.
         self.persist(image)?;
@@ -657,23 +678,15 @@ impl CustodyOwner {
             }
             Ok(_) => return Err(CustodyError::Unavailable),
         }
-        // No state/SQLite lock is held over async store I/O. The short lifecycle lock also
-        // serializes the receiver's current-authority callback with this single sampled instant.
+        // No state/SQLite lock is held over async store I/O. Each claim variant uses its short
+        // authority lock around the current-authority callback and one sampled instant.
         let claim = {
-            let state = lock(&self.state)?;
-            let live = state.live.as_ref().ok_or(CustodyError::Unavailable)?;
-            let result =
-                lock(&live.sessions)?.claim_completion(&live.session, &live.connection, |now| {
-                    pending.publication.evidence.observed_at <= now
-                        && now < pending.publication.evidence.expires_at
-                        && authority.recheck(
-                            &pending.publication.identity,
-                            pending.previous_generation,
-                            &pending.publication.evidence,
-                            now,
-                        )
-                });
-            result
+            let mut state = lock(&self.state)?;
+            state
+                .live
+                .as_mut()
+                .ok_or(CustodyError::Unavailable)?
+                .claim(&pending, authority)
         };
         let (authorized_at, deadline) = match claim {
             Ok(timing) => timing,
@@ -885,10 +898,259 @@ pub(super) fn project_session(
     }
 }
 
-fn lock<T>(mutex: &Mutex<T>) -> Result<MutexGuard<'_, T>> {
+fn lock<T: ?Sized>(mutex: &Mutex<T>) -> Result<MutexGuard<'_, T>> {
     mutex.lock().map_err(|_| CustodyError::Unavailable)
+}
+
+pub(super) trait RefreshClock: Send + Sync {
+    fn now(&self) -> Result<(u64, Instant)>;
+}
+/// Real receiver clock; tests install a controlled receiver at owner construction.
+pub(super) struct SystemRefreshClock;
+impl RefreshClock for SystemRefreshClock {
+    fn now(&self) -> Result<(u64, Instant)> {
+        let wall = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| CustodyError::Unavailable)?;
+        let wall = u64::try_from(wall.as_millis()).map_err(|_| CustodyError::Unavailable)?;
+        Ok((wall, Instant::now()))
+    }
+}
+/// Current operation/grant admission. Mutations use this receiver's same mutex; callbacks perform
+/// no I/O or custody locking. There is no default grant or caller-supplied authorization instant.
+pub(super) trait RefreshAuthority: Send {
+    fn recheck(
+        &mut self,
+        operation: &str,
+        identity: &Identity,
+        generation: u64,
+        evidence: &Evidence,
+        now: u64,
+    ) -> bool;
+}
+pub(super) struct RefreshOwner {
+    binding: Binding,
+    clock: Arc<dyn RefreshClock>,
+    authority: Arc<Mutex<dyn RefreshAuthority>>,
+    gate: Arc<tokio::sync::Mutex<()>>,
+}
+struct RefreshLease {
+    owner: Arc<RefreshOwner>,
+    _gate: tokio::sync::OwnedMutexGuard<()>,
+}
+/// Acquisition/read/refresh owners share this binding gate. The caller can retain it through the
+/// subsequent operation; an unresolved completion retains its lease until reconciliation.
+pub(super) struct RefreshGuard {
+    lease: Arc<RefreshLease>,
+    begun: std::sync::atomic::AtomicBool,
+}
+/// Neither cloneable nor serializable. Its original window and target survive every awaited step.
+pub(super) struct RefreshCompletion {
+    lease: Arc<RefreshLease>,
+    operation: String,
+    previous: Publication,
+    start: u64,
+    deadline: u64,
+    monotonic_start: Instant,
+    monotonic_deadline: Instant,
+    claimed: bool,
+}
+impl RefreshOwner {
+    pub(super) fn new(
+        binding: Binding,
+        clock: Arc<dyn RefreshClock>,
+        authority: Arc<Mutex<dyn RefreshAuthority>>,
+    ) -> Self {
+        Self {
+            binding,
+            clock,
+            authority,
+            gate: Arc::new(tokio::sync::Mutex::new(())),
+        }
+    }
+    pub(super) async fn lock(self: &Arc<Self>) -> RefreshGuard {
+        let gate = self.gate.clone().lock_owned().await;
+        RefreshGuard {
+            lease: Arc::new(RefreshLease {
+                owner: self.clone(),
+                _gate: gate,
+            }),
+            begun: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+}
+impl RefreshGuard {
+    /// Before any refresh egress, admit under this gate. Old access expiry does not invalidate
+    /// refresh authority: the current operation grant is checked explicitly by the receiver.
+    pub(super) fn begin(
+        &self,
+        custody: &CustodyOwner,
+        operation: &str,
+    ) -> Result<RefreshCompletion> {
+        if self.begun.swap(true, std::sync::atomic::Ordering::SeqCst) || !valid_ref(operation) {
+            return Err(CustodyError::Refused);
+        }
+        let owner = &self.lease.owner;
+        let previous = custody
+            .snapshot(&owner.binding.identity)?
+            .ok_or(CustodyError::Refused)?;
+        let mut authority = lock(&owner.authority)?;
+        let (start, monotonic) = owner.clock.now()?;
+        let deadline = start.checked_add(30_000).ok_or(CustodyError::Refused)?;
+        let monotonic_deadline = monotonic
+            .checked_add(Duration::from_secs(30))
+            .ok_or(CustodyError::Refused)?;
+        if start == 0
+            || !authority.recheck(
+                operation,
+                &previous.identity,
+                previous.generation,
+                &previous.evidence,
+                start,
+            )
+        {
+            return Err(CustodyError::Refused);
+        }
+        Ok(RefreshCompletion {
+            lease: self.lease.clone(),
+            operation: operation.to_owned(),
+            previous,
+            start,
+            deadline,
+            monotonic_start: monotonic,
+            monotonic_deadline,
+            claimed: false,
+        })
+    }
+}
+impl RefreshCompletion {
+    /// The acquisition backend wraps token/evidence I/O with this same remaining budget.
+    pub(super) fn remaining(&self) -> Result<Duration> {
+        let (now, monotonic) = self.lease.owner.clock.now()?;
+        self.remaining_at(now, monotonic)
+    }
+    fn remaining_at(&self, now: u64, monotonic: Instant) -> Result<Duration> {
+        if self.claimed
+            || now < self.start
+            || now >= self.deadline
+            || monotonic < self.monotonic_start
+        {
+            return Err(CustodyError::Refused);
+        }
+        self.monotonic_deadline
+            .checked_duration_since(monotonic)
+            .filter(|remaining| !remaining.is_zero())
+            .ok_or(CustodyError::Refused)
+    }
+    fn claim(&mut self, pending: &Pending) -> Result<(u64, u64)> {
+        if self.claimed
+            || pending.previous_generation != self.previous.generation
+            || pending.publication.identity != self.previous.identity
+        {
+            return Err(CustodyError::Refused);
+        }
+        let evidence = &pending.publication.evidence;
+        let previous = &self.previous.evidence;
+        if evidence.client_digest != previous.client_digest
+            || evidence.origin_digest != previous.origin_digest
+            || evidence.authority_digest != previous.authority_digest
+            || evidence.subject != previous.subject
+            || evidence.ceiling != previous.ceiling
+        {
+            return Err(CustodyError::Refused);
+        }
+        let mut authority = lock(&self.lease.owner.authority)?;
+        let (now, monotonic) = self.lease.owner.clock.now()?;
+        self.remaining_at(now, monotonic)?;
+        if evidence.observed_at > now
+            || now >= evidence.expires_at
+            || !authority.recheck(
+                &self.operation,
+                &self.previous.identity,
+                self.previous.generation,
+                evidence,
+                now,
+            )
+        {
+            return Err(CustodyError::Refused);
+        }
+        self.claimed = true;
+        Ok((now, self.deadline))
+    }
+}
+impl CustodyOwner {
+    pub(super) async fn complete_refresh(
+        &self,
+        binding: &Binding,
+        evidence: Evidence,
+        proposal: Proposal,
+        refresh: RefreshCompletion,
+    ) -> Result<Publication> {
+        self.complete_claim(
+            binding,
+            refresh.previous.generation,
+            evidence,
+            proposal,
+            CompletionClaim::Refresh(Box::new(refresh)),
+            None,
+        )
+        .await
+    }
+}
+
+enum CompletionClaim {
+    Session(LiveCompletion),
+    Refresh(Box<RefreshCompletion>),
+}
+impl CompletionClaim {
+    fn connection(&self) -> &str {
+        match self {
+            Self::Session(live) => &live.connection,
+            Self::Refresh(refresh) => &refresh.previous.identity.connection,
+        }
+    }
+    fn recovery(&self) -> Result<()> {
+        match self {
+            Self::Session(live) => live.recovery(),
+            Self::Refresh(_) => Ok(()), // The custody image itself stays guarded/uncertain.
+        }
+    }
+    fn resolve(&self, published: bool) -> Result<()> {
+        match self {
+            Self::Session(live) => live.resolve(published),
+            Self::Refresh(_) => Ok(()), // Refresh has no terminal session to publish.
+        }
+    }
+    fn claim(
+        &mut self,
+        pending: &Pending,
+        authority: Option<&dyn CompletionAuthority>,
+    ) -> Result<(u64, u64)> {
+        match self {
+            Self::Refresh(refresh) => refresh.claim(pending),
+            Self::Session(live) => {
+                let authority = authority.ok_or(CustodyError::Refused)?;
+                lock(&live.sessions)?
+                    .claim_completion(&live.session, &live.connection, |now| {
+                        pending.publication.evidence.observed_at <= now
+                            && now < pending.publication.evidence.expires_at
+                            && authority.recheck(
+                                &pending.publication.identity,
+                                pending.previous_generation,
+                                &pending.publication.evidence,
+                                now,
+                            )
+                    })
+                    .map_err(|_| CustodyError::Refused)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 #[path = "custody_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "custody_refresh_tests.rs"]
+mod refresh_tests;
