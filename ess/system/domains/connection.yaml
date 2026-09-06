@@ -6,6 +6,35 @@ domain: connectors.connection
 summary: An authorized instance of an integration, the channel it supervises, and the connect sessions, candidates and observations that produce one.
 
 types:
+
+  # Proposed transient value vocabulary, design 21 (2026-09-06). Existing ConnectSession
+  # identity, Pending/Completed/Expired/Failed lifecycle and Connection wire are reused.
+  - name: connectors.connection.OAuthInstructionKind
+    kind: enum
+    variants: [BrowserAuthorization, DeviceAuthorization]
+
+  - name: connectors.connection.PersonalOAuthSessionPolicy
+    kind: struct
+    fields:
+      - name: flow
+        type: connectors.catalog.PersonalOAuthFlow
+      - name: browser_placement
+        type: connectors.deployment.OAuthBrowserPlacement
+      - name: instruction_kind
+        type: connectors.connection.OAuthInstructionKind
+
+  # Safe internal classifications, not new protocol error codes or model-tool payloads.
+  - name: connectors.connection.OAuthCompletionRefusal
+    kind: enum
+    variants: [FlowNotAdmitted, BrowserPlacementMismatch, PortInUse, StateMismatch, HostMismatch, OriginRefused, MalformedCallback, PkceBindingMismatch, CodeExchangeRefused, DeviceDenied, DeviceExpired, CustodyUnavailable]
+
+  # UNMAPPED: one-shot state consumption, bounded callback/device work, expiry versus
+  # durable commit-decision linearization, recovery, task/listener cancellation and
+  # terminal instruction removal. Existing lifecycle owners must enforce these in Rust.
+  # UNMAPPED: trusted outer-control URL access versus model/inner-tool redaction and
+  # remediation only for an already resolved/admitted stable Connection. No new wire
+  # field, endpoint, durable session entity, or unknown-Connection creation is asserted.
+
   # Every identity below is an opaque `String` reference in the protocol; the wire names are the
   # field names of the value-free summaries in `crates/protocol/src/connection.rs`.
   - name: connectors.connection.ConnectionRef
