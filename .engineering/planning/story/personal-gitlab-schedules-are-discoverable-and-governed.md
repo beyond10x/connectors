@@ -46,10 +46,14 @@ scope:
   path: crates/catalog-build/src/workspace.rs
 - confidence: cited
   path: crates/catalog-build/tests/main/catalog_invariants.rs
+- confidence: cited
+  path: crates/catalog-build/tests/main/no_network.rs
 - confidence: inferred
   path: crates/catalog-cli/Cargo.toml
 - confidence: inferred
   path: crates/catalog-cli/examples/vendor_gitlab.rs
+- confidence: cited
+  path: crates/catalog-cli/tests/offline_binary.rs
 - confidence: cited
   path: crates/catalog-reader/catalog.pack
 - confidence: cited
@@ -114,8 +118,12 @@ scope:
   path: crates/connectors-runtime/Cargo.lock
 - confidence: inferred
   path: crates/connectors-runtime/src/registry.rs
+- confidence: inferred
+  path: crates/connectors-runtime/tests/local_gitlab_schedules.rs
 - confidence: cited
   path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: crates/service/src/planning.rs
 - confidence: cited
   path: docs/design/01-domain-model.md
 - confidence: cited
@@ -138,7 +146,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 89
+revision: 94
 ---
 
 
@@ -275,3 +283,15 @@ The closed semantics are legacy_v1 and openapi_3_0_json_v1. ParamSet carries the
 Additional machine scope now records the generic importer/translation, contract/document/build/reader/table/resolver, profile tests, catalog directory and JSON inventory. The catalog directory scope owns only deterministic generated documents, pack/schema and their source registration; no other active worker owns generated catalog output. It is deliberately recorded as a directory and additionally reviewed for containment. Preserve the old schema 2 identity/bytes and emit a distinct schema 3 identity/file. Registry, CLI and integration-catalog/lib.rs remain deferred until their current owners hand off. The GitLab agent may return a small integration-catalog schema-selection patch for coordinator integration; it must not race the credentials owner.
 
 The exact algorithm/test proposal is the implementor's source-fidelity-design.md retained in the wave's private scratch. Its required cases independently compare all four literal source schema closures, nullable/enum/oneOf behavior, body absence/null/defaults, string bodies, safe namespaced path encoding, unknown profile/old-reader refusals and every retained legacy behavior. No production provider call or operator configuration change is authorized. Source defects remain visible and must not be silently repaired.
+
+## Current migration authority
+
+Fresh clean Atlas authority is3f0dbbf7701ce636df510316282d1c96a917df01 in managed tree wt-09ac7303c4aa. Its latest accepted ADR is0039, the ESS conformance-count reader-before-writer migration. The Connectors wave still aligns with accepted ADR0038's generic platform/independent extension boundary; ADR0039 does not change Connector provider selection, schema fidelity, grant or custody rules.
+
+Our unpublished migration drafts were replayed through AEP on a branch from that exact remote commit, reusing clean managed tree wt-19c8158c5cae as plan/connector-cli-migrations. Rate-limit protocol proposal is now ADR0040; source-fidelity catalog proposal is ADR0041. The prior local5e3a327 proposal branch remains a recovery reference; its0039/0040 numbering is superseded and not published. No planning journal was textually merged or copied.
+
+Atlas's full fences.sh exited1. Catalog, live Pages, projections and brand passed. Shared primary state fails documentation collection (AgentIDE b10x-docs/v4 unsupported by the pinned collector), Website Docs System pin, and map grounding (widgets lacks Serves). A bot-observer test also failed its error-message assertion; the exact focused rerun passed, and a full Rust rerun follows. Coordinator fixed one newly introduced relative ADR link; the managed Markdown checker now reports158files and0findings. The full gate remains red; the draft is not pushed and none of these observations claims delivery.
+
+Pipe worktree wt-55b6348b9982 GC completed through exact reviewed-id application. The manager recorded remote recovery through origin:refs/heads/wave/cli-ten-slack-first and origin:refs/pull/14/head before non-forced removal. No other tree was selected.
+
+One-shot source970e4af56f7a4ca1b9689c885fabd3a519bbe0ca is bot-authored and bot-committed after618 passing affected tests (2existing ignored), strict clippy/fmt/module fence. First tests-only attack is dispatched to adversary_one_shot_1 in the same owned tree; no AEP/Git writes delegated. Full base for its review remains3df1cd2df32472a4afc8feeaac8c46c9de8d1b55. The implementation report and original red fixtures remain under the recorded scratch triple.
