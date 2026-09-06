@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 38
+revision: 39
 ---
 ## Authorization and objective
 
@@ -3411,3 +3411,12 @@ Runtime/server starts from8815dea4with exactly8known additive reviewed test file
 Only runtime/server initially owns the compiler; client/CLI may edit while waiting for explicit slot transfer. Both use one job, no incremental/debug output and their existing private targets. The prospective8GiBdisk exception ended with the first review. Restore12GiBdisk,8GiBtmpfs and16GiBavailable-memory reserves, with12GiBtargetcap for the tmpfs owner and8GiBaggregate targetcap for the disk owner. No cleanup or target sharing is authorized by this correction.
 
 Manual release rehearsal34063924916 passed on exact public0ac093be: all12workspaces, shared checks and4native builds succeeded; the publish job was skipped. This is pre-correction source evidence and is not reused as a final corrected-candidate verdict.
+
+
+## Second ordinary authentication review — 2026-09-07
+
+Candidate77a5857cb3cd37ebb6fd17886926029240338a01 integrates the verified first-review corrections and full reports. The coordinator verified111server and130client evidence members,1229/1228 source files and20405/15259 target files respectively. All14transferred paths match tested bytes; both original preimages and retained assertion prefixes match. Complete affected server117/client47/console108/CLI141 suites and strict/fmt passed. The first review records its fixed outcome; final whole-auth review and finalCI remain outstanding.
+
+Original auth implementation history and corrected product bytes are retained locally at35ad91c3fb1dbaab42b6d3de8c391851149b0f70 on impl/auth-protocol-remediation-resumed. It is not a publication branch. The existing managed review tree ~/.local/state/worktree/trees/b10x/connectors/wt-78f189927231 is clean and detached at candidate77a5857c. Its private target remains /dev/shm/b10x-cli-wave-wt-78f189927231-urhrmq5y/runtime-target. New assigned scratch is ~/.cache/connectors-cli-wave-20260906/auth-as-tool-result/whole-unit-adversary-2, with owner-only TMPDIR ~/.cache/cw6/av2. The frozen source inventory has1225trackedfiles, SHA256421b5167c5adf9fdfdd4ffb20c74af8c5253684bd1764df7c6b4bbeea3febb7f; all tracked bytes matched the publication tree before this planning-only record.
+
+The reviewer receives the sole compiler and only additive ownership of the same10existing test files, at most6new bounded deciding cases. Preserve every old and first-review assertion. The same private target retains12GiBcap and continuous12GiBdisk/8GiBtmpfs/16GiBmemory reserves plus128MiBtemporary cap. No third ordinary auth review is authorized. OAuth completed its own two reviews and unchanged OAuth stays out of this attack; several-credentials stays held. The complete frozen brief owns source scope, current acceptance, first-case/full-suite order and reporting requirements.
