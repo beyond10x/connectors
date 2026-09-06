@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 25
+revision: 27
 ---
 
 
@@ -3289,3 +3289,13 @@ Workers resume the existing one-shot final review, GitLab stage2, and additive r
 ## Remote main reconciliation
 
 Integrated remote main a61e0a748be58ad03cf1907a48f9fefbb4423434 while preserving both published histories. Its seven source/lock files were applied from the exact merge-base diff. The eleven independent remote planning events for story:git-http-oauth-authentication and its immutable review were replayed sequentially through AEP under the current agent actor; both resulting artifact files were verified byte-for-byte against remote main. The merge retains the original remote event provenance through its second parent and avoids a textual append-only-journal merge. No new delivery or verification is claimed for that separate active story. Full wave verification remains pending.
+
+## GitLab parser ownership handoff
+
+The resumed GitLab worker recovered the three stage2 source/fixture/guide files and prepared exact search-bound patches. Current one-shot ownership is tests only in its separate tree; production CLI implementation is committed at17763bbc. Release GitLab parser ownership for ConnectionCommand::{Candidates,List,Observations}, OperationCommand::Search and EventCommand::Search limit attributes (current integration crates/connectors-cli/src/lib.rs lines267-395), plus the already scoped new tests/search_bounds.rs. This is disjoint by symbols from committed one-shot runtime routing and by file from the active one-shot test-only review. The GitLab tree will prove parser refusals before configuration/transport; the final integration gate must prove combined behavior. Preserve existing numeric defaults through their matching protocol constants, bound exactly to declared maxima, and leave Event Receive outside scope. Record diff hunk headers and perform a dry merge check before integrating both heads.
+
+## One-shot final review and source integration
+
+Second/final attack of corrected17763bbc is recorded verbatim as review-result:cli-one-shot-adversary-2-portable-20260906. Five appended cases increased affected execution626->631 passing with no confirmed product defect. Two initial invalid-fixture reds are retained as INFEASIBLE notes, not product defects. Full selected runners observed1685 nonduplicated passes and6 existing ignored; strict clippy/fmt and ESS0.18.0 validation passed. Tests-only commitd86716fb preserves both earlier and final adversary cases. The final public derivative renders scratch references as plain text for durable AEP recording; original frozen scratch reports and hashes remain retained. Whole-wave final gate and installation remain outstanding before lifecycle closure.
+
+Unpublished recording transactionad5a75a49cdb69fcadd6258fcda3263f10b2c0d4 is retained on recovery/cli-review-link-transaction-20260906. Its immutable report used machine-local Markdown links, rejected by the link fence. Integration resumed from its clean parent620d60ee on wave/cli-ten-slack-first-resumed; prior valid parser ownership/scope mutations were replayed through AEP, then a distinct portable review id was created from the reviewer-returned derivative. No published history or original review bytes were changed. This is one final review with mechanical presentation variants, not an extra attack.
