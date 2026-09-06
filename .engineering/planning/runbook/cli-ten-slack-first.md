@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 15
+revision: 16
 ---
 
 
@@ -1899,3 +1899,17 @@ The GitLab source unit measured a legitimate additional absent response body: of
 The multi-credential unit may extract focused catalog/config modules to satisfy the source-size fence. Its exact scope now includes config personal/catalog.rs and lib.rs, integration-catalog personal_connections.rs and personal_connections_tests.rs, and the runtime local_catalog_writes fixture constructor. The GitLab source unit may extend the existing declaration/publishing/patch/schema machinery and its tests, the catalog-build dev dependency, and catalog-reader/catalog.pack generated output. These surfaces do not overlap the current closed-pipe or multi-credential writers. Exact story scopes are the coordinator-owned current record.
 
 The Atlas migration proposal is an additional managed tree: wt-19c8158c5cae, branch plan/connector-operation-v2, proposed ADR commit b4ad7e8d94edecdcbea6a9aa4f7464e28078c4cf. It is not published or accepted; its planning and Markdown checks passed. Authoritative operation wrappers continue to come from the separate clean remote-main authority tree wt-ae608b71b66b.
+
+## Schema fidelity and second-batch review
+
+The operator refined the standing direction on 2026-09-06: a practical useful Slack operation set is sufficient; selected operation schemas must remain one for one with official specifications. The 1,847-operation inventory belongs to GitLab, not Slack. Official machine-readable sources remain mandatory when usable, and unsupported formats require importers. AGENTS.md now distinguishes provider scope selection from schema fidelity. No arbitrary operation count determines Slack's useful surface.
+
+The in-flight GitLab audit found actual losses: model-facing contract lowering widens integers and drops enum/other constraints; body flattening can discard body-level semantics; request assembly can turn omitted optional fields into explicit nulls. Schema-correcting response-array overlays also differ from the literal official OpenAPI. These are implementation gaps to address before claiming fidelity. Preserve original source, report upstream defects, and fix generic import/projection/assembly owners rather than writing replacement definitions. Stage 1 is being revised; its earlier green package run does not satisfy this newer requirement.
+
+Credential adversarial pass 1 measured compound-auth disappearance (real Datadog API-key/application-key conjunction) and credential replacement before a rejected enrollment lock check. Its final immutable report and correction routing follow when the reviewer completes. The coordinator added only a cfg(test) enrollment seam at 66c62dea36120bf1bd267b0863f2f3e2bc4b9d8b.
+
+Closed-pipe correction 1 is committed at 68b30016aafb3a2bf5912f2d606c2a3a6413e100, bot author/committer verified. All retained first-pass cases plus class controls pass: CLI 96 to 101, zero red. The first review outcome is fixed; a fresh final second adversarial pass is dispatched. Command semantic status is evaluated after result emission even when the output consumer closes.
+
+The first-batch checkpoint a5dfb480ab58acba1ed637f0bd34be3a392ed114 is published on origin/wave/cli-ten-slack-first. After confirming source recovery on that remote branch and no process using the exact tree outputs, the coordinator cargo-cleaned only measured owned target directories, finished the three clean trees, reviewed GC dry-run and applied exactly wt-09950110d866, wt-728fb204f8cb and wt-6ae00b19e482. All three were removed by the worktree manager. Their source and review records remain reachable; their table paths above are historical, not live checkouts.
+
+Atlas remote main advanced to f4f2b51bdbe18c188055d70e9762b9c520d3a9f1. The current clean exact authority tree is wt-09ac7303c4aa under ~/.local/state/worktree/trees/b10x/atlas/. Prior authority trees remain managed and untouched. The separate draft migration tree wt-19c8158c5cae at b4ad7e8d94edecdcbea6a9aa4f7464e28078c4cf holds proposed ADR 0039 for a new operation protocol version; it is not an accepted architecture decision or the bot authority checkout.
