@@ -688,8 +688,8 @@ fn auth_openapi_selects_each_supported_identity_explicitly() {
             ],
         ),
     ] {
-        let selection = &doc["paths"][path]["post"]["requestBody"]["content"]["application/json"]["schema"]
-            ["oneOf"];
+        let selection = &doc["paths"][path]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["oneOf"];
         let references: BTreeSet<_> = selection
             .as_array()
             .expect("the endpoint documents explicit version selection")
@@ -772,11 +772,9 @@ fn auth_openapi_remediation_examples_keep_the_operation_unattempted() {
             .expect("each explicit bound command is documented");
         assert_eq!(example["protocol"], "b10x.connector-connection.v0alpha2");
         assert_eq!(example["request"]["method"], name);
-        assert!(
-            example["request"]["params"]
-                .get("approval_evidence_ref")
-                .is_none()
-        );
+        assert!(example["request"]["params"]
+            .get("approval_evidence_ref")
+            .is_none());
     }
     let description = doc["paths"]["/connections"]["post"]["description"]
         .as_str()
