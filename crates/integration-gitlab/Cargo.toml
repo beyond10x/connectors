@@ -12,6 +12,7 @@ workspace = "../connectors-runtime"
 
 [dependencies]
 async-trait = "0.1"
+base64 = "0.22"
 catalog = { version = "0.6.5", path = "../catalog" }
 connector-oauth = { version = "0.6.5", path = "../connector-oauth" }
 connector-resolve = { version = "0.6.5", path = "../connector-resolve" }

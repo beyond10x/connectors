@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use base64::Engine as _;
 use connector_secrets::Secret;
 use serde::Deserialize;
 use serde_json::Value;
@@ -35,6 +36,17 @@ pub(crate) fn bearer_headers(token: &Secret) -> BTreeMap<String, String> {
         "authorization".to_owned(),
         format!("Bearer {}", token.expose_secret()),
     )])
+}
+
+pub(crate) fn git_http_headers(token: &Secret) -> BTreeMap<String, String> {
+    // GitLab accepts OAuth tokens as the password of HTTP Basic auth for Git, with the
+    // recommended username oauth2; API requests retain Bearer auth. Keep credentials out of URLs.
+    // https://docs.gitlab.com/api/oauth2/#access-git-over-https-with-access-token
+    let credentials = Zeroizing::new(format!("oauth2:{}", token.expose_secret()));
+    let mut authorization = String::from("Basic ");
+    base64::engine::general_purpose::STANDARD
+        .encode_string(credentials.as_bytes(), &mut authorization);
+    BTreeMap::from([("authorization".to_owned(), authorization)])
 }
 
 pub(crate) fn decode_response<T: for<'de> Deserialize<'de>>(
