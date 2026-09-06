@@ -21,7 +21,7 @@
 
 use std::sync::OnceLock;
 
-use axum::http::{StatusCode, header};
+use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::Value;
 use sha2::Digest as _;
