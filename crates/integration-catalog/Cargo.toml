@@ -23,6 +23,7 @@ connector-resolve = { version = "0.6.5", path = "../connector-resolve" }
 connector-address = { version = "0.6.5", path = "../connector-address" }
 connector-secrets = { version = "0.6.5", path = "../connector-secrets" }
 connector-state = { version = "0.6.5", path = "../connector-state" }
+state-sqlite = { version = "0.6.5", path = "../state-sqlite" }
 connectors-config = { version = "0.6.5", path = "../connectors-config" }
 domain = { version = "0.6.5", path = "../domain" }
 protocol = { version = "0.6.5", path = "../protocol" }
