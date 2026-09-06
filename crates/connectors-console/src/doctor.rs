@@ -113,7 +113,42 @@ pub fn run(config_path: &Path, state_root: &Path) -> Report {
     checks.push(check_state_root(state_root));
     checks.extend(check_socket_budget(state_root));
     checks.push(check_daemon(state_root));
-    checks.push(check_credential_store(state_root));
+    let config = PersonalConfig::read(config_path).ok();
+    let has_ordinary_credentials = config.as_ref().is_none_or(|config| {
+        config.catalog.iter().all(|entry| entry.oauth.is_none())
+            || config.slack.is_some()
+            || config.grafana.is_some()
+            || config.catalog.iter().any(|entry| entry.oauth.is_none())
+    });
+    if has_ordinary_credentials {
+        checks.push(check_credential_store(state_root));
+    }
+    if let Some(config) = config {
+        for entry in config.catalog.iter().filter(|entry| entry.oauth.is_some()) {
+            let registration = entry.oauth.as_ref().expect("filtered OAuth registration");
+            let admitted = config.principal_context().ok().is_some_and(|owner| {
+                integration_catalog::personal_oauth_admitted_origins(&owner, entry).is_ok()
+            });
+            if !admitted {
+                checks.push(Check::new(
+                    "personal-oauth",
+                    Status::Fail,
+                    "the configured personal OAuth registration is not admitted",
+                ));
+                continue;
+            }
+            checks.push(Check::new("personal-oauth-custody", Status::Warn,
+                format!("{} is configured to use DevelopmentFile at {}; this custody requires durable owner-only storage, is unsealed at rest, and is refused for production use",
+                    entry.provider, state_root.join("oauth/credentials.store").display())));
+            if let Some(redirect) = &registration.redirect_uri {
+                checks.push(Check::new("personal-oauth-redirect", Status::Ok,
+                    format!("register this exact development redirect: {redirect}; the browser must run on this machine")));
+            } else {
+                checks.push(Check::new("personal-oauth-device", Status::Ok,
+                    "the configured device flow has no OAuth callback; instructions are created only by explicit connection setup"));
+            }
+        }
+    }
 
     Report { checks }
 }

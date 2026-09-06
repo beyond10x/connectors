@@ -479,7 +479,7 @@ mod tests {
             required_names.push("body");
         }
         let value = json!({
-            "schema_version":3,"connector":"fixture",
+            "schema_version":4,"connector":"fixture",
             "services":[{"name":"default","base_url":"https://api.example.com"}],
             "operations":[{
                 "id":"fixture-write","service":"default","expose":false,

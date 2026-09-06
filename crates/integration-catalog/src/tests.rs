@@ -271,6 +271,7 @@ mod tests {
             network: connectors_config::NetworkScopeConfig::Public,
             credential: None,
             credential_file: None,
+            oauth: None,
         }
     }
 

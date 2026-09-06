@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "authority": "io.b10x",
   "connector": "b10x",
   "description": "B10x-owned Connector capabilities implemented by closed built-in protocol drivers",
@@ -138134,7 +138134,7 @@
       "service": "planning"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "base_url": "https://b10x.io",

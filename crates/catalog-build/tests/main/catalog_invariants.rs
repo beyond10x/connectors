@@ -67,6 +67,58 @@ use catalog_build::pipeline::{self, Plan};
 use catalog_build::workspace::Workspace;
 use serde_json::{json, Value};
 
+#[test]
+fn oauth_pass1_all_current_documents_retain_frozen_operation_meaning() {
+    let (workspace, plan) = full_plan();
+    let frozen: Value = serde_json::from_str(planned(
+        &workspace,
+        &plan,
+        "catalog/connector-document-v3.schema.json",
+    ))
+    .unwrap();
+    let validator = jsonschema::validator_for(&frozen).unwrap();
+    let mut seen = 0;
+    let mut admitted = 0;
+    for (provider, mut document) in documents(&workspace, &plan) {
+        assert_eq!(document["schema_version"], 4);
+        assert_eq!(
+            document["$schema"],
+            catalog_build::document::schema()["$id"]
+        );
+        let operations = document["operations"].clone();
+        for credential in document
+            .get_mut("auth")
+            .and_then(Value::as_array_mut)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(oauth) = credential.get_mut("oauth2").and_then(Value::as_object_mut) {
+                if let Some(flows) = oauth.remove("personal_flows") {
+                    admitted += 1;
+                    assert_eq!(provider, "gitlab");
+                    assert_eq!(flows.as_array().unwrap().len(), 2);
+                    oauth
+                        .get_mut("grants")
+                        .unwrap()
+                        .as_array_mut()
+                        .unwrap()
+                        .retain(|grant| grant != "device_authorization");
+                }
+            }
+        }
+        document["schema_version"] = json!(3);
+        document["$schema"] = frozen["$id"].clone();
+        assert!(
+            validator.is_valid(&document),
+            "{provider}: a non-OAuth schema change cannot hide in the version migration"
+        );
+        assert_eq!(document["operations"], operations);
+        seen += 1;
+    }
+    assert_eq!(seen, 65);
+    assert_eq!(admitted, 1);
+}
+
 // ---------------------------------------------------------------------------------------------
 // The subject
 // ---------------------------------------------------------------------------------------------
@@ -684,7 +736,7 @@ fn every_canonical_document_validates_against_the_committed_schema() {
     let schema_text = planned(
         &workspace,
         &plan,
-        "catalog/connector-document-v3.schema.json",
+        "catalog/connector-document-v4.schema.json",
     );
     let schema: Value = serde_json::from_str(schema_text).expect("the schema is JSON");
     let validator = jsonschema::validator_for(&schema).expect("the schema compiles");
@@ -994,6 +1046,7 @@ fn no_input_or_artifact_carries_a_credential_shaped_value() {
         "grants",
         "redirect",
         "public_client",
+        "personal_flows",
     ];
 
     let mut offences = Vec::new();
@@ -1021,6 +1074,17 @@ fn no_input_or_artifact_carries_a_credential_shaped_value() {
             }
 
             if let Some(oauth2) = credential["oauth2"].as_object() {
+                if let Some(admissions) = oauth2.get("personal_flows") {
+                    if serde_json::from_value::<Vec<connector_spec::PersonalOAuthAdmission>>(
+                        admissions.clone(),
+                    )
+                    .is_err()
+                    {
+                        offences.push(format!(
+                            "{provider}: credential `{name}` has a personal acquisition declaration outside the closed value-free vocabulary"
+                        ));
+                    }
+                }
                 for key in oauth2.keys() {
                     if !OAUTH2_KEYS.contains(&key.as_str()) {
                         offences.push(format!(
@@ -2535,6 +2599,8 @@ fn rate_adversary_canonical_source_urls_match_authoring_reader() {
         .should_validate_formats(true)
         .build(&schema)
         .unwrap();
+    document["schema_version"] = json!(3);
+    document["$schema"] = schema["$id"].clone();
     assert!(validator.is_valid(&document));
     let mut mismatches = Vec::new();
     for source in [
@@ -2769,9 +2835,11 @@ fn rate_final_actual_provider_loading_preserves_uri_and_vendor_contract() {
             "real provider loader must enforce the published profile"
         );
         if let Ok(loaded) = loaded {
-            let document: Value =
+            let mut document: Value =
                 serde_json::from_str(&catalog_build::document::render(&loaded.connector).unwrap())
                     .unwrap();
+            document["schema_version"] = json!(3);
+            document["$schema"] = source_schema["$id"].clone();
             assert!(validator.is_valid(&document));
             let mut operation = find(&document);
             assert_eq!(
@@ -2793,6 +2861,217 @@ fn rate_final_actual_provider_loading_preserves_uri_and_vendor_contract() {
                 operation, baseline_operation,
                 "source URI edits must not rewrite any vendor contract or select a category"
             );
+        }
+    }
+}
+
+#[test]
+fn personal_acquisition_schema_four_retains_the_rate_declaration_contract() {
+    let (workspace, plan) = full_plan();
+    let mut document = documents(&workspace, &plan)["slack"].clone();
+    assert_eq!(document["schema_version"], json!(4));
+    let current = catalog_build::document::schema();
+    let frozen: Value = serde_json::from_str(include_str!(
+        "../../../../catalog/connector-document-v3.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        current["$defs"]["conditional_rate_limit"],
+        frozen["$defs"]["conditional_rate_limit"]
+    );
+    assert_eq!(
+        current["$defs"]["published_rate"],
+        frozen["$defs"]["published_rate"]
+    );
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(current)
+        .unwrap();
+    assert!(validator.is_valid(&document));
+    let index = document["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|operation| operation["id"] == "slack-conversations-history")
+        .unwrap();
+    for source in [
+        "https://docs.example.test/rate",
+        "HTTPS://docs.example.test/rate",
+        "https://docs.example.test:65536/rate",
+        "https://docs.example.test/a b",
+    ] {
+        let declaration = &mut document["operations"][index]["conditional_rate_limits"][0];
+        declaration["source_url"] = json!(source);
+        let authoring =
+            serde_json::from_value::<connector_spec::ConditionalRateLimit>(declaration.clone())
+                .is_ok();
+        assert_eq!(
+            validator.is_valid(&document),
+            authoring,
+            "schema 4 source URI: {source}"
+        );
+    }
+}
+
+#[test]
+fn personal_acquisition_schema_four_preserves_actual_provider_uri_vectors_and_contract() {
+    let original = std::fs::read_to_string(repo_root().join("providers/slack.toml")).unwrap();
+    let parsed: toml::Value = toml::from_str(&original).unwrap();
+    let cache: Vec<(String, String)> = parsed["spec"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            let path = entry["path"].as_str().unwrap().to_owned();
+            let bytes = std::fs::read_to_string(repo_root().join(&path)).unwrap();
+            (path, bytes)
+        })
+        .collect();
+    let documents: Vec<_> = cache
+        .iter()
+        .map(|(path, document)| connector_spec::provider::SpecDocument { path, document })
+        .collect();
+    let load = |source: &str| connector_spec::provider::load_with_spec("slack", source, &documents);
+    let baseline = load(&original).unwrap();
+    let baseline: Value =
+        serde_json::from_str(&catalog_build::document::render(&baseline.connector).unwrap())
+            .unwrap();
+    let find = |document: &Value| {
+        document["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|op| op["id"] == "slack-conversations-history")
+            .unwrap()
+            .clone()
+    };
+    let baseline_operation = find(&baseline);
+    let source_schema: Value = serde_json::from_str(include_str!(
+        "../../../../catalog/connector-document-v4.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(&source_schema)
+        .unwrap();
+    for (sources, valid) in [
+        (
+            [
+                "https://%41.example.test:00065535/a%2fb?x=%23%40",
+                "https://[v1.a:b]:/category?cursor=a/b?c",
+                "https://docs.example.test/%00%7F?x=%ff",
+            ],
+            true,
+        ),
+        (
+            [
+                "https://docs.example.test/",
+                "https://docs.example.test:00065536/",
+                "https://docs.example.test/",
+            ],
+            false,
+        ),
+    ] {
+        let mut authored = parsed.clone();
+        let operation = authored["patch"]["operations"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|op| {
+                op.get("rename").and_then(toml::Value::as_str)
+                    == Some("slack-conversations-history")
+            })
+            .unwrap();
+        for (alternative, source) in operation["conditional_rate_limits"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(sources)
+        {
+            alternative["source_url"] = toml::Value::String(source.into());
+        }
+        let loaded = load(&toml::to_string(&authored).unwrap());
+        assert_eq!(
+            loaded.is_ok(),
+            valid,
+            "real provider loader must enforce the published profile"
+        );
+        if let Ok(loaded) = loaded {
+            let document: Value =
+                serde_json::from_str(&catalog_build::document::render(&loaded.connector).unwrap())
+                    .unwrap();
+            assert_eq!(document["schema_version"], json!(4));
+            assert!(validator.is_valid(&document));
+            let mut operation = find(&document);
+            assert_eq!(
+                operation["conditional_rate_limits"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                3
+            );
+            for (i, source) in sources.into_iter().enumerate() {
+                assert_eq!(
+                    operation["conditional_rate_limits"][i]["source_url"],
+                    source
+                );
+                operation["conditional_rate_limits"][i]["source_url"] =
+                    baseline_operation["conditional_rate_limits"][i]["source_url"].clone();
+            }
+            assert_eq!(
+                operation, baseline_operation,
+                "source URI edits must not rewrite any vendor contract or select a category"
+            );
+        }
+    }
+}
+
+#[test]
+fn oauth_pass2_nearby_authoring_array_shapes_agree_with_the_active_schema() {
+    let authoring: Value = serde_json::from_str(include_str!(
+        "../../../connector-spec/schema/provider-toml.schema.json"
+    ))
+    .unwrap();
+    let selected = json!({"$schema":authoring["$schema"], "$defs":authoring["$defs"], "$ref":"#/$defs/oauth2"});
+    let validator = jsonschema::validator_for(&selected).unwrap();
+    let gitlab: Value =
+        serde_json::from_str(include_str!("../../../../catalog/gitlab.catalog.json")).unwrap();
+    let current = gitlab["auth"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|auth| auth.get("oauth2"))
+        .unwrap();
+    assert!(validator.is_valid(current));
+    assert!(serde_json::from_value::<connector_spec::OAuth2Spec>(current.clone()).is_ok());
+    for field in ["personal_flows", "grants", "scopes"] {
+        for value in [
+            None,
+            Some(json!([])),
+            Some(Value::Null),
+            Some(json!({})),
+            Some(json!(false)),
+        ] {
+            let mut candidate = current.clone();
+            if field != "personal_flows" {
+                // Legacy arrays have defaults only outside personal admission's
+                // cross-field grant requirements, which run after deserialization.
+                candidate.as_object_mut().unwrap().remove("personal_flows");
+            }
+            if let Some(value) = value {
+                candidate[field] = value;
+            } else {
+                candidate.as_object_mut().unwrap().remove(field);
+            }
+            let schema_accepts = validator.is_valid(&candidate);
+            let rust_accepts =
+                serde_json::from_value::<connector_spec::OAuth2Spec>(candidate.clone()).is_ok();
+            assert_eq!(rust_accepts, schema_accepts, "{field}: {candidate}");
+            let expected = candidate.get(field).is_none()
+                || field != "personal_flows" && candidate[field] == json!([]);
+            assert_eq!(schema_accepts, expected, "{field}: {candidate}");
         }
     }
 }
