@@ -136,12 +136,14 @@ fn bounded_text(value: &str, maximum: usize) -> bool {
     !value.is_empty() && value.chars().count() <= maximum && !value.chars().any(char::is_control)
 }
 fn valid_source_url(value: &str) -> bool {
-    url::Url::parse(value).is_ok_and(|url| {
-        url.scheme() == "https"
-            && url.has_host()
-            && url.username().is_empty()
-            && url.password().is_none()
-            && url.fragment().is_none()
+    fluent_uri::Uri::parse(value).is_ok_and(|uri| {
+        uri.scheme().as_str() == "https"
+            && uri.fragment().is_none()
+            && uri.authority().is_some_and(|authority| {
+                !authority.host().is_empty()
+                    && authority.userinfo().is_none()
+                    && authority.port_to_u16().is_ok()
+            })
     })
 }
 
