@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 44
+revision: 45
 ---
 ## Authorization and objective
 
@@ -3462,3 +3462,9 @@ For that later review, retain the existing private target at /dev/shm/b10x-cli-w
 The CLI continues using its own crates/connectors-cli/target with CARGO_TARGET_DIR unset, the existing sccache wrapper and its unchanged 8 GiB target cap. One compiling workspace at a time, jobs 1, incremental disabled and dev/test debug disabled remain mandatory. Freeze exact source, executable inventories and complete evidence before any later cleanup; no copy, symlink, shared-cache cleanup or other-session target use is assigned. No gate or review requirement is relaxed by this resource adjustment.
 
 Atlas main advanced to 78d96cc706f735c3a160369e3ce2f2133f4b1d41. The coordinator fetched that exact advertised commit and created clean managed authority wt-784121831be6. Its AGENTS.md and bot wrappers are byte-identical to prior b0fb59be; the four changed files record ESS delivery observations and generated documentation. Set B10X_ATLAS_CHECKOUT to /home/timo/.local/state/worktree/trees/b10x/atlas/wt-784121831be6 for subsequent organization operations, rechecking remote main before publication.
+
+## Frozen OAuth source handed to whole-unit review — 2026-09-06
+
+Verification-report:cli-oauth-operational-implementation-20260906 retains the full implementor report unchanged and the root hash audit. Local source 6fae9df000986f39d009a2e8503bdff03db41762 is clean, bot-authored and bot-committed over planning 789525f3. The report records 1,496 passing affected-package cases plus one preexisting ignored reader measurement, with final strict Clippy/formatting and all actual earlier failures preserved. Source/evidence manifests contain 1,188 and 608 entries, respectively; after the planning-only handoff all 1,017 nonplanning source bytes remain exact. This is not full integration or publication evidence.
+
+Dispatch the first formal tests-only whole-unit attack to the existing reviewer, review_one_shot_final, using the same managed OAuth tree and whole-unit-adversary-1-brief.md at SHA256 4b4b29bbbf958d88166c0ef5291dfe8f493eaffbfa675d15b5b6b835aa4b8fab. The full published base is 0c69450921ab1794c81dadec915b717a61bf0983. Prior helper, FULL SQLite, custody and refresh stages are all included; unrelated Design 22/model-only preparation is identified separately. The preceding prospective resource assignment governs the serial build slot. The implementor is idle and the auth worker has no compiling assignment. No review verdict exists yet; both ordinary pass limits and exact test owners remain.
