@@ -267,7 +267,12 @@ enum ConnectionCommand {
         integration: String,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -289,7 +294,12 @@ enum ConnectionCommand {
         config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -302,7 +312,12 @@ enum ConnectionCommand {
         source: String,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -326,7 +341,12 @@ enum OperationCommand {
         config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 25)]
+        #[arg(
+            long,
+            default_value_t = protocol::operation::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::operation::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::operation::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -387,7 +407,12 @@ enum EventCommand {
         config: Option<PathBuf>,
         #[arg(long, default_value = "")]
         query: String,
-        #[arg(long, default_value_t = 64)]
+        #[arg(
+            long,
+            default_value_t = protocol::event::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::event::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::event::MAX_SEARCH_RESULTS)
+        )]
         limit: u16,
         #[arg(long)]
         state_root: Option<PathBuf>,
