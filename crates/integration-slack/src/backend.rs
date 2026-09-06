@@ -1022,7 +1022,7 @@ impl AuditJournal {
     }
 
     fn finish(&self, event: AuditEvent<'_>) -> Result<(), SlackError> {
-        if !matches!(event.outcome, "completed" | "indeterminate") {
+        if !matches!(event.outcome, "completed" | "indeterminate" | "refused") {
             return Err(SlackError::new("audit-outcome"));
         }
         let mut state = lock(&self.state);

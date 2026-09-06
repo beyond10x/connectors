@@ -300,14 +300,11 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
     backend: Arc<B>,
 ) -> Result<Option<Vec<u8>>, LocalDaemonError> {
     let bytes = match protocol_name {
-        protocol::operation::CONTRACT => {
-            let request: RequestEnvelope = match serde_json::from_slice(frame) {
+        protocol::operation::legacy::CONTRACT | protocol::operation::wire::CONTRACT => {
+            let (version, request) = match protocol::operation::decode_request(frame) {
                 Ok(request) => request,
                 Err(_) => return Ok(None),
             };
-            if request.validate().is_err() {
-                return Ok(None);
-            }
             let context = match PrincipalContext::local(&request.context) {
                 Ok(context) => context,
                 Err(_) => return Ok(None),
@@ -321,7 +318,9 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                 Ok(()) => response,
                 Err(error) => ResponseEnvelope::failure(request_id, error),
             };
-            serde_json::to_vec(&response).map_err(io::Error::other)?
+            version
+                .encode_response(response)
+                .map_err(io::Error::other)?
         }
         protocol::connection::CONTRACT => {
             let request: protocol::connection::RequestEnvelope = match serde_json::from_slice(frame)
@@ -623,6 +622,87 @@ mod tests {
             authority_snapshot_id: "authority-1".to_owned(),
             authority_snapshot_sha256: "a".repeat(64),
         }
+    }
+
+    struct RateRefusalBackend {
+        calls: AtomicU64,
+    }
+
+    #[async_trait]
+    impl ConnectorBackend for RateRefusalBackend {
+        async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+            Ok(())
+        }
+        async fn handle(
+            &self,
+            _context: &PrincipalContext,
+            _request: OperationRequest,
+        ) -> Result<OperationResult, OperationError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Err(serde_json::from_value(serde_json::json!({
+                "code":"rate_limited", "message":"provider refused this request",
+                "retriable":true, "retry_after_seconds":30
+            }))
+            .expect("the current internal error vocabulary carries definite rate refusal"))
+        }
+    }
+
+    #[tokio::test]
+    async fn rate_stage2_actual_socket_serves_both_versions_without_resending() {
+        let (socket, root) = temporary_socket();
+        let backend = Arc::new(RateRefusalBackend {
+            calls: AtomicU64::new(0),
+        });
+        let daemon = LocalOperationDaemon::bind(&socket, Arc::clone(&backend))
+            .await
+            .unwrap();
+        let (stop, stopped) = oneshot::channel();
+        let serving = tokio::spawn(async move {
+            daemon
+                .serve_until(async {
+                    let _ = stopped.await;
+                })
+                .await
+                .unwrap();
+        });
+        let mut responses = Vec::new();
+        for version in [
+            "b10x.connector-operation.v0alpha2",
+            "b10x.connector-operation.v0alpha1",
+            "b10x.connector-operation.v0alpha99",
+        ] {
+            let frame = serde_json::json!({"protocol":version,"request_id":"rate-local","context":context(),
+                "request":{"method":"invoke","params":{"operation_ref":"fixture.read","connection_ref":"connection:fixture","description_ref":"description:fixture","input":{}}}});
+            let mut stream = UnixStream::connect(&socket).await.unwrap();
+            let mut bytes = serde_json::to_vec(&frame).unwrap();
+            bytes.push(b'\n');
+            stream.write_all(&bytes).await.unwrap();
+            let mut response = String::new();
+            BufReader::new(stream)
+                .read_line(&mut response)
+                .await
+                .unwrap();
+            responses.push(response);
+        }
+        stop.send(()).unwrap();
+        serving.await.unwrap();
+        std::fs::remove_file(root.join(".connectors.lock")).unwrap();
+        std::fs::remove_dir(root).unwrap();
+        assert!(
+            !responses[0].is_empty(),
+            "the v2 socket request needs a correlated response"
+        );
+        let current: serde_json::Value = serde_json::from_str(&responses[0]).unwrap();
+        assert_eq!(current["protocol"], "b10x.connector-operation.v0alpha2");
+        assert_eq!(current["request_id"], "rate-local");
+        assert_eq!(current["error"]["code"], "rate_limited");
+        assert_eq!(current["error"]["retry_after_seconds"], 30);
+        let old: serde_json::Value = serde_json::from_str(&responses[1]).unwrap();
+        assert_eq!(old["protocol"], "b10x.connector-operation.v0alpha1");
+        assert_eq!(old["error"]["code"], "unavailable");
+        assert!(old["error"].get("retry_after_seconds").is_none());
+        assert!(responses[2].is_empty());
+        assert_eq!(backend.calls.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

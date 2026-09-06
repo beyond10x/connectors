@@ -23,6 +23,17 @@
 /// whatever its own error surface is; the point is that a refusal cannot be mistaken for a result.
 #[macro_export]
 macro_rules! reduce_envelope {
+    ($envelope:expr, operation) => {{
+        let envelope = $envelope;
+        let delay = envelope
+            .error
+            .as_ref()
+            .and_then(|error| error.retry_after_seconds);
+        $crate::reduce_envelope!(envelope).map_err(|mut error| {
+            error.retry_after_seconds = delay;
+            error
+        })
+    }};
     ($envelope:expr) => {{
         let envelope = $envelope;
         match (envelope.status, envelope.response, envelope.error) {
@@ -33,6 +44,7 @@ macro_rules! reduce_envelope {
                     .unwrap_or_else(|| "refused".to_owned()),
                 message: error.message,
                 retriable: error.retriable,
+                retry_after_seconds: None,
             }),
             (_, Some(result), None) => ::serde_json::to_value(result)
                 .map($crate::output::payload)
@@ -40,11 +52,13 @@ macro_rules! reduce_envelope {
                     code: "malformed-response".to_owned(),
                     message: error.to_string(),
                     retriable: false,
+                    retry_after_seconds: None,
                 }),
             (_, None, None) => Err($crate::envelope::ReducedError {
                 code: "malformed-response".to_owned(),
                 message: "the Connector returned neither a result nor an error".to_owned(),
                 retriable: false,
+                retry_after_seconds: None,
             }),
         }
     }};
@@ -61,6 +75,7 @@ pub struct ReducedError {
     pub code: String,
     pub message: String,
     pub retriable: bool,
+    pub retry_after_seconds: Option<u64>,
 }
 
 #[cfg(test)]

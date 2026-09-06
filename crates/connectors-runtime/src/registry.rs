@@ -158,6 +158,9 @@ impl BackendRegistry {
                 }
             }
         }
+        for pair in descriptions.windows(2) {
+            ensure_compatible_description(&pair[0].1, &pair[1].1)?;
+        }
         Ok(descriptions)
     }
 }
@@ -216,11 +219,11 @@ impl ConnectorBackend for BackendRegistry {
                 let mut merged = descriptions
                     .pop()
                     .ok_or_else(|| operation_not_found("no Integration owns this operation"))?;
-                let mut local_refs = vec![merged.description_ref.clone()];
+                let mut local_refs = vec![registry_contributor_ref(&merged)];
                 for description in descriptions {
                     ensure_compatible_description(&merged, &description)?;
+                    local_refs.push(registry_contributor_ref(&description));
                     merged.connections.extend(description.connections);
-                    local_refs.push(description.description_ref);
                 }
                 merged
                     .connections
@@ -240,7 +243,7 @@ impl ConnectorBackend for BackendRegistry {
                     .await?;
                 let mut local_refs = contributors
                     .iter()
-                    .map(|(_, description)| description.description_ref.clone())
+                    .map(|(_, description)| registry_contributor_ref(description))
                     .collect::<Vec<_>>();
                 let expected =
                     registry_description_ref(context, &invoke.operation_ref, &mut local_refs)?;
@@ -645,6 +648,7 @@ fn ensure_compatible_description(
         && left.output_schema == right.output_schema
         && left.effect == right.effect
         && left.approval == right.approval
+        && left.rate_advice == right.rate_advice
     {
         Ok(())
     } else {
@@ -652,6 +656,11 @@ fn ensure_compatible_description(
             "Integrations disagreed about one operation description",
         ))
     }
+}
+
+fn registry_contributor_ref(description: &OperationDescription) -> String {
+    serde_json::to_string(&(&description.description_ref, &description.rate_advice))
+        .expect("typed description advice serializes")
 }
 
 fn registry_description_ref(
@@ -1154,6 +1163,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn rate_stage2_advice_changes_refuse_merging_and_invalidate_the_registry_lease() {
+        let left = operation_description("tickets-list", "connection:a", "same-local-ref");
+        let mut right = left.clone();
+        right.rate_advice = Some(protocol::operation::OperationRateAdvice {
+            fixed: Some(protocol::operation::FixedRateLimit {
+                requests: 1,
+                per_seconds: 60,
+                bucket: None,
+            }),
+            alternatives: Vec::new(),
+        });
+        assert_eq!(
+            ensure_compatible_description(&left, &right)
+                .unwrap_err()
+                .code,
+            OperationErrorCode::Protocol
+        );
+        let mut before = [registry_contributor_ref(&left)];
+        let mut after = [registry_contributor_ref(&right)];
+        assert_ne!(
+            registry_description_ref(&context(), "tickets-list", &mut before).unwrap(),
+            registry_description_ref(&context(), "tickets-list", &mut after).unwrap()
+        );
+    }
+
     fn operation_summary(operation_ref: &str, connection_ref: &str) -> OperationSummary {
         OperationSummary {
             operation_ref: operation_ref.to_owned(),
@@ -1170,6 +1205,7 @@ mod tests {
         lease: &str,
     ) -> OperationDescription {
         OperationDescription {
+            rate_advice: None,
             operation_ref: operation_ref.to_owned(),
             title: format!("Operation {operation_ref}"),
             description: "Reads one ticket".to_owned(),

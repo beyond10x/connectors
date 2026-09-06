@@ -55,9 +55,13 @@ impl Fixture {
     }
 
     fn command(&self, arguments: &[&str]) -> Command {
+        self.command_format(arguments, "json")
+    }
+
+    fn command_format(&self, arguments: &[&str], format: &str) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_connectors"));
         command
-            .args(["--output", "json"])
+            .args(["--output", format])
             .args(arguments)
             .env("HOME", &self.root)
             .env("XDG_CONFIG_HOME", self.root.join("config"))
@@ -897,4 +901,308 @@ fn final_adversary_kubernetes_candidates_never_publish_a_dead_connection_or_run_
         .unwrap()
         .contains("connectors serve local"));
     assert!(!fixture.state.join("connectors.sock").exists());
+}
+
+#[test]
+fn rate_stage2_cli_json_and_yaml_preserve_delay_and_never_resend_an_invoke() {
+    for format in ["json", "yaml"] {
+        for delay in [Some(30_u64), None] {
+            let fixture = Fixture::new();
+            fs::create_dir(&fixture.state).unwrap();
+            fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+            let socket = fixture.state.join("connectors.sock");
+            let listener = UnixListener::bind(&socket).unwrap();
+            fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&mut stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(request["request"]["method"], "invoke");
+                let mut error = json!({"code":"rate_limited","message":"provider refused request","retriable":true});
+                if let Some(delay) = delay {
+                    error["retry_after_seconds"] = json!(delay);
+                }
+                let response = json!({"protocol":"b10x.connector-operation.v0alpha2","request_id":request["request_id"],"status":"error","error":error});
+                writeln!(stream, "{response}").unwrap();
+                drop(stream);
+                listener.set_nonblocking(true).unwrap();
+                thread::sleep(Duration::from_millis(100));
+                assert!(
+                    matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+                );
+                request
+            });
+            let output = fixture
+                .command_format(
+                    &[
+                        "operation",
+                        "invoke",
+                        "--operation",
+                        "fixture.read",
+                        "--connection",
+                        "connection:fixture",
+                        "--description-ref",
+                        "description:fixture",
+                        "--input-json",
+                        "{}",
+                    ],
+                    format,
+                )
+                .arg("--config")
+                .arg(&fixture.config)
+                .arg("--state-root")
+                .arg(&fixture.state)
+                .output()
+                .unwrap();
+            let request = server.join().unwrap();
+            assert_eq!(request["protocol"], "b10x.connector-operation.v0alpha2");
+            assert!(!output.status.success());
+            let value: Value = if format == "json" {
+                serde_json::from_slice(&output.stdout).unwrap()
+            } else {
+                serde_norway::from_slice(&output.stdout).unwrap()
+            };
+            assert_eq!(value["target"], "local");
+            assert_eq!(value["error"]["code"], "rate_limited");
+            assert_eq!(value["error"]["retriable"], true);
+            assert_eq!(
+                value["error"]
+                    .get("retry_after_seconds")
+                    .and_then(Value::as_u64),
+                delay
+            );
+        }
+    }
+}
+
+#[test]
+fn rate_stage2_one_shot_refusals_preserve_retriable_without_inventing_delay() {
+    let fixture = Fixture::new();
+    let output = fixture.run(&[
+        "operation",
+        "invoke",
+        "--operation",
+        "slack-conversations-history",
+        "--connection",
+        "connection:unknown",
+        "--description-ref",
+        "description:unknown",
+        "--input-json",
+        "{}",
+    ]);
+    assert!(!output.status.success());
+    let value = value(&output);
+    assert!(value["error"]["retriable"].is_boolean());
+    assert!(value["error"].get("retry_after_seconds").is_none());
+    assert!(!fixture.state.join("connectors.sock").exists());
+}
+#[test]
+fn rate_adversary_cli_keeps_integer_extremes_and_never_resends_before_exit() {
+    use std::sync::{atomic::AtomicBool, Arc};
+    for format in ["json", "yaml"] {
+        for (code, delay, wrong) in [
+            ("rate_limited", Some(0_u64), ""),
+            ("rate_limited", Some(u64::MAX), ""),
+            ("rate_limited", None, ""),
+            ("protocol", None, ""),
+            ("outcome_unknown", None, ""),
+            ("unavailable", None, "version"),
+            ("rate_limited", Some(30), "correlation"),
+        ] {
+            let fixture = Fixture::new();
+            fs::create_dir(&fixture.state).unwrap();
+            fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+            let listener = UnixListener::bind(fixture.state.join("connectors.sock")).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let done = Arc::new(AtomicBool::new(false));
+            let finished = done.clone();
+            let server = thread::spawn(move || {
+                let mut calls = 0;
+                loop {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            stream
+                                .set_read_timeout(Some(Duration::from_secs(2)))
+                                .unwrap();
+                            let mut line = String::new();
+                            std::io::BufReader::new(&mut stream)
+                                .read_line(&mut line)
+                                .unwrap();
+                            let request: Value = serde_json::from_str(&line).unwrap();
+                            calls += 1;
+                            assert_eq!(request["request"]["method"], "invoke");
+                            let mut error = json!({"code":code,"message":"fixture refusal","retriable":code=="rate_limited"});
+                            if let Some(delay) = delay {
+                                error["retry_after_seconds"] = json!(delay);
+                            }
+                            let reply = json!({"protocol":if wrong=="version" {"b10x.connector-operation.v0alpha1"}else{"b10x.connector-operation.v0alpha2"},"request_id":if wrong=="correlation" {json!("other-request")}else{request["request_id"].clone()},"status":"error","error":error});
+                            writeln!(stream, "{reply}").unwrap();
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if finished.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                }
+                calls
+            });
+            let mut child = fixture
+                .command_format(
+                    &[
+                        "operation",
+                        "invoke",
+                        "--operation",
+                        "fixture.read",
+                        "--connection",
+                        "connection:fixture",
+                        "--description-ref",
+                        "description:fixture",
+                        "--input-json",
+                        "{}",
+                    ],
+                    format,
+                )
+                .arg("--config")
+                .arg(&fixture.config)
+                .arg("--state-root")
+                .arg(&fixture.state)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while child.try_wait().unwrap().is_none() {
+                if Instant::now() >= deadline {
+                    child.kill().unwrap();
+                    break;
+                }
+                thread::sleep(Duration::from_millis(2));
+            }
+            let output = child.wait_with_output().unwrap();
+            done.store(true, Ordering::SeqCst);
+            assert_eq!(server.join().unwrap(), 1, "{format} {code} {wrong}");
+            assert!(!output.status.success());
+            let value: Value = if format == "json" {
+                serde_json::from_slice(&output.stdout).unwrap()
+            } else {
+                serde_norway::from_slice(&output.stdout).unwrap()
+            };
+            if wrong.is_empty() {
+                assert_eq!(value["error"]["code"], code, "{value}");
+                assert_eq!(value["error"]["retriable"], code == "rate_limited");
+                assert_eq!(
+                    value["error"]
+                        .get("retry_after_seconds")
+                        .and_then(Value::as_u64),
+                    delay
+                );
+            } else {
+                assert_ne!(value["error"]["code"], code);
+            }
+        }
+    }
+}
+
+#[test]
+fn rate_final_cli_describe_spelling_and_invalid_advice_never_resend() {
+    use std::sync::{atomic::AtomicBool, Arc};
+    for format in ["json", "yaml"] {
+        for valid in [true, false] {
+            let source = if valid {
+                "https://%41.example.test:00065535/a%2fb?x=%23%40"
+            } else {
+                "https://docs.example.test:65536/private-SENTINEL"
+            };
+            let fixture = Fixture::new();
+            fs::create_dir(&fixture.state).unwrap();
+            fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+            let socket = fixture.state.join("connectors.sock");
+            let listener = UnixListener::bind(&socket).unwrap();
+            fs::set_permissions(socket, fs::Permissions::from_mode(0o600)).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let done = Arc::new(AtomicBool::new(false));
+            let finished = done.clone();
+            let server = thread::spawn(move || {
+                let mut calls = 0;
+                loop {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            stream
+                                .set_read_timeout(Some(Duration::from_secs(2)))
+                                .unwrap();
+                            let mut line = String::new();
+                            std::io::BufReader::new(&mut stream)
+                                .read_line(&mut line)
+                                .unwrap();
+                            let request: Value = serde_json::from_str(&line).unwrap();
+                            calls += 1;
+                            assert_eq!(request["protocol"], "b10x.connector-operation.v0alpha2");
+                            assert_eq!(request["request"]["method"], "describe");
+                            let description = json!({"operation_ref":"fixture.read","title":"Fixture read","description":"Fixture metadata","input_schema":{"type":"object","additionalProperties":false},"output_schema":{"type":"object","properties":{"vendor":{"const":"retained"}}},"effect":"read_only","approval":"not_required","connections":[],"description_ref":"fixture-description","rate_advice":{"alternatives":[{"declaration":{"applies_when":"Fixture category","source_url":source}}]}});
+                            let reply = json!({"protocol":request["protocol"],"request_id":request["request_id"],"status":"ok","response":{"result":"describe","value":description}});
+                            writeln!(stream, "{reply}").unwrap();
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if finished.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                }
+                calls
+            });
+            let mut child = fixture
+                .command_format(
+                    &["operation", "describe", "--operation", "fixture.read"],
+                    format,
+                )
+                .arg("--config")
+                .arg(&fixture.config)
+                .arg("--state-root")
+                .arg(&fixture.state)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while child.try_wait().unwrap().is_none() {
+                if Instant::now() >= deadline {
+                    child.kill().unwrap();
+                    break;
+                }
+                thread::sleep(Duration::from_millis(2));
+            }
+            let output = child.wait_with_output().unwrap();
+            done.store(true, Ordering::SeqCst);
+            assert_eq!(server.join().unwrap(), 1, "{format} {valid}");
+            let value: Value = if format == "json" {
+                serde_json::from_slice(&output.stdout).unwrap()
+            } else {
+                serde_norway::from_slice(&output.stdout).unwrap()
+            };
+            assert_eq!(value["target"], "local");
+            assert_eq!(output.status.success(), valid, "{value} {output:?}");
+            if valid {
+                assert_eq!(
+                    value["rate_advice"]["alternatives"][0]["declaration"]["source_url"],
+                    source
+                );
+                assert_eq!(
+                    value["output_schema"]["properties"]["vendor"]["const"],
+                    "retained"
+                );
+            } else {
+                assert_eq!(value["error"]["code"], "connector-unreachable", "{value}");
+                assert!(!String::from_utf8_lossy(&output.stdout).contains("SENTINEL"));
+                assert!(!String::from_utf8_lossy(&output.stderr).contains("SENTINEL"));
+                assert!(value.get("rate_advice").is_none());
+            }
+        }
+    }
 }
