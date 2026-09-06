@@ -199,8 +199,18 @@ scope:
   path: docs/architecture/interfaces.md
 - confidence: inferred
   path: docs/design/22-authentication-remediation.md
+- confidence: cited
+  path: ess/generated/clap/PLAN.md
+- confidence: cited
+  path: ess/generated/clap/TARGET.md
+- confidence: cited
+  path: ess/generated/clap/crates/connectors-cli/Cargo.toml
+- confidence: cited
+  path: ess/generated/clap/crates/connectors-cli/src/handler.rs
 - confidence: inferred
   path: ess/generated/clap/crates/connectors-cli/src/main.rs
+- confidence: cited
+  path: ess/generated/clap/crates/connectors-cli/src/tree.rs
 - confidence: inferred
   path: ess/system/components.yaml
 - confidence: inferred
@@ -209,7 +219,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 77
+revision: 79
 ---
 ## Acceptance
 
@@ -457,3 +467,19 @@ Authorize one additive RemediationAuthority::recheck_status method in the alread
 The personal implementation in the already assigned crates/integration-catalog/src/oauth_remediation.rs extracts its complete current-admission validation and overrides only the status method. Strict start and FULL custody publication continue to reject binding expiry. Status rechecks current policy before and after lifecycle observation and under the completion gate, then derives Expired from the real clock and retained deadline. Acknowledgement remains unusable after expiry or consumption and returns Conflict only to a currently admitted caller. Pending endpoints must actually be retired by the existing lifecycle before an Expired DTO is published. Preserve the same session map, acknowledgement bit, protocol values and credential publication; introduce no entity, dependency, error class or hosted acquisition adapter.
 
 Deciding cases in the existing OAuth remediation test owner precede implementation: actual completed session at the owner-clock deadline yields authorized Expired status and Conflict acknowledgement without rolling back credentials; current-policy revocation remains an opaque refusal even after expiry; custom receiver Conflict and Refused propagate without status disclosure; receiver revocation at FULL publication prevents credentials. Keep the existing strict recheck expiry assertion unchanged. A also adds the distinct real local daemon/registry/OAuth completion case that observes zero dispatch during remediation and one dispatch only after a separate explicit invocation, within its already assigned runtime/tests/personal_oauth.rs. This closes a concrete missing paired witness, without duplicating the existing refusal-only cases.
+
+## Complete source assembly and common validation — 2026-09-06
+
+Root assembled the complete auth source at df637dc00bd47ffc4f300c89d33b0853c913e257, preserving runtime/server commit 1156626a57bc3149bfd40264965d784be0138499, client/console/CLI commit d7e7a673600c868078659d6412a1f6ccb7aefca8, tested root docs 9bac5f2f1466bff45404b146965b215fc91acf98, and both earlier protocol/service and reviewed OAuth histories. Both direct source commits have verified bot author and committer. The merge preserves every A and B source byte except the exact shared-lock union: root and CLI now contain both the existing server and connectors-client validator edges, with all versions/checksums and unrelated dependencies unchanged. Runtime and console locks remain their exact respective owner bytes. The root journal is unchanged by both source merges.
+
+Root independently verified A's complete 365-member evidence seal d39bfff811831b65ba6aab5c1ef127667de7b948729eafcaea6e07b1c3d968a3, all 1,222 source objects and 27 assigned changed paths. The original 747-line registry test body formats to the exact extracted file. Root verified B's 258-member checkpoint, 12-member final supplement and 19-member strict supplement, all 28 source objects and 23 assigned changed paths. Original client tests differ only by two explicit v2 calls; original CLI tests only add the required provider Option assertions. Reversing three explicit v2 selector pairs and one formatter array wrap restores the complete retained rate test file exactly. The temporary root-owned docs and early carrier copies were restored only after committing their respective owner's assigned files; both unit trees are clean and their complete tested handoffs remain preserved in scratch.
+
+Actual final A selections include eight OAuth remediation passes, two hosted Connection v2 passes, the real local completion-to-explicit-invocation pass, and one valid hostile-envelope MCP projection pass. The first MCP fixture failed its strict reader because its new auth_profile contained an invalid URL; projection had not executed. The corrected valid profile fixture passed, and both observations remain. B's final package run passed 41 unit, two retained OAuth and three doc tests, including initial Identity 401 followed by 409 and an actual external-schema trap with zero connections. Client strict Clippy passed first execution without a source delta. Earlier CLI checks passed five library, six remediation/version and 36 surface cases, plus five selected rate/one-shot cases; these are per-command observations, never a sum of unique cases. The complete assembled suites and whole-auth review remain pending.
+
+Root closes ESS citations against the actual assembled owners and refreshes the existing lifecycle source anchors. Compile comparison changes only five summary citation strings: no value type, field, entity, lifecycle, command or relation changes. The actual ten-file specification validates, and ESS 0.18.0 generates 207 capabilities, 191 generated, 16 obligations and zero refusals. All six tracked generated files reproduce exactly from the actual checkout; their only changes are the two digest header lines. Setup connect remains an unspecified flow and the CLI component still owns only target. Design 22 receives a dated source checkpoint without rewriting its earlier proposal history or claiming accepted Atlas migration status.
+
+After this root checkpoint, fast-forward both clean unit trees to the same complete root candidate and verify all source objects match. A runs complete root and runtime default/no-default locked/offline suites, strict all-target workspace Clippy and formatting in its same managed wt-78f189927231 and existing private target, capped at 12 GiB. B runs complete console and CLI suites, strict all-target Clippy and formatting in wt-38354a193753 using its own ordinary targets under the existing aggregate 8 GiB cap. One compiler slot remains global; root grants and records each handoff. Keep one Cargo job, incremental disabled, dev/test debug disabled, and continuous 12 GiB disk / 8 GiB tmpfs / 16 GiB memory reserves. No shared, copied or symlinked target and no cleanup. The last released runtime selection observed 15,829,180,416 free disk bytes and a 4,995,461,120-byte private target. These affect execution scheduling, not test verdicts.
+
+Retain every actual first failure, full output, exit and count. The repository gate supplies the later complete twelve-workspace/thirteen-configuration closure; neither owner repeats that full wave gate alone. Full source gates precede the first whole-auth adversary dispatch. The OAuth final review is complete, the credential story remains held after its two red reviews, and publication, normal documentation delivery, supported source installation and the two previously authorized daemon restarts remain pending. No release/tag/version change or live provider invocation is added.
+
+The final scope check found that the typed list named only the generated main.rs, although the already assigned deterministic generation closure requires all six tracked outputs (scripts/gate.sh, ess_checks). Root records the remaining five cited output paths now, after copying the reproducible generated bytes: ess/generated/clap/PLAN.md, ess/generated/clap/TARGET.md, ess/generated/clap/crates/connectors-cli/Cargo.toml, ess/generated/clap/crates/connectors-cli/src/handler.rs and ess/generated/clap/crates/connectors-cli/src/tree.rs. They remain coordinator-only outputs; no implementor ownership or generated behavior changes. This closes the recorded scope gap rather than backdating it.
