@@ -6,10 +6,8 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 34
+revision: 35
 ---
-
-
 ## Authorization and objective
 
 Interactive run, preapproved by the operator on 2026-09-06: "commit and push (planning artifacts) ... the next 10 stories ahead, with highest prio the slack bug ... dispatch the stories with up to 5 agents". The operator then confirmed an unlimited subscription budget. aep-drive:wave skill version 0.8.0. O1 governed reach and O5 generic platform, using existing typed owners; Atlas ADR 0038 keeps extension-host responsibility independent of the platform core.
@@ -3372,3 +3370,11 @@ Atlas authority remains clean exactremote mainf3b9f99 inwt-679b510698e5. Guard t
 Six coordinator planning events accidentally inherited the configured human recording actor because AEP_ACTOR was omitted: three OAuth updatesrev45–47 and three Atlas first-review/assignment events. ExacteventIDs/hashes are in p/coordinator-actor-correction-inventory.json. Append-only corrections were recorded in both stories with agent:cli-ten-slack-first; no immutable history was rewritten and no human approval/status/test_result was among the mistaken events. All subsequent coordinator writes explicitly set the agent actor.
 
 Disk was temporarily below the conservative20GiBfloor because another session consumed space. Workers paused new lanes and retained exactobservations; completed owned OAuth/guard/rate targets were cleaned only after outsideevidence verification and sourcehash preservation. Rate now builds one workspace target at a time, freezing evidence before cleanup. No unrelated targets/caches/primary sources or managed trees were removed. Existing root integration/Atlas/draft leases were refreshed through the manager. The held credential unit stillawaits explicit authorization beyond its two red attacks; allits source/evidence remains retained.
+
+## Prospective build reserve adjustment — 2026-09-06
+
+The coordinator checked the original and resumed session's user instructions. They require a measured disk floor but specify no numeric reserve; 20 GiB was a coordinator scheduling choice. Earlier wording that called it agreed was imprecise. All prior 20 GiB observations, interruptions and reports remain unchanged. Every inactive target in the wave's owned checkouts has now been cleaned after source/evidence verification; the active Atlas review target remains reserved for that reviewer. Shared free space currently fluctuates near 20 GiB, with no other Cargo/rustc process observed at the check.
+
+For subsequent wave commands, set a prospective reserve of 16 GiB (17179869184 bytes), permit exactly one compiling workspace target across the wave at a time, and retain jobs 1, no shared target, source/evidence freeze and completed-lane cleanup. Measured prior targets were approximately 0.67 GiB for Atlas and up to about 3.4 GB for the affected Connectors lanes with these profiles. The current roughly 21.5 GB free leaves room for one measured lane plus reserve; a new larger lane must be assessed before launch. Monitor free bytes during compilation, interrupt the active owned process gracefully if the reserve is crossed, preserve that interrupted command, and resume only after capacity is restored. Do not remove another session's targets, shared caches, primary data or immutable evidence.
+
+This is a coordinator resource allocation change within the approved implementation, not a relaxation of tests, review counts, source publication gates or the held credential decision. It supersedes earlier numeric 20 GiB instructions only for future commands; no historical result is relabeled. The Atlas final review runs first using its existing target. Schema 3 publication gates and OAuth deciding/build lanes receive explicit successive ownership.
