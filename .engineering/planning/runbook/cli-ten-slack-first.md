@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 18
+revision: 19
 ---
 
 
@@ -2553,3 +2553,17 @@ The closed semantics are legacy_v1 and openapi_3_0_json_v1. ParamSet carries the
 Additional machine scope now records the generic importer/translation, contract/document/build/reader/table/resolver, profile tests, catalog directory and JSON inventory. The catalog directory scope owns only deterministic generated documents, pack/schema and their source registration; no other active worker owns generated catalog output. It is deliberately recorded as a directory and additionally reviewed for containment. Preserve the old schema 2 identity/bytes and emit a distinct schema 3 identity/file. Registry, CLI and integration-catalog/lib.rs remain deferred until their current owners hand off. The GitLab agent may return a small integration-catalog schema-selection patch for coordinator integration; it must not race the credentials owner.
 
 The exact algorithm/test proposal is the implementor's source-fidelity-design.md retained in the wave's private scratch. Its required cases independently compare all four literal source schema closures, nullable/enum/oneOf behavior, body absence/null/defaults, string bodies, safe namespaced path encoding, unknown profile/old-reader refusals and every retained legacy behavior. No production provider call or operator configuration change is authorized. Source defects remain visible and must not be silently repaired.
+
+## Final credential review and remaining dispatch
+
+Draft PR14 publishes the in-progress wave branch at d5807a694858258a8fa9818224ae7909322f43ea: https://github.com/beyond10x/connectors/pull/14. The full first-batch gate remains the latest complete integrated gate; later units are not closed by that result.
+
+The pipe unit's final tests/source are merged and published through that branch. Its owned worktree wt-55b6348b9982 had no live processes, was clean, and its HEAD51c85706d633c1b2621d6a1babc159192e6b78bf was reachable from the advertised integration ref. Its measured CLI build output was cleaned (2.5GiB removed), worktree finish succeeded, and profile-wide GC dry-run reviewed every record. Only the exact eligible pipe id was passed to GC apply; final result is recorded after completion.
+
+Atlas authority is the clean managed tree wt-09ac7303c4aa at 304a58f851ac95cd1010aced1a2aa0f57ed8c511, compared with remote main. Proposed migration ADR0040 and its AEP record are committed on the separate plan/connector-operation-v2 branch at 5e3a327d748da55591a3df5f079d77b1d140e3b1; that draft is not published or accepted. ADR0039 is the preceding rate-limit protocol proposal. No consumer upgrade is claimed.
+
+Credential review2 is immutable in review-result:cli-credentials-adversary-2-20260906. It has one confirmed blocker after two full attacks; decision-blocker:cli-credentials-final-review blocks its completion and the source leaves the merge set. No third attack is dispatched. One-shot continues using distinct named fixture instances, without merging the failed credential unit.
+
+GitLab compiler/contract fallout is now explicitly scoped: catalog-build/src/scaffold.rs retains LegacyV1 for existing scaffolding; shipped_providers.rs checks whole-body requiredness against its explicit source value while preserving all other checks. One-shot's existing target fixture is updated to the now-intended missing-daemon behavior, retaining target selection and invalid hosted-login isolation. Coordinator applied that patch and formatted its additive CatalogBackend capability hunk.
+
+Read-only OAuth runtime scoping is dispatched to scope_oauth, using the plugin story-scoper charter through an ordinary agent (same declared harness deviation). The existing schema/doc-only scope is insufficient for the recorded runtime acceptance. No OAuth implementation or new entity is dispatched before the model and exact scope are recorded. Scratch brief is under the wave's connect-session-oauth-custody-in-personal-posture directory; the scoper writes no files.

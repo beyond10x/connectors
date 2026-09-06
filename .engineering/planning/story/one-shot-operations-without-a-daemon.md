@@ -12,6 +12,8 @@ scope:
   path: crates/connectors-cli/README.md
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/one_shot_operations.rs
 - confidence: cited
@@ -44,7 +46,7 @@ scope:
   path: crates/server/src/local.rs
 - confidence: cited
   path: crates/service/src/runtime.rs
-revision: 31
+revision: 32
 ---
 # Story: one-shot operations without a daemon
 
