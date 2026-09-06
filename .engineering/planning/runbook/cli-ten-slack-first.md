@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 46
+revision: 47
 ---
 ## Authorization and objective
 
@@ -3476,3 +3476,11 @@ Auth story revision 61 at 538b0081e1a5ce2b0c19dc1d457fe1f5006b0871 released only
 The whole-OAuth first pass has an actual introduced authoring-contract mismatch: its explicit-empty personal_flows case failed once because the loader accepts an empty list while the new schema requires at least one item. The omission control loaded. This is a preliminary observation, not the completed review report or a credential-exposure finding. A separate new reader test stopped at its own unstable iterator is_empty compiler error with zero cases executed; the reviewer is correcting only that new case. Original evidence is preserved, and production source remains frozen at 6fae9df0.
 
 Prospectively assign the exact published-reader-probe outputs under the already assigned whole-unit-adversary-1 scratch: libpublished_catalog_reader.rlib and witness, with the entire probe directory capped at 256 MiB and the same continuous reserves. The reviewer waits for explicit slot return. Root compared the three old source/pack copies byte for byte with published 0c69450921ab1794c81dadec915b717a61bf0983. The three exact commands and new witness are preserved in commands.json and witness.rs; the resource supplement published-reader-resource-assignment.md and root oauth-published-reader-root-provenance.json retain their hashes. This uses unmodified historical source to test actual new-pack refusal, not a changed reader fixture, and creates no new Cargo workspace or shared target. The completed pass will retain its actual result.
+
+## Frozen independent service ports and continued OAuth review — 2026-09-06
+
+Verification-report:cli-auth-service-port-checkpoint-20260906 preserves the full service-port report and root verification. Auth source ae53a93092453266cd5b40a5c6f9cee484478310 is a clean, local bot commit over protocol 05c94ac4, with exactly three source paths and 420 additions. Full service grew 64 to 67 passing tests; all three new cases, strict Clippy and formatting pass. The tests-first missing-module compiler exit remains distinct from executable product failures. Root rehashed all 80 evidence files, 1,195 source files, 1,869 target files and 57 executable files; post-commit source hashes remain exact. No authentication runtime/server/client/CLI wiring or whole-story review is claimed by this checkpoint.
+
+The auth tree remains wt-78f189927231 with its recorded ordinary root target; the worker released compilation before sealing and is idle. Root explicitly returned the sole slot to review_one_shot_final in OAuth wt-4f1de73d0685. Its actual published-reader probe loaded the old schema 3 pack with 65 providers and refused the full current schema 4 pack, one passing witness and no resource interruption. The same first review continues; its preliminary empty-personal-flows mismatch remains open. A harness usage-limit error interrupted the reviewer's turn, and the operator then said the usage issue was fixed and to continue. The reviewer resumed that same pass and its already-running CLI full-workspace command; no new pass or product verdict was inferred from the harness error.
+
+Auth story revision 67 prospectively scopes only the exact five possible test extractions. Actual runtime wiring and extraction edits still wait for the reviewed OAuth handoff. A read-only merge-tree of frozen OAuth 6fae9df0 and auth ae53a930 produced 88574985438ffece4a3a6181bd6c30e9ff1292e9 without textual conflict; no compilation, integration-branch movement or publication occurred. Existing review budgets, held credential decision and final delivery/install obligations remain unchanged.
