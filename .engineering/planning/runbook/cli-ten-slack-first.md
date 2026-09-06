@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 35
+revision: 36
 ---
 ## Authorization and objective
 
@@ -3378,3 +3378,13 @@ The coordinator checked the original and resumed session's user instructions. Th
 For subsequent wave commands, set a prospective reserve of 16 GiB (17179869184 bytes), permit exactly one compiling workspace target across the wave at a time, and retain jobs 1, no shared target, source/evidence freeze and completed-lane cleanup. Measured prior targets were approximately 0.67 GiB for Atlas and up to about 3.4 GB for the affected Connectors lanes with these profiles. The current roughly 21.5 GB free leaves room for one measured lane plus reserve; a new larger lane must be assessed before launch. Monitor free bytes during compilation, interrupt the active owned process gracefully if the reserve is crossed, preserve that interrupted command, and resume only after capacity is restored. Do not remove another session's targets, shared caches, primary data or immutable evidence.
 
 This is a coordinator resource allocation change within the approved implementation, not a relaxation of tests, review counts, source publication gates or the held credential decision. It supersedes earlier numeric 20 GiB instructions only for future commands; no historical result is relabeled. The Atlas final review runs first using its existing target. Schema 3 publication gates and OAuth deciding/build lanes receive explicit successive ownership.
+
+## Prospective serial-build reserve adjustment — 2026-09-06
+
+The coordinator changes the reserve for subsequent wave builds from 16 GiB to 12 GiB (12,884,901,888 bytes). This numeric reserve is an agent operating choice; the original user instructions supplied no numeric disk floor. The wave skill requires a measured floor and bounded concurrency, without prescribing its size. This record changes no historical observation or result.
+
+Eight of twelve publication workspace gates have passed and their completed owned targets are absent. Measured completed targets included root 1.8 GiB and runtime 3.0 GiB. CLI tests and strict Clippy completed before its separate release check hit the 16 GiB floor; after the process stopped and evidence was frozen, an authorized dev-profile cleanup preserved partial release files and the original command completed successfully. The full CLI target was then cleaned. The merged and activated Atlas target was also cleaned, reclaiming 667.3 MiB with all 1,477 source hashes and the installed binary unchanged.
+
+The subsequent SQL compile stopped before tests at 17,021,902,848 free bytes, exit 143, with only about 191 MB in its partial target. A later coordinator sample was 16,816,013,312 free bytes while no wave compiler ran; other-workspace compilers were observed. The entire shared-space change was not attributed. There is no completed wave target left to reclaim. A 12 GiB reserve leaves several times the measured ordinary target size protected while allowing one further build phase from the available capacity.
+
+Keep exactly one compiling workspace in this wave, jobs 1, per-tree targets, compiler caching and no incremental/debug information. Measure immediately before each command and continuously while it runs; gracefully stop its own process group below 12 GiB and preserve the actual exit, time, sample and logs. Freeze evidence/source before cleaning completed owned targets. Profile cleanup is limited to completed debug outputs after the active release process has stopped and its partial output has been frozen. Do not clean another session's targets, shared caches or primary checkouts. This adjustment is prospective; all earlier 20 GiB and 16 GiB pauses, including the two publication interruptions, remain intact.
