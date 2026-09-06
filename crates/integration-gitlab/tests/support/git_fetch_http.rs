@@ -21,6 +21,9 @@ use service::{
 
 use super::{lock, tests, GitFetchSessionState};
 
+// Basic authentication for the fixture's oauth2:synthetic-gitlab-token credential.
+const GIT_AUTHORIZATION: &str = "Basic b2F1dGgyOnN5bnRoZXRpYy1naXRsYWItdG9rZW4=";
+
 struct TlsFixture {
     listener: tokio::net::TcpListener,
     acceptor: tokio_rustls::TlsAcceptor,
@@ -159,10 +162,20 @@ struct Provider {
 }
 
 async fn provider(State(state): State<Provider>, request: Request) -> Response<Body> {
-    assert_eq!(
-        request.headers()["authorization"],
-        "Bearer synthetic-gitlab-token"
-    );
+    // GitLab's Git HTTP boundary refuses API Bearer authentication, even for a valid token.
+    if request
+        .headers()
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        != Some(GIT_AUTHORIZATION)
+    {
+        return Response::builder()
+            .status(401)
+            .header("content-type", "text/plain")
+            .header("www-authenticate", "Basic realm=\"Git\"")
+            .body(Body::from("Git authentication required"))
+            .unwrap();
+    }
     assert!(!request
         .headers()
         .contains_key("x-b10x-git-source-authorization"));
@@ -267,6 +280,15 @@ impl EgressTransport for LoopbackEgress {
         _authority: &str,
         request: EgressHttpRequest,
     ) -> Result<EgressHttpResponse, EgressTransportError> {
+        assert_eq!(
+            request
+                .request
+                .headers
+                .get("authorization")
+                .map(String::as_str),
+            Some("Bearer synthetic-gitlab-token"),
+            "REST admission must retain API Bearer authentication"
+        );
         let path = url::Url::parse(&request.request.url).unwrap();
         let body = match path.path() {
             "/api/v4/projects/42" => {
@@ -291,6 +313,9 @@ impl EgressTransport for LoopbackEgress {
     ) -> Result<EgressStreamingHttpResponse, EgressTransportError> {
         let url = url::Url::parse(&request.url).unwrap();
         assert_eq!(url.host_str(), Some("gitlab.example.test"));
+        assert!(url.username().is_empty());
+        assert!(url.password().is_none());
+        assert!(!request.url.contains("synthetic-gitlab-token"));
         let mut outbound = self.client.request(
             request.method.parse().unwrap(),
             format!(
@@ -344,6 +369,25 @@ async fn real_v2_clone_preserves_depth_and_reduces_many_ref_discovery_bytes() {
     let upstream_task = tokio::spawn(async move {
         axum::serve(upstream, upstream_app).await.unwrap();
     });
+    let provider_client = reqwest::Client::builder().no_proxy().build().unwrap();
+    for (method, path) in [
+        (
+            reqwest::Method::GET,
+            "/group/repository.git/info/refs?service=git-upload-pack",
+        ),
+        (
+            reqwest::Method::POST,
+            "/group/repository.git/git-upload-pack",
+        ),
+    ] {
+        let response = provider_client
+            .request(method, format!("{upstream_origin}{path}"))
+            .bearer_auth("synthetic-gitlab-token")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    }
     let egress = Arc::new(LoopbackEgress {
         origin: upstream_origin,
         commit: repository.commit.clone(),
@@ -407,7 +451,11 @@ async fn real_v2_clone_preserves_depth_and_reduces_many_ref_discovery_bytes() {
         .send()
         .await
         .unwrap();
-    assert!(legacy_response.status().is_success());
+    assert!(
+        legacy_response.status().is_success(),
+        "the broker's upstream Git authentication was refused: {}",
+        legacy_response.status()
+    );
     let legacy_body = legacy_response.bytes().await.unwrap();
     assert!(!String::from_utf8_lossy(&legacy_body).contains("private"));
 
@@ -465,6 +513,10 @@ async fn real_v2_clone_preserves_depth_and_reduces_many_ref_discovery_bytes() {
         );
         assert!(git_text(&checkout, &["tag", "--list"], None).is_empty());
         assert!(!git_text(&checkout, &["show-ref"], None).contains("private"));
+        let configuration = std::fs::read_to_string(checkout.join(".git/config")).unwrap();
+        assert!(!configuration.contains("synthetic-gitlab-token"));
+        assert!(!configuration.contains(GIT_AUTHORIZATION));
+        assert!(!configuration.contains("x-b10x-git-source-authorization"));
     })
     .await
     .unwrap();

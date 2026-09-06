@@ -2454,6 +2454,7 @@ name = "integration-gitlab"
 version = "0.6.5"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "catalog",
  "connector-oauth",
  "connector-resolve",
