@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 43
+revision: 44
 ---
 ## Authorization and objective
 
@@ -3450,3 +3450,15 @@ For subsequent CLI workspace commands in wt-4f1de73d0685 only, after freezing th
 For the fresh CLI target, require at least 24 GiB free disk before the initial cold command and continuously retain the 12 GiB disk reserve. Keep one compiling workspace across the wave, jobs 1, incremental 0, dev/test debug 0 and the existing /usr/bin/sccache wrapper. Record the exact manifest, cwd, environment and target path for every command. Bound this new CLI target itself to 8 GiB, and retain the existing MemAvailable 16 GiB and tmpfs 8 GiB monitoring while the frozen private target remains resident. Gracefully stop only this command's process group on a guard crossing and preserve its actual result. A larger target requires a separately measured coordinator decision, not a silent cap increase.
 
 Freeze completed source, executable hashes and full execution evidence before any later cargo clean of this owned CLI target, then reverify persistent source/evidence. No shared-cache cleaning, other-session target cleanup, primary mutation, compilation overlap, scope expansion or test/review waiver is authorized. Whole-unit OAuth verification and independent review remain outstanding.
+
+## Prospective serial whole-OAuth review handoff — 2026-09-06
+
+The implementor reports that source is frozen and all final affected tests, strict Clippy and formatting pass; its full report and source inventories are still being sealed. This is an implementor observation, not a whole-unit review verdict. The coordinator will verify those bytes and record the exact source commit before dispatching the first ordinary adversary pass. Both passes remain unstarted at this note.
+
+Use the existing managed OAuth checkout wt-4f1de73d0685 serially for the later tests-only adversary. The implementor relinquishes source and compilation ownership at the recorded handoff. No second worktree is necessary, and no other tree may use its build artifacts. Review the complete published-base 0c69450921ab1794c81dadec915b717a61bf0983 to frozen-head union, including helper, FULL SQLite, custody and refresh commits; identify the separate Design 22/model-only preparation. The eleven test owners in the preserved checklist are the later review assignment. No implementation, planning, model, Git or provider changes are delegated to the adversary.
+
+For that later review, retain the existing private target at /dev/shm/b10x-cli-wave-wt-4f1de73d0685-nr00xjox/runtime-target with its private parent and explicit CARGO_TARGET_DIR, RUSTC_WRAPPER unset. Prospectively raise only its aggregate target cap from 8 GiB to 12 GiB to accommodate additional test artifacts. The observed final implementation target is 8,403,660,800 allocated bytes. The coordinator's contemporaneous resource observation is retained in the assigned scratch as oauth-review-resource-observation.json; it proves that even a further 4 GiB allocation leaves the existing 8 GiB tmpfs and 16 GiB MemAvailable reserves intact. The 12 GiB disk floor also remains. Continuous samples must stop only this wave's own process group if any guard is crossed, preserving the actual interruption and all completed results.
+
+The CLI continues using its own crates/connectors-cli/target with CARGO_TARGET_DIR unset, the existing sccache wrapper and its unchanged 8 GiB target cap. One compiling workspace at a time, jobs 1, incremental disabled and dev/test debug disabled remain mandatory. Freeze exact source, executable inventories and complete evidence before any later cleanup; no copy, symlink, shared-cache cleanup or other-session target use is assigned. No gate or review requirement is relaxed by this resource adjustment.
+
+Atlas main advanced to 78d96cc706f735c3a160369e3ce2f2133f4b1d41. The coordinator fetched that exact advertised commit and created clean managed authority wt-784121831be6. Its AGENTS.md and bot wrappers are byte-identical to prior b0fb59be; the four changed files record ESS delivery observations and generated documentation. Set B10X_ATLAS_CHECKOUT to /home/timo/.local/state/worktree/trees/b10x/atlas/wt-784121831be6 for subsequent organization operations, rechecking remote main before publication.
