@@ -59,6 +59,14 @@ use sha2::{Digest as _, Sha256};
 
 mod config;
 pub use config::DeclaredConfig;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "Private OAuth custody kernel awaits the recorded acquisition handoff"
+    )
+)]
+mod custody;
 mod hosted;
 pub use hosted::{hosted_admitted_origins, HostedCatalogBackend, HostedCatalogError};
 
