@@ -29,6 +29,30 @@ fn envelope(request: OperationRequest) -> RequestEnvelope {
 }
 
 #[tokio::test]
+async fn auth_one_shot_v3_refuses_persistent_control_before_configuration_or_state() {
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("uncreated-state");
+    let response = PersonalRuntime::one_shot_operation_v3(
+        &root.path().join("absent-configuration.toml"),
+        &state,
+        context(),
+        OperationRequest::SessionStatus(operation::SessionRequest {
+            execution_ref: "execution:fixture".into(),
+        }),
+    )
+    .await
+    .unwrap();
+    response.validate().unwrap();
+    assert_eq!(response.protocol, operation::v3::CONTRACT);
+    assert!(response.response.is_none());
+    let error = response.error.unwrap();
+    assert_eq!(error.code, operation::v3::OperationErrorCode::Unavailable);
+    assert!(!error.retriable);
+    assert!(error.authentication.is_none());
+    assert!(!state.exists());
+}
+
+#[tokio::test]
 async fn an_existing_owner_refuses_before_opening_the_reply_claim_journal() {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
@@ -620,4 +644,196 @@ async fn final_adversary_malformed_backend_reply_is_reduced_before_shutdown_and_
         1
     );
     assert!(LocalStateOwnership::acquire(socket).is_ok());
+}
+
+#[tokio::test]
+async fn auth_one_shot_origin_precomposition_is_typed_and_preserves_legacy_envelopes() {
+    use connectors_runtime::OneShotOperationV3Outcome;
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("never-created");
+    let missing = root.path().join("missing-config");
+    for (value, valid) in [
+        (
+            serde_json::json!({"method":"session_status","params":{"execution_ref":"fixture"}}),
+            true,
+        ),
+        (
+            serde_json::json!({"method":"session_reconcile","params":{"execution_ref":"fixture"}}),
+            true,
+        ),
+        (
+            serde_json::json!({"method":"session_terminate","params":{"execution_ref":"fixture","reason":"cancelled"}}),
+            true,
+        ),
+        (
+            serde_json::json!({"method":"session_signal","params":{"execution_ref":"fixture","signal":{"kind":"dtmf","digits":"1"}}}),
+            true,
+        ),
+        (
+            serde_json::json!({"method":"session_status","params":{"execution_ref":""}}),
+            false,
+        ),
+    ] {
+        let request: OperationRequest = serde_json::from_value(value).unwrap();
+        let outcome = PersonalRuntime::one_shot_operation_v3_outcome(
+            &missing,
+            &state,
+            context(),
+            request.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            matches!(&outcome, OneShotOperationV3Outcome::RequiresDaemon(_)),
+            valid
+        );
+        let response = match outcome {
+            OneShotOperationV3Outcome::Reply(response)
+            | OneShotOperationV3Outcome::RequiresDaemon(response) => response,
+        };
+        response.validate().unwrap();
+        let legacy = PersonalRuntime::one_shot_operation_v3(&missing, &state, context(), request)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(response).unwrap(),
+            serde_json::to_value(legacy).unwrap()
+        );
+        assert!(!state.exists());
+    }
+}
+
+struct OriginBackend {
+    ephemeral: bool,
+    dispatched: std::sync::atomic::AtomicUsize,
+    shutdown_started: tokio::sync::Notify,
+    shutdown_release: tokio::sync::Notify,
+}
+#[async_trait::async_trait]
+impl ConnectorBackend for OriginBackend {
+    async fn ready(&self) -> Result<(), service::BackendReadinessError> {
+        Ok(())
+    }
+    fn supports_ephemeral_invocation(&self, _: &operation::InvokeRequest) -> bool {
+        self.ephemeral
+    }
+    async fn handle(
+        &self,
+        _: &PrincipalContext,
+        _: OperationRequest,
+    ) -> Result<OperationResult, operation::OperationError> {
+        self.dispatched
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Err(operation::OperationError::new(
+            operation::OperationErrorCode::Unavailable,
+            "private backend says run connectors serve local with --config private-value",
+            false,
+        ))
+    }
+    async fn shutdown(&self) {
+        self.shutdown_started.notify_one();
+        self.shutdown_release.notified().await;
+    }
+}
+
+#[tokio::test]
+async fn auth_one_shot_origin_comes_only_from_local_decisions_and_joins_shutdown() {
+    use connectors_runtime::OneShotOperationV3Outcome;
+    // Persistent control, unknown invoke lifetime, real backend outage, invalid persistent input.
+    for (persistent, ephemeral, valid, needs_daemon, calls) in [
+        (true, true, true, true, 0),
+        (false, false, true, true, 0),
+        (false, true, true, false, 1),
+        (true, true, false, false, 0),
+    ] {
+        let mut previous = None;
+        for typed in [true, false] {
+            let root = tempfile::tempdir().unwrap();
+            std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+            let socket = root.path().join("connectors.sock");
+            let backend = Arc::new(OriginBackend {
+                ephemeral,
+                dispatched: 0.into(),
+                shutdown_started: tokio::sync::Notify::new(),
+                shutdown_release: tokio::sync::Notify::new(),
+            });
+            let request = operation::v3::RequestEnvelope {
+                protocol: operation::v3::CONTRACT.into(),
+                request_id: "origin-fixture".into(),
+                context: context(),
+                request: if persistent {
+                    OperationRequest::SessionStatus(operation::SessionRequest {
+                        execution_ref: if valid { "fixture" } else { "" }.into(),
+                    })
+                } else {
+                    OperationRequest::Invoke(operation::InvokeRequest {
+                        operation_ref: "fixture".into(),
+                        connection_ref: "fixture".into(),
+                        description_ref: "fixture".into(),
+                        input: serde_json::json!({}),
+                        approval_evidence_ref: None,
+                    })
+                },
+            };
+            let runtime = LocalOneShot::new(
+                LocalStateOwnership::acquire(&socket).unwrap(),
+                backend.clone(),
+            )
+            .unwrap();
+            let task = tokio::spawn(async move {
+                if typed {
+                    runtime.operation_v3_outcome(request).await
+                } else {
+                    runtime
+                        .operation_v3(request)
+                        .await
+                        .map(OneShotOperationV3Outcome::Reply)
+                }
+            });
+            tokio::time::timeout(
+                std::time::Duration::from_secs(3),
+                backend.shutdown_started.notified(),
+            )
+            .await
+            .unwrap();
+            assert!(LocalStateOwnership::acquire(&socket).is_err());
+            assert!(
+                !task.is_finished(),
+                "outcome returned before joined shutdown"
+            );
+            assert_eq!(
+                backend.dispatched.load(std::sync::atomic::Ordering::SeqCst),
+                calls
+            );
+            backend.shutdown_release.notify_one();
+            let outcome = task.await.unwrap().unwrap();
+            assert_eq!(
+                matches!(&outcome, OneShotOperationV3Outcome::RequiresDaemon(_)),
+                typed && needs_daemon
+            );
+            let response = match outcome {
+                OneShotOperationV3Outcome::Reply(response)
+                | OneShotOperationV3Outcome::RequiresDaemon(response) => response,
+            };
+            response.validate().unwrap();
+            assert_eq!(response.request_id, "origin-fixture");
+            assert!(!response.error.as_ref().unwrap().retriable);
+            if calls == 1 {
+                assert!(response
+                    .error
+                    .as_ref()
+                    .unwrap()
+                    .message
+                    .contains("private-value"));
+            }
+            let value = serde_json::to_value(response).unwrap();
+            if let Some(previous) = previous.take() {
+                assert_eq!(value, previous);
+            } else {
+                previous = Some(value);
+            }
+            assert!(LocalStateOwnership::acquire(&socket).is_ok());
+            assert!(!socket.exists());
+        }
+    }
 }

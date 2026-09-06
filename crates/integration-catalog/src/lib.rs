@@ -59,6 +59,12 @@ use sha2::{Digest as _, Sha256};
 
 mod config;
 pub use config::DeclaredConfig;
+mod custody;
+mod oauth;
+pub use oauth::{
+    personal_oauth_admitted_connection_ref, personal_oauth_admitted_origins, PersonalOAuthBackend,
+    PersonalOAuthError,
+};
 mod hosted;
 pub use hosted::{hosted_admitted_origins, HostedCatalogBackend, HostedCatalogError};
 
@@ -76,6 +82,8 @@ const MAX_INPUT_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CatalogIntegrationError {
+    #[error("personal OAuth requires its dedicated custody owner")]
+    OAuthCustodyRequired,
     #[error("provider `{0}` is not in the catalogue")]
     UnknownProvider(String),
     #[error("provider `{0}` declares no authority, so its credential has no address")]
@@ -194,6 +202,9 @@ impl CatalogBackend {
         ensure_owner_directory(state_root)?;
         let mut bindings = Vec::with_capacity(configured.len());
         for entry in configured {
+            if entry.oauth.is_some() {
+                return Err(CatalogIntegrationError::OAuthCustodyRequired);
+            }
             let provider = catalog::provider(catalog::ProviderKey::id(&entry.provider))
                 .ok_or_else(|| CatalogIntegrationError::UnknownProvider(entry.provider.clone()))?;
             let authority = provider
@@ -248,6 +259,9 @@ impl CatalogBackend {
     ) -> Result<Self, CatalogIntegrationError> {
         let mut bindings = Vec::with_capacity(configured.len());
         for entry in configured {
+            if entry.oauth.is_some() {
+                return Err(CatalogIntegrationError::OAuthCustodyRequired);
+            }
             let provider = catalog::provider(catalog::ProviderKey::id(&entry.provider))
                 .ok_or_else(|| CatalogIntegrationError::UnknownProvider(entry.provider.clone()))?;
             provider
@@ -465,14 +479,14 @@ impl Inner {
     /// The order is the whole safety argument: admit by grant, then resolve the credential, then
     /// build the request, then execute inside the aperture. A credential is read only after the
     /// operation has been admitted for this connection.
-    async fn invoke(
+    fn admit_invocation(
         &self,
         operation_ref: &str,
         connection_ref: &str,
         description_ref: &str,
-        input: serde_json::Value,
-    ) -> Result<InvocationResult, OperationError> {
-        if serde_json::to_vec(&input).map_or(true, |bytes| bytes.len() > MAX_INPUT_BYTES) {
+        input: &serde_json::Value,
+    ) -> Result<(&'static catalog::Operation, &Binding), OperationError> {
+        if serde_json::to_vec(input).map_or(true, |bytes| bytes.len() > MAX_INPUT_BYTES) {
             return Err(refusal(
                 OperationErrorCode::InvalidInput,
                 "caller input is too large",
@@ -522,6 +536,19 @@ impl Inner {
                 "this Connection does not permit the platform to initiate operations",
             ));
         }
+
+        Ok((operation, binding))
+    }
+
+    async fn invoke(
+        &self,
+        operation_ref: &str,
+        connection_ref: &str,
+        description_ref: &str,
+        input: serde_json::Value,
+    ) -> Result<InvocationResult, OperationError> {
+        let (operation, binding) =
+            self.admit_invocation(operation_ref, connection_ref, description_ref, &input)?;
 
         let document =
             connector_resolve::document::provider(binding.provider.id).ok_or_else(|| {
@@ -691,7 +718,10 @@ impl ConnectorBackend for CatalogBackend {
             OperationRequest::Describe(describe) => {
                 self.owns_operation_ref(&describe.operation_ref)
             }
-            OperationRequest::Invoke(invoke) => self.owns_operation_ref(&invoke.operation_ref),
+            OperationRequest::Invoke(invoke) => {
+                self.owns_operation_ref(&invoke.operation_ref)
+                    && self.inner.binding_by_ref(&invoke.connection_ref).is_some()
+            }
             _ => false,
         }
     }

@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:connect-session-oauth-custody-in-personal-posture
 kind: story
-status: proposed
+status: active
 title: Decide the connect-session ↔ OAuth-callback custody chain in personal posture
 tags:
 - ready
@@ -14,32 +14,336 @@ relations:
 - derived_from: epic:carried-constraints
 scope:
 - confidence: cited
+  path: .gitleaksignore
+- confidence: cited
+  path: Cargo.lock
+- confidence: cited
+  path: catalog/airtable.catalog.json
+- confidence: cited
+  path: catalog/alertmanager.catalog.json
+- confidence: cited
+  path: catalog/algolia.catalog.json
+- confidence: cited
+  path: catalog/anthropic.catalog.json
+- confidence: cited
+  path: catalog/argocd.catalog.json
+- confidence: cited
+  path: catalog/asana.catalog.json
+- confidence: cited
+  path: catalog/asterisk.catalog.json
+- confidence: cited
+  path: catalog/b10x.catalog.json
+- confidence: cited
+  path: catalog/babelforce.catalog.json
+- confidence: cited
+  path: catalog/bitbucket.catalog.json
+- confidence: cited
+  path: catalog/box.catalog.json
+- confidence: cited
+  path: catalog/calendly.catalog.json
+- confidence: cited
+  path: catalog/claude-code.catalog.json
+- confidence: cited
+  path: catalog/clickup.catalog.json
+- confidence: cited
+  path: catalog/cloudflare.catalog.json
+- confidence: cited
+  path: catalog/confluence.catalog.json
+- confidence: cited
+  path: catalog/connector-document-v4.schema.json
+- confidence: cited
+  path: catalog/contentful.catalog.json
+- confidence: cited
+  path: catalog/datadog.catalog.json
+- confidence: cited
+  path: catalog/discord.catalog.json
+- confidence: cited
+  path: catalog/docusign.catalog.json
+- confidence: cited
+  path: catalog/dropbox.catalog.json
+- confidence: cited
+  path: catalog/figma.catalog.json
+- confidence: cited
+  path: catalog/fly.catalog.json
+- confidence: cited
+  path: catalog/freshdesk.catalog.json
+- confidence: cited
+  path: catalog/front.catalog.json
+- confidence: cited
+  path: catalog/github.catalog.json
+- confidence: cited
+  path: catalog/gitlab.catalog.json
+- confidence: cited
+  path: catalog/google.catalog.json
+- confidence: cited
+  path: catalog/grafana.catalog.json
+- confidence: cited
+  path: catalog/hubspot.catalog.json
+- confidence: cited
+  path: catalog/intercom.catalog.json
+- confidence: cited
+  path: catalog/jira.catalog.json
+- confidence: cited
+  path: catalog/klaviyo.catalog.json
+- confidence: cited
+  path: catalog/launchdarkly.catalog.json
+- confidence: cited
+  path: catalog/loki.catalog.json
+- confidence: cited
+  path: catalog/mailchimp.catalog.json
+- confidence: cited
+  path: catalog/microsoft_graph.catalog.json
+- confidence: cited
+  path: catalog/miro.catalog.json
+- confidence: cited
+  path: catalog/mysql.catalog.json
+- confidence: cited
+  path: catalog/newrelic.catalog.json
+- confidence: cited
+  path: catalog/notion.catalog.json
+- confidence: cited
+  path: catalog/okta.catalog.json
+- confidence: cited
+  path: catalog/openai.catalog.json
+- confidence: cited
+  path: catalog/openrouter.catalog.json
+- confidence: cited
+  path: catalog/pagerduty.catalog.json
+- confidence: cited
+  path: catalog/postgresql.catalog.json
+- confidence: cited
+  path: catalog/postmark.catalog.json
+- confidence: cited
+  path: catalog/prometheus.catalog.json
+- confidence: cited
+  path: catalog/resend.catalog.json
+- confidence: cited
+  path: catalog/runpod.catalog.json
+- confidence: cited
+  path: catalog/salesforce.catalog.json
+- confidence: cited
+  path: catalog/sendgrid.catalog.json
+- confidence: cited
+  path: catalog/sentry.catalog.json
+- confidence: cited
+  path: catalog/shopify.catalog.json
+- confidence: cited
+  path: catalog/slack.catalog.json
+- confidence: cited
+  path: catalog/statuspage.catalog.json
+- confidence: cited
+  path: catalog/stripe.catalog.json
+- confidence: cited
+  path: catalog/supabase.catalog.json
+- confidence: cited
+  path: catalog/trello.catalog.json
+- confidence: cited
+  path: catalog/twilio.catalog.json
+- confidence: cited
+  path: catalog/typeform.catalog.json
+- confidence: cited
+  path: catalog/vercel.catalog.json
+- confidence: cited
+  path: catalog/webflow.catalog.json
+- confidence: cited
+  path: catalog/zendesk.catalog.json
+- confidence: cited
+  path: catalog/zoom.catalog.json
+- confidence: cited
+  path: connectors.lock
+- confidence: cited
+  path: crates/catalog-build/src/check.rs
+- confidence: cited
   path: crates/catalog-build/src/document.rs
+- confidence: cited
+  path: crates/catalog-build/src/document_schema.rs
+- confidence: cited
+  path: crates/catalog-build/src/document_tests.rs
+- confidence: cited
+  path: crates/catalog-build/src/pipeline.rs
+- confidence: cited
+  path: crates/catalog-build/src/workspace.rs
+- confidence: cited
+  path: crates/catalog-build/tests/main/catalog_invariants.rs
+- confidence: cited
+  path: crates/catalog-build/tests/main/ess_claim_fence.rs
+- confidence: cited
+  path: crates/catalog-build/tests/main/no_network.rs
+- confidence: cited
+  path: crates/catalog-reader/catalog.pack
+- confidence: cited
+  path: crates/catalog-reader/src/lib.rs
+- confidence: cited
+  path: crates/catalog-reader/tests/main/pack.rs
 - confidence: cited
   path: crates/catalog/src/lib.rs
 - confidence: cited
   path: crates/catalog/src/table.rs
-- confidence: inferred
+- confidence: cited
   path: crates/catalog/tests/main/consumer_api.rs
-- confidence: inferred
+- confidence: cited
+  path: crates/connect-session-transport/Cargo.toml
+- confidence: cited
+  path: crates/connect-session-transport/src/lib.rs
+- confidence: cited
+  path: crates/connect-session-transport/src/oauth.rs
+- confidence: cited
+  path: crates/connect-session-transport/src/oauth_tests.rs
+- confidence: cited
+  path: crates/connector-oauth/src/device.rs
+- confidence: cited
+  path: crates/connector-oauth/src/lib.rs
+- confidence: cited
+  path: crates/connector-oauth/src/token.rs
+- confidence: cited
+  path: crates/connector-resolve/src/document.rs
+- confidence: cited
+  path: crates/connector-resolve/src/resolve.rs
+- confidence: cited
+  path: crates/connector-resolve/tests/adversary_gitlab_pass1.rs
+- confidence: cited
   path: crates/connector-spec/schema/provider-toml.schema.json
 - confidence: cited
   path: crates/connector-spec/src/auth.rs
-- confidence: inferred
+- confidence: cited
+  path: crates/connector-spec/src/lib.rs
+- confidence: cited
   path: crates/connector-spec/src/provider/auth_validation.rs
-- confidence: inferred
+- confidence: cited
+  path: crates/connector-spec/src/provider/schema_sync.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/ir_roundtrip.rs
+- confidence: cited
   path: crates/connector-spec/tests/main/oauth2_acquisition.rs
 - confidence: cited
+  path: crates/connector-spec/tests/main/oauth_token_endpoint.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/personal_oauth.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/provider_schema.rs
+- confidence: cited
+  path: crates/connectors-cli/Cargo.lock
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/one_shot_operations.rs
+- confidence: cited
+  path: crates/connectors-client/src/completion.rs
+- confidence: cited
+  path: crates/connectors-client/src/lib.rs
+- confidence: cited
+  path: crates/connectors-client/src/model.rs
+- confidence: cited
+  path: crates/connectors-client/src/personal_oauth.rs
+- confidence: cited
+  path: crates/connectors-client/tests/personal_oauth_adversary.rs
+- confidence: cited
+  path: crates/connectors-config/examples/gitlab-personal-oauth.example.toml
+- confidence: cited
+  path: crates/connectors-config/src/lib.rs
+- confidence: cited
+  path: crates/connectors-config/src/personal.rs
+- confidence: cited
+  path: crates/connectors-config/src/personal_oauth.rs
+- confidence: cited
+  path: crates/connectors-config/src/personal_oauth_tests.rs
+- confidence: cited
+  path: crates/connectors-console/Cargo.lock
+- confidence: cited
+  path: crates/connectors-console/src/connect.rs
+- confidence: cited
+  path: crates/connectors-console/src/doctor.rs
+- confidence: cited
+  path: crates/connectors-console/src/enrol.rs
+- confidence: cited
+  path: crates/connectors-console/src/envelope.rs
+- confidence: cited
+  path: crates/connectors-console/tests/personal_oauth.rs
+- confidence: cited
+  path: crates/connectors-runtime/Cargo.lock
+- confidence: cited
+  path: crates/connectors-runtime/src/composition.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/registry.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/registry_claims_tests.rs
+- confidence: cited
+  path: crates/connectors-runtime/tests/local_catalog_writes.rs
+- confidence: cited
+  path: crates/connectors-runtime/tests/local_gitlab_schedules.rs
+- confidence: cited
+  path: crates/connectors-runtime/tests/one_shot_runtime.rs
+- confidence: cited
+  path: crates/connectors-runtime/tests/personal_oauth.rs
+- confidence: cited
+  path: crates/driver-cdp/Cargo.lock
+- confidence: cited
+  path: crates/driver-sip/Cargo.lock
+- confidence: cited
+  path: crates/driver-speech/Cargo.lock
+- confidence: cited
+  path: crates/integration-catalog/Cargo.toml
+- confidence: cited
+  path: crates/integration-catalog/src/custody.rs
+- confidence: cited
+  path: crates/integration-catalog/src/custody_refresh_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/custody_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/hosted.rs
+- confidence: cited
+  path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth_acquisition.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth_adversary_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/oauth_tests.rs
+- confidence: cited
+  path: crates/integration-catalog/src/tests.rs
+- confidence: cited
+  path: crates/protocol/src/connection.rs
+- confidence: cited
+  path: crates/rtvbp-voice-endpoint/Cargo.lock
+- confidence: cited
+  path: crates/server/src/hosted/tests/mcp.rs
+- confidence: cited
+  path: crates/service/src/connect_session.rs
+- confidence: cited
+  path: crates/service/src/planning.rs
+- confidence: cited
+  path: crates/state-sqlite/src/lib.rs
+- confidence: cited
+  path: crates/voice-runtime/Cargo.lock
+- confidence: cited
   path: docs/design/07-credential-custody-topologies.md
-- confidence: inferred
+- confidence: cited
   path: docs/design/21-personal-oauth-callback-custody.md
-- confidence: inferred
+- confidence: cited
+  path: docs/security/secret-scan-baseline.md
+- confidence: cited
+  path: ess/generated/clap
+- confidence: cited
+  path: ess/system/domains/catalog.yaml
+- confidence: cited
+  path: ess/system/domains/connection.yaml
+- confidence: cited
+  path: ess/system/domains/deployment.yaml
+- confidence: cited
+  path: json-schemas.toml
+- confidence: cited
   path: providers/gitlab.toml
-- confidence: inferred
+- confidence: cited
   path: providers/jira.toml
-- confidence: inferred
+- confidence: cited
   path: providers/slack.toml
-revision: 33
+revision: 36
 ---
 ## Acceptance
 
@@ -125,3 +429,17 @@ Would collide with any unit editing these files; directory entries require an ad
 ## Execution queue
 
 CLI execution queue 2026-09-06: 9 of 10. The urgent Slack delivery follow-up leads the queue. Original wave-cli readiness ordering remains historical context. Dependencies and measured scope govern dispatch order; priority is not a claim that prerequisites have landed.
+
+## Current bounded OAuth acceptance — 2026-09-07
+
+Design21 records the supported provider and custody boundary. Implement configured GitLab public PKCE and device authorization, exact callback/state/PKCE ownership, one existing ConnectSession owner, verified subject continuity, FULL credential publication/recovery and refresh without invocation replay. GitLab support is DevelopmentOnly using the explicitly selected unsealed DevelopmentFile store; existing raw/keyring behavior remains unchanged. Slack/Jira compatibility gaps are explicit. Schema4 and matching readers declare the supported capabilities instead of runtime trial-and-fallback. Preserve the original acceptance as history; no production-store or universal-provider claim follows from this development-scoped implementation.
+
+## Publication continuation — 2026-09-07
+
+The same approved CLI wave continues from public main 0c69450921ab1794c81dadec915b717a61bf0983. The coordinator carries the tested nonplanning source into this isolated publication checkout and records its exact content equivalence before CI. Raw execution records and the original implementation branches remain preserved separately. Published branch history is not rewritten. This public store keeps its existing journal prefix and records current scope and evidence through AEP.
+
+Seven selected stories already reached published main. Personal OAuth passed its two ordinary reviews; the first whole-authentication review is running against the frozen identical source. The several-credentials story remains held under its existing decision blocker. No version bump, release tag, live provider action or additional credential-store support is authorized here. Source publication, normal documentation delivery, supported source installation and the two already authorized daemon replacements remain in the approved delivery sequence.
+
+Current source includes Operation v3 default with explicit operation-only v2, Connection v2 bound remediation, schema4 with matching readers, and development-only GitLab public PKCE/device authorization through a dedicated unsealed store. Hosted remediation remains Unsupported after admission where no acquisition owner exists. Protected instructions stay outside model output; completion ends with fresh validation and an explicit new invocation. Full affected local gates pass: server115, runtime455 per default/no-default configuration with two existing PostgreSQL ignores, console107, CLI140, strict affected checks and the final catalog/Markdown/story/ESS gate. Initial root1301pass/2fail/4oldignores was closed by full affected server115 and catalog-cli14 rechecks. Complete sharded CI and auth review remain pending.
+
+Exact runtime final seal: eba21e5f93152eb0aacd01dadf31a19569401421c8a8397f3b09216d11ed7b04 (179 members). Exact client final seal:334ab4c9adf141862dcb9a701e930f80dcdf909dfb3a1c1142dc75af3c8fcae7 (95 members). All first failures remain in those records. Counts describe executed cases per command, not a unique aggregate. Future review results are recorded in full before any findings are routed.

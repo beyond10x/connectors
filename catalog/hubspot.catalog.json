@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "HubSpot private-app access token (pat-…) with crm.objects.contacts.read/write, crm.objects.companies.read and crm.objects.deals.read",
@@ -600,7 +600,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "api_version": "v3",

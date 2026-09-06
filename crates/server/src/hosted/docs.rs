@@ -1,8 +1,8 @@
 //! The hosted server's own contract surface (S-067 + S-068).
 //!
 //! `GET {base_path}/openapi.json` serves a committed OpenAPI 3.1 document, unauthenticated
-//! and verbatim: the artifact beside this module is the contract, embedded at compile time
-//! and never derived from the running code. Drift is caught by the test suite instead —
+//! from the embedded skeleton and the exact versioned protocol schemas. Drift is caught
+//! by the test suite —
 //! every request example in the document must be accepted by the exact `protocol` types the
 //! routes deserialize with, and every documented route must exist in the real router
 //! (`hosted/tests/docs.rs`).
@@ -32,9 +32,9 @@ use sha2::Digest as _;
 /// use — the structs are the contract; the skeleton only says where they bind.
 const OPENAPI_SKELETON: &str = include_str!("docs/openapi.json");
 
-/// The served document: skeleton plus the twelve envelope schemas generated from the
-/// exact `protocol` types the routes deserialize with, inlined so no name can
-/// collide across modules. Built once per process.
+/// The served document: skeleton plus schemas owned by each exact protocol version.
+/// Definition references are namespaced so retained and current contracts cannot collide.
+/// Built once per process.
 pub(in crate::hosted) fn document_json() -> &'static str {
     static DOCUMENT: OnceLock<String> = OnceLock::new();
     DOCUMENT.get_or_init(|| {
@@ -145,8 +145,108 @@ pub(in crate::hosted) fn document_json() -> &'static str {
             }
             table.insert(name.to_owned(), schema);
         }
+        insert_protocol_schema(
+            table,
+            "operation.v1.frame",
+            serde_json::from_str(include_str!(
+                "../../../../contracts/connector-operation/v0alpha1/connector-operation.schema.json"
+            ))
+            .expect("the retained operation v1 schema is JSON"),
+            [
+                ("operation.v1.requestEnvelope", "requestEnvelope"),
+                ("operation.v1.responseEnvelope", "responseEnvelope"),
+            ],
+        );
+        insert_protocol_schema(
+            table,
+            "operation.v2.frame",
+            protocol::operation::schema::operation_v2_schema(),
+            [
+                ("operation.requestEnvelope", "RequestEnvelope"),
+                ("operation.responseEnvelope", "ResponseEnvelope"),
+            ],
+        );
+        insert_protocol_schema(
+            table,
+            "operation.v3.frame",
+            protocol::operation::schema_v3::operation_v3_schema(),
+            [
+                ("operation.v3.requestEnvelope", "RequestEnvelope"),
+                ("operation.v3.responseEnvelope", "ResponseEnvelope"),
+            ],
+        );
+        insert_protocol_schema(
+            table,
+            "connection.v1.frame",
+            serde_json::from_str(include_str!(
+                "../../../../contracts/connector-connection/v0alpha1/connector-connection.schema.json"
+            ))
+            .expect("the retained connection v1 schema is JSON"),
+            [
+                ("connection.request_envelope", "request_envelope"),
+                ("connection.response_envelope", "response_envelope"),
+            ],
+        );
+        insert_protocol_schema(
+            table,
+            "connection.v2.frame",
+            protocol::connection_v2_schema::connection_v2_schema(),
+            [
+                ("connection.v2.request_envelope", "RequestEnvelope"),
+                ("connection.v2.response_envelope", "ResponseEnvelope"),
+            ],
+        );
         serde_json::to_string_pretty(&document).expect("the merged document serializes")
     })
+}
+
+/// Embed the authoritative frame schema without widening its conditional constraints.
+/// The two envelope components select its exact definitions; the frame keeps every
+/// shared definition under a version-specific name in the OpenAPI document.
+fn insert_protocol_schema(
+    schemas: &mut serde_json::Map<String, Value>,
+    namespace: &str,
+    mut frame: Value,
+    envelopes: [(&str, &str); 2],
+) {
+    fn namespace_references(value: &mut Value, namespace: &str) {
+        match value {
+            Value::Object(object) => {
+                if let Some(reference) = object.get_mut("$ref") {
+                    let definition = reference
+                        .as_str()
+                        .and_then(|reference| reference.strip_prefix("#/$defs/"))
+                        .expect("protocol schemas contain only local definition references");
+                    *reference = Value::String(format!(
+                        "#/components/schemas/{namespace}/$defs/{definition}"
+                    ));
+                }
+                for child in object.values_mut() {
+                    namespace_references(child, namespace);
+                }
+            }
+            Value::Array(values) => {
+                for child in values {
+                    namespace_references(child, namespace);
+                }
+            }
+            _ => {}
+        }
+    }
+    let object = frame.as_object_mut().expect("a protocol frame is a schema");
+    // Relative references resolve against the containing OpenAPI document, not the
+    // standalone bundle's canonical URI.
+    object.remove("$id");
+    object.remove("$schema");
+    namespace_references(&mut frame, namespace);
+    for (component, definition) in envelopes {
+        let envelope = frame["$defs"]
+            .get(definition)
+            .expect("the canonical protocol schema defines both envelopes")
+            .clone();
+        schemas.insert(component.to_owned(), envelope);
+    }
+    schemas.insert(namespace.to_owned(), frame);
 }
 
 /// The six envelope endpoints in reading order, each with the request and response

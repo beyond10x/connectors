@@ -29,6 +29,12 @@ pub fn accepted_keys() -> Vec<(&'static str, Vec<String>)> {
         ("authMethod", probe::<AuthMethod>()),
         ("oauth2", probe::<crate::OAuth2Spec>()),
         ("oauthRedirect", probe::<crate::OAuthRedirect>()),
+        (
+            "personalOAuthAdmission",
+            probe::<crate::PersonalOAuthAdmission>(),
+        ),
+        ("oauthEndpoint", probe::<crate::OAuthEndpoint>()),
+        ("oauthTokenEvidence", probe::<crate::OAuthTokenEvidence>()),
         ("authWorkarounds", probe::<crate::AuthWorkarounds>()),
         (
             "tokenEndpointWorkaround",

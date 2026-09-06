@@ -143,6 +143,55 @@ impl HostedAuthority {
         }
     }
 
+    pub(super) fn require_remediation_store(&self) -> Result<(), EnforcementRefusal> {
+        self.store
+            .as_ref()
+            .map(|_| ())
+            .ok_or(EnforcementRefusal::Unavailable)
+    }
+
+    /// Current canonical grant evaluation only. Never consumes approval or returns dispatch proof.
+    pub(super) fn admit_remediation(
+        &self,
+        principal: &HostedPrincipal,
+        metadata: &service::RemediationMetadata<'_>,
+        record: &serde_json::Value,
+        description_ref: &str,
+        input_digest: &str,
+    ) -> Result<GrantDecision, EnforcementRefusal> {
+        self.require_remediation_store()?;
+        let facts = GrantFacts {
+            risk: serde_json::from_value(record["risk"].clone())
+                .map_err(|_| EnforcementRefusal::Unavailable)?,
+            effects: serde_json::from_value(record["semantic_effects"].clone())
+                .map_err(|_| EnforcementRefusal::Unavailable)?,
+            idempotency: serde_json::from_value(record["idempotency"].clone())
+                .map_err(|_| EnforcementRefusal::Unavailable)?,
+        };
+        let request = GrantRequest {
+            issuer: principal.issuer.clone(),
+            tenant: principal.tenant_id.clone(),
+            subject: principal.subject.clone(),
+            actor: (principal.actor_subject != principal.subject)
+                .then(|| principal.actor_subject.clone()),
+            provider: metadata.operation.provider().into(),
+            connection: metadata.connection.clone(),
+            catalog_generation: metadata.catalog_generation.clone(),
+            description_ref: description_ref.into(),
+            input_digest: input_digest.into(),
+            action: GrantAction::Invoke {
+                operation: metadata.operation.id().into(),
+                facts,
+            },
+        };
+        self.evaluator
+            .evaluate(&request, SystemTime::now())
+            .map_err(|error| match error {
+                GrantRefusal::Refused => EnforcementRefusal::NotAdmitted,
+                GrantRefusal::Unavailable => EnforcementRefusal::Unavailable,
+            })
+    }
+
     /// Decide one invocation against the re-described operation.
     pub(super) fn admit_invoke(
         &self,

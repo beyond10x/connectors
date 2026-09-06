@@ -552,6 +552,61 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         false
     }
 
+    /// Exact ownership only; performs no credential read, session work or provider access.
+    fn owns_remediation(&self, _route: crate::RemediationRoute<'_>) -> bool {
+        false
+    }
+
+    /// Static configured metadata, including Created bindings, without callable discovery.
+    ///
+    /// Returning metadata declares an implemented bound acquisition path for this exact
+    /// profile; otherwise return Unsupported. A one-shot caller still cannot start a session.
+    /// Neither this lookup nor its output is a grant/management decision or output-safe data.
+    fn remediation_metadata<'a>(
+        &'a self,
+        _context: &PrincipalContext,
+        _target: crate::RemediationTarget<'_>,
+    ) -> Result<crate::RemediationMetadata<'a>, crate::RemediationError> {
+        Err(crate::RemediationError::Unsupported)
+    }
+
+    /// Supply current personal operation/self-management admission from the actual policy owner.
+    /// Does not validate raw input, observe a credential, allocate a session or dispatch work.
+    /// Hosted receivers use their real Grant store and never fall back to this personal policy.
+    fn personal_remediation_admission(
+        &self,
+        _context: &PrincipalContext,
+        _target: crate::RemediationTarget<'_>,
+    ) -> Result<crate::RemediationAdmission, crate::RemediationError> {
+        Err(crate::RemediationError::Unsupported)
+    }
+
+    /// Observe the exact generation only after non-consuming current grant/input admission.
+    /// Never spend approval/event evidence, start acquisition, refresh, or dispatch here.
+    /// Unsupported preserves the ordinary v2 path and does not manufacture an auth outcome.
+    async fn credential_readiness(
+        &self,
+        _context: &PrincipalContext,
+        _target: crate::RemediationTarget<'_>,
+    ) -> crate::CredentialReadiness {
+        crate::CredentialReadiness::Unsupported
+    }
+
+    /// Trusted bound start/status/ack; distinct from the unchanged Connection-v1 handler.
+    ///
+    /// The owner rechecks live authority on the stored binding for every request and at its
+    /// publication decision, preserving its existing lock order, capacity and lifecycle.
+    /// Neither Start facts nor a session reference substitute for that recheck. This method
+    /// never calls ordinary operation handling or returns a reusable invocation authority.
+    async fn handle_remediation(
+        &self,
+        _context: &PrincipalContext,
+        _request: crate::RemediationRequest,
+        _authority: std::sync::Arc<dyn crate::RemediationAuthority>,
+    ) -> Result<crate::RemediationResult, crate::RemediationError> {
+        Err(crate::RemediationError::Unsupported)
+    }
+
     /// Declare who may start a backend-owned Connect Session profile.
     fn connect_session_access(
         &self,
@@ -829,5 +884,213 @@ mod tests {
         assert!(!submission.extend_from_slice(b"overflow"));
         assert_eq!(submission.expose_secret(), b"secret");
         assert_eq!(submission.expose_secret().as_ptr(), allocation);
+    }
+}
+
+// Contract tests for the non-consuming remediation ports.
+#[cfg(test)]
+mod remediation_contract_tests {
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    use async_trait::async_trait;
+    use protocol::connection_v2::{
+        RemediationAcknowledgeRequest, RemediationAcknowledgement, RemediationNextAction,
+        RemediationStatusRequest,
+    };
+    use protocol::operation::{
+        v3::{AuthenticationAttemptState, AuthenticationNeed, AuthenticationNextAction},
+        OperationError, OperationErrorCode, OperationRequest, OperationResult,
+    };
+
+    use crate::remediation::*;
+    use crate::{BackendReadinessError, ConnectorBackend, PrincipalContext};
+
+    const PRIVATE: &str = "https://private.example.test/SYNTHETIC_PRIVATE_INSTRUCTION";
+
+    struct OrdinaryBackend(Arc<AtomicUsize>);
+
+    #[async_trait]
+    impl ConnectorBackend for OrdinaryBackend {
+        async fn ready(&self) -> Result<(), BackendReadinessError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        // The signature intentionally remains the existing ordinary wire-v2 port.
+        async fn handle(
+            &self,
+            _context: &PrincipalContext,
+            _request: OperationRequest,
+        ) -> Result<OperationResult, OperationError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(OperationError::new(
+                OperationErrorCode::Unavailable,
+                "ordinary fixture refusal",
+                false,
+            ))
+        }
+    }
+
+    struct RefusingAuthority(Arc<AtomicUsize>);
+
+    impl RemediationAuthority for RefusingAuthority {
+        fn recheck(
+            &self,
+            _context: &PrincipalContext,
+            _binding: &RemediationBinding,
+            _now_unix_ms: u64,
+        ) -> Result<(), RemediationError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(RemediationError::Refused)
+        }
+    }
+
+    fn context() -> PrincipalContext {
+        PrincipalContext::hosted(
+            "fixture-tenant".into(),
+            "fixture-person".into(),
+            "fixture-person".into(),
+            None,
+            "fixture-snapshot".into(),
+            "a".repeat(64),
+        )
+        .unwrap()
+    }
+
+    fn binding() -> RemediationBinding {
+        // Synthetic test data, never asserted to name production authority or real digests.
+        RemediationBinding {
+            operation_ref: PRIVATE.into(),
+            connection_ref: PRIVATE.into(),
+            integration_ref: PRIVATE.into(),
+            auth_profile: "oauth".into(),
+            need: AuthenticationNeed::AuthorizeConfigured,
+            canonical_input_sha256: "a".repeat(64),
+            stable_authority_sha256: "b".repeat(64),
+            grant_ref: "fixture-only-policy".into(),
+            grant_revision: None,
+            admission_policy_sha256: "c".repeat(64),
+            expires_at_unix_ms: 10_000,
+        }
+    }
+
+    #[test]
+    fn personal_remediation_factory_defaults_to_refusal_without_backend_work() {
+        let work = Arc::new(AtomicUsize::new(0));
+        let backend: Arc<dyn ConnectorBackend> = Arc::new(OrdinaryBackend(work.clone()));
+        for (operation_ref, connection_ref) in [("unknown", "unknown"), (PRIVATE, PRIVATE)] {
+            let result = backend.personal_remediation_admission(
+                &context(),
+                RemediationTarget {
+                    operation_ref,
+                    connection_ref,
+                },
+            );
+            assert_eq!(result.unwrap_err(), RemediationError::Unsupported);
+        }
+        assert_eq!(work.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn remediation_defaults_do_not_run_existing_backend_work() {
+        let work = Arc::new(AtomicUsize::new(0));
+        let backend: Arc<dyn ConnectorBackend> = Arc::new(OrdinaryBackend(work.clone()));
+        let context = context();
+        for (operation_ref, connection_ref) in [
+            ("unknown-operation", "unknown-connection"),
+            (PRIVATE, PRIVATE),
+        ] {
+            let target = RemediationTarget {
+                operation_ref,
+                connection_ref,
+            };
+            assert!(!backend.owns_remediation(RemediationRoute::Target(target)));
+            assert_eq!(
+                backend.remediation_metadata(&context, target).unwrap_err(),
+                RemediationError::Unsupported,
+            );
+            assert_eq!(
+                backend.credential_readiness(&context, target).await,
+                CredentialReadiness::Unsupported,
+            );
+        }
+        assert!(!backend.owns_remediation(RemediationRoute::Session(PRIVATE)));
+        assert_eq!(work.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn remediation_default_bound_methods_refuse_without_authority_or_operation_work() {
+        let work = Arc::new(AtomicUsize::new(0));
+        let checks = Arc::new(AtomicUsize::new(0));
+        let backend: Arc<dyn ConnectorBackend> = Arc::new(OrdinaryBackend(work.clone()));
+        let authority: Arc<dyn RemediationAuthority> = Arc::new(RefusingAuthority(checks.clone()));
+        let context = context();
+        let requests = [
+            RemediationRequest::Start(Box::new(binding())),
+            RemediationRequest::Status(RemediationStatusRequest {
+                connect_session_ref: PRIVATE.into(),
+            }),
+            RemediationRequest::Acknowledge(RemediationAcknowledgeRequest {
+                connect_session_ref: PRIVATE.into(),
+                operation_ref: PRIVATE.into(),
+                connection_ref: PRIVATE.into(),
+            }),
+        ];
+        for request in requests {
+            let error = backend
+                .handle_remediation(&context, request, authority.clone())
+                .await
+                .unwrap_err();
+            assert_eq!(error, RemediationError::Unsupported);
+            assert_eq!(
+                error.to_string(),
+                "authentication remediation is unsupported"
+            );
+            assert!(!format!("{error:?}").contains(PRIVATE));
+        }
+        assert_eq!(work.load(Ordering::SeqCst), 0);
+        assert_eq!(checks.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn remediation_internal_diagnostics_do_not_trust_printable_reference_fields() {
+        let facts = protocol::operation::v3::AuthenticationRequired {
+            operation_ref: PRIVATE.into(),
+            connection_ref: PRIVATE.into(),
+            integration_ref: PRIVATE.into(),
+            auth_profile: "oauth".into(),
+            need: AuthenticationNeed::AuthorizeConfigured,
+            attempt: AuthenticationAttemptState::NotAttempted,
+            next_action: AuthenticationNextAction::StartTrustedRemediation,
+        };
+        // This is deliberately valid under the unchanged DTO contract. Validity is not secrecy.
+        facts.validate().unwrap();
+        let mut error = protocol::operation::v3::OperationError::authentication_required(facts);
+        error.message = PRIVATE.into();
+        error.validate().unwrap();
+        let envelope =
+            protocol::operation::v3::ResponseEnvelope::failure("fixture-response", error);
+        envelope.validate().unwrap();
+        let bytes = serde_json::to_vec(&envelope).unwrap();
+        let (version, decoded) = protocol::operation::versions::decode_response(&bytes).unwrap();
+        assert_eq!(version, protocol::operation::versions::Version::V0Alpha3);
+        assert_eq!(decoded.error.unwrap().message, PRIVATE);
+
+        let bound = binding();
+        assert_eq!(bound.operation_ref, PRIVATE);
+        assert_eq!(format!("{bound:?}"), "RemediationBinding(<redacted>)");
+        let request = RemediationRequest::Start(Box::new(bound));
+        assert_eq!(format!("{request:?}"), "RemediationRequest(<redacted>)");
+        let result = RemediationResult::Acknowledged(RemediationAcknowledgement {
+            connect_session_ref: PRIVATE.into(),
+            operation_ref: PRIVATE.into(),
+            connection_ref: PRIVATE.into(),
+            next_action: RemediationNextAction::FreshDescriptionThenExplicitInvoke,
+        });
+        assert_eq!(format!("{result:?}"), "RemediationResult(<redacted>)");
+        // Real client/console/MCP output tests for the valid envelope remain separately required.
     }
 }

@@ -77,6 +77,12 @@ pub async fn dispatch(
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
+    #[error("personal OAuth needs exactly one configured binding and its declared profile")]
+    PersonalOAuthConfiguration,
+    #[error(
+        "personal OAuth needs a controlling terminal or a new owner-only instruction file in a private directory"
+    )]
+    PrivateInstructionsRequired,
     #[error(transparent)]
     Enrol(#[from] crate::enrol::EnrolError),
     #[error("the guided connection flow does not support provider `{0}` yet")]
@@ -258,5 +264,278 @@ mod tests {
     fn the_error_for_an_unknown_provider_names_it() {
         let error = ConnectError::Unsupported("gitlab".to_owned());
         assert!(error.to_string().contains("gitlab"));
+    }
+}
+
+/// Select a configured OAuth registration before any session or human instruction is created.
+/// Existing raw enrollment remains available when the caller did not select a deployed OAuth purpose.
+pub async fn dispatch_with_personal_oauth(
+    provider: &str,
+    config: &PersonalConfig,
+    config_path: &Path,
+    state_root: &Path,
+    label: Option<String>,
+    context: Option<String>,
+    oauth: PersonalOAuthOptions,
+) -> Result<Value, ConnectError> {
+    let options = oauth.enrol;
+    let configured: Vec<_> = config
+        .catalog
+        .iter()
+        .filter(|entry| entry.provider == provider && entry.oauth.is_some())
+        .collect();
+    let selected = oauth
+        .auth_profile
+        .as_deref()
+        .or(options.credential.as_deref());
+    let matches: Vec<_> = configured
+        .iter()
+        .copied()
+        .filter(|entry| {
+            selected.is_none_or(|profile| {
+                entry
+                    .oauth
+                    .as_ref()
+                    .is_some_and(|registration| registration.auth_profile == profile)
+            })
+        })
+        .collect();
+    if oauth.auth_profile.is_none()
+        && oauth.instruction_file.is_none()
+        && (configured.is_empty() || selected.is_some() && matches.is_empty())
+    {
+        return dispatch(
+            provider,
+            config,
+            config_path,
+            state_root,
+            label,
+            context,
+            options,
+        )
+        .await;
+    }
+    let [entry] = matches.as_slice() else {
+        return Err(ConnectError::PersonalOAuthConfiguration);
+    };
+    if context.is_some()
+        || !options.values.is_empty()
+        || options.allow_writes
+        || options.operator_network
+        || options.force
+        || options.credential_file.is_some()
+        || options.instance.is_some()
+        || options.acquire.is_some()
+    {
+        return Err(ConnectError::PersonalOAuthConfiguration);
+    }
+    let registration = entry
+        .oauth
+        .as_ref()
+        .ok_or(ConnectError::PersonalOAuthConfiguration)?;
+    registration
+        .validate()
+        .map_err(|_| ConnectError::PersonalOAuthConfiguration)?;
+    let principal = config
+        .principal_context()
+        .map_err(|_| ConnectError::PersonalOAuthConfiguration)?;
+    let origins = integration_catalog::personal_oauth_admitted_origins(&principal, entry)
+        .map_err(|_| ConnectError::PersonalOAuthConfiguration)?;
+    let [origin] = origins.as_slice() else {
+        return Err(ConnectError::PersonalOAuthConfiguration);
+    };
+    let expected_connection_ref =
+        integration_catalog::personal_oauth_admitted_connection_ref(&principal, entry)
+            .map_err(|_| ConnectError::PersonalOAuthConfiguration)?;
+    let display_label = label.unwrap_or_else(|| entry.label());
+    let mut destination = PrivateInstructionDestination::open(oauth.instruction_file.as_deref())?;
+    let client = LocalClient::new(state_root.join("connectors.sock"));
+    let pending = client
+        .begin_personal_oauth(
+            &config.owner_context(),
+            provider.to_owned(),
+            display_label.clone(),
+            registration.auth_profile.clone(),
+            expected_connection_ref,
+        )
+        .await?;
+    let instructions = client.personal_oauth_instructions(&pending, origin).await?;
+    instructions
+        .write_human(&mut destination.file)
+        .map_err(ConnectError::Prompt)?;
+    drop(instructions);
+    let owner = config.owner_context();
+    let completion = client.finish_personal_oauth(&owner, &pending);
+    tokio::pin!(completion);
+    let connection = tokio::select! {
+        result = &mut completion => result?,
+        _ = pending.instruction_expiry() => {
+            destination.clear()?;
+            completion.await?
+        }
+    };
+    destination.clear()?;
+    Ok(json!({ "provider": provider, "connected": true,
+        "connection_ref": connection.summary.connection_ref,
+        "connection": display_label }))
+}
+
+/// Only the selected profile and private output path cross the CLI/console boundary.
+#[derive(Default)]
+pub struct PersonalOAuthOptions {
+    pub enrol: crate::enrol::Options,
+    pub auth_profile: Option<String>,
+    pub instruction_file: Option<std::path::PathBuf>,
+}
+
+pub(crate) struct PrivateInstructionDestination {
+    pub(crate) file: std::fs::File,
+    path: Option<std::path::PathBuf>,
+    identity: Option<(u64, u64)>,
+}
+impl PrivateInstructionDestination {
+    pub(crate) fn open(path: Option<&Path>) -> Result<Self, ConnectError> {
+        use std::io::IsTerminal as _;
+        use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
+        let Some(path) = path else {
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open("/dev/tty")
+                .map_err(|_| ConnectError::PrivateInstructionsRequired)?;
+            if !file.is_terminal() {
+                return Err(ConnectError::PrivateInstructionsRequired);
+            }
+            return Ok(Self {
+                file,
+                path: None,
+                identity: None,
+            });
+        };
+        let parent = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let parent = parent
+            .canonicalize()
+            .map_err(|_| ConnectError::PrivateInstructionsRequired)?;
+        let metadata =
+            std::fs::metadata(&parent).map_err(|_| ConnectError::PrivateInstructionsRequired)?;
+        if !metadata.is_dir()
+            || metadata.uid() != rustix::process::geteuid().as_raw()
+            || metadata.mode() & 0o077 != 0
+        {
+            return Err(ConnectError::PrivateInstructionsRequired);
+        }
+        let path = parent.join(
+            path.file_name()
+                .ok_or(ConnectError::PrivateInstructionsRequired)?,
+        );
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|_| ConnectError::PrivateInstructionsRequired)?;
+        let metadata = file
+            .metadata()
+            .map_err(|_| ConnectError::PrivateInstructionsRequired)?;
+        if !metadata.is_file()
+            || metadata.uid() != rustix::process::geteuid().as_raw()
+            || metadata.mode() & 0o077 != 0
+            || metadata.nlink() != 1
+        {
+            return Err(ConnectError::PrivateInstructionsRequired);
+        }
+        Ok(Self {
+            file,
+            path: Some(path),
+            identity: Some((metadata.dev(), metadata.ino())),
+        })
+    }
+    pub(crate) fn clear(&mut self) -> Result<(), ConnectError> {
+        use std::os::unix::fs::MetadataExt as _;
+        let Some(path) = self.path.as_ref() else {
+            return Ok(());
+        };
+        self.file.set_len(0).map_err(ConnectError::Prompt)?;
+        self.file.sync_all().map_err(ConnectError::Prompt)?;
+        match std::fs::symlink_metadata(path) {
+            Ok(metadata)
+                if Some((metadata.dev(), metadata.ino())) == self.identity
+                    && metadata.is_file() =>
+            {
+                std::fs::remove_file(path).map_err(ConnectError::Prompt)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            _ => return Err(ConnectError::PrivateInstructionsRequired),
+        }
+        self.path = None;
+        Ok(())
+    }
+}
+impl Drop for PrivateInstructionDestination {
+    fn drop(&mut self) {
+        let _ = self.clear();
+    }
+}
+
+#[cfg(test)]
+mod personal_oauth_tests {
+    use super::*;
+    use std::io::Write as _;
+    use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+
+    #[test]
+    fn instruction_file_is_exclusive_owner_only_and_cleared_on_drop() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(
+            directory.path().metadata().unwrap().mode() & 0o777,
+            0o700,
+            "the fixture must supply a private directory"
+        );
+        let path = directory.path().join("instructions");
+        {
+            let mut destination = PrivateInstructionDestination::open(Some(&path)).unwrap();
+            destination.file.write_all(b"PRIVATE-SENTINEL").unwrap();
+            let metadata = path.metadata().unwrap();
+            assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+            assert_eq!(metadata.uid(), rustix::process::geteuid().as_raw());
+            assert!(PrivateInstructionDestination::open(Some(&path)).is_err());
+        }
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn instruction_file_refuses_shared_parent_symlink_and_existing_content() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let existing = directory.path().join("existing");
+        std::fs::write(&existing, "original").unwrap();
+        let link = directory.path().join("link");
+        std::os::unix::fs::symlink(&existing, &link).unwrap();
+        assert!(PrivateInstructionDestination::open(Some(&link)).is_err());
+        assert!(PrivateInstructionDestination::open(Some(&existing)).is_err());
+        assert_eq!(std::fs::read_to_string(&existing).unwrap(), "original");
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(PrivateInstructionDestination::open(Some(&directory.path().join("new"))).is_err());
+    }
+
+    #[test]
+    fn instruction_cleanup_never_removes_a_replacement_inode() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let path = directory.path().join("instructions");
+        let mut destination = PrivateInstructionDestination::open(Some(&path)).unwrap();
+        destination.file.write_all(b"PRIVATE-SENTINEL").unwrap();
+        std::fs::rename(&path, directory.path().join("moved")).unwrap();
+        std::fs::write(&path, "replacement").unwrap();
+        assert!(destination.clear().is_err());
+        drop(destination);
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "replacement");
+        assert!(std::fs::read(directory.path().join("moved"))
+            .unwrap()
+            .is_empty());
     }
 }
