@@ -216,7 +216,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 134
+revision: 135
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -419,3 +419,13 @@ Current exact source owners already cover protocol operation wire/schema and bun
 Both retained URL cases were reproduced oncc143696 before edits, one failure each. The implementor identifies the normalization difference between WHATWG URL parsing and the RFC3986 URI parser used by the published schema validator. Use the already locked fluent-uri0.4.1 as a direct reader dependency so both sides interpret URI syntax consistently. Add the root Cargo.toml workspace dependency and the already scoped protocol/connector-spec manifest edges; connector-spec's now-unused url edge may be removed after verifying no other owner uses it. Preserve every existing dependency version/checksum and close all twelve metadata graphs through Cargo.
 
 The explicit citation spelling policy is literal lowercase https, ASCII RFC3986 URI, nonempty host, absent userinfo/fragment, and optional decimal port within u16. Preserve valid explicit443, leading zero spellings and an empty port where RFC3986 permits it; percent-encoded path/query text is retained exactly. Rust must not normalize a spelling that the schema rejects. No new helper file is assigned: existing rate_limit/wire/schema owners can define the property and validation helpers. The canonical schema3 property uses its owning spec helper; the existing hand-authored provider schema retains its ownership model with an explicit synchronization assertion. Additional tests should compare the grammar classes and all three schema projections, preserving the two adversary assertions and prior positive cases.
+
+## URI contract repair handed to final review — 2026-09-06
+
+Frozen repair2f89a6fccf9878ed8275565d68667cbd1fc08d43 fixes the two retained first-pass URL mismatches using the pinned RFC URI parser and a shared explicit lowercase-HTTPS host/port/encoding profile. The coordinator verified24scoped source/artifact hashes and122frozen evidence entries, complete raw/portable report equality apart from the home-directory prefix, and exact bot author/committer. All original adversary test bytes remain preserved, with only two appended grammar groups.
+
+Full affected suites measured1770→1772 executed: root1209, runtime346, CLI130 and console87 nowpass, with6existingignored. Strict Clippy/formatting, all12locked/offline dependency graphs,85conformancevectors, canonical/provider/wire grammar equality, repeated deterministic generation and whole-stage fidelity pass. These are actual four-workspace results, not a full twelve-workspace repository gate or final independent verdict. No release, external consumer upgrade or source publication is claimed.
+
+Complete immutable handoff is in `~/.cache/connectors-cli-wave-20260906/rate-limit-in-the-protocol/stage2-repair-*`. Raw report SHA256eeb4522f474113e47b75749a9893c34685afc80217ed2b6e5444aac36c872e54; portable report SHA256b87e68a1b80f2580839238603877363ec99a08b70357c85dfd313d04bae95fc6; evidence manifest SHA25682ac97a1f2147542558ad39bf13e790d9f7cbadacb30d43b78be02b94f9edad9; source patch SHA2561589d34a9fc3d390cc101e754512a6c3d2d31cb232ab9821982e8454e4c6d622. Every existing version/source/checksum is preserved across the10changed locks; the driver-sql closure adds only two already-pinned root packages.
+
+The second/final ordinary adversary pass is assigned against the complete frozen unit in wt-af054beacfba. At most seven additive parameterized attacks use the existing12test owners; preserve all source/earlier cases and report actual caller reachability/origin. Full four-workspace ordinary-parallel suites and strict checks follow the deciding cases. Completed exact owned targets may be cleaned only after outside-evidence/source verification to preserve the20GiBfloor. No third ordinary attack or production repair by the adversary is authorized if the final pass is red. Complete schema3 publication and full integration gates remain pending; shared runtime owners are not released yet.
