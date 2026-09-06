@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 30
+revision: 31
 ---
 
 
@@ -3334,3 +3334,9 @@ Source84ccd024 completed every declared workspace lane, including both runtime f
 Total2133passing executions,0failures,27existing ignored. These are executions, including the two declared runtime variants, not a count of unique assertions. One-shot and closed-pipe acceptance have their retained two-pass review records and are eligible for implemented. Final installed-byte verification still owns the urgent delivery story. GitLab, rate-limit and OAuth/auth-remediation remain separate incomplete units.
 
 Published reviewed one-shot unit HEADd86716fb was finished and removed by worktree after exact-id dry-run, with remote recovery through origin/wave/cli-ten-slack-first-resumed. Its scratch reports and all test logs remain retained.
+
+## GitLab whole-unit review and rate handoff
+
+review-result:cli-gitlab-adversary-1-20260906 records the first whole-unit attack of6e655168. Six first-run deciding cases passed, with no findings. Source lanes784->789, runtime/catalog80->81, CLI88->88 and service57->57 passed with strict clippy/fmt. All1847pinned source operations were checked against actual importability/coverage classification; frozen schema2 bytes remain unchanged. Source/test commitseafffa88,6e655168 and50256e4b preserve all selected schemas and source provenance. This is a bounded schedule slice with explicit remaining coverage, not complete GitLab operation coverage.
+
+Independent tests were authorized in affected test directories; the new resolver test file is now recorded as an exact cited machine scope. Coordinator merges this green source after conflict-free dry merge; final combined gate remains required for lifecycle closure. Rate stage2 receives this source and the reviewed one-shot integration as prerequisites. Schema3 is still this unpublished migration's active new schema; optional conditional rate metadata may join it before final publication/freeze, preserving schema2 and literal vendor schemas. OAuth acquisition interpretation will be a separate subsequent schema4 migration and requires its own Atlas reliance/rollout update.
