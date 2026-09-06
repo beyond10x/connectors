@@ -305,7 +305,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 47
+revision: 48
 ---
 ## Acceptance
 
@@ -449,3 +449,9 @@ The stage2C read-only supplement identified the actual kernel seam: completion c
 Authorize the private custody Session/Refresh claim adapter within the existing custody.rs owner, preserving its session completion API. Add exactly crates/integration-catalog/src/custody_refresh_tests.rs through a test-only registration in custody.rs; keep the1441-line existing custody_tests.rs bytes and assertions intact. Runtime/acquisition witnesses stay in their already assigned owners. These changes wait for the exact accepted rate source handoff; this record alone starts no runtime edits.
 
 Read-only plans remain immutable in the assigned OAuth scratch: stage2c-plan-supplement.md SHA256fbf5d12f88049f82d207b55e60e4443cb98fcfc84f97355bcb0faefdf7b9dd72; stage2c-refresh-window-supplement.md SHA256264313aff8886943a4728fd88cd6c7c71623cf41045661a496530aa160f3a6d2. The coordinator records the local bounded-time choice; no additional contract field, entity, public session state, live provider compatibility, or executed refresh result is claimed.
+
+## Recording-actor correction — 2026-09-06
+
+The coordinator agent, agent:cli-ten-slack-first, performed the three preceding updates at revisions45–47. Those CLI invocations omitted AEP_ACTOR and therefore inherited the configured human actor. They are coordinator source-evidence, scope and design updates; they are not human decisions or new approvals. The existing approved wave is their authorization. This append records the actual actor without rewriting the journal, the recorded timestamps, or source history.
+
+Affected immutable event IDs: story:connect-session-oauth-custody-in-personal-posture@45#0~23b3e9b7463d8afa; story:connect-session-oauth-custody-in-personal-posture@46#0~888bee356beb49a9; story:connect-session-oauth-custody-in-personal-posture@47#0~21b13e63d853ea45. Exact raw lines and SHA256 hashes are retained outside the repository in `~/.cache/cw6/p/coordinator-actor-correction-inventory.json`. No status move, approval record or test_result was among these events. Subsequent coordinator CLI writes explicitly set the agent actor.
