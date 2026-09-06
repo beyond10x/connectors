@@ -344,6 +344,32 @@
       ],
       "type": "object"
     },
+    "conditional_rate_limit": {
+      "additionalProperties": false,
+      "properties": {
+        "applies_when": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+          "type": "string"
+        },
+        "rate": {
+          "$ref": "#/$defs/published_rate"
+        },
+        "source_url": {
+          "format": "uri",
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "^https://[^/?#@\\s]+(?:[/?][^#\\s]*)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "applies_when",
+        "source_url"
+      ],
+      "type": "object"
+    },
     "config_field": {
       "additionalProperties": false,
       "properties": {
@@ -811,6 +837,13 @@
         "auth_requirements": {
           "$ref": "#/$defs/auth_requirements"
         },
+        "conditional_rate_limits": {
+          "items": {
+            "$ref": "#/$defs/conditional_rate_limit"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
         "contract": {
           "$ref": "#/$defs/contract"
         },
@@ -1133,6 +1166,33 @@
       "required": [
         "credential",
         "secret"
+      ],
+      "type": "object"
+    },
+    "published_rate": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "enum": [
+            "minimum_allowance",
+            "ceiling"
+          ]
+        },
+        "per_seconds": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "requests": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requests",
+        "per_seconds",
+        "basis"
       ],
       "type": "object"
     },

@@ -1094,6 +1094,7 @@ pub(crate) fn status_operation(
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
+        rate_advice: None,
         operation_ref: STATUS_OPERATION.to_owned(),
         title: "Read Kubernetes deployment status".to_owned(),
         description: "Reads the observed replica and Available condition of one admitted Kubernetes Deployment. It cannot read Secrets or mutate cluster state.".to_owned(),
@@ -1130,6 +1131,7 @@ pub(crate) fn logs_operation(
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
+        rate_advice: None,
         operation_ref: LOGS_OPERATION.to_owned(),
         title: "Read Kubernetes pod logs".to_owned(),
         description: "Reads the most recent log lines of one container in one admitted Kubernetes Pod, bounded to 128 KiB. Logs may contain whatever the workload printed; the namespace grant is the containment. It cannot read Secrets or mutate cluster state.".to_owned(),
@@ -1207,6 +1209,7 @@ pub(crate) fn restart_operation(
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
+        rate_advice: None,
         operation_ref: RESTART_OPERATION.to_owned(),
         title: "Restart a Kubernetes Deployment rollout".to_owned(),
         description: "Patches the admitted Deployment pod-template restart annotation after exact human approval. It never deletes Pods and reports success when Kubernetes accepts the patch.".to_owned(),

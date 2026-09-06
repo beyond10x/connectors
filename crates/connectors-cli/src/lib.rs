@@ -6,6 +6,9 @@
 //! in a Zwirn build that carries the local placement. One implementation, so the alias cannot drift
 //! from the tool it aliases — a second parser would be a second product with the same name.
 
+mod error;
+use error::MainError;
+
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -443,85 +446,6 @@ enum EventCommand {
     },
 }
 
-#[derive(Debug, thiserror::Error)]
-enum MainError {
-    #[error(transparent)]
-    Runtime(#[from] RuntimeError),
-    #[error(transparent)]
-    Config(#[from] connectors_runtime::ConfigError),
-    #[error(transparent)]
-    Client(#[from] connectors_client::ClientError),
-    #[error(transparent)]
-    Identity(#[from] connectors_client::IdentityError),
-    #[error(transparent)]
-    Hosted(#[from] connectors_client::AuthenticatedHostedError),
-    #[error("local Connector request failed: {0}")]
-    Io(#[from] io::Error),
-    #[error("local Connector response was malformed: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error(transparent)]
-    Connect(#[from] connect::ConnectError),
-    #[error(transparent)]
-    Input(#[from] input::InputError),
-    #[error(transparent)]
-    Auth(#[from] auth::AuthError),
-    #[error(transparent)]
-    Admin(#[from] admin::AdminError),
-    #[error(transparent)]
-    Enrol(#[from] enrol::EnrolError),
-    #[error(transparent)]
-    Refused(#[from] connectors_console::envelope::ReducedError),
-    #[error(transparent)]
-    Init(#[from] init::InitError),
-    #[error(transparent)]
-    Output(#[from] output::OutputError),
-    #[error("could not write the completion script: {0}")]
-    Completions(io::Error),
-    /// `doctor` found something that cannot work. The detail is in the report it already printed.
-    #[error("this installation has a problem `connectors inspect doctor` named above")]
-    Unhealthy,
-    #[error("`connectors serve mcp` owns stdout and cannot be combined with --output")]
-    McpOutput,
-    #[error("--target hosted cannot be combined with local-only --config or --state-root")]
-    TargetConflict,
-    #[error("events require a persistent daemon; run `connectors serve local` with the same --config and --state-root")]
-    DaemonRequired,
-}
-
-impl MainError {
-    /// A stable token naming the *class* of fault, for a caller that branches on failures.
-    ///
-    /// Deliberately coarse and deliberately not the message: a script should be able to match on
-    /// `configuration` without depending on the sentence a human reads, and the sentence is free to
-    /// improve. A refusal forwards the Connector's own code, which is the contract's vocabulary and
-    /// more precise than anything this layer could invent. No arm can carry a credential.
-    fn code(&self) -> &str {
-        match self {
-            Self::Runtime(_) => "runtime",
-            Self::Config(_) | Self::Init(_) => "configuration",
-            Self::Client(_) => "connector-unreachable",
-            Self::Identity(IdentityError::NoActiveLogin) => "hosted-login-required",
-            Self::Identity(_) => "identity",
-            Self::Hosted(_) => "hosted-connector",
-            Self::Io(_) => "io",
-            Self::Json(_) => "malformed-response",
-            Self::Connect(connect::ConnectError::Unsupported(_)) => "unsupported-provider",
-            Self::Connect(_) => "connect",
-            Self::Output(_) => "output",
-            Self::Completions(_) => "output",
-            Self::Refused(refusal) => &refusal.code,
-            Self::Unhealthy => "unhealthy",
-            Self::McpOutput => "invalid-argument",
-            Self::TargetConflict => "target-conflict",
-            Self::DaemonRequired => "daemon-required",
-            Self::Input(_) => "invalid-argument",
-            Self::Auth(_) => "credential-store",
-            Self::Admin(_) => "admin",
-            Self::Enrol(_) => "connect",
-        }
-    }
-}
-
 /// **Old top-level paths, and where each moved.** Applied by [`moved`] before clap is handed the
 /// argv, and removed one release after `story:cli-first-level-groups`.
 ///
@@ -829,7 +753,11 @@ where
     match run(cli).await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
-            output::emit_error_with_target(format, error.code(), &error.to_string(), target);
+            if let MainError::Refused(refusal) = &error {
+                output::emit_refusal_with_target(format, refusal, target);
+            } else {
+                output::emit_error_with_target(format, error.code(), &error.to_string(), target);
+            }
             std::process::ExitCode::FAILURE
         }
     }
@@ -1326,7 +1254,11 @@ async fn operation(
         let response = AuthenticatedHostedClient::active()?
             .operation(request)
             .await?;
-        emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+        emit_targeted(
+            format,
+            &reduce_envelope!(response, operation)?,
+            target.as_str(),
+        )?;
         return Ok(());
     }
     let config_path = config_path.map_or_else(default_config_path, Ok)?;
@@ -1346,7 +1278,11 @@ async fn operation(
             .operation(&config.owner_context(), request)
             .await?
     };
-    emit_targeted(format, &reduce_envelope!(response)?, target.as_str())?;
+    emit_targeted(
+        format,
+        &reduce_envelope!(response, operation)?,
+        target.as_str(),
+    )?;
     Ok(())
 }
 

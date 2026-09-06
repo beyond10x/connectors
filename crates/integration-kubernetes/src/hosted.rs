@@ -213,6 +213,7 @@ impl KubernetesStatusBackend {
     ) -> Result<OperationDescription, OperationError> {
         if operation_ref == STATUS_OPERATION && self.has_read_access(context) {
             return Ok(OperationDescription {
+                rate_advice: None,
             operation_ref: STATUS_OPERATION.to_owned(),
             title: "Read Kubernetes deployment status".to_owned(),
             description: "Reads the observed replica and Available condition of one admitted Kubernetes Deployment. It cannot read Secrets or mutate cluster state.".to_owned(),
@@ -245,6 +246,7 @@ impl KubernetesStatusBackend {
         }
         if operation_ref == RESTART_OPERATION && self.has_restart_access(context) {
             return Ok(OperationDescription {
+                rate_advice: None,
                 operation_ref: RESTART_OPERATION.to_owned(),
                 title: "Restart a Kubernetes Deployment rollout".to_owned(),
                 description: "Patches the admitted Deployment pod-template restart annotation after exact human approval. It never deletes Pods and reports success when Kubernetes accepts the patch.".to_owned(),

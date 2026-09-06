@@ -201,6 +201,7 @@ pub(super) fn namespace_operation(
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
+        rate_advice: None,
         operation_ref: NAMESPACE_OPERATION.to_owned(),
         title: "List admitted Kubernetes namespaces".to_owned(),
         description: "Lists namespaces admitted by this local configuration for the selected activated Connection. An empty list admits none; Kubernetes RBAC is checked when workloads are read. Does not enumerate the cluster.".to_owned(),
@@ -225,6 +226,7 @@ pub(super) fn workload_operation(
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
+        rate_advice: None,
         operation_ref: WORKLOAD_OPERATION.to_owned(),
         title: "List Kubernetes deployment inventory".to_owned(),
         description: "Lists Deployment names, template container images, and desired/ready replicas in one admitted namespace of the selected activated Connection. Bounded pages may be short; use next_cursor for the next page. No Pod or Secret reads.".to_owned(),

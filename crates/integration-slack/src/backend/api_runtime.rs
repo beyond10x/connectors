@@ -789,6 +789,9 @@ impl SlackInner {
         digest.update(serde_json::to_vec(context).expect("principal context serializes"));
         digest.update(b"\0");
         digest.update(operation_ref.as_bytes());
+        let advice = catalog::operation(catalog::OperationKey::id(operation_ref))
+            .and_then(service::operation_rate_advice);
+        digest.update(serde_json::to_vec(&advice).expect("typed rate advice serializes"));
         digest.update(b"\0");
         digest.update(self.policy.grant_ref.as_bytes());
         for connection in self.operation_connections(context, operation_ref) {
@@ -813,6 +816,8 @@ impl SlackInner {
             return Err(operation_not_found());
         }
         Ok(OperationResult::Describe(OperationDescription {
+            rate_advice: catalog::operation(catalog::OperationKey::id(operation_ref))
+                .and_then(service::operation_rate_advice),
             operation_ref: operation_ref.to_owned(),
             title: operation_title(operation_ref).to_owned(),
             description: operation.contract_description().to_owned(),
@@ -944,7 +949,7 @@ impl SlackInner {
                     EgressHttpRequest {
                         request: outbound,
                         maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
-                        response_headers: Vec::new(),
+                        response_headers: vec!["retry-after".to_owned()],
                     },
                 )
                 .await
@@ -957,6 +962,14 @@ impl SlackInner {
                     service::EgressTransportError::Refused
                     | service::EgressTransportError::Transport(_) => operation_unavailable(),
                 })?;
+            if response.status == 429 {
+                return Err(OperationError::rate_limited(
+                    "Slack refused this request with HTTP 429",
+                    service::retry_after_seconds(
+                        response.headers.get("retry-after").map(String::as_str),
+                    ),
+                ));
+            }
             if !response.is_success() {
                 return Err(operation_unavailable());
             }
@@ -966,6 +979,14 @@ impl SlackInner {
         let output = match dispatched {
             Ok(output) => output,
             Err(error) => {
+                if error.code == OperationErrorCode::RateLimited {
+                    self.audit.finish(AuditEvent { outcome: "refused", ..audit })
+                        .map_err(|_| OperationError::rate_limited(
+                            "Slack refused this request with HTTP 429; the terminal audit record is unavailable",
+                            error.retry_after_seconds,
+                        ))?;
+                    return Err(error);
+                }
                 self.audit
                     .finish(AuditEvent {
                         outcome: "indeterminate",

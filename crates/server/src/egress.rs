@@ -353,43 +353,16 @@ impl EgressTransport for ConnectionEgress {
         if let Some(body) = request.request.body {
             outbound = outbound.body(body);
         }
-        let mut response = outbound
+        let response = outbound
             .send()
             .await
             .map_err(|error| EgressTransportError::Transport(classify_send_failure(&error)))?;
-        if response
-            .content_length()
-            .is_some_and(|size| size > request.maximum_response_bytes as u64)
-        {
-            return Err(EgressTransportError::ResponseTooLarge);
-        }
-        let headers = selected_response_headers(response.headers(), request.response_headers)?;
-        let status = response.status().as_u16();
-        let mut body = Vec::with_capacity(
-            response
-                .content_length()
-                .unwrap_or(0)
-                .min(request.maximum_response_bytes as u64) as usize,
-        );
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| EgressTransportError::Transport(EgressTransportFailure::BodyRead))?
-        {
-            if body
-                .len()
-                .checked_add(chunk.len())
-                .is_none_or(|size| size > request.maximum_response_bytes)
-            {
-                return Err(EgressTransportError::ResponseTooLarge);
-            }
-            body.extend_from_slice(&chunk);
-        }
-        Ok(EgressHttpResponse {
-            status,
-            headers,
-            body,
-        })
+        read_http_response(
+            response,
+            request.maximum_response_bytes,
+            request.response_headers,
+        )
+        .await
     }
 
     async fn execute_stream(
@@ -475,6 +448,52 @@ impl EgressTransport for ConnectionEgress {
             .map_err(|_| EgressTransportError::Refused)?;
         Ok(Box::new(ServerWebSocket { socket }))
     }
+}
+
+/// Consume a bounded response after the transport has admitted and dispatched it.
+async fn read_http_response(
+    mut response: reqwest::Response,
+    maximum: usize,
+    requested: Vec<String>,
+) -> Result<EgressHttpResponse, EgressTransportError> {
+    let status = response.status().as_u16();
+    let headers = selected_response_headers(response.headers(), requested)?;
+    // A received 429 is a definite refusal even when its irrelevant error body is too large
+    // or never finishes. Do not turn that known outcome into an uncertain transport failure.
+    if status == 429 {
+        return Ok(EgressHttpResponse {
+            status,
+            headers,
+            body: Vec::new(),
+        });
+    }
+    if response
+        .content_length()
+        .is_some_and(|size| size > maximum as u64)
+    {
+        return Err(EgressTransportError::ResponseTooLarge);
+    }
+    let mut body =
+        Vec::with_capacity(response.content_length().unwrap_or(0).min(maximum as u64) as usize);
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| EgressTransportError::Transport(EgressTransportFailure::BodyRead))?
+    {
+        if body
+            .len()
+            .checked_add(chunk.len())
+            .is_none_or(|size| size > maximum)
+        {
+            return Err(EgressTransportError::ResponseTooLarge);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(EgressHttpResponse {
+        status,
+        headers,
+        body,
+    })
 }
 
 /// Preserve only response headers explicitly admitted by the owning Integration.
@@ -782,6 +801,49 @@ fn is_v6_documentation(ip: Ipv6Addr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn rate_stage2_definite_http_429_survives_oversized_or_broken_error_bodies() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        for (declared_size, retry_headers, expected) in [
+            (1_000_000, "Retry-After: 30\r\n", Some("30")),
+            (32, "Retry-After: 30\r\nRetry-After: 30\r\n", None),
+            (32, "Retry-After: -1\r\n", None),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let serving = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut bytes = Vec::new();
+                while !bytes.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    socket.read_exact(&mut byte).await.unwrap();
+                    bytes.push(byte[0]);
+                    assert!(bytes.len() < 4096);
+                }
+                socket.write_all(format!("HTTP/1.1 429 Too Many Requests\r\nContent-Length: {declared_size}\r\n{retry_headers}\r\nSENTINEL").as_bytes()).await.unwrap();
+                // Deliberately close before the advertised body is complete.
+            });
+            let response = reqwest::Client::new()
+                .get(format!("http://{address}/fixture"))
+                .send()
+                .await
+                .unwrap();
+            let response = read_http_response(response, 64, vec!["retry-after".to_owned()])
+                .await
+                .expect("known provider refusal must not become an uncertain body-read failure");
+            assert_eq!(response.status, 429);
+            assert_eq!(
+                response.headers.get("retry-after").map(String::as_str),
+                expected
+            );
+            assert!(
+                response.body.is_empty(),
+                "the provider's error body is never exposed"
+            );
+            serving.await.unwrap();
+        }
+    }
 
     #[test]
     fn ambiguous_retry_after_is_not_flattened_into_advice() {

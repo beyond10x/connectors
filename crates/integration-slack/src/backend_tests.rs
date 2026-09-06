@@ -9,6 +9,184 @@ mod tests {
 
     const SENTINEL: &str = "SENTINEL-NOT-A-REAL-SECRET";
 
+    struct RateEgress {
+        retry: Option<&'static str>,
+        uncertain: bool,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait]
+    impl EgressTransport for RateEgress {
+        async fn execute(
+            &self,
+            _: &str,
+            request: EgressHttpRequest,
+        ) -> Result<service::EgressHttpResponse, service::EgressTransportError> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if self.uncertain {
+                return Err(service::EgressTransportError::Transport(
+                    service::EgressTransportFailure::BodyRead,
+                ));
+            }
+            assert_eq!(request.response_headers, ["retry-after"]);
+            Ok(service::EgressHttpResponse {
+                status: 429,
+                headers: self
+                    .retry
+                    .map(|value| ("retry-after".to_owned(), value.to_owned()))
+                    .into_iter()
+                    .collect(),
+                body: SENTINEL.as_bytes().to_vec(),
+            })
+        }
+
+        async fn connect_websocket(
+            &self,
+            _: &str,
+            _: String,
+            _: usize,
+        ) -> Result<Box<dyn service::EgressWebSocket>, service::EgressTransportError> {
+            unreachable!("HTTP operation")
+        }
+    }
+
+    #[tokio::test]
+    async fn rate_stage2_slack_definite_write_refusal_is_not_an_uncertain_outcome() {
+        for (retry, delay, uncertain) in [
+            (Some("30"), Some(30_u64), false),
+            (None, None, false),
+            (Some("30, 30"), None, false),
+            (Some("-1"), None, false),
+            (None, None, true),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+            let egress = Arc::new(RateEgress {
+                retry,
+                uncertain,
+                calls: std::sync::atomic::AtomicUsize::new(0),
+            });
+            let backend = SlackBackend::open_without_supervision(
+                owner(),
+                policy(),
+                root.path(),
+                Arc::new(MemoryStore::new()),
+                egress.clone(),
+            )
+            .await
+            .unwrap();
+            let connection = StoredConnection {
+                connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
+                instance_id: "00000000-0000-4000-8000-000000000001".to_owned(),
+                label: "Fixture companion".to_owned(),
+                grant_ref: policy().grant_for_profile(PROFILE_COMPANION_BOT).to_owned(),
+                initiation: InitiationConfig::Provider,
+                allowed_events: policy().allowed_events,
+                owner_subject: String::new(),
+                team_id: "T012345".to_owned(),
+                profile: SlackConnectionProfile::CompanionBot,
+                external_subject_id: "U012345".to_owned(),
+                scopes: vec!["chat:write".to_owned(), "channels:history".to_owned()],
+                purpose: String::new(),
+                carries_operations: true,
+            };
+            let credential = backend
+                .inner
+                .operation_credential_ref(&connection, BOT_TOKEN_CREDENTIAL)
+                .unwrap();
+            backend
+                .inner
+                .credential_store
+                .put(&credential, &connector_secrets::Secret::new(SENTINEL))
+                .await
+                .unwrap();
+            lock(&backend.inner.metadata)
+                .connections
+                .push(connection.clone());
+            let OperationResult::Describe(description) = backend
+                .inner
+                .describe_operation(&owner(), "slack-conversations-history")
+                .unwrap()
+            else {
+                panic!("description expected");
+            };
+            let advice = description
+                .rate_advice
+                .expect("history publishes every category");
+            advice.validate().unwrap();
+            assert!(advice.fixed.is_none());
+            assert_eq!(
+                advice
+                    .alternatives
+                    .iter()
+                    .map(|alternative| alternative.suggested_interval_ms)
+                    .collect::<Vec<_>>(),
+                [Some(1200), Some(60000), None]
+            );
+            let operation_ref = "slack-chat-post-message";
+            let error = backend
+                .inner
+                .invoke(
+                    &owner(),
+                    InvokeRequest {
+                        operation_ref: operation_ref.to_owned(),
+                        connection_ref: connection.connection_ref,
+                        description_ref: backend.inner.description_ref(&owner(), operation_ref),
+                        input: serde_json::json!({"channel":"C012345","text":"fixture"}),
+                        approval_evidence_ref: None,
+                    },
+                )
+                .await
+                .unwrap_err();
+            let value = serde_json::to_value(error).unwrap();
+            assert_eq!(
+                egress.calls.load(std::sync::atomic::Ordering::SeqCst),
+                1,
+                "{value}"
+            );
+            assert_eq!(
+                value["code"],
+                if uncertain {
+                    "outcome_unknown"
+                } else {
+                    "rate_limited"
+                }
+            );
+            assert_eq!(value["retriable"], !uncertain);
+            assert_eq!(
+                value
+                    .get("retry_after_seconds")
+                    .and_then(serde_json::Value::as_u64),
+                delay
+            );
+            assert!(!value.to_string().contains(SENTINEL));
+            let audit =
+                fs::read_to_string(root.path().join("slack-operation-audit.jsonl")).unwrap();
+            assert!(!audit.contains(SENTINEL));
+            let outcomes: Vec<_> = audit
+                .lines()
+                .map(|line| {
+                    serde_json::from_str::<serde_json::Value>(line).unwrap()["event"]["outcome"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned()
+                })
+                .collect();
+            assert_eq!(
+                outcomes,
+                [
+                    "attempted",
+                    if uncertain {
+                        "indeterminate"
+                    } else {
+                        "refused"
+                    }
+                ]
+            );
+            backend.shutdown().await;
+        }
+    }
+
     struct UnavailableStore;
 
     #[async_trait]

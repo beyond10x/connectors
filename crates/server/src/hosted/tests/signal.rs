@@ -62,6 +62,7 @@ impl ConnectorBackend for SessionBackend {
             )),
             OperationRequest::Describe(request) => {
                 Ok(OperationResult::Describe(OperationDescription {
+                    rate_advice: None,
                     operation_ref: request.operation_ref,
                     title: "test dial".to_owned(),
                     description: "test dial".to_owned(),

@@ -737,6 +737,13 @@ pub struct OperationPatch {
     /// Published rate limit to attach when the vendor document does not state it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_limit: Option<RateLimit>,
+    /// Conditional vendor declarations, carried without choosing an application category.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "crate::rate_limit::alternatives"
+    )]
+    pub conditional_rate_limits: Vec<crate::ConditionalRateLimit>,
     /// Structured vendor error envelope to attach when the vendor document does not state it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_envelope: Option<ErrorEnvelope>,
