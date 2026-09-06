@@ -2683,3 +2683,116 @@ fn rate_repair_source_uri_grammar_matches_authoring_and_both_schemas() {
     );
     check("", false);
 }
+
+#[test]
+fn rate_final_actual_provider_loading_preserves_uri_and_vendor_contract() {
+    let original = std::fs::read_to_string(repo_root().join("providers/slack.toml")).unwrap();
+    let parsed: toml::Value = toml::from_str(&original).unwrap();
+    let cache: Vec<(String, String)> = parsed["spec"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            let path = entry["path"].as_str().unwrap().to_owned();
+            let bytes = std::fs::read_to_string(repo_root().join(&path)).unwrap();
+            (path, bytes)
+        })
+        .collect();
+    let documents: Vec<_> = cache
+        .iter()
+        .map(|(path, document)| connector_spec::provider::SpecDocument { path, document })
+        .collect();
+    let load = |source: &str| connector_spec::provider::load_with_spec("slack", source, &documents);
+    let baseline = load(&original).unwrap();
+    let baseline: Value =
+        serde_json::from_str(&catalog_build::document::render(&baseline.connector).unwrap())
+            .unwrap();
+    let find = |document: &Value| {
+        document["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|op| op["id"] == "slack-conversations-history")
+            .unwrap()
+            .clone()
+    };
+    let baseline_operation = find(&baseline);
+    let source_schema: Value = serde_json::from_str(include_str!(
+        "../../../../catalog/connector-document-v3.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(&source_schema)
+        .unwrap();
+    for (sources, valid) in [
+        (
+            [
+                "https://%41.example.test:00065535/a%2fb?x=%23%40",
+                "https://[v1.a:b]:/category?cursor=a/b?c",
+                "https://docs.example.test/%00%7F?x=%ff",
+            ],
+            true,
+        ),
+        (
+            [
+                "https://docs.example.test/",
+                "https://docs.example.test:00065536/",
+                "https://docs.example.test/",
+            ],
+            false,
+        ),
+    ] {
+        let mut authored = parsed.clone();
+        let operation = authored["patch"]["operations"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|op| {
+                op.get("rename").and_then(toml::Value::as_str)
+                    == Some("slack-conversations-history")
+            })
+            .unwrap();
+        for (alternative, source) in operation["conditional_rate_limits"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(sources)
+        {
+            alternative["source_url"] = toml::Value::String(source.into());
+        }
+        let loaded = load(&toml::to_string(&authored).unwrap());
+        assert_eq!(
+            loaded.is_ok(),
+            valid,
+            "real provider loader must enforce the published profile"
+        );
+        if let Ok(loaded) = loaded {
+            let document: Value =
+                serde_json::from_str(&catalog_build::document::render(&loaded.connector).unwrap())
+                    .unwrap();
+            assert!(validator.is_valid(&document));
+            let mut operation = find(&document);
+            assert_eq!(
+                operation["conditional_rate_limits"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                3
+            );
+            for (i, source) in sources.into_iter().enumerate() {
+                assert_eq!(
+                    operation["conditional_rate_limits"][i]["source_url"],
+                    source
+                );
+                operation["conditional_rate_limits"][i]["source_url"] =
+                    baseline_operation["conditional_rate_limits"][i]["source_url"].clone();
+            }
+            assert_eq!(
+                operation, baseline_operation,
+                "source URI edits must not rewrite any vendor contract or select a category"
+            );
+        }
+    }
+}
