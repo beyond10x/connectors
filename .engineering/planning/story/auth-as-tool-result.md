@@ -13,6 +13,8 @@ refs:
 relations:
 - derived_from: epic:carried-constraints
 scope:
+- confidence: cited
+  path: Cargo.lock
 - confidence: inferred
   path: contracts/connector-connection/v0alpha2
 - confidence: inferred
@@ -37,6 +39,8 @@ scope:
   path: contracts/connector-operation/v0alpha3/vectors.json
 - confidence: inferred
   path: contracts/connector-operation/v0alpha3/vectors.schema.json
+- confidence: cited
+  path: crates/connectors-cli/Cargo.lock
 - confidence: inferred
   path: crates/connectors-cli/README.md
 - confidence: cited
@@ -52,6 +56,8 @@ scope:
 - confidence: inferred
   path: crates/connectors-cli/tests/remediation.rs
 - confidence: cited
+  path: crates/connectors-client/Cargo.toml
+- confidence: cited
   path: crates/connectors-client/src/identity.rs
 - confidence: inferred
   path: crates/connectors-client/src/lib.rs
@@ -65,6 +71,8 @@ scope:
   path: crates/connectors-client/src/response.rs
 - confidence: inferred
   path: crates/connectors-client/src/tests.rs
+- confidence: cited
+  path: crates/connectors-console/Cargo.lock
 - confidence: inferred
   path: crates/connectors-console/src/connect.rs
 - confidence: inferred
@@ -197,7 +205,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 70
+revision: 72
 ---
 ## Acceptance
 
@@ -395,3 +403,13 @@ Root retains all AEP/ESS, source citation, schema inventory, generated projectio
 Atlas draft PR23 was read back OPEN and draft at exactb95b84c8fdae634447e57bd8eafea5871f8ce46f, a normal fast-forward of the correct plan/connector-cli-migrations-resumed branch. The earlier checked unsuffixed branch was an older separate branch, not an advancement of this PR. Current accepted mainb89e5b83 allocated0041 to Eventlog. This wave's proposed migrations are now0042rate v2,0043schema3,0044OAuth schema4 and0045auth Operationv3/Connectionv2. Design22 appends that current mapping while retaining all pinned historical sections. Architecture acceptance, consumer adoption, Eventlog conversion and release are not claimed.
 
 The full Atlas source fence at8c9172ca passed149Rust cases and repository-owned catalog/livePages/projection/Markdown/brand checks, with the same three external failures retained. A mutable verification-report projection later exposed one checkout-local prefix in the captured refusal; its first failed Markdown output, initial report commit/event, raw logs and seal remain preserved. AEP body corrected only that presentation prefix and appended the explicit erratum. The corrected123artifact AEP validation and219file Markdown check pass; no source test was repeated. The exact published-tip Gate run34054300291 is in progress, without a CI-success claim. Auth source implementation remains in the two assigned trees at the common95fad7c7handoff.
+
+## Client schema-validation dependency and actual one-shot API — 2026-09-06
+
+The first client deciding execution produced 0 passes and 2 product failures; the actual console decoder-to-output execution produced 1 pass and 1 product failure, with hostile message text escaping all four output formats. These original logs remain in stage2-client-implementation. B released its compiler slot before A received the next bounded batch.
+
+B identified a concrete dependency gap for validating the same intended input against a fresh description after acknowledgement. The existing validator in connector-resolve is private to request construction. Add the existing workspace jsonschema dependency to crates/connectors-client/Cargo.toml. The exact affected dependency graph is recorded in Cargo.lock, crates/connectors-console/Cargo.lock and crates/connectors-cli/Cargo.lock; these three already contain connectors-client and the validator. These four paths are assigned to B in addition to its previous 21 paths. Root, runtime and console/CLI package versions, third-party versions/checksums and unrelated dependency edges must remain unchanged. Capture initial lock bytes, run only Cargo metadata offline to update the required connectors-client edge, and verify the exact structural lock diff. External schema retrieval is refused; schema/compiler/validation errors use closed output without copying input, schema or remote reference content. Preserve legacy behavior outside this explicit remediation flow. No other manifest or lock is assigned.
+
+Root verified all six frozen one-shot handoff entries and read the actual API patch. B may implement against PersonalRuntime::one_shot_operation_v3 with the actual v3 response envelope, while root remains responsible for assembling A source before integration checks. The frozen checkpoint was source-only; A's later deciding results belong to their own logs and must not be retroactively attributed to it.
+
+Atlas draft PR23 at b95b84c8fdae634447e57bd8eafea5871f8ce46f completed Gate run 34054300291 successfully. The readback reports typed catalog, public portal Markdown and live Pages delivery completed. This is draft CI evidence, without architecture acceptance or a main-merge claim. The source fence's three external workspace failures remain separately recorded.
