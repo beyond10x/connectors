@@ -146,7 +146,7 @@ async fn ordinary(
             | ConnectionRequest::Materialize(_)
             | ConnectionRequest::ConnectSessionCreate(_)
     ) && !self_service
-        && !state.policy.admits_operator(&principal)
+        && !state.policy.admits_operator(principal)
     {
         return failure(
             &request.request_id,
