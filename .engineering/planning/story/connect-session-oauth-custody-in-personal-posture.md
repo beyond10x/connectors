@@ -151,6 +151,8 @@ scope:
   path: catalog/zoom.catalog.json
 - confidence: inferred
   path: connectors.lock
+- confidence: cited
+  path: crates/catalog-build/src/check.rs
 - confidence: inferred
   path: crates/catalog-build/src/document.rs
 - confidence: inferred
@@ -163,6 +165,8 @@ scope:
   path: crates/catalog-build/src/workspace.rs
 - confidence: inferred
   path: crates/catalog-build/tests/main/catalog_invariants.rs
+- confidence: cited
+  path: crates/catalog-build/tests/main/no_network.rs
 - confidence: inferred
   path: crates/catalog-reader/catalog.pack
 - confidence: inferred
@@ -191,6 +195,10 @@ scope:
   path: crates/connector-oauth/src/token.rs
 - confidence: cited
   path: crates/connector-resolve/src/document.rs
+- confidence: cited
+  path: crates/connector-resolve/src/resolve.rs
+- confidence: cited
+  path: crates/connector-resolve/tests/adversary_gitlab_pass1.rs
 - confidence: inferred
   path: crates/connector-spec/schema/provider-toml.schema.json
 - confidence: inferred
@@ -222,15 +230,23 @@ scope:
 - confidence: inferred
   path: crates/connectors-cli/tests/one_shot_operations.rs
 - confidence: inferred
+  path: crates/connectors-client/src/completion.rs
+- confidence: inferred
   path: crates/connectors-client/src/lib.rs
 - confidence: inferred
   path: crates/connectors-client/src/model.rs
+- confidence: inferred
+  path: crates/connectors-client/src/personal_oauth.rs
 - confidence: inferred
   path: crates/connectors-config/examples/gitlab-personal-oauth.example.toml
 - confidence: inferred
   path: crates/connectors-config/src/lib.rs
 - confidence: inferred
   path: crates/connectors-config/src/personal.rs
+- confidence: inferred
+  path: crates/connectors-config/src/personal_oauth.rs
+- confidence: inferred
+  path: crates/connectors-config/src/personal_oauth_tests.rs
 - confidence: inferred
   path: crates/connectors-console/Cargo.lock
 - confidence: inferred
@@ -280,6 +296,8 @@ scope:
 - confidence: inferred
   path: crates/integration-catalog/src/oauth.rs
 - confidence: inferred
+  path: crates/integration-catalog/src/oauth_acquisition.rs
+- confidence: inferred
   path: crates/integration-catalog/src/oauth_tests.rs
 - confidence: cited
   path: crates/integration-catalog/src/tests.rs
@@ -317,7 +335,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 62
+revision: 65
 ---
 ## Acceptance
 
@@ -533,3 +551,15 @@ The trusted frontend uses setup connect <provider>, with --auth-profile naming t
 ## Existing raw configuration fixture closure — 2026-09-06
 
 Add crates/integration-catalog/src/tests.rs only for oauth: None in the existing entry helper's CatalogIntegrationConfig literal at current line 258. The new optional typed field requires that explicit old/raw configuration value. Preserve every existing test, assertion and other byte in this frozen rate preimage, apart from formatter placement of that one field. This is a subsequent OAuth constructor closure; the schema 3 publication candidate remains unchanged. Retain the exact preimage and disclose the one-field adaptation in whole-unit OAuth review evidence.
+
+## Measured schema4 fixture and module closure — 2026-09-06
+
+The first affected root execution retained actual failures: canonical artifact count fixtures still expected5 where the new frozen-v3-plus-current-v4 output contains6; the resolver's shared synthetic source-fidelity fixture declared3; and the first GitLab adversary combined a frozen-v3 validator with current-reader acceptance of the generated GitHub document. Its reader deciding test separately failed with UnsupportedSchema found4 before implementation. Preserve every first execution and original source preimage.
+
+Assign catalog-build/src/check.rs and tests/main/no_network.rs only for the exact fixture artifact-count expectations5to6, retaining snapshot/no-write and zero-network assertions. In connector-resolve/src/resolve.rs, change only the shared synthetic fixture's current schema identity3to4; preserve every body omission/null/requiredness and request assertion. Existing catalog_invariants current-output closure may admit the typed personal_flows field while continuing to reject unknown and invalid acquisition declarations.
+
+Assign connector-resolve/tests/adversary_gitlab_pass1.rs solely for a versioned compatibility split of its schema_versions_and_profiles_fail_closed case. Preserve every previous version/profile class against the exact frozen v3 schema, using only the generated GitHub document's top-level schema_version/$schema normalization to3. Preserve all operation/vendor/request bytes. Separately test actual current-v4 document and reader acceptance, invalid profiles, old3 and future5 refusal and equivalent malformed version classes. The historical current-reader-positive-v3 assertion describes the older reader; migrate that assertion explicitly to current4 rather than retaining a false oracle or copying an obsolete reader. Preserve all other original adversary cases/assertions and the historical file in Git; disclose this narrow compatibility exception in whole-unit review. Any nonidentity field incompatibility with frozen v3 must be reported before alteration.
+
+For the measured1500-line fence, allow only cohesive new OAuth extraction: connectors-config/src/personal_oauth.rs and personal_oauth_tests.rs own the new declarations/validation/tests. All preexisting config tests remain in personal.rs. The existing CatalogIntegrationConfig::validate method may move intact alongside its new OAuth check to keep that existing owner below the limit; preserve its old validation branches, messages and public API. connectors-client/src/personal_oauth.rs owns only the new client implementation/helpers/tests; original lib APIs/tests remain intact via registration/reexports. If the measured split still exceeds the limit, connectors-client/src/completion.rs may receive only the existing dedicated CompletionEndpoint type/implementation, unchanged, with its existing tests and API preserved. integration-catalog/src/oauth_acquisition.rs receives only the cohesive new acquisition implementation, keeping private state and authority with the existing OAuth owner. Record exact formatted sizes and moved-byte preservation. No broad refactor, line-limit waiver, assertion deletion or production policy relaxation is assigned.
+
+Coordinator refreshed the stale service lifecycle evidence comments in ess/system/domains/connection.yaml against integrated9c6ce892 and regenerates existing ESS derivatives. No entity, lifecycle, command, auth authority or transition changes. All root/source/backend/config/client closures remain preparation for actual operational tests and independent whole-unit review; schema3 publication is a separate verified candidate.
