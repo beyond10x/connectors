@@ -35,7 +35,7 @@ pub const DOCUMENTS_DIR: &str = "catalog";
 pub const DOCUMENT_SUFFIX: &str = "catalog.json";
 
 /// The committed JSON Schema the documents validate against, beside them under [`DOCUMENTS_DIR`].
-pub const DOCUMENT_SCHEMA_FILE: &str = "connector-document-v3.schema.json";
+pub const DOCUMENT_SCHEMA_FILE: &str = "connector-document-v4.schema.json";
 
 /// The dependency-free reader crate, which embeds the compiled catalog pack (C-537).
 pub const READER_DIR: &str = "crates/catalog-reader";
@@ -93,6 +93,12 @@ impl Workspace {
     /// The old schema keeps its original generated path and identity.
     pub fn document_schema_v2_path(&self) -> PathBuf {
         self.documents_dir().join("connector-document.schema.json")
+    }
+
+    /// The source-fidelity/rate schema keeps its original generated path and identity.
+    pub fn document_schema_v3_path(&self) -> PathBuf {
+        self.documents_dir()
+            .join("connector-document-v3.schema.json")
     }
 
     /// `<root>/crates/catalog-reader/catalog.pack` — the compiled catalog pack (C-537).

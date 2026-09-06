@@ -250,14 +250,19 @@ trait JournalIo: Send + Sync {
     fn read(&self) -> Result<Option<Vec<u8>>>;
     fn write(&self, bytes: &[u8]) -> Result<()>;
 }
-pub(super) struct FullJournal(state_sqlite::SqliteState);
+pub(super) struct FullJournal(Arc<state_sqlite::SqliteState>);
 impl FullJournal {
     /// Composition supplies an already admitted owner-only state directory and journal path.
     /// This constructor never accepts an ambient store or a NORMAL SQLite connection.
     pub(super) fn open(path: &Path) -> Result<Self> {
         state_sqlite::SqliteState::open_full(path)
-            .map(Self)
+            .map(|state| Self(Arc::new(state)))
             .map_err(|_| CustodyError::Unavailable)
+    }
+
+    /// The acquisition marker and completion journal share this exact FULL connection.
+    pub(super) fn shared_state(&self) -> Arc<state_sqlite::SqliteState> {
+        self.0.clone()
     }
 }
 impl JournalIo for FullJournal {
@@ -270,6 +275,53 @@ impl JournalIo for FullJournal {
         self.0
             .replace(KEY, bytes, MAX_BYTES)
             .map_err(|_| CustodyError::Unavailable)
+    }
+}
+
+// Test observations wrap the same FULL journal. Only a closed value-free boundary leaves this
+// module; the wrapper never supplies alternate records or exposes serialized journal contents.
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum JournalPhase {
+    Preparing,
+    Decided,
+    Published,
+    Aborted,
+    Retired,
+}
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum JournalMoment {
+    BeforeWrite,
+    AfterWrite,
+}
+#[cfg(test)]
+struct ObservedJournal {
+    inner: Arc<dyn JournalIo>,
+    observe: Arc<dyn Fn(JournalPhase, JournalMoment) -> Result<()> + Send + Sync>,
+}
+#[cfg(test)]
+impl JournalIo for ObservedJournal {
+    fn read(&self) -> Result<Option<Vec<u8>>> {
+        self.inner.read()
+    }
+    fn write(&self, bytes: &[u8]) -> Result<()> {
+        let image: Image = serde_json::from_slice(bytes).map_err(|_| CustodyError::Unavailable)?;
+        let phase = match image.pending.map(|pending| pending.phase) {
+            Some(Phase::Preparing) => JournalPhase::Preparing,
+            Some(Phase::Decided { .. }) => JournalPhase::Decided,
+            Some(Phase::Published { .. }) => JournalPhase::Published,
+            Some(Phase::Aborted) => JournalPhase::Aborted,
+            None => JournalPhase::Retired,
+        };
+        (self.observe)(phase, JournalMoment::BeforeWrite)?;
+        self.inner.write(bytes)?;
+        // This is journal readback supplied by the real SQLite owner, not secret-store digest
+        // readback or a power-loss simulation. Reopen fixtures separately establish recovery.
+        if self.inner.read()?.as_deref() != Some(bytes) {
+            return Err(CustodyError::Unavailable);
+        }
+        (self.observe)(phase, JournalMoment::AfterWrite)
     }
 }
 
@@ -333,6 +385,17 @@ pub(super) struct CustodyOwner {
     transaction_gate: tokio::sync::Mutex<()>,
 }
 impl CustodyOwner {
+    #[cfg(test)]
+    pub(super) fn observe_journal(
+        &mut self,
+        observe: Arc<dyn Fn(JournalPhase, JournalMoment) -> Result<()> + Send + Sync>,
+    ) {
+        self.journal = Arc::new(ObservedJournal {
+            inner: self.journal.clone(),
+            observe,
+        });
+    }
+
     pub(super) fn open(
         journal: FullJournal,
         store: Arc<connector_secrets::FileStore>,

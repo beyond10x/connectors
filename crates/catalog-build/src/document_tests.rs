@@ -9,18 +9,55 @@ mod tests {
             "b42980401d914c00a849dd39b267e60650a5d11adc9e24a1cf4adaff5e7c6607"
         );
         assert_ne!(SCHEMA_ID, SCHEMA_V2_ID);
-        assert_eq!(schema()["properties"]["schema_version"]["const"], 3);
-        assert!(schema()["$defs"]["operation"]["required"]
+        assert_eq!(schema_v3()["properties"]["schema_version"]["const"], 3);
+        assert!(schema_v3()["$defs"]["operation"]["required"]
             .as_array()
             .unwrap()
             .contains(&json!("request_semantics")));
         assert_eq!(
-            schema()["$defs"]["operation"]["properties"]["request_semantics"]["enum"],
+            schema_v3()["$defs"]["operation"]["properties"]["request_semantics"]["enum"],
             json!(["legacy_v1", "openapi_3_0_json_v1"])
         );
         assert!(schema_v2()["$defs"]["operation"]["properties"]
             .get("request_semantics")
             .is_none());
+    }
+
+    #[test]
+    fn personal_acquisition_schema_four_keeps_frozen_schema_three_bytes_and_closed_registration_boundary(
+    ) {
+        assert_eq!(
+            schema_v3_text(),
+            include_str!("../../../catalog/connector-document-v3.schema.json")
+        );
+        assert_eq!(schema()["properties"]["schema_version"]["const"], 4);
+        assert_ne!(schema()["$id"], schema_v3()["$id"]);
+        assert!(schema_v3()["$defs"]["oauth2"]["properties"]
+            .get("personal_flows")
+            .is_none());
+        assert!(schema()["$defs"]["oauth2"]["properties"]
+            .get("personal_flows")
+            .is_some());
+        for name in [
+            "client_id",
+            "client_secret",
+            "client_secret_ref",
+            "redirect_uri",
+            "custody",
+        ] {
+            assert!(
+                schema()["$defs"]["oauth2"]["properties"]
+                    .get(name)
+                    .is_none(),
+                "{name}"
+            );
+            assert!(
+                schema()["$defs"]["personalOAuthAdmission"]["properties"]
+                    .get(name)
+                    .is_none(),
+                "{name}"
+            );
+        }
     }
 
     #[test]

@@ -23,6 +23,10 @@
 /// whatever its own error surface is; the point is that a refusal cannot be mistaken for a result.
 #[macro_export]
 macro_rules! reduce_envelope {
+    ($envelope:expr, connection) => {{
+        let envelope = $crate::envelope::without_instruction_endpoints($envelope);
+        $crate::reduce_envelope!(envelope)
+    }};
     ($envelope:expr, operation) => {{
         let envelope = $envelope;
         let delay = envelope
@@ -62,6 +66,23 @@ macro_rules! reduce_envelope {
             }),
         }
     }};
+}
+
+/// Ordinary result renderers never receive one-use instruction capabilities or completion paths.
+/// Trusted acquisition consumes the original typed response through its private client workflow.
+#[must_use]
+pub fn without_instruction_endpoints(
+    mut envelope: protocol::connection::ResponseEnvelope,
+) -> protocol::connection::ResponseEnvelope {
+    if let Some(
+        protocol::connection::ConnectionResult::ConnectSessionCreate(status)
+        | protocol::connection::ConnectionResult::ConnectSessionStatus(status),
+    ) = envelope.response.as_mut()
+    {
+        status.browser_completion_url = None;
+        status.completion_endpoint = None;
+    }
+    envelope
 }
 
 /// The Connector answered, and its answer was a refusal.
@@ -138,5 +159,43 @@ mod tests {
         };
         let error = reduce_envelope!(envelope).expect_err("must not succeed");
         assert_eq!(error.code, "malformed-response");
+    }
+}
+
+#[cfg(test)]
+mod personal_oauth_tests {
+    use protocol::connection::*;
+
+    #[test]
+    fn ordinary_connection_result_payload_has_no_private_instruction_endpoint() {
+        for create in [true, false] {
+            let status = ConnectSessionStatus {
+                connect_session_ref: "connect-session:fixture".into(),
+                integration_ref: "gitlab".into(),
+                state: ConnectSessionState::Pending,
+                expires_at_unix_ms: 1_000,
+                completion_endpoint: Some("/private/one-use.sock".into()),
+                browser_completion_url: Some(
+                    "http://127.0.0.1:18423/#token=PRIVATE-SENTINEL".into(),
+                ),
+                connection_ref: None,
+            };
+            let result = if create {
+                ConnectionResult::ConnectSessionCreate(status)
+            } else {
+                ConnectionResult::ConnectSessionStatus(status)
+            };
+            let reduced = crate::reduce_envelope!(
+                ResponseEnvelope::success("request:fixture", result),
+                connection
+            )
+            .unwrap();
+            let serialized = serde_json::to_string(&reduced).unwrap();
+            assert!(!serialized.contains("PRIVATE-SENTINEL"));
+            assert!(!serialized.contains("one-use.sock"));
+            assert!(!serialized.contains("browser_completion_url"));
+            assert!(!serialized.contains("completion_endpoint"));
+            assert!(serialized.contains("connect-session:fixture"));
+        }
     }
 }
