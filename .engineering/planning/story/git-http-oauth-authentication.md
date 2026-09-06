@@ -14,7 +14,7 @@ scope:
   path: crates/connectors-runtime/Cargo.lock
 - confidence: cited
   path: crates/integration-gitlab
-revision: 6
+revision: 7
 ---
 ## Outcome
 
@@ -53,3 +53,9 @@ Source CI34002384974 completed successfully at fe3541a6d866e84855dfdc19ec4d22a7e
 The existing optional interoperability lane also executed the production Git materialization code from the exact deployed Substrate 0.7.5 source, 64ae2ed5a888663b036cbe06515cbfd277369d58. A release-profile host test executable built with its pinned Rust toolchain passed git::materialization_tests::external_connectors_proxy_v2_fixture through the repaired Connectors router/broker: the admitted commit, 50 shallow-history entries, absent tags, no transient authority in stored Git configuration and spent broker session were verified. Both inner and outer tests actually ran and passed. The enabled branch asserts six v2 provider exchanges across native Git and gix; its unchanged final log label describes the original three-exchange native-only lane.
 
 This fixture uses synthetic credentials, loopback TLS and real Git HTTP bytes. It establishes client compatibility, not hosted end-to-end timing, quota lifecycle or authenticated browser acceptance. Devcenter PR50 owns the composed image and delivery. Immutable publication, downstream rollout and authenticated file/Agent checks remain required, so the story stays active. Temporary build outputs and the managed read-only Substrate checkout were retired after retaining commands, hashes and logs.
+
+## Downstream delivery evidence
+
+Devcenter PR50 merged the reviewed source consumption at a15597c0d08527a553afe9562c8b3eaa255b2f01 after its complete gate and affected OCI builds passed in CI34003341500. The signed Connectors 0.8.26 publication passed both architecture builds and composed-candidate validation in CI34004333609. Its immutable image digest is sha256:d499c64f3a30bc2a86d3ee2b5bc887a6bbd2fb1433cd1d1f97d1b85ef7232a0a and its exact integration source remains fe3541a6d866e84855dfdc19ec4d22a7e779b1e5.
+
+The downstream validation, atomic deployment and running-image verification jobs all succeeded. Direct observation confirmed a ready Connectors pod with the published image ID and zero restarts. No additional cloud resources were created by this authentication repair. The post-deployment headless browser reached the public sign-in entry without JavaScript or application-asset failures, but it had no authenticated user session. Hosted file-tree and Agent acceptance remain open under the Devcenter recovery story, so this story remains active. Source test evidence is retained outside the repository; task-local build output and scratch copies were removed after byte-for-byte archive verification.
