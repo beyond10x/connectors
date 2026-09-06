@@ -20,6 +20,8 @@ mod git_fetch_client;
 mod hosted_catalog;
 mod identity;
 mod model;
+mod personal_oauth;
+mod remediation;
 mod response;
 
 pub use admin::AdminIdentityClient;
@@ -31,8 +33,8 @@ pub use model::{
     AdminAuthMetadata, AdminConfigurationField, AdminCredentialState, AdminCredentialStatus,
     AdminCredentialWrite, AdminIntegrationStatus, AdminLoginMetadata, AdminStatus,
     CandidateActivationOutcome, ClientError, GitFetchSession, MaterializationOutcome,
-    PendingConnection, RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart,
-    SubscriptionStatus,
+    PendingConnection, PendingPersonalOAuth, PendingRemediation, PersonalOAuthInstructions,
+    RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
 };
 use model::{
     CompleteSubscriptionOAuthRequest, ConnectSubscriptionRequest, CreateSubscriptionLeaseRequest,
@@ -63,7 +65,17 @@ impl LocalClient {
     }
 
     /// Sends one operation request and validates its correlated response.
+    /// Sends one operation request using the coordinated v3 identity, with no fallback.
     pub async fn operation(
+        &self,
+        context: &operation::OwnerContext,
+        request: operation::OperationRequest,
+    ) -> Result<operation::v3::ResponseEnvelope, ClientError> {
+        self.operation_v3(context, request).await
+    }
+
+    /// Explicit predecessor selection preserves the complete v2 client contract.
+    pub async fn operation_v2(
         &self,
         context: &operation::OwnerContext,
         request: operation::OperationRequest,
@@ -460,7 +472,18 @@ impl HostedClient {
     }
 
     /// Sends one hosted operation request with an ephemeral Identity bearer.
+    /// Sends one hosted operation using the coordinated v3 identity, with no fallback.
     pub async fn operation(
+        &self,
+        bearer: &str,
+        context: &operation::OwnerContext,
+        request: operation::OperationRequest,
+    ) -> Result<operation::v3::ResponseEnvelope, ClientError> {
+        self.operation_v3(bearer, context, request).await
+    }
+
+    /// Explicit predecessor selection preserves the complete v2 client contract.
+    pub async fn operation_v2(
         &self,
         bearer: &str,
         context: &operation::OwnerContext,
@@ -1090,410 +1113,4 @@ fn request_id() -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use axum::body::Bytes;
-    use axum::extract::{Path as AxumPath, State};
-    use axum::http::HeaderMap;
-    use axum::response::IntoResponse as _;
-    use axum::routing::{get, post};
-    use axum::{Json, Router};
-    use protocol::operation::{
-        OperationRequest, OperationResult, OwnerContext, ResponseEnvelope, ResponseStatus,
-        SearchRequest,
-    };
-    use tempfile::tempdir;
-    use tokio::io::BufReader;
-    use tokio::net::{TcpListener, UnixListener};
-
-    use super::*;
-
-    fn context() -> OwnerContext {
-        OwnerContext {
-            tenant_id: "tenant-1".to_owned(),
-            agent_id: "agent-1".to_owned(),
-            agent_revision: 1,
-            authority_snapshot_id: "snapshot-1".to_owned(),
-            authority_snapshot_sha256: "a".repeat(64),
-        }
-    }
-
-    #[tokio::test]
-    async fn local_client_frames_and_correlates_an_operation() {
-        let root = tempdir().unwrap();
-        let socket = root.path().join("connectors.sock");
-        let listener = UnixListener::bind(&socket).unwrap();
-        let serving = tokio::spawn(async move {
-            let (mut stream, _) = listener.accept().await.unwrap();
-            let mut line = String::new();
-            BufReader::new(&mut stream)
-                .read_line(&mut line)
-                .await
-                .unwrap();
-            let request: operation::RequestEnvelope = serde_json::from_str(&line).unwrap();
-            request.validate().unwrap();
-            assert_eq!(request.protocol, operation::CONTRACT);
-            let response = ResponseEnvelope::success(
-                request.request_id,
-                OperationResult::Search {
-                    operations: Vec::new(),
-                },
-            );
-            let mut bytes = serde_json::to_vec(&response).unwrap();
-            bytes.push(b'\n');
-            stream.write_all(&bytes).await.unwrap();
-        });
-        let response = LocalClient::new(&socket)
-            .operation(
-                &context(),
-                OperationRequest::Search(SearchRequest {
-                    query: "status".to_owned(),
-                    limit: 1,
-                }),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status, ResponseStatus::Ok);
-        serving.await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn completion_endpoint_is_validated_before_secret_submission() {
-        let root = tempdir().unwrap();
-        let sessions = root.path().join("connect-sessions");
-        fs::create_dir(&sessions).unwrap();
-        fs::set_permissions(&sessions, fs::Permissions::from_mode(0o700)).unwrap();
-        let socket = sessions.join("complete.sock");
-        let listener = UnixListener::bind(&socket).unwrap();
-        fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
-        let endpoint = CompletionEndpoint::validate(root.path(), &socket).unwrap();
-        let serving = tokio::spawn(async move {
-            let (mut stream, _) = listener.accept().await.unwrap();
-            let mut credential = String::new();
-            BufReader::new(&mut stream)
-                .read_line(&mut credential)
-                .await
-                .unwrap();
-            assert_eq!(credential, "secret-value\n");
-            stream.write_all(b"{\"accepted\":true}\n").await.unwrap();
-        });
-        endpoint.submit(b"secret-value").await.unwrap();
-        serving.await.unwrap();
-
-        let outside = root.path().join("outside.sock");
-        let _outside_listener = UnixListener::bind(&outside).unwrap();
-        assert!(matches!(
-            CompletionEndpoint::validate(root.path(), &outside),
-            Err(ClientError::UnsafeCompletionEndpoint)
-        ));
-    }
-
-    #[test]
-    fn hosted_client_requires_https_except_on_loopback_or_internal_cluster_dns() {
-        assert!(HostedClient::new("https://connectors.example/api/connectors/v1").is_ok());
-        assert!(HostedClient::new("http://127.0.0.1:8091/api/connectors/v1").is_ok());
-        assert!(HostedClient::new(
-            "http://connectors.devcenter.svc.cluster.local:8091/api/connectors/v1"
-        )
-        .is_ok());
-        assert!(matches!(
-            HostedClient::new("http://connectors.example/api/connectors/v1"),
-            Err(ClientError::InvalidHostedBase)
-        ));
-        assert!(matches!(
-            HostedClient::new("https://user@connectors.example/api/connectors/v1"),
-            Err(ClientError::InvalidHostedBase)
-        ));
-    }
-
-    #[tokio::test]
-    async fn hosted_client_posts_the_same_typed_operation_frame() {
-        async fn operation_handler(
-            State(expected): State<OwnerContext>,
-            headers: HeaderMap,
-            body: Bytes,
-        ) -> Bytes {
-            assert_eq!(
-                headers.get(reqwest::header::AUTHORIZATION).unwrap(),
-                "Bearer session-1"
-            );
-            let request: operation::RequestEnvelope = serde_json::from_slice(&body).unwrap();
-            request.validate().unwrap();
-            assert_eq!(request.context, expected);
-            Bytes::from(
-                serde_json::to_vec(&ResponseEnvelope::success(
-                    request.request_id,
-                    OperationResult::Search {
-                        operations: Vec::new(),
-                    },
-                ))
-                .unwrap(),
-            )
-        }
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let app = Router::new()
-            .route("/api/connectors/v1/operations", post(operation_handler))
-            .with_state(context());
-        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
-        let client = HostedClient::from_parts(base, reqwest::Client::new());
-        let response = client
-            .operation(
-                "session-1",
-                &context(),
-                OperationRequest::Search(SearchRequest {
-                    query: String::new(),
-                    limit: 1,
-                }),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status, ResponseStatus::Ok);
-        serving.abort();
-    }
-
-    #[tokio::test]
-    async fn hosted_client_posts_and_validates_a_datasource_frame() {
-        async fn datasource_handler(
-            State(expected): State<OwnerContext>,
-            headers: HeaderMap,
-            body: Bytes,
-        ) -> Bytes {
-            assert_eq!(
-                headers.get(reqwest::header::AUTHORIZATION).unwrap(),
-                "Bearer session-1"
-            );
-            let request: datasource::RequestEnvelope = serde_json::from_slice(&body).unwrap();
-            request.validate().unwrap();
-            assert_eq!(request.context, expected);
-            Bytes::from(
-                serde_json::to_vec(&datasource::ResponseEnvelope::success(
-                    request.request_id,
-                    datasource::DatasourceResult::Search {
-                        definitions: Vec::new(),
-                    },
-                ))
-                .unwrap(),
-            )
-        }
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let app = Router::new()
-            .route("/api/connectors/v1/datasources", post(datasource_handler))
-            .with_state(context());
-        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
-        let client = HostedClient::from_parts(base, reqwest::Client::new());
-        let response = client
-            .datasource(
-                "session-1",
-                &context(),
-                datasource::DatasourceRequest::Search(datasource::SearchRequest {
-                    query: "gitlab".to_owned(),
-                    limit: 1,
-                }),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status, datasource::ResponseStatus::Ok);
-        serving.abort();
-    }
-
-    #[tokio::test]
-    async fn hosted_subscription_client_redacts_and_redeems_one_attempt_capability() {
-        async fn lease(headers: HeaderMap, body: Bytes) -> axum::response::Response {
-            assert_eq!(
-                headers[reqwest::header::AUTHORIZATION],
-                "Bearer identity-access"
-            );
-            let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            assert_eq!(request["attempt_id"], "attempt-one");
-            (
-                [
-                    (reqwest::header::CACHE_CONTROL, "no-store"),
-                    (reqwest::header::PRAGMA, "no-cache"),
-                ],
-                Json(serde_json::json!({
-                    "lease_id": "lease-one",
-                    "lease_token": "lease-capability-value",
-                    "expires_at": 4_000_000_000_u64
-                })),
-            )
-                .into_response()
-        }
-
-        async fn redeem(
-            AxumPath(lease_id): AxumPath<String>,
-            headers: HeaderMap,
-            body: Bytes,
-        ) -> axum::response::Response {
-            assert_eq!(lease_id, "lease-one");
-            assert_eq!(
-                headers[reqwest::header::AUTHORIZATION],
-                "Bearer lease-capability-value"
-            );
-            let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            assert_eq!(request["attempt_id"], "attempt-one");
-            (
-                [
-                    (reqwest::header::CACHE_CONTROL, "no-store"),
-                    (reqwest::header::PRAGMA, "no-cache"),
-                ],
-                Json(serde_json::json!({
-                    "credential": "synthetic-provider-credential",
-                    "kind": "oauth"
-                })),
-            )
-                .into_response()
-        }
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let app = Router::new()
-            .route(
-                "/api/connectors/v1/subscription-credentials/claude-code/leases",
-                post(lease),
-            )
-            .route(
-                "/api/connectors/v1/subscription-leases/{lease_id}/redeem",
-                post(redeem),
-            );
-        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
-        let client = HostedClient::from_parts(base, reqwest::Client::new());
-        let lease = client
-            .lease_claude_code_subscription(
-                "identity-access",
-                "attempt-one",
-                Duration::from_secs(60),
-                1,
-            )
-            .await
-            .unwrap();
-        assert!(!format!("{lease:?}").contains("capability-value"));
-        let redeemed = client
-            .redeem_claude_code_subscription(&lease, "attempt-one")
-            .await
-            .unwrap();
-        assert_eq!(
-            redeemed.expose_at_provider_boundary(),
-            "synthetic-provider-credential"
-        );
-        assert!(!format!("{redeemed:?}").contains("synthetic-provider"));
-        serving.abort();
-    }
-
-    #[tokio::test]
-    async fn hosted_subscription_client_starts_and_completes_pkce_without_retaining_the_code() {
-        async fn start(headers: HeaderMap) -> axum::response::Response {
-            assert_eq!(
-                headers[reqwest::header::AUTHORIZATION],
-                "Bearer identity-access"
-            );
-            (
-                [
-                    (reqwest::header::CACHE_CONTROL, "no-store"),
-                    (reqwest::header::PRAGMA, "no-cache"),
-                ],
-                Json(serde_json::json!({
-                    "authorization_url":"https://provider.example/authorize?state=opaque",
-                    "flow_id":"opaque-flow-identifier",
-                    "expires_at":4_000_000_000_u64
-                })),
-            )
-                .into_response()
-        }
-
-        async fn complete(headers: HeaderMap, body: Bytes) -> axum::response::Response {
-            assert_eq!(
-                headers[reqwest::header::AUTHORIZATION],
-                "Bearer identity-access"
-            );
-            let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            assert_eq!(request["flow_id"], "opaque-flow-identifier");
-            if request["code"] == "refused-provider-code" {
-                return (
-                    axum::http::StatusCode::BAD_REQUEST,
-                    Json(serde_json::json!({"error":"must-not-cross-client"})),
-                )
-                    .into_response();
-            }
-            assert_eq!(request["code"], "one-use-provider-code");
-            (
-                [
-                    (reqwest::header::CACHE_CONTROL, "no-store"),
-                    (reqwest::header::PRAGMA, "no-cache"),
-                ],
-                Json(serde_json::json!({
-                    "provider":"claude-code",
-                    "connected":true
-                })),
-            )
-                .into_response()
-        }
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let app = Router::new()
-            .route(
-                "/api/connectors/v1/subscription-credentials/claude-code/oauth/start",
-                post(start),
-            )
-            .route(
-                "/api/connectors/v1/subscription-credentials/claude-code/oauth/complete",
-                post(complete),
-            );
-        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        let client = HostedClient::new(&format!("http://{address}/api/connectors/v1")).unwrap();
-        let started = client
-            .start_claude_code_subscription_oauth("identity-access")
-            .await
-            .unwrap();
-        assert_eq!(started.flow_id, "opaque-flow-identifier");
-        let completed = client
-            .complete_claude_code_subscription_oauth(
-                "identity-access",
-                &started.flow_id,
-                Zeroizing::new("one-use-provider-code".to_owned()),
-            )
-            .await
-            .unwrap();
-        assert!(completed.connected);
-        assert!(matches!(
-            client
-                .complete_claude_code_subscription_oauth(
-                    "identity-access",
-                    &started.flow_id,
-                    Zeroizing::new("refused-provider-code".to_owned()),
-                )
-                .await,
-            Err(ClientError::SubscriptionRefused(400))
-        ));
-        serving.abort();
-    }
-
-    #[tokio::test]
-    async fn hosted_subscription_client_refuses_a_cacheable_credential_boundary() {
-        async fn status() -> Json<serde_json::Value> {
-            Json(serde_json::json!({"provider":"claude-code","connected":false}))
-        }
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let app = Router::new().route(
-            "/api/connectors/v1/subscription-credentials/claude-code",
-            get(status),
-        );
-        let serving = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        let base = Url::parse(&format!("http://{address}/api/connectors/v1")).unwrap();
-        let client = HostedClient::from_parts(base, reqwest::Client::new());
-        assert!(matches!(
-            client
-                .claude_code_subscription_status("identity-access")
-                .await,
-            Err(ClientError::CacheableCredentialResponse)
-        ));
-        serving.abort();
-    }
-}
+mod tests;

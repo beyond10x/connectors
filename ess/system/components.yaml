@@ -106,9 +106,9 @@ components:
     reached_by: command_line
     # The binary is `connectors` (`crates/connectors-cli/Cargo.toml:20-22`, `[[bin]] name`), and
     # the eight words below are the whole first level of `enum Command`
-    # (`crates/connectors-cli/src/lib.rs:55-94`), every one of which carries a subcommand of its
-    # own: `setup` (line 58), `inspect` (line 63), `session` (line 68), `serve` (line 73),
-    # `connection` (line 78), `event` (line 83), `operation` (line 88) and `admin` (line 93).
+    # (`crates/connectors-cli/src/lib.rs:58-109`), every one of which carries a subcommand of its
+    # own: `setup` (line 61), `inspect` (line 66), `session` (line 71), `serve` (line 76),
+    # `connection` (line 81), `event` (line 89), `operation` (line 97) and `admin` (line 108).
     #
     # `story:cli-first-level-groups` made it eight. Before it the first level was fifteen words in
     # one block — five groups and ten leaves — and `connectors --help` could not tell an operator
@@ -134,7 +134,7 @@ components:
     # `crates/catalog-build/tests/main/ess_claim_fence.rs:360`). Placing them would
     # emit `SuperviseChannel`, `FinishConnectSession` and `SettleSession` as words at a shell —
     # measured, not supposed — and each of those is an act the platform performs on its own
-    # (`ess/system/domains/connection.yaml:435-439`,
+    # (`ess/system/domains/connection.yaml:633-642`,
     # `crates/integration-sip/src/backend/sessions.rs:148-150`),
     # not one a person asks for. Settled by a construct that lets a client declare a tree over a
     # command it forwards rather than handles; `ess specify compose` generates such clients today

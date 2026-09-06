@@ -6,6 +6,93 @@ domain: connectors.deployment
 summary: A tenant's configured enablement of a provider, and the vendor secret material backing the connections made from it.
 
 types:
+
+  # Proposed deployment values, design 21 (2026-09-06). Registrations remain here;
+  # neither a client identifier nor a secret value becomes a catalog field.
+  - name: connectors.deployment.OAuthBrowserPlacement
+    kind: enum
+    variants: [SameMachine, OtherMachine]
+
+  - name: connectors.deployment.PersonalOAuthCustody
+    kind: enum
+    variants: [DevelopmentFile]
+
+  - name: connectors.deployment.PersonalOAuthRegistration
+    kind: struct
+    fields:
+      - name: auth_profile
+        type: connectors.connection.AuthProfile
+      - name: flow
+        type: connectors.catalog.PersonalOAuthFlow
+      - name: client_authentication
+        type: connectors.catalog.OAuthClientAuthentication
+      - name: client_id
+        type: String
+      - name: client_secret_ref
+        type: Optional<connectors.deployment.CredentialRef>
+      - name: redirect_uri
+        type: Optional<String>
+      - name: browser_placement
+        type: connectors.deployment.OAuthBrowserPlacement
+      - name: registration_use
+        type: connectors.catalog.OAuthRegistrationUse
+      - name: custody
+        type: connectors.deployment.PersonalOAuthCustody
+      - name: allowed_scopes
+        type: List<connectors.deployment.Scope>
+      - name: session_ttl_seconds
+        type: Integer
+
+  # Value-free evidence joined to existing Connection/credential metadata, not a new
+  # credential entity or a settlement of the held multi-credential cardinality question.
+  - name: connectors.deployment.OAuthCredentialEvidence
+    kind: struct
+    fields:
+      - name: generation
+        type: Integer
+      - name: subject
+        type: connectors.deployment.CredentialSubject
+      - name: proven_scopes
+        type: List<connectors.deployment.Scope>
+      - name: observed_at_unix_ms
+        type: Integer
+      - name: expires_at_unix_ms
+        type: Integer
+      - name: refresh_available
+        type: Boolean
+      - name: observation_endpoint
+        type: connectors.catalog.OAuthEndpoint
+
+  # Private pre-egress marker, design 21 (2026-09-06). Stored beside the custody
+  # journal in its existing FULL SQLite store; it is not a public protocol value.
+  - name: connectors.deployment.OAuthRefreshAttempt
+    kind: struct
+    fields:
+      - name: version
+        type: Integer
+      - name: connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: binding_sha256
+        type: List<Integer>
+      - name: previous_generation
+        type: Integer
+
+  # UNMAPPED: marker version exactly 1, exactly 32 octets in binding_sha256, key
+  # oauth.refresh.v1.<64 lowercase hex SHA256 of canonical custody Identity>,
+  # bounded closed decoding and checked generation arithmetic. Runtime owns the
+  # canonical identity digest and FULL confirmation before any refresh egress.
+  # UNMAPPED: recovery clears this marker only after a confirmed newer same-binding
+  # publication passes current authority and evidence checks. Preparing abort does
+  # not prove remote rollback; unknown marker reads/writes/deletes stay unavailable.
+  # These runtime obligations do not change the custody journal envelope or lifecycle.
+
+  # UNMAPPED: secret custody, no Debug/serialization of private token material, positive
+  # bounded TTL/generation/time arithmetic, exact configured URI/Host/Origin validation,
+  # keyring/file routing, and production refusal for DevelopmentFile. Deployment policy
+  # and runtime tests own these constraints; ESS does not establish encryption at rest.
+  # UNMAPPED: a proven scope set authorizes only its exact credential generation and
+  # existing Connection grant. No field above creates or broadens that grant.
+
   - name: connectors.deployment.IntegrationRef
     kind: newtype
     of: String

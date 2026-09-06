@@ -97,13 +97,20 @@ fn assert_request_example_accepted(path: &str, name: &str, value: Value) {
             .validate()
             .unwrap_or_else(|error| refused("validation", error.to_string())),
         "/operations" => {
-            protocol::operation::decode_request(&serde_json::to_vec(&value).unwrap())
+            protocol::operation::versions::decode_request(&serde_json::to_vec(&value).unwrap())
                 .unwrap_or_else(|error| refused("validation", error.to_string()));
         }
-        "/connections" => serde_json::from_value::<ConnectionRequestEnvelope>(value)
-            .unwrap_or_else(|error| refused("type", error.to_string()))
-            .validate()
-            .unwrap_or_else(|error| refused("validation", error.to_string())),
+        "/connections" => {
+            if value["protocol"] == protocol::connection_v2::CONTRACT {
+                protocol::connection_v2::decode_request(&serde_json::to_vec(&value).unwrap())
+                    .unwrap_or_else(|error| refused("validation", error.to_string()));
+            } else {
+                serde_json::from_value::<ConnectionRequestEnvelope>(value)
+                    .unwrap_or_else(|error| refused("type", error.to_string()))
+                    .validate()
+                    .unwrap_or_else(|error| refused("validation", error.to_string()));
+            }
+        }
         "/catalog" => serde_json::from_value::<CatalogRequestEnvelope>(value)
             .unwrap_or_else(|error| refused("type", error.to_string()))
             .validate()
@@ -211,8 +218,15 @@ fn every_documented_refusal_example_names_a_real_error_code() {
                 // The closed serde enums are the proof: an invented code cannot deserialize.
                 match path {
                     "/operations" => {
-                        serde_json::from_value::<OperationError>(error)
+                        if value["protocol"] == protocol::operation::v3::CONTRACT {
+                            protocol::operation::versions::decode_response(
+                                &serde_json::to_vec(&value).unwrap(),
+                            )
                             .unwrap_or_else(|error| refused(error.to_string()));
+                        } else {
+                            serde_json::from_value::<OperationError>(error)
+                                .unwrap_or_else(|error| refused(error.to_string()));
+                        }
                         operation_codes
                             .insert(code_string.unwrap_or_else(|| refused("no code".to_owned())))
                     }
@@ -651,5 +665,162 @@ async fn every_documented_mcp_request_example_is_answered_by_the_live_transport(
             frame.get("result").is_some(),
             "MCP example `{name}` produces a result, got {frame}"
         );
+    }
+}
+
+#[test]
+fn auth_openapi_selects_each_supported_identity_explicitly() {
+    let doc = document();
+    for (path, names) in [
+        (
+            "/operations",
+            vec![
+                "operation.v1.requestEnvelope",
+                "operation.requestEnvelope",
+                "operation.v3.requestEnvelope",
+            ],
+        ),
+        (
+            "/connections",
+            vec![
+                "connection.request_envelope",
+                "connection.v2.request_envelope",
+            ],
+        ),
+    ] {
+        let selection = &doc["paths"][path]["post"]["requestBody"]["content"]["application/json"]
+            ["schema"]["oneOf"];
+        let references: BTreeSet<_> = selection
+            .as_array()
+            .expect("the endpoint documents explicit version selection")
+            .iter()
+            .map(|entry| entry["$ref"].as_str().expect("a local schema reference"))
+            .collect();
+        let expected: BTreeSet<_> = names
+            .iter()
+            .map(|name| format!("#/components/schemas/{name}"))
+            .collect();
+        assert_eq!(
+            references,
+            expected.iter().map(String::as_str).collect(),
+            "{path} documents every retained version, with no implicit negotiation"
+        );
+    }
+    for (name, identity) in [
+        (
+            "operation.v1.requestEnvelope",
+            "b10x.connector-operation.v0alpha1",
+        ),
+        (
+            "operation.requestEnvelope",
+            "b10x.connector-operation.v0alpha2",
+        ),
+        (
+            "operation.v3.requestEnvelope",
+            "b10x.connector-operation.v0alpha3",
+        ),
+        (
+            "connection.request_envelope",
+            "b10x.connector-connection.v0alpha1",
+        ),
+        (
+            "connection.v2.request_envelope",
+            "b10x.connector-connection.v0alpha2",
+        ),
+    ] {
+        assert_eq!(
+            doc["components"]["schemas"][name]["properties"]["protocol"]["const"], identity,
+            "{name} retains its exact identity"
+        );
+    }
+}
+
+#[test]
+fn auth_openapi_remediation_examples_keep_the_operation_unattempted() {
+    let doc = document();
+    let responses = &doc["paths"]["/operations"]["post"]["responses"];
+    let examples = named_examples(&responses["409"]);
+    assert_eq!(
+        examples.len(),
+        1,
+        "the admitted authentication refusal is documented"
+    );
+    let response = &examples[0].1;
+    assert_eq!(response["protocol"], "b10x.connector-operation.v0alpha3");
+    assert_eq!(response["status"], "error");
+    assert!(response.get("response").is_none());
+    assert_eq!(response["error"]["code"], "authentication_required");
+    assert_eq!(response["error"]["retriable"], false);
+    assert!(response["error"].get("retry_after_seconds").is_none());
+    assert_eq!(
+        response["error"]["authentication"]["attempt"],
+        "not_attempted"
+    );
+    assert_eq!(
+        response["error"]["authentication"]["next_action"],
+        "start_trusted_remediation"
+    );
+    for name in [
+        "remediation_start",
+        "remediation_status",
+        "remediation_acknowledge",
+    ] {
+        let examples: std::collections::BTreeMap<_, _> =
+            request_examples(&doc, "/connections").into_iter().collect();
+        let example = examples
+            .get(name)
+            .expect("each explicit bound command is documented");
+        assert_eq!(example["protocol"], "b10x.connector-connection.v0alpha2");
+        assert_eq!(example["request"]["method"], name);
+        assert!(example["request"]["params"]
+            .get("approval_evidence_ref")
+            .is_none());
+    }
+    let description = doc["paths"]["/connections"]["post"]["description"]
+        .as_str()
+        .unwrap();
+    assert!(description.contains("hosted acquisition remains Unsupported"));
+    assert!(description.contains("fresh description"));
+    assert!(description.contains("explicit invocation"));
+}
+
+#[test]
+fn auth_openapi_schema_projection_preserves_protocol_vector_results() {
+    let doc = document();
+    for (name, encoded) in [
+        (
+            "operation.v2.frame",
+            include_str!("../../../../../contracts/connector-operation/v0alpha2/vectors.json"),
+        ),
+        (
+            "operation.v3.frame",
+            include_str!("../../../../../contracts/connector-operation/v0alpha3/vectors.json"),
+        ),
+        (
+            "connection.v2.frame",
+            include_str!("../../../../../contracts/connector-connection/v0alpha2/vectors.json"),
+        ),
+    ] {
+        let schema = serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": format!("#/components/schemas/{name}"),
+            "components": doc["components"].clone(),
+        });
+        let validator = jsonschema::validator_for(&schema)
+            .expect("the served, locally namespaced contract compiles");
+        let vectors: Value = serde_json::from_str(encoded).unwrap();
+        let cases = vectors["cases"].as_array().expect("the bundle has cases");
+        assert!(!cases.is_empty(), "the projection check has real vectors");
+        for case in cases {
+            let expected = case["schema_valid"]
+                .as_bool()
+                .expect("the independent bundle records schema validity");
+            assert_eq!(
+                validator.is_valid(&case["frame"]),
+                expected,
+                "{name} changed the published schema result of {}",
+                case["name"]
+            );
+        }
     }
 }

@@ -2,7 +2,11 @@
 
 use super::*;
 use axum::body::Bytes;
-use protocol::operation::{decode_request, legacy, Version, MAX_FRAME_BYTES};
+use protocol::operation::{
+    legacy, v3,
+    versions::{decode_request, decode_response, Version},
+    MAX_FRAME_BYTES,
+};
 
 pub(super) async fn operation(
     State(state): State<HostedState>,
@@ -23,12 +27,14 @@ pub(super) async fn operation(
         Ok(value) => value,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
-    let version =
-        if probe.get("protocol").and_then(serde_json::Value::as_str) == Some(legacy::CONTRACT) {
-            Version::V0Alpha1
-        } else {
-            Version::V0Alpha2
-        };
+    let version = match probe.get("protocol").and_then(serde_json::Value::as_str) {
+        Some(legacy::CONTRACT) => Version::V0Alpha1,
+        Some(protocol::operation::wire::CONTRACT) => Version::V0Alpha2,
+        Some(v3::CONTRACT) => Version::V0Alpha3,
+        // Retain the existing v2 protocol-refusal envelope for unknown identities. The
+        // original-byte reader below still rejects them before authentication or dispatch.
+        _ => Version::V0Alpha2,
+    };
     let request = match decode_request(&body) {
         Ok((_, request)) => request,
         Err(refusal) => {
@@ -36,14 +42,18 @@ pub(super) async fn operation(
                 .get("request_id")
                 .and_then(serde_json::Value::as_str)
                 .filter(|request_id| {
-                    ResponseEnvelope::failure(*request_id, refusal.clone())
+                    v3::ResponseEnvelope::failure(*request_id, refusal.clone())
                         .validate()
                         .is_ok()
                 })
                 .unwrap_or("invalid-request");
             return project(
                 version,
-                operation_failure(request_id, refusal, StatusCode::BAD_REQUEST),
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(v3::ResponseEnvelope::failure(request_id, refusal)),
+                )
+                    .into_response(),
             )
             .await;
         }
@@ -73,8 +83,8 @@ async fn project(version: Version, response: Response) -> Response {
         Ok(bytes) => bytes,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    let envelope: ResponseEnvelope = match serde_json::from_slice(&bytes) {
-        Ok(envelope) => envelope,
+    let envelope = match decode_response(&bytes) {
+        Ok((_, envelope)) => envelope,
         Err(_) => return Response::from_parts(parts, Body::from(bytes)),
     };
     match version.encode_response(envelope) {

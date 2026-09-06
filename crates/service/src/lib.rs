@@ -14,6 +14,12 @@ pub use rate_limit::operation_rate_advice;
 mod factory;
 mod git_fetch;
 mod planning;
+mod remediation;
+pub use remediation::{
+    CredentialReadiness, RemediationAdmission, RemediationAuthority, RemediationBinding,
+    RemediationError, RemediationMetadata, RemediationRequest, RemediationResult, RemediationRoute,
+    RemediationTarget,
+};
 mod runtime;
 mod sip;
 mod voice;

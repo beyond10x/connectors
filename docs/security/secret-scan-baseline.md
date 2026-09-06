@@ -43,3 +43,24 @@ enabled and a checksum-pinned scanner.
 If provenance changes or any material is later shown to have been live, remove its fingerprint,
 rotate or revoke it at the issuing system, purge it under the incident process if required, and
 record the incident separately. Never add a broad rule or path allowlist to make this gate pass.
+
+## Planning evidence references — 2026-09-06
+
+A complete scan at `21d93af5740b7504f50b9ad3f824ac1474e28321`, with the ignore file absent,
+reported 72 findings at 63 distinct fingerprints. Seventeen findings at nine new fingerprints
+were scratch-evidence basenames in the OAuth story and its append-only planning journal.
+Each exact historical match was reconstructed without printing its value and proved equal to an
+existing evidence filename. It was neither a credential nor either SHA256 citation on the same
+source line. Repeated journal observations come from the command arguments and recorded body.
+
+The nine new entries below the dated comment in `.gitleaksignore` identify only those exact
+commit, path, rule and line combinations. All 91 prior entries remain; 54 of them matched this
+particular reachable-history scan and 37 did not. The absence of those 37 from this scan does not
+reclassify their historical material or prove that their original findings were resolved. The
+earlier counts above describe their dated baseline rather than this new observation.
+
+The current mutable story uses a sentence boundary before its filename references so the prose
+does not resemble a key/value assignment. Historical commits and journal entries remain intact.
+Detector rules and path coverage are unchanged; a new match at any new location still fails.
+The redacted scan, stable ref inventory and value-free reconstruction proof are retained with the
+coordinator's OAuth history-reference scan evidence.

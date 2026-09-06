@@ -4,6 +4,81 @@ domain: connectors.catalog
 summary: The reviewed, compiled template of one vendor surface, its declared operations, and the sealed set a deployment serves.
 
 types:
+
+  # Proposed value vocabulary, design 21 (2026-09-06); not an implemented acquisition.
+  # These per-flow admissions do not reinterpret legacy OAuth2Spec.public_client.
+  - name: connectors.catalog.PersonalOAuthFlow
+    kind: enum
+    variants: [AuthorizationCodePkce, DeviceAuthorization]
+
+  - name: connectors.catalog.OAuthClientAuthentication
+    kind: enum
+    variants: [Public, ClientSecretPost]
+
+  - name: connectors.catalog.OAuthRedirectShape
+    kind: enum
+    variants: [LoopbackIpv4Http, LocalhostHttp, RegisteredHttps]
+
+  - name: connectors.catalog.OAuthRegistrationUse
+    kind: enum
+    variants: [DevelopmentOnly, ProductionAllowed]
+
+  - name: connectors.catalog.OAuthRefreshPolicy
+    kind: enum
+    variants: [Required, IfIssued]
+
+  - name: connectors.catalog.OAuthEndpoint
+    kind: struct
+    fields:
+      - name: service
+        type: connectors.catalog.ServiceName
+      - name: path
+        type: String
+
+  - name: connectors.catalog.OAuthScopeEncoding
+    kind: enum
+    variants: [SpaceDelimited, CommaDelimited, StringArray]
+
+  # Provider-declared authenticated evidence observation, never requested-scope inference.
+  - name: connectors.catalog.OAuthTokenEvidence
+    kind: struct
+    fields:
+      - name: endpoint
+        type: connectors.catalog.OAuthEndpoint
+      - name: scopes_pointer
+        type: String
+      - name: scope_encoding
+        type: connectors.catalog.OAuthScopeEncoding
+      - name: subject_pointer
+        type: Optional<String>
+      - name: client_id_pointer
+        type: Optional<String>
+
+  - name: connectors.catalog.PersonalOAuthAdmission
+    kind: struct
+    fields:
+      - name: flow
+        type: connectors.catalog.PersonalOAuthFlow
+      - name: client_authentication
+        type: connectors.catalog.OAuthClientAuthentication
+      - name: redirect_shape
+        type: Optional<connectors.catalog.OAuthRedirectShape>
+      - name: registration_use
+        type: connectors.catalog.OAuthRegistrationUse
+      - name: device_authorization_endpoint
+        type: Optional<connectors.catalog.OAuthEndpoint>
+      - name: refresh_policy
+        type: connectors.catalog.OAuthRefreshPolicy
+      - name: token_evidence
+        type: connectors.catalog.OAuthTokenEvidence
+
+  # UNMAPPED: flow-dependent presence, declaration uniqueness, service/path resolution,
+  # endpoint egress admission, pointer/response bounds and measured provider compatibility.
+  # Rust loader/canonical schema and acquisition tests must enforce design 21; the
+  # variants describe representable facts, not admission of every combination/vendor.
+  # UNMAPPED: mandatory canonical-version migration for per-flow interpretation; this
+  # value-only patch changes neither canonical documents nor any Connection wire version.
+
   # Operator-selected rate-limit story, grounded in connector-spec::RateLimit and the
   # current Slack history/rate-limit references. Advice never grants access or selects
   # an application category. Existing fixed RateLimit serialization remains unchanged.

@@ -3304,3 +3304,132 @@ fn selected_target_preserves_provider_owned_target_fields_in_every_renderer() {
         }
     }
 }
+
+#[test]
+fn personal_oauth_setup_requires_explicit_profile_and_private_instruction_option() {
+    let arguments = [
+        "connectors",
+        "setup",
+        "connect",
+        "gitlab",
+        "--auth-profile",
+        "gitlab.oauth_token",
+        "--instruction-file",
+        "/synthetic/private-instructions",
+    ];
+    assert!(connectors_cli::command()
+        .try_get_matches_from(arguments)
+        .is_ok());
+    for conflict in ["--credential", "--as"] {
+        let mut arguments = arguments.to_vec();
+        arguments.extend([conflict, "fixture"]);
+        assert!(connectors_cli::command()
+            .try_get_matches_from(arguments)
+            .is_err());
+    }
+}
+
+#[test]
+fn oauth_pass1_cli_private_setup_refusal_closes_all_output_formats_and_clears_file() {
+    use std::io::{BufRead as _, Write as _};
+    use std::os::unix::net::UnixListener;
+    for format in ["text", "compact", "json", "yaml"] {
+        let fixture = TargetFixture::new(false);
+        let config = fixture.root.join("c/b10x/connectors.toml");
+        let old = std::fs::read_to_string(&config).unwrap();
+        let owner = old.split("[[catalog]]").next().unwrap();
+        let catalog = r#"[[catalog]]
+provider = "gitlab"
+instance = "personal"
+grant_ref = "grant:personal"
+initiation = "platform"
+credential = "gitlab.oauth_token"
+operator_approved = true
+[catalog.endpoints]
+origin = "https://gitlab.example"
+[catalog.oauth]
+auth_profile = "gitlab.oauth_token"
+flow = "authorization_code_pkce"
+client_authentication = "public"
+client_id = "OAUTH-PASS1-PRIVATE-CLIENT"
+redirect_uri = "http://127.0.0.1:47193/oauth/callback"
+browser_placement = "same_machine"
+registration_use = "development_only"
+custody = "development_file"
+allowed_scopes = ["read_api"]
+"#;
+        std::fs::write(&config, format!("{owner}{catalog}")).unwrap();
+        let destination = fixture.root.join("private-instructions");
+        let listener = UnixListener::bind(fixture.root.join("connectors.sock")).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let worker = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let mut stream = loop {
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::WouldBlock
+                            && std::time::Instant::now() < deadline =>
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(5));
+                    }
+                    other => {
+                        panic!("setup must reach exactly its selected local daemon: {other:?}")
+                    }
+                }
+            };
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            let request: protocol::connection::RequestEnvelope =
+                serde_json::from_str(&line).unwrap();
+            request.validate().unwrap();
+            let protocol::connection::ConnectionRequest::ConnectSessionCreate(create) =
+                request.request
+            else {
+                panic!("exact setup Create")
+            };
+            assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
+            let response = protocol::connection::ResponseEnvelope::failure(
+                request.request_id,
+                protocol::connection::ConnectionError::new(
+                    protocol::connection::ConnectionErrorCode::InvalidInput,
+                    "OAUTH-PASS1-PRIVATE-DAEMON https://gitlab.example/authorize?state=PRIVATE",
+                    false,
+                ),
+            );
+            writeln!(stream, "{}", serde_json::to_string(&response).unwrap()).unwrap();
+        });
+        let result = fixture.run(&[
+            "-o",
+            format,
+            "setup",
+            "connect",
+            "gitlab",
+            "--auth-profile",
+            "gitlab.oauth_token",
+            "--instruction-file",
+            destination.to_str().unwrap(),
+            "--state-root",
+            fixture.root.to_str().unwrap(),
+        ]);
+        worker.join().unwrap();
+        assert!(!result.status.success());
+        assert!(!destination.exists());
+        for output in [result.stdout, result.stderr] {
+            let output = String::from_utf8(output).unwrap();
+            assert!(
+                !output.contains("OAUTH-PASS1-PRIVATE"),
+                "{format}: {output}"
+            );
+            assert!(
+                !output.contains("https://gitlab.example"),
+                "{format}: {output}"
+            );
+        }
+    }
+}

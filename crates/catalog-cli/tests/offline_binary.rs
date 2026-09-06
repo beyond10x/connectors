@@ -115,6 +115,18 @@ fn build_succeeds_with_networking_unavailable() {
         fixture.0.join("catalog").join("acme.catalog.json").exists(),
         "the offline build wrote no canonical document"
     );
+    for artifact in [
+        "catalog/connector-document.schema.json",
+        "catalog/connector-document-v3.schema.json",
+        "catalog/connector-document-v4.schema.json",
+        "crates/catalog-reader/catalog.pack",
+        "connectors.lock",
+    ] {
+        assert!(
+            fixture.0.join(artifact).is_file(),
+            "the offline build did not write {artifact}"
+        );
+    }
 
     let check = Command::new(program)
         .args(args)
@@ -132,7 +144,7 @@ fn build_succeeds_with_networking_unavailable() {
     );
     assert_eq!(
         String::from_utf8_lossy(&check.stdout),
-        "1 provider, 5 artifacts verified\n"
+        "1 provider, 6 artifacts verified\n"
     );
 }
 
