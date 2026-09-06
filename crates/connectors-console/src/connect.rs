@@ -388,13 +388,13 @@ pub struct PersonalOAuthOptions {
     pub instruction_file: Option<std::path::PathBuf>,
 }
 
-struct PrivateInstructionDestination {
-    file: std::fs::File,
+pub(crate) struct PrivateInstructionDestination {
+    pub(crate) file: std::fs::File,
     path: Option<std::path::PathBuf>,
     identity: Option<(u64, u64)>,
 }
 impl PrivateInstructionDestination {
-    fn open(path: Option<&Path>) -> Result<Self, ConnectError> {
+    pub(crate) fn open(path: Option<&Path>) -> Result<Self, ConnectError> {
         use std::io::IsTerminal as _;
         use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
         let Some(path) = path else {
@@ -453,7 +453,7 @@ impl PrivateInstructionDestination {
             identity: Some((metadata.dev(), metadata.ino())),
         })
     }
-    fn clear(&mut self) -> Result<(), ConnectError> {
+    pub(crate) fn clear(&mut self) -> Result<(), ConnectError> {
         use std::os::unix::fs::MetadataExt as _;
         let Some(path) = self.path.as_ref() else {
             return Ok(());

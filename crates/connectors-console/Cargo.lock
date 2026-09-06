@@ -551,6 +551,7 @@ dependencies = [
  "base64",
  "getrandom 0.3.4",
  "identity-client",
+ "jsonschema",
  "keyring",
  "protocol",
  "reqwest",
