@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 41
+revision: 42
 ---
 ## Authorization and objective
 
@@ -3428,3 +3428,13 @@ Keep jobs 1, incremental 0 and dev/test debug 0, with RUSTC_WRAPPER unset. All f
 Do not clean this warm target while any command uses it. If space reclamation becomes necessary, freeze source and complete execution evidence before cleaning only this exact owned target; preserve all durable logs outside tmpfs and verify source bytes afterward. No other session's targets, shared caches or primary checkouts are cleanup candidates. The auth-protocol worker keeps its separate default root target and scheduling.
 
 The next runtime-to-client transition waits for the coordinator's explicit build-slot transfer after the auth-protocol worker's already proposed four-package validation. Website and Atlas's noncompiling collection/verification may continue independently. Full client/console/CLI verification, final root schema-4 cases and whole-unit OAuth review remain unexecuted obligations until their actual results are recorded.
+
+## Published schema 3 delivery and bounded OAuth/auth checkpoints — 2026-09-06
+
+Connectors PR 18 merged at 0c69450921ab1794c81dadec915b717a61bf0983; CI 34037821332 passed all required workspace/check/native lanes. Automatic Atlas publication 34039715421 delivered that source with verified complete v2 artifact, exact live provenance/mirror and fresh24-source set. Website PR 7 also merged atd914fa947cc3e497e8770bb814af36d55b880f5c; PRCI34040841314 and mainCI34041314425 passed. Verification-report:cli-schema 3-published-delivery-20260906 retains the full prior report and exact later publication/cleanup record. Both completed source/Website worktrees were removed only through reviewed manager finish/GC, with published recovery refs and persistent source/build evidence.
+
+Verification-report:cli-oauth-runtime-checkpoint-20260906 records the frozen 201 pass runtime lane and root verification of all 167 evidence members. OAuth remains active with client/console/CLI and late schema 4 checks plus whole-unit review outstanding. Its next root/client regression found five service failures from one old current-document identity; story revision 69 adds only the cited cfg(test) literal 3 to 4 fixture closure, preserving all production/assertion bytes and original failures. New private-client error cases and their disk no-start observations remain separate later evidence.
+
+Verification-report:cli-auth-protocol-checkpoint-20260906 preserves the 77 pass additive protocol slice, the actual separate 328 pass/2fail broader result, and completed owned-target cleanup. Root verified the 261 original,21 broader and 12 cleanup evidence members. The two broader failures have byte-identical baseline inputs; they remain red until the existing OAuth-owned claim-fence correction is assembled and tested. Runtime/transport/CLI authentication wiring remains a source-only plan pending the reviewed OAuth handoff and exact coordinator scope.
+
+No partial report admits a whole story as implemented. All original red/compiler/no-start/resource observations, historical scope exceptions and the credential unit's held two-review decision remain intact. Final combined gates, later source publication/documentation and supported-source installation with the two authorized daemon restarts remain outstanding.
