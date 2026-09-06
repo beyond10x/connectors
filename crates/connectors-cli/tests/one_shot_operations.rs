@@ -531,3 +531,197 @@ fn browser_session_operations_are_refused_under_canonical_and_published_aliases(
         assert!(!fixture.root.join("artifacts").exists());
     }
 }
+
+#[test]
+fn adversary_uncertain_invoke_never_resends_after_the_control_socket_disappears() {
+    for reply in ["eof", "malformed", "wrong-correlation"] {
+        let fixture = Fixture::new();
+        let egress = fixture.platform();
+        egress.set_nonblocking(true).unwrap();
+        let description =
+            success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
+        let socket = fixture.state.join("connectors.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&mut stream)
+                .read_line(&mut line)
+                .unwrap();
+            let request: Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(request["request"]["method"], "invoke");
+            fs::remove_file(socket).unwrap();
+            match reply {
+                "eof" => {}
+                "malformed" => writeln!(stream, "not-json").unwrap(),
+                _ => writeln!(
+                    stream,
+                    "{}",
+                    json!({
+                        "protocol": request["protocol"], "request_id": "another-request",
+                        "status": "ok", "response": {"result": "invoke", "value": {
+                            "operation_ref": "work.requests.list", "output": {},
+                            "connector_audit_ref": "fixture-audit"
+                        }}
+                    })
+                )
+                .unwrap(),
+            }
+            request
+        });
+        let output = fixture.run(&[
+            "operation",
+            "invoke",
+            "--operation",
+            "work.requests.list",
+            "--connection",
+            "connection-fixture",
+            "--description-ref",
+            description["description_ref"].as_str().unwrap(),
+            "--input-json",
+            r#"{"cursor":"","limit":1}"#,
+        ]);
+        assert!(!output.status.success(), "{reply}: {output:?}");
+        let request = server.join().unwrap();
+        assert_eq!(request["request"]["params"]["input"]["limit"], 1);
+        assert!(
+            matches!(egress.accept(), Err(error)
+            if error.kind() == std::io::ErrorKind::WouldBlock),
+            "{reply}: uncertain invocation was dispatched again through ephemeral egress"
+        );
+        assert!(!fixture.state.join("connectors.sock").exists());
+    }
+}
+
+#[test]
+fn adversary_json_source_and_size_refusals_precede_one_shot_state_creation() {
+    let fixture = Fixture::new();
+    let input_path = fixture.root.join("oversized-input.json");
+    fs::write(
+        &input_path,
+        json!({"value": "x".repeat(65_536)}).to_string(),
+    )
+    .unwrap();
+    let base = [
+        "operation",
+        "invoke",
+        "--operation",
+        "slack-conversations-list",
+        "--connection",
+        "fixture-connection",
+        "--description-ref",
+        "fixture-description",
+    ];
+    for source in [
+        vec![],
+        vec!["--input-json", "{"],
+        vec!["--input-file", input_path.to_str().unwrap()],
+        vec![
+            "--input-json",
+            "{}",
+            "--input-file",
+            input_path.to_str().unwrap(),
+        ],
+    ] {
+        let arguments = base.iter().copied().chain(source).collect::<Vec<_>>();
+        let output = fixture.run(&arguments);
+        assert!(!output.status.success(), "{output:?}");
+        assert!(
+            !fixture.state.exists(),
+            "input refusal initialized local runtime state"
+        );
+    }
+}
+
+#[test]
+fn adversary_hosted_refusal_and_target_conflict_never_construct_the_local_runtime() {
+    let fixture = Fixture::new();
+    for arguments in [
+        vec!["operation", "search", "--target", "hosted"],
+        vec!["connection", "list", "--target", "hosted"],
+    ] {
+        let output = fixture.command(&arguments).output().unwrap();
+        assert!(!output.status.success(), "{output:?}");
+        assert_eq!(value(&output)["target"], "hosted");
+        assert!(!fixture.root.join("state/b10x/connectors").exists());
+    }
+    let output = fixture.run(&[
+        "operation",
+        "invoke",
+        "--target",
+        "hosted",
+        "--operation",
+        "fixture",
+        "--connection",
+        "fixture",
+        "--description-ref",
+        "fixture",
+        "--input-file",
+        "/this-fixture-file-does-not-exist",
+    ]);
+    assert!(!output.status.success());
+    assert_eq!(value(&output)["error"]["code"], "target-conflict");
+    assert!(!fixture.state.exists());
+}
+
+#[test]
+fn adversary_caller_input_cannot_rebind_routes_or_revoked_grants() {
+    let fixture = Fixture::new();
+    let egress = fixture.platform();
+    egress.set_nonblocking(true).unwrap();
+    let description =
+        success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
+    for input in [
+        r#"{"cursor":"","limit":1,"base_url":"http://attacker.invalid"}"#,
+        r#"{"cursor":"","limit":1,"Authorization":"Bearer attacker"}"#,
+    ] {
+        let serving = serve_http(egress.try_clone().unwrap());
+        let invoked = fixture.run(&[
+            "operation",
+            "invoke",
+            "--operation",
+            "work.requests.list",
+            "--connection",
+            "connection-fixture",
+            "--description-ref",
+            description["description_ref"].as_str().unwrap(),
+            "--input-json",
+            input,
+        ]);
+        success(&invoked);
+        let actual = serving.join().unwrap();
+        assert!(actual.starts_with("GET /api/work/v2/requests?"), "{actual}");
+        assert!(
+            !actual.contains("attacker"),
+            "caller input changed the request: {actual}"
+        );
+        assert!(
+            !actual.to_ascii_lowercase().contains("authorization:"),
+            "{actual}"
+        );
+    }
+    let changed = fs::read_to_string(&fixture.config)
+        .unwrap()
+        .replace("grant-fixture", "replacement-grant");
+    fs::write(&fixture.config, changed).unwrap();
+    let refused = fixture.run(&[
+        "operation",
+        "invoke",
+        "--operation",
+        "work.requests.list",
+        "--connection",
+        "connection-fixture",
+        "--description-ref",
+        description["description_ref"].as_str().unwrap(),
+        "--input-json",
+        r#"{"cursor":"","limit":1}"#,
+    ]);
+    assert!(!refused.status.success(), "{refused:?}");
+    assert_eq!(value(&refused)["error"]["code"], "stale_authority");
+    assert!(matches!(egress.accept(), Err(error)
+        if error.kind() == std::io::ErrorKind::WouldBlock));
+}
