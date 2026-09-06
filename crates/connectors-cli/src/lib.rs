@@ -17,7 +17,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 use connectors_client::{AuthenticatedHostedClient, IdentityError, LocalClient, LoginOptions};
 use connectors_runtime::{
     default_config_path, default_state_root, local_socket_absent, validate_state_root,
-    HostedRuntime, PersonalConfig, PersonalRuntime, RuntimeError,
+    HostedRuntime, OneShotOperationV3Outcome, PersonalConfig, PersonalRuntime, RuntimeError,
 };
 use protocol::connection::{
     CandidateActivateRequest, CandidateSearchRequest, ConnectionRequest, MaterializeRequest,
@@ -1354,16 +1354,27 @@ async fn operation(
                 .await?,
                 operation
             )?,
-            OperationVersion::V3 => reduce_envelope!(
-                PersonalRuntime::one_shot_operation_v3(
-                    &config_path,
-                    state_root,
-                    config.owner_context(),
-                    request,
-                )
-                .await?,
-                operation
-            )?,
+            OperationVersion::V3 => match PersonalRuntime::one_shot_operation_v3_outcome(
+                &config_path,
+                state_root,
+                config.owner_context(),
+                request,
+            )
+            .await?
+            {
+                OneShotOperationV3Outcome::Reply(response) => {
+                    reduce_envelope!(response, operation)?
+                }
+                OneShotOperationV3Outcome::RequiresDaemon(_) => {
+                    return Err(connectors_console::envelope::ReducedError {
+                        code: "unavailable".into(),
+                        message: "this operation requires a persistent daemon; run `connectors serve local` with the same --config and --state-root".into(),
+                        retriable: false,
+                        retry_after_seconds: None,
+                        authentication: None,
+                    }.into());
+                }
+            },
         }
     } else {
         validate_state_root(&state_root)?;

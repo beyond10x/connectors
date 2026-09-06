@@ -448,3 +448,88 @@ fn auth_stage2_unknown_operation_version_refuses_before_input_or_socket() {
         ])
         .is_err());
 }
+
+#[test]
+fn auth_stage2_v3_refusal_keeps_failure_and_privacy_with_open_or_closed_output() {
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::sync::{atomic::AtomicBool, Arc};
+
+    for format in ["json", "yaml", "text", "compact"] {
+        for closed in [false, true] {
+            let fixture = Fixture::new();
+            let socket = fixture.root.join("connectors.sock");
+            let listener = UnixListener::bind(&socket).unwrap();
+            fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let done = Arc::new(AtomicBool::new(false));
+            let finished = done.clone();
+            let server = std::thread::spawn(move || {
+                let mut calls = 0;
+                loop {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            stream
+                                .set_read_timeout(Some(Duration::from_secs(5)))
+                                .unwrap();
+                            let mut line = String::new();
+                            std::io::BufReader::new(&mut stream)
+                                .read_line(&mut line)
+                                .unwrap();
+                            let (version, request) =
+                                protocol::operation::versions::decode_request(line.as_bytes())
+                                    .unwrap();
+                            assert_eq!(version, protocol::operation::versions::Version::V0Alpha3);
+                            assert!(matches!(
+                                request.request,
+                                protocol::operation::OperationRequest::Search(_)
+                            ));
+                            calls += 1;
+                            let response = serde_json::json!({"protocol":protocol::operation::v3::CONTRACT,"request_id":request.request_id,"status":"error","error":{"code":"not_found","message":"SYNTHETIC_PRIVATE_INSTRUCTION","retriable":false}});
+                            protocol::operation::versions::decode_response(
+                                response.to_string().as_bytes(),
+                            )
+                            .unwrap();
+                            writeln!(stream, "{response}").unwrap();
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if finished.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            std::thread::sleep(Duration::from_millis(1));
+                        }
+                        Err(error) => panic!("{error}"),
+                    }
+                }
+                calls
+            });
+            let mut command = fixture.command(format, &["operation", "search"]);
+            if closed {
+                let (writer, reader) = UnixStream::pair().unwrap();
+                drop(reader);
+                let writer: OwnedFd = writer.into();
+                command.stdout(writer);
+            }
+            let output = command.output().unwrap();
+            done.store(true, Ordering::SeqCst);
+            assert_eq!(server.join().unwrap(), 1, "{format}, closed={closed}");
+            assert!(!output.status.success(), "{format}, closed={closed}");
+            let public = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(
+                !public.contains("SYNTHETIC_PRIVATE_INSTRUCTION"),
+                "{format}, closed={closed}"
+            );
+            if !closed {
+                assert!(public.contains("not_found"), "{format}: {public}");
+                assert!(
+                    public.contains("the operation was not found"),
+                    "{format}: {public}"
+                );
+            }
+        }
+    }
+}
