@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Anthropic API key, sent as x-api-key",
@@ -101,6 +101,7 @@
         "method": "GET",
         "url": "{base}/v1/models"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -212,6 +213,7 @@
         "method": "GET",
         "url": "{base}/v1/models/{model_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -293,6 +295,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/me"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -358,6 +361,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/users"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -480,6 +484,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/users/{user_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -559,6 +564,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -670,6 +676,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces/{workspace_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -796,6 +803,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces/{workspace_id}/members"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -924,6 +932,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/workspaces/{workspace_id}/members/{user_id}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -994,6 +1003,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/api_keys"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1090,6 +1100,7 @@
         "method": "GET",
         "url": "{base}/v1/organizations/invites"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -1173,7 +1184,7 @@
       "service": "admin"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "api_version": "v1",

@@ -1544,3 +1544,139 @@ fn the_canonical_surface_is_selected_and_the_file_stays_reviewable() {
          selector is that this number does not scale with the operation count"
     );
 }
+
+fn array_overlay_fixture(
+    pointers: &str,
+    schema: serde_json::Value,
+) -> (String, Vec<SpecDocument<'static>>) {
+    let document = serde_json::json!({"openapi":"3.0.0","info":{"title":"fixture","version":"1"},"paths":{"/things":{"get":{"operationId":"listThings","summary":"List things","responses":{"200":{"description":"ok","content":{"application/json":{"schema":schema}}}}}}}});
+    let declaration = format!(
+        r#"
+id = "fixture"
+base_url = "https://api.example.com"
+[spec]
+path = "specs/fixture.yaml"
+[[patch.operations]]
+select = "listThings"
+rename = "fixture-list"
+direction = "read"
+risk = "low"
+idempotency = "idempotent"
+effects = ["read", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+response_arrays = {pointers}
+"#
+    );
+    (
+        declaration,
+        synthetic("specs/fixture.yaml", document.to_string()),
+    )
+}
+
+fn source_fidelity_fixture(
+    body_required: bool,
+    schema: serde_json::Value,
+) -> (String, Vec<SpecDocument<'static>>) {
+    let document = serde_json::json!({
+        "openapi":"3.0.3", "info":{"title":"Fixture","version":"1"},
+        "paths":{"/things/{id}":{"post":{
+            "operationId":"createThing", "summary":"Create a thing",
+            "parameters":[{"name":"id","in":"path","required":true,"schema":{"oneOf":[{"type":"string"},{"type":"integer"}]}}],
+            "requestBody":{"required":body_required,"content":{"application/json":{"schema":schema}}},
+            "responses":{"201":{"description":"Created","content":{"application/json":{"schema":{"type":"object","properties":{"id":{"type":"integer"}}}}}}}
+        }}}
+    });
+    let declaration = r#"
+id = "fixture"
+base_url = "https://api.example.com"
+[spec]
+path = "specs/fixture.yaml"
+request_semantics = "openapi_3_0_json_v1"
+[[patch.operations]]
+select = "createThing"
+rename = "fixture-create"
+direction = "write"
+risk = "high"
+idempotency = "non_idempotent"
+effects = ["write", "network"]
+interaction_shape = "unary"
+protocol_driver = "http_v1"
+placement_requirement = "connectors_deployment"
+implementation_form = "built_in"
+required_capabilities = ["public_network"]
+"#;
+    (
+        declaration.to_owned(),
+        synthetic("specs/fixture.yaml", document.to_string()),
+    )
+}
+
+#[test]
+fn source_fidelity_preserves_whole_body_constraints_and_body_presence() {
+    let schema = serde_json::json!({"type":"object","required":["title"],"additionalProperties":false,"minProperties":1,"properties":{"title":{"type":"string","nullable":true},"enabled":{"type":"boolean","default":true}}});
+    for required in [false, true] {
+        let (declaration, cache) = source_fidelity_fixture(required, schema.clone());
+        let connector = load_from(&declaration, &cache);
+        let params = &connector.operations[0].params;
+        assert_eq!(params.body_schema.as_ref(), Some(&schema));
+        assert!(params.body.is_empty());
+        let serialized = serde_json::to_value(params).unwrap();
+        assert_eq!(serialized["body_required"], required);
+        assert_eq!(serialized["request_semantics"], "openapi_3_0_json_v1");
+        assert_eq!(
+            params.path[0].schema,
+            serde_json::json!({"oneOf":[{"type":"string"},{"type":"integer"}]})
+        );
+    }
+}
+
+#[test]
+fn source_fidelity_refuses_schema_replacement_and_parameter_omission() {
+    let (declaration, cache) = source_fidelity_fixture(
+        false,
+        serde_json::json!({"type":"object","properties":{"title":{"type":"string"}}}),
+    );
+    for patch in [
+        "\n[[patch.operations.params]]\nposition=\"path\"\nname=\"id\"\nschema={type=\"integer\"}\n",
+        "\nomit.body=[\"title\"]\n",
+    ] {
+        let message = refuse_from(&(declaration.clone() + patch), &cache);
+        assert!(message.contains("source-faithful"), "{message}");
+    }
+}
+
+#[test]
+fn response_array_schema_rewrites_cannot_wrap_valid_source_schemas() {
+    let schema = serde_json::json!({"type":"object","required":["id"],"properties":{"id":{"type":"integer","minimum":1},"children":{"type":"object","properties":{"name":{"type":"string"}}}}});
+    let (declaration, cache) =
+        array_overlay_fixture(r#"["", "/properties/children"]"#, schema.clone());
+    assert!(refuse_from(&declaration, &cache).contains("unknown field `response_arrays`"));
+    let (reverse, cache) = array_overlay_fixture(r#"["/properties/children", ""]"#, schema);
+    assert!(refuse_from(&reverse, &cache).contains("unknown field `response_arrays`"));
+}
+
+#[test]
+fn response_array_schema_rewrites_are_rejected_for_every_pointer() {
+    let schema = serde_json::json!({"type":"object","properties":{"already":{"type":"array","items":{"type":"string"}},"scalar":{"type":"string"}},"description":{"type":"object"}});
+    for pointer in [
+        "/properties/missing",
+        "/properties/already",
+        "/properties/scalar",
+        "/description",
+        "bad",
+        "/properties/~2invalid",
+    ] {
+        let (declaration, cache) =
+            array_overlay_fixture(&serde_json::json!([pointer]).to_string(), schema.clone());
+        assert!(
+            refuse_from(&declaration, &cache).contains("response_arrays"),
+            "{pointer}"
+        );
+    }
+    let (declaration, cache) = array_overlay_fixture(r#"["", ""]"#, schema);
+    assert!(refuse_from(&declaration, &cache).contains("unknown field `response_arrays`"));
+}

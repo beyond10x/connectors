@@ -268,7 +268,7 @@ mod tests {
     /// inside operation records, exactly where a naive scan goes wrong.
     const DOCUMENT: &str = r#"{
   "connector": "acme",
-  "schema_version": 2,
+  "schema_version": 3,
   "operations": [
     {
       "id": "acme-thing-get",
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn a_nested_operations_key_is_not_the_array() {
         let document = r#"{
-  "schema_version": 2,
+  "schema_version": 3,
   "config": [ { "help": "operations", "operations": [ { "id": "decoy" } ] } ],
   "operations": [ { "id": "real-op", "service": "default" } ]
 }
@@ -334,7 +334,7 @@ mod tests {
             .expect("the digest spelling");
         let body_start = pack.find('\n').expect("a newline") + 1 + digest.len() + 1;
         assert_eq!(stated, sha256_hex(&pack.as_bytes()[body_start..]));
-        assert_eq!(lines.next(), Some("schema 2"));
+        assert_eq!(lines.next(), Some("schema 3"));
         assert_eq!(lines.next(), Some("providers 1"));
         assert_eq!(lines.next(), Some("operations 2"));
     }
@@ -352,11 +352,11 @@ mod tests {
 
     #[test]
     fn disagreeing_schema_versions_are_refused() {
-        let newer = DOCUMENT.replace("\"schema_version\": 2", "\"schema_version\": 3");
+        let newer = DOCUMENT.replace("\"schema_version\": 3", "\"schema_version\": 4");
         let error = compile(&[("acme", DOCUMENT), ("beacon", &newer)])
             .expect_err("one pack cannot carry two schema versions");
         assert!(
-            format!("{error:#}").contains("schema_version 3"),
+            format!("{error:#}").contains("schema_version 4"),
             "the refusal names the disagreement: {error:#}"
         );
     }

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/b10x/blob/main/foundation/connectors/catalog/connector-document.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
   "auth": [
     {
       "description": "Vercel access token sent as a bearer",
@@ -95,6 +95,7 @@
         ],
         "url": "{base}/v10/projects"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -164,6 +165,7 @@
         ],
         "url": "{base}/v9/projects/{idOrName}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -271,6 +273,7 @@
         ],
         "url": "{base}/v7/deployments"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -443,6 +446,7 @@
         ],
         "url": "{base}/v13/deployments/{idOrUrl}"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -549,6 +553,7 @@
         ],
         "url": "{base}/v12/deployments/{id}/cancel"
       },
+      "request_semantics": "legacy_v1",
       "required_capabilities": [
         "public_network"
       ],
@@ -582,7 +587,7 @@
       "service": "default"
     }
   ],
-  "schema_version": 2,
+  "schema_version": 3,
   "services": [
     {
       "base_url": "https://api.vercel.com",

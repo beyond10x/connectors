@@ -32,3 +32,5 @@ jsonschema.workspace = true
 # the pack rather than through a second parser written for the test. Dev-only: nothing in the build
 # path reads a pack, it only writes one.
 catalog-reader.workspace = true
+
+serde_norway.workspace = true

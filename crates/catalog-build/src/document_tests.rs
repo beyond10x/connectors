@@ -3,6 +3,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn source_fidelity_schema_three_preserves_the_frozen_schema_two_identity_and_bytes() {
+        assert_eq!(
+            connector_spec::sha256_hex(schema_v2_text().as_bytes()),
+            "b42980401d914c00a849dd39b267e60650a5d11adc9e24a1cf4adaff5e7c6607"
+        );
+        assert_ne!(SCHEMA_ID, SCHEMA_V2_ID);
+        assert_eq!(schema()["properties"]["schema_version"]["const"], 3);
+        assert!(schema()["$defs"]["operation"]["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("request_semantics")));
+        assert_eq!(
+            schema()["$defs"]["operation"]["properties"]["request_semantics"]["enum"],
+            json!(["legacy_v1", "openapi_3_0_json_v1"])
+        );
+        assert!(schema_v2()["$defs"]["operation"]["properties"]
+            .get("request_semantics")
+            .is_none());
+    }
+
+    #[test]
     fn an_approved_origin_may_be_the_whole_base_url() {
         assert_eq!(origin_template("{origin}"), Some("origin"));
         assert_eq!(origin_template("{origin}/api/v1"), Some("origin"));
