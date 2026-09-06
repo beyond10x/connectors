@@ -343,7 +343,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 75
+revision: 76
 ---
 ## Acceptance
 
@@ -617,3 +617,11 @@ Verification-report:cli-oauth-correction-one-20260906 preserves the complete fir
 The corrector released all compilation and is idle. Dispatch review_one_shot_final for the second and final ordinary whole-unit pass using whole-unit-adversary-2/brief.md, exact candidate f9bf1d6a and published base 0c69450921ab1794c81dadec915b717a61bf0983. Its twelve existing additive test owners include the already scoped oauth_adversary_tests.rs child; no new test owner or production scope is added. This pass still covers the whole helper/FULL/custody/refresh/operational OAuth unit, with the corrected presence contract and all first-pass cases retained. Actual auth protocol/service/runtime work stays separate, and auth runtime implementation remains held for the reviewed handoff.
 
 Assign its new scratch whole-unit-adversary-2 and TMPDIR ~/.cache/cw6/oa2. Transfer the sole compiling slot to that reviewer under the existing private 12 GiB and ordinary CLI 8 GiB target caps and continuous 12/8/16 GiB reserves. Root's oauth-pass2-resource-observation.json records fresh adequate headroom. Follow the bounded deciding-before-full ordering and same four affected full/strict/fmt lanes; the historical-reader witness is retained, not needlessly rerun. Complete raw/portable reports include actual outputs, all failures and a structured findings block. No third ordinary attack is authorized. Full integration/publication/delivery and the supported installation still remain after review.
+
+## Final ordinary OAuth review and integration routing — 2026-09-06
+
+Immutable review-result cli-oauth-adversary-2-20260906 contains the complete second/final report exactly returned, including all 17 actual command outputs and its empty findings block. Report SHA256 f6e776e336a5d2111257fcdd9a09f704c3d3ac62e102ae7ff8afa74daa991e2a; 134-member manifest SHA256 3a3e2306af8c5de9d1678dc2a3e4ba7d09870f43e20c66174cb9c1eedfbbb8cc. Root independently verified all members, all 1,193 source hashes, four exact additive test paths, twelve unchanged old test prefixes, public/raw prefix-only equality and all 17 complete output embeddings. Source is f9bf1d6a plus tests.patch b4b0f459f8ef6d4b42cac24dd67f248e21df869056720b50a449c84e5e0602fb.
+
+The second review found no product defect. All four full suites pass: root 1,106 with one existing ignore, runtime 222, console 102 and CLI 133; zero failures. The operational cohort is 1,509 to 1,513, plus 50 helper/SQLite cases counted separately. All four strict Clippy and formatting lanes exit zero. The historical published-reader witness remains separately retained first-pass evidence and was not rerun. The first review's authoring finding, undecided origin and recorded fixed disposition remain unchanged. The review's incorrect edition-format precheck and initial schema-fixture failure remain preserved; they are not product findings or additional passes. No resource guard interrupted any command.
+
+Route this green reviewed source and its four additive cases to integration. The final combined twelve-workspace gate, source publication, documentation delivery and supported installation remain later coordinator work. No third ordinary attack is opened and the story remains active until its required assembled gate closes. Credentials remain held under their separate two-review blocker.
