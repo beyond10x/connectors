@@ -224,7 +224,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 140
+revision: 141
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -443,3 +443,11 @@ The second/final ordinary adversary pass is assigned against the complete frozen
 The read-only schema 3 preflight identifies missing public explanation of the completed rate source. Assign CHANGELOG.md, crates/protocol/README.md, docs/architecture/interfaces.md and docs/design/04-the-callers-contract.md solely for concise publication guidance grounded in frozen source 2f89a6fccf9878ed8275565d68667cbd1fc08d43 and Atlas proposed migration records 0040/0041. The implementor may edit these four paths in the coordinator's managed integration checkout; no source, generated output, planning, manifest, lock, release identity, provider data or remote write is assigned. The adversary's separate rate checkout remains untouched.
 
 Explain Operation v2 and strict v1 compatibility, advisory rate metadata, definite 429 and trusted delay, no automatic resend, and schema 3's required reader/producer migration with preserved source semantics. Keep the unreleased entry under Unreleased. Mark proposed external migration and source-versus-release/install status accurately; do not claim OAuth schema 4, Operation v3, consumer adoption or a completed final review. Preserve the design's existing text and append its dated conditional-metadata note. Validate links/text without a new Cargo build, freeze a four-path patch and short report, then return source to the coordinator for the accepted schema 3 assembly.
+
+## Final rate adversary green — 2026-09-06
+
+Immutable review-result cli-rate-adversary-2-20260906 retains the complete final independent report. Frozen repair source 2f89a6fccf9878ed8275565d68667cbd1fc08d43 plus seven additive cases is committed as 0c026610e67f3ec6da0a8014813f3d88c4e72799. The coordinator verified all 108 evidence entries, exact seven-path source hashes, insertion-only preservation, exact source patch and complete portable report equality except for the home prefix. Report SHA256 193e58ed85dec84579a383c7f239f6fba8b952f7454333946495233d59aee4d6; patch SHA256 074a14c8b34081cb700cd47155d6cf416f9b14da6d7b1b3847cda0ddc0271eef; evidence manifest SHA256 92f92a514d37d211bab07312162facb30b9c6e3e3a80e2422f51a65577d8c395.
+
+The final ordinary parallel affected suites passed root 1214, runtime 347, CLI 131 and console 87: 1779 total, zero failures and six unchanged ignored cases. Strict Clippy/formatting pass in every lane. The seven independent new cases and two retained URL countercases each executed exactly once in their deciding selections and passed. Findings are empty; no third pass is needed. The initial zero-test selector miss and shared-disk floor incident remain explicitly recorded in the immutable report. Whole canonical/vendor fidelity, schema 2 and v1 byte preservation, all old case names and existing assertions remain verified.
+
+The source is now released for the coordinator's local integration and downstream implementation. This acceptance does not publish schema 3 or complete the twelve-workspace gate. Assemble the exact published Git framing source, selected planning evidence, current deterministic ESS projection and bounded public guidance without the uncalled private OAuth kernel; run the complete repository and publication gates before source publication. Schema 4 writer publication remains later. Full-wave integration, installation and external consumer adoption remain separate outcomes.
