@@ -14,6 +14,10 @@ Neither version negotiation nor a retriable refusal authorizes automatic invocat
 An operation description may include `rate_advice`, with an unchanged fixed declaration shape
 and bounded conditional alternatives. Each alternative preserves its `declaration`:
 `applies_when`, optional `rate` (`requests`, `per_seconds`, `basis`), and `source_url`.
+Sources use RFC 3986 ASCII URI spelling with literal lowercase `https`, a nonempty host,
+no userinfo or fragment, and an optional decimal port from 0 through 65535. An empty port
+denotes the default. Leading zeros and percent-encoded spelling are preserved; spaces and
+non-ASCII path/query characters must be percent-encoded. The readers do not normalize URLs.
 `minimum_allowance` is a published minimum tier allowance; `ceiling` is a published maximum.
 No numeric rate means that source establishes none. Applicability is explanatory data; a runtime
 must expose all alternatives and must not infer an application category from credentials.

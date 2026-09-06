@@ -131,7 +131,9 @@ pub fn operation_v2_schema() -> Value {
         bounded_text(wire::MAX_APPLICABILITY_CHARS);
     defs["ConditionalRateLimit"]["properties"]["source_url"] = json!({
         "type":"string", "minLength":1,"maxLength":wire::MAX_SOURCE_URL_CHARS,
-        "format":"uri", "pattern":"^https://[^/?#@\\s]+(?:[/?][^#\\s]*)?$"
+        "format":"uri",
+        "description":"RFC 3986 ASCII URI with literal lowercase https, a nonempty host, no userinfo or fragment, and an optional decimal port from 0 through 65535. Empty ports denote the default; leading zeros and percent-encoded spelling are preserved.",
+        "pattern":r"^https://(?:\[[^\]]+\]|[^:/?#@\[\]]+)(?::(?:0*(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?)?(?:[/?][^#]*)?$"
     });
     defs["ConditionalRateAdvice"]["properties"]["suggested_interval_ms"] =
         nullable(unsigned(1, u64::from(u32::MAX) * 1000));

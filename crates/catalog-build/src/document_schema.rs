@@ -19,7 +19,7 @@ pub fn schema() -> &'static Value {
             "required":["applies_when","source_url"],
             "properties":{
                 "applies_when":{"type":"string","minLength":1,"maxLength":4096,"pattern":"^[^\\u0000-\\u001f\\u007f-\\u009f]+$"},
-                "source_url":{"type":"string","minLength":1,"maxLength":2048,"format":"uri","pattern":"^https://[^/?#@\\s]+(?:[/?][^#\\s]*)?$"},
+                "source_url":connector_spec::ConditionalRateLimit::source_url_schema(),
                 "rate":{"$ref":"#/$defs/published_rate"}
             }
         });

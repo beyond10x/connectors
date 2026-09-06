@@ -145,6 +145,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 tokio = { version = "1", default-features = false }
 rustix = { version = "1.1.4", features = ["fs", "process"] }
 url = "2"
+fluent-uri = "=0.4.1"
 identity-client = { git = "https://github.com/beyond10x/identity.git", tag = "0.5.6" }
 # Dependencies at opt-level 2 even in dev: the test suites' cost is parse-dominated (21 MB of
 # vendored specs through serde per whole-catalogue sweep), and debug-mode serde made one

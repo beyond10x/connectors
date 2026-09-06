@@ -623,6 +623,7 @@ name = "connector-spec"
 version = "0.6.5"
 dependencies = [
  "connector-address",
+ "fluent-uri",
  "indexmap",
  "serde",
  "serde_json",
@@ -630,7 +631,6 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror",
  "toml",
- "url",
 ]
 
 [[package]]
@@ -1852,6 +1852,7 @@ version = "0.6.5"
 dependencies = [
  "clap",
  "domain",
+ "fluent-uri",
  "jsonschema",
  "schemars",
  "serde",

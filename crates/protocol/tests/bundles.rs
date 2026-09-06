@@ -552,3 +552,106 @@ fn operation_v2_description_downgrade_loses_only_advice() {
         .remove("rate_advice");
     assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), expected);
 }
+
+#[test]
+fn rate_repair_source_uri_grammar_matches_wire_and_published_schema() {
+    use protocol::operation::wire as v2;
+    let schema: Value = serde_json::from_slice(
+        &fs::read(
+            root().join("contracts/connector-operation/v0alpha2/connector-operation.schema.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let source_schema = &schema["$defs"]["ConditionalRateLimit"]["properties"]["source_url"];
+    let validator = jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft202012)
+        .should_validate_formats(true)
+        .build(source_schema)
+        .unwrap();
+    let check = |source: &str, expected: bool| {
+        let advice = v2::OperationRateAdvice {
+            fixed: None,
+            alternatives: vec![v2::ConditionalRateAdvice::new(v2::ConditionalRateLimit {
+                applies_when: "a documented category".into(),
+                rate: None,
+                source_url: source.into(),
+            })],
+        };
+        let rust = advice.validate().is_ok();
+        let schema = validator.is_valid(&serde_json::json!(source));
+        assert_eq!(
+            (rust, schema),
+            (expected, expected),
+            "{source:?}: wire/schema URL grammar"
+        );
+    };
+    for (source, expected) in [
+        ("https://docs.example.test", true),
+        ("https://DOCS.example.test/rate", true),
+        ("https://docs.example.test:443/rate", true),
+        ("https://docs.example.test:/rate", true),
+        ("https://127.0.0.1:443/rate", true),
+        ("https://[2001:db8::1]:443/rate", true),
+        ("https://docs.example.test/a%20b?category=a/b?c", true),
+        ("https://docs.example.test/%E2%82%AC", true),
+        ("https://docs.example.test/rate?email=a@b", true),
+        ("HTTPS://docs.example.test/rate", false),
+        ("hTtPs://docs.example.test/rate", false),
+        ("http://docs.example.test/rate", false),
+        ("https:/docs.example.test/rate", false),
+        ("https:///rate", false),
+        ("https://:443/rate", false),
+        ("https://user@docs.example.test/rate", false),
+        ("https://user:pass@docs.example.test/rate", false),
+        ("https://@docs.example.test/rate", false),
+        ("https://docs.example.test/rate#", false),
+        ("https://docs.example.test/rate#part", false),
+        (" https://docs.example.test/rate", false),
+        ("https://docs.example.test/a b", false),
+        ("https://docs.example.test/rate?x=a b", false),
+        ("https://docs.example.test/rate\n", false),
+        ("https://docs.example.test/a\\b", false),
+        ("https://docs.example.test/a%", false),
+        ("https://docs.example.test/a%2", false),
+        ("https://docs.example.test/a%GG", false),
+        ("https://docs.example.test/€", false),
+        ("https://döcs.example.test/rate", false),
+        ("https://[2001:db8::zz]/rate", false),
+        ("https://[2001:db8::1/rate", false),
+    ] {
+        check(source, expected);
+    }
+
+    for port in [
+        0_u32, 9, 10, 99, 100, 999, 1000, 9999, 10000, 59999, 60000, 64999, 65000, 65499, 65500,
+        65529, 65530, 65535, 65536, 99999, 100000,
+    ] {
+        for spelling in [port.to_string(), format!("000{port}")] {
+            check(
+                &format!("https://docs.example.test:{spelling}/rate"),
+                port <= u32::from(u16::MAX),
+            );
+        }
+    }
+    for port in ["-1", "+1", "1.0", "1e2", "18446744073709551616"] {
+        check(&format!("https://docs.example.test:{port}/rate"), false);
+    }
+    for source in [
+        "https://%64ocs.example.test/a%2fb",
+        "https://[v1.fe80]/rate",
+        "https://docs.example.test/a%23b?x=%40",
+    ] {
+        check(source, true);
+    }
+    let prefix = "https://docs.example.test/";
+    check(
+        &format!("{prefix}{}", "a".repeat(2048 - prefix.len())),
+        true,
+    );
+    check(
+        &format!("{prefix}{}", "a".repeat(2049 - prefix.len())),
+        false,
+    );
+    check("", false);
+}

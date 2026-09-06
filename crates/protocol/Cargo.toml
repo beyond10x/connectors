@@ -16,6 +16,7 @@ schemars.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 url.workspace = true
+fluent-uri.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true
