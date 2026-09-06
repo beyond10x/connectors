@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v3.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
       "description": "Contentful Content Delivery API (CDA) access token, sent as a bearer. Read-only: published content in one space only, and only the Delivery API accepts it",
@@ -684,7 +684,7 @@
       "service": "management"
     }
   ],
-  "schema_version": 3,
+  "schema_version": 4,
   "services": [
     {
       "audiences": [

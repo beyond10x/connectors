@@ -3304,3 +3304,27 @@ fn selected_target_preserves_provider_owned_target_fields_in_every_renderer() {
         }
     }
 }
+
+#[test]
+fn personal_oauth_setup_requires_explicit_profile_and_private_instruction_option() {
+    let arguments = [
+        "connectors",
+        "setup",
+        "connect",
+        "gitlab",
+        "--auth-profile",
+        "gitlab.oauth_token",
+        "--instruction-file",
+        "/synthetic/private-instructions",
+    ];
+    assert!(connectors_cli::command()
+        .try_get_matches_from(arguments)
+        .is_ok());
+    for conflict in ["--credential", "--as"] {
+        let mut arguments = arguments.to_vec();
+        arguments.extend([conflict, "fixture"]);
+        assert!(connectors_cli::command()
+            .try_get_matches_from(arguments)
+            .is_err());
+    }
+}

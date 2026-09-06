@@ -29,10 +29,14 @@ fn adversary_gitlab_pass1_schema_versions_and_profiles_fail_closed() {
     .unwrap();
     let v3 = jsonschema::validator_for(&schema3).unwrap();
     let v2 = jsonschema::validator_for(&schema2).unwrap();
-    let original: Value =
+    let mut original: Value =
         serde_json::from_str(include_str!("../../../catalog/github.catalog.json")).unwrap();
+    // Preserve the frozen v3 schema oracle over identical operation bytes. The current reader
+    // accepts v4; its positive and malformed-version/profile cases are tested separately below.
+    original["$schema"] = schema3["$id"].clone();
+    original["schema_version"] = json!(3);
     assert!(v3.is_valid(&original));
-    assert!(Document::parse(&original.to_string()).is_ok());
+    assert!(Document::parse(&original.to_string()).is_err());
     let mut old = original.clone();
     old["$schema"] = schema2["$id"].clone();
     old["schema_version"] = json!(2);
@@ -60,7 +64,6 @@ fn adversary_gitlab_pass1_schema_versions_and_profiles_fail_closed() {
         let mut mutated = original.clone();
         mutated["schema_version"] = version;
         assert!(!v3.is_valid(&mutated));
-        assert!(Document::parse(&mutated.to_string()).is_err());
     }
     for profile in [
         None,
@@ -76,6 +79,51 @@ fn adversary_gitlab_pass1_schema_versions_and_profiles_fail_closed() {
             operation.remove("request_semantics");
         }
         assert!(!v3.is_valid(&mutated));
+        assert!(Document::parse(&mutated.to_string()).is_err());
+    }
+}
+
+#[test]
+fn current_schema_four_and_reader_keep_all_version_and_profile_refusal_classes() {
+    let schema4: Value = serde_json::from_str(include_str!(
+        "../../../catalog/connector-document-v4.schema.json"
+    ))
+    .unwrap();
+    let v4 = jsonschema::validator_for(&schema4).unwrap();
+    let original: Value =
+        serde_json::from_str(include_str!("../../../catalog/github.catalog.json")).unwrap();
+    assert_eq!(original["schema_version"], json!(4));
+    assert!(v4.is_valid(&original));
+    assert!(Document::parse(&original.to_string()).is_ok());
+    for version in [
+        json!(0),
+        json!(2),
+        json!(3),
+        json!(5),
+        json!(null),
+        json!("3"),
+        json!("4"),
+        json!(-1),
+    ] {
+        let mut mutated = original.clone();
+        mutated["schema_version"] = version;
+        assert!(!v4.is_valid(&mutated));
+        assert!(Document::parse(&mutated.to_string()).is_err());
+    }
+    for profile in [
+        None,
+        Some(json!(null)),
+        Some(json!("openapi_3_0_json_v2")),
+        Some(json!("")),
+    ] {
+        let mut mutated = original.clone();
+        let operation = mutated["operations"][0].as_object_mut().unwrap();
+        if let Some(profile) = profile {
+            operation.insert("request_semantics".to_owned(), profile);
+        } else {
+            operation.remove("request_semantics");
+        }
+        assert!(!v4.is_valid(&mutated));
         assert!(Document::parse(&mutated.to_string()).is_err());
     }
 }
