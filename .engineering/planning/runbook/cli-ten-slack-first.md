@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 24
+revision: 25
 ---
 
 
@@ -3285,3 +3285,7 @@ Inspected integration HEAD e101a24e and its four coordinator-owned dirty plannin
 Atlas primary is dirty and stale; new managed authority wt-679b510698e5 is clean at exact advertised main f686fe034bc3f1c7c5d276476b814ee05c2bca9f. Its path is ~/.local/state/worktree/trees/b10x/atlas/wt-679b510698e5. Current Connectors remote main is a61e0a748be58ad03cf1907a48f9fefbb4423434 and wave remote50f0ab5107de9f07f42d9f2b73df80bcfe978e89. Both are observations, not merged-source claims.
 
 Workers resume the existing one-shot final review, GitLab stage2, and additive rate-limit stage1. They retain their original managed tree/build/scratch triples and short TMPDIRs. No Git, AEP, model, service or live-provider mutations are delegated. Free space measured26GiB against20GiB floor; only the one-shot reviewer initially has the build slot. Connectors doctor is healthy, but operation search exposes no GitHub operation, so Atlas bot tooling remains the declared GitHub path.
+
+## Remote main reconciliation
+
+Integrated remote main a61e0a748be58ad03cf1907a48f9fefbb4423434 while preserving both published histories. Its seven source/lock files were applied from the exact merge-base diff. The eleven independent remote planning events for story:git-http-oauth-authentication and its immutable review were replayed sequentially through AEP under the current agent actor; both resulting artifact files were verified byte-for-byte against remote main. The merge retains the original remote event provenance through its second parent and avoids a textual append-only-journal merge. No new delivery or verification is claimed for that separate active story. Full wave verification remains pending.
