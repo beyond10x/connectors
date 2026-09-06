@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 27
+revision: 28
 ---
 
 
@@ -3299,3 +3299,9 @@ The resumed GitLab worker recovered the three stage2 source/fixture/guide files 
 Second/final attack of corrected17763bbc is recorded verbatim as review-result:cli-one-shot-adversary-2-portable-20260906. Five appended cases increased affected execution626->631 passing with no confirmed product defect. Two initial invalid-fixture reds are retained as INFEASIBLE notes, not product defects. Full selected runners observed1685 nonduplicated passes and6 existing ignored; strict clippy/fmt and ESS0.18.0 validation passed. Tests-only commitd86716fb preserves both earlier and final adversary cases. The final public derivative renders scratch references as plain text for durable AEP recording; original frozen scratch reports and hashes remain retained. Whole-wave final gate and installation remain outstanding before lifecycle closure.
 
 Unpublished recording transactionad5a75a49cdb69fcadd6258fcda3263f10b2c0d4 is retained on recovery/cli-review-link-transaction-20260906. Its immutable report used machine-local Markdown links, rejected by the link fence. Integration resumed from its clean parent620d60ee on wave/cli-ten-slack-first-resumed; prior valid parser ownership/scope mutations were replayed through AEP, then a distinct portable review id was created from the reviewer-returned derivative. No published history or original review bytes were changed. This is one final review with mechanical presentation variants, not an extra attack.
+
+## Rate-limit additive stage1 handoff
+
+Recovered stage1 now passes194->209 affected cases, strict clippy/fmt and deterministic85-vector checks. Exact original baseline argv was recovered from the predecessor transcript, not reconstructed. Existing public DTOs still re-export the byte-identical legacy snapshot; actual default transport/catalog/CLI migration remains held for the reviewed GitLab source handoff. Coordinator applies the source relocation citation patch to runtime/system/components only. Historical review citations retain their original context.
+
+Stage2 fixture closure adds existing Slack backend and one-shot CLI test files. GitLab source remains unpublished and schema3 has not frozen; the rate stage may add its optional conditional declarations under this same migration after the independent GitLab review and handoff. No v1/v2 frozen schema is changed. One-shot reviewed source integrated at7a2de67bd291f719115d6094b995004c60ee956e; dry combined GitLab merge at6e655168 is conflict-free. This scope record authorizes preparation, not concurrent edits to GitLab's review tree.
