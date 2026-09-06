@@ -53,6 +53,8 @@ scope:
   path: crates/connectors-cli/src/tests.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/cli_surface.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/closed_pipe.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/one_shot_operations.rs
 - confidence: inferred
@@ -221,7 +223,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 81
+revision: 83
 ---
 ## Acceptance
 
@@ -493,3 +495,13 @@ The complete root workspace run on 99328258395255dd10038104c1487a64fd5abd8f retu
 The catalog test actually ran its network namespace and both build and check succeeded. Only its literal artifact count remained five. OAuth commit 6fae9df000986f39d009a2e8503bdff03db41762 added the retained v3 schema alongside retained v2 and current v4 in catalog-build/src/pipeline.rs, and updated the corresponding catalog-build no_network and check count assertions to six. The six independently identified artifacts are catalog/acme.catalog.json, catalog/connector-document.schema.json, catalog/connector-document-v3.schema.json, catalog/connector-document-v4.schema.json, crates/catalog-reader/catalog.pack and connectors.lock. The prior OAuth review command selected ten root packages and did not include catalog-cli; its recorded passing count never covered this binary test.
 
 Record this exact additional root-owned test scope before editing. Preserve the existing namespace probe, actual build/check success assertions and canonical document assertion. Update only the justified count to six and add explicit existence assertions for the three published schema paths, pack and lock. This is the observed generated inventory, not an altered generator or an oracle inferred from the failing output alone. Retain the initial failure and run the real binary test under an available network namespace before claiming closure. No provider, schema, version, lock content or production code changes are authorized by this correction.
+
+## CLI full-gate observations and correction scope — 2026-09-06
+
+All twelve workspace cargo metadata --locked --offline commands resolve successfully at 289da8a0bc9e1b6eb85fa302024d6d173734eb1e without source changes. B's complete console suite passes 107 cases with zero failures or ignores; strict all-target Clippy and workspace formatting pass first execution. Its initial CLI full suite records 134 passes, five failures and zero ignores, exit 101, in the retained auth-client-common-full-cli-tests-first command/log/result objects. No compiler failure or source correction preceded that output.
+
+Two retained doctor cases encounter the actual Unix socket 107-byte path limit under the originally assigned long private TMPDIR; the observed generated path is 114 bytes. Prospectively assign separate shorter private temp roots to A and B, retaining all existing scratch and outputs. This changes test execution configuration, not the platform limit, the fixture oracle, the daemon or operator state. The original literal refusal remains evidence; no test is skipped.
+
+The retained closed_pipe protocol-refusal case uses a literal old operation error fixture and expects its message. Root adds crates/connectors-cli/tests/closed_pipe.rs as an exact cited B-owned correction scope: only select --protocol-version v2 in the existing search_output helper for the retained operation controls, preserving every response byte and assertion. Add a separate current-v3 closed-pipe/privacy control in the already assigned crates/connectors-cli/tests/remediation.rs, using the actual canonical decoder and a valid hostile response. No silent wire fallback or resending is introduced.
+
+Two other preserved CLI cases expect actionable persistent-daemon guidance for session signals and browser operations. The new generic v3 closed Unavailable presentation suppresses that locally generated instruction. B continues source-only diagnosis and returns a concrete typed local-origin remedy before implementation. Arbitrary received error messages must remain closed; no message matching or daemon-string forwarding is authorized. Root will record the selected origin boundary after reading it. The compiler transfers to A only after B explicitly releases it; A completes queued catalog/root/runtime lanes and the repository final checks, and B awaits the next explicit grant for its correction checks.
