@@ -799,6 +799,10 @@ fn is_v6_documentation(ip: Ipv6Addr) -> bool {
 }
 
 #[cfg(test)]
+#[path = "egress_rate_adversary_tests.rs"]
+mod rate_adversary_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
