@@ -13,6 +13,7 @@ publish.workspace = true
 base64.workspace = true
 getrandom.workspace = true
 identity-client.workspace = true
+jsonschema.workspace = true
 keyring.workspace = true
 protocol.workspace = true
 reqwest.workspace = true
