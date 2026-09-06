@@ -4,6 +4,28 @@ domain: connectors.catalog
 summary: The reviewed, compiled template of one vendor surface, its declared operations, and the sealed set a deployment serves.
 
 types:
+  # Proposed by the operator-selected GitLab source-fidelity work, 2026-09-06.
+  # Closed execution semantics for imported requests; schema 3 requires the profile before a
+  # consumer acts. LegacyV1 preserves existing request-template behavior. OpenApi30JsonV1
+  # preserves the declared OpenAPI 3.0 JSON body, parameter and schema semantics in its
+  # explicitly supported subset; unsupported constructs remain importer refusals.
+  - name: connectors.catalog.RequestSemantics
+    kind: enum
+    variants: [LegacyV1, OpenApi30JsonV1]
+
+  # Value-only projection of the new facts on connector-spec ParamSet. Existing body_schema
+  # and parameter schema values remain source-owned; no new schema entity or lifecycle is
+  # inferred. body_required is present only beside body_schema; None retains legacy behavior.
+  # UNMAPPED: ESS cannot express the conditional presence constraint here; the provider loader
+  # and canonical document schema enforce it. This model does not claim schema round trips.
+  - name: connectors.catalog.RequestParameterSemantics
+    kind: struct
+    fields:
+      - name: request_semantics
+        type: connectors.catalog.RequestSemantics
+      - name: body_required
+        type: Optional<Boolean>
+
   - name: connectors.catalog.ProviderRef
     kind: newtype
     of: String

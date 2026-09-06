@@ -17,11 +17,25 @@ scope:
 - confidence: inferred
   path: SOURCES.toml
 - confidence: cited
+  path: catalog
+- confidence: cited
   path: catalog/gitlab.catalog.json
 - confidence: cited
   path: connectors.lock
 - confidence: cited
   path: crates/catalog-build/Cargo.toml
+- confidence: cited
+  path: crates/catalog-build/src/contract.rs
+- confidence: cited
+  path: crates/catalog-build/src/document.rs
+- confidence: cited
+  path: crates/catalog-build/src/document_tests.rs
+- confidence: cited
+  path: crates/catalog-build/src/pack.rs
+- confidence: cited
+  path: crates/catalog-build/src/pipeline.rs
+- confidence: cited
+  path: crates/catalog-build/src/workspace.rs
 - confidence: cited
   path: crates/catalog-build/tests/main/catalog_invariants.rs
 - confidence: inferred
@@ -30,34 +44,80 @@ scope:
   path: crates/catalog-cli/examples/vendor_gitlab.rs
 - confidence: cited
   path: crates/catalog-reader/catalog.pack
+- confidence: cited
+  path: crates/catalog-reader/src/lib.rs
+- confidence: cited
+  path: crates/catalog-reader/tests/main/pack.rs
+- confidence: cited
+  path: crates/catalog/src/lib.rs
+- confidence: cited
+  path: crates/catalog/src/table.rs
+- confidence: cited
+  path: crates/catalog/tests/main.rs
+- confidence: cited
+  path: crates/connector-resolve/Cargo.toml
+- confidence: cited
+  path: crates/connector-resolve/src/document.rs
+- confidence: cited
+  path: crates/connector-resolve/src/resolve.rs
 - confidence: inferred
   path: crates/connector-spec/schema/provider-toml.schema.json
+- confidence: cited
+  path: crates/connector-spec/src/ir.rs
+- confidence: cited
+  path: crates/connector-spec/src/lib.rs
+- confidence: cited
+  path: crates/connector-spec/src/openapi.rs
 - confidence: inferred
   path: crates/connector-spec/src/provider/declaration.rs
+- confidence: cited
+  path: crates/connector-spec/src/provider/loading.rs
+- confidence: cited
+  path: crates/connector-spec/src/provider/operation_validation.rs
 - confidence: inferred
   path: crates/connector-spec/src/provider/patch_validation.rs
 - confidence: inferred
   path: crates/connector-spec/src/provider/publishing.rs
 - confidence: inferred
   path: crates/connector-spec/src/provider/schema_sync.rs
+- confidence: cited
+  path: crates/connector-spec/src/provider/validation.rs
+- confidence: cited
+  path: crates/connector-spec/src/schema_translation.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/ir_roundtrip.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/openapi_ingest.rs
 - confidence: inferred
   path: crates/connector-spec/tests/main/operation_selection.rs
+- confidence: cited
+  path: crates/connector-spec/tests/main/provider_schema.rs
 - confidence: cited
   path: crates/connector-spec/tests/main/response_schema_coverage.rs
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: inferred
   path: crates/connectors-cli/tests/search_bounds.rs
+- confidence: cited
+  path: crates/connectors-runtime/Cargo.lock
 - confidence: inferred
   path: crates/connectors-runtime/src/registry.rs
 - confidence: cited
   path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: docs/design/01-domain-model.md
+- confidence: cited
+  path: docs/design/04-the-callers-contract.md
 - confidence: inferred
   path: docs/guides/connect-gitlab.md
+- confidence: cited
+  path: ess/system/domains/catalog.yaml
 - confidence: inferred
   path: ess/system/domains/gitlab.yaml
 - confidence: inferred
   path: ess/system/system.yaml
+- confidence: cited
+  path: json-schemas.toml
 - confidence: cited
   path: providers/gitlab.toml
 - confidence: inferred
@@ -66,7 +126,7 @@ scope:
   path: specs/gitlab/coverage-19.4.toml
 - confidence: inferred
   path: specs/gitlab/openapi-19.4.yaml
-revision: 52
+revision: 83
 ---
 
 
@@ -193,3 +253,13 @@ The pinned complete source is the official OpenAPI at commit eaeb4b8b88fdee3fe9b
 The earlier stage-1 response-array and parameter-schema correction proposal is superseded. Read-only inspection also measured existing generic contract loss: integer becomes number, enum/constraints disappear from the model-facing contract, object request-body semantics can be lost during flattening, and absent optional fields can be emitted as null. Fix the actual generic owners, with end-to-end fixtures for requiredness, omission/null, full object schemas and literal source equality. A green source/catalog stage alone cannot close runtime/CLI acceptance.
 
 The new source retains all 1,847 operations, with four generated schedule operations, 20 legacy inline operations, 1,772 unreviewed coverage gaps and 51 importer-gap rows. Actual multipart import refusals affect 52 operations total: those 51 gap rows and one legacy operation. Keep existing inline provenance truthful. Recompute this measured inventory if source or admission changes.
+
+## Source-fidelity execution
+
+Atlas proposed ADR 0040 (connector-catalog-source-fidelity) records catalog schema 3 and the producer/reader/resolver and relying-party movement. It is a reviewable migration decision under the operator's existing source-fidelity requirement; it does not claim release or delivery. The coordinator drafted RequestSemantics and RequestParameterSemantics in ess/system/domains/catalog.yaml before implementation. ESS validation over ess/system reports: connectors v1 — 10 file(s), valid. An initial invocation on system.yaml alone refused undeclared domains because it loaded only the header; the complete-directory validation resolved that invocation error without changing domain ownership.
+
+The closed semantics are legacy_v1 and openapi_3_0_json_v1. ParamSet carries the profile plus optional body_required, meaningful only with body_schema. The required canonical operation profile prevents old or unknown request interpretation. Keep literal source schemas, translate OAS 3.0 semantics deterministically into caller JSON Schema, preserve request-body presence and literal strings, and refuse unsupported constructs. Remove the unused response_arrays feature introduced by this uncommitted stage rather than retaining a new hand-correction facility. Existing legacy behavior remains explicit and is not relabeled faithful.
+
+Additional machine scope now records the generic importer/translation, contract/document/build/reader/table/resolver, profile tests, catalog directory and JSON inventory. The catalog directory scope owns only deterministic generated documents, pack/schema and their source registration; no other active worker owns generated catalog output. It is deliberately recorded as a directory and additionally reviewed for containment. Preserve the old schema 2 identity/bytes and emit a distinct schema 3 identity/file. Registry, CLI and integration-catalog/lib.rs remain deferred until their current owners hand off. The GitLab agent may return a small integration-catalog schema-selection patch for coordinator integration; it must not race the credentials owner.
+
+The exact algorithm/test proposal is the implementor's source-fidelity-design.md retained in the wave's private scratch. Its required cases independently compare all four literal source schema closures, nullable/enum/oneOf behavior, body absence/null/defaults, string bodies, safe namespaced path encoding, unknown profile/old-reader refusals and every retained legacy behavior. No production provider call or operator configuration change is authorized. Source defects remain visible and must not be silently repaired.

@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:one-shot-operations-without-a-daemon
 kind: story
-status: proposed
+status: active
 title: One-shot operations without a daemon
 tags:
 - ready
@@ -21,8 +21,30 @@ scope:
 - confidence: inferred
   path: crates/connectors-runtime/src/lib.rs
 - confidence: cited
+  path: crates/connectors-runtime/src/one_shot.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/registry.rs
+- confidence: cited
+  path: crates/connectors-runtime/tests/one_shot_runtime.rs
+- confidence: cited
+  path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: crates/integration-kubernetes/src/local.rs
+- confidence: cited
+  path: crates/integration-monitoring/src/backend.rs
+- confidence: cited
+  path: crates/integration-platform/src/lib.rs
+- confidence: cited
+  path: crates/integration-slack/src/backend.rs
+- confidence: cited
+  path: crates/integration-slack/src/backend/open.rs
+- confidence: cited
+  path: crates/integration-slack/src/backend_tests.rs
+- confidence: cited
   path: crates/server/src/local.rs
-revision: 19
+- confidence: cited
+  path: crates/service/src/runtime.rs
+revision: 31
 ---
 # Story: one-shot operations without a daemon
 
