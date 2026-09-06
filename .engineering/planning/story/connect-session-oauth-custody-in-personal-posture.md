@@ -307,7 +307,7 @@ scope:
   path: providers/jira.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 53
+revision: 54
 ---
 ## Acceptance
 
@@ -491,3 +491,7 @@ Retain actual deciding failures through runnable baseline/scaffold callers, then
 ## Declaration reexport closure — 2026-09-06
 
 The stage 2C implementor identified crates/connector-spec/src/lib.rs as the explicit public auth-type reexport owner. Assign that exact path only for the new Design 21 admission-type reexports required by catalog-build and tests. The typed vocabulary already exists in ESS; this is a declaration/consumer closure, not a new model, protocol or helper abstraction. Preserve all existing exports and rate behavior. Compilation remains subject to the shared build slot.
+
+## Typed registration scope ceiling closure — 2026-09-06
+
+Design 21 names allowed scopes among deployment-owned registration values at its deployment registration paragraph. The proposed source PersonalOAuthRegistration correctly requires allowed_scopes, but the existing ESS struct omitted it. Add the required field as List<connectors.deployment.Scope> in the already scoped deployment domain, using the existing Scope type. This records the deployment ceiling; it does not grant scopes or replace observed token-info evidence and the existing Connection grant. ESS validates and its six deterministic CLI outputs are regenerated with report JSON retained outside source. Runtime/config admission, scope grammar and authorization enforcement remain implementation/test obligations.

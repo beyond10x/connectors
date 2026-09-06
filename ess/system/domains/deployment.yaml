@@ -38,6 +38,8 @@ types:
         type: connectors.catalog.OAuthRegistrationUse
       - name: custody
         type: connectors.deployment.PersonalOAuthCustody
+      - name: allowed_scopes
+        type: List<connectors.deployment.Scope>
       - name: session_ttl_seconds
         type: Integer
 
