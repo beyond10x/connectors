@@ -214,7 +214,7 @@ scope:
   path: json-schemas.toml
 - confidence: inferred
   path: providers/slack.toml
-revision: 131
+revision: 132
 ---
 # Story: a provider's rate limit is a protocol fact, not a sentence
 
@@ -401,3 +401,13 @@ Stage protocol/egress work first. Catalog/spec/typed-reader/schema files remain 
 ## Stage1 generator and lock scope
 
 Stage1 inspection found no existing ConnectorOperation bundle generator. Add a deterministic Rust example `crates/protocol/examples/operation_v2_bundle.rs` with clap-derived explicit check/write modes, schema projection `crates/protocol/src/operation/schema.rs`, and protocol manifest dev-dependencies on the already-pinned workspace clap/jsonschema versions. These paths and all twelve gate workspace lockfiles are recorded before edits. Refresh lock metadata offline after the manifest change and report exact changed lock rows; do not update dependency versions. Both schema and Rust readers must independently exercise complete v2 request/response positive and adversarial vectors. Frozen v1 files remain byte-identical. This extends stage1 tooling ownership, not any held runtime/catalog/CLI owner.
+
+## First complete adversary result and bounded repair assignment
+
+Immutable review-result:cli-rate-adversary-1-20260906 records the complete first pass against90735eac. The twelve retained deciding cases are committed incc143696f02e082ee64158907e562cad629cffea. All prior tests/source were preserved and the full frozen evidence manifest verified. Complete affected suites measured root1205 pass/2 new failures/4 existing ignored, runtime346 pass/2 existing ignored, CLI130 pass, console87 pass; all strict Clippy/format checks passed.
+
+The two introduced contract warnings share a URL-validation mismatch: uppercase HTTPS and literal path space pass the Rust wire/authoring readers but fail the schemas; port65536 passes the schemas but fails Rust. The current shipped Slack documents remain valid. Actual client/authoring caller reachability and its limits are in the immutable report. This is not evidence of a deployed malformed provider or credential effect.
+
+The original implementor owns a bounded repair fromcc143696. Establish one explicit URL spelling/range policy consistently across the existing wire reader/schema, authoring reader/provider-schema and canonical schema3 generator; preserve supported positive controls including ordinary lowercase HTTPS and valid explicit ports. Address the grammar classes rather than special-casing the three strings. Preserve all first-pass cases and all frozen v1/schema2/vendor bytes. Regenerate affected new v2/schema3 artifacts only through their owners and retain deterministic fixed-point, conformance and schema-fidelity evidence. No retry, grant, protocol-version retirement or runtime behavior expansion belongs to this repair.
+
+Current exact source owners already cover protocol operation wire/schema and bundle example/tests, connector-spec rate_limit/provider schema generation, catalog-build document_schema and schema invariants, new contract bundle and schema3 artifact. If a shared helper or dependency requires another path, request it before writing. ESS/AEP/Git/integration/operator actions stay coordinator-owned. Run the two retained failed cases first on the assigned base, then implement and rerun all affected suites, strict checks and regeneration gates. The second adversary pass is the final ordinary pass under the approved wave. No successful test_result or fixed review outcome is recorded before measured repair evidence exists.
