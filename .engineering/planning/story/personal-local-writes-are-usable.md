@@ -25,7 +25,7 @@ scope:
   path: docs/architecture/deployment.md
 - confidence: cited
   path: docs/guides/connect-slack.md
-revision: 30
+revision: 31
 ---
 
 ## Objective
@@ -86,3 +86,11 @@ The normal local daemon still failed write search before restart (protocol, exit
 Long-lived daemon logs were moved outside disposable wave scratch into each daemon's existing state root as daemon-wave-20260906.log; their processes retain the open files. Final integration must reinstall the reviewed bytes before closing the delivery story. Socket fixture invocation and adversarial review subsequently passed, and the complete integration gate is recorded in the wave runbook.
 
 The fixture found actionable guidance missing when all bindings are read-only. Coordinator reviewed and applied the implementor's exact two-string catalog-guidance.patch, extending scope to integration-catalog/src/lib.rs. It names an intentional allow_writes policy update and daemon restart; the existing enrollment command only sets the flag on a new instance. No grant policy was changed by this wave.
+
+## Reviewed installed bytes — 2026-09-06
+
+Installed published reviewed integration5600867e2c3e1d2a710fcdcfbee6067fe34f3b70 using the supported locked debug cargo install path, exit0. Installed CLI remains version0.6.5; no version bump or tag was made. Installed/workspace binary SHA256 is 2db5607c8f99da4d7169b7ce1befaa47c07e35529b1ef5b1cd415ac71bcda01c. The full source gate at84ccd024 plus generated-only correctionc08c4728 passed2133executions with0failures and27existing ignored.
+
+The two previously authorized ordinary personal daemons were gracefully replaced at their exact saved argv/cwd. Both serving executable hashes equal the installed hash. Both read-only Slack write-search and describe commands exit0 through their persistent local sockets and show local target, nonempty admitted Connections and required approval metadata. The independently built brain-fresh process was not part of this authorized replacement set. Fixture provider invocation and selected-readonly refusal remain covered by retained tests; no live provider invocation or Slack post was sent.
+
+Exact source/install/restart/hash/read-only outputs and previous executable are retained in the assigned reviewed-installation scratch directory. Logs for running daemons live in their existing persistent state roots. The previous opening-install evidence is historical; these are the newly reviewed installed bytes. Whole-wave source publication to main and documentation delivery remain outstanding.

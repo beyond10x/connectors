@@ -104,3 +104,18 @@ UNMAPPED in the ESS patch means an explicit enforcement obligation: flow-depende
 The coordinator adopted this explicit development-scoped implementation shape for the approved story after the complete ESS model validated. GitLab source-fidelity schema3 and reviewed one-shot source are now integrated ate0974691. Rate metadata completes that same unpublished schema3 migration first; OAuth acquisition uses a subsequent schema4 and never edits frozen schema2 or an already published schema3. Atlas migration authority must record the schema4 relying parties and rollout before its canonical writer changes.
 
 Stage1 owns only the pure OAuth/device/token helpers and the isolated local instruction/callback transport. Catalog declaration, runtime/acquisition/custody/client integration and generated schema/pack output remain held until the rate unit hands those shared owners back. Stage1 is not an operational OAuth completion claim.
+
+## Existing Connection v1 target limit
+
+The unchanged Connection v1 create request names an integration and optional auth profile, but no
+target Connection. Before creating a session, callback listener or provider request, the authenticated
+owner, integration and admitted profile must identify exactly one configured stable Binding. An
+omitted profile uses a deployment-owned default only where that selection is unambiguous. Zero or
+multiple matching bindings refuse. Labels remain display text; profiles cannot select another
+instance or broaden authority.
+
+Capture that exact Binding/Connection identity immutably when the session is created and recheck it
+at completion. Reauthorization under this contract repairs only that uniquely selected binding;
+completion-time lookup must never substitute a different target. The subsequent auth-result story
+requires a separate Connection version for caller-selected, bound remediation. This story neither
+reserves those fields nor imports the held multiple-credential implementation.
