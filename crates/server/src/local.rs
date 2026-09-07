@@ -199,6 +199,18 @@ async fn local_auth_preflight<B: ConnectorBackend + ?Sized>(
     Option<protocol::operation::v3::AuthenticationRequired>,
     protocol::operation::v3::OperationError,
 > {
+    local_auth_preflight_at(backend, context, invoke, false).await
+}
+
+async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
+    backend: &B,
+    context: &PrincipalContext,
+    invoke: &protocol::operation::InvokeRequest,
+    target_specific: bool,
+) -> Result<
+    Option<protocol::operation::v3::AuthenticationRequired>,
+    protocol::operation::v3::OperationError,
+> {
     use crate::hosted::remediation::{
         authentication, operation_error, validate_input, validated_metadata,
     };
@@ -220,15 +232,24 @@ async fn local_auth_preflight<B: ConnectorBackend + ?Sized>(
     let admission = backend
         .personal_remediation_admission(context, target)
         .map_err(operation_error)?;
-    let description = match backend
-        .handle(
-            context,
-            protocol::operation::OperationRequest::Describe(protocol::operation::DescribeRequest {
-                operation_ref: invoke.operation_ref.clone(),
-            }),
-        )
-        .await
-    {
+    let described = if target_specific {
+        backend
+            .describe_target(context, &invoke.operation_ref, &invoke.connection_ref)
+            .await
+            .map(protocol::operation::OperationResult::Describe)
+    } else {
+        backend
+            .handle(
+                context,
+                protocol::operation::OperationRequest::Describe(
+                    protocol::operation::DescribeRequest {
+                        operation_ref: invoke.operation_ref.clone(),
+                    },
+                ),
+            )
+            .await
+    };
+    let description = match described {
         Ok(protocol::operation::OperationResult::Describe(value)) => value,
         Err(error) if error.code == protocol::operation::OperationErrorCode::StaleAuthority => {
             return Err(error.into())
@@ -521,7 +542,7 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                             if let protocol::operation::OperationRequest::Invoke(invoke) =
                                 &normalized.request
                             {
-                                local_auth_preflight(&*backend, &context, invoke).await
+                                local_auth_preflight_at(&*backend, &context, invoke, true).await
                             } else {
                                 Ok(None)
                             };
@@ -536,24 +557,44 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                                 &request_id,
                                 error,
                             ),
-                            Ok(None) => match backend
-                                .handle(&context, normalized.request)
-                                .await
-                                .and_then(|result| {
+                            Ok(None) => {
+                                let outcome = if let (
+                                    protocol::operation::OperationRequest::Describe(describe),
+                                    Some(connection),
+                                ) =
+                                    (&normalized.request, &normalized.description_connection)
+                                {
+                                    backend
+                                        .describe_target(
+                                            &context,
+                                            &describe.operation_ref,
+                                            connection,
+                                        )
+                                        .await
+                                        .map(protocol::operation::OperationResult::Describe)
+                                } else {
+                                    backend.handle(&context, normalized.request).await
+                                };
+                                match outcome.and_then(|result| {
                                     service::constrain_endpoint_description(
                                         result,
                                         normalized.description_connection.as_deref(),
                                     )
                                 }) {
-                                Ok(result) => protocol::operation::v4::ResponseEnvelope::success(
-                                    &request_id,
-                                    result,
-                                ),
-                                Err(error) => protocol::operation::v4::ResponseEnvelope::failure(
-                                    &request_id,
-                                    error.into(),
-                                ),
-                            },
+                                    Ok(result) => {
+                                        protocol::operation::v4::ResponseEnvelope::success(
+                                            &request_id,
+                                            result,
+                                        )
+                                    }
+                                    Err(error) => {
+                                        protocol::operation::v4::ResponseEnvelope::failure(
+                                            &request_id,
+                                            error.into(),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 };
