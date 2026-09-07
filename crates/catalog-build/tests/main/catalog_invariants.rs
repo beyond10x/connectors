@@ -2521,9 +2521,11 @@ fn adversary_gitlab_pass1_coverage_statuses_match_actual_importer_results() {
         }
     }
     assert_eq!(counts.get("catalogued_generated"), Some(&4));
-    assert_eq!(counts.get("catalogued_legacy"), Some(&20));
+    // The bounded pipeline, deployment and commit reads now have authored inline contracts;
+    // their vendor import diagnostics remain recorded rather than claiming generated coverage.
+    assert_eq!(counts.get("catalogued_legacy"), Some(&23));
     assert_eq!(counts.get("coverage_gap"), Some(&1510));
-    assert_eq!(counts.get("importer_gap"), Some(&313));
+    assert_eq!(counts.get("importer_gap"), Some(&310));
     println!("coverage decisions checked for 1847 source operations: {counts:?}");
 }
 
