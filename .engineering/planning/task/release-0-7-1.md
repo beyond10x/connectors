@@ -2,11 +2,12 @@
 format: aep.planning-md/1
 id: task:release-0-7-1
 kind: task
-status: draft
+status: active
 title: Cut and verify Connectors v0.7.1
 relations:
 - derived_from: runbook:small-wave-after-0-7-0
-revision: 1
+- decomposes: story:release-0-7-1
+revision: 3
 ---
 ## Acceptance
 
