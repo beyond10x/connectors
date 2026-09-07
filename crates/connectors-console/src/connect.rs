@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use connectors_client::{CandidateActivationOutcome, ClientError, CompletionEndpoint, LocalClient};
+use connectors_client::{ClientError, CompletionEndpoint, LocalClient};
 use connectors_config::PersonalConfig;
 use serde_json::{json, Value};
 use zeroize::Zeroizing;
@@ -108,7 +108,7 @@ pub async fn run(
     config: &PersonalConfig,
     state_root: &Path,
     label: Option<String>,
-    context: Option<String>,
+    _context: Option<String>,
 ) -> Result<Value, ConnectError> {
     if !GUIDED.contains(&provider) {
         return Err(ConnectError::Unsupported(provider.to_owned()));
@@ -117,7 +117,7 @@ pub async fn run(
     let owner = config.owner_context();
 
     if provider == "kubernetes" {
-        return kubernetes(&client, &owner, label, context).await;
+        return discovered(&client, &owner, "kubernetes", None).await;
     }
 
     let display_name = if provider == "slack" {
@@ -161,44 +161,7 @@ pub async fn run(
         &client,
         &owner,
         "grafana",
-        description.summary.connection_ref,
-    )
-    .await
-}
-
-/// Kubernetes needs no credential — it reads the operator's own kubeconfig — so its flow either
-/// activates a named context or reports the ones it detected.
-async fn kubernetes(
-    client: &LocalClient,
-    owner: &protocol::operation::OwnerContext,
-    label: Option<String>,
-    context: Option<String>,
-) -> Result<Value, ConnectError> {
-    let outcome = client
-        .activate_candidate(owner, "kubernetes".to_owned(), label, context)
-        .await?;
-    let CandidateActivationOutcome::Connected {
-        connection,
-        observations: _,
-    } = outcome
-    else {
-        let CandidateActivationOutcome::SelectionRequired(candidates) = outcome else {
-            unreachable!("the outcome is one of two variants")
-        };
-        return Ok(json!({
-            "provider": "kubernetes",
-            "connected": false,
-            // The next command, in the payload rather than only on the terminal, so a caller
-            // reading JSON is told what to do rather than left with an empty result.
-            "next": "connectors setup connect kubernetes --context <name>",
-            "contexts": candidates.iter().map(|candidate| candidate.title.clone()).collect::<Vec<_>>(),
-        }));
-    };
-    discovered(
-        client,
-        owner,
-        "kubernetes",
-        connection.summary.connection_ref,
+        Some(description.summary.connection_ref),
     )
     .await
 }
@@ -207,14 +170,14 @@ async fn discovered(
     client: &LocalClient,
     owner: &protocol::operation::OwnerContext,
     provider: &str,
-    source_ref: String,
+    source_ref: Option<String>,
 ) -> Result<Value, ConnectError> {
     use protocol::endpoint::{EndpointRequest, ListRequest, RefreshRequest};
     let refreshed = client
         .endpoint(
             owner,
             EndpointRequest::Refresh(RefreshRequest {
-                source_ref: Some(source_ref.clone()),
+                source_ref: source_ref.clone(),
             }),
         )
         .await?;
@@ -223,7 +186,7 @@ async fn discovered(
         .endpoint(
             owner,
             EndpointRequest::List(ListRequest {
-                source_ref: Some(source_ref.clone()),
+                source_ref: source_ref.clone(),
                 query: String::new(),
                 limit: protocol::endpoint::MAX_RESULTS,
                 cursor: None,
