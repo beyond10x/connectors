@@ -2,6 +2,112 @@
   "contract": "b10x.connector-connection.v0alpha2",
   "cases": [
     {
+      "name": "pending-session-status-omits-completion-capability",
+      "kind": "response",
+      "valid": true,
+      "schema_valid": true,
+      "note": "Polling does not reissue the one-use completion capability.",
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha2",
+        "request_id": "request-status-1",
+        "status": "ok",
+        "response": {
+          "result": "connect_session_status",
+          "value": {
+            "connect_session_ref": "connect-session:fixture",
+            "integration_ref": "fixture",
+            "state": "pending",
+            "expires_at_unix_ms": 1234
+          }
+        }
+      }
+    },
+    {
+      "name": "pending-session-create-requires-completion-route",
+      "kind": "response",
+      "valid": false,
+      "schema_valid": false,
+      "note": "Creation must supply a usable completion route even though later status polls may omit it.",
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha2",
+        "request_id": "request-create-1",
+        "status": "ok",
+        "response": {
+          "result": "connect_session_create",
+          "value": {
+            "connect_session_ref": "connect-session:fixture",
+            "integration_ref": "fixture",
+            "state": "pending",
+            "expires_at_unix_ms": 1234
+          }
+        }
+      }
+    },
+    {
+      "name": "pending-remediation-status-omits-completion-capability",
+      "kind": "response",
+      "valid": true,
+      "schema_valid": true,
+      "note": "Bound remediation polling retains its binding without reissuing the completion capability.",
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha2",
+        "request_id": "request-remediation-status-1",
+        "status": "ok",
+        "response": {
+          "result": "remediation_status",
+          "value": {
+            "connect_session_ref": "connect-session:fixture",
+            "operation_ref": "fixture.read",
+            "connection_ref": "connection:fixture",
+            "integration_ref": "fixture",
+            "auth_profile": "fixture.user",
+            "need": "authorize_configured",
+            "session_state": "pending",
+            "expires_at_unix_ms": 1234,
+            "resume_state": "pending",
+            "session": {
+              "connect_session_ref": "connect-session:fixture",
+              "integration_ref": "fixture",
+              "state": "pending",
+              "expires_at_unix_ms": 1234
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "pending-remediation-start-requires-completion-route",
+      "kind": "response",
+      "valid": false,
+      "schema_valid": false,
+      "note": "Bound remediation start must deliver a completion route; binding fields alone do not make acquisition usable.",
+      "frame": {
+        "protocol": "b10x.connector-connection.v0alpha2",
+        "request_id": "request-remediation-start-1",
+        "status": "ok",
+        "response": {
+          "result": "remediation_start",
+          "value": {
+            "connect_session_ref": "connect-session:fixture",
+            "operation_ref": "fixture.read",
+            "connection_ref": "connection:fixture",
+            "integration_ref": "fixture",
+            "auth_profile": "fixture.user",
+            "need": "authorize_configured",
+            "session_state": "pending",
+            "expires_at_unix_ms": 1234,
+            "resume_state": "pending",
+            "session": {
+              "connect_session_ref": "connect-session:fixture",
+              "integration_ref": "fixture",
+              "state": "pending",
+              "expires_at_unix_ms": 1234
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "inherited-candidate-search-valid",
       "kind": "request",
       "valid": true,

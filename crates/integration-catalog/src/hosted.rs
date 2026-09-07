@@ -1,6 +1,6 @@
 //! Hosted, per-principal acquisition for catalog-declared Connect Session credentials.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -43,6 +43,7 @@ const STATE_VERSION: u8 = 1;
 const MAX_STATE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_PENDING_SESSIONS: usize = 256;
 const MAX_SECRET_BYTES: usize = 8 * 1024;
+const MAX_OPERATION_DELEGATES: usize = 256;
 
 #[derive(Debug, thiserror::Error)]
 pub enum HostedCatalogError {
@@ -76,6 +77,7 @@ struct Inner {
     egress: Arc<dyn EgressTransport>,
     metadata: Mutex<StateFile>,
     sessions: Mutex<BTreeMap<String, Session>>,
+    operation_delegates: Mutex<VecDeque<([u8; 32], Arc<CatalogBackend>)>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -203,6 +205,7 @@ impl HostedCatalogBackend {
                 egress,
                 metadata: Mutex::new(metadata),
                 sessions: Mutex::new(BTreeMap::new()),
+                operation_delegates: Mutex::new(VecDeque::new()),
             }),
         };
         backend.inner.recover_pending().await?;
@@ -328,20 +331,48 @@ impl Inner {
         summary
     }
 
-    fn delegate(&self, context: &PrincipalContext) -> Result<CatalogBackend, OperationError> {
+    fn delegate(&self, context: &PrincipalContext) -> Result<Arc<CatalogBackend>, OperationError> {
+        // Admission is refreshed before consulting the cache. Only a matching owner, grant,
+        // profile and exact destination configuration can reuse a delegate's leases.
         let configured = self
             .owned_connections(context)
             .iter()
             .filter(|connection| self.connection_current(connection))
             .map(|connection| Self::config(connection, &self.grant_ref))
             .collect::<Vec<_>>();
-        CatalogBackend::bind_stored(
-            context.clone(),
-            &configured,
-            self.values.clone(),
-            self.egress.clone(),
-        )
-        .map_err(|_| operation_unavailable())
+        let encoded = serde_json::to_vec(&configured).map_err(|_| operation_unavailable())?;
+        let mut digest = Sha256::new();
+        digest.update(b"b10x/hosted-catalog-operation-delegate/v1\0");
+        digest.update(context.stable_authority_seed());
+        digest.update((encoded.len() as u64).to_be_bytes());
+        digest.update(encoded);
+        let key: [u8; 32] = digest.finalize().into();
+        let mut delegates = lock(&self.operation_delegates);
+        if let Some(index) = delegates
+            .iter()
+            .position(|(candidate, _)| *candidate == key)
+        {
+            let entry = delegates
+                .remove(index)
+                .expect("located delegate remains present");
+            let delegate = entry.1.clone();
+            delegates.push_back(entry);
+            return Ok(delegate);
+        }
+        let delegate = Arc::new(
+            CatalogBackend::bind_stored(
+                context.clone(),
+                &configured,
+                self.values.clone(),
+                self.egress.clone(),
+            )
+            .map_err(|_| operation_unavailable())?,
+        );
+        if delegates.len() == MAX_OPERATION_DELEGATES {
+            delegates.pop_front();
+        }
+        delegates.push_back((key, delegate.clone()));
+        Ok(delegate)
     }
 
     fn create_session(

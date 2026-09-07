@@ -453,17 +453,15 @@ async fn invoke(
     connection: &str,
     input: serde_json::Value,
 ) -> Result<protocol::operation::InvocationResult, OperationError> {
-    let delegate = backend.inner.delegate(owner)?;
-    let description = delegate.inner.describe("grafana-datasources-list")?;
-    delegate
-        .inner
-        .invoke(
-            "grafana-datasources-list",
-            connection,
-            &description.description_ref,
-            input,
-        )
-        .await
+    let description = describe_hosted(backend, owner).await?;
+    invoke_hosted(
+        backend,
+        owner,
+        connection,
+        &description.description_ref,
+        input,
+    )
+    .await
 }
 
 #[tokio::test]
@@ -732,3 +730,5 @@ async fn refused_verification_or_wrong_session_capability_commits_no_connection(
     assert!(backend.inner.owned_connections(&owner).is_empty());
     assert!(lock(&backend.inner.metadata).pending.is_empty());
 }
+
+include!("hosted_dispatch_tests.rs");

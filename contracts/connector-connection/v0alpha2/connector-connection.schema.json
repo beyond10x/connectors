@@ -321,32 +321,6 @@
       "description": "Value-free status for one single-purpose acquisition session.\n\nCompletion endpoints are short-lived Connector-owned endpoints, not Agent Endpoints and not\nthe durable Connection. They are present only while pending and accept one completion attempt.",
       "oneOf": [
         {
-          "anyOf": [
-            {
-              "properties": {
-                "completion_endpoint": {
-                  "not": {
-                    "type": "null"
-                  }
-                }
-              },
-              "required": [
-                "completion_endpoint"
-              ]
-            },
-            {
-              "properties": {
-                "browser_completion_url": {
-                  "not": {
-                    "type": "null"
-                  }
-                }
-              },
-              "required": [
-                "browser_completion_url"
-              ]
-            }
-          ],
           "properties": {
             "connection_ref": {
               "type": "null"
@@ -414,7 +388,7 @@
         "browser_completion_url": {
           "anyOf": [
             {
-              "$comment": "Legacy WHATWG parse, route and fragment-capability checks are enforced by the unchanged v1 reader.",
+              "$comment": "Legacy WHATWG parse, route and fragment-capability checks are enforced by the inherited v1 reader.",
               "maxLength": 4096,
               "minLength": 1,
               "pattern": "^[^\\r\\n]*$",
@@ -1136,7 +1110,49 @@
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/ConnectSessionStatus"
+              "$ref": "#/$defs/ConnectSessionStatus",
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "state": {
+                        "const": "pending"
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ]
+                  },
+                  "then": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "completion_endpoint": {
+                            "not": {
+                              "type": "null"
+                            }
+                          }
+                        },
+                        "required": [
+                          "completion_endpoint"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "browser_completion_url": {
+                            "not": {
+                              "type": "null"
+                            }
+                          }
+                        },
+                        "required": [
+                          "browser_completion_url"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
             }
           },
           "required": [
@@ -1170,7 +1186,53 @@
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/BoundRemediationStatus"
+              "$ref": "#/$defs/BoundRemediationStatus",
+              "allOf": [
+                {
+                  "properties": {
+                    "session": {
+                      "if": {
+                        "properties": {
+                          "state": {
+                            "const": "pending"
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      },
+                      "then": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "completion_endpoint": {
+                                "not": {
+                                  "type": "null"
+                                }
+                              }
+                            },
+                            "required": [
+                              "completion_endpoint"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "browser_completion_url": {
+                                "not": {
+                                  "type": "null"
+                                }
+                              }
+                            },
+                            "required": [
+                              "browser_completion_url"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
             }
           },
           "required": [

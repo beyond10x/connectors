@@ -166,6 +166,17 @@ pub fn connection_v2_schema() -> Value {
         .as_array_mut()
         .expect("tagged results")
     {
+        match variant["properties"]["result"]["const"].as_str() {
+            Some("connect_session_create") => {
+                variant["properties"]["value"]["allOf"] = json!([pending_completion_route()]);
+            }
+            Some("remediation_start") => {
+                variant["properties"]["value"]["allOf"] = json!([
+                    {"properties":{"session":pending_completion_route()}}
+                ]);
+            }
+            _ => {}
+        }
         if let Some(properties) = variant
             .get_mut("properties")
             .and_then(|properties| properties.get_mut("value"))
@@ -192,15 +203,10 @@ pub fn connection_v2_schema() -> Value {
     );
     replace_preserving_null(
         &mut session["properties"]["browser_completion_url"],
-        json!({"type":"string","minLength":1,"maxLength":4096,"pattern":"^[^\\r\\n]*$","$comment":"Legacy WHATWG parse, route and fragment-capability checks are enforced by the unchanged v1 reader."}),
+        json!({"type":"string","minLength":1,"maxLength":4096,"pattern":"^[^\\r\\n]*$","$comment":"Legacy WHATWG parse, route and fragment-capability checks are enforced by the inherited v1 reader."}),
     );
-    let mut pending = state_fields("pending", &[], &["connection_ref"]);
-    pending["anyOf"] = json!([
-        {"required":["completion_endpoint"],"properties":{"completion_endpoint":{"not":{"type":"null"}}}},
-        {"required":["browser_completion_url"],"properties":{"browser_completion_url":{"not":{"type":"null"}}}}
-    ]);
     session["oneOf"] = json!([
-        pending,
+        state_fields("pending", &[], &["connection_ref"]),
         state_fields(
             "completed",
             &["connection_ref"],
@@ -243,6 +249,16 @@ pub fn connection_v2_schema() -> Value {
         bound_state("failed", "failed")
     ]);
     schema
+}
+
+fn pending_completion_route() -> Value {
+    json!({
+        "if":{"required":["state"],"properties":{"state":{"const":"pending"}}},
+        "then":{"anyOf":[
+            {"required":["completion_endpoint"],"properties":{"completion_endpoint":{"not":{"type":"null"}}}},
+            {"required":["browser_completion_url"],"properties":{"browser_completion_url":{"not":{"type":"null"}}}}
+        ]}
+    })
 }
 
 fn reference(max: usize) -> Value {
