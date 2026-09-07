@@ -47,6 +47,12 @@ pub enum CustodyError {
     LeaseRefused,
     #[error("the subscription OAuth flow was refused")]
     OauthRefused,
+    #[error("the subscription OAuth flow is no longer pending")]
+    OauthFlowExpired,
+    #[error("the subscription OAuth provider is rate limiting requests")]
+    OauthRateLimited,
+    #[error("the subscription OAuth provider is unavailable")]
+    OauthUnavailable,
 }
 
 /// Public, non-secret provider configuration for Claude's subscription OAuth client.
@@ -355,7 +361,7 @@ impl SubscriptionCustody {
             .lock()
             .await
             .take(flow_id, now_millis()?)
-            .ok_or(CustodyError::OauthRefused)?
+            .ok_or(CustodyError::OauthFlowExpired)?
             .payload;
         if pending.tenant_id != tenant_id || pending.subject != subject {
             return Err(CustodyError::OauthRefused);
@@ -576,7 +582,17 @@ impl ClaudeOAuth {
             .json(request)
             .send()
             .await
-            .map_err(|_| CustodyError::Unavailable)?;
+            .map_err(|_| CustodyError::OauthUnavailable)?;
+        // Never read or forward a provider failure body: it may contain credential material.
+        // A retryable provider failure is not evidence that the user's code was invalid.
+        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return Err(CustodyError::OauthRateLimited);
+        }
+        if response.status().is_server_error()
+            || response.status() == reqwest::StatusCode::REQUEST_TIMEOUT
+        {
+            return Err(CustodyError::OauthUnavailable);
+        }
         if !response.status().is_success()
             || response
                 .content_length()
@@ -587,7 +603,7 @@ impl ClaudeOAuth {
         let body = response
             .bytes()
             .await
-            .map_err(|_| CustodyError::Unavailable)?;
+            .map_err(|_| CustodyError::OauthUnavailable)?;
         if body.len() > MAX_OAUTH_RESPONSE_BYTES {
             return Err(CustodyError::OauthRefused);
         }
@@ -926,6 +942,108 @@ mod tests {
                 }))
             }
             other => panic!("unexpected grant type: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_oauth_exchange_preserves_custody_and_reports_the_recovery_cause() {
+        for (status, expected) in [
+            (
+                429,
+                "the subscription OAuth provider is rate limiting requests",
+            ),
+            (503, "the subscription OAuth provider is unavailable"),
+            (400, "the subscription OAuth flow was refused"),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let exchanges = Arc::new(AtomicUsize::new(0));
+            let observed = exchanges.clone();
+            let server =
+                tokio::spawn(async move {
+                    axum::serve(
+                        listener,
+                        Router::new().route(
+                            "/token",
+                            post(move || {
+                                let observed = observed.clone();
+                                async move {
+                                    observed.fetch_add(1, Ordering::SeqCst);
+                                    (axum::http::StatusCode::from_u16(status).unwrap(),
+                         "provider body containing secret-shaped diagnostic material")
+                                }
+                            }),
+                        ),
+                    )
+                    .await
+                    .unwrap();
+                });
+            let origin = format!("http://{address}");
+            let config = ClaudeOAuthConfig::new(
+                "public-client",
+                &format!("{origin}/authorize"),
+                &format!("{origin}/token"),
+                &format!("{origin}/callback"),
+                "user:inference",
+            )
+            .unwrap();
+            let custody =
+                SubscriptionCustody::with_claude_oauth(Arc::new(MemoryStore::new()), config)
+                    .unwrap();
+            custody
+                .connect(
+                    "tenant-one",
+                    "human-alice",
+                    Zeroizing::new("synthetic-existing-credential".to_owned()),
+                )
+                .await
+                .unwrap();
+            let start = custody
+                .start_oauth("tenant-one", "human-alice")
+                .await
+                .unwrap();
+            let url = Url::parse(&start.authorization_url).unwrap();
+            let state = url
+                .query_pairs()
+                .find(|(key, _)| key == "state")
+                .unwrap()
+                .1
+                .into_owned();
+            let code = format!("synthetic-provider-code#{state}");
+            let error = custody
+                .complete_oauth("tenant-one", "human-alice", &start.flow_id, &code)
+                .await
+                .unwrap_err();
+            assert_eq!(error.to_string(), expected);
+            let replay = custody
+                .complete_oauth("tenant-one", "human-alice", &start.flow_id, &code)
+                .await
+                .unwrap_err();
+            assert_eq!(
+                replay.to_string(),
+                "the subscription OAuth flow is no longer pending"
+            );
+            assert_eq!(exchanges.load(Ordering::SeqCst), 1);
+            let lease = custody
+                .lease(
+                    "tenant-one",
+                    "human-alice",
+                    "attempt-one",
+                    Duration::from_secs(60),
+                    1,
+                )
+                .await
+                .unwrap();
+            let saved = custody
+                .redeem(
+                    &lease.lease_id,
+                    lease.expose_at_transport_boundary(),
+                    "attempt-one",
+                )
+                .await
+                .unwrap();
+            assert_eq!(saved.expose_secret(), "synthetic-existing-credential");
+            server.abort();
         }
     }
 

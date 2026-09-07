@@ -331,9 +331,129 @@ fn custody_error(error: CustodyError) -> Response {
         CustodyError::OauthRefused => {
             super::error(StatusCode::BAD_REQUEST, "subscription-oauth-refused")
         }
+        CustodyError::OauthFlowExpired => {
+            super::error(StatusCode::GONE, "subscription-oauth-flow-expired")
+        }
+        CustodyError::OauthRateLimited => super::error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "subscription-oauth-rate-limited",
+        ),
+        CustodyError::OauthUnavailable => {
+            super::error(StatusCode::BAD_GATEWAY, "subscription-oauth-unavailable")
+        }
         CustodyError::Unavailable => super::error(
             StatusCode::SERVICE_UNAVAILABLE,
             "subscription-custody-unavailable",
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hosted::{
+        router_with_subscription_custody,
+        tests::{Backend, Verifier},
+        HostedAdmissionPolicy, HostedAuthority,
+    };
+    use axum::{
+        body::{to_bytes, Body},
+        http::Request,
+    };
+    use std::sync::Arc;
+    use subscription_custody::SubscriptionCustody;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn subscription_oauth_failure_retains_provider_status_and_consumes_the_flow() {
+        for (provider_status, expected_status, expected_error) in [
+            (
+                429,
+                StatusCode::TOO_MANY_REQUESTS,
+                "subscription-oauth-rate-limited",
+            ),
+            (
+                503,
+                StatusCode::BAD_GATEWAY,
+                "subscription-oauth-unavailable",
+            ),
+            (400, StatusCode::BAD_REQUEST, "subscription-oauth-refused"),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let origin = format!("http://{}", listener.local_addr().unwrap());
+            let provider = tokio::spawn(async move {
+                axum::serve(
+                    listener,
+                    Router::new().route(
+                        "/token",
+                        axum::routing::post(move || async move {
+                            (
+                                StatusCode::from_u16(provider_status).unwrap(),
+                                "private provider failure body",
+                            )
+                        }),
+                    ),
+                )
+                .await
+                .unwrap();
+            });
+            let custody = Arc::new(
+                SubscriptionCustody::with_claude_oauth(
+                    Arc::new(connector_secrets::MemoryStore::new()),
+                    subscription_custody::ClaudeOAuthConfig::new(
+                        "public-client",
+                        &format!("{origin}/authorize"),
+                        &format!("{origin}/token"),
+                        &format!("{origin}/callback"),
+                        "user:inference",
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            );
+            let start = custody
+                .start_oauth("tenant-dev", "person:test")
+                .await
+                .unwrap();
+            let state = start
+                .authorization_url
+                .split("state=")
+                .nth(1)
+                .unwrap()
+                .split('&')
+                .next()
+                .unwrap();
+            let body = serde_json::to_vec(&serde_json::json!({"flow_id": start.flow_id, "code": format!("synthetic-code#{state}")})).unwrap();
+            let app = router_with_subscription_custody(
+                Arc::new(Verifier),
+                Arc::new(Backend),
+                HostedAdmissionPolicy::new(["operator".to_owned()]),
+                HostedAuthority::unbound(),
+                Some(custody),
+            );
+            for (status, error) in [
+                (expected_status, expected_error),
+                (StatusCode::GONE, "subscription-oauth-flow-expired"),
+            ] {
+                let response = app
+                    .clone()
+                    .oneshot(
+                        Request::post("/subscription-credentials/claude-code/oauth/complete")
+                            .header(header::AUTHORIZATION, "Bearer access")
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Body::from(body.clone()))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), status);
+                let bytes = to_bytes(response.into_body(), 1024).await.unwrap();
+                assert_eq!(
+                    serde_json::from_slice::<serde_json::Value>(&bytes).unwrap(),
+                    serde_json::json!({"error":error})
+                );
+            }
+            provider.abort();
+        }
     }
 }
