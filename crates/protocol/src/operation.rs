@@ -5,7 +5,9 @@
 pub mod legacy;
 pub mod schema;
 pub mod schema_v3;
+pub mod schema_v4;
 pub mod v3;
+pub mod v4;
 pub mod versions;
 pub mod wire;
 pub use wire::*;

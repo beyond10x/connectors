@@ -1,0 +1,1385 @@
+{
+  "$comment": "Exact suggested_interval_ms arithmetic and serialized UTF-8 byte budgets are additional Rust reader checks. No provider request or response schema is transformed by this projection.",
+  "$defs": {
+    "ApprovalPosture": {
+      "enum": [
+        "not_required",
+        "required"
+      ],
+      "type": "string"
+    },
+    "AuthenticationAttemptState": {
+      "enum": [
+        "not_attempted"
+      ],
+      "type": "string"
+    },
+    "AuthenticationNeed": {
+      "enum": [
+        "authorize_configured",
+        "reauthorize_existing"
+      ],
+      "type": "string"
+    },
+    "AuthenticationNextAction": {
+      "enum": [
+        "start_trusted_remediation"
+      ],
+      "type": "string"
+    },
+    "AuthenticationRequired": {
+      "additionalProperties": false,
+      "description": "Safe facts only; this value cannot carry a session URL or execution authority.",
+      "properties": {
+        "attempt": {
+          "$ref": "#/$defs/AuthenticationAttemptState"
+        },
+        "auth_profile": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._-]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "need": {
+          "$ref": "#/$defs/AuthenticationNeed"
+        },
+        "next_action": {
+          "$ref": "#/$defs/AuthenticationNextAction"
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_ref",
+        "connection_ref",
+        "integration_ref",
+        "auth_profile",
+        "need",
+        "attempt",
+        "next_action"
+      ],
+      "type": "object"
+    },
+    "ChannelSignal": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "digits": {
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[0-9A-D*#]+$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "dtmf",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "digits"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ConditionalRateAdvice": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "suggested_interval_ms": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "declaration": {
+                "properties": {
+                  "rate": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "rate"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "suggested_interval_ms": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "suggested_interval_ms"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "declaration": {
+          "$ref": "#/$defs/ConditionalRateLimit"
+        },
+        "suggested_interval_ms": {
+          "anyOf": [
+            {
+              "maximum": 4294967295000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "declaration"
+      ],
+      "type": "object"
+    },
+    "ConditionalRateLimit": {
+      "additionalProperties": false,
+      "properties": {
+        "applies_when": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+          "type": "string"
+        },
+        "rate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublishedRate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_url": {
+          "description": "RFC 3986 ASCII URI with literal lowercase https, a nonempty host, no userinfo or fragment, and an optional decimal port from 0 through 65535. Empty ports denote the default; leading zeros and percent-encoded spelling are preserved.",
+          "format": "uri",
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "^https://(?:\\[[^\\]]+\\]|[^:/?#@\\[\\]]+)(?::(?:0*(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?)?(?:[/?][^#]*)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "applies_when",
+        "source_url"
+      ],
+      "type": "object"
+    },
+    "ConnectionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "audiences": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[!-~]+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        },
+        "provider": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "purpose": {
+          "description": "When a caller should invoke through this Connection rather than another admitted one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "connection_ref",
+        "label",
+        "provider",
+        "audiences"
+      ],
+      "type": "object"
+    },
+    "DescribeRequest": {
+      "additionalProperties": false,
+      "not": {
+        "required": [
+          "connection_ref",
+          "endpoint_ref"
+        ]
+      },
+      "properties": {
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "endpoint_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_ref"
+      ],
+      "type": "object"
+    },
+    "EffectClass": {
+      "enum": [
+        "read_only",
+        "mutating",
+        "destructive"
+      ],
+      "type": "string"
+    },
+    "FixedRateLimit": {
+      "additionalProperties": false,
+      "description": "The existing fixed declaration shape, without extending its fields.",
+      "properties": {
+        "bucket": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "per_seconds": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "requests": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requests",
+        "per_seconds"
+      ],
+      "type": "object"
+    },
+    "InvocationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "connector_audit_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "execution_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "output": true
+      },
+      "required": [
+        "operation_ref",
+        "output",
+        "connector_audit_ref"
+      ],
+      "type": "object"
+    },
+    "InvokeRequest": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "not": {
+            "required": [
+              "endpoint_ref"
+            ]
+          },
+          "required": [
+            "connection_ref"
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "connection_ref"
+            ]
+          },
+          "required": [
+            "endpoint_ref"
+          ]
+        }
+      ],
+      "properties": {
+        "approval_evidence_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "description_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "endpoint_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "input": true,
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_ref",
+        "description_ref",
+        "input"
+      ],
+      "type": "object"
+    },
+    "OperationDescription": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "enum": [
+                  "mutating",
+                  "destructive"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "approval": {
+                "const": "required"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/ApprovalPosture"
+        },
+        "connections": {
+          "items": {
+            "$ref": "#/$defs/ConnectionSummary"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "description": {
+          "maxLength": 16384,
+          "minLength": 0,
+          "type": "string"
+        },
+        "description_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "effect": {
+          "$ref": "#/$defs/EffectClass"
+        },
+        "input_schema": true,
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "output_schema": true,
+        "rate_advice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationRateAdvice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_ref",
+        "title",
+        "description",
+        "input_schema",
+        "output_schema",
+        "effect",
+        "approval",
+        "connections",
+        "description_ref"
+      ],
+      "type": "object"
+    },
+    "OperationError": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "retry_after_seconds"
+            ]
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "const": "rate_limited"
+              }
+            }
+          }
+        },
+        {
+          "else": {
+            "not": {
+              "required": [
+                "authentication"
+              ]
+            }
+          },
+          "if": {
+            "properties": {
+              "code": {
+                "const": "authentication_required"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "retry_after_seconds"
+              ]
+            },
+            "properties": {
+              "retriable": {
+                "const": false
+              }
+            },
+            "required": [
+              "authentication"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "authentication": {
+          "$ref": "#/$defs/AuthenticationRequired"
+        },
+        "code": {
+          "$ref": "#/$defs/OperationErrorCode"
+        },
+        "message": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean"
+        },
+        "retry_after_seconds": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retriable"
+      ],
+      "type": "object"
+    },
+    "OperationErrorCode": {
+      "enum": [
+        "unavailable",
+        "not_found",
+        "not_granted",
+        "invalid_input",
+        "stale_authority",
+        "approval_required",
+        "approval_denied",
+        "result_too_large",
+        "protocol",
+        "outcome_unknown",
+        "rate_limited",
+        "authentication_required"
+      ],
+      "type": "string"
+    },
+    "OperationRateAdvice": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "fixed": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "fixed"
+          ]
+        },
+        {
+          "properties": {
+            "alternatives": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "properties": {
+        "alternatives": {
+          "items": {
+            "$ref": "#/$defs/ConditionalRateAdvice"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "fixed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FixedRateLimit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "alternatives"
+      ],
+      "type": "object"
+    },
+    "OperationRequest": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "search",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SearchRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "describe",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/DescribeRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "invoke",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/InvokeRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "session_status",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "session_terminate",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionTerminateRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "session_reconcile",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "session_signal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionSignalRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OperationResult": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "search",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "operations": {
+                  "items": {
+                    "$ref": "#/$defs/OperationSummary"
+                  },
+                  "maxItems": 25,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "operations"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "describe",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/OperationDescription"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "invoke",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/InvocationResult"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "session_status",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SessionStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "session_terminate",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SessionStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "session_reconcile",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SessionStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "session_signal",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SessionStatus"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OperationSummary": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effect": {
+                "enum": [
+                  "mutating",
+                  "destructive"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "approval": {
+                "const": "required"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/ApprovalPosture"
+        },
+        "connections": {
+          "items": {
+            "$ref": "#/$defs/ConnectionSummary"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "effect": {
+          "$ref": "#/$defs/EffectClass"
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_ref",
+        "title",
+        "effect",
+        "approval",
+        "connections"
+      ],
+      "type": "object"
+    },
+    "OwnerContext": {
+      "additionalProperties": false,
+      "description": "Owner facts presented by a client and re-evaluated by Connectors.",
+      "properties": {
+        "agent_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "agent_revision": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "authority_snapshot_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "authority_snapshot_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "agent_id",
+        "agent_revision",
+        "authority_snapshot_id",
+        "authority_snapshot_sha256"
+      ],
+      "type": "object"
+    },
+    "PublishedRate": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/RateLimitBasis"
+        },
+        "per_seconds": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "requests": {
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requests",
+        "per_seconds",
+        "basis"
+      ],
+      "type": "object"
+    },
+    "RateLimitBasis": {
+      "enum": [
+        "minimum_allowance",
+        "ceiling"
+      ],
+      "type": "string"
+    },
+    "RequestEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/OwnerContext"
+        },
+        "protocol": {
+          "const": "b10x.connector-operation.v0alpha4"
+        },
+        "request": {
+          "$ref": "#/$defs/OperationRequest"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "context",
+        "request"
+      ],
+      "type": "object"
+    },
+    "RequestedSessionTermination": {
+      "enum": [
+        "completed",
+        "cancelled",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "ResponseEnvelope": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "error": {
+              "type": "null"
+            },
+            "response": {
+              "$ref": "#/$defs/OperationResult"
+            },
+            "status": {
+              "const": "ok"
+            }
+          },
+          "required": [
+            "response"
+          ]
+        },
+        {
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/OperationError"
+            },
+            "response": {
+              "type": "null"
+            },
+            "status": {
+              "const": "error"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ],
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protocol": {
+          "const": "b10x.connector-operation.v0alpha4"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/ResponseStatus"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ResponseStatus": {
+      "enum": [
+        "ok",
+        "error"
+      ],
+      "type": "string"
+    },
+    "SearchRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "maximum": 25,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "maxLength": 512,
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "SessionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "execution_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "execution_ref"
+      ],
+      "type": "object"
+    },
+    "SessionSignalRequest": {
+      "additionalProperties": false,
+      "description": "Send a signal into a session that is already established.\n\n# Why this is a session operation and not an invoke\n\nThe call outlives the invocation that placed it. A keypress answering an IVR prompt has no\nmeaning at establishment time -- the prompt has not been heard yet -- so it cannot be an\nargument to `sip.dial`, and it addresses the live session by the same `execution_ref` its\nsiblings use.\n\nIt carries no destination and no route: a signal reaches whatever the session is already\nconnected to, which is what keeps it from being a second way to choose where a call goes.",
+      "properties": {
+        "execution_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "signal": {
+          "$ref": "#/$defs/ChannelSignal"
+        }
+      },
+      "required": [
+        "execution_ref",
+        "signal"
+      ],
+      "type": "object"
+    },
+    "SessionState": {
+      "enum": [
+        "establishing",
+        "established",
+        "terminating",
+        "terminated",
+        "outcome_unknown"
+      ],
+      "type": "string"
+    },
+    "SessionStatus": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "establishing",
+                  "established",
+                  "terminating"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "termination": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "terminated"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "termination": {
+                "enum": [
+                  "completed",
+                  "cancelled",
+                  "revoked",
+                  "lease_expired",
+                  "remote_ended",
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "termination"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "outcome_unknown"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "termination": {
+                "const": "outcome_unknown"
+              }
+            },
+            "required": [
+              "termination"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "connector_audit_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "execution_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "operation_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState"
+        },
+        "termination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionTermination"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "execution_ref",
+        "operation_ref",
+        "connection_ref",
+        "state",
+        "connector_audit_ref"
+      ],
+      "type": "object"
+    },
+    "SessionTerminateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "execution_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/RequestedSessionTermination"
+        }
+      },
+      "required": [
+        "execution_ref",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "SessionTermination": {
+      "enum": [
+        "completed",
+        "cancelled",
+        "revoked",
+        "lease_expired",
+        "remote_ended",
+        "failed",
+        "outcome_unknown"
+      ],
+      "type": "string"
+    }
+  },
+  "$id": "https://github.com/beyond10x/connectors/blob/main/contracts/connector-operation/v0alpha4/connector-operation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/RequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ResponseEnvelope"
+    }
+  ],
+  "title": "B10x ConnectorOperation v0alpha4 frame"
+}

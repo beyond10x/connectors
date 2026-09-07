@@ -1,0 +1,801 @@
+{
+  "$comment": "Serialized UTF-8 byte budgets, exact source policy, route and credential validation are additional Rust reader and runtime checks. Inventory is never an invocation Grant.",
+  "$defs": {
+    "BindRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "binding": {
+          "$ref": "#/$defs/EndpointBinding"
+        },
+        "endpoint_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint_ref",
+        "binding"
+      ],
+      "type": "object"
+    },
+    "Endpoint": {
+      "additionalProperties": false,
+      "description": "One interface on an immutable discovered resource identity. Inventory is not a Grant.",
+      "properties": {
+        "binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndpointBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reviewed operator binding, with references and never credential values."
+        },
+        "endpoint_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "interface": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "namespace": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "port_name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9._-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resource_kind": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "resource_name": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "resource_uid": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "source_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/EndpointState",
+          "description": "Current readiness explanation; Ready still requires invocation admission."
+        },
+        "transport": {
+          "$ref": "#/$defs/EndpointTransport",
+          "description": "Advertised transport, independently of driver availability."
+        }
+      },
+      "required": [
+        "endpoint_ref",
+        "source_ref",
+        "resource_kind",
+        "resource_name",
+        "resource_uid",
+        "transport",
+        "interface",
+        "state"
+      ],
+      "type": "object"
+    },
+    "EndpointBinding": {
+      "additionalProperties": false,
+      "description": "Operator-controlled interpretation of an endpoint, persisted outside the cluster.",
+      "properties": {
+        "base_path": {
+          "description": "Optional HTTP path prefix; no query, fragment, or authority is accepted.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "credential": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndpointCredentialReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact credential reference authorized by source policy."
+        },
+        "database": {
+          "default": null,
+          "description": "SQL database override; Crossplane may instead provide the authoritative external name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "direct_address": {
+          "description": "Explicit credential-free origin for an approved direct route.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9._-]+$",
+          "type": "string"
+        },
+        "tls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndpointTls"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SQL transport policy; absence requires TLS. HTTP profiles use their declared scheme."
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "type": "object"
+    },
+    "EndpointCredentialReference": {
+      "description": "A named credential source; this type cannot carry Secret values.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Kubernetes Secret fields mapped to provider-declared credential requirements.",
+          "properties": {
+            "keys": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Provider credential field to Secret data key; neither side is a value.",
+              "type": "object"
+            },
+            "kind": {
+              "const": "kubernetes_secret",
+              "type": "string"
+            },
+            "name": {
+              "description": "Exact Secret name, never a discovery selector.",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "Namespace admitted by the source's credential policy.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "namespace",
+            "name",
+            "keys"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EndpointError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/EndpointErrorCode"
+        },
+        "message": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retriable"
+      ],
+      "type": "object"
+    },
+    "EndpointErrorCode": {
+      "enum": [
+        "not_found",
+        "not_granted",
+        "invalid_input",
+        "conflict",
+        "unavailable",
+        "protocol"
+      ],
+      "type": "string"
+    },
+    "EndpointRequest": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "list",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/ListRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "show",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/ShowRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "refresh",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/RefreshRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "bind",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/BindRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EndpointResult": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "list",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "endpoints": {
+                  "items": {
+                    "$ref": "#/$defs/Endpoint"
+                  },
+                  "type": "array"
+                },
+                "next_cursor": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "warnings": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "endpoints",
+                "warnings"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "show",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "$ref": "#/$defs/Endpoint"
+                }
+              },
+              "required": [
+                "endpoint"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "refresh",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "endpoints": {
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "warnings": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "endpoints",
+                "warnings"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "bind",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "endpoint": {
+                  "$ref": "#/$defs/Endpoint"
+                }
+              },
+              "required": [
+                "endpoint"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EndpointState": {
+      "description": "Actionable state of a discovered interface.",
+      "oneOf": [
+        {
+          "const": "ready",
+          "description": "Recognized and configured; invocation authorization remains independent.",
+          "type": "string"
+        },
+        {
+          "const": "unknown_provider",
+          "description": "No unambiguous catalog provider matches the interface.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_protocol",
+          "description": "No installed driver or route supports the advertised interface.",
+          "type": "string"
+        },
+        {
+          "const": "missing_credentials",
+          "description": "A required credential reference is not configured or cannot be resolved.",
+          "type": "string"
+        },
+        {
+          "const": "denied",
+          "description": "Current source or endpoint policy refuses access.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable_route",
+          "description": "No approved reachable route exists.",
+          "type": "string"
+        },
+        {
+          "const": "stale",
+          "description": "The source resource has disappeared or current evidence is unavailable.",
+          "type": "string"
+        }
+      ]
+    },
+    "EndpointTls": {
+      "description": "Operator-owned TLS policy, separate from Kubernetes authentication and tunnel encryption.",
+      "oneOf": [
+        {
+          "const": "required",
+          "description": "Verify TLS using the logical target hostname and optionally a referenced CA.",
+          "type": "string"
+        },
+        {
+          "const": "disabled",
+          "description": "Explicit operator consent to a plaintext backend protocol.",
+          "type": "string"
+        }
+      ]
+    },
+    "EndpointTransport": {
+      "description": "A discovered transport does not by itself install a protocol driver.",
+      "oneOf": [
+        {
+          "const": "tcp",
+          "description": "Stream transport supported by Kubernetes Pod forwarding.",
+          "type": "string"
+        },
+        {
+          "const": "udp",
+          "description": "Datagram transport, visible even when execution is unsupported.",
+          "type": "string"
+        },
+        {
+          "const": "sctp",
+          "description": "Stream Control Transmission Protocol.",
+          "type": "string"
+        }
+      ]
+    },
+    "ListRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 4096,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "maxLength": 512,
+          "type": "string"
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "query",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "OwnerContext": {
+      "additionalProperties": false,
+      "description": "Owner facts presented by a client and re-evaluated by Connectors.",
+      "properties": {
+        "agent_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "agent_revision": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "authority_snapshot_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "authority_snapshot_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "agent_id",
+        "agent_revision",
+        "authority_snapshot_id",
+        "authority_snapshot_sha256"
+      ],
+      "type": "object"
+    },
+    "RefreshRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "source_ref": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "minLength": 1,
+              "pattern": "^[!-~]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "RequestEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/OwnerContext"
+        },
+        "protocol": {
+          "const": "b10x.connector-endpoint.v0alpha1"
+        },
+        "request": {
+          "$ref": "#/$defs/EndpointRequest"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "context",
+        "request"
+      ],
+      "type": "object"
+    },
+    "ResponseEnvelope": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "error": {
+              "type": "null"
+            },
+            "response": {
+              "$ref": "#/$defs/EndpointResult"
+            },
+            "status": {
+              "const": "ok"
+            }
+          },
+          "required": [
+            "response"
+          ]
+        },
+        {
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/EndpointError"
+            },
+            "response": {
+              "type": "null"
+            },
+            "status": {
+              "const": "error"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ],
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndpointError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protocol": {
+          "const": "b10x.connector-endpoint.v0alpha1"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndpointResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/ResponseStatus"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ResponseStatus": {
+      "enum": [
+        "ok",
+        "error"
+      ],
+      "type": "string"
+    },
+    "ShowRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint_ref"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/beyond10x/connectors/blob/main/contracts/connector-endpoint/v0alpha1/connector-endpoint.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/RequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ResponseEnvelope"
+    }
+  ],
+  "title": "B10x ConnectorEndpoint v0alpha1 frame"
+}

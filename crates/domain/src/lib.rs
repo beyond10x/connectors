@@ -8,6 +8,7 @@ mod approval;
 pub mod audio;
 mod connection;
 mod discovery;
+pub mod endpoint;
 mod evaluator;
 mod grant;
 mod plan;
