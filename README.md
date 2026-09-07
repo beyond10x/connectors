@@ -59,6 +59,20 @@ The same example connects all six chapters.
 
 ## Connect a provider
 
+With a valid local Kubernetes context, start service discovery directly:
+
+```bash
+connectors setup connect kubernetes
+connectors endpoint list
+```
+
+Setup saves the selected context and namespace policy and starts the daemon. Endpoints describe
+individual service interfaces, including services without an installed driver. Bind named
+credential references where needed, then describe and invoke a compatible operation with
+`--endpoint-ref`. The daemon resolves the route and credentials when the operation runs.
+See the [Kubernetes guide](docs/guides/connect-kubernetes.md) for namespace selection, bindings,
+SQL and HTTP examples, and hosted use.
+
 The provider guides explain the supported connection paths and their credential requirements.
 
 | Provider | Guide |

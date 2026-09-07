@@ -18,8 +18,8 @@ use std::path::{Path, PathBuf};
 use clap::{CommandFactory, Parser, Subcommand};
 use connectors_client::{AuthenticatedHostedClient, IdentityError, LocalClient, LoginOptions};
 use connectors_runtime::{
-    default_config_path, default_state_root, validate_state_root, HostedRuntime, PersonalConfig,
-    PersonalRuntime, RuntimeError,
+    default_config_path, default_state_root, HostedRuntime, PersonalConfig, PersonalRuntime,
+    RuntimeError,
 };
 use protocol::connection::{ConnectionRequest, SearchRequest as ConnectionSearchRequest};
 use protocol::event::{

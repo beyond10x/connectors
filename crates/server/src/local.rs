@@ -11,7 +11,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fs2::FileExt as _;
-use protocol::operation::{RequestEnvelope, ResponseEnvelope, MAX_FRAME_BYTES};
+use protocol::operation::MAX_FRAME_BYTES;
+#[cfg(test)]
+use protocol::operation::{RequestEnvelope, ResponseEnvelope};
 use serde::Deserialize;
 use service::{ConnectorBackend, PrincipalContext};
 use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
