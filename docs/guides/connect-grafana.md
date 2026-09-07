@@ -64,7 +64,7 @@ Start the Connector:
 
 ```sh
 cargo run --manifest-path crates/connectors-cli/Cargo.toml --locked -- \
-  serve --config crates/connectors-config/examples/grafana-federation.example.toml \
+  daemon start --config crates/connectors-config/examples/grafana-federation.example.toml \
   --state-root /absolute/owner-only/state/root
 ```
 
@@ -72,16 +72,17 @@ In another terminal, use the guided flow:
 
 ```sh
 cargo run --manifest-path crates/connectors-cli/Cargo.toml --locked -- \
-  connect grafana \
+  setup connect grafana \
   --config crates/connectors-config/examples/grafana-federation.example.toml \
   --state-root /absolute/owner-only/state/root \
   --label "Infrastructure Grafana"
 ```
 
 The hidden prompt sends the token directly to a one-use Connector socket. The Connector verifies
-Grafana, discovers its data sources, and materializes recognized targets covered by the configured
-target Grants. It prints only safe labels and opaque Connection references. Unsupported plug-in
-types stay visible as a count and never fall through to generic proxy access.
+Grafana and discovers its data sources as endpoints. It prints safe metadata and opaque endpoint
+references. Installed drivers and configured target Grants determine which endpoints can be used.
+Unsupported plug-in types remain visible with readiness reasons. The daemon resolves the target
+through Grafana when an admitted operation invokes it.
 
 In personal-local mode the token is currently retained only in daemon memory. A restart requires
 this guided action again; the alpha does not write a plaintext credential file. OS-keychain and
@@ -98,20 +99,23 @@ connectors operation search \
   --query prometheus
 ```
 
-Describe `prometheus-query-range`, then use the returned `description_ref` and one returned
-`connection_ref` in an invocation:
+List endpoints, select a compatible Prometheus endpoint, then describe and invoke it:
 
 ```sh
+connectors endpoint list --query prometheus \
+  --config /absolute/path/connectors.toml \
+  --state-root /absolute/owner-only/state/root
+
 connectors operation describe \
   --config /absolute/path/connectors.toml \
   --state-root /absolute/owner-only/state/root \
-  --operation prometheus-query-range
+  --operation prometheus-query-range --endpoint-ref "$endpoint_ref"
 
 connectors operation invoke \
   --config /absolute/path/connectors.toml \
   --state-root /absolute/owner-only/state/root \
   --operation prometheus-query-range \
-  --connection 'connection:prometheus:…' \
+  --endpoint-ref "$endpoint_ref" \
   --description-ref 'description-sha256-…' \
   --input-json '{"query":"up","start":"1723676400","end":"1723676700","step":"30s"}'
 ```

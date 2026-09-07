@@ -42,7 +42,7 @@ deployments. Each runtime supplies its own configuration and storage bindings.
 | Authority | Local-owner boundary and owner-controlled access | Validated Identity authority, exact scope, receiver policy |
 | Configuration | Personal TOML and owner-only state root | Hosted TOML describing identity, integrations, storage, and listeners |
 | Credentials | Connector-managed owner-bound custody | Configured SecretStore; hosted Slack requires Vault-backed custody |
-| Access | CLI, local client/socket, selected one-shot operations | HTTP contracts, hosted MCP, authenticated client |
+| Access | CLI and local client through the owner-only daemon socket | HTTP contracts, hosted MCP, authenticated client |
 | Background work | Enabled local channel/session supervisors | Hosted listeners and enabled Integration supervisors |
 
 The project is pre-v1. A catalogued provider or local driver does not imply an equivalent hosted
@@ -91,17 +91,15 @@ command -v connectors
 connectors --version
 ```
 
-Stop the daemon that owns the intended state root through its existing supervisor, or with Ctrl-C
-in the terminal running `connectors serve local`. Wait for that process to exit. Start the newly
-installed executable with the same absolute configuration and state-root paths shown under
-[Run a service](#run-a-service), then repeat the operation search and description from an ordinary
-CLI session using those same paths. Restart through the existing supervisor when it owns the
-process, and check that its executable path selects the new installation too.
+Run `connectors daemon stop --state-root /absolute/path/private-state`, then start the newly
+installed executable with the same configuration and state-root paths shown under
+[Run a service](#run-a-service). `connectors daemon status` reports the process, version, and served
+configuration. Repeat operation search and description using those same paths. When an existing
+supervisor owns the process, restart through that supervisor and check its executable path too.
 
 This restarts background channels and sessions owned by that daemon. Do not delete its state or
 socket to force a second process into the same root; the owner lock deliberately refuses that.
-`connectors --version` identifies the client executable, so it alone does not prove which build is
-serving requests. The stopped process and replacement launch establish that part of the update.
+`connectors --version` identifies the client executable; `daemon status` identifies the server.
 Source installation is supported independently of the release archive schedule; use the reviewed
 source revision when a fix has not yet reached a published archive.
 
@@ -120,7 +118,7 @@ Use the actual deployment URL. The client discovers the Identity origin and audi
 continuity in the OS keyring, and obtains short-lived access tokens. Non-secret deployment
 selection is stored separately.
 
-Connection, Event, and Operation commands default to `--target local`, including when a hosted
+Connection, Endpoint, Event, and Operation commands default to `--target local`, including when a hosted
 login is stored. Select `--target hosted` explicitly to use that deployment. The flag works before
 or after the group's leaf command. Local `--config` and `--state-root` options select local paths;
 combining either with `--target hosted` is refused before input is read or a transport is contacted.
@@ -129,12 +127,14 @@ Responses and command errors identify the selected target.
 ## Run a service
 
 ```bash
-connectors serve local --config /absolute/path/personal.toml --state-root /absolute/path/private-state
+connectors daemon start --config /absolute/path/personal.toml --state-root /absolute/path/private-state
+connectors daemon status --state-root /absolute/path/private-state
 ```
 
-The state root must satisfy ownership and permission checks and be outside the checkout. Selected
-one-shot operations can construct a local runtime without a standing daemon; ongoing channels and
-sessions require their owning process to remain available.
+The state root must satisfy ownership and permission checks and be outside the checkout. All local
+provider access uses this daemon. Setup can create and start it on first use. Help and the installed
+provider catalog remain available offline. Use `serve local` with the same paths for a foreground
+process or an existing supervisor.
 
 ```bash
 connectors serve hosted --config /absolute/path/hosted.toml
