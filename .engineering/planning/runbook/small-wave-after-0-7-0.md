@@ -8,7 +8,7 @@ tags:
 - wave-small
 relations:
 - delivers: story:the-binary-says-what-it-carries
-revision: 3
+revision: 4
 ---
 # Next small wave: inspect the installed binary
 
@@ -1444,3 +1444,24 @@ Remote Connectors main advanced to 9f2a361b5751ac1d1fcbdce06a0a09e9ce741db1, add
 The opening branch is wave/inspect-upgrade-after-0.7.0. Current disk is 26,729,488,384 bytes free, 97% used; tmpfs has 24,226,791,424 bytes free. Use one compiler lane, one Cargo job, no incremental/debug output and a verified sccache wrapper. Full workspace testing will use the repository's existing sharded release rehearsal, avoiding simultaneous local targets that cannot fit. Local focused lanes preserve the 20 GB disk floor. All per-lane exits and counts are retained in assigned scratch.
 
 Connectors 0.7.0 doctor is healthy, but local operation search returned no admitted GitHub workflow/release operations. The capability gap was reported before using Atlas bot-authenticated GitHub tooling. No custom Python coordinator is introduced.
+
+## Unit dispatched
+
+Opening commit a4bff98c6f6166529ad727179ecfd5828a765392 and merged base 80c7666f4a36dc3b8902a1c8106a5edfe7afefe1 have verified bot author and committer. The ordinary Git union merge preserved disjoint journal histories; native AEP validation returned valid for187artifacts. Portable Markdown, legacy story checks and whitespace checks passed before dispatch.
+
+The actual unit is impl/the-binary-says-what-it-carries at80c7666f4a36dc3b8902a1c8106a5edfe7afefe1 in ~/.local/state/worktree/trees/b10x/connectors/wt-inspect-upgrade-20260907. The manager initially resolved HEAD against the primary repository; before dispatch the clean unit was explicitly switched to the exact merged base. Its target directories are root target/, crates/connectors-cli/target and crates/connectors-console/target inside that tree; scratch/TMPDIR and brief are ~/.cache/cw7/upgrade and ~/.cache/cw7/upgrade/brief.md. Stage: implementation, changes left uncommitted for independent review.
+
+A private sccache server is active on127.0.0.1:49387 with cache ~/.cache/cw7/sccache, maximum1GiB. Wrapper execution of rustc succeeded. Owned unit targets may occupy at most4GiB together while preserving20GB free disk; one compiler job, no debug/incremental output. No retained recovery tree has an in-tree target directory. Recovery wt-2c3596f5baa5 is clean; wt-38354a193753 retains precisely these six changes, all preserved:
+
+```text
+ M crates/connectors-cli/src/lib.rs
+ M crates/connectors-cli/tests/remediation.rs
+ M crates/connectors-client/src/remediation.rs
+ M crates/connectors-client/src/tests.rs
+ M crates/connectors-console/src/remediation.rs
+ M crates/connectors-console/tests/remediation.rs
+```
+
+The CLI/lib.rs and client/lib.rs area can overlap conceptually with this wave, but the preserved tree is frozen history, not an implementation branch to merge. The new unit starts from published main and does not copy those changes. This is the explicitly approved recovery preservation exception.
+
+Default PATH selected ESS0.9.2, which refused the required specify command. The exact pinned ESS0.18.0 at ~/.cache/ess-rel/ess-0.18.0-x86_64-unknown-linux-gnu/ess validated the base: connectors v1 —10file(s), valid; compile succeeded. Coordinator uses that version for the projection check. Cargo set-version is installed and its offline root-workspace dry-run supports the approved0.7.1 identity bump; no version bytes have changed yet.
