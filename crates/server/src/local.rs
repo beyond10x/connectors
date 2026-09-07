@@ -22,6 +22,10 @@ const MAX_LOCAL_CLIENTS: usize = 64;
 const FRAME_READ_DEADLINE: Duration = Duration::from_secs(5);
 const BACKEND_SHUTDOWN_DEADLINE: Duration = Duration::from_secs(15);
 
+#[cfg(test)]
+#[path = "local_lifecycle_tests.rs"]
+mod lifecycle_tests;
+
 /// Bound personal-local daemon. Binding completes before this value is returned, so callers can
 /// publish readiness without racing the accept loop.
 pub struct LocalOperationDaemon<B: ?Sized> {
@@ -29,6 +33,8 @@ pub struct LocalOperationDaemon<B: ?Sized> {
     socket_path: PathBuf,
     owner_uid: u32,
     backend: Arc<B>,
+    lifecycle: Arc<crate::local_lifecycle::Lifecycle>,
+    setup: Option<Arc<dyn crate::local_setup::LocalSetupHandler>>,
     _ownership: LocalStateOwnership,
 }
 
@@ -108,6 +114,8 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
             socket_path,
             owner_uid,
             backend,
+            lifecycle: Arc::new(crate::local_lifecycle::Lifecycle::new(None)),
+            setup: None,
             _ownership: ownership,
         })
     }
@@ -115,6 +123,23 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
     #[must_use]
     pub fn socket_path(&self) -> &Path {
         &self.socket_path
+    }
+
+    /// Name the exact configuration served, so background startup detects another configuration.
+    #[must_use]
+    pub fn with_configuration(mut self, configuration: Option<PathBuf>) -> Self {
+        self.lifecycle = Arc::new(crate::local_lifecycle::Lifecycle::new(configuration));
+        self
+    }
+
+    /// Bind confidential enrollment to the runtime's own configuration and credential store.
+    #[must_use]
+    pub fn with_setup_handler(
+        mut self,
+        handler: Arc<dyn crate::local_setup::LocalSetupHandler>,
+    ) -> Self {
+        self.setup = Some(handler);
+        self
     }
 
     /// Serve until shutdown, then abort and join every incomplete local client before removing the
@@ -128,6 +153,7 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
         loop {
             tokio::select! {
                 () = &mut shutdown => break,
+                () = self.lifecycle.shutdown.notified() => break,
                 accepted = self.listener.accept() => {
                     let (stream, _) = accepted?;
                     if clients.len() >= MAX_LOCAL_CLIENTS {
@@ -136,8 +162,10 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
                     }
                     let backend = Arc::clone(&self.backend);
                     let owner_uid = self.owner_uid;
+                    let lifecycle = Arc::clone(&self.lifecycle);
+                    let setup = self.setup.clone();
                     clients.spawn(async move {
-                        let _ = serve_client(stream, owner_uid, backend).await;
+                        let _ = serve_client(stream, owner_uid, backend, lifecycle, setup).await;
                     });
                 }
                 Some(_) = clients.join_next(), if !clients.is_empty() => {}
@@ -598,6 +626,8 @@ async fn serve_client<B: ConnectorBackend + ?Sized>(
     mut stream: UnixStream,
     owner_uid: u32,
     backend: Arc<B>,
+    lifecycle: Arc<crate::local_lifecycle::Lifecycle>,
+    setup: Option<Arc<dyn crate::local_setup::LocalSetupHandler>>,
 ) -> Result<(), LocalDaemonError> {
     let credential = stream.peer_cred()?;
     if credential.uid() != owner_uid {
@@ -617,12 +647,28 @@ async fn serve_client<B: ConnectorBackend + ?Sized>(
         Ok(probe) => probe,
         Err(_) => return Ok(()),
     };
-    let Some(mut bytes) = dispatch_frame(&frame, &probe.protocol, backend).await? else {
-        return Ok(());
+    let (mut bytes, stopping) = if probe.protocol == protocol::lifecycle::CONTRACT {
+        let Some(response) = lifecycle.response(&frame) else {
+            return Ok(());
+        };
+        response
+    } else if probe.protocol == protocol::local_setup::CONTRACT {
+        let Some(bytes) = crate::local_setup::handle(&frame, setup.as_deref()).await else {
+            return Ok(());
+        };
+        (bytes, false)
+    } else {
+        let Some(bytes) = dispatch_frame(&frame, &probe.protocol, backend).await? else {
+            return Ok(());
+        };
+        (bytes, false)
     };
     bytes.push(b'\n');
     stream.write_all(&bytes).await?;
     stream.shutdown().await?;
+    if stopping {
+        lifecycle.shutdown.notify_one();
+    }
     Ok(())
 }
 
@@ -884,8 +930,8 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
 
 async fn read_frame<R: tokio::io::AsyncBufRead + Unpin>(
     reader: &mut R,
-) -> io::Result<Option<Vec<u8>>> {
-    let mut frame = Vec::with_capacity(4096);
+) -> io::Result<Option<zeroize::Zeroizing<Vec<u8>>>> {
+    let mut frame = zeroize::Zeroizing::new(Vec::with_capacity(4096));
     loop {
         let available = reader.fill_buf().await?;
         if available.is_empty() {
@@ -1004,9 +1050,9 @@ mod tests {
     static SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
     #[derive(Default)]
-    struct SyntheticBackend {
-        shutdown: AtomicBool,
-        operation_calls: AtomicU64,
+    pub(super) struct SyntheticBackend {
+        pub(super) shutdown: AtomicBool,
+        pub(super) operation_calls: AtomicU64,
         connection_called: AtomicBool,
         event_called: AtomicBool,
     }
@@ -1068,7 +1114,7 @@ mod tests {
         }
     }
 
-    fn temporary_socket() -> (PathBuf, PathBuf) {
+    pub(super) fn temporary_socket() -> (PathBuf, PathBuf) {
         let root = std::env::temp_dir().join(format!(
             "b10x-local-operation-{}-{}",
             std::process::id(),

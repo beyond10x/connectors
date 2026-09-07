@@ -25,8 +25,6 @@ pub(super) enum MainError {
     #[error(transparent)]
     Input(#[from] input::InputError),
     #[error(transparent)]
-    Auth(#[from] auth::AuthError),
-    #[error(transparent)]
     Admin(#[from] admin::AdminError),
     #[error(transparent)]
     Enrol(#[from] enrol::EnrolError),
@@ -45,8 +43,10 @@ pub(super) enum MainError {
     McpOutput,
     #[error("--target hosted cannot be combined with local-only --config or --state-root")]
     TargetConflict,
-    #[error("events require a persistent daemon; run `connectors serve local` with the same --config and --state-root")]
-    DaemonRequired,
+    #[error(transparent)]
+    Daemon(#[from] connectors_console::daemon::DaemonError),
+    #[error(transparent)]
+    KubernetesSetup(#[from] connectors_console::kubernetes_setup::SetupError),
 }
 
 impl MainError {
@@ -75,9 +75,10 @@ impl MainError {
             Self::Unhealthy => "unhealthy",
             Self::McpOutput => "invalid-argument",
             Self::TargetConflict => "target-conflict",
-            Self::DaemonRequired => "daemon-required",
+            Self::Daemon(connectors_console::daemon::DaemonError::Required) => "daemon-required",
+            Self::Daemon(_) => "daemon",
+            Self::KubernetesSetup(_) => "kubernetes-setup",
             Self::Input(_) => "invalid-argument",
-            Self::Auth(_) => "credential-store",
             Self::Admin(_) => "admin",
             Self::Enrol(_) => "connect",
         }

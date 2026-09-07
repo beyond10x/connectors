@@ -182,11 +182,14 @@ components:
     #   unspecified-path: admin integrations status — read
     #   unspecified-path: admin credentials — grouping
     #   unspecified-path: admin credentials set — lifecycle
-    #   unspecified-path: connection candidates — read
-    #   unspecified-path: connection activate — forwarded
+    #   unspecified-path: daemon start — lifecycle
+    #   unspecified-path: daemon status — read
+    #   unspecified-path: daemon stop — lifecycle
+    #   unspecified-path: endpoint list — read
+    #   unspecified-path: endpoint show — read
+    #   unspecified-path: endpoint refresh — flow
+    #   unspecified-path: endpoint bind — flow
     #   unspecified-path: connection list — read
-    #   unspecified-path: connection observations — read
-    #   unspecified-path: connection materialize — forwarded
     #   unspecified-path: event search — read
     #   unspecified-path: event receive — read
     #   unspecified-path: event replay — read
@@ -205,6 +208,10 @@ components:
           summary: Sign in to a hosted Connector deployment, and sign out of it.
         - name: serve
           summary: Run a Connector for this machine, for a hosted deployment, or over stdio.
+        - name: daemon
+          summary: Start, inspect, or stop the background local Connector.
+        - name: endpoint
+          summary: Discover service interfaces and manage their provider bindings.
         - name: connection
           summary: Manage durable Connections through the credential-free control socket.
         - name: event

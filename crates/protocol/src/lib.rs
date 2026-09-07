@@ -15,6 +15,8 @@ pub mod endpoint;
 pub mod endpoint_schema;
 pub mod event;
 pub mod git_fetch;
+pub mod lifecycle;
+pub mod local_setup;
 pub mod operation;
 pub mod sip;
 pub mod sql;

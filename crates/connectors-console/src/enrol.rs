@@ -12,28 +12,18 @@
 //! approval, and which operation verifies the result. This walks exactly that and asks only what the
 //! catalogue cannot answer — the values themselves.
 //!
-//! # Where the credential goes
+//! # Credential ownership
 //!
-//! Straight from a non-echoing prompt into the [`SecretStore`], at the address
-//! [`connector_resolve`] will look it up under. It is never written to the configuration, never
-//! passed as an argument, and never printed. The configuration gets policy — which provider, which
-//! credential name, which endpoint values, what the grant admits — and no value.
-//!
-//! # Why it does not need the daemon
-//!
-//! The curated guided flows ([`crate::connect`]) drive a running Connector because they complete a
-//! Connect Session, which is how a provider-initiated OAuth or Socket Mode credential arrives. A
-//! catalogued provider with a pasted credential needs none of that: the store and the configuration
-//! are both files this process can write. So `connect` works before `serve` has ever run, which is
-//! the order a person actually does things in.
+//! The console collects the declared metadata and hidden input. The running daemon owns every
+//! credential write and provider acquisition through one bounded owner-only socket exchange.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
 
-use connector_secrets::Secret;
 use connectors_config::PersonalConfig;
-use serde_json::{json, Value};
+use protocol::local_setup::{CredentialSource, EnrollRequest, SecretValue};
+use serde_json::Value;
 use zeroize::Zeroizing;
 
 /// Where one declared configuration value belongs, read from its `binds` grammar.
@@ -74,15 +64,6 @@ pub struct Options {
     /// in `ps` output and shell history. The file is read once, its bytes go to the store, and it
     /// can be deleted afterwards — the same import the runtime performs for a declared instance.
     pub credential_file: Option<std::path::PathBuf>,
-    /// How to obtain a credential the provider will issue us, rather than one a person pastes.
-    ///
-    /// Supplied by the composition root, because acquiring is a network act and this package links
-    /// no transport. What comes back is the value alone: **this module still decides where it is
-    /// stored**, through the one addressing function the backend also uses. A closure that stored
-    /// its own result would be the second copy of that rule, and the second copy is the one that
-    /// drifts — `auth status` reported every named instance as `not-connected` for exactly that
-    /// reason.
-    pub acquire: Option<integration_catalog::argocd::Acquire>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -108,8 +89,10 @@ pub enum EnrolError {
     Acquisition(String),
     #[error("{0} is not an owner-only regular file")]
     UnsafeCredentialFile(String),
-    #[error("the credential could not be stored: {0}")]
-    Store(#[from] connector_secrets::StoreError),
+    #[error(transparent)]
+    Client(#[from] connectors_client::ClientError),
+    #[error(transparent)]
+    Daemon(#[from] crate::daemon::DaemonError),
     #[error("the configuration could not be written: {0}")]
     Config(#[from] connectors_config::ConfigError),
 }
@@ -129,21 +112,12 @@ pub async fn run(
 ) -> Result<Value, EnrolError> {
     let provider = catalog::provider(catalog::ProviderKey::id(provider_id))
         .ok_or_else(|| EnrolError::UnknownProvider(provider_id.to_owned()))?;
-    let authority = provider
+    let _authority = provider
         .authority
         .ok_or_else(|| EnrolError::NoAuthority(provider_id.to_owned()))?;
 
-    let existing = PersonalConfig::read(config_path)?;
-    // Named entries are distinct Connections of one provider, so a clash is on the *name*, not on
-    // the provider: connecting a second Slack identity must not read as connecting Slack twice.
-    let identity = options
-        .instance
-        .clone()
-        .unwrap_or_else(|| provider_id.to_owned());
-    let already = existing
-        .catalog
-        .iter()
-        .any(|entry| entry.provider == provider_id && entry.instance() == identity);
+    let _existing = PersonalConfig::read(config_path)?;
+    crate::daemon::start(config_path, state_root).await?;
 
     let credential = match options.credential.as_deref() {
         Some(name) => provider
@@ -229,161 +203,59 @@ pub async fn run(
             approval_needed.join(", ")
         );
     }
-    eprintln!("Input is hidden and goes straight to the credential store.");
-
-    let mut acquired = None;
-    let value = match options.credential_file.take() {
-        Some(path) => read_credential_file(&path)?,
-        // A provider that issues its own credential is asked for one rather than asking a person to
-        // go and fetch it. The password this collects buys exactly one thing and is dropped inside
-        // the acquisition; only what comes back is stored, by the same path a pasted value takes.
-        None if acquires(provider_id) && options.acquire.is_some() => {
-            let acquire = options.acquire.take().expect("checked above");
+    eprintln!("Input is hidden and sent only to the local Connector daemon.");
+    let source = match options.credential_file.take() {
+        Some(path) => CredentialSource::File {
+            path: if path.is_absolute() {
+                path
+            } else {
+                std::env::current_dir()?.join(path)
+            },
+        },
+        None if acquires(provider_id) => {
             let origin = endpoints
                 .get("origin")
-                .ok_or_else(|| EnrolError::MissingValue("origin".to_owned()))?
+                .ok_or_else(|| EnrolError::MissingValue("origin".into()))?
                 .clone();
             let request = argocd_request(origin, options.allow_writes)?;
-            let (token, report) = acquire(request).await.map_err(EnrolError::Acquisition)?;
-            acquired = Some(report);
-            token
+            CredentialSource::Argocd {
+                username: request.username,
+                password: SecretValue::new(request.password.to_string()),
+                project: request.project,
+                role: request.role,
+                expires_in_seconds: request.expires_in_seconds,
+            }
         }
-        None => Zeroizing::new(rpassword::prompt_password(format!(
-            "{}: ",
-            credential.name
-        ))?),
+        None => {
+            let value = Zeroizing::new(rpassword::prompt_password(format!(
+                "{}: ",
+                credential.name
+            ))?);
+            if value.trim().is_empty() {
+                return Err(EnrolError::MissingValue(credential.name.into()));
+            }
+            CredentialSource::Pasted {
+                value: SecretValue::new(value.trim().to_owned()),
+            }
+        }
     };
-    if value.trim().is_empty() {
-        return Err(EnrolError::MissingValue(credential.name.to_owned()));
+    let mut outcome = connectors_client::LocalClient::new(state_root.join("connectors.sock"))
+        .enroll(EnrollRequest {
+            provider: provider_id.to_owned(),
+            instance: options.instance,
+            credential: credential.name.to_owned(),
+            endpoints,
+            usernames,
+            allow_writes: options.allow_writes,
+            operator_network: options.operator_network,
+            source,
+        })
+        .await?;
+    if outcome["reload_required"] == true {
+        crate::daemon::stop(state_root).await?;
+        outcome["daemon"] = crate::daemon::start(config_path, state_root).await?;
     }
-
-    // Addressed exactly as the runtime will read it: the same function, so a credential this
-    // command stores cannot land somewhere the backend does not look.
-    let entry = connectors_config::CatalogIntegrationConfig {
-        provider: provider_id.to_owned(),
-        instance: options.instance.clone(),
-        label: None,
-        grant_ref: format!("grant:{provider_id}:local"),
-        initiation: connectors_config::InitiationConfig::Platform,
-        allow_writes: options.allow_writes,
-        endpoints: endpoints.clone(),
-        usernames: usernames.clone(),
-        operator_approved: true,
-        network: connectors_config::NetworkScopeConfig::Public,
-        credential: Some(credential.name.to_owned()),
-        credential_file: None,
-        oauth: None,
-    };
-    let reference = integration_catalog::credential_address(
-        existing.owner.tenant_id.as_str(),
-        authority,
-        &entry,
-        credential.leaf,
-    )
-    .map_err(|_| EnrolError::NoAuthority(provider_id.to_owned()))?;
-    let (store, backend) = crate::auth::open_store(state_root)?;
-    store.put(&reference, &Secret::new(value.trim())).await?;
-    drop(value);
-
-    // **One identity, several credentials.** A companion bot holds a bot token *and* a user token:
-    // same provider, same instance, different leaf, so they are already distinct addresses. Adding
-    // the second is storing a value against an identity that exists, not declaring a second
-    // Connection — and `assemble_credentials` then picks whichever declared mechanism resolves,
-    // so a user-token operation starts working the moment its credential is there.
-    //
-    // The first cut refused this as "already configured", which pushed an operator into inventing
-    // a second identity (`timo-ai-user`) for what is one actor holding two tokens.
-    if already {
-        // A user half supplied against an entry that already exists is **not** written: this
-        // command appends whole blocks and does not rewrite one an operator may have commented and
-        // reordered. Saying so, and naming the section, is the difference between a person adding
-        // two lines and a person debugging a `not_granted` for an hour.
-        let pending: Vec<&String> = usernames
-            .iter()
-            .filter(|(name, _)| {
-                !existing.catalog.iter().any(|entry| {
-                    entry.provider == provider_id
-                        && entry.instance() == identity
-                        && entry.usernames.contains_key(*name)
-                })
-            })
-            .map(|(name, _)| name)
-            .collect();
-        return Ok(json!({
-            "provider": provider_id,
-            "name": identity,
-            "credential": credential.name,
-            "store": backend,
-            "added_to_existing_identity": true,
-            "user_half_not_written": (!pending.is_empty()).then(|| json!({
-                "credentials": pending,
-                "add_to": "[catalog.usernames] under this provider's existing [[catalog]] block",
-            })),
-            "verify": provider.verify,
-        }));
-    }
-
-    append_entry(
-        config_path,
-        provider_id,
-        credential.name,
-        &endpoints,
-        &usernames,
-        &options,
-    )?;
-
-    Ok(json!({
-        "provider": provider_id,
-        "name": identity,
-        "credential": credential.name,
-        "store": backend,
-        "endpoints": endpoints,
-        // The non-secret half of a Basic join, reported exactly as the endpoints are: the
-        // catalogue declares it `secret = false`, and an operator whose Jira call refuses needs to
-        // see whether the account name was recorded at all. The token is not here and never was.
-        "usernames": usernames,
-        "grant": if options.allow_writes { "read and write" } else { "read only" },
-        "verify": provider.verify,
-        "operations": provider.operations.len(),
-        "next": "connectors serve local, then connectors operation search",
-        // Present only when the provider issued the credential rather than a person pasting one.
-        // It is the whole record of what was created on the operator's side, and every field is
-        // safe to print — the token itself is not here and never was.
-        "acquired": acquired.map(|report| json!({
-            "project": report.project,
-            "role": report.role,
-            "role_created": report.role_created,
-            "token_id": report.token_id,
-            "policies": report.policies,
-            "expires_in_days": report.expires_in_seconds / 86_400,
-            "revoke": format!(
-                "argocd proj role delete-token {} {} <issued-at>, or delete the role",
-                report.project, report.role
-            ),
-        })),
-    }))
-}
-
-/// Read a credential from an owner-only file.
-///
-/// The same checks the runtime applies to a declared instance's `credential_file`: a regular file,
-/// owned by this user, no group or other bits, and bounded — a credential file readable by anyone
-/// else is a credential that has already leaked.
-fn read_credential_file(path: &Path) -> Result<Zeroizing<String>, EnrolError> {
-    use std::os::unix::fs::MetadataExt as _;
-    use std::os::unix::fs::PermissionsExt as _;
-
-    const MAX_CREDENTIAL_FILE_BYTES: u64 = 8 * 1024;
-
-    let metadata = std::fs::symlink_metadata(path)?;
-    if !metadata.file_type().is_file()
-        || metadata.uid() != rustix::process::geteuid().as_raw()
-        || metadata.permissions().mode() & 0o077 != 0
-        || metadata.len() > MAX_CREDENTIAL_FILE_BYTES
-    {
-        return Err(EnrolError::UnsafeCredentialFile(path.display().to_string()));
-    }
-    Ok(Zeroizing::new(std::fs::read_to_string(path)?))
+    Ok(outcome)
 }
 
 /// Parse one `field=value` setting.
@@ -439,64 +311,6 @@ fn prompt_value(field: &catalog::ConfigField) -> Result<Option<String>, EnrolErr
         return Ok(field.default.map(ToOwned::to_owned));
     }
     Ok(Some(answer.to_owned()))
-}
-
-/// Append the `[[catalog]]` block, then prove the file still reads.
-///
-/// Appended textually rather than by re-serializing the whole configuration, so an operator's
-/// comments and ordering survive being connected to a new provider. Validated by reading the
-/// result back through the daemon's own reader, exactly as `init` does — a configuration this
-/// command wrote must never be one the daemon then refuses.
-fn append_entry(
-    config_path: &Path,
-    provider: &str,
-    credential: &str,
-    endpoints: &BTreeMap<String, String>,
-    usernames: &BTreeMap<String, String>,
-    options: &Options,
-) -> Result<(), EnrolError> {
-    let previous = std::fs::read_to_string(config_path)?;
-    let mut block = String::new();
-    let _ = write!(
-        block,
-        "\n[[catalog]]\nprovider = \"{provider}\"\ngrant_ref = \"grant:{provider}:local\"\n\
-         initiation = \"platform\"\nallow_writes = {}\ncredential = \"{credential}\"\n\
-         operator_approved = true\n",
-        options.allow_writes
-    );
-    if let Some(name) = options.instance.as_deref() {
-        let _ = writeln!(block, "instance = \"{name}\"");
-    }
-    if options.operator_network {
-        let _ = writeln!(block, "network = \"operator\"");
-    }
-    if !endpoints.is_empty() {
-        let _ = writeln!(block, "\n[catalog.endpoints]");
-        for (name, value) in endpoints {
-            let _ = writeln!(block, "{name} = \"{value}\"");
-        }
-    }
-    // Quoted keys: a credential name is dotted (`jira.api_token`), and a bare dotted key in TOML
-    // is a nested table, not one name. Written unquoted it would parse as
-    // `usernames.jira.api_token`, which is a different map the resolver never asks.
-    if !usernames.is_empty() {
-        let _ = writeln!(block, "\n[catalog.usernames]");
-        for (name, value) in usernames {
-            let _ = writeln!(block, "\"{name}\" = \"{value}\"");
-        }
-    }
-
-    let mut next = previous.clone();
-    next.push_str(&block);
-    std::fs::write(config_path, &next)?;
-
-    if let Err(error) = PersonalConfig::read(config_path) {
-        // Put the file back exactly as it was. A half-connected provider that stops the daemon
-        // reading its configuration would take every other provider down with it.
-        std::fs::write(config_path, previous)?;
-        return Err(EnrolError::Config(error));
-    }
-    Ok(())
 }
 
 /// Whether this provider issues its own credential rather than expecting a pasted one.

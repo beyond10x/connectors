@@ -21,6 +21,8 @@ mod endpoint_client;
 mod git_fetch_client;
 mod hosted_catalog;
 mod identity;
+mod lifecycle;
+mod local_setup;
 mod model;
 mod personal_oauth;
 mod remediation;

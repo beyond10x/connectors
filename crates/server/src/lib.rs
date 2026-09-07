@@ -7,3 +7,7 @@ pub mod egress;
 pub mod hosted;
 #[cfg(unix)]
 pub mod local;
+#[cfg(unix)]
+mod local_lifecycle;
+#[cfg(unix)]
+pub mod local_setup;

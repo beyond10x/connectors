@@ -68,7 +68,7 @@ fn describe(provider: &'static catalog::Provider) -> Value {
 #[must_use]
 pub fn run(query: &str) -> Value {
     let needle = query.trim().to_ascii_lowercase();
-    let rows = catalog::providers()
+    let mut rows = catalog::providers()
         .iter()
         .filter(|provider| {
             needle.is_empty()
@@ -77,6 +77,14 @@ pub fn run(query: &str) -> Value {
         })
         .map(|provider| describe(provider))
         .collect::<Vec<_>>();
+    if needle.is_empty() || "kubernetes".contains(&needle) {
+        rows.push(json!({
+            "provider": "kubernetes", "vendor": "Kubernetes", "native": true,
+            "credentials": ["kubeconfig"], "ready": true,
+            "setup": "connectors setup connect kubernetes",
+            "operations": null,
+        }));
+    }
 
     // The summary is the part a person quotes, so it is computed over what was shown rather than
     // over the whole catalogue — a filtered listing that reported the global totals would be a
@@ -99,6 +107,17 @@ pub fn run(query: &str) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_kubernetes_is_available_in_the_setup_provider_list() {
+        let value = run("kubernetes");
+        assert_eq!(value["summary"]["listed"], 1);
+        assert_eq!(value["providers"][0]["native"], true);
+        assert_eq!(
+            value["providers"][0]["setup"],
+            "connectors setup connect kubernetes"
+        );
+    }
 
     #[test]
     fn the_shipped_catalogue_is_reported_rather_than_asserted() {
