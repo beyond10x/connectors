@@ -1,5 +1,5 @@
 coverage_path = "specs/gitlab/coverage-19.4.toml"
-coverage_sha256 = "970c539470de4d9c8b2edbd6740f72794a633e5f1d3310349034b6647e64262a"
+coverage_sha256 = "de02480d5d4aa93b42ad1d4ea58a178dfb4aefc0b8d66982784a250b1764761c"
 origin = "vendor"
 path = "specs/gitlab/openapi-19.4.yaml"
 projection_notes = [

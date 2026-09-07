@@ -256,6 +256,12 @@ was passed"*. Run `cargo metadata --offline` once in each workspace `--list-work
 
 ## Releases
 
+Before upgrading an installation built from a local commit, compare its required operation
+contracts with the release candidate and inspect unpublished commits. Integrate and publish any
+required source changes before treating a released binary as a replacement. Validate the actual
+consumer operations, pagination and output shapes; provider authentication probes alone do not
+establish compatibility. Record the remote commit, release and downloadable artifact verification.
+
 **The version is an artifact identity, not a label.** `[workspace.package] version` is what
 `catalog-build` writes into every catalog document's `generator` field, into every
 `connectors.lock` row, and into the wire User-Agent. Cutting a version therefore rewrites all 67
