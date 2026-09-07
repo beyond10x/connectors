@@ -1,0 +1,72 @@
+# Recognition hints, not authority. A profile matches exact app identity and a declared port,
+# or an explicit protocol port name. Operator bindings remain outside cluster metadata.
+[[profile]]
+provider = "loki"
+interface = "http"
+apps = ["loki"]
+ports = [3100]
+port_names = ["loki", "loki-http"]
+
+[[profile]]
+provider = "prometheus"
+interface = "http"
+apps = ["prometheus", "prometheus-server"]
+ports = [9090]
+port_names = ["prometheus", "prometheus-http"]
+
+[[profile]]
+provider = "alertmanager"
+interface = "http"
+apps = ["alertmanager"]
+ports = [9093]
+port_names = ["alertmanager", "alertmanager-http"]
+
+[[profile]]
+provider = "grafana"
+interface = "http"
+apps = ["grafana"]
+ports = [3000]
+port_names = ["grafana"]
+
+[[profile]]
+provider = "asterisk"
+interface = "http"
+apps = ["asterisk"]
+ports = [8088]
+port_names = ["ari", "ari-http"]
+base_path = "/ari"
+
+[[profile]]
+provider = "asterisk"
+interface = "https"
+apps = ["asterisk"]
+ports = [8089]
+port_names = ["ari-https"]
+base_path = "/ari"
+
+[[profile]]
+interface = "ami"
+apps = ["asterisk"]
+ports = [5038]
+port_names = ["ami"]
+
+[[profile]]
+provider = "postgresql"
+interface = "postgresql"
+apps = ["postgres", "postgresql"]
+ports = [5432]
+port_names = ["postgres", "postgresql"]
+
+[[profile]]
+provider = "mysql"
+interface = "mysql"
+apps = ["mysql", "mariadb"]
+ports = [3306]
+port_names = ["mysql", "mariadb"]
+
+[[profile]]
+provider = "argocd"
+interface = "https"
+apps = ["argocd-server"]
+ports = [443]
+port_names = ["argocd-https"]
