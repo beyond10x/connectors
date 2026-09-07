@@ -351,7 +351,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "catalog"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "catalog-reader",
  "serde",
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-reader"
-version = "0.7.0"
+version = "0.7.1"
 
 [[package]]
 name = "cbc"
@@ -477,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "connect-session-transport"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "base64",
  "connector-oauth",
@@ -492,14 +492,14 @@ dependencies = [
 
 [[package]]
 name = "connector-address"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "connector-oauth"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "base64",
  "getrandom 0.3.4",
@@ -511,13 +511,13 @@ dependencies = [
 
 [[package]]
 name = "connector-resolve"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "catalog",
  "catalog-reader",
  "connector-address",
  "connector-secrets",
- "jsonschema",
+ "jsonschema 0.49.9",
  "serde",
  "serde_json",
  "thiserror",
@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "connector-secrets"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-trait",
  "connector-address",
@@ -539,19 +539,19 @@ dependencies = [
 
 [[package]]
 name = "connector-state"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "connectors-client"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "base64",
  "getrandom 0.3.4",
  "identity-client",
- "jsonschema",
+ "jsonschema 0.49.9",
  "keyring",
  "protocol",
  "reqwest",
@@ -567,7 +567,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-config"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "connector-address",
  "domain",
@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-console"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "base64",
  "catalog",
@@ -773,7 +773,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -900,6 +900,17 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "fancy-regex"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "998b056554fbe42e03ae0e152895cd1a7e1002aec800fdc6635d20270260c46f"
+dependencies = [
+ "bit-set",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "fancy-regex"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "476de73bddf2ef8490aa4ee8f1cf40b430bf1d56c48c22080e5186952cd580e6"
@@ -926,6 +937,17 @@ name = "find-msvc-tools"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d45db016d36b838f563236e9193d0ee6ce38f3f68b6c94e914b4929c96bbb890"
+
+[[package]]
+name = "fluent-uri"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1918b65d96df47d3591bed19c5cca17e3fa5d0707318e4b5ef2eae01764df7e5"
+dependencies = [
+ "borrow-or-share",
+ "ref-cast",
+ "serde",
+]
 
 [[package]]
 name = "fluent-uri"
@@ -1404,7 +1426,7 @@ dependencies = [
 
 [[package]]
 name = "integration-catalog"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-trait",
  "catalog",
@@ -1418,6 +1440,7 @@ dependencies = [
  "domain",
  "getrandom 0.3.4",
  "hex",
+ "jsonschema 0.33.0",
  "protocol",
  "rustix",
  "serde",
@@ -1462,6 +1485,32 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d46662859bc5f60a145b75f4632fbadc84e829e45df6c5de74cfc8e05acb96b5"
+dependencies = [
+ "ahash",
+ "base64",
+ "bytecount",
+ "email_address",
+ "fancy-regex 0.16.2",
+ "fraction",
+ "idna",
+ "itoa",
+ "num-cmp",
+ "num-traits",
+ "once_cell",
+ "percent-encoding",
+ "referencing 0.33.0",
+ "regex",
+ "regex-syntax",
+ "serde",
+ "serde_json",
+ "uuid-simd",
+]
+
+[[package]]
+name = "jsonschema"
 version = "0.49.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ec8a241beed129f06114aa68007e905ca350e7baeb6e17a7631bb7978d91b2"
@@ -1470,7 +1519,7 @@ dependencies = [
  "bytecount",
  "data-encoding",
  "email_address",
- "fancy-regex",
+ "fancy-regex 0.19.0",
  "fraction",
  "getrandom 0.3.4",
  "idna",
@@ -1480,7 +1529,7 @@ dependencies = [
  "num-cmp",
  "num-traits",
  "percent-encoding",
- "referencing",
+ "referencing 0.49.9",
  "regex",
  "serde",
  "serde_json",
@@ -1838,10 +1887,10 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "domain",
- "fluent-uri",
+ "fluent-uri 0.4.1",
  "schemars",
  "serde",
  "serde_json",
@@ -1992,12 +2041,26 @@ dependencies = [
 
 [[package]]
 name = "referencing"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e9c261f7ce75418b3beadfb3f0eb1299fe8eb9640deba45ffa2cb783098697d"
+dependencies = [
+ "ahash",
+ "fluent-uri 0.3.2",
+ "once_cell",
+ "parking_lot",
+ "percent-encoding",
+ "serde_json",
+]
+
+[[package]]
+name = "referencing"
 version = "0.49.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6efa2154ea6f5ce0fdecdd2a8d18f2fa1a39a8fbba91564f555a592e4dce8278"
 dependencies = [
  "ahash",
- "fluent-uri",
+ "fluent-uri 0.4.1",
  "getrandom 0.3.4",
  "hashbrown 0.17.1",
  "itoa",
@@ -2378,7 +2441,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -2483,7 +2546,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "state-sqlite"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "connector-state",
  "rusqlite",
@@ -2894,6 +2957,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b082222b4f6619906941c17eb2297fff4c2fb96cb60164170522942a200bd8"
 dependencies = [
  "outref",
+ "uuid",
  "vsimd",
 ]
 

@@ -71,23 +71,11 @@ const MAX_AUDIT_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_CONNECT_SESSIONS: usize = 32;
 pub(crate) const MAX_PROVIDER_RESPONSE_BYTES: usize = 256 * 1024;
 const VALUE_PROJECTION_PROTOCOL: &str = "b10x.value-projection.v1";
-const GITLAB_OPERATIONS: [&str; 15] = [
-    "gitlab-user-get",
-    "gitlab-group-list",
-    "gitlab-project-list",
-    "gitlab-issue-list",
-    "gitlab-issue-get",
-    "gitlab-issue-create",
-    "gitlab-merge-request-list",
-    "gitlab-merge-request-create",
-    "gitlab-merge-request-update",
-    "gitlab-pipeline-get",
-    "gitlab-branch-list",
-    "gitlab-branch-create",
-    "gitlab-repository-commit-create",
-    "gitlab-repository-tree-list",
-    REPOSITORY_FILE_GET,
-];
+#[path = "incremental_reads.rs"]
+mod incremental_reads;
+#[path = "operation_policy.rs"]
+mod operation_policy;
+use operation_policy::*;
 const GITLAB_DATASOURCES: [&str; 6] = [
     "gitlab.users",
     "gitlab.groups",
@@ -1233,8 +1221,10 @@ impl GitlabInner {
             operation_ref: operation_ref.to_owned(),
             title: operation_ref.replace('-', " "),
             description: operation.contract_description().to_owned(),
-            input_schema: operation.input_schema().clone(),
-            output_schema: serde_json::json!({"type":"object"}),
+            input_schema: incremental_reads::input_schema(operation_ref)
+                .unwrap_or_else(|| operation.input_schema().clone()),
+            output_schema: incremental_reads::output_schema(operation_ref)
+                .unwrap_or_else(|| serde_json::json!({"type":"object"})),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
             connections,
@@ -1272,7 +1262,11 @@ impl GitlabInner {
         // reachable, so no local reading of the evidence reference decides admission (S-047).
         let operation = connector_resolve::document::operation(&request.operation_ref)
             .ok_or_else(operation_not_found)?;
-        let validator = jsonschema::validator_for(operation.input_schema())
+        let input_schema = incremental_reads::input_schema(&request.operation_ref)
+            .unwrap_or_else(|| operation.input_schema().clone());
+        let validator = jsonschema::options()
+            .should_validate_formats(true)
+            .build(&input_schema)
             .map_err(|_| operation_unavailable())?;
         if !validator.is_valid(&request.input) {
             return Err(operation_invalid());
@@ -1295,8 +1289,13 @@ impl GitlabInner {
         );
         drop(token);
         let base = format!("{}/api/v4", self.origin.as_str().trim_end_matches('/'));
-        let plan = resolve_operation_plan(operation, &base, &request.input, &[assembled])
+        let mut plan = resolve_operation_plan(operation, &base, &request.input, &[assembled])
             .map_err(|()| operation_invalid())?;
+        incremental_reads::prepare_request(
+            &request.operation_ref,
+            &request.input,
+            &mut plan.request,
+        )?;
         let target = url::Url::parse(&plan.request.url).map_err(|_| operation_unavailable())?;
         if !same_origin(&self.origin, &target) || !target.path().starts_with("/api/v4/") {
             return Err(operation_not_granted());
@@ -1320,11 +1319,18 @@ impl GitlabInner {
                 EgressHttpRequest {
                     request: plan.request,
                     maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
-                    response_headers: Vec::new(),
+                    response_headers: if incremental_reads::is_incremental(&request.operation_ref) {
+                        vec!["x-next-page".to_owned(), "link".to_owned()]
+                    } else {
+                        Vec::new()
+                    },
                 },
             )
             .await;
         let output = match response {
+            Ok(response) if incremental_reads::is_incremental(&request.operation_ref) => {
+                incremental_reads::decode(&request.operation_ref, &request.input, response)
+            }
             Ok(response) => decode_value_response(response).map_err(|_| {
                 if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
                     operation_unavailable()
@@ -2539,43 +2545,6 @@ fn token_response(value: OAuthTokenResponse) -> TokenResponse {
 
 fn canonical_scopes(scopes: Vec<String>) -> Vec<String> {
     connector_oauth::parse_scopes(&scopes.join(" "), &SCOPE_POLICY)
-}
-
-fn supports_operation(connection: &StoredConnection, operation_ref: &str) -> bool {
-    is_gitlab_operation(operation_ref)
-        && (!is_mutating_operation(operation_ref)
-            || connection.scopes.iter().any(|scope| scope == "api"))
-}
-
-fn is_gitlab_operation(value: &str) -> bool {
-    GITLAB_OPERATIONS.contains(&value)
-}
-
-fn operation_effect(operation_ref: &str) -> EffectClass {
-    if is_mutating_operation(operation_ref) {
-        EffectClass::Mutating
-    } else {
-        EffectClass::ReadOnly
-    }
-}
-
-fn operation_approval(operation_ref: &str) -> ApprovalPosture {
-    if is_mutating_operation(operation_ref) {
-        ApprovalPosture::Required
-    } else {
-        ApprovalPosture::NotRequired
-    }
-}
-
-fn is_mutating_operation(operation_ref: &str) -> bool {
-    matches!(
-        operation_ref,
-        "gitlab-issue-create"
-            | "gitlab-merge-request-create"
-            | "gitlab-merge-request-update"
-            | "gitlab-branch-create"
-            | "gitlab-repository-commit-create"
-    )
 }
 
 fn connection_summary(

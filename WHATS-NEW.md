@@ -4,6 +4,21 @@ This page explains what the latest release means for people using Connectors and
 built on it. The [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md)
 keeps the detailed history and compatibility notes.
 
+## v0.7.1 — 7 September 2026
+
+Applications can now collect changed Jira issues and comments, Confluence pages, and GitLab
+project activity and delivery records through bounded reads with explicit pagination. The
+operation descriptions explain how to keep a time window consistent and continue to its end.
+Comment results retain restriction metadata so applications can enforce their audience policy;
+provider identity objects are omitted from these read results.
+
+This release also fixes generated catalog calls that were incorrectly stopped by optional
+authentication-remediation checks. It retains v0.7.0's features and operation protocols.
+
+When upgrading a source-built installation, verify every operation your application uses against
+the candidate, including its input and output contract. Replace the CLI and local daemon together;
+a successful sign-in or account probe does not test a complete collection workflow.
+
 ## v0.7.0 — 7 September 2026
 
 This release makes everyday command-line use easier and adds more useful GitLab and Kubernetes
