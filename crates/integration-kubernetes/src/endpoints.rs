@@ -25,6 +25,15 @@ const MAX_STATE_BYTES: usize = 16 * 1024 * 1024;
 const PAGE_SIZE: u32 = 256;
 const MAX_PAGES: usize = 4096;
 
+pub(super) async fn api_call<T>(
+    future: impl std::future::Future<Output = Result<T, kube::Error>>,
+) -> Result<T, EndpointSourceError> {
+    tokio::time::timeout(std::time::Duration::from_secs(15), future)
+        .await
+        .map_err(|_| EndpointSourceError::Unavailable)?
+        .map_err(routes::source_error)
+}
+
 /// How an admitted endpoint is reached from this Connector process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EndpointPlacement {
@@ -66,6 +75,8 @@ pub struct EndpointScan {
 struct Image {
     endpoints: BTreeMap<String, Endpoint>,
     bindings: BTreeMap<String, EndpointBinding>,
+    #[serde(default)]
+    warnings: Vec<String>,
 }
 
 /// One configured cluster source, with durable credential-free inventory and operator bindings.
@@ -79,6 +90,7 @@ pub struct KubernetesEndpointSource {
     store: Arc<dyn StateStore>,
     key: String,
     image: Mutex<Image>,
+    unverified: Mutex<BTreeSet<String>>,
     refresh_lock: tokio::sync::Mutex<()>,
 }
 
@@ -117,6 +129,7 @@ impl KubernetesEndpointSource {
         {
             return Err(EndpointSourceError::Unavailable);
         }
+        let unverified = image.endpoints.keys().cloned().collect();
         Ok(Self {
             client,
             source_ref,
@@ -127,6 +140,7 @@ impl KubernetesEndpointSource {
             store,
             key,
             image: Mutex::new(image),
+            unverified: Mutex::new(unverified),
             refresh_lock: tokio::sync::Mutex::new(()),
         })
     }
@@ -153,15 +167,104 @@ impl KubernetesEndpointSource {
             .image
             .lock()
             .map_err(|_| EndpointSourceError::Unavailable)?;
+        let unverified = self
+            .unverified
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?;
         Ok(image
             .endpoints
             .values()
             .cloned()
             .map(|mut endpoint| {
                 self.apply_policy(&mut endpoint);
+                if unverified.contains(&endpoint.endpoint_ref) {
+                    endpoint.state = EndpointState::Stale;
+                }
                 endpoint
             })
             .collect())
+    }
+
+    /// Last refresh diagnostics contain no provider response body or Secret values.
+    pub fn warnings(&self) -> Result<Vec<String>, EndpointSourceError> {
+        let mut warnings = self
+            .image
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?
+            .warnings
+            .clone();
+        if !self
+            .unverified
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?
+            .is_empty()
+        {
+            warnings.push(
+                "Persisted endpoints await validation against the current cluster".to_owned(),
+            );
+        }
+        warnings.truncate(100);
+        Ok(warnings)
+    }
+
+    /// Credential-free authority projection used by the runtime to expire description leases.
+    pub fn binding_digest(&self, provider: &str) -> Result<String, EndpointSourceError> {
+        let image = self
+            .image
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?;
+        let endpoints = image
+            .endpoints
+            .values()
+            .filter(|endpoint| endpoint.provider.as_deref() == Some(provider))
+            .collect::<Vec<_>>();
+        let bytes = serde_json::to_vec(&(
+            endpoints,
+            &self.namespaces,
+            self.all_namespaces,
+            self.grant_for(provider),
+        ))
+        .map_err(|_| EndpointSourceError::Unavailable)?;
+        Ok(hex::encode(Sha256::digest(bytes)))
+    }
+
+    pub(super) fn validation_candidate(
+        &self,
+        reference: &str,
+    ) -> Result<Endpoint, EndpointSourceError> {
+        let mut endpoint = self
+            .image
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?
+            .endpoints
+            .get(reference)
+            .cloned()
+            .ok_or(EndpointSourceError::Stale)?;
+        if endpoint.state == EndpointState::Stale {
+            endpoint.state = EndpointState::Ready;
+        }
+        self.apply_policy(&mut endpoint);
+        Ok(endpoint)
+    }
+
+    pub(super) fn mark_validated(&self, endpoint: &Endpoint) -> Result<(), EndpointSourceError> {
+        let mut image = self
+            .image
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?;
+        let current = image
+            .endpoints
+            .get_mut(&endpoint.endpoint_ref)
+            .ok_or(EndpointSourceError::Stale)?;
+        if current.binding != endpoint.binding {
+            return Err(EndpointSourceError::Stale);
+        }
+        current.state = endpoint.state;
+        self.unverified
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?
+            .remove(&endpoint.endpoint_ref);
+        Ok(())
     }
 
     pub fn show(&self, reference: &str) -> Result<Endpoint, EndpointSourceError> {
@@ -226,7 +329,7 @@ impl KubernetesEndpointSource {
                 if let Some(cursor) = cursor.as_deref() {
                     params = params.continue_token(cursor);
                 }
-                match api.list(&params).await {
+                match api_call(api.list(&params)).await {
                     Ok(list) => {
                         if list.items.len() > PAGE_SIZE as usize
                             || list.items.iter().any(|service| {
@@ -262,8 +365,7 @@ impl KubernetesEndpointSource {
                         scan.complete = false;
                         scan.warnings.push(format!(
                             "Service discovery {} for namespace {}",
-                            if matches!(&error, kube::Error::Api(response) if response.code == 403)
-                            {
+                            if error == EndpointSourceError::Denied {
                                 "denied"
                             } else {
                                 "unavailable"
@@ -303,7 +405,12 @@ impl KubernetesEndpointSource {
                 }
             }
         }
+        next.warnings = scan.warnings.iter().take(100).cloned().collect();
         self.persist(&next)?;
+        self.unverified
+            .lock()
+            .map_err(|_| EndpointSourceError::Unavailable)?
+            .retain(|reference| !observed.contains(reference));
         *image = next;
         Ok(scan)
     }

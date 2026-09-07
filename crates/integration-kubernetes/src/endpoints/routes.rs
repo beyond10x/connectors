@@ -66,7 +66,7 @@ impl Drop for EndpointRouteLease {
 impl KubernetesEndpointSource {
     /// Revalidate immutable resource identity and current policy. Does not read a credential.
     pub async fn validate(&self, reference: &str) -> Result<Endpoint, EndpointSourceError> {
-        let endpoint = self.show(reference)?;
+        let endpoint = self.validation_candidate(reference)?;
         if endpoint.source_ref != self.source_ref {
             return Err(EndpointSourceError::Denied);
         }
@@ -79,7 +79,9 @@ impl KubernetesEndpointSource {
             _ => {}
         }
         if endpoint.resource_kind != "Service" {
-            return self.validate_crossplane(endpoint).await;
+            let endpoint = self.validate_crossplane(endpoint).await?;
+            self.mark_validated(&endpoint)?;
+            return Ok(endpoint);
         }
         let namespace = endpoint
             .namespace
@@ -89,16 +91,14 @@ impl KubernetesEndpointSource {
             return Err(EndpointSourceError::Denied);
         }
         let api: Api<Service> = Api::namespaced(self.client.clone(), namespace);
-        let current = api
-            .get(&endpoint.resource_name)
-            .await
-            .map_err(source_error)?;
+        let current = super::api_call(api.get(&endpoint.resource_name)).await?;
         if !project_service(&self.source_ref, &current)
             .iter()
             .any(|current| current.endpoint_ref == endpoint.endpoint_ref)
         {
             return Err(EndpointSourceError::Stale);
         }
+        self.mark_validated(&endpoint)?;
         Ok(endpoint)
     }
 
@@ -125,10 +125,9 @@ impl KubernetesEndpointSource {
             return Ok(ResolvedEndpointCredentials::default());
         };
         let api: Api<Secret> = Api::namespaced(self.client.clone(), namespace);
-        let mut secret = api
-            .get(name)
+        let mut secret = super::api_call(api.get(name))
             .await
-            .map_err(|error| match source_error(error) {
+            .map_err(|error| match error {
                 EndpointSourceError::Stale => EndpointSourceError::MissingCredentials,
                 other => other,
             })?;
@@ -210,10 +209,7 @@ impl KubernetesEndpointSource {
             .ok_or(EndpointSourceError::Stale)?;
         let port = endpoint.port.ok_or(EndpointSourceError::Stale)?;
         let api: Api<Service> = Api::namespaced(self.client.clone(), namespace);
-        let service = api
-            .get(&endpoint.resource_name)
-            .await
-            .map_err(source_error)?;
+        let service = super::api_call(api.get(&endpoint.resource_name)).await?;
         if service.metadata.uid.as_deref() != Some(&endpoint.resource_uid) {
             return Err(EndpointSourceError::Stale);
         }
@@ -280,7 +276,7 @@ impl KubernetesEndpointSource {
             if let Some(token) = cursor.as_deref() {
                 params = params.continue_token(token);
             }
-            let page = pods.list(&params).await.map_err(source_error)?;
+            let page = super::api_call(pods.list(&params)).await?;
             if page.items.len() > super::PAGE_SIZE as usize {
                 return Err(EndpointSourceError::Capacity);
             }
@@ -308,10 +304,7 @@ impl KubernetesEndpointSource {
             .name
             .as_deref()
             .ok_or(EndpointSourceError::UnavailableRoute)?;
-        let mut forwarder = pods
-            .portforward(name, &[target_port])
-            .await
-            .map_err(source_error)?;
+        let mut forwarder = super::api_call(pods.portforward(name, &[target_port])).await?;
         let mut stream = match forwarder.take_stream(target_port) {
             Some(stream) => stream,
             None => {
