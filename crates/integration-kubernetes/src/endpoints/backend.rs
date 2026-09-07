@@ -16,7 +16,8 @@ use service::{ConnectorBackend, EgressTransport, PrincipalContext};
 use sha2::{Digest, Sha256};
 
 use super::{
-    EndpointRouteLease, EndpointSourceError, KubernetesEndpointSource, ResolvedEndpointCredentials,
+    EndpointPrincipalPolicy, EndpointRouteLease, EndpointSourceError, KubernetesEndpointSource,
+    ResolvedEndpointCredentials,
 };
 
 /// Runtime composition supplies the network aperture. Integrations do not create an HTTP client.
@@ -26,66 +27,6 @@ pub trait EndpointEgressFactory: Send + Sync + 'static {
         connection_ref: &str,
         route: &EndpointRouteLease,
     ) -> Result<Arc<dyn EgressTransport>, EndpointSourceError>;
-}
-
-/// Authenticated actor policy, independently intersected with source/provider grants.
-pub enum EndpointPrincipalPolicy {
-    Local(Arc<PrincipalContext>),
-    Hosted {
-        tenant: String,
-        namespace_groups: BTreeMap<String, BTreeSet<String>>,
-        operator_groups: BTreeSet<String>,
-    },
-}
-
-impl EndpointPrincipalPolicy {
-    fn owns(&self, context: &PrincipalContext) -> bool {
-        match self {
-            Self::Local(owner) => owner.as_ref() == context,
-            Self::Hosted { tenant, .. } => tenant == context.tenant_id(),
-        }
-    }
-
-    fn manages(&self, context: &PrincipalContext) -> bool {
-        self.owns(context)
-            && match self {
-                Self::Local(_) => true,
-                Self::Hosted {
-                    operator_groups, ..
-                } => !operator_groups.is_disjoint(context.verified_groups()),
-            }
-    }
-
-    fn reads(&self, context: &PrincipalContext, endpoint: &Endpoint) -> bool {
-        if !self.owns(context) {
-            return false;
-        }
-        match self {
-            Self::Local(_) => true,
-            Self::Hosted {
-                namespace_groups, ..
-            } => {
-                let mut namespaces = Vec::new();
-                if let Some(namespace) = endpoint.namespace.as_deref() {
-                    namespaces.push(namespace);
-                }
-                if let Some(EndpointCredentialReference::KubernetesSecret { namespace, .. }) =
-                    endpoint
-                        .binding
-                        .as_ref()
-                        .and_then(|binding| binding.credential.as_ref())
-                {
-                    namespaces.push(namespace);
-                }
-                !namespaces.is_empty()
-                    && namespaces.into_iter().all(|namespace| {
-                        namespace_groups.get(namespace).is_some_and(|groups| {
-                            self.manages(context) || !groups.is_disjoint(context.verified_groups())
-                        })
-                    })
-            }
-        }
-    }
 }
 
 /// Generic endpoint projection with invocation routed through existing catalog/SQL owners.
