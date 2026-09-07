@@ -63,6 +63,158 @@ fn replacement(secret: &str) -> SecretBatch {
     batch
 }
 
+async fn exercise_exact_acknowledgement(store: &dyn PreparedSecretStore, same_generation: bool) {
+    let first = transaction(generation(8), 1);
+    let second_generation = generation(if same_generation { 8 } else { 9 });
+    let second = transaction(second_generation, 2);
+    assert_eq!(store.retirement_watermark().await.unwrap(), None);
+    assert_eq!(
+        store.acknowledge(first).await,
+        Err(PreparedSecretError::NotPrepared)
+    );
+    store
+        .prepare(first, digest(1), &replacement(SENTINEL_OLD))
+        .await
+        .unwrap();
+    assert_eq!(
+        store.acknowledge(first).await,
+        Err(PreparedSecretError::Busy)
+    );
+    store.commit(first).await.unwrap();
+    store
+        .prepare(second, digest(2), &replacement(SENTINEL_NEW))
+        .await
+        .unwrap();
+    store.commit(second).await.unwrap();
+    store.acknowledge(second).await.unwrap();
+    store.acknowledge(second).await.unwrap();
+    assert_eq!(
+        store.state(first).await,
+        Ok(SecretTransactionState::Committed),
+        "a later or same-generation owner cannot retire unfinished publication evidence"
+    );
+    assert_eq!(
+        store.state(second).await,
+        Ok(SecretTransactionState::Committed)
+    );
+    assert_eq!(
+        store.retirement_watermark().await.unwrap(),
+        Some(generation(7))
+    );
+    assert_eq!(
+        store
+            .prepare(second, digest(9), &replacement(SENTINEL_OLD))
+            .await,
+        Err(PreparedSecretError::DigestMismatch),
+        "acknowledged receipts still fence id reuse"
+    );
+    store.acknowledge(first).await.unwrap();
+    assert_eq!(
+        store.retirement_watermark().await.unwrap(),
+        Some(second_generation)
+    );
+    assert_eq!(store.state(first).await, Err(PreparedSecretError::Retired));
+    assert_eq!(store.state(second).await, Err(PreparedSecretError::Retired));
+    store.acknowledge(first).await.unwrap();
+    assert_eq!(
+        store
+            .prepare(first, digest(1), &replacement(SENTINEL_OLD))
+            .await,
+        Err(PreparedSecretError::Retired)
+    );
+    assert_eq!(
+        store.get(&reference()).await.unwrap().expose_secret(),
+        SENTINEL_NEW,
+        "retired prepare must have no credential effect"
+    );
+}
+
+#[tokio::test]
+async fn exact_acknowledgement_preserves_other_coordinators_terminal_outcomes() {
+    for same_generation in [false, true] {
+        exercise_exact_acknowledgement(&MemoryStore::new(), same_generation).await;
+        let root = Scratch::new("acknowledgement");
+        let file = FileStore::open(root.store()).unwrap();
+        exercise_exact_acknowledgement(&file, same_generation).await;
+    }
+}
+
+#[tokio::test]
+async fn file_acknowledgement_survives_reopen_without_retiring_unpublished_peers() {
+    let root = Scratch::new("acknowledgement-reopen");
+    let first = transaction(generation(8), 1);
+    let second = transaction(generation(8), 2);
+    {
+        let file = FileStore::open(root.store()).unwrap();
+        file.prepare(first, digest(1), &replacement(SENTINEL_OLD))
+            .await
+            .unwrap();
+        file.commit(first).await.unwrap();
+        file.abort(second).await.unwrap();
+        // Existing v2 records carry no acknowledgement. Reopening must retain that meaning.
+        let original = std::fs::read_to_string(root.store()).unwrap();
+        assert!(!original.contains("acknowledged"));
+    }
+    {
+        let file = FileStore::open(root.store()).unwrap();
+        file.acknowledge(second).await.unwrap();
+        assert_eq!(
+            file.state(first).await,
+            Ok(SecretTransactionState::Committed)
+        );
+        assert!(std::fs::read_to_string(root.store())
+            .unwrap()
+            .contains("acknowledged-aborted"));
+    }
+    {
+        let file = FileStore::open(root.store()).unwrap();
+        assert_eq!(
+            file.state(first).await,
+            Ok(SecretTransactionState::Committed)
+        );
+        assert_eq!(file.state(second).await, Ok(SecretTransactionState::Absent));
+        assert_eq!(
+            file.prepare(second, digest(2), &replacement(SENTINEL_NEW))
+                .await,
+            Err(PreparedSecretError::TransactionIdReused)
+        );
+        file.acknowledge(first).await.unwrap();
+    }
+    let file = FileStore::open(root.store()).unwrap();
+    assert_eq!(
+        file.retirement_watermark().await.unwrap(),
+        Some(generation(8))
+    );
+    assert_eq!(file.state(first).await, Err(PreparedSecretError::Retired));
+    assert_eq!(file.state(second).await, Err(PreparedSecretError::Retired));
+    file.acknowledge(first).await.unwrap();
+}
+
+#[tokio::test]
+async fn acknowledgement_handles_the_maximum_generation_without_wrapping() {
+    for file_backed in [false, true] {
+        let root = Scratch::new("acknowledgement-exhaustion");
+        let store: Box<dyn PreparedSecretStore> = if file_backed {
+            Box::new(FileStore::open(root.store()).unwrap())
+        } else {
+            Box::new(MemoryStore::new())
+        };
+        let maximum =
+            SecretTransactionGeneration::from_protocol_bytes(u64::MAX.to_be_bytes()).unwrap();
+        let first = transaction(maximum, 1);
+        let second = transaction(maximum, 2);
+        store.abort(first).await.unwrap();
+        store.abort(second).await.unwrap();
+        store.acknowledge(first).await.unwrap();
+        assert_eq!(
+            store.state(second).await,
+            Ok(SecretTransactionState::Absent)
+        );
+        store.acknowledge(second).await.unwrap();
+        assert_eq!(store.retirement_watermark().await.unwrap(), Some(maximum));
+    }
+}
+
 #[tokio::test]
 async fn prepared_store_is_object_safe_and_keeps_the_candidate_invisible_until_commit() {
     let store: Arc<dyn PreparedSecretStore> = Arc::new(MemoryStore::new());
@@ -307,10 +459,15 @@ async fn exhaustive_replay_and_winner_table_is_value_free() {
         store.prepare(other, digest(6), &batch).await,
         Err(PreparedSecretError::Busy)
     );
-    assert_eq!(store.abort(other).await, Err(PreparedSecretError::Busy));
+    assert_eq!(store.abort(other).await, Ok(SecretTransactionState::Absent));
     assert_eq!(
         store.commit(first).await,
         Ok(SecretTransactionState::Committed)
+    );
+    assert_eq!(
+        store.prepare(other, digest(6), &batch).await,
+        Err(PreparedSecretError::TransactionIdReused),
+        "the absent intent stays fenced after its peer commits"
     );
     assert_eq!(
         store.commit(first).await,
@@ -419,6 +576,87 @@ async fn every_acknowledged_cross_id_abort_survives_a_later_staged_commit() {
             .prepare(aborted, digest(10), &replacement(SENTINEL_OLD))
             .await,
         Err(PreparedSecretError::TransactionIdReused)
+    );
+}
+
+#[tokio::test]
+async fn memory_absent_intent_recovery_can_finish_before_another_prepared_owner() {
+    let store = MemoryStore::new();
+    let absent = transaction(generation(8), 1);
+    let prepared = transaction(generation(8), 2);
+    store
+        .put(&reference(), &Secret::new(SENTINEL_OLD))
+        .await
+        .unwrap();
+    store
+        .prepare(prepared, digest(2), &replacement(SENTINEL_NEW))
+        .await
+        .unwrap();
+    assert_eq!(
+        store.state(absent).await,
+        Ok(SecretTransactionState::Absent)
+    );
+    assert_eq!(
+        store.abort(absent).await,
+        Ok(SecretTransactionState::Absent)
+    );
+    store.acknowledge(absent).await.unwrap();
+    assert_eq!(
+        store.state(prepared).await,
+        Ok(SecretTransactionState::Prepared)
+    );
+    assert_eq!(
+        store.get(&reference()).await.unwrap().expose_secret(),
+        SENTINEL_OLD
+    );
+    store.commit(prepared).await.unwrap();
+    assert_eq!(
+        store
+            .prepare(absent, digest(1), &replacement(SENTINEL_OLD))
+            .await,
+        Err(PreparedSecretError::TransactionIdReused)
+    );
+    store.acknowledge(prepared).await.unwrap();
+    assert_eq!(store.state(absent).await, Err(PreparedSecretError::Retired));
+    assert_eq!(
+        store.state(prepared).await,
+        Err(PreparedSecretError::Retired)
+    );
+    assert_eq!(
+        store.get(&reference()).await.unwrap().expose_secret(),
+        SENTINEL_NEW
+    );
+}
+
+#[tokio::test]
+async fn memory_absent_intent_fencing_preserves_the_prepared_terminal_capacity_reservation() {
+    let store = MemoryStore::new();
+    for counter in 0..connector_secrets::MAX_TERMINAL_TRANSACTIONS - 1 {
+        let mut nonce = [0; 24];
+        nonce[..8].copy_from_slice(&(counter as u64).to_be_bytes());
+        store
+            .abort(SecretTransactionId::new(generation(1), nonce))
+            .await
+            .unwrap();
+    }
+    let prepared = transaction(generation(2), 1);
+    let absent = transaction(generation(2), 2);
+    store
+        .prepare(prepared, digest(1), &replacement(SENTINEL_NEW))
+        .await
+        .unwrap();
+    assert_eq!(
+        store.abort(absent).await,
+        Err(PreparedSecretError::Capacity)
+    );
+    assert_eq!(
+        store.state(absent).await,
+        Ok(SecretTransactionState::Absent)
+    );
+    store.commit(prepared).await.unwrap();
+    assert_eq!(
+        store.get(&reference()).await.unwrap().expose_secret(),
+        SENTINEL_NEW
     );
 }
 

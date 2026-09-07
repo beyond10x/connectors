@@ -500,6 +500,94 @@ pub enum HostedCompletionError {
     Invalid,
     #[error("hosted Connect Session completion is unavailable")]
     Unavailable,
+    /// Only emitted after the owning adapter accepts the session capability. Carries no
+    /// credential, destination, provider body or underlying transport error text.
+    #[error("hosted Connect Session provider verification failed")]
+    Verification(HostedVerificationFailure),
+    #[error("hosted Connect Session credential custody failed")]
+    Custody(HostedCustodyFailure),
+}
+
+/// Closed stages after successful provider verification. A failed commit may already have
+/// published the credential; callers must check the Connection before beginning another session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostedCustodyFailure {
+    Setup,
+    ReserveState,
+    Prepare(connector_secrets::PreparedSecretError),
+    PersistPending,
+    Commit(connector_secrets::PreparedSecretError),
+    PersistConnection,
+    SessionFinalization,
+}
+
+impl HostedCustodyFailure {
+    #[must_use]
+    pub const fn stage(self) -> &'static str {
+        match self {
+            Self::Setup => "setup",
+            Self::ReserveState => "reserve-state",
+            Self::Prepare(_) => "prepare",
+            Self::PersistPending => "persist-pending",
+            Self::Commit(_) => "commit",
+            Self::PersistConnection => "persist-connection",
+            Self::SessionFinalization => "session-finalization",
+        }
+    }
+
+    #[must_use]
+    pub const fn completion_unconfirmed(self) -> bool {
+        matches!(
+            self,
+            Self::Commit(_) | Self::PersistConnection | Self::SessionFinalization
+        )
+    }
+
+    #[must_use]
+    pub const fn diagnostic_code(self) -> &'static str {
+        use connector_secrets::PreparedSecretError;
+        match self {
+            Self::Prepare(error) | Self::Commit(error) => match error {
+                PreparedSecretError::Unsupported => "unsupported",
+                PreparedSecretError::Busy => "busy",
+                PreparedSecretError::DigestMismatch => "digest-mismatch",
+                PreparedSecretError::TransactionIdReused => "transaction-id-reused",
+                PreparedSecretError::NotPrepared => "not-prepared",
+                PreparedSecretError::AlreadyCommitted => "already-committed",
+                PreparedSecretError::Retired => "retired",
+                PreparedSecretError::Capacity => "capacity",
+                PreparedSecretError::InvalidBatch => "invalid-batch",
+                PreparedSecretError::Backend => "backend",
+            },
+            Self::Setup => "configuration",
+            Self::ReserveState | Self::PersistPending | Self::PersistConnection => "state",
+            Self::SessionFinalization => "session-terminal",
+        }
+    }
+}
+
+/// Value-free result of the single provider verification exchange.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostedVerificationFailure {
+    Preparation,
+    DestinationRefused,
+    Transport(crate::EgressTransportFailure),
+    ResponseTooLarge,
+    ProviderStatus(u16),
+}
+
+impl HostedVerificationFailure {
+    /// Closed operator diagnostic vocabulary. Numeric HTTP status is reported separately.
+    #[must_use]
+    pub const fn diagnostic_code(self) -> &'static str {
+        match self {
+            Self::Preparation => "preparation",
+            Self::DestinationRefused => "destination-refused",
+            Self::Transport(failure) => failure.as_str(),
+            Self::ResponseTooLarge => "response-too-large",
+            Self::ProviderStatus(_) => "provider-status",
+        }
+    }
 }
 
 /// Receiver-declared admission posture for starting one Connect Session profile.

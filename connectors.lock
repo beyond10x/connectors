@@ -6,7 +6,7 @@ version = 1
 [pack]
 path = "crates/catalog-reader/catalog.pack"
 schema_version = 4
-sha256 = "0cd076a942cd821efd488c3a0c7bd06c3358728d316fa0530d29be7369ff1a4c"
+sha256 = "95e1cd99187d53515dd966714679139f6dc152e477d46414faae94a2ba9330d8"
 
 [[provider]]
 id = "airtable"
@@ -390,8 +390,8 @@ id = "grafana"
 generator = "connectors 0.7.0"
 upstream_version = "Grafana 12+ HTTP API"
 spec_sha256 = "14c46194403f8831e0e80562fedb28685a3d803f980d9da9a230b9f0e0d35c35"
-toml_sha256 = "f6ff87de4d8d0e9c98bb1116315b10e4818f758f0958bc20f6891c2729a7cd11"
-ir_sha256 = "7048e48cfece6ecaf6a9e72adb93170dd28eea0d7e98c0ff50d81bdd7696c566"
+toml_sha256 = "d0447cf7d458432dee23f4275a93e2f113e42d94b0f51d44718499faf1ae006c"
+ir_sha256 = "b3830e873169bc33e2253eabdb64fb73325e26add5ac95f9789a54e3ca5d9884"
 
 [[provider.specs]]
 path = "specs/grafana/http-api-2026-08-14.openapi.yaml"
@@ -399,7 +399,7 @@ upstream_version = "Grafana 12+ HTTP API"
 sha256 = "14c46194403f8831e0e80562fedb28685a3d803f980d9da9a230b9f0e0d35c35"
 
 [provider.artifacts]
-"catalog/grafana.catalog.json" = "7d3075921571226928f29898dddae221c1f6020d66d35eacfc5d299107c1615e"
+"catalog/grafana.catalog.json" = "3aa08f421cd816abb4b0e84413d24e464210b6caf2794dec8f826118315922c1"
 
 [[provider]]
 id = "hubspot"

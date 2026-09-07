@@ -17,6 +17,20 @@ scope:
 - confidence: cited
   path: crates/catalog-reader/catalog.pack
 - confidence: cited
+  path: crates/connector-secrets/README.md
+- confidence: cited
+  path: crates/connector-secrets/src/file.rs
+- confidence: cited
+  path: crates/connector-secrets/src/file/prepared.rs
+- confidence: cited
+  path: crates/connector-secrets/src/file/transaction_crash_tests.rs
+- confidence: cited
+  path: crates/connector-secrets/src/memory.rs
+- confidence: cited
+  path: crates/connector-secrets/src/transaction.rs
+- confidence: cited
+  path: crates/connector-secrets/tests/main/prepared_transactions.rs
+- confidence: cited
   path: crates/connectors-cli/Cargo.lock
 - confidence: cited
   path: crates/connectors-cli/src/error.rs
@@ -49,18 +63,54 @@ scope:
 - confidence: cited
   path: crates/connectors-runtime/src/composition.rs
 - confidence: cited
+  path: crates/connectors-runtime/tests/shared_catalog_custody.rs
+- confidence: cited
+  path: crates/hosted-vault/src/prepared.rs
+- confidence: cited
+  path: crates/hosted-vault/src/prepared_acknowledgement_tests.rs
+- confidence: cited
   path: crates/integration-catalog/src/hosted.rs
+- confidence: cited
+  path: crates/integration-catalog/src/hosted_custody.rs
 - confidence: cited
   path: crates/integration-catalog/src/hosted_endpoint_tests.rs
 - confidence: cited
   path: crates/integration-catalog/src/hosted_endpoints.rs
 - confidence: cited
+  path: crates/integration-catalog/src/hosted_form.rs
+- confidence: cited
+  path: crates/integration-catalog/src/hosted_verification.rs
+- confidence: cited
   path: crates/integration-catalog/src/lib.rs
+- confidence: cited
+  path: crates/integration-gitlab/src/backend.rs
+- confidence: cited
+  path: crates/integration-gitlab/src/backend_custody.rs
+- confidence: cited
+  path: crates/integration-gitlab/src/backend_tests.rs
+- confidence: cited
+  path: crates/integration-jira/src/backend.rs
+- confidence: cited
+  path: crates/integration-jira/src/backend/auth.rs
+- confidence: cited
+  path: crates/integration-slack/src/backend.rs
+- confidence: cited
+  path: crates/integration-slack/src/backend/connection_runtime.rs
+- confidence: cited
+  path: crates/server/src/hosted/connect.rs
+- confidence: cited
+  path: crates/service/src/credential_commit.rs
+- confidence: cited
+  path: crates/service/src/credential_commit_tests.rs
+- confidence: cited
+  path: crates/service/src/lib.rs
+- confidence: cited
+  path: crates/service/src/runtime.rs
 - confidence: cited
   path: docs/guides/administer-hosted-integrations.md
 - confidence: cited
   path: providers/grafana.toml
-revision: 25
+revision: 39
 ---
 ## Outcome
 
@@ -140,3 +190,41 @@ The consuming deployment independently reports a successful fresh normal Identit
 The first focused source fixture used an HTTP hosted completion URL, which the unchanged Connection protocol correctly refused. Fixtures were corrected to use TLS and required Connection initiation/actor fields rather than weakening validation. Real provider token acquisition and an actual Grafana read remain pending owner setup; no service-account token was accessed or minted, and source/boundary tests are not claimed as real-provider success. This artifact remains active for that consuming-deployment evidence.
 
 The final all-target clippy run for connectors-console also passes with warnings denied. Its existing catalogue dependency owns CLI preflight; connectors-client gains only native-root TLS support plus test-only TLS fixture dependencies and retains no catalogue/runtime dependency.
+
+## Hosted completion failure diagnosis
+
+Real owner submission exposed a diagnostic gap: the browser renders every non-503 refusal as the same sentence, and catalog verification discards safe upstream status and transport failure classes. Read-only diagnosis confirms that the provisional connection reference satisfies egress authority syntax and the declared Grafana verification request is GET /api/datasources with a service-account bearer token. Official documentation requires datasources:read (datasources:* where RBAC applies): https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/. Network policy is independently owned by the consuming deployment; no deployment identifiers or credentials enter this source change.
+
+Acceptance: preserve closed diagnostic classes around the existing single verification exchange without recording credential bytes, capability, provider body, URL or underlying error Display. After valid capability admission, HTTP completion gives fixed actionable authentication, permission, unreachable and other provider-failure codes. Operator diagnostics retain fixed transport classifications and upstream status only. Unknown and invalid capabilities retain their indistinguishable refusal. The generic form displays the existing session deadline, refuses expired submission locally and never automatically retries or allows uncertain completion to replay. Provider help states the permission required by its unchanged verification operation. Focused tests prove classification, no custody on failure, invalid capability no dispatch, deadline rendering and sanitized HTTP responses. Full source gates remain required; real credential completion remains a separate deployment acceptance proof.
+
+Scope adds service HostedCompletionError vocabulary and re-export, hosted server response handling/tests, catalog verification observer and form helpers/tests, and existing provider-help canonical artifacts. Existing ConnectSession authority and expiry semantics remain unchanged; no new ownership, persistence, operation schema or egress authority is introduced.
+
+## Custody failure stages
+
+After deployment reachability was corrected, the owner received the existing generic HTTP503 completion. Preserve separate closed diagnostics for verification setup, transaction reservation state, prepared custody (including its payload-free PreparedSecretError class), pending metadata persistence, commit and final connection persistence. Commit/finalization failures are explicitly unconfirmed; the form directs the owner to check Connections and ask the operator rather than replaying a credential. This is diagnostic work, not an unreviewed persistence migration or mutation of existing custody state.
+
+Read-only source finding: runtime composition shares one PreparedVaultStore journal among adapters whose generation counters are independently persisted and initially1. Shared reclaim retires every generation through its threshold. A later adapter can therefore receive PreparedSecretError::Retired before any Secrets request. Deployment value-free metadata must establish whether this occurred; no secret values or staged credential bytes may be read. Any correction to this generation-domain mismatch needs its own reviewed scope and recovery proof.
+
+## Shared custody retirement correction
+
+Deployment metadata confirms a shared prepared-store retirement watermark above a new catalog coordinator's next generation. Preserve the existing shared journal and current pending transaction identifiers. Add an opaque retirement watermark and exact transaction acknowledgement to PreparedSecretStore, implemented by MemoryStore, FileStore and PreparedVaultStore. Existing decoded terminal records remain unacknowledged. Atomic prepared-store admission and Staging insertion must share one lock; terminal retirement must never cross an unacknowledged transaction, including a different nonce at the same generation.
+
+Each hosted catalog/GitLab/Slack/Jira coordinator reserves its next persisted generation at or above watermark+1. Retry only an explicitly no-effect Retired prepare, bounded and without provider reverification or resubmission. Busy, backend and uncertain commit outcomes are not retried. Replace broad generation reclaim with exact acknowledgement after final Connection metadata is durable. Keep the existing pending record with an additive default-false published receipt until acknowledgement succeeds, including across restart. Recovery of published receipts performs acknowledgement/receipt cleanup without credential publication or provider access; legacy pending records retain their existing recovery path.
+
+Acceptance includes cross-coordinator same/different generation acknowledgement, committed-but-not-published recovery while another owner completes, published-before-ack interruption, legacy journal decode, retired-generation advance, prepare admission races and bounded no-effect retry. No journal migration, no lower retirement fence and no private state patch is used. Shared store implementation is delegated to the read-only review agent after its findings; this session remains the sole AEP writer and owns all coordinator/form/diagnostic changes. The independent store implementation and coordinator implementation use disjoint files in the retained managed tree and separate leases.
+
+## Write-ahead custody intent
+
+Persist each owner pending intent before prepared custody staging, including the exact candidate Connection and transaction id. Add a default-false intent marker so legacy prepared receipts retain conservative recovery, while a new intent fenced by a Retired refusal can be discarded without claiming a committed credential. A no-effect retry durably replaces only its prior exact intent; interruption between counter reservation and replacement remains recoverable. Recovery fences unknown absent ids before durably recording discard and exact acknowledgement, preventing a delayed prepare from reappearing after cleanup. Hosted and memory journals allow this tombstone alongside a peer Prepared transaction; whole-image file storage defers until pending preparation is resolved, then retries in a second pass. Tests cover interruption before prepare, after prepare, staging abort, retired retry reservation and bounded exhaustion, as well as failed metadata publication and peer acknowledgement.
+
+## Shared custody and completion verification
+
+The corrected candidate passes every required scripts/gate.sh lane: all twelve Cargo workspaces, both hosted runtime feature configurations, catalog verification (65 providers and 70 artifacts), portable documentation links, story index, ESS 0.18.0 validation and exact committed clap projection. Formatting passes across every workspace; root and hosted-runtime all-target clippy pass with warnings denied. The final GitLab custody-module extraction also passes the full native package tests and a repeated hosted-runtime clippy check.
+
+Five composed acquisition/recovery tests exercise the real PreparedVaultStore over controlled state/value adapters and provider HTTP. They cover the deployed retirement-floor shape, independent coordinator final-metadata and receipt-cleanup failures, failed intent persistence, cancellation before prepare, during staging and after prepare, retired write-ahead recovery, and fourth-attempt exhaustion without a fifth attempt or provider replay. Eight shared helper tests additionally cover racing watermark advance, failed reservation after a Retired attempt, no retries of Busy/backend/uncertain results, maximum generation, absent-id fencing and real FileStore deferred recovery. Store tests cover same-generation peers, exact acknowledgement across reopen, atomic concurrent admission, uncertain acknowledgement and the process-crash matrix. Foreign owner scope remains refused.
+
+The exact generic form JavaScript passes 18 real Chromium cases against controlled responses, including expiry, fixed failure messages, credential clearing, malformed/lost acknowledgement, redirect refusal and one-submit behavior. This is source boundary evidence, not a claim of successful provider acquisition. The consuming deployment separately proved its corrected network policy and a task-owned sentinel roundtrip through the real Secrets HTTP boundary; no owner credential was accessed or replayed by this work.
+
+The first root gate caught existing source-size ceilings. Extracting FileStore crash tests and GitLab custody methods restored the bounds without raising a waiver. A following compile caught an incorrect extracted impl type name; it was corrected and the affected package/runtime checks passed. All failed logs remain retained. The complete gate was run in bounded workspace lanes, with exact completed test executables and inactive task-owned incremental cache reclaimed between lanes to preserve local cluster disk headroom; source, libraries, actual CLI and deployment state were retained.
+
+The existing shared journal is loaded in place. Legacy outcomes remain unacknowledged; legacy pending receipts with lost Retired outcomes remain refused, never invented as successful commits. The additive write-ahead marker applies only to new intents. Mixed writers using the old broad-reclaim algorithm are unsupported; the consuming deployment has confirmed a single replica and Recreate upgrade strategy. Real owner Grafana completion and a governed read remain deployment acceptance, so this story remains active. No release, merge, deployment or private-state generation patch was performed here.

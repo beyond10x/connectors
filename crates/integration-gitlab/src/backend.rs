@@ -51,6 +51,9 @@ use crate::transport::{
     http_request,
 };
 
+#[path = "backend_custody.rs"]
+mod custody;
+
 #[path = "git_fetch.rs"]
 mod git_fetch;
 use git_fetch::GitFetchSessionRecord;
@@ -197,6 +200,12 @@ struct StoredConnection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PendingCommit {
+    #[serde(default)]
+    published: bool,
+    #[serde(default)]
+    discarded: bool,
+    #[serde(default)]
+    intent: bool,
     transaction_id: String,
     connection: StoredConnection,
 }
@@ -992,8 +1001,6 @@ impl GitlabInner {
             },
             |connection| Ok((connection.instance_id, connection.connection_ref)),
         )?;
-        let (transaction, generation) = self.reserve_transaction()?;
-        let generation_value = u64::from_be_bytes(generation.protocol_bytes());
         let connection = StoredConnection {
             connection_ref: connection_ref.clone(),
             instance_id,
@@ -1005,136 +1012,12 @@ impl GitlabInner {
             email_sha256: email_sha256(&owner.email),
             profile: owner.profile,
             scopes: evidence.scopes,
-            credential_generation: generation_value,
+            credential_generation: 0,
             observed_at_unix_ms: now_ms().ok_or_else(|| GitlabError::new("clock"))?,
             expires_at_unix_ms: evidence.expires_at_unix_ms,
         };
-        self.commit_credentials(transaction, generation, connection, credentials)
-            .await?;
+        self.commit_credentials(connection, credentials).await?;
         Ok(connection_ref)
-    }
-
-    async fn commit_credentials(
-        &self,
-        transaction: SecretTransactionId,
-        generation: SecretTransactionGeneration,
-        connection: StoredConnection,
-        credentials: CredentialValues,
-    ) -> Result<(), GitlabError> {
-        let mut batch = SecretBatch::new(
-            CredentialScope::new(&self.tenant_id, AUTHORITY)
-                .map_err(|_| GitlabError::new("credential-address"))?,
-        );
-        batch
-            .put(
-                self.connection_credential_ref(&connection, ACCESS_TOKEN_CREDENTIAL)?,
-                credentials.access_token,
-            )
-            .map_err(|_| GitlabError::new("credential-batch"))?;
-        if let Some(refresh) = credentials.refresh_token {
-            batch
-                .put(
-                    self.connection_credential_ref(&connection, REFRESH_TOKEN_CREDENTIAL)?,
-                    refresh,
-                )
-                .map_err(|_| GitlabError::new("credential-batch"))?;
-        }
-        self.credential_store
-            .prepare(transaction, proposal_digest(&batch), &batch)
-            .await
-            .map_err(|_| GitlabError::new("credential-prepare"))?;
-        let transaction_id = hex::encode(transaction.protocol_bytes());
-        let persisted = {
-            let mut state = lock(&self.metadata);
-            state.pending.push(PendingCommit {
-                transaction_id: transaction_id.clone(),
-                connection: connection.clone(),
-            });
-            let result = self.persist(&state);
-            if result.is_err() {
-                state
-                    .pending
-                    .retain(|pending| pending.transaction_id != transaction_id);
-            }
-            result
-        };
-        if let Err(error) = persisted {
-            let _ = self.credential_store.abort(transaction).await;
-            return Err(error);
-        }
-        self.credential_store
-            .commit(transaction)
-            .await
-            .map_err(|_| GitlabError::new("credential-commit"))?;
-        {
-            let mut state = lock(&self.metadata);
-            state
-                .pending
-                .retain(|pending| pending.transaction_id != transaction_id);
-            upsert_connection(&mut state.connections, connection);
-            self.persist(&state)?;
-        }
-        let _ = self.credential_store.reclaim(generation).await;
-        Ok(())
-    }
-
-    fn reserve_transaction(
-        &self,
-    ) -> Result<(SecretTransactionId, SecretTransactionGeneration), GitlabError> {
-        let mut state = lock(&self.metadata);
-        let generation = SecretTransactionGeneration::from_protocol_bytes(
-            state.next_transaction_generation.to_be_bytes(),
-        )
-        .ok_or_else(|| GitlabError::new("transaction-generation"))?;
-        state.next_transaction_generation = state
-            .next_transaction_generation
-            .checked_add(1)
-            .ok_or_else(|| GitlabError::new("transaction-generation"))?;
-        self.persist(&state)?;
-        let mut nonce = [0_u8; 24];
-        getrandom::fill(&mut nonce).map_err(|_| GitlabError::new("randomness"))?;
-        Ok((SecretTransactionId::new(generation, nonce), generation))
-    }
-
-    async fn recover_pending(&self) -> Result<(), GitlabError> {
-        let pending_transactions = lock(&self.metadata).pending.clone();
-        for pending in pending_transactions {
-            // Never complete custody under an absent or superseded Grant. Preserve the pending
-            // record for recovery; only a fresh verified connect may bind current authority.
-            if pending.connection.grant_ref != self.policy.user_grant_ref {
-                continue;
-            }
-            let transaction = decode_transaction(&pending.transaction_id)?;
-            match self
-                .credential_store
-                .state(transaction)
-                .await
-                .map_err(|_| GitlabError::new("credential-recovery"))?
-            {
-                SecretTransactionState::Prepared => {
-                    self.credential_store
-                        .commit(transaction)
-                        .await
-                        .map_err(|_| GitlabError::new("credential-recovery"))?;
-                }
-                SecretTransactionState::Committed => {}
-                SecretTransactionState::Absent => {
-                    let mut state = lock(&self.metadata);
-                    state
-                        .pending
-                        .retain(|candidate| candidate.transaction_id != pending.transaction_id);
-                    self.persist(&state)?;
-                    continue;
-                }
-            }
-            let mut state = lock(&self.metadata);
-            state
-                .pending
-                .retain(|candidate| candidate.transaction_id != pending.transaction_id);
-            upsert_connection(&mut state.connections, pending.connection);
-            self.persist(&state)?;
-        }
-        Ok(())
     }
 
     fn connection_credential_ref(
@@ -1481,10 +1364,8 @@ impl GitlabInner {
         {
             return Err(GitlabError::new("oauth-refresh-evidence"));
         }
-        let (transaction, generation) = self.reserve_transaction()?;
         let mut updated = connection;
         updated.scopes = canonical_scopes(info.scopes);
-        updated.credential_generation = u64::from_be_bytes(generation.protocol_bytes());
         updated.observed_at_unix_ms = now_ms().ok_or_else(|| GitlabError::new("clock"))?;
         updated.expires_at_unix_ms = info
             .created_at
@@ -1494,8 +1375,6 @@ impl GitlabInner {
             return Err(GitlabError::new("oauth-refresh-evidence"));
         }
         self.commit_credentials(
-            transaction,
-            generation,
             updated,
             CredentialValues {
                 access_token: access,

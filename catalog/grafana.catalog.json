@@ -2,7 +2,7 @@
   "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
   "auth": [
     {
-      "description": "Grafana service account token with dashboards:read and data source query access appropriate to this Connection. Entered or resolved at the Connector placement and never returned to the caller",
+      "description": "Grafana service account token with datasources:read for connection verification, plus dashboards:read and data source query access appropriate to this Connection. Entered or resolved at the Connector placement and never returned to the caller",
       "entry": "connect_session",
       "name": "grafana.service_account_token",
       "scheme": {
@@ -32,7 +32,7 @@
       "binds": "credential.grafana.service_account_token",
       "docs_url": "https://grafana.com/docs/grafana/latest/administration/service-accounts/",
       "format": "token",
-      "help": "Paste a Grafana service account token for this instance. Your browser SSO password is not an API token. In Grafana, open Administration > Users and access > Service accounts, select a service account and add a token. Ask an administrator if you do not have permission. Connectors stores the token in credential custody.",
+      "help": "Paste a Grafana service account token for this instance. Your browser SSO password is not an API token. In Grafana, open Administration > Users and access > Service accounts, select a service account and add a token. Ask an administrator if you do not have permission. Connection verification lists data sources and requires datasources:read (datasources:* where RBAC applies). Connectors stores the token in credential custody.",
       "label": "Grafana service account token",
       "level": "connection",
       "name": "service_account_token",

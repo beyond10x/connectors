@@ -7,6 +7,7 @@ mod audio;
 pub mod authority;
 mod browser;
 mod connect_session;
+mod credential_commit;
 mod dispatch;
 mod egress;
 mod rate_limit;
@@ -41,6 +42,10 @@ pub use browser::{
 pub use connect_session::{
     ConnectSessionLifecycle, ConnectSessionLifecycleError, ConnectSessionTerminal,
 };
+pub use credential_commit::{
+    acknowledge_credential_publication, prepare_credential_batch, recover_credential_intent,
+    CredentialPreparationError, CredentialRecovery,
+};
 pub use dispatch::{
     AuditSink, BuiltInDriver, CredentialSet, DispatchError, DispatchPolicy, DispatchResult,
     Dispatcher, SensitiveValue,
@@ -63,7 +68,8 @@ pub use planning::{plan_operation, PlanError, PlanningEnvironment};
 pub use runtime::{
     BackendCapabilities, BackendReadinessError, ConnectSessionAccess, ConnectorBackend,
     DelegatedExecution, HostedCompletionError, HostedCompletionPage, HostedCompletionSubmission,
-    PrincipalContext, PrincipalContextError, PrincipalIdentity,
+    HostedCustodyFailure, HostedVerificationFailure, PrincipalContext, PrincipalContextError,
+    PrincipalIdentity,
 };
 pub use sip::{
     admit_sip_dial, admit_sip_plan, validate_sip_deployment_route, AdmittedSipPlan,

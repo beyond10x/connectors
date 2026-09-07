@@ -31,8 +31,12 @@ use service::{
 use sha2::{Digest as _, Sha256};
 
 use super::{
-    connection_ref, credential_address, hosted_endpoints, CatalogBackend, CatalogIntegrationError,
+    connection_ref, credential_address, hosted_endpoints, hosted_form::completion_page,
+    hosted_verification::VerificationEgress, CatalogBackend, CatalogIntegrationError,
 };
+
+#[path = "hosted_custody.rs"]
+mod custody;
 
 const STATE_KEY: &str = "catalog.connections.v1";
 const STATE_VERSION: u8 = 1;
@@ -127,6 +131,12 @@ enum StoredActor {
 #[serde(deny_unknown_fields)]
 struct PendingCommit {
     transaction_id: String,
+    #[serde(default)]
+    published: bool,
+    #[serde(default)]
+    discarded: bool,
+    #[serde(default)]
+    intent: bool,
     connection: StoredConnection,
 }
 
@@ -436,8 +446,10 @@ impl Inner {
 
     fn reserve_transaction(
         &self,
+        minimum: u64,
     ) -> Result<(SecretTransactionId, SecretTransactionGeneration), HostedCatalogError> {
         let mut metadata = lock(&self.metadata);
+        metadata.next_transaction_generation = metadata.next_transaction_generation.max(minimum);
         let generation = SecretTransactionGeneration::from_protocol_bytes(
             metadata.next_transaction_generation.to_be_bytes(),
         )
@@ -452,150 +464,68 @@ impl Inner {
         Ok((SecretTransactionId::new(generation, nonce), generation))
     }
 
-    async fn commit_connection(
-        &self,
-        session_ref: &str,
-        session: &Session,
-        secret: Secret,
-        verification: Option<(String, u64)>,
-    ) -> Result<String, HostedCatalogError> {
-        let provider = catalog::provider(catalog::ProviderKey::id(&session.provider))
-            .ok_or(HostedCatalogError::InvalidPolicy)?;
-        let authority = provider
-            .authority
-            .ok_or(HostedCatalogError::InvalidPolicy)?;
-        let credential = self
-            .profile(&session.provider, &session.credential)
-            .ok_or(HostedCatalogError::InvalidPolicy)?;
-        let instance = random_uuid().map_err(|_| HostedCatalogError::State)?;
-        let entry = CatalogIntegrationConfig {
-            provider: session.provider.clone(),
-            instance: Some(instance.clone()),
-            label: Some(session.label.clone()),
-            grant_ref: self.grant_ref.clone(),
-            initiation: InitiationConfig::Platform,
-            allow_writes: false,
-            endpoints: session.binding.endpoints.clone(),
-            // Hosted self-service stores no user half today, so a `basic` connector is not
-            // connectable through it. Stated as an empty map rather than left implicit: the
-            // personal placement fills this from `[catalog.usernames]`, and the hosted gap is a
-            // missing acquisition surface, not a different resolution rule.
-            usernames: BTreeMap::new(),
-            operator_approved: !session.binding.endpoints.is_empty(),
-            credential: Some(session.credential.clone()),
-            network: session.binding.network,
-            credential_file: None,
-            oauth: None,
-        };
-        let reference = credential_address(&self.tenant_id, authority, &entry, credential.leaf)?;
-        let connection = StoredConnection {
-            connection_ref: connection_ref(&session.provider, &instance),
-            provider: session.provider.clone(),
-            instance,
-            credential: session.credential.clone(),
-            label: session.label.clone(),
-            owner_subject: session.owner_subject.clone(),
-            binding: session.binding.clone(),
-            actor: match credential.subject {
-                Subject::User => StoredActor::User,
-                Subject::App => StoredActor::App,
-                Subject::Unstated => return Err(HostedCatalogError::InvalidPolicy),
-            },
-            credential_sha256: verification.as_ref().map(|value| value.0.clone()),
-            last_verified_at_unix_ms: verification.map(|value| value.1),
-        };
-        let (transaction, generation) = self.reserve_transaction()?;
-        let mut batch = SecretBatch::new(
-            CredentialScope::new(&self.tenant_id, authority)
-                .map_err(|_| HostedCatalogError::Credential)?,
-        );
-        batch
-            .put(reference, secret)
-            .map_err(|_| HostedCatalogError::Credential)?;
-        self.prepared
-            .prepare(transaction, proposal_digest(&batch), &batch)
-            .await
-            .map_err(|_| HostedCatalogError::Credential)?;
-        let transaction_id = hex::encode(transaction.protocol_bytes());
-        let persist_result = {
-            let mut metadata = lock(&self.metadata);
-            metadata.pending.push(PendingCommit {
-                transaction_id: transaction_id.clone(),
-                connection: connection.clone(),
-            });
-            let result = self.persist(&metadata);
-            if result.is_err() {
-                metadata
-                    .pending
-                    .retain(|pending| pending.transaction_id != transaction_id);
-            }
-            result
-        };
-        if let Err(error) = persist_result {
-            let _ = self.prepared.abort(transaction).await;
-            return Err(error);
-        }
-        self.prepared
-            .commit(transaction)
-            .await
-            .map_err(|_| HostedCatalogError::Credential)?;
-        {
-            let mut metadata = lock(&self.metadata);
-            metadata
-                .pending
-                .retain(|pending| pending.transaction_id != transaction_id);
-            metadata
-                .connections
-                .retain(|candidate| candidate.connection_ref != connection.connection_ref);
-            metadata.connections.push(connection.clone());
-            metadata
-                .connections
-                .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
-            self.persist(&metadata)?;
-        }
-        let _ = self.prepared.reclaim(generation).await;
-        let _ = session_ref;
-        Ok(connection.connection_ref)
-    }
-
     async fn recover_pending(&self) -> Result<(), HostedCatalogError> {
-        let pending = lock(&self.metadata).pending.clone();
-        for record in pending {
-            let transaction = decode_transaction(&record.transaction_id)?;
-            match self
-                .prepared
-                .state(transaction)
-                .await
-                .map_err(|_| HostedCatalogError::Credential)?
-            {
-                SecretTransactionState::Prepared => {
-                    self.prepared
-                        .commit(transaction)
-                        .await
-                        .map_err(|_| HostedCatalogError::Credential)?;
-                }
-                SecretTransactionState::Committed => {}
-                SecretTransactionState::Absent => {
+        for pass in 0..2 {
+            let pending = lock(&self.metadata).pending.clone();
+            for record in pending {
+                let transaction = decode_transaction(&record.transaction_id)?;
+                if !record.published && !record.discarded {
+                    match service::recover_credential_intent(
+                        self.prepared.as_ref(),
+                        transaction,
+                        record.intent,
+                    )
+                    .await
+                    .map_err(|_| HostedCatalogError::Credential)?
+                    {
+                        service::CredentialRecovery::Committed => {}
+                        service::CredentialRecovery::Deferred => {
+                            if pass == 1 {
+                                return Err(HostedCatalogError::Credential);
+                            }
+                            continue;
+                        }
+                        service::CredentialRecovery::Discarded => {
+                            let mut metadata = lock(&self.metadata);
+                            let prior = metadata.clone();
+                            if let Some(receipt) = metadata
+                                .pending
+                                .iter_mut()
+                                .find(|receipt| receipt.transaction_id == record.transaction_id)
+                            {
+                                receipt.discarded = true;
+                            }
+                            if let Err(error) = self.persist(&metadata) {
+                                *metadata = prior;
+                                return Err(error);
+                            }
+                            continue;
+                        }
+                    }
                     let mut metadata = lock(&self.metadata);
-                    metadata
+                    let prior = metadata.clone();
+                    if let Some(pending) = metadata
                         .pending
-                        .retain(|candidate| candidate.transaction_id != record.transaction_id);
-                    self.persist(&metadata)?;
-                    continue;
+                        .iter_mut()
+                        .find(|candidate| candidate.transaction_id == record.transaction_id)
+                    {
+                        pending.published = true;
+                    }
+                    metadata.connections.retain(|candidate| {
+                        candidate.connection_ref != record.connection.connection_ref
+                    });
+                    metadata.connections.push(record.connection);
+                    metadata
+                        .connections
+                        .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+                    if let Err(error) = self.persist(&metadata) {
+                        *metadata = prior;
+                        return Err(error);
+                    }
                 }
+                self.acknowledge_publications().await;
             }
-            let mut metadata = lock(&self.metadata);
-            metadata
-                .pending
-                .retain(|candidate| candidate.transaction_id != record.transaction_id);
-            metadata.connections.push(record.connection);
-            metadata
-                .connections
-                .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
-            metadata
-                .connections
-                .dedup_by(|left, right| left.connection_ref == right.connection_ref);
-            self.persist(&metadata)?;
+            self.acknowledge_publications().await;
         }
         Ok(())
     }
@@ -605,18 +535,23 @@ impl Inner {
         session: &Session,
         value: &str,
     ) -> Result<Option<(String, u64)>, HostedCompletionError> {
-        let provider = catalog::provider(catalog::ProviderKey::id(&session.provider))
-            .ok_or(HostedCompletionError::Unavailable)?;
+        let provider = catalog::provider(catalog::ProviderKey::id(&session.provider)).ok_or(
+            HostedCompletionError::Verification(service::HostedVerificationFailure::Preparation),
+        )?;
         let Some(operation_ref) = provider.verify else {
             return Ok(None);
         };
         let authority = provider
             .authority
-            .ok_or(HostedCompletionError::Unavailable)?;
-        let credential = self
-            .profile(&session.provider, &session.credential)
-            .ok_or(HostedCompletionError::Unavailable)?;
-        let instance = random_uuid().map_err(|_| HostedCompletionError::Unavailable)?;
+            .ok_or(HostedCompletionError::Verification(
+                service::HostedVerificationFailure::Preparation,
+            ))?;
+        let credential = self.profile(&session.provider, &session.credential).ok_or(
+            HostedCompletionError::Verification(service::HostedVerificationFailure::Preparation),
+        )?;
+        let instance = random_uuid().map_err(|_| {
+            HostedCompletionError::Verification(service::HostedVerificationFailure::Preparation)
+        })?;
         let connection = StoredConnection {
             connection_ref: connection_ref(&session.provider, &instance),
             provider: session.provider.clone(),
@@ -628,31 +563,42 @@ impl Inner {
             actor: match credential.subject {
                 Subject::User => StoredActor::User,
                 Subject::App => StoredActor::App,
-                Subject::Unstated => return Err(HostedCompletionError::Unavailable),
+                Subject::Unstated => {
+                    return Err(HostedCompletionError::Verification(
+                        service::HostedVerificationFailure::Preparation,
+                    ))
+                }
             },
             credential_sha256: None,
             last_verified_at_unix_ms: None,
         };
         let entry = Self::config(&connection, &self.grant_ref);
         let address = credential_address(&self.tenant_id, authority, &entry, credential.leaf)
-            .map_err(|_| HostedCompletionError::Unavailable)?;
+            .map_err(|_| {
+                HostedCompletionError::Verification(service::HostedVerificationFailure::Preparation)
+            })?;
         let ephemeral = Arc::new(connector_secrets::MemoryStore::new());
         ephemeral
             .put(&address, &Secret::new(value))
             .await
-            .map_err(|_| HostedCompletionError::Unavailable)?;
+            .map_err(|_| {
+                HostedCompletionError::Verification(service::HostedVerificationFailure::Preparation)
+            })?;
         let values: Arc<dyn SecretStore> = ephemeral;
+        let verification_egress = Arc::new(VerificationEgress::new(self.egress.clone()));
         let backend = CatalogBackend::bind_stored(
             session.owner.clone(),
             &[entry],
             values,
-            self.egress.clone(),
+            verification_egress.clone(),
         )
-        .map_err(|_| HostedCompletionError::Unavailable)?;
+        .map_err(|_| {
+            HostedCompletionError::Verification(service::HostedVerificationFailure::Preparation)
+        })?;
         let description = backend
             .inner
             .describe(operation_ref)
-            .map_err(|_| HostedCompletionError::Refused)?;
+            .map_err(|_| HostedCompletionError::Verification(verification_egress.failure()))?;
         backend
             .inner
             .invoke(
@@ -662,9 +608,11 @@ impl Inner {
                 serde_json::json!({}),
             )
             .await
-            .map_err(|_| HostedCompletionError::Refused)?;
+            .map_err(|_| HostedCompletionError::Verification(verification_egress.failure()))?;
         let fingerprint = hex::encode(Sha256::digest(value.as_bytes()));
-        let verified_at = now_ms().ok_or(HostedCompletionError::Unavailable)?;
+        let verified_at = now_ms().ok_or(HostedCompletionError::Verification(
+            service::HostedVerificationFailure::Preparation,
+        ))?;
         Ok(Some((fingerprint, verified_at)))
     }
 }
@@ -766,7 +714,12 @@ impl ConnectorBackend for HostedCatalogBackend {
             .ok_or(HostedCompletionError::Unavailable)?;
         let origins = hosted_endpoints::origins(provider, &session.binding)
             .map_err(|_| HostedCompletionError::Unavailable)?;
-        Ok(completion_page(provider, &session.credential, &origins))
+        Ok(completion_page(
+            provider,
+            &session.credential,
+            &origins,
+            session.expires_at_unix_ms,
+        ))
     }
 
     async fn complete_hosted_session(
@@ -805,12 +758,14 @@ impl ConnectorBackend for HostedCatalogBackend {
             .inner
             .commit_connection(session_ref, &session, Secret::new(value), verification)
             .await
-            .map_err(|_| HostedCompletionError::Unavailable)?;
+            .map_err(HostedCompletionError::Custody)?;
         let mut sessions = lock(&self.inner.sessions);
         let current = sessions
             .get_mut(session_ref)
             .filter(|session| session.state == ConnectSessionState::Pending)
-            .ok_or(HostedCompletionError::NotFound)?;
+            .ok_or(HostedCompletionError::Custody(
+                service::HostedCustodyFailure::SessionFinalization,
+            ))?;
         current.state = ConnectSessionState::Completed;
         current.connection_ref = Some(connection_ref);
         current.capability_sha256.fill(0);
@@ -906,79 +861,6 @@ fn connection_summary(connection: StoredConnection) -> ConnectionSummary {
     }
 }
 
-fn completion_page(
-    provider: &catalog::Provider,
-    credential: &str,
-    origins: &[String],
-) -> HostedCompletionPage {
-    let title = html_escape(provider.id);
-    let binding = format!("credential.{credential}");
-    let field = provider.config.iter().find(|field| {
-        field.secret && (field.binds == binding || field.also_binds.contains(&binding.as_str()))
-    });
-    let label = html_escape(field.map_or(credential, |field| field.label));
-    let auth_description = credential_description(provider.id, credential);
-    let mut help = field.map_or_else(String::new, |field| html_escape(field.help));
-    if !auth_description.is_empty() && field.is_none_or(|field| field.help != auth_description) {
-        if !help.is_empty() {
-            help.push_str("</p><p>");
-        }
-        help.push_str(&html_escape(&auth_description));
-    }
-    let documentation = field
-        .and_then(|field| field.docs_url)
-        .and_then(documentation_link)
-        .unwrap_or_default();
-    let destinations = if origins.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "<p>Provider destination: <strong>{}</strong></p>",
-            html_escape(&origins.join(", "))
-        )
-    };
-    HostedCompletionPage {
-        title: format!("Connect {title}"),
-        html: format!(
-            r#"<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect {title}</title>
-<style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}label,input,button{{display:block;width:100%;box-sizing:border-box}}input,button{{padding:.8rem;margin-top:.5rem}}button{{margin-top:1rem}}a{{color:#93c5fd}}</style>
-<h1>Connect {title}</h1>{destinations}<p>Enter the provider credential once. Connectors verifies it with the provider and stores it in the configured credential store.</p>
-<div id="credential-help"><p>{help}</p>{documentation}</div>
-<form><label>{label}<input name="credential" type="password" autocomplete="off" aria-describedby="credential-help" maxlength="8192" required></label><button>Connect</button></form><p id="status" role="status"></p>
-<script>const form=document.querySelector('form'),status=document.querySelector('#status'),button=document.querySelector('button');const capability=new URL(location.href).hash.match(/^#token=([A-Za-z0-9_-]{{32,256}})$/)?.[1];history.replaceState(null,'',location.pathname);form.addEventListener('submit',async event=>{{event.preventDefault();const field=form.elements.credential,value=field.value;if(!capability||!value||value.length>8192){{status.textContent='Check the credential value.';return;}}field.value='';button.disabled=true;status.textContent='Saving the credential…';try{{const response=await fetch(location.pathname,{{method:'POST',headers:{{'Content-Type':'application/octet-stream','X-Connect-Session':capability}},body:value}});if(response.ok){{status.textContent='{title} connected. You may close this tab.';return;}}status.textContent=response.status===503?'The credential store is unavailable. Start Connect again later.':'The connection was refused.';}}catch{{status.textContent='Hosted Connectors is unavailable. Start Connect again later.';}}button.disabled=false;}});</script>"#
-        ),
-    }
-}
-
-fn credential_description(provider: &str, credential: &str) -> String {
-    // Authentication descriptions belong to the canonical catalogue, including profiles without
-    // a form field. Reading that reviewed document avoids inventing provider-specific UI copy.
-    catalog::reader::provider(provider)
-        .and_then(|provider| serde_json::from_str::<serde_json::Value>(provider.document()).ok())
-        .and_then(|document| {
-            document.get("auth")?.as_array()?.iter().find_map(|auth| {
-                (auth.get("name")?.as_str()? == credential)
-                    .then(|| auth.get("description")?.as_str().map(str::to_owned))?
-            })
-        })
-        .unwrap_or_default()
-}
-
-fn documentation_link(value: &str) -> Option<String> {
-    let url = url::Url::parse(value).ok()?;
-    if url.scheme() != "https"
-        || url.host_str().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
-        return None;
-    }
-    Some(format!(
-        "<p><a href=\"{}\" target=\"_blank\" rel=\"noopener noreferrer\">Credential setup documentation</a></p>",
-        html_escape(url.as_str())
-    ))
-}
-
 fn proposal_digest(batch: &SecretBatch) -> SecretProposalDigest {
     let mut digest = Sha256::new();
     digest.update(b"b10x/catalog-credential-transaction/v1\0");
@@ -1029,7 +911,7 @@ fn now_ms() -> Option<u64> {
         .and_then(|duration| u64::try_from(duration.as_millis()).ok())
 }
 
-fn html_escape(value: &str) -> String {
+pub(super) fn html_escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
         .replace('"', "&quot;")
@@ -1300,7 +1182,9 @@ mod tests {
 
         assert!(matches!(
             task.await.expect("completion task joins"),
-            Err(HostedCompletionError::NotFound)
+            Err(HostedCompletionError::Custody(
+                service::HostedCustodyFailure::SessionFinalization
+            ))
         ));
         assert_eq!(
             lock(&backend.inner.sessions)

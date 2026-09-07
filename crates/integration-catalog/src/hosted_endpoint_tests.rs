@@ -1,6 +1,7 @@
 //! Boundary tests use sentinel credentials and a recording transport, never a provider account.
 
 use super::*;
+use crate::hosted_form::{credential_description, documentation_link};
 use connector_secrets::MemoryStore;
 use connector_state::MemoryState;
 use connectors_config::NetworkScopeConfig;
@@ -13,6 +14,8 @@ const SENTINEL: &str = "SENTINEL-NOT-A-REAL-SERVICE-ACCOUNT-TOKEN";
 struct RecordingEgress {
     urls: Mutex<Vec<String>>,
     reject_credential: bool,
+    status: Option<u16>,
+    failure: Option<EgressTransportError>,
 }
 
 #[async_trait]
@@ -33,8 +36,13 @@ impl EgressTransport for RecordingEgress {
             Some(format!("Bearer {SENTINEL}").as_str())
         );
         lock(&self.urls).push(request.request.url);
+        if let Some(failure) = self.failure {
+            return Err(failure);
+        }
         Ok(EgressHttpResponse {
-            status: if self.reject_credential { 401 } else { 200 },
+            status: self
+                .status
+                .unwrap_or(if self.reject_credential { 401 } else { 200 }),
             headers: BTreeMap::new(),
             body: b"[]".to_vec(),
         })
@@ -74,7 +82,7 @@ fn policy(origin: Option<&str>) -> HostedCatalogConfig {
 async fn open(
     policy: HostedCatalogConfig,
     values: Arc<MemoryStore>,
-    state: Arc<MemoryState>,
+    state: Arc<dyn StateStore>,
     egress: Arc<RecordingEgress>,
 ) -> HostedCatalogBackend {
     HostedCatalogBackend::open(
@@ -148,8 +156,8 @@ async fn connect(backend: &HostedCatalogBackend, owner: &PrincipalContext) -> St
 #[test]
 fn completion_copy_follows_the_selected_catalog_credential() {
     let provider = catalog::provider(catalog::ProviderKey::id("anthropic")).unwrap();
-    let ordinary = completion_page(provider, "anthropic.api_key", &[]);
-    let admin = completion_page(provider, "anthropic.admin_key", &[]);
+    let ordinary = completion_page(provider, "anthropic.api_key", &[], u64::MAX);
+    let admin = completion_page(provider, "anthropic.admin_key", &[], u64::MAX);
     assert!(ordinary.html.contains("<label>API key<input"));
     assert!(ordinary
         .html
@@ -181,7 +189,7 @@ fn form_copy_is_escaped_and_documentation_links_are_safe() {
     field.help = "<script>untrusted()</script>";
     field.docs_url = Some("javascript:untrusted()");
     provider.config = Box::leak(vec![field].into_boxed_slice());
-    let page = completion_page(&provider, "anthropic.api_key", &[]);
+    let page = completion_page(&provider, "anthropic.api_key", &[], u64::MAX);
     assert!(page
         .html
         .contains("API &lt;key&gt; &amp; &quot;account&quot;"));
@@ -200,6 +208,243 @@ fn form_copy_is_escaped_and_documentation_links_are_safe() {
     assert!(documentation_link("https://docs.example/setup?a=1&b=2")
         .unwrap()
         .contains("?a=1&amp;b=2"));
+}
+
+#[tokio::test]
+async fn verification_failure_classes_survive_without_custody_or_replay() {
+    use service::{EgressTransportFailure, HostedVerificationFailure};
+    let outcomes = [
+        (
+            Some(401),
+            None,
+            HostedVerificationFailure::ProviderStatus(401),
+        ),
+        (
+            Some(403),
+            None,
+            HostedVerificationFailure::ProviderStatus(403),
+        ),
+        (
+            Some(429),
+            None,
+            HostedVerificationFailure::ProviderStatus(429),
+        ),
+        (
+            Some(302),
+            None,
+            HostedVerificationFailure::ProviderStatus(302),
+        ),
+        (
+            Some(500),
+            None,
+            HostedVerificationFailure::ProviderStatus(500),
+        ),
+        (
+            None,
+            Some(EgressTransportError::Refused),
+            HostedVerificationFailure::DestinationRefused,
+        ),
+        (
+            None,
+            Some(EgressTransportError::ResponseTooLarge),
+            HostedVerificationFailure::ResponseTooLarge,
+        ),
+    ];
+    let outcomes = outcomes.into_iter().chain(
+        [
+            EgressTransportFailure::Timeout,
+            EgressTransportFailure::Connect,
+            EgressTransportFailure::Tls,
+            EgressTransportFailure::BodyRead,
+            EgressTransportFailure::Other,
+        ]
+        .map(|failure| {
+            (
+                None,
+                Some(EgressTransportError::Transport(failure)),
+                HostedVerificationFailure::Transport(failure),
+            )
+        }),
+    );
+    for (status, failure, expected) in outcomes {
+        let egress = Arc::new(RecordingEgress {
+            status,
+            failure,
+            ..Default::default()
+        });
+        let values = Arc::new(MemoryStore::new());
+        let backend = open(
+            policy(Some(ORIGIN)),
+            values,
+            Arc::new(MemoryState::new()),
+            egress.clone(),
+        )
+        .await;
+        let owner = principal("first");
+        let (session, capability) = pending(&backend, &owner);
+        let result = backend
+            .complete_hosted_session(
+                &session,
+                &capability,
+                HostedCompletionSubmission::new(SENTINEL.as_bytes().to_vec()),
+            )
+            .await;
+        assert_eq!(result, Err(HostedCompletionError::Verification(expected)));
+        assert_eq!(lock(&egress.urls).len(), 1);
+        let metadata = lock(&backend.inner.metadata);
+        assert!(metadata.connections.is_empty());
+        assert!(metadata.pending.is_empty());
+        assert_eq!(metadata.next_transaction_generation, 1);
+        drop(metadata);
+        assert_eq!(
+            backend
+                .inner
+                .session_status(&owner, &session)
+                .unwrap()
+                .state,
+            ConnectSessionState::Pending
+        );
+        assert!(!format!("{result:?}").contains(SENTINEL));
+        assert!(!format!("{result:?}").contains(ORIGIN));
+    }
+}
+
+#[test]
+fn completion_page_has_the_exact_session_deadline() {
+    let provider = catalog::provider(catalog::ProviderKey::id("grafana")).unwrap();
+    let page = completion_page(
+        provider,
+        "grafana.service_account_token",
+        &[],
+        1_800_000_123_456,
+    );
+    assert!(page.html.contains("data-expires-at=\"1800000123456\""));
+    assert!(page.html.contains("id=\"expiry\" role=\"timer\""));
+}
+
+struct FailingState {
+    inner: MemoryState,
+    writes: std::sync::atomic::AtomicUsize,
+    fail_at: usize,
+}
+
+impl StateStore for FailingState {
+    fn read(
+        &self,
+        key: &str,
+        maximum: usize,
+    ) -> Result<Option<Vec<u8>>, connector_state::StateError> {
+        self.inner.read(key, maximum)
+    }
+    fn replace(
+        &self,
+        key: &str,
+        body: &[u8],
+        maximum: usize,
+    ) -> Result<(), connector_state::StateError> {
+        if self
+            .writes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1
+            == self.fail_at
+        {
+            return Err(connector_state::StateError::Unavailable);
+        }
+        self.inner.replace(key, body, maximum)
+    }
+    fn append(
+        &self,
+        key: &str,
+        suffix: &[u8],
+        maximum: usize,
+    ) -> Result<usize, connector_state::StateError> {
+        self.inner.append(key, suffix, maximum)
+    }
+    fn delete(&self, key: &str) -> Result<(), connector_state::StateError> {
+        self.inner.delete(key)
+    }
+}
+
+#[tokio::test]
+async fn custody_state_failures_keep_their_stage_and_recover_committed_outcomes() {
+    use service::HostedCustodyFailure;
+    for (fail_at, expected) in [
+        (1, HostedCustodyFailure::ReserveState),
+        (2, HostedCustodyFailure::PersistPending),
+        (3, HostedCustodyFailure::PersistConnection),
+    ] {
+        let state = Arc::new(FailingState {
+            inner: MemoryState::new(),
+            writes: std::sync::atomic::AtomicUsize::new(0),
+            fail_at,
+        });
+        let values = Arc::new(MemoryStore::new());
+        let egress = Arc::new(RecordingEgress::default());
+        let backend = open(
+            policy(Some(ORIGIN)),
+            values.clone(),
+            state.clone(),
+            egress.clone(),
+        )
+        .await;
+        let owner = principal("first");
+        let (session, capability) = pending(&backend, &owner);
+        let result = backend
+            .complete_hosted_session(
+                &session,
+                &capability,
+                HostedCompletionSubmission::new(SENTINEL.as_bytes().to_vec()),
+            )
+            .await;
+        assert_eq!(result, Err(HostedCompletionError::Custody(expected)));
+        assert_eq!(lock(&egress.urls).len(), 1);
+        assert_eq!(expected.completion_unconfirmed(), fail_at == 3);
+        drop(backend);
+        let recovered = open(policy(Some(ORIGIN)), values, state, egress.clone()).await;
+        assert_eq!(
+            recovered.inner.owned_connections(&owner).len(),
+            usize::from(fail_at == 3)
+        );
+        assert!(recovered
+            .inner
+            .owned_connections(&principal("other"))
+            .is_empty());
+        assert_eq!(
+            lock(&egress.urls).len(),
+            1,
+            "recovery must not resend the provider credential"
+        );
+    }
+}
+
+#[tokio::test]
+async fn retired_shared_generation_advances_before_custody_without_provider_replay() {
+    let values = Arc::new(MemoryStore::new());
+    values
+        .reclaim(SecretTransactionGeneration::from_protocol_bytes(1_u64.to_be_bytes()).unwrap())
+        .await
+        .unwrap();
+    let egress = Arc::new(RecordingEgress::default());
+    let backend = open(
+        policy(Some(ORIGIN)),
+        values,
+        Arc::new(MemoryState::new()),
+        egress.clone(),
+    )
+    .await;
+    let (session, capability) = pending(&backend, &principal("first"));
+    let result = backend
+        .complete_hosted_session(
+            &session,
+            &capability,
+            HostedCompletionSubmission::new(SENTINEL.as_bytes().to_vec()),
+        )
+        .await;
+    assert_eq!(result, Ok(()));
+    assert_eq!(lock(&egress.urls).len(), 1);
+    assert!(lock(&backend.inner.metadata).pending.is_empty());
+    assert_eq!(lock(&backend.inner.metadata).connections.len(), 1);
+    assert_eq!(lock(&backend.inner.metadata).next_transaction_generation, 3);
 }
 
 async fn invoke(
