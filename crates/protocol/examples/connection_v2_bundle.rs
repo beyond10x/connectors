@@ -6,7 +6,7 @@ use sha2::{Digest as _, Sha256};
 use std::{error::Error, fs, path::Path};
 
 #[derive(Parser)]
-#[command(about = "Reproduce or check ConnectorConnection v0alpha2 bundle artifacts")]
+#[command(about = "Reproduce or check ConnectorEndpoint v0alpha2 bundle artifacts")]
 struct Args {
     #[command(subcommand)]
     mode: Mode,
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let prefix = "contracts/connector-connection/v0alpha2";
-    let schema = protocol::connection_v2_schema::connection_v2_schema();
+    let schema = protocol::endpoint_v2_schema::connection_v2_schema();
     let schema_bytes = pretty(&schema)?;
     let validator = jsonschema::options()
         .with_draft(jsonschema::Draft::Draft202012)
@@ -45,10 +45,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         let schema_valid = validator.is_valid(&vector.frame);
         let bytes = serde_json::to_vec(&vector.frame)?;
         let rust_valid = match vector.kind.as_str() {
-            "request" => serde_json::from_slice::<protocol::connection_v2::RequestEnvelope>(&bytes)
+            "request" => serde_json::from_slice::<protocol::endpoint_v2::RequestEnvelope>(&bytes)
                 .is_ok_and(|frame| frame.validate().is_ok()),
             "response" => {
-                serde_json::from_slice::<protocol::connection_v2::ResponseEnvelope>(&bytes)
+                serde_json::from_slice::<protocol::endpoint_v2::ResponseEnvelope>(&bytes)
                     .is_ok_and(|frame| frame.validate().is_ok())
             }
             _ => return Err(format!("unknown vector kind: {}", vector.kind).into()),

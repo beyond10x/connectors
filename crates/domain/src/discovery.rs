@@ -1,4 +1,4 @@
-use crate::{ConnectionRoute, RouteAdapter};
+use crate::{EndpointRoute, RouteAdapter};
 
 /// A bounded fact emitted by one catalog-declared discovery normalizer.
 ///
@@ -27,24 +27,24 @@ struct DiscoveryTarget {
 /// A normalized possible Provider instance. It is still unusable until control-plane admission
 /// materializes a durable Connection and an independent Connector Grant admits an operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConnectionCandidate {
-    pub source: ConnectionCandidateSource,
+pub struct EndpointCandidate {
+    pub source: EndpointCandidateSource,
     pub target_provider: String,
     pub title: String,
     pub evidence_generation: u64,
     pub evidence_sha256: String,
-    pub route: ConnectionRoute,
+    pub route: EndpointRoute,
 }
 
 /// Closed origin of one unusable Connection candidate. Local configuration precedes a direct
 /// source Connection; an observation follows an existing source Connection and proposes mediation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConnectionCandidateSource {
+pub enum EndpointCandidateSource {
     LocalConfiguration { candidate_binding: String },
     Observation { observation: String },
 }
 
-impl ConnectionCandidate {
+impl EndpointCandidate {
     /// Construct a candidate detected in trusted local configuration. The binding remains private
     /// Connector state and activation still has to verify provider identity and authority.
     pub fn direct(
@@ -55,14 +55,14 @@ impl ConnectionCandidate {
         evidence_sha256: impl Into<String>,
     ) -> Result<Self, DiscoveryError> {
         let candidate = Self {
-            source: ConnectionCandidateSource::LocalConfiguration {
+            source: EndpointCandidateSource::LocalConfiguration {
                 candidate_binding: candidate_binding.into(),
             },
             target_provider: target_provider.into(),
             title: title.into(),
             evidence_generation,
             evidence_sha256: evidence_sha256.into(),
-            route: ConnectionRoute::Direct,
+            route: EndpointRoute::Direct,
         };
         candidate.validate()?;
         Ok(candidate)
@@ -70,12 +70,12 @@ impl ConnectionCandidate {
 
     fn validate(&self) -> Result<(), DiscoveryError> {
         let source_valid = match &self.source {
-            ConnectionCandidateSource::LocalConfiguration { candidate_binding } => {
-                valid_ref(candidate_binding) && matches!(self.route, ConnectionRoute::Direct)
+            EndpointCandidateSource::LocalConfiguration { candidate_binding } => {
+                valid_ref(candidate_binding) && matches!(self.route, EndpointRoute::Direct)
             }
-            ConnectionCandidateSource::Observation { observation } => {
+            EndpointCandidateSource::Observation { observation } => {
                 valid_ref(observation)
-                    && matches!(self.route, ConnectionRoute::ViaConnection { .. })
+                    && matches!(self.route, EndpointRoute::ViaEndpoint { .. })
             }
         };
         if !source_valid
@@ -223,18 +223,18 @@ impl DiscoveryObservation {
 
     /// Produce a candidate only for a recognized mapping. No Connection or authority is created.
     #[must_use]
-    pub fn candidate(&self) -> Option<ConnectionCandidate> {
+    pub fn candidate(&self) -> Option<EndpointCandidate> {
         let target = self.target.as_ref()?;
-        Some(ConnectionCandidate {
-            source: ConnectionCandidateSource::Observation {
+        Some(EndpointCandidate {
+            source: EndpointCandidateSource::Observation {
                 observation: self.id.clone(),
             },
             target_provider: target.provider.clone(),
             title: self.title.clone(),
             evidence_generation: self.evidence_generation,
             evidence_sha256: self.evidence_sha256.clone(),
-            route: ConnectionRoute::ViaConnection {
-                parent_connection: self.source_connection.clone(),
+            route: EndpointRoute::ViaEndpoint {
+                parent_endpoint: self.source_connection.clone(),
                 resource_binding: self.resource_binding.clone(),
                 adapter: target.adapter,
             },
@@ -285,8 +285,8 @@ mod tests {
         assert_eq!(candidate.target_provider, "prometheus");
         assert!(matches!(
             candidate.route,
-            ConnectionRoute::ViaConnection { ref parent_connection, .. }
-                if parent_connection == "connection:grafana-infra"
+            EndpointRoute::ViaEndpoint { ref parent_endpoint, .. }
+                if parent_endpoint == "connection:grafana-infra"
         ));
     }
 
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn trusted_local_candidate_proposes_only_a_direct_route() {
-        let candidate = ConnectionCandidate::direct(
+        let candidate = EndpointCandidate::direct(
             "binding:kubeconfig-context",
             "kubernetes",
             "development",
@@ -319,8 +319,8 @@ mod tests {
         .unwrap();
         assert!(matches!(
             candidate.source,
-            ConnectionCandidateSource::LocalConfiguration { .. }
+            EndpointCandidateSource::LocalConfiguration { .. }
         ));
-        assert_eq!(candidate.route, ConnectionRoute::Direct);
+        assert_eq!(candidate.route, EndpointRoute::Direct);
     }
 }

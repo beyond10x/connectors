@@ -29,12 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (
             "connector-endpoint",
             "v0alpha1",
-            protocol::endpoint_schema::endpoint_schema(),
+            protocol::endpoint_inventory_schema::endpoint_schema(),
         ),
         (
             "connector-operation",
-            "v0alpha4",
-            protocol::operation::schema_v4::operation_v4_schema(),
+            "v0alpha5",
+            protocol::operation::schema_v5::operation_v5_schema(),
         ),
     ] {
         let directory = format!("contracts/{name}/{version}");

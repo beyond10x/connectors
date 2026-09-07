@@ -1,7 +1,7 @@
 //! Credential-free, paginated projection of the complete Connector catalog.
 //!
 //! Catalog membership is descriptive, never invocation authority. Callers must use the Operation
-//! contract to discover callable Connections and to describe or invoke an operation.
+//! contract to discover callable Endpoints and to describe or invoke an operation.
 
 use serde::{Deserialize, Serialize};
 

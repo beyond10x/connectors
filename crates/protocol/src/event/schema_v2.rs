@@ -31,7 +31,7 @@ pub fn event_v2_schema() -> Value {
             "ChannelSummary",
             vec![
                 "channel_ref",
-                "connection_ref",
+                "endpoint_ref",
                 "integration_ref",
                 "binding_ref",
             ],
@@ -41,7 +41,7 @@ pub fn event_v2_schema() -> Value {
             vec![
                 "event_ref",
                 "channel_ref",
-                "connection_ref",
+                "endpoint_ref",
                 "integration_ref",
                 "event_type",
             ],

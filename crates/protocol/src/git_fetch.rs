@@ -34,7 +34,7 @@ pub struct CreateRequest {
     /// Caller-stable retry identity. Replays keep the locator stable and rotate authority.
     pub idempotency_key: String,
     /// Principal-owned Connector Connection.
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     /// GitLab numeric project identity.
     pub project_id: u64,
     /// Provider-selected branch, normally the project's current default branch.
@@ -90,7 +90,7 @@ impl CreateRequest {
     /// Validate exact repository coordinate shape independently of a transport envelope.
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        valid_ref(&self.connection_ref, 512)
+        valid_ref(&self.endpoint_ref, 512)
             && valid_ref(&self.idempotency_key, 128)
             && self.project_id > 0
             && valid_git_reference(&self.reference)
@@ -194,7 +194,7 @@ mod tests {
             },
             request: CreateRequest {
                 idempotency_key: "coding-session-one".to_owned(),
-                connection_ref: "connection:gitlab:one".to_owned(),
+                endpoint_ref: "connection:gitlab:one".to_owned(),
                 project_id: 42,
                 reference: "trunk/release".to_owned(),
                 expected_commit: "b".repeat(40),

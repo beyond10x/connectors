@@ -76,7 +76,7 @@ pub enum EventProvenance {
 #[serde(deny_unknown_fields)]
 pub struct ChannelSummary {
     pub channel_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub integration_ref: String,
     pub binding_ref: String,
     pub events: Vec<String>,
@@ -87,7 +87,7 @@ pub struct ChannelSummary {
 pub struct DataEvent {
     pub event_ref: String,
     pub channel_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub integration_ref: String,
     pub event_type: String,
     pub provenance: EventProvenance,
@@ -248,7 +248,7 @@ fn validate_result(result: &EventResult) -> Result<(), EventError> {
             }
             for channel in channels {
                 require_ref(&channel.channel_ref)?;
-                require_ref(&channel.connection_ref)?;
+                require_ref(&channel.endpoint_ref)?;
                 require_ref(&channel.integration_ref)?;
                 require_ref(&channel.binding_ref)?;
                 if channel.events.is_empty()
@@ -278,7 +278,7 @@ fn validate_result(result: &EventResult) -> Result<(), EventError> {
 fn validate_event(event: &DataEvent) -> Result<(), EventError> {
     if !valid_ref(&event.event_ref, 512)
         || !valid_ref(&event.channel_ref, 512)
-        || !valid_ref(&event.connection_ref, 512)
+        || !valid_ref(&event.endpoint_ref, 512)
         || !valid_ref(&event.integration_ref, 512)
         || !valid_ref(&event.event_type, 512)
         || serde_json::to_vec(&event.payload).map_or(true, |bytes| bytes.len() > MAX_EVENT_BYTES)
