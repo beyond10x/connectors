@@ -703,6 +703,93 @@ async fn describe_merges_connections_and_invoke_receives_the_selected_local_leas
 }
 
 #[tokio::test]
+async fn exact_target_keeps_distinct_schemas_and_rejects_cross_target_leases() {
+    let first = SyntheticBackend::contributor("connection:a", "lease:a");
+    let mut second = SyntheticBackend::contributor("connection:b", "lease:b");
+    let second_mut = Arc::get_mut(&mut second).unwrap();
+    second_mut.description.as_mut().unwrap().output_schema = json!({"type":"array"});
+    second_mut.operations[0].title = "An alternate presentation".into();
+    let registry = registry(vec![first.clone(), second.clone()]);
+    let global = registry
+        .handle(
+            &context(),
+            OperationRequest::Describe(DescribeRequest {
+                operation_ref: "tickets.read".into(),
+            }),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(global.code, OperationErrorCode::Protocol);
+    let OperationResult::Search { operations } = registry
+        .handle(
+            &context(),
+            OperationRequest::Search(SearchRequest {
+                query: String::new(),
+                limit: 10,
+            }),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("expected search")
+    };
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0].connections.len(), 2);
+    let description = registry
+        .describe_target(&context(), "tickets.read", "connection:b")
+        .await
+        .unwrap();
+    assert_eq!(description.output_schema, json!({"type":"array"}));
+    assert_eq!(
+        description.connections,
+        vec![operation_connection("connection:b")]
+    );
+    let mut invoke = InvokeRequest {
+        operation_ref: "tickets.read".into(),
+        connection_ref: "connection:a".into(),
+        description_ref: description.description_ref,
+        input: json!({}),
+        approval_evidence_ref: None,
+    };
+    assert_eq!(
+        registry
+            .handle(&context(), OperationRequest::Invoke(invoke.clone()))
+            .await
+            .unwrap_err()
+            .code,
+        OperationErrorCode::StaleAuthority
+    );
+    invoke.connection_ref = "connection:b".into();
+    registry
+        .handle(&context(), OperationRequest::Invoke(invoke))
+        .await
+        .unwrap();
+    assert!(first.invocation_leases.lock().unwrap().is_empty());
+    assert_eq!(
+        second.invocation_leases.lock().unwrap().as_slice(),
+        ["lease:b"]
+    );
+}
+
+#[test]
+fn target_lease_covers_schema_and_source_policy_revision() {
+    let original = operation_description("tickets.read", "connection:a", "lease:a");
+    let before = target_description_ref(&context(), "connection:a", &original).unwrap();
+    let mut changed = original.clone();
+    changed.description_ref = "lease:rebound".into();
+    assert_ne!(
+        before,
+        target_description_ref(&context(), "connection:a", &changed).unwrap()
+    );
+    changed = original;
+    changed.input_schema = json!({"type":"array"});
+    assert_ne!(
+        before,
+        target_description_ref(&context(), "connection:a", &changed).unwrap()
+    );
+}
+
+#[tokio::test]
 async fn duplicate_connection_references_fail_search() {
     let first =
         SyntheticBackend::with_connections(vec![resource_connection("connection:duplicate")]);

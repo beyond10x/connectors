@@ -122,12 +122,13 @@ fn refusal(request_id: &str, error: RemediationError) -> Response {
         .into_response()
 }
 
-pub(super) async fn operation_preflight(
+pub(super) async fn operation_preflight_at(
     state: &HostedState,
     principal: &HostedPrincipal,
     owner: &PrincipalContext,
     request_id: &str,
     invoke: &InvokeRequest,
+    target_specific: bool,
 ) -> Option<Response> {
     let target = RemediationTarget {
         operation_ref: &invoke.operation_ref,
@@ -163,16 +164,24 @@ pub(super) async fn operation_preflight(
     }
     // Ordinary invoke still needs its current real description. This is never fabricated for
     // Created bindings; those use the separately admitted trusted Start path.
-    let description = match state
-        .backend
-        .handle(
-            owner,
-            OperationRequest::Describe(DescribeRequest {
-                operation_ref: invoke.operation_ref.clone(),
-            }),
-        )
-        .await
-    {
+    let described = if target_specific {
+        state
+            .backend
+            .describe_target(owner, &invoke.operation_ref, &invoke.connection_ref)
+            .await
+            .map(OperationResult::Describe)
+    } else {
+        state
+            .backend
+            .handle(
+                owner,
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: invoke.operation_ref.clone(),
+                }),
+            )
+            .await
+    };
+    let description = match described {
         Ok(OperationResult::Describe(description)) => description,
         Err(error)
             if matches!(
