@@ -2,13 +2,13 @@
 format: aep.planning-md/1
 id: runbook:small-wave-after-0-7-0
 kind: runbook
-status: active
+status: implemented
 title: 'Next small wave: inspect the installed binary'
 tags:
 - wave-small
 relations:
 - delivers: story:the-binary-says-what-it-carries
-revision: 22
+revision: 25
 ---
 # Next small wave: inspect the installed binary
 
@@ -1733,3 +1733,15 @@ Native findings comparison, verbatim:
 }
 
 ```
+
+## Whole gate and integration close
+
+All twelve workspace jobs and the shared checks succeeded in native release-workflow rehearsal https://github.com/beyond10x/connectors/actions/runs/34121542471 against integration commit `e13630fef05210c61772d29ca5c02ba297b7fbf8`. The runtime job includes both ordinary and no-default-features suites. Shared checks passed the catalog verifier, portable links/story index, pinned ESS validation and byte comparison, complete-history secret scan and local-identity refusal. Tag/version and CHANGELOG/tag checks were intentionally skipped by workflow_dispatch; they run on the actual release tag.
+
+Native job JSON and all thirteen job logs are retained under `~/.cache/connectors-small-wave-20260907/rehearsal-2-gates-green.json` and `rehearsal-2-logs/`. The earlier failed run remains recorded as failed/cancelled, not green. After all required repository gates succeeded, the coordinator cancelled this rehearsal's duplicate archive builds. Those archive builds are not claimed as evidence. The actual 0.7.2 tag workflow must pass all checks and build/smoke all four shipping targets before release completion. This replaces the earlier provisional intention to wait for two sets of archives; no required shipping check is removed.
+
+The feature's affected local suites and two independent reviews are recorded above. Findings remained 0 → 0, with native carried/new/resolved lists all empty. Integration is approved and green. Release versioning, source/catalog regeneration, public docs delivery and managed cleanup remain separate authorized work.
+
+Native Cargo summaries: 180 targets, 2673 passed executions, 0 failed, 27 ignored (includes both runtime feature configurations).
+
+Counts sum native Cargo target summaries, not unique cases; existing ignored cases are not counted as passing. All thirteen gate jobs completed successfully.
