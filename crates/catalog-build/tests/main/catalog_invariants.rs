@@ -132,6 +132,66 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+#[test]
+fn incremental_reads_are_catalogued_with_explicit_continuations() {
+    let (workspace, plan) = full_plan();
+    let documents = documents(&workspace, &plan);
+    for (provider, ids) in [
+        (
+            "jira",
+            vec![
+                "jira-project-list",
+                "jira-issue-search",
+                "jira-issue-comments-read",
+            ],
+        ),
+        ("confluence", vec!["confluence-page-search"]),
+        (
+            "gitlab",
+            vec![
+                "gitlab-issue-search",
+                "gitlab-merge-request-search",
+                "gitlab-project-activity-list",
+                "gitlab-pipeline-list",
+                "gitlab-deployment-list",
+                "gitlab-repository-commit-list",
+            ],
+        ),
+    ] {
+        let operations = documents[provider]["operations"].as_array().unwrap();
+        for id in ids {
+            let operation = operations
+                .iter()
+                .find(|operation| operation["id"] == id)
+                .unwrap_or_else(|| panic!("missing incremental read {id}"));
+            assert_eq!(
+                operation["credential_requirement"], "declared",
+                "{id} must require an admitted credential"
+            );
+            let properties = &operation["contract"]["input_schema"]["properties"];
+            let (limit, continuation) = match id {
+                "jira-issue-search" => ("limit", "next_page_token"),
+                "jira-project-list" | "jira-issue-comments-read" => ("limit", "start_at"),
+                "confluence-page-search" => ("limit", "cursor"),
+                _ => ("per_page", "page"),
+            };
+            // The legacy model-facing contract deliberately lowers constraints away. The
+            // canonical parameter declaration retains the authoritative bound.
+            let parameter = operation["params"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|parameter| parameter["symbol"] == limit)
+                .unwrap();
+            assert_eq!(parameter["schema"]["maximum"], 100, "{id} is bounded");
+            assert!(
+                properties[continuation].is_object(),
+                "{id} must accept continuation"
+            );
+        }
+    }
+}
+
 /// A whole-catalogue plan over the committed tree. Writes nothing.
 ///
 /// Computed **once** per process and handed out as a clone: a plan re-ingests 21 MB of vendored
@@ -2461,9 +2521,11 @@ fn adversary_gitlab_pass1_coverage_statuses_match_actual_importer_results() {
         }
     }
     assert_eq!(counts.get("catalogued_generated"), Some(&4));
-    assert_eq!(counts.get("catalogued_legacy"), Some(&20));
+    // The bounded pipeline, deployment and commit reads now have authored inline contracts;
+    // their vendor import diagnostics remain recorded rather than claiming generated coverage.
+    assert_eq!(counts.get("catalogued_legacy"), Some(&23));
     assert_eq!(counts.get("coverage_gap"), Some(&1510));
-    assert_eq!(counts.get("importer_gap"), Some(&313));
+    assert_eq!(counts.get("importer_gap"), Some(&310));
     println!("coverage decisions checked for 1847 source operations: {counts:?}");
 }
 

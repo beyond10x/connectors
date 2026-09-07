@@ -11,6 +11,8 @@ scope:
 - confidence: cited
   path: crates/connector-secrets/src/file.rs
 - confidence: cited
+  path: crates/connector-secrets/src/file/format.rs
+- confidence: cited
   path: crates/connector-secrets/src/file/prepared.rs
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
@@ -40,7 +42,7 @@ scope:
   path: docs/design/19-the-cli-surface.md
 - confidence: cited
   path: ess/system/components.yaml
-revision: 24
+revision: 28
 ---
 # Story: the binary says what it carries
 
@@ -107,6 +109,28 @@ Every inferred location was confirmed; none was wrong. The approved brief had al
 
 The independent adversary added `crates/connectors-cli/tests/upgrade_adversary.rs` (embedding, parser ownership, output-option placement) and `crates/connectors-console/tests/upgrade_adversary.rs` (actual credential transition and reopening), committed at `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`. These two cited verification paths bring the final typed scope to 16 paths. The native syscall probe remains a recorded external verifier rather than adding an undeclared strace prerequisite to Cargo tests.
 
+Full-gate correction at `0f2f5c64a63bd05ec016207288e694e8dd2c21d8` adds the confirmed owner `crates/connector-secrets/src/file/format.rs:4,12,13,20`. The earlier file.rs:102 helper location is superseded by `file.rs:74,83,84`: module registration, public reexport and imports. Existing v1 constants and helper move into the new 22-line module; v2 remains in the unchanged prepared.rs. The parent is 2617 lines against its unchanged 2625 ceiling. Final typed scope is 17 paths; no test or waiver changed in this correction.
+
+## Scope
+
+Confirmed by the implementor against unit commit `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. This replaces the original mixed cited/inferred scope: all four inferred locations were confirmed, credential ambiguity was resolved in the approved brief, and main.rs was added after a measured startup socketpair. These corrections supersede the earlier medium-confidence scoping language.
+
+| Scope hypothesis | Source confirmation |
+| --- | --- |
+| Inferred console registration | Confirmed existing registry; new registration `crates/connectors-console/src/lib.rs:47`. |
+| Inferred console report owner | Confirmed reporting pattern in `crates/connectors-console/src/providers.rs`; new report `crates/connectors-console/src/upgrade.rs:11`. |
+| Inferred session export | Existing identity exports `crates/connectors-client/src/lib.rs:28`; alias at line 31 uses owning constant `identity.rs:37`. |
+| Inferred real CLI test location | Confirmed existing integration suite; new tests `crates/connectors-cli/tests/upgrade.rs:67,106,122,142,159,179`. |
+| Cited parser and output owner | `crates/connectors-cli/src/lib.rs:235,769,817,853,962`; shared output handling preserves closed-pipe success and other write failures. |
+| Cited credential owners | `crates/connector-secrets/src/file.rs:102` exports both formats; `file/prepared.rs:19,21` derives v2 from the unchanged parser/writer header. |
+| Cited catalog owner, unchanged | `crates/catalog-reader/src/lib.rs:316,321,561`; metadata comes from embedded bytes. |
+| Cited contract/accounting | Three assigned exception copies updated; `ess/system/components.yaml:172` and `docs/design/19-the-cli-surface.md:83,111,121,273` account for 28 exceptions. |
+| Measured scope correction | Unconditional Tokio in `crates/connectors-cli/src/main.rs` created a socketpair. Coordinator applied the exact `main-runtime.patch`; main now uses the same clap tree before constructing Tokio. |
+
+Every inferred location was confirmed; none was wrong. The approved brief had already resolved credential-format ambiguity. Public async `run_from`, moved-path notices, help/errors and the normal fallback remain; no broad startup refactoring was made.
+
+The independent adversary added `crates/connectors-cli/tests/upgrade_adversary.rs` (embedding, parser ownership, output-option placement) and `crates/connectors-console/tests/upgrade_adversary.rs` (actual credential transition and reopening), committed at `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`. These two cited verification paths bring the final typed scope to 16 paths. The native syscall probe remains a recorded external verifier rather than adding an undeclared strace prerequisite to Cargo tests.
+
 ## Scope
 
 Confirmed by the implementor against unit commit `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. This replaces the original mixed cited/inferred scope: all four inferred locations were confirmed, credential ambiguity was resolved in the approved brief, and main.rs was added after a measured startup socketpair. These corrections supersede the earlier medium-confidence scoping language.
@@ -128,3 +152,11 @@ Every inferred location was confirmed; none was wrong. The approved brief had al
 ## Runtime-startup scope correction, 2026-09-07
 
 The implementor measured an AF_UNIX socket pair created by unconditional Tokio startup in `crates/connectors-cli/src/main.rs:5`, before command dispatch. Its pre-change executable also fails with exit 101 when `TOKIO_WORKER_THREADS=0`; the raw evidence is retained in the unit scratch `red-runtime-startup.log`. This violates the accepted socket-free diagnostic behavior even though the report itself is pure. Add `crates/connectors-cli/src/main.rs` as cited scope: use the same clap tree to dispatch this synchronous report before starting Tokio, while preserving the public async embedding entry point and normal fallback behavior. The coordinator applies the implementor's reviewed main-entry patch; this is a bounded implementation correction within the approved story.
+
+## Full-gate correction: credential format ownership
+
+Rehearsal 34118426365 tested integration `49ec5f3b56a3a0a78de71b14a9aac88d41448d98`. Eleven workspace jobs and shared checks succeeded; root job 101730626671 failed `architecture_fence::production_modules_obey_the_named_size_fence` at `crates/catalog-build/tests/main/architecture_fence.rs:427`. Its exact diagnostic reports `crates/connector-secrets/src/file.rs` at 2634 lines against the existing 2625-line ceiling. The unit added nine lines there. Root test-main ran 85 passing cases and one failure, then Cargo exited 101; subsequent root test targets were not proved by this failed run. Raw native job log is retained as `rehearsal-root.log` in coordinator scratch.
+
+This is an introduced structural regression found by the whole gate after the first adversary pass. The existing size waiver explicitly admits no growth. The correction extracts the v1 format constants and compiled-format helper into a focused `crates/connector-secrets/src/file/format.rs`, retaining the existing public `file::supported_format_versions` entry point and exact parser/writer bytes. The original module imports/reexports that owner. No size threshold or assertion is raised or removed. The new module path is inferred until implementation confirmation.
+
+The same implementor receives this correction; focused architecture-fence and affected regression/lint checks must pass. A second adversary pass reviews the corrected unit, within the two-attack budget. The failed rehearsal is superseded and cancelled; no base merge, version bump or release cut has occurred.

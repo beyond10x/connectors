@@ -2,13 +2,13 @@
 format: aep.planning-md/1
 id: runbook:small-wave-after-0-7-0
 kind: runbook
-status: draft
+status: active
 title: 'Next small wave: inspect the installed binary'
 tags:
 - wave-small
 relations:
 - delivers: story:the-binary-says-what-it-carries
-revision: 14
+revision: 20
 ---
 # Next small wave: inspect the installed binary
 
@@ -1658,12 +1658,42 @@ The four-mode native syscall probe is retained in review scratch rather than com
 
 ## Concurrent release preparation
 
-Read-only inspection found another active managed checkout, `~/.local/state/worktree/trees/b10x/connectors/connectors-upgrade-20260907`, based on `9f2a361b5751ac1d1fcbdce06a0a09e9ce741db1`, with uncommitted Cargo version 0.7.1 and a CHANGELOG section for broader incremental Jira/Confluence/GitLab reads. Those changes are owned by another session; this run does not copy, reset, merge or clean that worktree.
+## Concurrent release preparation
 
-v0.7.1 remains this task's provisional release number, not a reserved tag. The coordinator will recheck remote main and published tags immediately before release work. If v0.7.1 has already shipped, this approved feature uses the next available patch release, with planning and notes updated to the actual version. No published tag is replaced. The user authorized releasing the approved feature, without requiring a particular version number, and has been informed of this concurrency handling.
+The concurrent source-read work reached remote main `5c93cc661e6dc634ebdd900981258c7bfab1b983` and created the v0.7.1 tag. This run therefore selects **v0.7.2** for the approved inspection feature, preserving the published source-read changes and earlier fixes. The user was informed; their release authorization names the feature, not a mandatory version number. The v0.7.1 tag is not replaced.
+
+The release story/task retain their original immutable 0.7.1 IDs as planning history; native `artifact set` updates their visible titles and summaries to 0.7.2. This avoids inventing a second release task for the same approved work. Acceptance and consumer notes now name 0.7.2. Before the next full gate, the integration branch incorporates the exact published main source above, including its unchanged release workflow and new source-installation contract guidance in AGENTS.md. No installed CLI is replaced by this release task.
 
 ## Green unit integration checkpoint
 
 Separate adversary thread resume_gitlab returned no product findings and released the compiler lane. Final native suites executed 151 CLI and 111 console cases, all passing; strict Clippy and formatting exited 0. The final test fixture lifetime correction was checked by its single case, test-target Clippy and formatting without repeating the full suite. The raw report is being finalized in the assigned review scratch; no further source/build work is delegated.
 
 Retained independent cases are committed at `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`, following implementation `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. Both commits have the verified bot author and committer. No product correction or second attack was required. Integration proceeds on that green unit, with the full 12-workspace native release-workflow rehearsal next. The release number is still provisional pending concurrent publication.
+
+## Independent review record and full gate
+
+`review-result:inspect-upgrade-adversary-1-20260907` records the completed attack with an empty findings block. Outcome counts are no-op 1, fixed 0, escalated 0; there were no product findings or product corrections and no second attack. The raw report SHA256 is `c95de42f34c0d42072736432611a7eb14511a3b4096de8dfc4ec7660da23d69e`; its 301-member evidence manifest SHA256 is `967fb3e3e5975fc0efea9cca1bdc8915bbd658f2a12f46b08be16aab918118bc`. Coordinator verified the two source hashes against test commit `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`.
+
+Green unit integration is `49ec5f3b56a3a0a78de71b14a9aac88d41448d98`, published with verified bot author and committer. PR: https://github.com/beyond10x/connectors/pull/23. Native release-workflow rehearsal: https://github.com/beyond10x/connectors/actions/runs/34118426365. It is running against that exact integration commit, with all twelve native workspace shards, shared checks and four Unix binary builds. Manual dispatch intentionally does not publish a release. A successful final result has not yet been observed.
+
+## Native AEP empty-findings observation
+
+`aep plan artifact validate` with protocol 0.54.0 exits 0 and prints valid, but adds `review-result:inspect-upgrade-adversary-1-20260907` to its “recorded no findings block” warning despite the stored body ending with the explicit fenced YAML list `[]`. Coordinator read both the stored Markdown and `artifact show --format json`; the exact empty block is present. `artifact findings story:the-binary-says-what-it-carries --format json` reports one review and empty carried/new/resolved arrays. The record follows the adversary charter; no finding is invented to silence this diagnostic. This is a recorded tooling limitation, not a product issue or a reason to bypass AEP.
+
+## Full-gate correction: credential format ownership
+
+Rehearsal 34118426365 tested integration `49ec5f3b56a3a0a78de71b14a9aac88d41448d98`. Eleven workspace jobs and shared checks succeeded; root job 101730626671 failed `architecture_fence::production_modules_obey_the_named_size_fence` at `crates/catalog-build/tests/main/architecture_fence.rs:427`. Its exact diagnostic reports `crates/connector-secrets/src/file.rs` at 2634 lines against the existing 2625-line ceiling. The unit added nine lines there. Root test-main ran 85 passing cases and one failure, then Cargo exited 101; subsequent root test targets were not proved by this failed run. Raw native job log is retained as `rehearsal-root.log` in coordinator scratch.
+
+This is an introduced structural regression found by the whole gate after the first adversary pass. The existing size waiver explicitly admits no growth. The correction extracts the v1 format constants and compiled-format helper into a focused `crates/connector-secrets/src/file/format.rs`, retaining the existing public `file::supported_format_versions` entry point and exact parser/writer bytes. The original module imports/reexports that owner. No size threshold or assertion is raised or removed. The new module path is inferred until implementation confirmation.
+
+The same implementor receives this correction; focused architecture-fence and affected regression/lint checks must pass. A second adversary pass reviews the corrected unit, within the two-attack budget. The failed rehearsal is superseded and cancelled; no base merge, version bump or release cut has occurred.
+
+## Corrected unit and second attack
+
+The same implementor completed the focused extraction at `0f2f5c64a63bd05ec016207288e694e8dd2c21d8`, with verified bot author and committer. Coordinator read its two-file diff and unchanged tests/waiver, then checked its native logs. The exact existing module fence passed 1 selected case (85 filtered); secrets/client passed 125, console passed 111, CLI upgrade passed 6. Total selected local cases: 243. Strict connector-secrets Clippy, final formatting and whitespace checks exited 0. Original formatting refusal remains preserved; final ordering passed. Raw correction report and correction-*.log records are under the assigned unit scratch.
+
+Final reported unit targets total 5,321,617,408 bytes (4.956 GiB); free disk at handoff was 74,540,978,176 bytes, above the 20 GB floor. No parser/writer bytes, public API, test assertions or ceiling changed. The implementor froze source and released the compiler lane.
+
+Second and final adversary dispatch reuses resume_gitlab against corrected commit 0f2f5c64. Reports/probes use `~/.cache/cw7/upgrade/adversary-2`; the coordinator created private TMPDIR `~/.cache/cw7/a2` at mode 0700. It reuses the unit's targets and one compiler lane. No third attack is authorized by this wave's review budget. The adversary is instructed to compare the extraction and actual output with the retained prior source/bytes, without broad unrelated retesting or implementation edits.
+
+The first CI run is now observed terminal: `status=completed`, `conclusion=cancelled`, and no job remains running. Its eleven non-root workspace jobs and shared checks succeeded; root failed, and all four binary-build jobs were cancelled. Normal cancellation did not stop the workflow's always-conditioned build jobs; native `gh run cancel --force` completed their cancellation. Final job/step JSON is retained as `rehearsal-failed-final.json` in coordinator scratch. This superseded run is never treated as a full green gate.
