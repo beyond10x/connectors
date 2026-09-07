@@ -62,12 +62,83 @@ impl KubernetesLocalBackend {
             .values()
             .find(|candidate| candidate.context_name == selected)
             .ok_or(KubernetesLocalError::EndpointSource)?;
-        self.activate(CandidateActivateRequest {
-            candidate_ref: candidate.summary.candidate_ref.clone(),
-            label: selected.to_owned(),
-        })
+        let kubeconfig = Kubeconfig::read().map_err(|_| KubernetesLocalError::EndpointSource)?;
+        let fresh = binding_for_context(&kubeconfig, selected)
+            .ok_or(KubernetesLocalError::EndpointSource)?;
+        if fresh.evidence_material != candidate.evidence_material
+            || context_uses_credential_plugin(&kubeconfig, selected) && !self.policy.allow_exec_auth
+        {
+            return Err(KubernetesLocalError::EndpointSource);
+        }
+        // Config construction reads trusted local files only. Helpers and API access belong to
+        // the owned refresh/invocation task, so an offline cluster cannot stall daemon startup.
+        let mut config = Config::from_custom_kubeconfig(
+            kubeconfig,
+            &KubeConfigOptions {
+                context: Some(selected.to_owned()),
+                ..KubeConfigOptions::default()
+            },
+        )
         .await
         .map_err(|_| KubernetesLocalError::EndpointSource)?;
+        config.proxy_url = None;
+        config.connect_timeout = Some(std::time::Duration::from_secs(5));
+        let client = Client::try_from(config).map_err(|_| KubernetesLocalError::EndpointSource)?;
+        let connection_ref = opaque_ref(
+            "connection:kubernetes:",
+            &format!(
+                "{}\0{}",
+                candidate.summary.candidate_ref, candidate.evidence_material
+            ),
+        );
+        let store = self
+            .endpoint_state
+            .as_ref()
+            .ok_or(KubernetesLocalError::EndpointSource)?;
+        let egress = self
+            .endpoint_egress
+            .as_ref()
+            .ok_or(KubernetesLocalError::EndpointSource)?;
+        let source = Arc::new(
+            KubernetesEndpointSource::new(
+                client.clone(),
+                connection_ref.clone(),
+                self.policy.namespaces.iter().cloned().collect(),
+                self.policy.all_namespaces,
+                self.policy.target_grants.clone(),
+                store.clone(),
+                EndpointPlacement::Local,
+            )
+            .map_err(|_| KubernetesLocalError::EndpointSource)?,
+        );
+        let backend = KubernetesEndpointBackend::new(
+            source,
+            EndpointPrincipalPolicy::Local(Arc::new(self.owner.clone())),
+            egress.clone(),
+        )
+        .refresh_on_start();
+        let description = ConnectionDescription {
+            summary: ConnectionSummary {
+                connection_ref: connection_ref.clone(),
+                integration_ref: KUBERNETES.to_owned(),
+                label: selected.to_owned(),
+                state: ConnectionState::Authorized,
+                initiation: initiation(self.policy.initiation),
+                route: ConnectionRoute::Direct,
+                scope: None,
+                actor: None,
+                auth_profile: None,
+            },
+            channels: Vec::new(),
+        };
+        let mut state = lock(&self.state);
+        state.candidate_connections.insert(
+            candidate.summary.candidate_ref.clone(),
+            connection_ref.clone(),
+        );
+        state.clients.insert(connection_ref.clone(), client);
+        state.connections.insert(connection_ref, description);
+        *lock(&self.endpoint_backend) = Some(Arc::new(backend));
         Ok(())
     }
 
