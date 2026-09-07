@@ -9,7 +9,18 @@ refs:
   reference: S-007
 relations:
 - derived_from: epic:build-order
-revision: 1
+scope:
+- confidence: cited
+  path: crates/catalog-build/tests/main
+- confidence: cited
+  path: crates/connectors-runtime
+- confidence: cited
+  path: crates/identity-http
+- confidence: cited
+  path: crates/server
+- confidence: cited
+  path: crates/service
+revision: 7
 ---
 ## Acceptance
 
@@ -77,3 +88,16 @@ Migrated from `docs/stories/S-007-m2-the-platform-skeleton-serves.md`, which is 
 - First written 2026-08-13 · last touched 2026-08-15 · 5 revision(s)
 - Legacy id `S-007`, recorded as the reference `legacy:S-007`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper`, read-only against `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+
+- **Primary surface:** `crates/server` — cited; local serving exists in `src/local.rs:27`, hosted admission in `src/hosted.rs:297`, and HTTP routing in `src/hosted/routing.rs:136`. Reconcile the milestone against these owners; no server scaffolding is needed.
+- **Principal boundary:** `crates/service` — cited; `src/runtime.rs:101` owns `PrincipalContext`, but its public `hosted` constructor still accepts tenant and subject separately at `:139`.
+- **Identity integration:** `crates/identity-http` — cited; `src/adapter.rs:19` owns the verifier, currently configured through origin and expected tenant at `:67`. The requested owner-bundle/trust-domain/deployment/revocation contract requires comparison with this implementation.
+- **Composition:** `crates/connectors-runtime` — cited; `src/composition.rs:713` constructs the hosted verifier; this is the current deployment-composition owner.
+- **Fences:** `crates/catalog-build/tests/main` — cited; `dependency_fence.rs:117` classifies the platform crates, and `architecture_fence.rs:391` enforces the named module-size fence.
+- **Documents:** milestone acceptance needs reconciliation before scheduling implementation — inferred; its command spelling and unsupported-platform fallback predate the current release.
+- **Confidence:** medium — inferred; existing owners and several acceptance mismatches are located, but a complete milestone conformance audit is outstanding.
+- **Would collide with:** hosted routes/admission, principal construction, Identity verification, runtime composition and architecture/dependency fences — inferred.

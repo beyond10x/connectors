@@ -9,7 +9,14 @@ refs:
   reference: S-072
 relations:
 - derived_from: epic:subscription-custody
-revision: 1
+scope:
+- confidence: cited
+  path: crates/integration-catalog
+- confidence: inferred
+  path: crates/server
+- confidence: inferred
+  path: crates/service
+revision: 4
 ---
 ## Acceptance
 
@@ -47,3 +54,15 @@ Migrated from `docs/stories/S-072-the-anthropic-api-key-arrives-through-a-connec
 - First written 2026-08-25 · last touched 2026-08-25 · 1 revision(s)
 - Legacy id `S-072`, recorded as the reference `legacy:S-072`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper`, read-only against `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+
+- **Primary surface:** `crates/integration-catalog` — cited; `src/hosted.rs:628` discards verification failure details and `:910` owns completion messaging. Existing Anthropic session fixtures begin at `:1093`; scope remaining work to verification outcomes and missing acceptance coverage.
+- **Completion contract:** `crates/service` — inferred; `src/runtime.rs:494` defines the closed `HostedCompletionError` vocabulary, which currently cannot carry a named verification reason.
+- **HTTP boundary:** `crates/server` — inferred; `src/hosted/connect.rs:141` maps completion outcomes to responses and would carry any added bounded, value-free verification diagnosis.
+- **Already present:** declared acquisition, provider-selected verification, stored fingerprint/time, expiring capability-bound sessions, and Anthropic credential-isolation fixtures — cited.
+- **Documents:** no standalone documentation change required — cited.
+- **Confidence:** medium — inferred; concrete residual behavior is located, but terminal-event delivery and personal-posture equivalence remain unestablished.
+- **Would collide with:** generic hosted catalog completion, shared completion-error vocabulary, browser completion responses and their fixtures — inferred.

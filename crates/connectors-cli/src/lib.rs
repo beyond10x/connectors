@@ -233,6 +233,8 @@ struct PersonalOAuthArgs {
 
 #[derive(Debug, Subcommand)]
 enum InspectCommand {
+    /// Compiled versions, supported storage formats, and source installation guidance.
+    Upgrade,
     /// What is configured, what is running, and what cannot work.
     Doctor {
         #[arg(long)]
@@ -759,10 +761,32 @@ pub fn moved(
     Some((old, new))
 }
 
+/// Run a self-contained inspection without creating an async runtime, argv[0] included.
+///
+/// Returns `None` for commands that need the normal entry point, including clap's help and
+/// error handling. Parsing still belongs to the same clap tree. In particular, an upgrade
+/// report must not start Tokio's I/O driver, which creates a socket pair before dispatch.
+pub fn run_without_runtime_from<I, T>(arguments: I) -> Option<std::process::ExitCode>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    let cli = Cli::try_parse_from(arguments).ok()?;
+    if !matches!(
+        cli.command,
+        Command::Inspect {
+            command: InspectCommand::Upgrade
+        }
+    ) {
+        return None;
+    }
+    Some(finish_run(cli.output, None, report_upgrade(cli.output)))
+}
+
 /// Run the Connectors command line over the arguments given, argv[0] included.
 ///
-/// The caller owns the async runtime: the `connectors` binary makes one with `#[tokio::main]`, and
-/// Zwirn makes one for the duration of the call.
+/// The caller owns the async runtime. The binary first tries [`run_without_runtime_from`]
+/// and creates a runtime only for the remaining commands; Zwirn owns the runtime of its call.
 pub async fn run_from<I, T>(arguments: I) -> std::process::ExitCode
 where
     I: IntoIterator<Item = T>,
@@ -787,7 +811,15 @@ where
         | Command::Operation { target, .. } => Some(target.as_str()),
         _ => None,
     };
-    match run(cli).await {
+    finish_run(format, target, run(cli).await)
+}
+
+fn finish_run(
+    format: Format,
+    target: Option<&str>,
+    result: Result<(), MainError>,
+) -> std::process::ExitCode {
+    match result {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
             if let MainError::Refused(refusal) = &error {
@@ -816,6 +848,13 @@ fn complete_output(result: Result<(), MainError>) -> Result<(), MainError> {
 
 fn emit(format: Format, value: &serde_json::Value) -> Result<(), MainError> {
     complete_output(output::emit(format, value).map_err(Into::into))
+}
+
+fn report_upgrade(format: Format) -> Result<(), MainError> {
+    emit(
+        format,
+        &connectors_console::upgrade::run(env!("CARGO_PKG_VERSION")),
+    )
 }
 
 fn emit_targeted(format: Format, value: &serde_json::Value, target: &str) -> Result<(), MainError> {
@@ -920,6 +959,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             }
         },
         Command::Inspect { command } => match command {
+            InspectCommand::Upgrade => report_upgrade(format),
             InspectCommand::Doctor { config, state_root } => diagnose(format, config, state_root),
             InspectCommand::Providers { query } => {
                 emit(format, &connectors_console::providers::run(&query))?;

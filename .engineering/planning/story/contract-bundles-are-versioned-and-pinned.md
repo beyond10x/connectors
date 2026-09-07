@@ -9,7 +9,18 @@ refs:
   reference: S-031
 relations:
 - derived_from: epic:contract-release
-revision: 1
+scope:
+- confidence: cited
+  path: .github/workflows/release.yml
+- confidence: cited
+  path: contracts
+- confidence: cited
+  path: crates/protocol/examples
+- confidence: inferred
+  path: crates/protocol/src
+- confidence: cited
+  path: crates/protocol/tests/bundles.rs
+revision: 7
 ---
 ## Acceptance
 
@@ -43,3 +54,17 @@ Migrated from `docs/stories/S-031-contract-bundles-are-versioned-and-pinned.md`,
 - First written 2026-08-13 · last touched 2026-08-13 · 2 revision(s)
 - Legacy id `S-031`, recorded as the reference `legacy:S-031`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` through read-only inspection — cited.
+
+- **Primary surface:** `contracts` — cited; existing versioned manifests, schemas, vectors and accompanying contract documentation.
+- **Generators:** `crates/protocol/examples` — cited; existing bundle generators assemble and hash manifest contents.
+- **Conformance:** `crates/protocol/tests/bundles.rs:37` — cited; bundle hash verification and protocol/vector conformance.
+- **Evolution rules:** `crates/protocol/src` — inferred; request, response, event and channel readers may require changes after acceptance is reconciled with existing strict readers.
+- **Release:** `.github/workflows/release.yml:257` — cited; artifact packaging/publication, mutable action references, and the missing signed release evidence.
+- **Documents:** contract READMEs within the primary surface — cited.
+- **Symbols:** `Bundle`, `BundleFile`, `check` — cited.
+- **Confidence:** medium — inferred; existing owners are clear, but signing infrastructure and independent consumer ownership remain unspecified.
+- **Would collide with:** contract/schema releases, protocol generators/readers/conformance, and release workflow changes — inferred.

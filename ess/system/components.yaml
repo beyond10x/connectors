@@ -165,10 +165,11 @@ components:
     # is `the_exception_list_is_the_set_the_specification_enumerates`, which requires
     # `UNSPECIFIED_PATHS` to carry exactly these paths with exactly these kinds. Thirteen of the
     # kinds are also derived from the tree and do not rest on this list at all — see
-    # docs/design/19-the-cli-surface.md for which, and for why the other fourteen cannot be.
+    # docs/design/19-the-cli-surface.md for which, and for why the other fifteen cannot be.
     #   unspecified-path: setup init — lifecycle
     #   unspecified-path: setup connect — flow
     #   unspecified-path: setup completions — unmodelled
+    #   unspecified-path: inspect upgrade — read
     #   unspecified-path: inspect doctor — read
     #   unspecified-path: inspect providers — read
     #   unspecified-path: inspect auth — read
