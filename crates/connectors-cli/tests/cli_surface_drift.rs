@@ -94,6 +94,11 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
     ),
     // Under `inspect`.
     (
+        "inspect upgrade",
+        Unspecified::Read,
+        "a read of compiled versions and supported formats; no installation state is opened",
+    ),
+    (
         "inspect doctor",
         Unspecified::Read,
         "a read of the installation; no entity moves",
