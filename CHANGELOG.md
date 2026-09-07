@@ -11,6 +11,20 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.7.1 — 2026-09-07
+
+- Add bounded Jira issue search, project inventory and paginated comment reads; Confluence
+  page searches with explicit continuation; and GitLab activity, issue, merge-request,
+  pipeline, deployment and commit reads. Preserve stable source identities and revisions,
+  validate bounds before credential access, retain comment visibility metadata and omit provider
+  identity objects.
+- Keep the incremental contracts aligned across personal catalog and native hosted adapters,
+  including required deployment ordering when update-date filters are used.
+- Preserve structured rate-limit advice when incremental reads request pagination headers.
+- Keep generated catalog operations callable when their provider has no optional Connection
+  remediation metadata, and make expired authentication recovery fail consistently.
+- Document complete consumer-contract checks before upgrading a source-built installation.
+
 ## 0.7.0 — 2026-09-07
 
 - Catalog write discovery now considers every admitting Connection, so an earlier read-only

@@ -18,7 +18,7 @@ inside the service and checks each request against the caller's authority and se
 operations depend on the deployment, provider adapter, Connection, and Grant. Full SaaS and
 satellite federation remain outside the current support claim.
 
-Read [what's new in v0.7.0](https://github.com/beyond10x/connectors/blob/main/WHATS-NEW.md)
+Read [what's new in v0.7.1](https://github.com/beyond10x/connectors/blob/main/WHATS-NEW.md)
 for user-facing release highlights and upgrade notes.
 
 ## See the system
@@ -72,6 +72,19 @@ The provider guides explain the supported connection paths and their credential 
 
 For hosted operation, continue with [Integration administration](docs/guides/administer-hosted-integrations.md).
 For installation, configuration, and prerequisites, see [Deployment and runtime](docs/architecture/deployment.md).
+
+## Collect changes over time
+
+Bounded reads support Jira issue changes and comments, Confluence page changes, and GitLab
+project activity, issues, merge requests, pipelines, deployments and commits. Each operation
+describes its time filters and continuation fields. Follow every page, retain the same window
+while paging, and deduplicate overlapping results by their source identity and revision.
+An empty or partial page does not prove that a whole source has been collected.
+
+Use `connectors operation search` and a fresh `connectors operation describe` to check the
+operations admitted by your deployment. Before replacing a source-built installation, compare
+the operations your application actually uses with the candidate; a working account probe alone
+does not establish compatibility. Upgrade the CLI and its local daemon together.
 
 ## Contracts and implementation
 
