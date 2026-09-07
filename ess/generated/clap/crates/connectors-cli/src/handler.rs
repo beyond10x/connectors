@@ -1,6 +1,6 @@
 // generated from connectors v1
-// model digest 92d00f77341a93351ebb20ce24412c86947ef6a36dfe66fa4cebae0cab13e13a
-// contract digest a721680ab8e341cf3170805a2fa8ab211d3965b1d68dc7ef001bb77709e339ae
+// model digest 28b7f4588abf0f2922e31dd0e2731da2dedc3b13e15798da7658566d5e9f489c
+// contract digest dad28d01b32983092de2e0ba4fd965b5c88a7c200d85f9185debc6d844d8d838
 // do not edit: regenerate with `cargo xtask synth --target clap`
 
 

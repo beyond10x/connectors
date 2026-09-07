@@ -472,6 +472,29 @@ impl ConnectorBackend for DeployedServiceBackend {
         self.inner.owns_connection(request)
     }
 
+    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+        self.inner.owns_endpoint(request)
+    }
+
+    async fn handle_endpoint(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::endpoint::EndpointRequest,
+    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        self.inner.handle_endpoint(context, request).await
+    }
+
+    async fn resolve_endpoint(
+        &self,
+        context: &PrincipalContext,
+        endpoint_ref: &str,
+        operation_ref: &str,
+    ) -> Result<String, OperationError> {
+        self.inner
+            .resolve_endpoint(context, endpoint_ref, operation_ref)
+            .await
+    }
+
     fn connect_session_access(
         &self,
         request: &protocol::connection::ConnectSessionCreateRequest,

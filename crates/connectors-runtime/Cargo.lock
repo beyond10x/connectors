@@ -729,6 +729,7 @@ version = "0.7.2"
 dependencies = [
  "async-trait",
  "axum",
+ "catalog",
  "connector-secrets",
  "connector-state",
  "connectors-config",
@@ -761,7 +762,9 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tokio-rustls",
+ "toml",
  "url",
+ "zeroize",
 ]
 
 [[package]]
@@ -3528,6 +3531,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "url",
+ "zeroize",
 ]
 
 [[package]]

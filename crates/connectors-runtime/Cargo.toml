@@ -45,6 +45,7 @@ sip = ["dep:integration-sip"]
 
 [dependencies]
 async-trait = "0.1"
+catalog = { version = "0.7.2", path = "../catalog" }
 axum = { version = "0.8", features = ["json", "tokio"] }
 connector-secrets = { version = "0.7.2", path = "../connector-secrets" }
 connector-state = { version = "0.7.2", path = "../connector-state" }
@@ -68,6 +69,9 @@ hex = "0.4"
 protocol = { version = "0.7.2", path = "../protocol" }
 rustix = { version = "1.1.4", features = ["process"] }
 serde_json = "1"
+toml = "0.8"
+tempfile = "3"
+zeroize = "1"
 server = { version = "0.7.2", path = "../server" }
 service = { version = "0.7.2", path = "../service" }
 sha2 = "0.10"

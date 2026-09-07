@@ -36,6 +36,7 @@ url = "2"
 zeroize.workspace = true
 
 [dev-dependencies]
+connector-resolve.workspace = true
 connector-secrets.workspace = true
 tokio = { workspace = true, features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
 tower = { version = "0.5", features = ["util"] }
