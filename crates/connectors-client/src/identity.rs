@@ -319,6 +319,19 @@ pub struct AuthenticatedHostedClient {
 }
 
 impl AuthenticatedHostedClient {
+    /// Acquire a hosted token Connection using the saved principal's ordinary Identity scopes.
+    /// The provider credential is read privately; no local configuration or session is changed.
+    pub async fn connect_with_credential_file(
+        &self,
+        request: connection::ConnectSessionCreateRequest,
+        credential_file: &Path,
+    ) -> Result<connection::ConnectionDescription, AuthenticatedHostedError> {
+        crate::hosted_connect::connect(&self.hosted, request, credential_file, |request| {
+            self.connection(request)
+        })
+        .await
+    }
+
     /// Open the selected hosted deployment. No network access occurs until a request is sent.
     pub fn active() -> Result<Self, IdentityError> {
         let session = active_session_metadata()?.ok_or(IdentityError::NoActiveLogin)?;

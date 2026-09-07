@@ -16,7 +16,9 @@ identity-client.workspace = true
 jsonschema.workspace = true
 keyring.workspace = true
 protocol.workspace = true
-reqwest.workspace = true
+# Hosted development and private deployments use the operator's normal CA trust, including
+# SSL_CERT_FILE. Certificate and hostname verification remain enabled.
+reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
 rustix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -28,5 +30,7 @@ zeroize.workspace = true
 
 [dev-dependencies]
 axum.workspace = true
+rcgen = "0.13.2"
 tempfile = "3"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
