@@ -698,6 +698,45 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
             };
             serde_json::to_vec(&response).map_err(io::Error::other)?
         }
+        protocol::event::v2::CONTRACT => {
+            use protocol::event::v2;
+            if frame.len() > v2::MAX_FRAME_BYTES {
+                return Ok(None);
+            }
+            let request: v2::RequestEnvelope = match serde_json::from_slice(frame) {
+                Ok(value) => value,
+                Err(_) => return Ok(None),
+            };
+            if request.validate().is_err() {
+                return Ok(None);
+            }
+            let context = match PrincipalContext::local(&request.context) {
+                Ok(value) => value,
+                Err(_) => return Ok(None),
+            };
+            let response = match backend
+                .handle_event_v2(&context, request.request.clone())
+                .await
+            {
+                Ok(result) if result.matches(&request.request) => {
+                    v2::ResponseEnvelope::success(&request.request_id, result)
+                }
+                Ok(_) => v2::ResponseEnvelope::failure(
+                    &request.request_id,
+                    v2::EventError::new(
+                        v2::EventErrorCode::Protocol,
+                        "subscription backend returned an unrelated result",
+                        false,
+                    ),
+                ),
+                Err(error) => v2::ResponseEnvelope::failure(&request.request_id, error),
+            };
+            let response = match response.validate() {
+                Ok(()) => response,
+                Err(error) => v2::ResponseEnvelope::failure(request.request_id, error),
+            };
+            serde_json::to_vec(&response).map_err(io::Error::other)?
+        }
         protocol::event::CONTRACT => {
             let request: protocol::event::RequestEnvelope = match serde_json::from_slice(frame) {
                 Ok(request) => request,
@@ -1314,6 +1353,46 @@ mod tests {
 
         assert!(backend.connection_called.load(Ordering::Acquire));
         assert!(backend.event_called.load(Ordering::Acquire));
+    }
+
+    #[tokio::test]
+    async fn event_v2_local_dispatch_retains_reads_without_lifecycle_fallthrough() {
+        use protocol::event::v2;
+        let backend = Arc::new(SyntheticBackend::default());
+        let mut request = v2::RequestEnvelope {
+            protocol: v2::CONTRACT.into(),
+            request_id: "request:event-v2".into(),
+            context: context(),
+            request: v2::EventRequest::Search(protocol::event::SearchRequest {
+                query: String::new(),
+                limit: 10,
+            }),
+        };
+        let bytes = serde_json::to_vec(&request).unwrap();
+        let bytes = dispatch_frame(&bytes, v2::CONTRACT, backend.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        let response: v2::ResponseEnvelope = serde_json::from_slice(&bytes).unwrap();
+        response.validate().unwrap();
+        assert!(response.response.unwrap().matches(&request.request));
+        assert!(backend.event_called.load(Ordering::Acquire));
+        backend.event_called.store(false, Ordering::Release);
+        request.request = v2::EventRequest::Unsubscribe(v2::UnsubscribeRequest {
+            subscription_ref: "subscription:unowned".into(),
+        });
+        let bytes = serde_json::to_vec(&request).unwrap();
+        let response = dispatch_frame(&bytes, v2::CONTRACT, backend.clone())
+            .await
+            .unwrap()
+            .unwrap();
+        let response: v2::ResponseEnvelope = serde_json::from_slice(&response).unwrap();
+        assert_eq!(response.error.unwrap().code, v2::EventErrorCode::NotFound);
+        assert!(!backend.event_called.load(Ordering::Acquire));
+        assert!(dispatch_frame(&bytes, protocol::event::CONTRACT, backend)
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
