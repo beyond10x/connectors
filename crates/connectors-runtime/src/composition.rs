@@ -230,7 +230,7 @@ impl PersonalRuntime {
         state_root: PathBuf,
         supplied_stores: Option<PersonalCredentialStores>,
     ) -> Result<Self, RuntimeError> {
-        let composed = Self::compose(config_path, state_root, supplied_stores, true).await?;
+        let composed = Self::compose(config_path, state_root, supplied_stores).await?;
         let mut daemon =
             match LocalOperationDaemon::bind_owned(composed.ownership, composed.registry.clone())
                 .await
@@ -260,13 +260,9 @@ impl PersonalRuntime {
         config_path: Option<&Path>,
         state_root: PathBuf,
         supplied_stores: Option<PersonalCredentialStores>,
-        persistent: bool,
     ) -> Result<PersonalComposition, RuntimeError> {
         validate_state_root(&state_root)?;
         let ownership = LocalStateOwnership::acquire(state_root.join("connectors.sock"))?;
-        if !persistent {
-            ownership.require_absent_socket()?;
-        }
         // The local dispatch seam's one-time claim (S-048): an approval-demanding invocation
         // presenting an `event:` reference spends it exactly once, durably, before any
         // Integration is reached. Wired for every personal placement — the journal exists from
@@ -308,11 +304,7 @@ impl PersonalRuntime {
                 .partition(|entry| entry.oauth.is_some());
             let stores = if let Some(stores) = supplied_stores {
                 Some(stores)
-            } else if persistent
-                || config.slack.is_some()
-                || config.grafana.is_some()
-                || !ordinary_catalog.is_empty()
-            {
+            } else {
                 // **One durable store, opened once.**
                 //
                 // The OS keyring first: a credential on a workstation should be sealed by the
@@ -335,9 +327,7 @@ impl PersonalRuntime {
                 // keyring is reachable and the first open is skipped, and refused to start
                 // anywhere without a Secret Service: a server, a container, and any placement
                 // spawned with a different `HOME` than the session that has the bus.
-                let file: Option<Arc<FileStore>> = if config.slack.is_some()
-                    || (keyring.is_none() && (persistent || !ordinary_catalog.is_empty()))
-                {
+                let file: Option<Arc<FileStore>> = if config.slack.is_some() || keyring.is_none() {
                     Some(Arc::new(
                         FileStore::open(state_root.join("credentials.store"))
                             .map_err(|_| RuntimeError::CredentialStore)?,
@@ -353,13 +343,9 @@ impl PersonalRuntime {
                     (Some(store), true) => Arc::clone(store) as Arc<dyn PreparedSecretStore>,
                     _ => Arc::new(MemoryStore::new()),
                 };
-                // Catalogued providers keep their credential across a restart, so the operator can
-                // delete the file it was imported from. Grafana's own store stays in memory because
-                // its credential is re-entered through a Connect Session each time.
-                let monitoring: Arc<dyn SecretStore> = if !persistent && ordinary_catalog.is_empty()
-                {
-                    Arc::new(MemoryStore::new())
-                } else if let Some(store) = &keyring {
+                // Every configured daemon owns durable credential custody, including bootstrap
+                // daemons that have no providers enrolled yet.
+                let monitoring: Arc<dyn SecretStore> = if let Some(store) = &keyring {
                     Arc::clone(store) as Arc<dyn SecretStore>
                 } else if let Some(store) = &file {
                     Arc::clone(store) as Arc<dyn SecretStore>
@@ -377,18 +363,14 @@ impl PersonalRuntime {
                     (false, false) => "memory",
                 });
                 Some(PersonalCredentialStores::new(prepared, monitoring))
-            } else {
-                None
             };
-            if persistent {
-                if let Some(stores) = &stores {
-                    setup_handler = Some(Arc::new(crate::local_setup::PersonalSetup::new(
-                        config_path.to_path_buf(),
-                        config.owner_context(),
-                        stores.monitoring.clone(),
-                        credential_backend.unwrap_or("injected").to_owned(),
-                    )));
-                }
+            if let Some(stores) = &stores {
+                setup_handler = Some(Arc::new(crate::local_setup::PersonalSetup::new(
+                    config_path.to_path_buf(),
+                    config.owner_context(),
+                    stores.monitoring.clone(),
+                    credential_backend.unwrap_or("injected").to_owned(),
+                )));
             }
 
             #[cfg(not(feature = "sip"))]
@@ -528,7 +510,7 @@ impl PersonalRuntime {
                     &oauth_catalog,
                     &state_root,
                     egress,
-                    persistent,
+                    true,
                 )
                 .await?;
                 oauth_connections = Some(oauth_catalog.len());
@@ -547,18 +529,8 @@ impl PersonalRuntime {
                     .expect("credential consumer selected the shared store")
                     .prepared
                     .clone();
-                let backend = if persistent {
-                    SlackBackend::open(owner, slack, &state_root, store, slack_egress()?).await?
-                } else {
-                    SlackBackend::open_without_supervision(
-                        owner,
-                        slack,
-                        &state_root,
-                        store,
-                        slack_egress()?,
-                    )
-                    .await?
-                };
+                let backend =
+                    SlackBackend::open(owner, slack, &state_root, store, slack_egress()?).await?;
                 slack_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
             }
@@ -570,13 +542,14 @@ impl PersonalRuntime {
         ));
         let readiness = json!({
             "ready": true,
-            "protocol": protocol::operation::CONTRACT,
+            "protocol": protocol::operation::v4::CONTRACT,
             "protocols": [
-                protocol::operation::CONTRACT,
-                protocol::connection::CONTRACT,
-                protocol::event::CONTRACT,
+                protocol::operation::CONTRACT, protocol::operation::v4::CONTRACT,
+                protocol::connection::CONTRACT, protocol::event::CONTRACT,
+                protocol::endpoint::CONTRACT, protocol::lifecycle::CONTRACT,
+                protocol::local_setup::CONTRACT,
             ],
-            "socket": persistent.then(|| state_root.join("connectors.sock")),
+            "socket": state_root.join("connectors.sock"),
             "event_reply_claims": true,
             "sip_dial_configured": sip_dial_configured,
             "voice_authority_verifying_key": verifying_key,
@@ -1377,155 +1350,5 @@ pub fn validate_state_root(root: &Path) -> Result<(), RuntimeError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::os::unix::fs::PermissionsExt as _;
-
-    use super::*;
-
-    #[test]
-    fn git_fetch_environment_override_is_atomic_and_secret_free() {
-        assert_eq!(
-            git_fetch_override_from_values(None, None, None, None).unwrap(),
-            None
-        );
-        assert!(matches!(
-            git_fetch_override_from_values(
-                Some("https://git-fetch.example.test".to_owned()),
-                None,
-                Some("/etc/connectors-git-fetch/tls.crt".to_owned()),
-                Some("/etc/connectors-git-fetch/tls.key".to_owned()),
-            ),
-            Err(HostedServerConfigError::Invalid)
-        ));
-
-        let placement = git_fetch_override_from_values(
-            Some("https://git-fetch.example.test".to_owned()),
-            Some("0.0.0.0:8443".to_owned()),
-            Some("/etc/connectors-git-fetch/tls.crt".to_owned()),
-            Some("/etc/connectors-git-fetch/tls.key".to_owned()),
-        )
-        .unwrap()
-        .unwrap();
-        assert_eq!(placement.origin, "https://git-fetch.example.test");
-        assert_eq!(placement.listen, "0.0.0.0:8443".parse().unwrap());
-        assert_eq!(
-            placement.certificate_file,
-            PathBuf::from("/etc/connectors-git-fetch/tls.crt")
-        );
-        assert_eq!(
-            placement.private_key_file,
-            PathBuf::from("/etc/connectors-git-fetch/tls.key")
-        );
-    }
-
-    #[test]
-    fn git_fetch_environment_override_refuses_an_invalid_listener() {
-        assert!(matches!(
-            git_fetch_override_from_values(
-                Some("https://git-fetch.example.test".to_owned()),
-                Some("not-a-listener".to_owned()),
-                Some("/etc/connectors-git-fetch/tls.crt".to_owned()),
-                Some("/etc/connectors-git-fetch/tls.key".to_owned()),
-            ),
-            Err(HostedServerConfigError::Invalid)
-        ));
-    }
-
-    #[tokio::test]
-    async fn empty_personal_runtime_binds_and_cleans_without_a_credential_store() {
-        let temporary = tempfile::tempdir().unwrap();
-        fs::set_permissions(temporary.path(), fs::Permissions::from_mode(0o700)).unwrap();
-        let state_root = temporary.path().join("state");
-        let runtime = PersonalRuntime::bind(None, &state_root).await.unwrap();
-        assert_eq!(runtime.readiness()["ready"], true);
-        assert_eq!(runtime.readiness()["event_reply_claims"], true);
-        assert!(state_root.join("connectors.sock").exists());
-        assert!(
-            state_root.join("event-reply-claims.sqlite").exists(),
-            "the local reply-claim journal exists from first boot"
-        );
-        assert!(!state_root.join("credentials.store").exists());
-        runtime.serve_until(std::future::ready(())).await.unwrap();
-        assert!(!state_root.join("connectors.sock").exists());
-    }
-
-    #[test]
-    fn working_tree_state_roots_are_refused() {
-        assert!(matches!(
-            validate_state_root(Path::new(env!("CARGO_MANIFEST_DIR"))),
-            Err(RuntimeError::UnsafeStateRoot)
-        ));
-    }
-
-    #[test]
-    fn a_hosted_placement_keeps_its_state_in_a_file_when_no_database_is_offered() {
-        let temporary = tempfile::tempdir().unwrap();
-        let path = temporary.path().join("connectors.sqlite3");
-        let store = hosted_state_store(
-            None,
-            Some(path.to_str().expect("a UTF-8 test path").to_owned()),
-        )
-        .expect("a named SQLite file is a complete answer to where hosted state lives");
-        store.replace("connections", b"one", 64).unwrap();
-        let read_back = store.read("connections", 64).unwrap();
-        assert_eq!(read_back.as_deref(), Some(&b"one"[..]));
-        assert!(path.exists(), "the bookkeeping went to the named file");
-    }
-
-    #[test]
-    fn naming_both_stores_is_refused_rather_than_one_of_them_quietly_winning() {
-        assert!(matches!(
-            hosted_state_store(
-                Some("postgres://localhost/connectors".to_owned()),
-                Some("/var/lib/connectors/state.sqlite3".to_owned()),
-            ),
-            Err(RuntimeError::AmbiguousHostedState)
-        ));
-    }
-
-    #[test]
-    fn naming_no_store_is_refused_rather_than_a_database_file_appearing_somewhere() {
-        assert!(matches!(
-            hosted_state_store(None, None),
-            Err(RuntimeError::MissingHostedState)
-        ));
-    }
-
-    /// A supervisor that interpolates an unset variable hands the process an empty string, not an
-    /// absent one. Treating that as a store would either dial an empty database URL or open a file
-    /// called nothing; both come up looking healthy with no bookkeeping in them.
-    #[test]
-    fn an_empty_variable_is_no_store_at_all() {
-        assert!(matches!(
-            hosted_state_store(Some(String::new()), Some("   ".to_owned())),
-            Err(RuntimeError::MissingHostedState)
-        ));
-    }
-
-    /// A path that cannot hold a database is a typo in a variable, and the person who typed it
-    /// needs to see which path the process tried rather than "state is unavailable".
-    #[test]
-    fn an_unopenable_sqlite_path_is_named_in_the_refusal() {
-        let temporary = tempfile::tempdir().unwrap();
-        let path = temporary.path().join("absent/connectors.sqlite3");
-        let path = path.to_str().expect("a UTF-8 test path").to_owned();
-        let Err(refusal) = hosted_state_store(None, Some(path.clone())) else {
-            panic!("a SQLite path under a missing directory must be refused");
-        };
-        assert!(refusal.to_string().contains(&path), "{refusal}");
-    }
-
-    /// The sentence a person reads when the placement did not say where its state lives has to name
-    /// what to set. The previous one named only the database URL, and stayed on the screen long
-    /// after a second store existed.
-    #[test]
-    fn the_refusal_names_both_stores_a_deployment_may_choose() {
-        let Err(refusal) = hosted_state_store(None, None) else {
-            panic!("a placement that named no store must be refused");
-        };
-        let refusal = refusal.to_string();
-        assert!(refusal.contains("CONNECTORS_DATABASE_URL"), "{refusal}");
-        assert!(refusal.contains("CONNECTORS_SQLITE"), "{refusal}");
-    }
-}
+#[path = "composition_tests.rs"]
+mod tests;

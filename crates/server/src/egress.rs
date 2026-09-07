@@ -19,6 +19,7 @@ use service::{
     EgressWebSocket, EgressWebSocketFrame,
 };
 use tokio::net::{lookup_host, TcpStream};
+use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
 use tokio_tungstenite::tungstenite::handshake::client::Response;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
@@ -340,11 +341,40 @@ impl ConnectionEgress {
         &self,
         authority_ref: &str,
         url: &Url,
+        headers: &BTreeMap<String, String>,
         config: WebSocketConfig,
     ) -> Result<(PinnedWebSocket, Response), EgressError> {
         self.validate_owner(authority_ref)?;
         if url.scheme() != "wss" && !(self.endpoint_route.is_some() && url.scheme() == "ws") {
             return Err(EgressError::DestinationDenied);
+        }
+        if url.as_str().len() > MAX_URL_BYTES || headers.len() > MAX_REQUEST_HEADERS {
+            return Err(EgressError::DestinationDenied);
+        }
+        let mut request = url
+            .as_str()
+            .into_client_request()
+            .map_err(|_| EgressError::DestinationDenied)?;
+        for (name, value) in headers {
+            let lower = name.to_ascii_lowercase();
+            if name.len() > MAX_RESPONSE_HEADER_BYTES
+                || value.len() > MAX_RESPONSE_HEADER_BYTES
+                || matches!(
+                    lower.as_str(),
+                    "host" | "connection" | "upgrade" | "content-length" | "transfer-encoding"
+                )
+                || lower.starts_with("sec-websocket-")
+            {
+                return Err(EgressError::DestinationDenied);
+            }
+            let name =
+                tokio_tungstenite::tungstenite::http::HeaderName::from_bytes(name.as_bytes())
+                    .map_err(|_| EgressError::DestinationDenied)?;
+            let value = tokio_tungstenite::tungstenite::http::HeaderValue::from_str(value)
+                .map_err(|_| EgressError::DestinationDenied)?;
+            if request.headers_mut().insert(name, value).is_some() {
+                return Err(EgressError::DestinationDenied);
+            }
         }
         let destination = self.resolve(url).await?;
         for address in destination.addresses {
@@ -354,7 +384,7 @@ impl ConnectionEgress {
                     Ok(Err(_)) | Err(_) => continue,
                 };
             let handshake = tokio_tungstenite::client_async_tls_with_config(
-                url.as_str(),
+                request.clone(),
                 stream,
                 Some(config),
                 None,
@@ -548,6 +578,22 @@ impl EgressTransport for ConnectionEgress {
         url: String,
         maximum_message_bytes: usize,
     ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
+        self.connect_websocket_with_headers(
+            authority_ref,
+            url,
+            BTreeMap::new(),
+            maximum_message_bytes,
+        )
+        .await
+    }
+
+    async fn connect_websocket_with_headers(
+        &self,
+        authority_ref: &str,
+        url: String,
+        headers: BTreeMap<String, String>,
+        maximum_message_bytes: usize,
+    ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
         if maximum_message_bytes == 0 || maximum_message_bytes > MAX_WEBSOCKET_MESSAGE_BYTES {
             return Err(EgressTransportError::Refused);
         }
@@ -556,7 +602,7 @@ impl EgressTransport for ConnectionEgress {
             .max_message_size(Some(maximum_message_bytes))
             .max_frame_size(Some(maximum_message_bytes));
         let (socket, _) = self
-            .open_websocket(authority_ref, &url, config)
+            .open_websocket(authority_ref, &url, &headers, config)
             .await
             .map_err(|_| EgressTransportError::Refused)?;
         Ok(Box::new(ServerWebSocket { socket }))
