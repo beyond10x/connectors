@@ -11,6 +11,8 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.7.0 — 2026-09-07
+
 - Catalog write discovery now considers every admitting Connection, so an earlier read-only
   placement cannot hide a writable one. Search and describe report required approval; invoke
   still checks the explicitly selected Connection.
@@ -38,6 +40,21 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
   refusals. Trusted local setup binds remediation to the intended operation and Connection, then
   stops ready for a separate explicit invocation. `operation --protocol-version v2` retains
   explicit interoperability; no negotiation, automatic session creation or invocation replay.
+
+### Also included since the last published release (v0.6.0)
+
+- Add bounded, read-only GitLab fetch sessions over internal TLS for the admitted default branch
+  and exact commit, including Git protocol v2 support and the hosted client operation. Recheck
+  identity, grants and project membership; bound session lifetime, depth, requests and bytes.
+- Reuse a bounded set of provider HTTP connections while rechecking destination policy and DNS
+  for every request.
+- Keep concurrent hosted Connect Session expiry terminal after credential verification and custody
+  awaits, so an expired session cannot become completed.
+- Keep legacy GitLab connections inactive until a verified reconnect binds current authority;
+  preserve their metadata and refuse recovery when a credential transaction's grant is absent
+  or superseded.
+- Refresh all twelve Cargo workspace lockfiles together with the release identity so cold runners
+  can fetch and verify the complete locked graphs.
 
 ## 0.6.5 — 2026-09-05
 

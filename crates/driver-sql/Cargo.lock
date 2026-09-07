@@ -147,7 +147,7 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
 name = "connector-state"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "thiserror",
 ]
@@ -263,7 +263,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "driver-sql"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "futures-util",
  "mysql_async",
@@ -944,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "domain",
  "fluent-uri",
