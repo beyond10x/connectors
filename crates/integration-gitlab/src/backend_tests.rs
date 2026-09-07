@@ -196,7 +196,7 @@ mod tests {
         }
         let request = |input| InvokeRequest {
             operation_ref: id.to_owned(),
-            connection_ref: description.connections[0].connection_ref.clone(),
+            endpoint_ref: description.endpoints[0].endpoint_ref.clone(),
             description_ref: description.description_ref.clone(),
             input,
             approval_evidence_ref: None,
@@ -266,7 +266,7 @@ mod tests {
                     &context,
                     InvokeRequest {
                         operation_ref: id.to_owned(),
-                        connection_ref: "connection:ungranted".to_owned(),
+                        endpoint_ref: "connection:ungranted".to_owned(),
                         description_ref: "ungranted".to_owned(),
                         input: serde_json::json!({"project_id":7,"per_page":2}),
                         approval_evidence_ref: None,
@@ -285,8 +285,8 @@ mod tests {
         let metadata = StateFile {
             version: STATE_VERSION,
             next_transaction_generation: 1,
-            connections: vec![StoredConnection {
-                connection_ref: "connection:gitlab:legacy".to_owned(),
+            endpoints: vec![StoredEndpoint {
+                endpoint_ref: "connection:gitlab:legacy".to_owned(),
                 instance_id: "00000000-0000-4000-8000-000000000007".to_owned(),
                 label: "GitLab".to_owned(),
                 grant_ref: String::new(),
@@ -303,13 +303,13 @@ mod tests {
             pending: Vec::new(),
         };
         let mut encoded = serde_json::to_value(&metadata).unwrap();
-        encoded["connections"][0]
+        encoded["endpoints"][0]
             .as_object_mut()
             .unwrap()
             .remove("grant_ref");
         encoded["pending"] = serde_json::json!([{
             "transaction_id": "legacy-transaction-must-not-be-recovered",
-            "connection": encoded["connections"][0].clone()
+            "connection": encoded["endpoints"][0].clone()
         }]);
         let original = serde_json::to_vec(&encoded).unwrap();
         state
@@ -354,7 +354,7 @@ mod tests {
         assert!(backend.inner.owned_connections(&owner).is_empty());
         let refusal = backend
             .inner
-            .connection_token(&metadata.connections[0])
+            .connection_token(&metadata.endpoints[0])
             .await
             .unwrap_err();
         assert_eq!(refusal.code, "connection-grant");
@@ -379,18 +379,18 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(egress.calls.load(Ordering::SeqCst), 2);
-        let connections = backend.inner.owned_connections(&owner);
-        assert_eq!(connections.len(), 1);
+        let endpoints = backend.inner.owned_connections(&owner);
+        assert_eq!(endpoints.len(), 1);
         assert_eq!(
-            connections[0].connection_ref,
-            metadata.connections[0].connection_ref
+            endpoints[0].endpoint_ref,
+            metadata.endpoints[0].endpoint_ref
         );
-        assert_eq!(connections[0].grant_ref, "grant:gitlab:user");
+        assert_eq!(endpoints[0].grant_ref, "grant:gitlab:user");
         assert_eq!(backend.connection_count(), 1);
         let persisted: StateFile =
             serde_json::from_slice(&state.read(STATE_KEY, MAX_STATE_BYTES).unwrap().unwrap())
                 .unwrap();
-        assert_eq!(persisted.connections.len(), 1);
+        assert_eq!(persisted.endpoints.len(), 1);
         assert_eq!(persisted.pending.len(), 1);
         assert!(persisted.pending[0].connection.grant_ref.is_empty());
     }

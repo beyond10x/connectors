@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, EffectClass,
+    ApprovalPosture, EndpointSummary as OperationEndpointSummary, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationResult, OperationSummary,
 };
@@ -22,13 +22,13 @@ impl JiraInner {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-    ) -> Vec<OperationConnectionSummary> {
-        let mut connections: Vec<_> = self
+    ) -> Vec<OperationEndpointSummary> {
+        let mut endpoints: Vec<_> = self
             .owned_user_connections(context)
             .into_iter()
             .filter(|connection| supports_operation(connection, operation_ref))
-            .map(|connection| OperationConnectionSummary {
-                connection_ref: connection.connection_ref,
+            .map(|connection| OperationEndpointSummary {
+                endpoint_ref: connection.endpoint_ref,
                 label: connection.label,
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["delegated-user".to_owned()],
@@ -36,15 +36,15 @@ impl JiraInner {
             })
             .collect();
         if incremental::is_incremental(operation_ref) {
-            connections.push(OperationConnectionSummary {
-                connection_ref: ORG_CONNECTION_REF.to_owned(),
+            endpoints.push(OperationEndpointSummary {
+                endpoint_ref: ORG_CONNECTION_REF.to_owned(),
                 label: "Organization read-only".to_owned(),
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["organization".to_owned()],
                 purpose: None,
             });
         }
-        connections
+        endpoints
     }
 
     pub(super) fn search_operations(
@@ -56,8 +56,8 @@ impl JiraInner {
         JIRA_OPERATIONS
             .iter()
             .filter_map(|operation_ref| {
-                let connections = self.operation_connections(context, operation_ref);
-                if connections.is_empty() {
+                let endpoints = self.operation_connections(context, operation_ref);
+                if endpoints.is_empty() {
                     return None;
                 }
                 let operation = connector_resolve::document::operation(operation_ref)?;
@@ -72,7 +72,7 @@ impl JiraInner {
                     title: operation_ref.replace('-', " "),
                     effect: operation_effect(operation_ref),
                     approval: operation_approval(operation_ref),
-                    connections,
+                    endpoints,
                 })
             })
             .collect()
@@ -93,7 +93,7 @@ impl JiraInner {
         }
         for connection in self.operation_connections(context, operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.connection_ref.as_bytes());
+            digest.update(connection.endpoint_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }
@@ -108,8 +108,8 @@ impl JiraInner {
         }
         let operation = connector_resolve::document::operation(operation_ref)
             .ok_or_else(operation_not_found)?;
-        let connections = self.operation_connections(context, operation_ref);
-        if connections.is_empty() {
+        let endpoints = self.operation_connections(context, operation_ref);
+        if endpoints.is_empty() {
             return Err(operation_not_found());
         }
         Ok(OperationResult::Describe(OperationDescription {
@@ -122,7 +122,7 @@ impl JiraInner {
             output_schema: operation_output_schema(operation_ref),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
-            connections,
+            endpoints,
             description_ref: self.operation_description_ref(context, operation_ref),
         }))
     }
@@ -135,13 +135,13 @@ impl JiraInner {
         if !is_jira_operation(&request.operation_ref) {
             return Err(operation_not_found());
         }
-        let organization_read = request.connection_ref == ORG_CONNECTION_REF
+        let organization_read = request.endpoint_ref == ORG_CONNECTION_REF
             && incremental::is_incremental(&request.operation_ref);
         let connection = self
             .owned_user_connections(context)
             .into_iter()
             .find(|connection| {
-                connection.connection_ref == request.connection_ref
+                connection.endpoint_ref == request.endpoint_ref
                     && supports_operation(connection, &request.operation_ref)
             });
         if connection.is_none() && !organization_read {
@@ -223,7 +223,7 @@ impl JiraInner {
         self.audit(
             &audit_ref,
             &request.operation_ref,
-            &request.connection_ref,
+            &request.endpoint_ref,
             context,
             "attempted",
         )
@@ -305,7 +305,7 @@ impl JiraInner {
                 self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.connection_ref,
+                    &request.endpoint_ref,
                     context,
                     "completed",
                 )
@@ -321,7 +321,7 @@ impl JiraInner {
                 let _ = self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.connection_ref,
+                    &request.endpoint_ref,
                     context,
                     "refused_or_indeterminate",
                 );
@@ -670,7 +670,7 @@ pub(super) fn issue_project(value: &str) -> Option<&str> {
     .then_some(project)
 }
 
-fn supports_operation(connection: &StoredConnection, operation_ref: &str) -> bool {
+fn supports_operation(connection: &StoredEndpoint, operation_ref: &str) -> bool {
     is_jira_operation(operation_ref)
         && connection
             .scopes

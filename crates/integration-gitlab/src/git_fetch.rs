@@ -27,7 +27,7 @@ mod v2;
 
 use super::{
     bearer_headers, http_request, lock, now_ms, random_token, GitlabBackend, GitlabInner,
-    StoredConnection, MAX_PROVIDER_RESPONSE_BYTES,
+    StoredEndpoint, MAX_PROVIDER_RESPONSE_BYTES,
 };
 
 const SESSION_TTL_MS: u64 = 15 * 60 * 1_000;
@@ -71,7 +71,7 @@ impl GitFetchSessionState {
 pub(super) struct GitFetchSessionRecord {
     idempotency_key: String,
     owner_subject: String,
-    connection_ref: String,
+    endpoint_ref: String,
     project_id: u64,
     reference: String,
     expected_commit: String,
@@ -127,7 +127,7 @@ impl GitFetchBroker for GitlabBackend {
             .inner
             .owned_connections(context)
             .into_iter()
-            .find(|connection| connection.connection_ref == request.connection_ref)
+            .find(|connection| connection.endpoint_ref == request.endpoint_ref)
             .filter(connection_admits_repository)
             .ok_or(GitFetchControlError::NotGranted)?;
         let token = self
@@ -172,7 +172,7 @@ impl GitFetchBroker for GitlabBackend {
             let generation = if let Some(previous) = sessions.get(&session_ref) {
                 if previous.idempotency_key != request.idempotency_key
                     || previous.owner_subject != context.subject()
-                    || previous.connection_ref != request.connection_ref
+                    || previous.endpoint_ref != request.endpoint_ref
                     || previous.project_id != request.project_id
                     || previous.reference != request.reference
                     || previous.expected_commit != request.expected_commit
@@ -211,7 +211,7 @@ impl GitFetchBroker for GitlabBackend {
                 GitFetchSessionRecord {
                     idempotency_key: request.idempotency_key.clone(),
                     owner_subject: context.subject().to_owned(),
-                    connection_ref: request.connection_ref.clone(),
+                    endpoint_ref: request.endpoint_ref.clone(),
                     project_id: request.project_id,
                     reference: request.reference.clone(),
                     expected_commit: request.expected_commit.clone(),
@@ -271,7 +271,7 @@ impl GitFetchBroker for GitlabBackend {
             Sha256::digest(request.source_authorization.as_bytes()).into();
         let now = now_ms().ok_or(GitFetchDataError::Unavailable)?;
         let (
-            connection_ref,
+            endpoint_ref,
             owner_subject,
             project_id,
             reference,
@@ -334,7 +334,7 @@ impl GitFetchBroker for GitlabBackend {
                 session.state = GitFetchSessionState::UploadInFlight;
             }
             (
-                session.connection_ref.clone(),
+                session.endpoint_ref.clone(),
                 session.owner_subject.clone(),
                 session.project_id,
                 session.reference.clone(),
@@ -361,10 +361,10 @@ impl GitFetchBroker for GitlabBackend {
         };
 
         let connection = lock(&self.inner.metadata)
-            .connections
+            .endpoints
             .iter()
             .find(|connection| {
-                connection.connection_ref == connection_ref
+                connection.endpoint_ref == endpoint_ref
                     && connection.owner_subject == owner_subject
                     && connection.grant_ref == self.inner.policy.user_grant_ref
                     && connection_admits_repository(connection)
@@ -448,7 +448,7 @@ impl GitFetchBroker for GitlabBackend {
             .inner
             .egress
             .execute_stream(
-                &connection_ref,
+                &endpoint_ref,
                 EgressStreamingHttpRequest {
                     method: match request.service {
                         GitFetchService::Discovery => "GET".to_owned(),
@@ -576,7 +576,7 @@ impl GitFetchBroker for GitlabBackend {
 impl GitlabInner {
     async fn admit_project(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         token: &Secret,
         project_id: u64,
         reference: &str,
@@ -590,7 +590,7 @@ impl GitlabInner {
             .clear()
             .extend([
                 "api",
-                "v4",
+                "v5",
                 "projects",
                 project_id_text.as_str(),
                 "repository",
@@ -601,8 +601,8 @@ impl GitlabInner {
         // overlapping their network latency; retain project-first refusal precedence.
         let project_path = format!("/api/v4/projects/{project_id}");
         let (project, branch) = tokio::join!(
-            self.fetch_admission_json::<Project>(&connection.connection_ref, &project_path, token),
-            self.fetch_admission_url::<Branch>(&connection.connection_ref, branch_url, token),
+            self.fetch_admission_json::<Project>(&connection.endpoint_ref, &project_path, token),
+            self.fetch_admission_url::<Branch>(&connection.endpoint_ref, branch_url, token),
         );
         let project = project?;
         if project.id != project_id || project.default_branch.as_deref() != Some(reference) {
@@ -618,27 +618,27 @@ impl GitlabInner {
 
     async fn fetch_admission_json<T: for<'de> Deserialize<'de>>(
         &self,
-        connection_ref: &str,
+        endpoint_ref: &str,
         path: &str,
         token: &Secret,
     ) -> Result<T, ProjectAdmissionError> {
         let target = self
             .provider_url(path)
             .map_err(|_| ProjectAdmissionError::Unavailable)?;
-        self.fetch_admission_url(connection_ref, target, token)
+        self.fetch_admission_url(endpoint_ref, target, token)
             .await
     }
 
     async fn fetch_admission_url<T: for<'de> Deserialize<'de>>(
         &self,
-        connection_ref: &str,
+        endpoint_ref: &str,
         target: url::Url,
         token: &Secret,
     ) -> Result<T, ProjectAdmissionError> {
         let response = self
             .egress
             .execute(
-                connection_ref,
+                endpoint_ref,
                 service::EgressHttpRequest {
                     request: http_request("GET", target, bearer_headers(token), None),
                     maximum_response_bytes: MAX_PROVIDER_RESPONSE_BYTES,
@@ -714,8 +714,8 @@ impl GitlabInner {
             .get_mut(session_ref)
             .filter(|session| session.generation == generation && session.state.is_live())
             .ok_or(EgressTransportError::Refused)?;
-        if !lock(&self.metadata).connections.iter().any(|connection| {
-            connection.connection_ref == session.connection_ref
+        if !lock(&self.metadata).endpoints.iter().any(|connection| {
+            connection.endpoint_ref == session.endpoint_ref
                 && connection.owner_subject == session.owner_subject
                 && connection.grant_ref == self.policy.user_grant_ref
                 && connection_admits_repository(connection)
@@ -892,7 +892,7 @@ impl Drop for BudgetedGitFetchStream {
     }
 }
 
-fn connection_admits_repository(connection: &StoredConnection) -> bool {
+fn connection_admits_repository(connection: &StoredEndpoint) -> bool {
     connection
         .scopes
         .iter()

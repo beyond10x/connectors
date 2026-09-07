@@ -299,7 +299,7 @@ impl TelephonySession for SipTelephonySession {
             return Ok(None);
         };
         if samples.len() != SAMPLES_PER_FRAME {
-            return Err(VoiceError::Endpoint(
+            return Err(VoiceError::EndpointInventoryEntry(
                 "sipx emitted a non-profile PCM frame".to_owned(),
             ));
         }
@@ -322,7 +322,7 @@ impl TelephonySession for SipTelephonySession {
         let frame = AudioFrame::new(frame.sequence, frame.bytes, &self.descriptor.media)?;
         let prior = self.output_sequence.load(Ordering::Acquire);
         if frame.sequence <= prior {
-            return Err(VoiceError::Endpoint(
+            return Err(VoiceError::EndpointInventoryEntry(
                 "non-monotonic telephony output sequence".to_owned(),
             ));
         }
@@ -348,7 +348,7 @@ impl TelephonySession for SipTelephonySession {
         if completed {
             Ok(())
         } else {
-            Err(VoiceError::Endpoint("sipx playback ended early".to_owned()))
+            Err(VoiceError::EndpointInventoryEntry("sipx playback ended early".to_owned()))
         }
     }
 
@@ -377,7 +377,7 @@ impl TelephonySession for SipTelephonySession {
             // crates and only a test keeps them equal.
             let digit = Digit::from_char(character).ok_or(VoiceError::InvalidSignal)?;
             if !self.media.send_digit(digit, DTMF_TONE).await {
-                return Err(VoiceError::Endpoint(
+                return Err(VoiceError::EndpointInventoryEntry(
                     "the media session refused a DTMF event".to_owned(),
                 ));
             }
@@ -417,7 +417,7 @@ impl TelephonySession for SipTelephonySession {
         if let Some(owner) = owner {
             owner
                 .await
-                .map_err(|error| VoiceError::Endpoint(error.to_string()))?;
+                .map_err(|error| VoiceError::EndpointInventoryEntry(error.to_string()))?;
         }
         Ok(())
     }
@@ -482,7 +482,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 fn lock_error<T>(error: std::sync::PoisonError<T>) -> VoiceError {
-    VoiceError::Endpoint(error.to_string())
+    VoiceError::EndpointInventoryEntry(error.to_string())
 }
 
 #[cfg(test)]
@@ -532,7 +532,7 @@ mod tests {
     use std::time::Duration;
 
     use domain::{
-        AdmittedOperation, Capability, ConnectionAuthority, Implementation, InitiationPolicy,
+        AdmittedOperation, Capability, EndpointAuthority, Implementation, InitiationPolicy,
         Interaction, OperationFacts, Placement, ProtocolPlan, SipPlan, ZeroIoPlan,
     };
     use protocol::voice::Ready;
@@ -567,7 +567,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
+                EndpointAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {

@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use connector_resolve::document::{Document, ProtocolDriver};
 use connectors_config::PlatformIntegrationConfig;
-use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId};
+use domain::{AdmittedOperation, Capability, EndpointAuthority, DriverId};
 use driver_cdp::LocalBrowserDriver;
 use driver_speech::{LocalSpeechDriver, SpeechCancellation, SpeechEngine as _};
 use protocol::audio::{SpeechSpeakInput, SPEECH_SPEAK_OPERATION, SPEECH_STATUS_OPERATION};
@@ -22,10 +22,10 @@ use protocol::browser::{
     BrowserGotoInput, BrowserOpenInput, BROWSER_CLOSE_OPERATION, BROWSER_GOTO_OPERATION,
     BROWSER_OPEN_OPERATION, BROWSER_SCREENSHOT_OPERATION, BROWSER_SNAPSHOT_OPERATION,
 };
-use protocol::connection::{
-    ChannelState, ConnectionDescription, ConnectionError, ConnectionErrorCode, ConnectionInitiator,
-    ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
-    ConnectionSummary as LifecycleConnectionSummary,
+use protocol::endpoint::{
+    ChannelState, EndpointDescription, EndpointError, EndpointErrorCode, EndpointInitiator,
+    EndpointRequest, EndpointResult, EndpointRoute, EndpointState,
+    EndpointSummary as LifecycleEndpointSummary,
 };
 use protocol::datasource::{
     AccessMode, BindingSearchRequest, Completeness, DatasourceBinding, DatasourceDescription,
@@ -39,7 +39,7 @@ use protocol::event::{
     EventResult,
 };
 use protocol::operation::{
-    ConnectionSummary, InvocationResult, InvokeRequest, OperationError, OperationErrorCode,
+    EndpointSummary, InvocationResult, InvokeRequest, OperationError, OperationErrorCode,
     OperationRequest, OperationResult,
 };
 use serde_json::Value;
@@ -121,12 +121,12 @@ impl PlatformBackend {
         }
     }
 
-    fn check_connection_context(&self, context: &PrincipalContext) -> Result<(), ConnectionError> {
+    fn check_connection_context(&self, context: &PrincipalContext) -> Result<(), EndpointError> {
         if self.context_admitted(context) {
             Ok(())
         } else {
-            Err(ConnectionError::new(
-                ConnectionErrorCode::StaleAuthority,
+            Err(EndpointError::new(
+                EndpointErrorCode::StaleAuthority,
                 "owner authority snapshot is not current",
                 false,
             ))
@@ -175,9 +175,9 @@ impl PlatformBackend {
             || self.config.tenant_member_module_enabled(module)
     }
 
-    fn connection(&self) -> ConnectionSummary {
-        ConnectionSummary {
-            connection_ref: self.config.connection.connection_ref.clone(),
+    fn connection(&self) -> EndpointSummary {
+        EndpointSummary {
+            endpoint_ref: self.config.connection.endpoint_ref.clone(),
             label: self.config.connection.label.clone(),
             provider: PROVIDER.to_owned(),
             audiences: catalog::provider(catalog::ProviderKey::id(PROVIDER))
@@ -193,23 +193,23 @@ impl PlatformBackend {
         }
     }
 
-    fn lifecycle_connection(&self) -> LifecycleConnectionSummary {
+    fn lifecycle_connection(&self) -> LifecycleEndpointSummary {
         let initiation = match self.config.connection.initiation {
             connectors_config::InitiationConfig::Platform => {
-                vec![ConnectionInitiator::Platform]
+                vec![EndpointInitiator::Platform]
             }
-            connectors_config::InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
+            connectors_config::InitiationConfig::Provider => vec![EndpointInitiator::Provider],
             connectors_config::InitiationConfig::Both => {
-                vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+                vec![EndpointInitiator::Platform, EndpointInitiator::Provider]
             }
         };
-        LifecycleConnectionSummary {
-            connection_ref: self.config.connection.connection_ref.clone(),
+        LifecycleEndpointSummary {
+            endpoint_ref: self.config.connection.endpoint_ref.clone(),
             integration_ref: PROVIDER.to_owned(),
             label: self.config.connection.label.clone(),
-            state: ConnectionState::Callable,
+            state: EndpointState::Callable,
             initiation,
-            route: ConnectionRoute::Direct,
+            route: EndpointRoute::Direct,
             scope: None,
             actor: None,
             auth_profile: None,
@@ -255,7 +255,7 @@ impl PlatformBackend {
                 false,
             ));
         }
-        if request.connection_ref != self.config.connection.connection_ref {
+        if request.endpoint_ref != self.config.connection.endpoint_ref {
             return Err(not_granted());
         }
         if request.description_ref != self.description_ref(context, canonical) {
@@ -276,7 +276,7 @@ impl PlatformBackend {
         let audit = AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            connection_ref: &request.connection_ref,
+            endpoint_ref: &request.endpoint_ref,
             tenant_id: context.tenant_id(),
             subject: context.subject(),
             actor_subject: context.actor_subject(),
@@ -343,7 +343,7 @@ impl PlatformBackend {
             .finish(AuditEvent {
                 audit_ref: &audit_ref,
                 operation_ref: &request.operation_ref,
-                connection_ref: &request.connection_ref,
+                endpoint_ref: &request.endpoint_ref,
                 tenant_id: context.tenant_id(),
                 subject: context.subject(),
                 actor_subject: context.actor_subject(),
@@ -371,8 +371,8 @@ impl PlatformBackend {
         operation: &connector_resolve::document::Operation,
         canonical: &str,
     ) -> Result<domain::ZeroIoPlan, OperationError> {
-        let connection = ConnectionAuthority::new(
-            &self.config.connection.connection_ref,
+        let connection = EndpointAuthority::new(
+            &self.config.connection.endpoint_ref,
             self.config.initiation_policy(),
         )
         .map_err(|_| not_granted())?;
@@ -812,7 +812,7 @@ impl PlatformBackend {
                 DataEvent {
                     event_ref: "pending:b10x:work".to_owned(),
                     channel_ref: WORK_EVENT_CHANNEL.to_owned(),
-                    connection_ref: self.config.connection.connection_ref.clone(),
+                    endpoint_ref: self.config.connection.endpoint_ref.clone(),
                     integration_ref: PROVIDER.to_owned(),
                     event_type,
                     provenance: EventProvenance::Polled,
@@ -923,7 +923,7 @@ impl PlatformBackend {
                 DataEvent {
                     event_ref: "pending:b10x:planner".to_owned(),
                     channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
-                    connection_ref: self.config.connection.connection_ref.clone(),
+                    endpoint_ref: self.config.connection.endpoint_ref.clone(),
                     integration_ref: PROVIDER.to_owned(),
                     event_type,
                     provenance: EventProvenance::Polled,
@@ -979,7 +979,7 @@ impl ConnectorBackend for PlatformBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
-            connections: true,
+            endpoints: true,
             events: self.config.module_configured("work")
                 || self.config.module_configured("planner"),
             datasources: self.workspace_datasource_admitted(),
@@ -990,7 +990,7 @@ impl ConnectorBackend for PlatformBackend {
         match request {
             OperationRequest::Describe(request) => self.operation(&request.operation_ref).is_some(),
             OperationRequest::Invoke(request) => {
-                request.connection_ref == self.config.connection.connection_ref
+                request.endpoint_ref == self.config.connection.endpoint_ref
                     && self.operation(&request.operation_ref).is_some()
             }
             OperationRequest::Search(_)
@@ -1009,9 +1009,9 @@ impl ConnectorBackend for PlatformBackend {
             })
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
-        matches!(request, ConnectionRequest::Describe(request)
-            if request.connection_ref == self.config.connection.connection_ref)
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
+        matches!(request, EndpointRequest::Describe(request)
+            if request.endpoint_ref == self.config.connection.endpoint_ref)
     }
 
     fn owns_event(&self, request: &EventRequest) -> bool {
@@ -1058,31 +1058,31 @@ impl ConnectorBackend for PlatformBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         self.check_connection_context(context)?;
         match request {
-            ConnectionRequest::Search(request) => {
+            EndpointRequest::Search(request) => {
                 let query = request.query.to_ascii_lowercase();
                 let summary = self.lifecycle_connection();
-                let connections = (query.is_empty()
+                let endpoints = (query.is_empty()
                     || PROVIDER.contains(&query)
                     || summary.label.to_ascii_lowercase().contains(&query))
                 .then_some(summary)
                 .into_iter()
                 .take(usize::from(request.limit))
                 .collect();
-                Ok(ConnectionResult::Search { connections })
+                Ok(EndpointResult::Search { endpoints })
             }
-            ConnectionRequest::Describe(request)
-                if request.connection_ref == self.config.connection.connection_ref =>
+            EndpointRequest::Describe(request)
+                if request.endpoint_ref == self.config.connection.endpoint_ref =>
             {
                 let mut channels = Vec::new();
                 if self.configured("work-request-list") {
-                    channels.push(protocol::connection::ChannelSummary {
+                    channels.push(protocol::endpoint::ChannelSummary {
                         channel_ref: WORK_EVENT_CHANNEL.to_owned(),
                         binding_ref: WORK_EVENT_BINDING.to_owned(),
                         state: ChannelState::Connected,
@@ -1094,7 +1094,7 @@ impl ConnectorBackend for PlatformBackend {
                     });
                 }
                 if self.configured("planner-project-list") {
-                    channels.push(protocol::connection::ChannelSummary {
+                    channels.push(protocol::endpoint::ChannelSummary {
                         channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
                         binding_ref: PLANNER_EVENT_BINDING.to_owned(),
                         state: ChannelState::Connected,
@@ -1109,13 +1109,13 @@ impl ConnectorBackend for PlatformBackend {
                         ],
                     });
                 }
-                Ok(ConnectionResult::Describe(ConnectionDescription {
+                Ok(EndpointResult::Describe(EndpointDescription {
                     summary: self.lifecycle_connection(),
                     channels,
                 }))
             }
-            _ => Err(ConnectionError::new(
-                ConnectionErrorCode::NotFound,
+            _ => Err(EndpointError::new(
+                EndpointErrorCode::NotFound,
                 "platform Integration Connection was not found",
                 false,
             )),
@@ -1245,7 +1245,7 @@ fn http_client(
 fn work_event_channel(config: &PlatformIntegrationConfig) -> ChannelSummary {
     ChannelSummary {
         channel_ref: WORK_EVENT_CHANNEL.to_owned(),
-        connection_ref: config.connection.connection_ref.clone(),
+        endpoint_ref: config.connection.endpoint_ref.clone(),
         integration_ref: PROVIDER.to_owned(),
         binding_ref: WORK_EVENT_BINDING.to_owned(),
         events: vec![
@@ -1259,7 +1259,7 @@ fn work_event_channel(config: &PlatformIntegrationConfig) -> ChannelSummary {
 fn planner_event_channel(config: &PlatformIntegrationConfig) -> ChannelSummary {
     ChannelSummary {
         channel_ref: PLANNER_EVENT_CHANNEL.to_owned(),
-        connection_ref: config.connection.connection_ref.clone(),
+        endpoint_ref: config.connection.endpoint_ref.clone(),
         integration_ref: PROVIDER.to_owned(),
         binding_ref: PLANNER_EVENT_BINDING.to_owned(),
         events: vec![

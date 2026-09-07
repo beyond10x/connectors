@@ -231,7 +231,7 @@ struct Image {
     next_generation: u64,
     retired_through: u64,
     retired_transaction: Option<[u8; 32]>,
-    connections: BTreeMap<String, Publication>,
+    endpoints: BTreeMap<String, Publication>,
     pending: Option<Pending>,
 }
 impl Default for Image {
@@ -241,7 +241,7 @@ impl Default for Image {
             next_generation: 1,
             retired_through: 0,
             retired_transaction: None,
-            connections: BTreeMap::new(),
+            endpoints: BTreeMap::new(),
             pending: None,
         }
     }
@@ -456,7 +456,7 @@ impl CustodyOwner {
     fn validate(&self, image: &Image) -> Result<()> {
         if image.version != 1
             || image.next_generation == 0
-            || image.connections.len() > MAX_BINDINGS
+            || image.endpoints.len() > MAX_BINDINGS
             || image.retired_through >= image.next_generation
         {
             return Err(CustodyError::Unavailable);
@@ -469,7 +469,7 @@ impl CustodyOwner {
                     && SecretTransactionId::from_protocol_bytes(id).is_some() => {}
             _ => return Err(CustodyError::Unavailable),
         }
-        for (key, publication) in &image.connections {
+        for (key, publication) in &image.endpoints {
             if key != &publication.identity.connection
                 || !self.valid_publication(publication)
                 || publication.generation >= image.next_generation
@@ -524,7 +524,7 @@ impl CustodyOwner {
                 _ => {}
             }
             let current = image
-                .connections
+                .endpoints
                 .get(&pending.publication.identity.connection);
             if matches!(pending.phase, Phase::Published { .. }) {
                 if current != Some(&pending.publication) {
@@ -573,7 +573,7 @@ impl CustodyOwner {
         {
             return Err(CustodyError::Refused);
         }
-        Ok(state.image.connections.get(&identity.connection).cloned())
+        Ok(state.image.endpoints.get(&identity.connection).cloned())
     }
     pub(super) async fn complete(
         &self,
@@ -621,7 +621,7 @@ impl CustodyOwner {
                 .is_none_or(|known| known.identity != binding.identity)
             || !evidence.valid()
             || image
-                .connections
+                .endpoints
                 .get(&binding.identity.connection)
                 .map_or(0, |entry| entry.generation)
                 != previous_generation
@@ -687,7 +687,7 @@ impl CustodyOwner {
             .publication
             .clone();
         budget
-            .connections
+            .endpoints
             .insert(publication.identity.connection.clone(), publication);
         // Reserve both copies of the authorization object and the largest phase encoding.
         // These maxima measure JSON width only; they are never persisted or used as a claim.
@@ -843,7 +843,7 @@ impl CustodyOwner {
             _ => return Err(CustodyError::Unavailable),
         }
         let mut image = lock(&self.state)?.image.clone();
-        image.connections.insert(
+        image.endpoints.insert(
             pending.publication.identity.connection.clone(),
             pending.publication.clone(),
         );
@@ -954,7 +954,7 @@ impl CustodyOwner {
 pub(super) fn project_session(
     sessions: &ConnectSessionLifecycle,
     session: &str,
-) -> Result<Option<protocol::connection::ConnectSessionStatus>> {
+) -> Result<Option<protocol::endpoint::ConnectSessionStatus>> {
     match sessions.status(session) {
         None if sessions.owns(session) => Err(CustodyError::Unavailable),
         status => Ok(status),

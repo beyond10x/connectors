@@ -14,10 +14,10 @@ use connector_resolve::document::{Document, HostEffect, ProtocolDriver};
 use connector_state::StateStore;
 use domain::voice::TelephonySession;
 use domain::{
-    voice::TerminationReason, AdmittedOperation, Capability, ConnectionAuthority, DriverId,
+    voice::TerminationReason, AdmittedOperation, Capability, EndpointAuthority, DriverId,
 };
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
+    ApprovalPosture, EndpointSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
     OperationResult, OperationSummary, RequestedSessionTermination, SessionRequest,
     SessionSignalRequest, SessionState, SessionStatus, SessionTerminateRequest, SessionTermination,
@@ -111,7 +111,7 @@ pub struct SipOperationBackend<L> {
 
 struct SessionRecord {
     operation_ref: String,
-    connection_ref: String,
+    endpoint_ref: String,
     audit_ref: String,
     session: Option<Arc<dyn TelephonySession>>,
     control: VoiceSessionControl,
@@ -138,7 +138,7 @@ struct AuditEvent<'a> {
     audit_ref: &'a str,
     execution_ref: &'a str,
     operation_ref: &'a str,
-    connection_ref: &'a str,
+    endpoint_ref: &'a str,
     tenant_id: &'a str,
     agent_id: &'a str,
     action: &'a str,
@@ -302,13 +302,13 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             title: "Dial a SIP voice session".to_owned(),
             effect: effect(operation.effects()),
             approval: ApprovalPosture::Required,
-            connections: vec![self.connection()],
+            endpoints: vec![self.connection()],
         }
     }
 
-    fn connection(&self) -> ConnectionSummary {
-        ConnectionSummary {
-            connection_ref: self.config.connection.connection_ref.clone(),
+    fn connection(&self) -> EndpointSummary {
+        EndpointSummary {
+            endpoint_ref: self.config.connection.endpoint_ref.clone(),
             label: self.config.connection.label.clone(),
             provider: SIP_DIAL_PROVIDER.to_owned(),
             audiences: catalog::provider(catalog::ProviderKey::id(SIP_DIAL_PROVIDER))
@@ -332,7 +332,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         digest.update(b"\0");
         digest.update(context.stable_authority_seed());
         digest.update(b"\0");
-        digest.update(self.config.connection.connection_ref.as_bytes());
+        digest.update(self.config.connection.endpoint_ref.as_bytes());
         digest.update(b"\0");
         digest.update(self.config.connection.grant_ref.as_bytes());
         format!("description-sha256-{:x}", digest.finalize())
@@ -357,7 +357,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             output_schema: self.output_schema.clone(),
             effect: effect(operation.effects()),
             approval: ApprovalPosture::Required,
-            connections: vec![self.connection()],
+            endpoints: vec![self.connection()],
             description_ref: self.description_ref(context),
         }))
     }
@@ -368,7 +368,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
         require_operation(&request.operation_ref)?;
-        if request.connection_ref != self.config.connection.connection_ref {
+        if request.endpoint_ref != self.config.connection.endpoint_ref {
             return Err(not_granted());
         }
         if request.description_ref != self.description_ref(context) {
@@ -399,8 +399,8 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             .document
             .operation(SIP_DIAL_OPERATION)
             .expect("validated canonical operation");
-        let connection = ConnectionAuthority::new(
-            &self.config.connection.connection_ref,
+        let connection = EndpointAuthority::new(
+            &self.config.connection.endpoint_ref,
             self.config.initiation_policy(),
         )
         .map_err(|_| not_granted())?;
@@ -482,7 +482,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                 audit_ref: &audit_ref,
                 execution_ref: &execution_ref,
                 operation_ref: SIP_DIAL_TOOL_REF,
-                connection_ref: &self.config.connection.connection_ref,
+                endpoint_ref: &self.config.connection.endpoint_ref,
                 tenant_id: context.tenant_id(),
                 agent_id: context.actor_subject(),
                 action: "session_established",
@@ -499,7 +499,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         let terminal_audit = Arc::clone(&self.audit);
         let terminal_audit_ref = audit_ref.clone();
         let terminal_execution_ref = execution_ref.clone();
-        let terminal_connection_ref = self.config.connection.connection_ref.clone();
+        let terminal_connection_ref = self.config.connection.endpoint_ref.clone();
         let terminal_tenant_id = context.tenant_id().to_owned();
         let terminal_agent_id = context.actor_subject().to_owned();
         tokio::spawn(async move {
@@ -510,7 +510,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
                         audit_ref: &terminal_audit_ref,
                         execution_ref: &terminal_execution_ref,
                         operation_ref: SIP_DIAL_TOOL_REF,
-                        connection_ref: &terminal_connection_ref,
+                        endpoint_ref: &terminal_connection_ref,
                         tenant_id: &terminal_tenant_id,
                         agent_id: &terminal_agent_id,
                         action: "session_terminated",
@@ -527,7 +527,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             execution_ref.clone(),
             SessionRecord {
                 operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
-                connection_ref: self.config.connection.connection_ref.clone(),
+                endpoint_ref: self.config.connection.endpoint_ref.clone(),
                 audit_ref: audit_ref.clone(),
                 session: launched.session,
                 control: launched.control,
@@ -585,7 +585,7 @@ impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
             OperationRequest::Describe(request) => request.operation_ref == SIP_DIAL_TOOL_REF,
             OperationRequest::Invoke(request) => {
                 request.operation_ref == SIP_DIAL_TOOL_REF
-                    && request.connection_ref == self.config.connection.connection_ref
+                    && request.endpoint_ref == self.config.connection.endpoint_ref
             }
             OperationRequest::SessionStatus(request)
             | OperationRequest::SessionReconcile(request) => {
@@ -660,7 +660,7 @@ impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
                     (
                         execution_ref.clone(),
                         record.operation_ref.clone(),
-                        record.connection_ref.clone(),
+                        record.endpoint_ref.clone(),
                         record.audit_ref.clone(),
                         record.control.clone(),
                         record.completion.clone(),
@@ -668,13 +668,13 @@ impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
                 })
                 .collect::<Vec<_>>()
         };
-        for (execution_ref, operation_ref, connection_ref, audit_ref, control, _) in &sessions {
+        for (execution_ref, operation_ref, endpoint_ref, audit_ref, control, _) in &sessions {
             if control.terminate(TerminationReason::AuthorityRevoked) {
                 let _ = self.audit.append(AuditEvent {
                     audit_ref,
                     execution_ref,
                     operation_ref,
-                    connection_ref,
+                    endpoint_ref,
                     tenant_id: &self.config.owner.tenant_id,
                     agent_id: &self.config.owner.agent_id,
                     action: "daemon_shutdown_requested",
@@ -833,7 +833,7 @@ authority_snapshot_id = "snapshot-7"
 authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 [connection]
-connection_ref = "connection-asterisk-dev"
+endpoint_ref = "connection-asterisk-dev"
 label = "Asterisk development cluster"
 grant_ref = "grant-sip-dial-1"
 initiation = "platform"
@@ -939,7 +939,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
     fn invoke(description_ref: String, target: &str) -> OperationRequest {
         OperationRequest::Invoke(InvokeRequest {
             operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
-            connection_ref: "connection-asterisk-dev".to_owned(),
+            endpoint_ref: "connection-asterisk-dev".to_owned(),
             description_ref,
             input: serde_json::json!({"target": target}),
             // The demanded approval is verified and spent upstream by the proof chain
@@ -1030,7 +1030,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
             execution_ref.to_owned(),
             SessionRecord {
                 operation_ref: SIP_DIAL_TOOL_REF.to_owned(),
-                connection_ref: "connection-asterisk-dev".to_owned(),
+                endpoint_ref: "connection-asterisk-dev".to_owned(),
                 audit_ref: "audit-1".to_owned(),
                 session,
                 control: VoiceSessionControl::new(),
@@ -1131,7 +1131,7 @@ media_apertures = [{ address = "127.0.0.1", first_port = 1, last_port = 65535 }]
             &backend,
             "execution-3",
             Some(signalling_session(Some(
-                domain::voice::VoiceError::Endpoint("media refused".to_owned()),
+                domain::voice::VoiceError::EndpointInventoryEntry("media refused".to_owned()),
             ))),
         );
         let refused = backend

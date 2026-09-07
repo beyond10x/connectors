@@ -5,7 +5,7 @@ use super::*;
 /// Named here rather than at each call site: this module owns the format, and a caller that has to
 /// spell the file name is a second place for it to be spelled differently — which reads to the
 /// person running it as a placement that lost every Connection it had.
-const CONNECTIONS_FILE: &str = "connections.json";
+const CONNECTIONS_FILE: &str = "endpoints.json";
 
 pub(super) fn read_state(
     state_root: &Path,
@@ -60,7 +60,7 @@ pub(super) fn write_state(
     }
     let path = state_root.join(CONNECTIONS_FILE);
     ensure_owner_directory(state_root)?;
-    let temporary = state_root.join(".connections.json.tmp");
+    let temporary = state_root.join(".endpoints.json.tmp");
     refuse_existing_non_owner_file(&temporary)?;
     let mut file = OpenOptions::new()
         .create(true)

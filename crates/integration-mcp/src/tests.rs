@@ -134,7 +134,7 @@ fn profile() -> McpServiceProfile {
     McpServiceProfile {
         contract: PROFILE_CONTRACT.to_owned(),
         service_ref: "service:mcp:example".to_owned(),
-        connection_ref: "connection:mcp:example".to_owned(),
+        endpoint_ref: "connection:mcp:example".to_owned(),
         connection_label: "Reviewed example MCP".to_owned(),
         provider: ReviewedProvider {
             display_name: "Example MCP".to_owned(),
@@ -157,7 +157,7 @@ fn deployment() -> ServiceDeployment {
         provider: ProviderIdentity {
             provider_ref: "provider:mcp:example".to_owned(),
             authority: "test.example.mcp".to_owned(),
-            connection_ref: "connection:mcp:example".to_owned(),
+            endpoint_ref: "connection:mcp:example".to_owned(),
         },
         operations: BTreeMap::from([(
             OPERATION.to_owned(),
@@ -244,7 +244,7 @@ async fn frozen_reviewed_tools_cross_connector_custody_and_egress() {
             &context(),
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: OPERATION.to_owned(),
-                connection_ref: "connection:mcp:example".to_owned(),
+                endpoint_ref: "connection:mcp:example".to_owned(),
                 description_ref: description.description_ref,
                 input: json!({"text": "hello"}),
                 approval_evidence_ref: None,

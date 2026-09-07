@@ -11,7 +11,7 @@ const MAX_PROJECT_SCAN_PAGES: u64 = 100;
 impl GitlabInner {
     pub(crate) async fn scan_membership_projects(
         &self,
-        connection_ref: &str,
+        endpoint_ref: &str,
         token: &Secret,
         order_by_activity: bool,
         mut inspect: impl FnMut(&Value) -> bool,
@@ -31,7 +31,7 @@ impl GitlabInner {
             target.query_pairs_mut().extend_pairs(&query);
             let response = self
                 .execute(
-                    connection_ref,
+                    endpoint_ref,
                     http_request("GET", target, bearer_headers(token), None),
                     MAX_PROVIDER_RESPONSE_BYTES,
                     vec!["x-next-page".to_owned()],

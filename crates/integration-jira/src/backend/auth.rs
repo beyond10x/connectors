@@ -7,7 +7,7 @@ use connector_secrets::{
     CredentialRef, CredentialScope, Layout, SecretBatch, SecretProposalDigest,
     SecretTransactionGeneration, SecretTransactionId, SecretTransactionState, TenantLayout,
 };
-use protocol::connection::{ConnectSessionStatus, ConnectionError, ConnectionErrorCode};
+use protocol::endpoint::{ConnectSessionStatus, EndpointError, EndpointErrorCode};
 use serde::Deserialize;
 use serde_json::Value;
 use service::{ConnectSessionTerminal, HostedCompletionError, PrincipalContext};
@@ -52,11 +52,11 @@ impl JiraInner {
         &self,
         owner: &PrincipalContext,
         label: String,
-    ) -> Result<ConnectSessionStatus, ConnectionError> {
+    ) -> Result<ConnectSessionStatus, EndpointError> {
         self.expire_sessions();
         let email = owner.email().ok_or_else(|| {
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "Jira user connection requires a verified Identity email",
                 false,
             )
@@ -192,10 +192,10 @@ impl JiraInner {
         }
         .await;
         match outcome {
-            Ok(connection_ref) => lock(&self.sessions)
+            Ok(endpoint_ref) => lock(&self.sessions)
                 .finish(
                     &pending.session_ref,
-                    ConnectSessionTerminal::Completed { connection_ref },
+                    ConnectSessionTerminal::Completed { endpoint_ref },
                 )
                 .map_err(|_| HostedCompletionError::Unavailable),
             Err(error) => {
@@ -300,22 +300,22 @@ impl JiraInner {
             .pending_label(session_ref)
             .map_err(|_| JiraError::new("connect-session"))?;
         let existing = lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .find(|connection| connection.owner_subject == owner.subject)
             .cloned();
-        let (instance_id, connection_ref) = existing.map_or_else(
+        let (instance_id, endpoint_ref) = existing.map_or_else(
             || {
                 random_uuid().map(|id| {
                     let reference = format!("connection:jira:{id}");
                     (id, reference)
                 })
             },
-            |connection| Ok((connection.instance_id, connection.connection_ref)),
+            |connection| Ok((connection.instance_id, connection.endpoint_ref)),
         )?;
         let (transaction, generation) = self.reserve_transaction()?;
-        let connection = StoredConnection {
-            connection_ref: connection_ref.clone(),
+        let connection = StoredEndpoint {
+            endpoint_ref: endpoint_ref.clone(),
             instance_id,
             label,
             grant_ref: self.policy.user_grant_ref.clone(),
@@ -330,14 +330,14 @@ impl JiraInner {
         };
         self.commit_credentials(transaction, generation, connection, credentials)
             .await?;
-        Ok(connection_ref)
+        Ok(endpoint_ref)
     }
 
     async fn commit_credentials(
         &self,
         transaction: SecretTransactionId,
         generation: SecretTransactionGeneration,
-        connection: StoredConnection,
+        connection: StoredEndpoint,
         credentials: CredentialValues,
     ) -> Result<(), JiraError> {
         let mut batch = SecretBatch::new(
@@ -388,7 +388,7 @@ impl JiraInner {
             state
                 .pending
                 .retain(|pending| pending.transaction_id != transaction_id);
-            upsert_connection(&mut state.connections, connection);
+            upsert_connection(&mut state.endpoints, connection);
             self.persist(&state)?;
         }
         let _ = self.credential_store.reclaim(generation).await;
@@ -443,7 +443,7 @@ impl JiraInner {
             state
                 .pending
                 .retain(|candidate| candidate.transaction_id != pending.transaction_id);
-            upsert_connection(&mut state.connections, pending.connection);
+            upsert_connection(&mut state.endpoints, pending.connection);
             self.persist(&state)?;
         }
         Ok(())
@@ -451,7 +451,7 @@ impl JiraInner {
 
     pub(super) fn connection_credential_ref(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         credential: &str,
     ) -> Result<CredentialRef, JiraError> {
         CredentialRef::for_instance(
@@ -471,7 +471,7 @@ impl JiraInner {
 
     pub(super) async fn user_access_token(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
     ) -> Result<Secret, JiraError> {
         if connection.grant_ref != self.policy.user_grant_ref {
             return Err(JiraError::new("connection-grant"));
@@ -481,13 +481,13 @@ impl JiraInner {
             now_ms(),
             self.policy.refresh_skew_seconds,
         ) {
-            self.refresh_user_oauth(&connection.connection_ref).await?;
+            self.refresh_user_oauth(&connection.endpoint_ref).await?;
         }
         let current = lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .find(|candidate| {
-                candidate.connection_ref == connection.connection_ref
+                candidate.endpoint_ref == connection.endpoint_ref
                     && candidate.grant_ref == self.policy.user_grant_ref
             })
             .cloned()
@@ -498,13 +498,13 @@ impl JiraInner {
             .map_err(|_| JiraError::new("credential-resolve"))
     }
 
-    async fn refresh_user_oauth(&self, connection_ref: &str) -> Result<(), JiraError> {
+    async fn refresh_user_oauth(&self, endpoint_ref: &str) -> Result<(), JiraError> {
         let _refresh = self.refresh_lock.lock().await;
         let connection = lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .find(|connection| {
-                connection.connection_ref == connection_ref
+                connection.endpoint_ref == endpoint_ref
                     && connection.grant_ref == self.policy.user_grant_ref
             })
             .cloned()
@@ -560,7 +560,7 @@ impl JiraInner {
     async fn verify_refresh_subject(
         &self,
         token: &Secret,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
     ) -> Result<(Vec<String>, AtlassianMe), JiraError> {
         let resources: Vec<AccessibleResource> = self
             .bearer_json(
@@ -805,10 +805,10 @@ fn normalize_email(value: &str) -> String {
     value.trim().to_ascii_lowercase()
 }
 
-fn upsert_connection(connections: &mut Vec<StoredConnection>, connection: StoredConnection) {
-    connections.retain(|candidate| candidate.connection_ref != connection.connection_ref);
-    connections.push(connection);
-    connections.sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+fn upsert_connection(endpoints: &mut Vec<StoredEndpoint>, connection: StoredEndpoint) {
+    endpoints.retain(|candidate| candidate.endpoint_ref != connection.endpoint_ref);
+    endpoints.push(connection);
+    endpoints.sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
 }
 
 fn proposal_digest(batch: &SecretBatch) -> SecretProposalDigest {

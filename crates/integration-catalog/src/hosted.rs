@@ -14,10 +14,10 @@ use connector_secrets::{
 use connector_state::StateStore;
 use connectors_config::{CatalogIntegrationConfig, HostedCatalogConfig, InitiationConfig};
 use protocol::catalog::{SetupProfileActor, SetupProfileSummary};
-use protocol::connection::{
-    ConnectSessionState, ConnectSessionStatus, ConnectionActor, ConnectionDescription,
-    ConnectionError, ConnectionErrorCode, ConnectionInitiator, ConnectionRequest, ConnectionResult,
-    ConnectionRoute, ConnectionScope, ConnectionState, ConnectionSummary,
+use protocol::endpoint::{
+    ConnectSessionState, ConnectSessionStatus, EndpointActor, EndpointDescription,
+    EndpointError, EndpointErrorCode, EndpointInitiator, EndpointRequest, EndpointResult,
+    EndpointRoute, EndpointScope, EndpointState, EndpointSummary,
 };
 use protocol::operation::{OperationError, OperationRequest, OperationResult};
 use serde::{Deserialize, Serialize};
@@ -29,10 +29,10 @@ use service::{
 use sha2::{Digest as _, Sha256};
 
 use super::{
-    connection_ref, credential_address, origin_of, CatalogBackend, CatalogIntegrationError,
+    endpoint_ref, credential_address, origin_of, CatalogBackend, CatalogIntegrationError,
 };
 
-const STATE_KEY: &str = "catalog.connections.v1";
+const STATE_KEY: &str = "catalog.endpoints.v1";
 const STATE_VERSION: u8 = 1;
 const MAX_STATE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_PENDING_SESSIONS: usize = 256;
@@ -50,7 +50,7 @@ pub enum HostedCatalogError {
     Catalog(#[from] CatalogIntegrationError),
 }
 
-/// Generic catalog backend for principal-owned hosted Connections.
+/// Generic catalog backend for principal-owned hosted Endpoints.
 pub struct HostedCatalogBackend {
     inner: Arc<Inner>,
 }
@@ -76,7 +76,7 @@ struct Inner {
 struct StateFile {
     version: u8,
     next_transaction_generation: u64,
-    connections: Vec<StoredConnection>,
+    endpoints: Vec<StoredEndpoint>,
     pending: Vec<PendingCommit>,
 }
 
@@ -85,7 +85,7 @@ impl Default for StateFile {
         Self {
             version: STATE_VERSION,
             next_transaction_generation: 1,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             pending: Vec::new(),
         }
     }
@@ -93,8 +93,8 @@ impl Default for StateFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct StoredConnection {
-    connection_ref: String,
+struct StoredEndpoint {
+    endpoint_ref: String,
     provider: String,
     instance: String,
     credential: String,
@@ -118,7 +118,7 @@ enum StoredActor {
 #[serde(deny_unknown_fields)]
 struct PendingCommit {
     transaction_id: String,
-    connection: StoredConnection,
+    connection: StoredEndpoint,
 }
 
 #[derive(Clone)]
@@ -131,7 +131,7 @@ struct Session {
     capability_sha256: [u8; 32],
     expires_at_unix_ms: u64,
     state: ConnectSessionState,
-    connection_ref: Option<String>,
+    endpoint_ref: Option<String>,
 }
 
 impl HostedCatalogBackend {
@@ -240,30 +240,30 @@ impl Inner {
             .collect()
     }
 
-    fn check_context(&self, context: &PrincipalContext) -> Result<(), ConnectionError> {
+    fn check_context(&self, context: &PrincipalContext) -> Result<(), EndpointError> {
         if context.tenant_id() == self.tenant_id {
             Ok(())
         } else {
-            Err(connection_error(
-                ConnectionErrorCode::StaleAuthority,
+            Err(endpoint_error(
+                EndpointErrorCode::StaleAuthority,
                 "owner authority snapshot is not current",
             ))
         }
     }
 
-    fn owned_connections(&self, context: &PrincipalContext) -> Vec<StoredConnection> {
+    fn owned_connections(&self, context: &PrincipalContext) -> Vec<StoredEndpoint> {
         if context.tenant_id() != self.tenant_id {
             return Vec::new();
         }
         lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .filter(|connection| connection.owner_subject == context.subject())
             .cloned()
             .collect()
     }
 
-    fn config(connection: &StoredConnection, grant_ref: &str) -> CatalogIntegrationConfig {
+    fn config(connection: &StoredEndpoint, grant_ref: &str) -> CatalogIntegrationConfig {
         CatalogIntegrationConfig {
             provider: connection.provider.clone(),
             instance: Some(connection.instance.clone()),
@@ -306,11 +306,11 @@ impl Inner {
         provider: &str,
         credential: &str,
         label: String,
-    ) -> Result<ConnectSessionStatus, ConnectionError> {
+    ) -> Result<ConnectSessionStatus, EndpointError> {
         self.expire_sessions();
         self.profile(provider, credential).ok_or_else(|| {
-            connection_error(
-                ConnectionErrorCode::InvalidInput,
+            endpoint_error(
+                EndpointErrorCode::InvalidInput,
                 "the catalog does not admit that setup profile",
             )
         })?;
@@ -346,7 +346,7 @@ impl Inner {
                 capability_sha256: Sha256::digest(capability.as_bytes()).into(),
                 expires_at_unix_ms,
                 state: ConnectSessionState::Pending,
-                connection_ref: None,
+                endpoint_ref: None,
             },
         );
         Ok(ConnectSessionStatus {
@@ -356,7 +356,7 @@ impl Inner {
             expires_at_unix_ms,
             completion_endpoint: None,
             browser_completion_url: Some(url.into()),
-            connection_ref: None,
+            endpoint_ref: None,
         })
     }
 
@@ -364,13 +364,13 @@ impl Inner {
         &self,
         context: &PrincipalContext,
         session_ref: &str,
-    ) -> Result<ConnectSessionStatus, ConnectionError> {
+    ) -> Result<ConnectSessionStatus, EndpointError> {
         self.expire_sessions();
         let sessions = lock(&self.sessions);
         let session = sessions.get(session_ref).filter(|session| {
             session.owner_subject == context.subject() && context.tenant_id() == self.tenant_id
         });
-        let session = session.ok_or_else(connection_not_found)?;
+        let session = session.ok_or_else(endpoint_not_found)?;
         Ok(ConnectSessionStatus {
             connect_session_ref: session_ref.to_owned(),
             integration_ref: session.provider.clone(),
@@ -378,7 +378,7 @@ impl Inner {
             expires_at_unix_ms: session.expires_at_unix_ms,
             completion_endpoint: None,
             browser_completion_url: None,
-            connection_ref: session.connection_ref.clone(),
+            endpoint_ref: session.endpoint_ref.clone(),
         })
     }
 
@@ -453,8 +453,8 @@ impl Inner {
             oauth: None,
         };
         let reference = credential_address(&self.tenant_id, authority, &entry, credential.leaf)?;
-        let connection = StoredConnection {
-            connection_ref: connection_ref(&session.provider, &instance),
+        let connection = StoredEndpoint {
+            endpoint_ref: endpoint_ref(&session.provider, &instance),
             provider: session.provider.clone(),
             instance,
             credential: session.credential.clone(),
@@ -509,17 +509,17 @@ impl Inner {
                 .pending
                 .retain(|pending| pending.transaction_id != transaction_id);
             metadata
-                .connections
-                .retain(|candidate| candidate.connection_ref != connection.connection_ref);
-            metadata.connections.push(connection.clone());
+                .endpoints
+                .retain(|candidate| candidate.endpoint_ref != connection.endpoint_ref);
+            metadata.endpoints.push(connection.clone());
             metadata
-                .connections
-                .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+                .endpoints
+                .sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
             self.persist(&metadata)?;
         }
         let _ = self.prepared.reclaim(generation).await;
         let _ = session_ref;
-        Ok(connection.connection_ref)
+        Ok(connection.endpoint_ref)
     }
 
     async fn recover_pending(&self) -> Result<(), HostedCatalogError> {
@@ -552,13 +552,13 @@ impl Inner {
             metadata
                 .pending
                 .retain(|candidate| candidate.transaction_id != record.transaction_id);
-            metadata.connections.push(record.connection);
+            metadata.endpoints.push(record.connection);
             metadata
-                .connections
-                .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+                .endpoints
+                .sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
             metadata
-                .connections
-                .dedup_by(|left, right| left.connection_ref == right.connection_ref);
+                .endpoints
+                .dedup_by(|left, right| left.endpoint_ref == right.endpoint_ref);
             self.persist(&metadata)?;
         }
         Ok(())
@@ -581,8 +581,8 @@ impl Inner {
             .profile(&session.provider, &session.credential)
             .ok_or(HostedCompletionError::Unavailable)?;
         let instance = random_uuid().map_err(|_| HostedCompletionError::Unavailable)?;
-        let connection = StoredConnection {
-            connection_ref: connection_ref(&session.provider, &instance),
+        let connection = StoredEndpoint {
+            endpoint_ref: endpoint_ref(&session.provider, &instance),
             provider: session.provider.clone(),
             instance,
             credential: session.credential.clone(),
@@ -620,7 +620,7 @@ impl Inner {
             .inner
             .invoke(
                 operation_ref,
-                &connection.connection_ref,
+                &connection.endpoint_ref,
                 &description.description_ref,
                 serde_json::json!({}),
             )
@@ -645,7 +645,7 @@ impl ConnectorBackend for HostedCatalogBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
-            connections: true,
+            endpoints: true,
             events: false,
             datasources: false,
         }
@@ -659,42 +659,42 @@ impl ConnectorBackend for HostedCatalogBackend {
             ))
             .is_some_and(|operation| {
                 lock(&self.inner.metadata)
-                    .connections
+                    .endpoints
                     .iter()
                     .any(|connection| connection.provider == operation.provider)
             }),
             OperationRequest::Invoke(request) => lock(&self.inner.metadata)
-                .connections
+                .endpoints
                 .iter()
-                .any(|connection| connection.connection_ref == request.connection_ref),
+                .any(|connection| connection.endpoint_ref == request.endpoint_ref),
             _ => false,
         }
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
         match request {
-            ConnectionRequest::ConnectSessionCreate(request) => {
+            EndpointRequest::ConnectSessionCreate(request) => {
                 request.auth_profile.as_deref().is_some_and(|profile| {
                     self.inner
                         .profile(&request.integration_ref, profile)
                         .is_some()
                 })
             }
-            ConnectionRequest::ConnectSessionStatus(request) => {
+            EndpointRequest::ConnectSessionStatus(request) => {
                 lock(&self.inner.sessions).contains_key(&request.connect_session_ref)
             }
-            ConnectionRequest::Describe(request) => lock(&self.inner.metadata)
-                .connections
+            EndpointRequest::Describe(request) => lock(&self.inner.metadata)
+                .endpoints
                 .iter()
-                .any(|connection| connection.connection_ref == request.connection_ref),
-            ConnectionRequest::Search(_) => false,
+                .any(|connection| connection.endpoint_ref == request.endpoint_ref),
+            EndpointRequest::Search(_) => false,
             _ => false,
         }
     }
 
     fn connect_session_access(
         &self,
-        request: &protocol::connection::ConnectSessionCreateRequest,
+        request: &protocol::endpoint::ConnectSessionCreateRequest,
     ) -> ConnectSessionAccess {
         if request.auth_profile.as_deref().is_some_and(|profile| {
             self.inner
@@ -760,7 +760,7 @@ impl ConnectorBackend for HostedCatalogBackend {
             .ok_or(HostedCompletionError::Invalid)?;
         let value = std::str::from_utf8(value).map_err(|_| HostedCompletionError::Invalid)?;
         let verification = self.inner.verify_credential(&session, value).await?;
-        let connection_ref = self
+        let endpoint_ref = self
             .inner
             .commit_connection(session_ref, &session, Secret::new(value), verification)
             .await
@@ -771,7 +771,7 @@ impl ConnectorBackend for HostedCatalogBackend {
             .filter(|session| session.state == ConnectSessionState::Pending)
             .ok_or(HostedCompletionError::NotFound)?;
         current.state = ConnectSessionState::Completed;
-        current.connection_ref = Some(connection_ref);
+        current.endpoint_ref = Some(endpoint_ref);
         current.capability_sha256.fill(0);
         Ok(())
     }
@@ -784,16 +784,16 @@ impl ConnectorBackend for HostedCatalogBackend {
         self.inner.delegate(context)?.handle(context, request).await
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         self.inner.check_context(context)?;
         match request {
-            ConnectionRequest::Search(request) => {
+            EndpointRequest::Search(request) => {
                 let query = request.query.to_ascii_lowercase();
-                let mut connections = self
+                let mut endpoints = self
                     .inner
                     .owned_connections(context)
                     .into_iter()
@@ -802,39 +802,39 @@ impl ConnectorBackend for HostedCatalogBackend {
                             || connection.provider.to_ascii_lowercase().contains(&query)
                             || connection.label.to_ascii_lowercase().contains(&query)
                     })
-                    .map(connection_summary)
+                    .map(endpoint_summary)
                     .collect::<Vec<_>>();
-                connections.truncate(usize::from(request.limit));
-                Ok(ConnectionResult::Search { connections })
+                endpoints.truncate(usize::from(request.limit));
+                Ok(EndpointResult::Search { endpoints })
             }
-            ConnectionRequest::Describe(request) => self
+            EndpointRequest::Describe(request) => self
                 .inner
                 .owned_connections(context)
                 .into_iter()
-                .find(|connection| connection.connection_ref == request.connection_ref)
+                .find(|connection| connection.endpoint_ref == request.endpoint_ref)
                 .map(|connection| {
-                    ConnectionResult::Describe(ConnectionDescription {
-                        summary: connection_summary(connection),
+                    EndpointResult::Describe(EndpointDescription {
+                        summary: endpoint_summary(connection),
                         channels: Vec::new(),
                     })
                 })
-                .ok_or_else(connection_not_found),
-            ConnectionRequest::ConnectSessionCreate(request) => {
+                .ok_or_else(endpoint_not_found),
+            EndpointRequest::ConnectSessionCreate(request) => {
                 let profile = request.auth_profile.as_deref().ok_or_else(|| {
-                    connection_error(
-                        ConnectionErrorCode::InvalidInput,
+                    endpoint_error(
+                        EndpointErrorCode::InvalidInput,
                         "a catalog setup profile is required",
                     )
                 })?;
                 self.inner
                     .create_session(context, &request.integration_ref, profile, request.label)
-                    .map(ConnectionResult::ConnectSessionCreate)
+                    .map(EndpointResult::ConnectSessionCreate)
             }
-            ConnectionRequest::ConnectSessionStatus(request) => self
+            EndpointRequest::ConnectSessionStatus(request) => self
                 .inner
                 .session_status(context, &request.connect_session_ref)
-                .map(ConnectionResult::ConnectSessionStatus),
-            _ => Err(connection_not_found()),
+                .map(EndpointResult::ConnectSessionStatus),
+            _ => Err(endpoint_not_found()),
         }
     }
 }
@@ -881,18 +881,18 @@ pub fn hosted_admitted_origins(
     Ok(origins.into_iter().collect())
 }
 
-fn connection_summary(connection: StoredConnection) -> ConnectionSummary {
-    ConnectionSummary {
-        connection_ref: connection.connection_ref,
+fn endpoint_summary(connection: StoredEndpoint) -> EndpointSummary {
+    EndpointSummary {
+        endpoint_ref: connection.endpoint_ref,
         integration_ref: connection.provider,
         label: connection.label,
-        state: ConnectionState::Callable,
-        initiation: vec![ConnectionInitiator::Platform],
-        route: ConnectionRoute::Direct,
-        scope: Some(ConnectionScope::Principal),
+        state: EndpointState::Callable,
+        initiation: vec![EndpointInitiator::Platform],
+        route: EndpointRoute::Direct,
+        scope: Some(EndpointScope::Principal),
         actor: Some(match connection.actor {
-            StoredActor::User => ConnectionActor::User,
-            StoredActor::App => ConnectionActor::App,
+            StoredActor::User => EndpointActor::User,
+            StoredActor::App => EndpointActor::App,
         }),
         auth_profile: Some(connection.credential),
     }
@@ -981,17 +981,17 @@ fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
     difference == 0
 }
 
-fn connection_error(code: ConnectionErrorCode, message: &str) -> ConnectionError {
-    ConnectionError::new(code, message, false)
+fn endpoint_error(code: EndpointErrorCode, message: &str) -> EndpointError {
+    EndpointError::new(code, message, false)
 }
 
-fn connection_not_found() -> ConnectionError {
-    connection_error(ConnectionErrorCode::NotFound, "no such catalog Connection")
+fn endpoint_not_found() -> EndpointError {
+    endpoint_error(EndpointErrorCode::NotFound, "no such catalog Connection")
 }
 
-fn connection_unavailable() -> ConnectionError {
-    connection_error(
-        ConnectionErrorCode::Unavailable,
+fn connection_unavailable() -> EndpointError {
+    endpoint_error(
+        EndpointErrorCode::Unavailable,
         "catalog Connection setup is temporarily unavailable",
     )
 }
@@ -1097,10 +1097,10 @@ mod tests {
         sentinel: &str,
     ) -> String {
         let created = backend
-            .handle_connection(
+            .handle_endpoint(
                 principal,
-                ConnectionRequest::ConnectSessionCreate(
-                    protocol::connection::ConnectSessionCreateRequest {
+                EndpointRequest::ConnectSessionCreate(
+                    protocol::endpoint::ConnectSessionCreateRequest {
                         integration_ref: "anthropic".to_owned(),
                         label: label.to_owned(),
                         auth_profile: Some("anthropic.api_key".to_owned()),
@@ -1109,7 +1109,7 @@ mod tests {
             )
             .await
             .expect("session created");
-        let ConnectionResult::ConnectSessionCreate(created) = created else {
+        let EndpointResult::ConnectSessionCreate(created) = created else {
             panic!("wrong result")
         };
         let url = url::Url::parse(
@@ -1132,20 +1132,20 @@ mod tests {
             .await
             .expect("session completed");
         let status = backend
-            .handle_connection(
+            .handle_endpoint(
                 principal,
-                ConnectionRequest::ConnectSessionStatus(
-                    protocol::connection::ConnectSessionStatusRequest {
+                EndpointRequest::ConnectSessionStatus(
+                    protocol::endpoint::ConnectSessionStatusRequest {
                         connect_session_ref: created.connect_session_ref,
                     },
                 ),
             )
             .await
             .expect("status");
-        let ConnectionResult::ConnectSessionStatus(status) = status else {
+        let EndpointResult::ConnectSessionStatus(status) = status else {
             panic!("wrong status")
         };
-        status.connection_ref.expect("connection")
+        status.endpoint_ref.expect("connection")
     }
 
     fn pending_session(
@@ -1242,11 +1242,11 @@ mod tests {
     async fn search(
         backend: &HostedCatalogBackend,
         principal: &PrincipalContext,
-    ) -> ConnectionResult {
+    ) -> EndpointResult {
         backend
-            .handle_connection(
+            .handle_endpoint(
                 principal,
-                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                EndpointRequest::Search(protocol::endpoint::SearchRequest {
                     query: String::new(),
                     limit: 10,
                 }),
@@ -1286,24 +1286,24 @@ mod tests {
         let second_ref = connect(&backend, &second, "Second key", SENTINEL_TWO).await;
         assert_ne!(first_ref, second_ref);
 
-        let ConnectionResult::Search {
-            connections: first_rows,
+        let EndpointResult::Search {
+            endpoints: first_rows,
         } = search(&backend, &first).await
         else {
             panic!("wrong search result")
         };
-        let ConnectionResult::Search {
-            connections: second_rows,
+        let EndpointResult::Search {
+            endpoints: second_rows,
         } = search(&backend, &second).await
         else {
             panic!("wrong search result")
         };
         assert_eq!(first_rows.len(), 1);
         assert_eq!(second_rows.len(), 1);
-        assert_eq!(first_rows[0].connection_ref, first_ref);
-        assert_eq!(second_rows[0].connection_ref, second_ref);
+        assert_eq!(first_rows[0].endpoint_ref, first_ref);
+        assert_eq!(second_rows[0].endpoint_ref, second_ref);
 
-        let stored = lock(&backend.inner.metadata).connections.clone();
+        let stored = lock(&backend.inner.metadata).endpoints.clone();
         assert_eq!(stored.len(), 2);
         let provider = catalog::provider(catalog::ProviderKey::id("anthropic")).unwrap();
         let authority = provider.authority.unwrap();

@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use connector_resolve::document::Document;
 use domain::{
-    AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ZeroIoPlan,
+    AdmittedOperation, Capability, EndpointAuthority, DriverId, InitiationPolicy, ZeroIoPlan,
 };
 use futures_util::{SinkExt as _, StreamExt as _};
 use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER};
@@ -104,7 +104,7 @@ fn plan() -> ZeroIoPlan {
             "org-1",
             "principal-1",
             "grant-1",
-            ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only()).unwrap(),
+            EndpointAuthority::new("connection-1", InitiationPolicy::platform_only()).unwrap(),
         ),
         &PlanningEnvironment {
             available_drivers: BTreeSet::from([DriverId::SipV1]),

@@ -207,7 +207,7 @@ mod tests {
     fn logs_invoke(description_ref: String, input: serde_json::Value) -> OperationRequest {
         OperationRequest::Invoke(InvokeRequest {
             operation_ref: LOGS_OPERATION.to_owned(),
-            connection_ref: CONNECTION.to_owned(),
+            endpoint_ref: CONNECTION.to_owned(),
             description_ref,
             input,
             approval_evidence_ref: None,
@@ -552,7 +552,7 @@ mod tests {
                 &context,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: STATUS_OPERATION.to_owned(),
-                    connection_ref: CONNECTION.to_owned(),
+                    endpoint_ref: CONNECTION.to_owned(),
                     description_ref: description.description_ref,
                     input: json!({"namespace": "b10x", "name": "backend"}),
                     approval_evidence_ref: None,
@@ -570,7 +570,7 @@ mod tests {
                 &context,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: STATUS_OPERATION.to_owned(),
-                    connection_ref: CONNECTION.to_owned(),
+                    endpoint_ref: CONNECTION.to_owned(),
                     description_ref: description_ref(&context, STATUS_OPERATION),
                     input: json!({"namespace": "kube-system", "name": "backend"}),
                     approval_evidence_ref: None,
@@ -590,10 +590,10 @@ mod tests {
             Arc::new(Reader),
         )
         .unwrap();
-        let ConnectionResult::Search { connections } = backend
-            .handle_connection(
+        let EndpointResult::Search { endpoints } = backend
+            .handle_endpoint(
                 &owner("tenant-dev"),
-                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                EndpointRequest::Search(protocol::endpoint::SearchRequest {
                     query: String::new(),
                     limit: 16,
                 }),
@@ -603,11 +603,11 @@ mod tests {
         else {
             panic!("Connection search result expected");
         };
-        assert_eq!(connections, vec![control_connection()]);
+        assert_eq!(endpoints, vec![control_connection()]);
         assert!(backend
-            .handle_connection(
+            .handle_endpoint(
                 &owner("tenant-other"),
-                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                EndpointRequest::Search(protocol::endpoint::SearchRequest {
                     query: String::new(),
                     limit: 16,
                 }),
@@ -768,7 +768,7 @@ mod tests {
                 &invoking,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: STATUS_OPERATION.to_owned(),
-                    connection_ref: CONNECTION.to_owned(),
+                    endpoint_ref: CONNECTION.to_owned(),
                     description_ref: description.description_ref,
                     input: json!({"namespace": "b10x", "name": "backend"}),
                     approval_evidence_ref: None,
@@ -928,7 +928,7 @@ mod tests {
                 &sre,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: RESTART_OPERATION.to_owned(),
-                    connection_ref: CONNECTION.to_owned(),
+                    endpoint_ref: CONNECTION.to_owned(),
                     description_ref: description.description_ref,
                     input,
                     approval_evidence_ref: None,

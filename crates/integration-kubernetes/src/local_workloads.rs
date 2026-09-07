@@ -472,7 +472,7 @@ impl WorkloadSurface {
         connection: Option<(String, Client)>,
         namespaces: &[String],
     ) -> Result<DatasourceResult, DatasourceError> {
-        let Some((connection_ref, client)) = connection else {
+        let Some((endpoint_ref, client)) = connection else {
             // Not a defect and not a missing grant: nobody has activated a kubeconfig context in
             // this daemon generation yet, so there is no cluster to read. Retriable, because
             // activating one is a thing the person reading this can go and do.
@@ -507,14 +507,14 @@ impl WorkloadSurface {
                     .iter()
                     .filter(|namespace| query.is_empty() || namespace.contains(&query))
                     .take(usize::from(limit))
-                    .map(|namespace| namespace_binding(&connection_ref, namespace))
+                    .map(|namespace| namespace_binding(&endpoint_ref, namespace))
                     .collect();
                 Ok(DatasourceResult::Bindings { bindings })
             }
             DatasourceRequest::Read(read) => {
                 let namespace = Self::binding_namespace(namespaces, &read.binding_ref)?.to_owned();
                 let reader = KubeconfigReader::new(client);
-                let connector_audit_ref = audit_ref(context, &connection_ref, &namespace);
+                let connector_audit_ref = audit_ref(context, &endpoint_ref, &namespace);
                 read_workloads(
                     &reader,
                     &self.cursors,
@@ -530,9 +530,9 @@ impl WorkloadSurface {
     }
 }
 
-fn audit_ref(context: &PrincipalContext, connection_ref: &str, namespace: &str) -> String {
+fn audit_ref(context: &PrincipalContext, endpoint_ref: &str, namespace: &str) -> String {
     let digest = Sha256::digest(format!(
-        "{}\0{DATASOURCE}\0{connection_ref}\0{namespace}",
+        "{}\0{DATASOURCE}\0{endpoint_ref}\0{namespace}",
         context.authority_snapshot_sha256()
     ));
     format!("audit:kubernetes-local:{}", hex::encode(&digest[..16]))

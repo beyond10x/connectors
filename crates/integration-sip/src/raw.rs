@@ -111,14 +111,31 @@ impl SessionLauncher for SipLauncher {
         // call, and the binding is what makes it audible, not what makes it succeed.
         let binding = voice_local_audio::bind(Arc::clone(&session), self.device.as_ref()).ok();
 
-        // The call outlives this call, so its terminal fact is published by a task that waits for
-        // the driver's own answer rather than inferring one from media or signal EOF.
+        // The backend uses this control for explicit termination, daemon shutdown and cleanup
+        // after a failed audit write. Carry each request to the driver, and publish completion
+        // only after its owner task has closed the dialog and joined its transports.
         let supervised = Arc::clone(&session);
+        let supervised_control = control.clone();
         tokio::spawn(async move {
-            let reason = supervised
-                .wait_terminated()
-                .await
-                .unwrap_or(TerminationReason::TransportLost);
+            let (selected, requested) = tokio::select! {
+                biased;
+                terminal = supervised.wait_terminated() => {
+                    (terminal.unwrap_or(TerminationReason::TransportLost), false)
+                }
+                requested = supervised_control.wait_termination() => (requested, true),
+            };
+            let reason = if supervised.terminate(selected).await.is_ok() {
+                match supervised.wait_terminated().await {
+                    // The SIP stack reports a successful local BYE as Completed. Preserve the
+                    // reason that requested it, while retaining a crossing remote hangup or
+                    // transport failure as the driver's observed terminal fact.
+                    Ok(TerminationReason::Completed) if requested => selected,
+                    Ok(reason) => reason,
+                    Err(_) => TerminationReason::TransportLost,
+                }
+            } else {
+                TerminationReason::TransportLost
+            };
             // Released on the driver's terminal fact, so the recorder never outlives the call it
             // was opened for.
             if let Some(binding) = binding {
@@ -137,6 +154,10 @@ impl SessionLauncher for SipLauncher {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "raw_tests.rs"]
+mod supervision_tests;
 
 #[cfg(test)]
 mod tests {

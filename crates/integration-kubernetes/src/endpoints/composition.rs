@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use domain::endpoint::{Endpoint, EndpointCredentialReference};
+use domain::endpoint_inventory::{EndpointInventoryEntry, EndpointCredentialReference};
 use service::{ConnectorBackend, PrincipalContext};
 
 use super::KubernetesEndpointSource;
@@ -46,7 +46,7 @@ impl EndpointPrincipalPolicy {
             }
     }
 
-    pub fn reads(&self, context: &PrincipalContext, endpoint: &Endpoint) -> bool {
+    pub fn reads(&self, context: &PrincipalContext, endpoint: &EndpointInventoryEntry) -> bool {
         if !self.owns(context) {
             return false;
         }

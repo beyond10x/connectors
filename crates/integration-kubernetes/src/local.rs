@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::endpoints::{
+use crate::endpoint_inventorys::{
     EndpointBackendFactory, EndpointPlacement, EndpointPrincipalPolicy, KubernetesEndpointSource,
 };
 
@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use connector_resolve::document::ProtocolDriver;
 use connector_resolve::resolve;
 use domain::{
-    AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ProtocolPlan,
+    AdmittedOperation, Capability, EndpointAuthority, DriverId, InitiationPolicy, ProtocolPlan,
     RouteAdapter as DomainRouteAdapter,
 };
 use inventory::{namespace_operation, workload_operation, NAMESPACE_OPERATION, WORKLOAD_OPERATION};
@@ -33,18 +33,18 @@ use inventory::{namespace_operation, workload_operation, NAMESPACE_OPERATION, WO
 use k8s_openapi::api::core::v1::Service;
 use kube::config::{KubeConfigOptions, Kubeconfig};
 use kube::{Client, Config};
-use protocol::connection::{
-    CandidateActivateRequest, CandidateSearchRequest, ConnectionCandidateState,
-    ConnectionCandidateSummary, ConnectionDescription, ConnectionError, ConnectionErrorCode,
-    ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
-    ConnectionSummary, DiscoveryObservationState, DiscoveryObservationSummary, MaterializeRequest,
+use protocol::endpoint::{
+    CandidateActivateRequest, CandidateSearchRequest, EndpointCandidateState,
+    EndpointCandidateSummary, EndpointDescription, EndpointError, EndpointErrorCode,
+    EndpointInitiator, EndpointRequest, EndpointResult, EndpointRoute, EndpointState,
+    EndpointSummary, DiscoveryObservationState, DiscoveryObservationSummary, MaterializeRequest,
     ObservationSearchRequest, RouteAdapter,
 };
 use protocol::datasource::{
     DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult,
 };
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, DescribeRequest, EffectClass,
+    ApprovalPosture, EndpointSummary as OperationEndpointSummary, DescribeRequest, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
@@ -77,18 +77,18 @@ pub use endpoint_surface::{local_contexts, LocalContextSummary};
 
 #[derive(Debug, Clone)]
 struct CandidateBinding {
-    summary: ConnectionCandidateSummary,
+    summary: EndpointCandidateSummary,
     context_name: String,
     evidence_material: String,
 }
 
 #[derive(Default)]
 struct KubernetesState {
-    connections: BTreeMap<String, ConnectionDescription>,
+    endpoints: BTreeMap<String, EndpointDescription>,
     candidate_connections: BTreeMap<String, String>,
     clients: BTreeMap<String, Client>,
     observations: BTreeMap<String, StoredServiceObservation>,
-    children: BTreeMap<String, KubernetesServiceConnection>,
+    children: BTreeMap<String, KubernetesServiceEndpoint>,
 }
 
 #[derive(Debug, Clone)]
@@ -103,12 +103,12 @@ pub(crate) struct StoredServiceObservation {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct KubernetesServiceConnection {
-    pub(crate) connection_ref: String,
+pub(crate) struct KubernetesServiceEndpoint {
+    pub(crate) endpoint_ref: String,
     pub(crate) label: String,
     pub(crate) provider: String,
     pub(crate) grant_ref: String,
-    pub(crate) parent_connection_ref: String,
+    pub(crate) parent_endpoint_ref: String,
     pub(crate) observation_ref: String,
     pub(crate) namespace: String,
     pub(crate) service: String,
@@ -126,14 +126,14 @@ pub(crate) struct KubernetesServiceConnection {
 /// selection rule this is. Testing the rule needs neither.
 fn cluster_rows<'a>(
     attached: impl IntoIterator<Item = &'a String>,
-    connections: &BTreeMap<String, ConnectionDescription>,
+    endpoints: &BTreeMap<String, EndpointDescription>,
 ) -> Vec<(String, String)> {
     attached
         .into_iter()
-        .filter_map(|connection_ref| {
-            connections
-                .get(connection_ref)
-                .map(|description| (connection_ref.clone(), description.summary.label.clone()))
+        .filter_map(|endpoint_ref| {
+            endpoints
+                .get(endpoint_ref)
+                .map(|description| (endpoint_ref.clone(), description.summary.label.clone()))
         })
         .collect()
 }
@@ -177,7 +177,7 @@ impl KubernetesLocalBackend {
         })
     }
 
-    /// Number of activated Kubernetes source Connections in this daemon generation.
+    /// Number of activated Kubernetes source Endpoints in this daemon generation.
     #[must_use]
     pub fn connection_count(&self) -> usize {
         lock(&self.state).candidate_connections.len()
@@ -189,10 +189,10 @@ impl KubernetesLocalBackend {
         self.candidates.len()
     }
 
-    fn check_context(&self, context: &PrincipalContext) -> Result<(), ConnectionError> {
+    fn check_context(&self, context: &PrincipalContext) -> Result<(), EndpointError> {
         if context != &self.owner {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::StaleAuthority,
+            return Err(EndpointError::new(
+                EndpointErrorCode::StaleAuthority,
                 "owner context does not match this Connector generation",
                 false,
             ));
@@ -235,7 +235,7 @@ impl KubernetesLocalBackend {
             .clients
             .iter()
             .next()
-            .map(|(connection_ref, client)| (connection_ref.clone(), client.clone()))
+            .map(|(endpoint_ref, client)| (endpoint_ref.clone(), client.clone()))
     }
 
     /// Namespaces this placement offers as datasource bindings.
@@ -260,7 +260,7 @@ impl KubernetesLocalBackend {
     fn search_candidates(
         &self,
         request: &CandidateSearchRequest,
-    ) -> Vec<ConnectionCandidateSummary> {
+    ) -> Vec<EndpointCandidateSummary> {
         let query = request.query.to_ascii_lowercase();
         let state = lock(&self.state);
         self.candidates
@@ -274,12 +274,12 @@ impl KubernetesLocalBackend {
             })
             .map(|candidate| {
                 let mut summary = candidate.summary.clone();
-                if let Some(connection_ref) = state
+                if let Some(endpoint_ref) = state
                     .candidate_connections
                     .get(&candidate.summary.candidate_ref)
                 {
-                    summary.state = ConnectionCandidateState::Activated;
-                    summary.connection_ref = Some(connection_ref.clone());
+                    summary.state = EndpointCandidateState::Activated;
+                    summary.endpoint_ref = Some(endpoint_ref.clone());
                 }
                 summary
             })
@@ -287,10 +287,10 @@ impl KubernetesLocalBackend {
             .collect()
     }
 
-    fn search_connections(&self, query: &str) -> Vec<ConnectionSummary> {
+    fn search_connections(&self, query: &str) -> Vec<EndpointSummary> {
         let query = query.to_ascii_lowercase();
         lock(&self.state)
-            .connections
+            .endpoints
             .values()
             .map(|connection| connection.summary.clone())
             .filter(|connection| connection.label.to_ascii_lowercase().contains(&query))
@@ -300,35 +300,35 @@ impl KubernetesLocalBackend {
     async fn activate(
         &self,
         request: CandidateActivateRequest,
-    ) -> Result<ConnectionDescription, ConnectionError> {
+    ) -> Result<EndpointDescription, EndpointError> {
         let candidate = self
             .candidates
             .get(&request.candidate_ref)
             .cloned()
-            .ok_or_else(connection_not_found)?;
+            .ok_or_else(endpoint_not_found)?;
         // Activation can invoke an external credential helper. Serialize and re-check so repeated
         // calls cannot run that effect more than once for the same candidate in this generation.
         let _activation = self.activation.lock().await;
-        if let Some(connection_ref) = lock(&self.state)
+        if let Some(endpoint_ref) = lock(&self.state)
             .candidate_connections
             .get(&request.candidate_ref)
             .cloned()
         {
             return lock(&self.state)
-                .connections
-                .get(&connection_ref)
+                .endpoints
+                .get(&endpoint_ref)
                 .cloned()
-                .ok_or_else(connection_protocol);
+                .ok_or_else(endpoint_protocol);
         }
 
         // Re-read at the explicit activation boundary so a stale passive candidate cannot silently
         // bind to a different cluster or identity.
         let kubeconfig = Kubeconfig::read().map_err(|_| connection_unavailable())?;
         let fresh = binding_for_context(&kubeconfig, &candidate.context_name)
-            .ok_or_else(connection_not_found)?;
+            .ok_or_else(endpoint_not_found)?;
         if fresh.evidence_material != candidate.evidence_material {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::StaleAuthority,
+            return Err(EndpointError::new(
+                EndpointErrorCode::StaleAuthority,
                 "kubeconfig context changed after it was detected",
                 false,
             ));
@@ -336,8 +336,8 @@ impl KubernetesLocalBackend {
         if context_uses_credential_plugin(&kubeconfig, &candidate.context_name)
             && !self.policy.allow_exec_auth
         {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            return Err(EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "the selected context uses a credential plugin; allow_exec_auth is required",
                 false,
             ));
@@ -367,33 +367,33 @@ impl KubernetesLocalBackend {
             discover_services(client.clone(), &self.policy).await?
         };
 
-        let connection_ref = opaque_ref(
+        let endpoint_ref = opaque_ref(
             "connection:kubernetes:",
             &format!(
                 "{}\0{}",
                 candidate.summary.candidate_ref, candidate.evidence_material
             ),
         );
-        let description = ConnectionDescription {
-            summary: ConnectionSummary {
-                connection_ref: connection_ref.clone(),
+        let description = EndpointDescription {
+            summary: EndpointSummary {
+                endpoint_ref: endpoint_ref.clone(),
                 integration_ref: KUBERNETES.to_owned(),
                 label: request.label,
-                state: ConnectionState::Authorized,
+                state: EndpointState::Authorized,
                 initiation: initiation(self.policy.initiation),
-                route: ConnectionRoute::Direct,
+                route: EndpointRoute::Direct,
                 scope: None,
                 actor: None,
                 auth_profile: None,
             },
             channels: Vec::new(),
         };
-        let observations = normalize_services(&connection_ref, services);
+        let observations = normalize_services(&endpoint_ref, services);
         if let (Some(store), Some(factory)) = (&self.endpoint_state, &self.endpoint_factory) {
             let source = Arc::new(
                 KubernetesEndpointSource::new(
                     client.clone(),
-                    connection_ref.clone(),
+                    endpoint_ref.clone(),
                     self.policy.namespaces.iter().cloned().collect(),
                     self.policy.all_namespaces,
                     self.policy.target_grants.clone(),
@@ -414,16 +414,16 @@ impl KubernetesLocalBackend {
         let mut state = lock(&self.state);
         state
             .candidate_connections
-            .insert(request.candidate_ref, connection_ref.clone());
-        state.clients.insert(connection_ref.clone(), client);
+            .insert(request.candidate_ref, endpoint_ref.clone());
+        state.clients.insert(endpoint_ref.clone(), client);
         for observation in observations {
             state
                 .observations
                 .insert(observation.summary.observation_ref.clone(), observation);
         }
         state
-            .connections
-            .insert(connection_ref, description.clone());
+            .endpoints
+            .insert(endpoint_ref, description.clone());
         Ok(description)
     }
 
@@ -434,8 +434,8 @@ impl KubernetesLocalBackend {
         let query = request.query.to_ascii_lowercase();
         let state = lock(&self.state);
         if !state
-            .connections
-            .contains_key(&request.source_connection_ref)
+            .endpoints
+            .contains_key(&request.source_endpoint_ref)
         {
             return None;
         }
@@ -444,7 +444,7 @@ impl KubernetesLocalBackend {
                 .observations
                 .values()
                 .filter(|observation| {
-                    observation.summary.source_connection_ref == request.source_connection_ref
+                    observation.summary.source_endpoint_ref == request.source_endpoint_ref
                         && observation
                             .summary
                             .title
@@ -463,7 +463,7 @@ impl KubernetesLocalBackend {
 
     /// **Every attached cluster Connection**, in a stable order.
     ///
-    /// Distinct from the child Service Connections below it: those are Prometheus and Loki behind
+    /// Distinct from the child Service Endpoints below it: those are Prometheus and Loki behind
     /// Kubernetes Services, reached by proxy. These are the clusters, and they are what
     /// `kubernetes.deployment.*` acts on.
     ///
@@ -479,16 +479,16 @@ impl KubernetesLocalBackend {
     /// Activation is what admits a cluster. Nothing downstream of it may then quietly pick one.
     fn cluster_connections(&self) -> Vec<(String, String)> {
         let state = lock(&self.state);
-        cluster_rows(state.clients.keys(), &state.connections)
+        cluster_rows(state.clients.keys(), &state.endpoints)
     }
 
-    /// Whether `connection_ref` names a cluster this backend has attached.
-    fn is_cluster_connection(&self, connection_ref: &str) -> bool {
+    /// Whether `endpoint_ref` names a cluster this backend has attached.
+    fn is_cluster_connection(&self, endpoint_ref: &str) -> bool {
         let state = lock(&self.state);
-        state.clients.contains_key(connection_ref) && state.connections.contains_key(connection_ref)
+        state.clients.contains_key(endpoint_ref) && state.endpoints.contains_key(endpoint_ref)
     }
 
-    fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationConnectionSummary> {
+    fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationEndpointSummary> {
         // Workload and inventory operations belong to the cluster, not to a Service behind it. Publishing
         // them only for child Services is why an activated cluster admitted nothing a person could
         // call: the Connection was attached, readable as a datasource, and had no operation at all.
@@ -499,8 +499,8 @@ impl KubernetesLocalBackend {
             return self
                 .cluster_connections()
                 .into_iter()
-                .map(|(connection_ref, label)| OperationConnectionSummary {
-                    connection_ref,
+                .map(|(endpoint_ref, label)| OperationEndpointSummary {
+                    endpoint_ref,
                     label,
                     provider: KUBERNETES.to_owned(),
                     audiences: vec!["operations".to_owned()],
@@ -517,8 +517,8 @@ impl KubernetesLocalBackend {
             .children
             .values()
             .filter(|child| child.provider == provider && child_is_current(&state, child))
-            .map(|child| OperationConnectionSummary {
-                connection_ref: child.connection_ref.clone(),
+            .map(|child| OperationEndpointSummary {
+                endpoint_ref: child.endpoint_ref.clone(),
                 label: child.label.clone(),
                 provider: child.provider.clone(),
                 audiences: monitoring_model::audiences_for_operation(operation_ref),
@@ -527,14 +527,14 @@ impl KubernetesLocalBackend {
             .collect()
     }
 
-    fn child_is_current(&self, child: &KubernetesServiceConnection) -> bool {
+    fn child_is_current(&self, child: &KubernetesServiceEndpoint) -> bool {
         let state = lock(&self.state);
         child_is_current(&state, child)
     }
 
     fn operation_summary(&self, operation_ref: &str) -> Option<OperationSummary> {
-        let connections = self.connections_for_operation(operation_ref);
-        if connections.is_empty() {
+        let endpoints = self.connections_for_operation(operation_ref);
+        if endpoints.is_empty() {
             return None;
         }
         // A rollout restart changes a running deployment, so it carries the posture that says so.
@@ -571,7 +571,7 @@ impl KubernetesLocalBackend {
             title: title.to_owned(),
             effect,
             approval,
-            connections,
+            endpoints,
         })
     }
 
@@ -580,18 +580,18 @@ impl KubernetesLocalBackend {
         context: &PrincipalContext,
         operation_ref: &str,
     ) -> Result<OperationDescription, OperationError> {
-        let connections = self.connections_for_operation(operation_ref);
-        if connections.is_empty() {
+        let endpoints = self.connections_for_operation(operation_ref);
+        if endpoints.is_empty() {
             return Err(operation_not_found());
         }
-        // Status/restart keep their shared contracts; inventory is local-only. The Connections
+        // Status/restart keep their shared contracts; inventory is local-only. The Endpoints
         // and the lease below belong to this placement.
         let description_ref = self.operation_description_ref(context, operation_ref);
         match operation_ref {
-            STATUS_OPERATION => return Ok(status_operation(connections, description_ref)),
-            RESTART_OPERATION => return Ok(restart_operation(connections, description_ref)),
-            NAMESPACE_OPERATION => return Ok(namespace_operation(connections, description_ref)),
-            WORKLOAD_OPERATION => return Ok(workload_operation(connections, description_ref)),
+            STATUS_OPERATION => return Ok(status_operation(endpoints, description_ref)),
+            RESTART_OPERATION => return Ok(restart_operation(endpoints, description_ref)),
+            NAMESPACE_OPERATION => return Ok(namespace_operation(endpoints, description_ref)),
+            WORKLOAD_OPERATION => return Ok(workload_operation(endpoints, description_ref)),
             _ => {}
         }
         let operation =
@@ -608,7 +608,7 @@ impl KubernetesLocalBackend {
             )?,
             effect: EffectClass::ReadOnly,
             approval: ApprovalPosture::NotRequired,
-            connections,
+            endpoints,
             description_ref,
         })
     }
@@ -620,7 +620,7 @@ impl KubernetesLocalBackend {
         hash.update(operation_ref.as_bytes());
         for connection in self.connections_for_operation(operation_ref) {
             hash.update(b"\0");
-            hash.update(connection.connection_ref.as_bytes());
+            hash.update(connection.endpoint_ref.as_bytes());
         }
         format!("description-sha256-{:x}", hash.finalize())
     }
@@ -628,16 +628,16 @@ impl KubernetesLocalBackend {
     fn materialize(
         &self,
         request: &MaterializeRequest,
-    ) -> Result<ConnectionDescription, ConnectionError> {
+    ) -> Result<EndpointDescription, EndpointError> {
         let observation = self
             .observation(&request.observation_ref)
-            .ok_or_else(connection_not_found)?;
+            .ok_or_else(endpoint_not_found)?;
         if credential_bearing_provider(&observation.provider) {
             // The provider kind is already in the observation the caller is holding, so naming it
             // here costs nothing and is the difference between a refusal someone can act on and one
             // they have to guess at.
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            return Err(EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 format!(
                     "the discovered {} Service requires an explicit credential source",
                     observation.provider
@@ -649,44 +649,44 @@ impl KubernetesLocalBackend {
             .policy
             .target_grant(&observation.provider)
             .ok_or_else(|| {
-                ConnectionError::new(
-                    ConnectionErrorCode::NotGranted,
+                EndpointError::new(
+                    EndpointErrorCode::NotGranted,
                     "target Provider has no independent Connector Grant",
                     false,
                 )
             })?
             .to_owned();
         let mut state = lock(&self.state);
-        if let Some(connection_ref) = observation.summary.connection_ref.as_deref() {
+        if let Some(endpoint_ref) = observation.summary.endpoint_ref.as_deref() {
             return state
-                .connections
-                .get(connection_ref)
+                .endpoints
+                .get(endpoint_ref)
                 .cloned()
-                .ok_or_else(connection_protocol);
+                .ok_or_else(endpoint_protocol);
         }
         if !state
             .clients
-            .contains_key(&observation.summary.source_connection_ref)
+            .contains_key(&observation.summary.source_endpoint_ref)
         {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::Conflict,
+            return Err(EndpointError::new(
+                EndpointErrorCode::Conflict,
                 "source Kubernetes Connection is no longer active",
                 false,
             ));
         }
-        let connection_ref = opaque_ref(
+        let endpoint_ref = opaque_ref(
             &format!("connection:{}:", observation.provider),
             &format!(
                 "{}\0{}",
                 observation.summary.observation_ref, observation.resource_binding
             ),
         );
-        let child = KubernetesServiceConnection {
-            connection_ref: connection_ref.clone(),
+        let child = KubernetesServiceEndpoint {
+            endpoint_ref: endpoint_ref.clone(),
             label: observation.summary.title.clone(),
             provider: observation.provider,
             grant_ref,
-            parent_connection_ref: observation.summary.source_connection_ref,
+            parent_endpoint_ref: observation.summary.source_endpoint_ref,
             observation_ref: observation.summary.observation_ref.clone(),
             namespace: observation.namespace,
             service: observation.service,
@@ -694,15 +694,15 @@ impl KubernetesLocalBackend {
             port: observation.port,
             resource_binding: observation.resource_binding,
         };
-        let description = ConnectionDescription {
-            summary: ConnectionSummary {
-                connection_ref: connection_ref.clone(),
+        let description = EndpointDescription {
+            summary: EndpointSummary {
+                endpoint_ref: endpoint_ref.clone(),
                 integration_ref: child.provider.clone(),
                 label: child.label.clone(),
-                state: ConnectionState::Callable,
-                initiation: vec![ConnectionInitiator::Platform],
-                route: ConnectionRoute::ViaConnection {
-                    parent_connection_ref: child.parent_connection_ref.clone(),
+                state: EndpointState::Callable,
+                initiation: vec![EndpointInitiator::Platform],
+                route: EndpointRoute::ViaEndpoint {
+                    parent_endpoint_ref: child.parent_endpoint_ref.clone(),
                     route_adapter: RouteAdapter::KubernetesServiceProxyV1,
                 },
                 scope: None,
@@ -714,13 +714,13 @@ impl KubernetesLocalBackend {
         let stored = state
             .observations
             .get_mut(&request.observation_ref)
-            .ok_or_else(connection_not_found)?;
+            .ok_or_else(endpoint_not_found)?;
         stored.summary.state = DiscoveryObservationState::Materialized;
-        stored.summary.connection_ref = Some(connection_ref.clone());
-        state.children.insert(connection_ref.clone(), child);
+        stored.summary.endpoint_ref = Some(endpoint_ref.clone());
+        state.children.insert(endpoint_ref.clone(), child);
         state
-            .connections
-            .insert(connection_ref, description.clone());
+            .endpoints
+            .insert(endpoint_ref, description.clone());
         Ok(description)
     }
 
@@ -737,8 +737,8 @@ impl KubernetesLocalBackend {
         // **The Connection the caller named**, not whichever one this backend would have picked.
         // A caller holding two clusters has to be able to say which; refusing an attached one here
         // is what made four of five activated clusters uncallable.
-        let connection_ref = request.connection_ref.clone();
-        if !self.is_cluster_connection(&connection_ref) {
+        let endpoint_ref = request.endpoint_ref.clone();
+        if !self.is_cluster_connection(&endpoint_ref) {
             return Err(operation_not_found());
         }
         if request.description_ref
@@ -752,7 +752,7 @@ impl KubernetesLocalBackend {
         }
         let client = {
             let state = lock(&self.state);
-            state.clients.get(&connection_ref).cloned()
+            state.clients.get(&endpoint_ref).cloned()
         }
         .ok_or_else(operation_unavailable)?;
         let reader = KubeconfigReader::new(client);
@@ -800,7 +800,7 @@ impl KubernetesLocalBackend {
                     "{}\0{}\0{}",
                     context.authority_snapshot_sha256(),
                     request.operation_ref,
-                    connection_ref
+                    endpoint_ref
                 ),
             ),
             execution_ref: None,
@@ -821,7 +821,7 @@ impl KubernetesLocalBackend {
         monitoring_model::validate_input(&request.operation_ref, &request.input)?;
         let child = lock(&self.state)
             .children
-            .get(&request.connection_ref)
+            .get(&request.endpoint_ref)
             .cloned()
             .ok_or_else(operation_not_granted)?;
         if child.provider != monitoring_model::provider_for_operation(&request.operation_ref)
@@ -834,10 +834,10 @@ impl KubernetesLocalBackend {
         if operation.protocol_driver() != ProtocolDriver::HttpV1 {
             return Err(operation_unavailable());
         }
-        let connection = ConnectionAuthority::mediated(
-            &child.connection_ref,
+        let connection = EndpointAuthority::mediated(
+            &child.endpoint_ref,
             InitiationPolicy::platform_only(),
-            &child.parent_connection_ref,
+            &child.parent_endpoint_ref,
             &child.resource_binding,
             DomainRouteAdapter::KubernetesServiceProxyV1,
         )
@@ -867,7 +867,7 @@ impl KubernetesLocalBackend {
         let ProtocolPlan::MediatedHttpV1(mediated) = plan.protocol() else {
             return Err(operation_unavailable());
         };
-        if mediated.parent_connection != child.parent_connection_ref
+        if mediated.parent_endpoint != child.parent_endpoint_ref
             || mediated.resource_binding != child.resource_binding
             || mediated.adapter != DomainRouteAdapter::KubernetesServiceProxyV1
         {
@@ -892,7 +892,7 @@ impl KubernetesLocalBackend {
         }
         let client = lock(&self.state)
             .clients
-            .get(&child.parent_connection_ref)
+            .get(&child.parent_endpoint_ref)
             .cloned()
             .ok_or_else(operation_not_granted)?;
         if !can_get_service(client.clone(), &child.namespace, &child.service).await?
@@ -913,7 +913,7 @@ impl KubernetesLocalBackend {
                     "{}\0{}\0{}\0{}",
                     context.authority_snapshot_sha256(),
                     request.operation_ref,
-                    child.connection_ref,
+                    child.endpoint_ref,
                     child.resource_binding
                 ),
             ),
@@ -1016,13 +1016,13 @@ fn binding_for_context(kubeconfig: &Kubeconfig, context_name: &str) -> Option<Ca
     ));
     let evidence_sha256 = evidence_material.clone();
     Some(CandidateBinding {
-        summary: ConnectionCandidateSummary {
+        summary: EndpointCandidateSummary {
             candidate_ref: opaque_ref("candidate:kubernetes:", &evidence_material),
             integration_ref: KUBERNETES.to_owned(),
             title: context_name.to_owned(),
-            state: ConnectionCandidateState::Detected,
+            state: EndpointCandidateState::Detected,
             evidence_sha256,
-            connection_ref: None,
+            endpoint_ref: None,
         },
         context_name: context_name.to_owned(),
         evidence_material,
@@ -1048,17 +1048,17 @@ fn context_uses_credential_plugin(kubeconfig: &Kubeconfig, context_name: &str) -
     })
 }
 
-fn child_is_current(state: &KubernetesState, child: &KubernetesServiceConnection) -> bool {
+fn child_is_current(state: &KubernetesState, child: &KubernetesServiceEndpoint) -> bool {
     state
         .observations
         .get(&child.observation_ref)
         .is_some_and(|observation| {
             observation.summary.state == DiscoveryObservationState::Materialized
-                && observation.summary.connection_ref.as_deref()
-                    == Some(child.connection_ref.as_str())
+                && observation.summary.endpoint_ref.as_deref()
+                    == Some(child.endpoint_ref.as_str())
                 && observation.resource_binding == child.resource_binding
-                && observation.summary.source_connection_ref == child.parent_connection_ref
-                && state.clients.contains_key(&child.parent_connection_ref)
+                && observation.summary.source_endpoint_ref == child.parent_endpoint_ref
+                && state.clients.contains_key(&child.parent_endpoint_ref)
         })
 }
 
@@ -1127,12 +1127,12 @@ fn kubernetes_route_operation(operation_ref: &str) -> bool {
     kubernetes_route_operations().contains(&operation_ref)
 }
 
-fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
+fn initiation(config: InitiationConfig) -> Vec<EndpointInitiator> {
     match config {
-        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
-        InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
+        InitiationConfig::Platform => vec![EndpointInitiator::Platform],
+        InitiationConfig::Provider => vec![EndpointInitiator::Provider],
         InitiationConfig::Both => {
-            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+            vec![EndpointInitiator::Platform, EndpointInitiator::Provider]
         }
     }
 }
@@ -1151,25 +1151,25 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-fn connection_not_found() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::NotFound,
+fn endpoint_not_found() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::NotFound,
         "connection candidate was not found",
         false,
     )
 }
 
-pub(crate) fn connection_unavailable() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Unavailable,
+pub(crate) fn connection_unavailable() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Unavailable,
         "the selected Kubernetes context could not be verified",
         true,
     )
 }
 
-fn connection_protocol() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Protocol,
+fn endpoint_protocol() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Protocol,
         "the Connection backend returned an invalid response",
         false,
     )

@@ -176,7 +176,7 @@ impl super::PlatformBackend {
                     title: title.to_owned(),
                     effect: super::effect(operation.effects()),
                     approval: super::approval(canonical, operation.effects()),
-                    connections: vec![self.connection()],
+                    endpoints: vec![self.connection()],
                 })
             })
             .collect()
@@ -212,7 +212,7 @@ impl super::PlatformBackend {
             output_schema: super::response_schema(&self.catalog, canonical)?,
             effect: super::effect(operation.effects()),
             approval: super::approval(canonical, operation.effects()),
-            connections: vec![self.connection()],
+            endpoints: vec![self.connection()],
             description_ref: self.description_ref(context, canonical),
         }))
     }

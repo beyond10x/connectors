@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use connector_secrets::{MemoryStore, SecretStore as _};
-    use protocol::connection::ConnectSessionState;
+    use protocol::endpoint::ConnectSessionState;
     use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
     use tokio::net::UnixStream;
 
@@ -75,8 +75,8 @@ mod tests {
             )
             .await
             .unwrap();
-            let connection = StoredConnection {
-                connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
+            let connection = StoredEndpoint {
+                endpoint_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
                 instance_id: "00000000-0000-4000-8000-000000000001".to_owned(),
                 label: "Fixture companion".to_owned(),
                 grant_ref: policy().grant_for_profile(PROFILE_COMPANION_BOT).to_owned(),
@@ -84,7 +84,7 @@ mod tests {
                 allowed_events: policy().allowed_events,
                 owner_subject: String::new(),
                 team_id: "T012345".to_owned(),
-                profile: SlackConnectionProfile::CompanionBot,
+                profile: SlackEndpointProfile::CompanionBot,
                 external_subject_id: "U012345".to_owned(),
                 scopes: vec!["chat:write".to_owned(), "channels:history".to_owned()],
                 purpose: String::new(),
@@ -101,7 +101,7 @@ mod tests {
                 .await
                 .unwrap();
             lock(&backend.inner.metadata)
-                .connections
+                .endpoints
                 .push(connection.clone());
             let OperationResult::Describe(description) = backend
                 .inner
@@ -130,7 +130,7 @@ mod tests {
                     &owner(),
                     InvokeRequest {
                         operation_ref: operation_ref.to_owned(),
-                        connection_ref: connection.connection_ref,
+                        endpoint_ref: connection.endpoint_ref,
                         description_ref: backend.inner.description_ref(&owner(), operation_ref),
                         input: serde_json::json!({"channel":"C012345","text":"fixture"}),
                         approval_evidence_ref: None,
@@ -291,7 +291,7 @@ mod tests {
 
         let (_, params, _, _) = datasource_request_plan(
             "slack.conversations",
-            SlackConnectionProfile::OrgBot,
+            SlackEndpointProfile::OrgBot,
             &DatasourceRead::List {
                 limit: 10,
                 cursor: None,
@@ -448,7 +448,7 @@ mod tests {
         let event = AuditEvent {
             audit_ref: "audit:slack:test",
             operation_ref: "slack-chat-post-message",
-            connection_ref: "connection:slack:test",
+            endpoint_ref: "connection:slack:test",
             tenant_id: "tenant-test",
             actor_subject: "subject-test",
             outcome: "attempted",
@@ -507,8 +507,8 @@ mod tests {
         )
         .await
         .unwrap();
-        backend.inner.start_supervisor(StoredConnection {
-            connection_ref: "connection:fixture".to_owned(),
+        backend.inner.start_supervisor(StoredEndpoint {
+            endpoint_ref: "connection:fixture".to_owned(),
             instance_id: "fixture".to_owned(),
             label: "fixture".to_owned(),
             grant_ref: "grant:fixture".to_owned(),
@@ -516,7 +516,7 @@ mod tests {
             allowed_events: vec!["app_mention".to_owned()],
             owner_subject: String::new(),
             team_id: "T012345".to_owned(),
-            profile: SlackConnectionProfile::OrgBot,
+            profile: SlackEndpointProfile::OrgBot,
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["app_mentions:read".to_owned()],
             purpose: String::new(),
@@ -527,7 +527,7 @@ mod tests {
         for operation in SLACK_OPERATIONS {
             assert!(backend.supports_ephemeral_invocation(&InvokeRequest {
                 operation_ref: operation.to_owned(),
-                connection_ref: "connection:fixture".to_owned(),
+                endpoint_ref: "connection:fixture".to_owned(),
                 description_ref: "description:fixture".to_owned(),
                 input: serde_json::json!({}),
                 approval_evidence_ref: None,
@@ -550,8 +550,8 @@ mod tests {
         )
         .await
         .unwrap();
-        let connection = StoredConnection {
-            connection_ref: "connection:slack:org-bot".to_owned(),
+        let connection = StoredEndpoint {
+            endpoint_ref: "connection:slack:org-bot".to_owned(),
             instance_id: "org-bot".to_owned(),
             label: "Organization Slack bot".to_owned(),
             grant_ref: policy().grant_for_profile(PROFILE_ORG_BOT).to_owned(),
@@ -559,7 +559,7 @@ mod tests {
             allowed_events: Vec::new(),
             owner_subject: String::new(),
             team_id: "T012345".to_owned(),
-            profile: SlackConnectionProfile::OrgBot,
+            profile: SlackEndpointProfile::OrgBot,
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["channels:history".to_owned(), "users:read".to_owned()],
             purpose: String::new(),
@@ -590,7 +590,7 @@ mod tests {
             backend.capabilities(),
             BackendCapabilities {
                 operations: true,
-                connections: true,
+                endpoints: true,
                 events: true,
                 datasources: true,
             }
@@ -605,21 +605,21 @@ mod tests {
             OperationResult::Search { operations } if operations.is_empty()
         ));
 
-        let candidate_search = ConnectionRequest::CandidateSearch(
-            protocol::connection::CandidateSearchRequest {
+        let candidate_search = EndpointRequest::CandidateSearch(
+            protocol::endpoint::CandidateSearchRequest {
                 integration_ref: INTEGRATION_REF.to_owned(),
                 query: String::new(),
                 limit: 10,
             },
         );
-        assert!(!backend.owns_connection(&candidate_search));
+        assert!(!backend.owns_endpoint(&candidate_search));
         assert_eq!(
             backend
-                .handle_connection(&owner(), candidate_search)
+                .handle_endpoint(&owner(), candidate_search)
                 .await
                 .unwrap_err()
                 .code,
-            ConnectionErrorCode::NotFound
+            EndpointErrorCode::NotFound
         );
         backend.shutdown().await;
     }
@@ -639,10 +639,10 @@ mod tests {
         .await
         .unwrap();
         let created = backend
-            .handle_connection(
+            .handle_endpoint(
                 &owner(),
-                ConnectionRequest::ConnectSessionCreate(
-                    protocol::connection::ConnectSessionCreateRequest {
+                EndpointRequest::ConnectSessionCreate(
+                    protocol::endpoint::ConnectSessionCreateRequest {
                         integration_ref: INTEGRATION_REF.to_owned(),
                         label: "Development Slack".to_owned(),
                         auth_profile: None,
@@ -651,7 +651,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let ConnectionResult::ConnectSessionCreate(created) = created else {
+        let EndpointResult::ConnectSessionCreate(created) = created else {
             panic!("wrong result");
         };
         assert!(
@@ -675,39 +675,39 @@ mod tests {
         assert!(UnixStream::connect(&endpoint).await.is_err());
 
         let status = backend
-            .handle_connection(
+            .handle_endpoint(
                 &owner(),
-                ConnectionRequest::ConnectSessionStatus(
-                    protocol::connection::ConnectSessionStatusRequest {
+                EndpointRequest::ConnectSessionStatus(
+                    protocol::endpoint::ConnectSessionStatusRequest {
                         connect_session_ref: created.connect_session_ref,
                     },
                 ),
             )
             .await
             .unwrap();
-        let ConnectionResult::ConnectSessionStatus(status) = status else {
+        let EndpointResult::ConnectSessionStatus(status) = status else {
             panic!("wrong result");
         };
         assert_eq!(status.state, ConnectSessionState::Completed);
         assert!(status.completion_endpoint.is_none());
         assert!(status.browser_completion_url.is_none());
-        let connection_ref = status.connection_ref.unwrap();
+        let endpoint_ref = status.endpoint_ref.unwrap();
         let description = backend
-            .handle_connection(
+            .handle_endpoint(
                 &owner(),
-                ConnectionRequest::Describe(protocol::connection::DescribeRequest {
-                    connection_ref,
+                EndpointRequest::Describe(protocol::endpoint::DescribeRequest {
+                    endpoint_ref,
                 }),
             )
             .await
             .unwrap();
-        let ConnectionResult::Describe(description) = description else {
+        let EndpointResult::Describe(description) = description else {
             panic!("wrong result");
         };
-        assert_eq!(description.summary.state, ConnectionState::Authorized);
+        assert_eq!(description.summary.state, EndpointState::Authorized);
         assert_eq!(description.channels[0].state, ChannelState::Starting);
 
-        let metadata = fs::read_to_string(root.path().join("connections.json")).unwrap();
+        let metadata = fs::read_to_string(root.path().join("endpoints.json")).unwrap();
         assert!(!metadata.contains(SENTINEL));
         assert!(!metadata.contains("completion_endpoint"));
         let credential = credential_store
@@ -741,7 +741,7 @@ mod tests {
             .create_session(
                 &owner(),
                 "Development Slack".to_owned(),
-                SlackConnectionProfile::CompanionBot,
+                SlackEndpointProfile::CompanionBot,
             )
             .await
             .unwrap();
@@ -788,7 +788,7 @@ mod tests {
             .create_session(
                 &owner(),
                 "Development Slack".to_owned(),
-                SlackConnectionProfile::CompanionBot,
+                SlackEndpointProfile::CompanionBot,
             )
             .await
             .unwrap();
@@ -840,8 +840,8 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
         let store = EventStore::open(root.path().join("events.jsonl"), None).unwrap();
-        let connection = StoredConnection {
-            connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
+        let connection = StoredEndpoint {
+            endpoint_ref: "connection:slack:00000000-0000-4000-8000-000000000001".to_owned(),
             instance_id: "00000000-0000-4000-8000-000000000001".to_owned(),
             label: "Development Slack".to_owned(),
             grant_ref: "grant:slack-inbound".to_owned(),
@@ -849,7 +849,7 @@ mod tests {
             allowed_events: vec!["message.channels".to_owned()],
             owner_subject: owner().subject().to_owned(),
             team_id: String::new(),
-            profile: SlackConnectionProfile::Legacy,
+            profile: SlackEndpointProfile::Legacy,
             external_subject_id: String::new(),
             scopes: Vec::new(),
             purpose: String::new(),
@@ -891,8 +891,8 @@ mod tests {
         )
         .await
         .unwrap();
-        let connection = StoredConnection {
-            connection_ref: "connection:slack:00000000-0000-4000-8000-000000000002".to_owned(),
+        let connection = StoredEndpoint {
+            endpoint_ref: "connection:slack:00000000-0000-4000-8000-000000000002".to_owned(),
             instance_id: "00000000-0000-4000-8000-000000000002".to_owned(),
             label: "Stale Slack".to_owned(),
             grant_ref: "grant:replaced".to_owned(),
@@ -900,14 +900,14 @@ mod tests {
             allowed_events: vec!["app_mention".to_owned(), "message.channels".to_owned()],
             owner_subject: owner().subject().to_owned(),
             team_id: String::new(),
-            profile: SlackConnectionProfile::Legacy,
+            profile: SlackEndpointProfile::Legacy,
             external_subject_id: String::new(),
             scopes: Vec::new(),
             purpose: String::new(),
             carries_operations: true,
         };
         lock(&backend.inner.metadata)
-            .connections
+            .endpoints
             .push(connection.clone());
         backend
             .inner
@@ -932,9 +932,9 @@ mod tests {
             });
 
         assert_eq!(backend.connection_count(), 0);
-        assert!(!backend.owns_connection(&ConnectionRequest::Describe(
-            protocol::connection::DescribeRequest {
-                connection_ref: connection.connection_ref.clone(),
+        assert!(!backend.owns_endpoint(&EndpointRequest::Describe(
+            protocol::endpoint::DescribeRequest {
+                endpoint_ref: connection.endpoint_ref.clone(),
             },
         )));
         assert!(!backend.owns_event(&EventRequest::Receive(protocol::event::ReceiveRequest {
@@ -1115,8 +1115,8 @@ mod tests {
         )
         .await
         .unwrap();
-        let companion = |allowed_events: Vec<String>| StoredConnection {
-            connection_ref: "connection:slack:companion".to_owned(),
+        let companion = |allowed_events: Vec<String>| StoredEndpoint {
+            endpoint_ref: "connection:slack:companion".to_owned(),
             instance_id: "companion".to_owned(),
             label: "Slack".to_owned(),
             grant_ref: policy().grant_for_profile(PROFILE_COMPANION_BOT).to_owned(),
@@ -1124,7 +1124,7 @@ mod tests {
             allowed_events,
             owner_subject: owner().subject().to_owned(),
             team_id: "T012345".to_owned(),
-            profile: SlackConnectionProfile::CompanionBot,
+            profile: SlackEndpointProfile::CompanionBot,
             external_subject_id: "U012345".to_owned(),
             scopes: vec!["channels:read".to_owned(), "users:read".to_owned()],
             purpose: String::new(),
@@ -1212,8 +1212,8 @@ mod tests {
         )
         .await
         .unwrap();
-        let connection = StoredConnection {
-            connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".into(),
+        let connection = StoredEndpoint {
+            endpoint_ref: "connection:slack:00000000-0000-4000-8000-000000000001".into(),
             instance_id: "00000000-0000-4000-8000-000000000001".into(),
             label: "Fixture".into(),
             grant_ref: policy().grant_for_profile(PROFILE_COMPANION_BOT).into(),
@@ -1221,7 +1221,7 @@ mod tests {
             allowed_events: policy().allowed_events,
             owner_subject: String::new(),
             team_id: "T012345".into(),
-            profile: SlackConnectionProfile::CompanionBot,
+            profile: SlackEndpointProfile::CompanionBot,
             external_subject_id: "U012345".into(),
             scopes: vec!["chat:write".into()],
             purpose: String::new(),
@@ -1238,7 +1238,7 @@ mod tests {
             .await
             .unwrap();
         lock(&backend.inner.metadata)
-            .connections
+            .endpoints
             .push(connection.clone());
         for expected in [1, 2] {
             let operation = "slack-chat-post-message";
@@ -1248,7 +1248,7 @@ mod tests {
                     &owner(),
                     InvokeRequest {
                         operation_ref: operation.into(),
-                        connection_ref: connection.connection_ref.clone(),
+                        endpoint_ref: connection.endpoint_ref.clone(),
                         description_ref: backend.inner.description_ref(&owner(), operation),
                         input: serde_json::json!({"channel":"C012345","text":"explicit attempt"}),
                         approval_evidence_ref: None,
@@ -1338,8 +1338,8 @@ mod tests {
             )
             .await
             .unwrap();
-            let connection = StoredConnection {
-                connection_ref: "connection:slack:00000000-0000-4000-8000-000000000001".into(),
+            let connection = StoredEndpoint {
+                endpoint_ref: "connection:slack:00000000-0000-4000-8000-000000000001".into(),
                 instance_id: "00000000-0000-4000-8000-000000000001".into(),
                 label: "Fixture".into(),
                 grant_ref: policy().grant_for_profile(PROFILE_COMPANION_BOT).into(),
@@ -1347,7 +1347,7 @@ mod tests {
                 allowed_events: policy().allowed_events,
                 owner_subject: String::new(),
                 team_id: "T012345".into(),
-                profile: SlackConnectionProfile::CompanionBot,
+                profile: SlackEndpointProfile::CompanionBot,
                 external_subject_id: "U012345".into(),
                 scopes: vec!["chat:write".into()],
                 purpose: String::new(),
@@ -1364,7 +1364,7 @@ mod tests {
                 .await
                 .unwrap();
             lock(&backend.inner.metadata)
-                .connections
+                .endpoints
                 .push(connection.clone());
             let operation = "slack-chat-post-message";
             let error = backend
@@ -1373,7 +1373,7 @@ mod tests {
                     &owner(),
                     InvokeRequest {
                         operation_ref: operation.into(),
-                        connection_ref: connection.connection_ref.clone(),
+                        endpoint_ref: connection.endpoint_ref.clone(),
                         description_ref: backend.inner.description_ref(&owner(), operation),
                         input: serde_json::json!({"channel":"C012345","text":"explicit attempt"}),
                         approval_evidence_ref: None,

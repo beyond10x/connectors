@@ -372,7 +372,7 @@ mod tests {
     use std::time::Duration;
 
     use domain::{
-        AdmittedOperation, BrowserPlan, Capability, ConnectionAuthority, Implementation,
+        AdmittedOperation, BrowserPlan, Capability, EndpointAuthority, Implementation,
         InitiationPolicy, Interaction, OperationFacts, Placement, ProtocolPlan, ZeroIoPlan,
     };
     use protocol::browser::UNTRUSTED_CONTENT_NOTE;
@@ -501,7 +501,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
+                EndpointAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::CdpV1(BrowserPlan {
                 connection: connection.to_owned(),
@@ -808,7 +808,7 @@ mod live {
     use std::time::Duration;
 
     use domain::{
-        AdmittedOperation, BrowserPlan, Capability, ConnectionAuthority, Implementation,
+        AdmittedOperation, BrowserPlan, Capability, EndpointAuthority, Implementation,
         InitiationPolicy, Interaction, OperationFacts, Placement, ProtocolPlan, ZeroIoPlan,
     };
     use service::{admit_browser_plan, BrowserDeploymentRoute};
@@ -844,7 +844,7 @@ mod live {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("live", InitiationPolicy::platform_only()).unwrap(),
+                EndpointAuthority::new("live", InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::CdpV1(BrowserPlan {
                 connection: "live".to_owned(),

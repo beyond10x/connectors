@@ -1,15 +1,15 @@
 use super::*;
 
 impl SlackInner {
-    pub(super) fn describe(&self, connection: &StoredConnection) -> ConnectionDescription {
+    pub(super) fn describe(&self, connection: &StoredEndpoint) -> EndpointDescription {
         let state = lock(&self.channel_states)
-            .get(&connection.connection_ref)
+            .get(&connection.endpoint_ref)
             .copied()
             .unwrap_or(ChannelState::Starting);
-        ConnectionDescription {
-            summary: self.connection_summary(connection),
+        EndpointDescription {
+            summary: self.endpoint_summary(connection),
             channels: if connection.profile.receives_events() {
-                vec![ConnectionChannelSummary {
+                vec![EndpointChannelSummary {
                     channel_ref: channel_ref(connection),
                     binding_ref: SOCKET_BINDING_REF.to_owned(),
                     state,
@@ -21,27 +21,27 @@ impl SlackInner {
         }
     }
 
-    pub(super) fn connection_summary(&self, connection: &StoredConnection) -> ConnectionSummary {
+    pub(super) fn endpoint_summary(&self, connection: &StoredEndpoint) -> EndpointSummary {
         let state = lock(&self.channel_states)
-            .get(&connection.connection_ref)
+            .get(&connection.endpoint_ref)
             .copied()
             .unwrap_or(ChannelState::Starting);
-        let state = if connection.profile == SlackConnectionProfile::OrgUser {
-            ConnectionState::Callable
+        let state = if connection.profile == SlackEndpointProfile::OrgUser {
+            EndpointState::Callable
         } else {
             match state {
-                ChannelState::Starting => ConnectionState::Authorized,
-                ChannelState::Connected => ConnectionState::Callable,
-                ChannelState::Reconnecting | ChannelState::Stopped => ConnectionState::Degraded,
+                ChannelState::Starting => EndpointState::Authorized,
+                ChannelState::Connected => EndpointState::Callable,
+                ChannelState::Reconnecting | ChannelState::Stopped => EndpointState::Degraded,
             }
         };
-        ConnectionSummary {
-            connection_ref: connection.connection_ref.clone(),
+        EndpointSummary {
+            endpoint_ref: connection.endpoint_ref.clone(),
             integration_ref: INTEGRATION_REF.to_owned(),
             label: connection.label.clone(),
             state,
             initiation: initiation(connection.initiation),
-            route: protocol::connection::ConnectionRoute::Direct,
+            route: protocol::endpoint::EndpointRoute::Direct,
             scope: Some(connection.profile.scope()),
             actor: Some(connection.profile.actor()),
             auth_profile: Some(connection.profile.as_str().to_owned()),
@@ -52,13 +52,13 @@ impl SlackInner {
         &self,
         requested: &str,
         context: &PrincipalContext,
-    ) -> Result<StoredConnection, EventError> {
+    ) -> Result<StoredEndpoint, EventError> {
         lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .find(|connection| {
                 channel_ref(connection) == requested
-                    && connection.profile != SlackConnectionProfile::OrgBot
+                    && connection.profile != SlackEndpointProfile::OrgBot
                     && self.connection_is_admitted(connection)
                     && self.connection_owned_by(connection, context)
             })
@@ -67,7 +67,7 @@ impl SlackInner {
     }
 
     pub(super) fn has_channel(&self, requested: &str) -> bool {
-        lock(&self.metadata).connections.iter().any(|connection| {
+        lock(&self.metadata).endpoints.iter().any(|connection| {
             channel_ref(connection) == requested && self.connection_is_admitted(connection)
         })
     }
@@ -76,8 +76,8 @@ impl SlackInner {
         self: &Arc<Self>,
         owner: &PrincipalContext,
         label: String,
-        profile: SlackConnectionProfile,
-    ) -> Result<ConnectSessionStatus, ConnectionError> {
+        profile: SlackEndpointProfile,
+    ) -> Result<ConnectSessionStatus, EndpointError> {
         self.expire_hosted_sessions();
         let id = random_uuid().map_err(|_| connection_unavailable())?;
         let session_ref = format!("connect-session:{id}");
@@ -91,9 +91,9 @@ impl SlackInner {
             email: owner.email().map(str::to_owned),
             profile,
         };
-        if profile == SlackConnectionProfile::OrgUser && session_owner.email.is_none() {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+        if profile == SlackEndpointProfile::OrgUser && session_owner.email.is_none() {
+            return Err(EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "Slack user OAuth requires a verified Identity email",
                 false,
             ));
@@ -128,7 +128,7 @@ impl SlackInner {
             CompletionMode::Hosted { public_origin } => {
                 let capability = random_capability().map_err(|_| connection_unavailable())?;
                 let (oauth_state, oauth_authorize_url) =
-                    if profile == SlackConnectionProfile::OrgUser {
+                    if profile == SlackEndpointProfile::OrgUser {
                         let state = random_capability().map_err(|_| connection_unavailable())?;
                         let authorize = self
                             .oauth_authorize_url(&state)
@@ -246,7 +246,7 @@ impl SlackInner {
             // `slack.conversations` and `slack.users` were published and could never be read: every
             // read needs the bot credential the local flow had no way to accept. The workspace pin
             // still holds; `verify_companion_credentials` checks the token's own team against it.
-            Ok(owner) if owner.profile == SlackConnectionProfile::CompanionBot => {
+            Ok(owner) if owner.profile == SlackEndpointProfile::CompanionBot => {
                 match parse_companion_submission(secret.expose_secret()) {
                     Ok(credentials) => match self
                         .verify_companion_credentials(&session_ref, &credentials)
@@ -288,10 +288,10 @@ impl SlackInner {
             Err(error) => Err(error),
         };
         let accepted = match result {
-            Ok(connection_ref) => {
+            Ok(endpoint_ref) => {
                 let _ = lock(&self.sessions).finish(
                     &session_ref,
-                    ConnectSessionTerminal::Completed { connection_ref },
+                    ConnectSessionTerminal::Completed { endpoint_ref },
                 );
                 true
             }
@@ -385,9 +385,9 @@ impl SlackInner {
         scopes: Vec<String>,
         credentials: SlackCredentials,
     ) -> Result<String, SlackError> {
-        let connection_ref = format!("connection:slack:{instance_id}");
-        let connection = StoredConnection {
-            connection_ref: connection_ref.clone(),
+        let endpoint_ref = format!("connection:slack:{instance_id}");
+        let connection = StoredEndpoint {
+            endpoint_ref: endpoint_ref.clone(),
             instance_id: instance_id.clone(),
             label,
             grant_ref: self
@@ -412,11 +412,11 @@ impl SlackInner {
             carries_operations,
         };
         let app_credential_ref = self.app_credential_ref_for(&connection)?;
-        if connection.profile == SlackConnectionProfile::Legacy
+        if connection.profile == SlackEndpointProfile::Legacy
             && lock(&self.metadata)
-                .connections
+                .endpoints
                 .iter()
-                .any(|stored| stored.profile == SlackConnectionProfile::Legacy)
+                .any(|stored| stored.profile == SlackEndpointProfile::Legacy)
         {
             let current = self
                 .credential_store
@@ -501,10 +501,10 @@ impl SlackInner {
             state
                 .pending
                 .retain(|pending| pending.transaction_id != transaction_hex);
-            state.connections.push(connection.clone());
+            state.endpoints.push(connection.clone());
             state
-                .connections
-                .sort_by(|a, b| a.connection_ref.cmp(&b.connection_ref));
+                .endpoints
+                .sort_by(|a, b| a.endpoint_ref.cmp(&b.endpoint_ref));
             if let Err(error) = self.persist_metadata(&state) {
                 *state = prior;
                 return Err(error);
@@ -514,7 +514,7 @@ impl SlackInner {
         if connection.profile.receives_events() {
             self.start_supervisor(connection);
         }
-        Ok(connection_ref)
+        Ok(endpoint_ref)
     }
 
     pub(super) fn reserve_transaction(
@@ -565,14 +565,14 @@ impl SlackInner {
                 .pending
                 .retain(|candidate| candidate.transaction_id != record.transaction_id);
             if !state
-                .connections
+                .endpoints
                 .iter()
-                .any(|connection| connection.connection_ref == record.connection.connection_ref)
+                .any(|connection| connection.endpoint_ref == record.connection.endpoint_ref)
             {
-                state.connections.push(record.connection);
+                state.endpoints.push(record.connection);
                 state
-                    .connections
-                    .sort_by(|a, b| a.connection_ref.cmp(&b.connection_ref));
+                    .endpoints
+                    .sort_by(|a, b| a.endpoint_ref.cmp(&b.endpoint_ref));
             }
             self.persist_metadata(&state)?;
         }
@@ -653,9 +653,9 @@ impl SlackInner {
 
     pub(super) fn app_credential_ref_for(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
     ) -> Result<CredentialRef, SlackError> {
-        if connection.profile == SlackConnectionProfile::CompanionBot {
+        if connection.profile == SlackEndpointProfile::CompanionBot {
             self.connection_credential_ref(connection, APP_TOKEN_CREDENTIAL)
         } else {
             self.app_credential_ref()
@@ -664,7 +664,7 @@ impl SlackInner {
 
     pub(super) fn connection_credential_ref(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         credential: &str,
     ) -> Result<CredentialRef, SlackError> {
         CredentialRef::for_instance(
@@ -679,7 +679,7 @@ impl SlackInner {
 
     pub(super) fn operation_credential_ref(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         credential: &str,
     ) -> Result<CredentialRef, SlackError> {
         // The tenant-wide organisation install is the one Connection whose credential has no
@@ -691,7 +691,7 @@ impl SlackInner {
         // `org_bot`: it stored its token per instance and then looked for it at the org address,
         // and the read came back "Slack datasource is not granted for this Connection" for a token
         // that was present and valid.
-        if connection.connection_ref == ORG_BOT_CONNECTION {
+        if connection.endpoint_ref == ORG_BOT_CONNECTION {
             CredentialRef::new(self.tenant_id(), AUTHORITY, SERVICE, credential)
                 .map_err(|_| SlackError::new("credential-address"))
         } else {
@@ -699,14 +699,14 @@ impl SlackInner {
         }
     }
 
-    pub(super) fn start_supervisor(self: &Arc<Self>, connection: StoredConnection) {
+    pub(super) fn start_supervisor(self: &Arc<Self>, connection: StoredEndpoint) {
         lock(&self.channel_states)
-            .insert(connection.connection_ref.clone(), ChannelState::Starting);
+            .insert(connection.endpoint_ref.clone(), ChannelState::Starting);
         if !self.supervision_enabled {
             return;
         }
         let mut started = lock(&self.supervisors_started);
-        if !started.insert(connection.connection_ref.clone()) {
+        if !started.insert(connection.endpoint_ref.clone()) {
             return;
         }
         drop(started);
@@ -719,7 +719,7 @@ impl SlackInner {
 
     pub(super) async fn supervise(
         self: Arc<Self>,
-        connection: StoredConnection,
+        connection: StoredEndpoint,
         mut shutdown: watch::Receiver<bool>,
     ) {
         let mut backoff = Duration::from_secs(1);
@@ -727,7 +727,7 @@ impl SlackInner {
             if *shutdown.borrow() {
                 break;
             }
-            self.set_connection_state(&connection.connection_ref, ChannelState::Reconnecting);
+            self.set_connection_state(&connection.endpoint_ref, ChannelState::Reconnecting);
             let outcome = self.run_socket(&connection, &mut shutdown).await;
             if *shutdown.borrow() {
                 break;
@@ -743,16 +743,16 @@ impl SlackInner {
             }
             backoff = (backoff * 2).min(Duration::from_secs(30));
         }
-        self.set_connection_state(&connection.connection_ref, ChannelState::Stopped);
+        self.set_connection_state(&connection.endpoint_ref, ChannelState::Stopped);
     }
 
-    pub(super) fn set_connection_state(&self, connection_ref: &str, state: ChannelState) {
-        lock(&self.channel_states).insert(connection_ref.to_owned(), state);
+    pub(super) fn set_connection_state(&self, endpoint_ref: &str, state: ChannelState) {
+        lock(&self.channel_states).insert(endpoint_ref.to_owned(), state);
     }
 
     pub(super) async fn run_socket(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         shutdown: &mut watch::Receiver<bool>,
     ) -> Result<(), SlackError> {
         let credential_ref = self.app_credential_ref_for(connection)?;
@@ -764,7 +764,7 @@ impl SlackInner {
         let response = self
             .egress
             .execute(
-                &connection.connection_ref,
+                &connection.endpoint_ref,
                 EgressHttpRequest {
                     request: bearer_request("POST", APPS_CONNECTIONS_OPEN.to_owned(), &token),
                     maximum_response_bytes: 64 * 1024,
@@ -792,13 +792,13 @@ impl SlackInner {
         let mut socket = self
             .egress
             .connect_websocket(
-                &connection.connection_ref,
+                &connection.endpoint_ref,
                 url.to_string(),
                 MAX_SOCKET_MESSAGE_BYTES,
             )
             .await
             .map_err(|_| SlackError::new("socket-connect"))?;
-        self.set_connection_state(&connection.connection_ref, ChannelState::Connected);
+        self.set_connection_state(&connection.endpoint_ref, ChannelState::Connected);
         loop {
             tokio::select! {
                 changed = shutdown.changed() => {
@@ -826,7 +826,7 @@ impl SlackInner {
 
     pub(super) async fn handle_socket_text(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         text: &str,
         socket: &mut dyn EgressWebSocket,
     ) -> Result<(), SlackError> {
@@ -920,11 +920,11 @@ impl SlackInner {
     pub(super) async fn ensure_declared_instances(self: &Arc<Self>) -> Result<(), SlackError> {
         for instance in self.policy.instances.clone() {
             let instance_id = instance_id_for_name(&instance.name);
-            let connection_ref = format!("connection:slack:{instance_id}");
+            let endpoint_ref = format!("connection:slack:{instance_id}");
             if lock(&self.metadata)
-                .connections
+                .endpoints
                 .iter()
-                .any(|stored| stored.connection_ref == connection_ref)
+                .any(|stored| stored.endpoint_ref == endpoint_ref)
             {
                 continue;
             }
@@ -951,9 +951,9 @@ impl SlackInner {
             return Err(SlackError::new("instance-credential-shape"));
         }
         let profile = match instance.profile {
-            SlackInstanceProfile::OrgBot => SlackConnectionProfile::OrgBot,
-            SlackInstanceProfile::OrgUser => SlackConnectionProfile::OrgUser,
-            SlackInstanceProfile::CompanionBot => SlackConnectionProfile::CompanionBot,
+            SlackInstanceProfile::OrgBot => SlackEndpointProfile::OrgBot,
+            SlackInstanceProfile::OrgUser => SlackEndpointProfile::OrgUser,
+            SlackInstanceProfile::CompanionBot => SlackEndpointProfile::CompanionBot,
         };
         // The Connection this credential is about to become is the authority for verifying it —
         // the egress boundary admits only a `connection:`/`connect-session:` ref, and a bare

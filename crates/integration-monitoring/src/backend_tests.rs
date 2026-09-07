@@ -5,7 +5,7 @@ mod tests {
     use super::*;
     use connector_secrets::{MemoryStore, StoreError};
     use monitoring_model::{GRAFANA_DASHBOARDS_LIST, PROMETHEUS_QUERY_RANGE};
-    use protocol::connection::ConnectSessionState;
+    use protocol::endpoint::ConnectSessionState;
     use service::{
         EgressHttpResponse, EgressTransportError, EgressTransportFailure, EgressWebSocket,
     };
@@ -187,8 +187,8 @@ alertmanager = "grant:alertmanager"
             credential_ref.clone(),
             Arc::clone(&executor),
         );
-        let parent = ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        let parent = ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         };
         let token = Secret::new("SENTINEL-NOT-A-REAL-SECRET");
@@ -205,7 +205,7 @@ alertmanager = "grant:alertmanager"
             .unwrap();
         backend
             .inner
-            .reconcile_observations(&parent.connection_ref, &output)
+            .reconcile_observations(&parent.endpoint_ref, &output)
             .unwrap();
         lock(&backend.inner.state).parent = Some(parent);
         store.put(&credential_ref, &token).await.unwrap();
@@ -226,7 +226,7 @@ alertmanager = "grant:alertmanager"
             .unwrap();
         assert!(matches!(
             child.summary.route,
-            ConnectionRoute::ViaConnection {
+            EndpointRoute::ViaEndpoint {
                 route_adapter: RouteAdapter::GrafanaDatasourceProxyV1,
                 ..
             }
@@ -244,13 +244,13 @@ alertmanager = "grant:alertmanager"
         let OperationResult::Describe(description) = described else {
             panic!("expected description")
         };
-        let child_ref = child.summary.connection_ref.clone();
+        let child_ref = child.summary.endpoint_ref.clone();
         backend
             .handle(
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: PROMETHEUS_QUERY_RANGE.to_owned(),
-                    connection_ref: child_ref.clone(),
+                    endpoint_ref: child_ref.clone(),
                     description_ref: description.description_ref,
                     input: serde_json::json!({
                         "query":"up",
@@ -289,7 +289,7 @@ alertmanager = "grant:alertmanager"
                 .unwrap()
                 .summary
                 .state,
-            ConnectionState::Degraded
+            EndpointState::Degraded
         );
         assert!(backend.inner.materialize(&observation_ref).is_err());
     }
@@ -316,8 +316,8 @@ alertmanager = "grant:alertmanager"
             credential_ref.clone(),
             Arc::clone(&executor),
         );
-        lock(&backend.inner.state).parent = Some(ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        lock(&backend.inner.state).parent = Some(ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         });
         store
@@ -342,7 +342,7 @@ alertmanager = "grant:alertmanager"
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
-                    connection_ref: "connection:grafana:test".to_owned(),
+                    endpoint_ref: "connection:grafana:test".to_owned(),
                     description_ref: description.description_ref,
                     input: serde_json::json!({"namespace": "default"}),
                     approval_evidence_ref: None,
@@ -389,8 +389,8 @@ alertmanager = "grant:alertmanager"
             Arc::clone(&egress) as Arc<dyn EgressTransport>,
         )
         .unwrap();
-        lock(&backend.inner.state).parent = Some(ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        lock(&backend.inner.state).parent = Some(ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         });
         store
@@ -424,7 +424,7 @@ alertmanager = "grant:alertmanager"
                     &owner,
                     OperationRequest::Invoke(InvokeRequest {
                         operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
-                        connection_ref: "connection:grafana:test".to_owned(),
+                        endpoint_ref: "connection:grafana:test".to_owned(),
                         description_ref: description.description_ref.clone(),
                         input: serde_json::json!({"namespace": "default"}),
                         approval_evidence_ref: None,
@@ -590,8 +590,8 @@ alertmanager = "grant:alertmanager"
             credential_ref,
             Arc::new(FakeExecutor::default()),
         );
-        lock(&backend.inner.state).parent = Some(ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        lock(&backend.inner.state).parent = Some(ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         });
         let described = backend
@@ -612,7 +612,7 @@ alertmanager = "grant:alertmanager"
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
-                    connection_ref: "connection:grafana:test".to_owned(),
+                    endpoint_ref: "connection:grafana:test".to_owned(),
                     description_ref: description.description_ref,
                     input: serde_json::json!({"namespace": "default"}),
                     approval_evidence_ref: None,
@@ -650,8 +650,8 @@ alertmanager = "grant:alertmanager"
             credential_ref.clone(),
             Arc::clone(&executor),
         );
-        let parent = ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        let parent = ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         };
         let token = Secret::new("SENTINEL-NOT-A-REAL-SECRET");
@@ -668,7 +668,7 @@ alertmanager = "grant:alertmanager"
             .unwrap();
         backend
             .inner
-            .reconcile_observations(&parent.connection_ref, &output)
+            .reconcile_observations(&parent.endpoint_ref, &output)
             .unwrap();
         lock(&backend.inner.state).parent = Some(parent);
         store.put(&credential_ref, &token).await.unwrap();
@@ -699,7 +699,7 @@ alertmanager = "grant:alertmanager"
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: PROMETHEUS_QUERY_RANGE.to_owned(),
-                    connection_ref: child.summary.connection_ref.clone(),
+                    endpoint_ref: child.summary.endpoint_ref.clone(),
                     description_ref: description.description_ref,
                     input: serde_json::json!({
                         "query": "up",
@@ -738,10 +738,10 @@ alertmanager = "grant:alertmanager"
         );
 
         let created = backend
-            .handle_connection(
+            .handle_endpoint(
                 &owner,
-                ConnectionRequest::ConnectSessionCreate(
-                    protocol::connection::ConnectSessionCreateRequest {
+                EndpointRequest::ConnectSessionCreate(
+                    protocol::endpoint::ConnectSessionCreateRequest {
                         integration_ref: GRAFANA.to_owned(),
                         label: "Infrastructure Grafana".to_owned(),
                         auth_profile: None,
@@ -750,7 +750,7 @@ alertmanager = "grant:alertmanager"
             )
             .await
             .unwrap();
-        let ConnectionResult::ConnectSessionCreate(created) = created else {
+        let EndpointResult::ConnectSessionCreate(created) = created else {
             panic!("expected Connect Session creation")
         };
         let endpoint = PathBuf::from(created.completion_endpoint.clone().unwrap());
@@ -772,17 +772,17 @@ alertmanager = "grant:alertmanager"
             "SENTINEL-NOT-A-REAL-SECRET"
         );
         let status = backend
-            .handle_connection(
+            .handle_endpoint(
                 &owner,
-                ConnectionRequest::ConnectSessionStatus(
-                    protocol::connection::ConnectSessionStatusRequest {
+                EndpointRequest::ConnectSessionStatus(
+                    protocol::endpoint::ConnectSessionStatusRequest {
                         connect_session_ref: created.connect_session_ref,
                     },
                 ),
             )
             .await
             .unwrap();
-        let ConnectionResult::ConnectSessionStatus(status) = status else {
+        let EndpointResult::ConnectSessionStatus(status) = status else {
             panic!("expected Connect Session status")
         };
         assert_eq!(status.state, ConnectSessionState::Completed);
@@ -899,7 +899,7 @@ alertmanager = "grant:alertmanager"
             backend.capabilities(),
             BackendCapabilities {
                 operations: true,
-                connections: true,
+                endpoints: true,
                 events: false,
                 datasources: false,
             }
@@ -914,10 +914,10 @@ alertmanager = "grant:alertmanager"
             .await
             .unwrap_err();
         assert_eq!(operation_error.code, OperationErrorCode::NotFound);
-        let connection_error = backend
-            .handle_connection(
+        let endpoint_error = backend
+            .handle_endpoint(
                 &owner,
-                ConnectionRequest::CandidateSearch(protocol::connection::CandidateSearchRequest {
+                EndpointRequest::CandidateSearch(protocol::endpoint::CandidateSearchRequest {
                     integration_ref: "elsewhere".to_owned(),
                     query: String::new(),
                     limit: 1,
@@ -925,7 +925,7 @@ alertmanager = "grant:alertmanager"
             )
             .await
             .unwrap_err();
-        assert_eq!(connection_error.code, ConnectionErrorCode::NotFound);
+        assert_eq!(endpoint_error.code, EndpointErrorCode::NotFound);
     }
 
     #[tokio::test]
@@ -950,7 +950,7 @@ alertmanager = "grant:alertmanager"
         let hosted = HostedGrafanaConfig {
             enabled: true,
             origin: Some("https://grafana.example".to_owned()),
-            connection_ref: Some("connection:grafana:global".to_owned()),
+            endpoint_ref: Some("connection:grafana:global".to_owned()),
             label: Some("Global infrastructure Grafana".to_owned()),
             grant_ref: Some("grant:grafana:read".to_owned()),
             read_groups: vec!["dev".to_owned(), "sre".to_owned()],
@@ -958,14 +958,14 @@ alertmanager = "grant:alertmanager"
                 HostedGrafanaTargetConfig {
                     provider: "alertmanager".to_owned(),
                     uid_sha256: "a".repeat(64),
-                    connection_ref: "connection:alertmanager:missing".to_owned(),
+                    endpoint_ref: "connection:alertmanager:missing".to_owned(),
                     label: "Alertmanager · missing".to_owned(),
                     grant_ref: "grant:alertmanager:read".to_owned(),
                 },
                 HostedGrafanaTargetConfig {
                     provider: "prometheus".to_owned(),
                     uid_sha256: format!("{:x}", Sha256::digest(b"prom-main")),
-                    connection_ref: "connection:prometheus:main".to_owned(),
+                    endpoint_ref: "connection:prometheus:main".to_owned(),
                     label: "Prometheus · main".to_owned(),
                     grant_ref: "grant:prometheus:read".to_owned(),
                 },
@@ -1005,39 +1005,39 @@ alertmanager = "grant:alertmanager"
         )
         .unwrap();
         let searched = backend
-            .handle_connection(
+            .handle_endpoint(
                 &dev,
-                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                EndpointRequest::Search(protocol::endpoint::SearchRequest {
                     query: String::new(),
                     limit: 16,
                 }),
             )
             .await
             .unwrap();
-        let ConnectionResult::Search { connections } = searched else {
-            panic!("expected hosted connections")
+        let EndpointResult::Search { endpoints } = searched else {
+            panic!("expected hosted endpoints")
         };
-        assert_eq!(connections.len(), 3);
+        assert_eq!(endpoints.len(), 3);
         assert_eq!(
-            connections
+            endpoints
                 .iter()
-                .find(|connection| connection.connection_ref == "connection:prometheus:main")
+                .find(|connection| connection.endpoint_ref == "connection:prometheus:main")
                 .unwrap()
                 .state,
-            ConnectionState::Callable
+            EndpointState::Callable
         );
         assert_eq!(
-            connections
+            endpoints
                 .iter()
-                .find(|connection| connection.connection_ref == "connection:alertmanager:missing")
+                .find(|connection| connection.endpoint_ref == "connection:alertmanager:missing")
                 .unwrap()
                 .state,
-            ConnectionState::Degraded
+            EndpointState::Degraded
         );
         let hidden = backend
-            .handle_connection(
+            .handle_endpoint(
                 &outsider,
-                ConnectionRequest::Search(protocol::connection::SearchRequest {
+                EndpointRequest::Search(protocol::endpoint::SearchRequest {
                     query: String::new(),
                     limit: 16,
                 }),
@@ -1045,13 +1045,13 @@ alertmanager = "grant:alertmanager"
             .await
             .unwrap();
         assert!(
-            matches!(hidden, ConnectionResult::Search { connections } if connections.is_empty())
+            matches!(hidden, EndpointResult::Search { endpoints } if endpoints.is_empty())
         );
         assert!(backend
-            .handle_connection(
+            .handle_endpoint(
                 &dev,
-                ConnectionRequest::ConnectSessionCreate(
-                    protocol::connection::ConnectSessionCreateRequest {
+                EndpointRequest::ConnectSessionCreate(
+                    protocol::endpoint::ConnectSessionCreateRequest {
                         integration_ref: GRAFANA.to_owned(),
                         label: "Another Grafana".to_owned(),
                         auth_profile: None,
@@ -1191,8 +1191,8 @@ alertmanager = "grant:alertmanager"
             Arc::new(OversizedBodyEgress),
         )
         .unwrap();
-        lock(&backend.inner.state).parent = Some(ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        lock(&backend.inner.state).parent = Some(ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         });
         store
@@ -1217,7 +1217,7 @@ alertmanager = "grant:alertmanager"
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
-                    connection_ref: "connection:grafana:test".to_owned(),
+                    endpoint_ref: "connection:grafana:test".to_owned(),
                     description_ref: description.description_ref,
                     input: serde_json::json!({"namespace": "default"}),
                     approval_evidence_ref: None,
@@ -1260,8 +1260,8 @@ alertmanager = "grant:alertmanager"
             credential_ref.clone(),
             Arc::clone(&executor),
         );
-        lock(&backend.inner.state).parent = Some(ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        lock(&backend.inner.state).parent = Some(ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         });
         store
@@ -1286,7 +1286,7 @@ alertmanager = "grant:alertmanager"
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
-                    connection_ref: "connection:grafana:test".to_owned(),
+                    endpoint_ref: "connection:grafana:test".to_owned(),
                     description_ref: description.description_ref.clone(),
                     input: serde_json::json!({"namespace": "default"}),
                     approval_evidence_ref: None,
@@ -1327,7 +1327,7 @@ alertmanager = "grant:alertmanager"
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: GRAFANA_DASHBOARDS_LIST.to_owned(),
-                    connection_ref: "connection:grafana:test".to_owned(),
+                    endpoint_ref: "connection:grafana:test".to_owned(),
                     description_ref: description.description_ref,
                     input: serde_json::json!({"namespace": "default", "limit": 7}),
                     approval_evidence_ref: None,
@@ -1366,8 +1366,8 @@ alertmanager = "grant:alertmanager"
             credential_ref.clone(),
             Arc::clone(&executor),
         );
-        let parent = ParentConnection {
-            connection_ref: "connection:grafana:test".to_owned(),
+        let parent = ParentEndpoint {
+            endpoint_ref: "connection:grafana:test".to_owned(),
             label: "Infrastructure Grafana".to_owned(),
         };
         let token = Secret::new("SENTINEL-NOT-A-REAL-SECRET");
@@ -1384,7 +1384,7 @@ alertmanager = "grant:alertmanager"
             .unwrap();
         backend
             .inner
-            .reconcile_observations(&parent.connection_ref, &output)
+            .reconcile_observations(&parent.endpoint_ref, &output)
             .unwrap();
         lock(&backend.inner.state).parent = Some(parent);
         store.put(&credential_ref, &token).await.unwrap();
@@ -1415,7 +1415,7 @@ alertmanager = "grant:alertmanager"
                 &owner,
                 OperationRequest::Invoke(InvokeRequest {
                     operation_ref: monitoring_model::ALERTMANAGER_ALERTS_LIST.to_owned(),
-                    connection_ref: child.summary.connection_ref.clone(),
+                    endpoint_ref: child.summary.endpoint_ref.clone(),
                     description_ref: description.description_ref,
                     input: serde_json::json!({}),
                     approval_evidence_ref: None,

@@ -17,7 +17,7 @@
 
 use driver_sql::credentials::{CredentialReference, FileEnvCredentialSource};
 use driver_sql::{
-    describe_table, list_schemas, list_tables, run_query, SqlConnectionConfig, SqlDriverError,
+    describe_table, list_schemas, list_tables, run_query, SqlEndpointConfig, SqlDriverError,
     SqlEngine, DEFAULT_STATEMENT_TIMEOUT_MS,
 };
 use protocol::sql::{SqlQueryInput, TruncationCause, MAX_RESULT_ROWS};
@@ -26,8 +26,8 @@ fn env_or(name: &str, fallback: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| fallback.to_owned())
 }
 
-fn postgres_config() -> SqlConnectionConfig {
-    SqlConnectionConfig {
+fn postgres_config() -> SqlEndpointConfig {
+    SqlEndpointConfig {
         engine: SqlEngine::Postgres,
         connect_address: None,
         tls: driver_sql::SqlTls::Disabled,
@@ -44,8 +44,8 @@ fn postgres_config() -> SqlConnectionConfig {
     }
 }
 
-fn mysql_config() -> SqlConnectionConfig {
-    SqlConnectionConfig {
+fn mysql_config() -> SqlEndpointConfig {
+    SqlEndpointConfig {
         engine: SqlEngine::MySql,
         connect_address: None,
         tls: driver_sql::SqlTls::Disabled,
