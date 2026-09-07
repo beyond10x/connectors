@@ -8,7 +8,7 @@ tags:
 - wave-small
 relations:
 - delivers: story:the-binary-says-what-it-carries
-revision: 25
+revision: 26
 ---
 # Next small wave: inspect the installed binary
 
@@ -1745,3 +1745,13 @@ The feature's affected local suites and two independent reviews are recorded abo
 Native Cargo summaries: 180 targets, 2673 passed executions, 0 failed, 27 ignored (includes both runtime feature configurations).
 
 Counts sum native Cargo target summaries, not unique cases; existing ignored cases are not counted as passing. All thirteen gate jobs completed successfully.
+
+## Documentation delivered and cleanup handoff
+
+Website's full 19-step gate passed at `29b944d2dec6d49a852c71ade13ef9c6ff1d48f0`: 99 tests, no failures or skips; 357 routes and 23,847 references verified. Atlas's scoped portal check passed for 24 sources, 25 surfaces and 52 delivery records. The complete source-freshness check passed before Website publication. Native Atlas snapshot generation recorded the actual published v0.7.2 release.
+
+Atlas reconciliation https://github.com/beyond10x/atlas/actions/runs/34126589527 succeeded. Live provenance names Connectors release source `c30e4f2475f6288b5e83c87ed09843882a882123` and source-set SHA256 `01491a19e72315310675a2d76aca04a69cff3fb4882f5127b2ee1ef5f7b62607`; the live commands-and-interfaces page contains inspect upgrade. Native root Pages verification passed 27 delivery routes. Website runtime and Docs System pins remain unchanged. The existing stale production release feed remains separately tracked by Website's `story:publish-connectors-release-highlights`; the command documentation, root WHATS-NEW notes and GitHub release are current.
+
+Release and documentation evidence is retained in `~/.cache/connectors-small-wave-20260907`, including the checked downloads, job logs, live provenance and an independently compared unit-evidence archive (SHA256 `19ee2cbcdc3836d0830128acbe6d6002a8a2a848552085c7cb8ca2560ccd1e93`). Unit targets/scratch/private cache and Website build/dependency caches were removed after preserving evidence. No active listener remained in assigned test roots; the private compiler server was already absent. The unit managed tree and its merged local branch are already removed.
+
+Publish this closing record, then finish and inspect exact-id GC for the remaining owned trees only: Connectors `wt-83fe13d0c209`, Website `wt-connectors-071-docs-20260907`, and Atlas `wt-840d0a4626a0`. Their actual removal results and final branch inventory belong to the retained native cleanup evidence; this paragraph records the authorized next operation rather than claiming removal before it happens. Older recovery trees and all other sessions' work remain outside that cleanup.
