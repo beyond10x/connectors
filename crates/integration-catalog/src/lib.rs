@@ -61,6 +61,7 @@ mod config;
 mod confluence_reads;
 mod incremental_reads;
 pub use config::DeclaredConfig;
+pub mod endpoint;
 mod custody;
 mod oauth;
 pub use oauth::{

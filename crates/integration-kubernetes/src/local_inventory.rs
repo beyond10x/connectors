@@ -118,7 +118,7 @@ impl KubernetesLocalBackend {
         if !request.input.is_object() {
             return Err(operation_invalid());
         }
-        let namespaces = self
+        let mut namespaces = self
             .policy
             .namespaces
             .iter()
@@ -128,6 +128,14 @@ impl KubernetesLocalBackend {
         if request.operation_ref == NAMESPACE_OPERATION {
             let _: NamespaceInput =
                 serde_json::from_value(request.input.clone()).map_err(|_| operation_invalid())?;
+            if self.policy.all_namespaces {
+                namespaces.extend(
+                    reader
+                        .list_namespaces()
+                        .await
+                        .map_err(operation_from_datasource)?,
+                );
+            }
             return bounded_value(NamespaceInventory {
                 connection_ref: &request.connection_ref,
                 namespaces: namespaces.into_iter().collect(),
@@ -144,7 +152,7 @@ impl KubernetesLocalBackend {
         {
             return Err(operation_invalid());
         }
-        if !namespaces.contains(&input.namespace) {
+        if !self.policy.all_namespaces && !namespaces.contains(&input.namespace) {
             return Err(OperationError::new(
                 OperationErrorCode::NotGranted,
                 "namespace is not admitted by this local Kubernetes configuration; list admitted namespaces first",

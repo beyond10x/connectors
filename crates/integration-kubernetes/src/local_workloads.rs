@@ -44,6 +44,48 @@ impl KubeconfigReader {
         Self { client }
     }
 
+    /// Explicit all-namespace admission enumerates every page; namespace-only configuration
+    /// continues to avoid cluster-wide enumeration entirely.
+    pub(crate) async fn list_namespaces(&self) -> Result<Vec<String>, DatasourceError> {
+        let mut namespaces = std::collections::BTreeSet::new();
+        let mut cursor = None;
+        let mut seen = std::collections::BTreeSet::new();
+        for _ in 0..MAX_UPSTREAM_LIST_FETCHES {
+            let mut pairs = vec![("limit", "256")];
+            if let Some(cursor) = cursor.as_deref() {
+                pairs.push(("continue", cursor));
+            }
+            let page: KubernetesList<serde_json::Value> = self
+                .get_json(&format!("/api/v1/namespaces?{}", query(&pairs)))
+                .await?;
+            if page.items.len() > 256 {
+                return Err(datasource_unavailable(
+                    "Kubernetes namespace page exceeded its bound",
+                ));
+            }
+            for namespace in page.items {
+                let name = namespace
+                    .pointer("/metadata/name")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|name| valid_dns_label(name, 63))
+                    .ok_or_else(|| {
+                        datasource_unavailable("Kubernetes namespace identity is invalid")
+                    })?;
+                namespaces.insert(name.to_owned());
+            }
+            cursor =
+                (!page.metadata.continue_token.is_empty()).then_some(page.metadata.continue_token);
+            match &cursor {
+                None => return Ok(namespaces.into_iter().collect()),
+                Some(value) if !seen.insert(value.clone()) => break,
+                _ => {}
+            }
+        }
+        Err(datasource_unavailable(
+            "Kubernetes namespace inventory did not complete",
+        ))
+    }
+
     async fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, DatasourceError> {
         let request = http::Request::get(path)
             .body(Vec::new())

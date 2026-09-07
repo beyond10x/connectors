@@ -25,6 +25,63 @@ use serde_json::Value;
 
 use super::local::*;
 
+/// Every Service name or identity label that names **exactly one** component, so a substring test
+/// would recognize its siblings too.
+///
+/// A default Argo CD install ships eight Services whose names contain `argocd`, and only
+/// `argocd-server` is the API. `argocd-repo-server` speaks a private gRPC protocol,
+/// `argocd-server-metrics` serves Prometheus text on a different port, and `argocd-redis` is a
+/// cache holding session state. `haystack.contains("argocd")` would offer all eight as Argo CD
+/// Connection candidates, and `contains("argocd-server")` would still take the metrics Service —
+/// which shares `app.kubernetes.io/component: server` — so this arm matches whole tokens and runs
+/// before the substring arms below.
+///
+/// Whole-token rather than name-only because a Helm release renames the Service: `argo-cd` chart
+/// installs it as `<release>-argocd-server` while keeping `app.kubernetes.io/name: argocd-server`,
+/// so the label is the stable identity and the name is not.
+const EXACT_IDENTITIES: [(&str, &str); 1] = [("argocd-server", "argocd")];
+
+pub(crate) fn recognize_service(service: &Service) -> Option<&'static str> {
+    let name = service
+        .metadata
+        .name
+        .as_deref()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let identity_labels = service
+        .metadata
+        .labels
+        .as_ref()
+        .into_iter()
+        .flat_map(|labels| {
+            ["app.kubernetes.io/name", "app", "k8s-app", "name"]
+                .into_iter()
+                .filter_map(|key| labels.get(key))
+                .map(|value| value.to_ascii_lowercase())
+        });
+    let identities = std::iter::once(name)
+        .chain(identity_labels)
+        .collect::<Vec<_>>();
+    if let Some((_, provider)) = EXACT_IDENTITIES
+        .iter()
+        .find(|(token, _)| identities.iter().any(|identity| identity == token))
+    {
+        return Some(provider);
+    }
+    let haystack = identities.join(" ");
+    if haystack.contains("grafana") {
+        Some("grafana")
+    } else if haystack.contains("alertmanager") {
+        Some("alertmanager")
+    } else if haystack.contains("loki") {
+        Some("loki")
+    } else if haystack.contains("prometheus") {
+        Some("prometheus")
+    } else {
+        None
+    }
+}
+
 pub(crate) async fn verify_identity(client: Client) -> Result<(), ConnectionError> {
     let reviews: Api<SelfSubjectReview> = Api::all(client);
     let reviewed = reviews
