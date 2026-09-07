@@ -53,6 +53,9 @@ use monitoring_model::{
 use crate::errors::*;
 use crate::projection::project_output;
 
+#[path = "backend_endpoints.rs"]
+mod endpoints;
+
 const GRAFANA_CREDENTIAL: &str = "grafana.service_account_token";
 const GRAFANA_AUTHORITY: &str = "com.grafana.api";
 const GRAFANA_CREDENTIAL_LEAF: &str = "service_account_token";
@@ -156,6 +159,7 @@ struct MonitoringInner {
     executor: Arc<dyn HttpExecutor>,
     audit: Mutex<()>,
     hosted_state: Option<Arc<dyn StateStore>>,
+    inventory_state: Option<Arc<dyn StateStore>>,
 }
 
 #[derive(Clone)]
@@ -168,7 +172,8 @@ enum MonitoringAccess {
     },
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct MonitoringState {
     parent: Option<ParentConnection>,
     observations: BTreeMap<String, StoredObservation>,
@@ -176,13 +181,15 @@ struct MonitoringState {
     evidence_generation: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ParentConnection {
     connection_ref: String,
     label: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct StoredObservation {
     observation_ref: String,
     source_connection_ref: String,
@@ -196,7 +203,8 @@ struct StoredObservation {
     connection_ref: Option<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ChildConnection {
     connection_ref: String,
     label: String,
@@ -220,6 +228,35 @@ struct AuditEvent<'a> {
 }
 
 impl MonitoringBackend {
+    /// Open a local Grafana source with durable credential-free inventory. This constructor
+    /// requires a running Tokio runtime to own its periodic inventory refresh.
+    pub fn open_with_state(
+        owner: PrincipalContext,
+        policy: GrafanaIntegrationConfig,
+        state_root: &Path,
+        credential_store: Arc<dyn SecretStore>,
+        egress: Arc<dyn EgressTransport>,
+        inventory_state: Arc<dyn StateStore>,
+    ) -> Result<Self, MonitoringError> {
+        let mut backend = Self::open(owner, policy, state_root, credential_store, egress)?;
+        Arc::get_mut(&mut backend.inner)
+            .expect("unshared new backend")
+            .inventory_state = Some(inventory_state);
+        backend.inner.restore_inventory()?;
+        let inner = Arc::clone(&backend.inner);
+        lock(&backend.inner.tasks).push(tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                ticker.tick().await;
+                let connected = lock(&inner.state).parent.is_some();
+                if connected && inner.refresh_endpoint_inventory().await.is_err() {
+                    inner.degrade_hosted_targets();
+                }
+            }
+        }));
+        Ok(backend)
+    }
+
     /// Construct a Grafana monitoring adapter over caller-owned credential custody.
     pub fn open(
         owner: PrincipalContext,
@@ -336,6 +373,7 @@ impl MonitoringBackend {
                 tasks: Mutex::new(Vec::new()),
                 executor,
                 audit: Mutex::new(()),
+                inventory_state: hosted_state.clone(),
                 hosted_state,
             }),
         };
@@ -385,6 +423,7 @@ impl MonitoringBackend {
                 executor,
                 audit: Mutex::new(()),
                 hosted_state: None,
+                inventory_state: None,
             }),
         }
     }
@@ -399,6 +438,29 @@ impl MonitoringBackend {
 
 #[async_trait]
 impl ConnectorBackend for MonitoringBackend {
+    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+        self.inner.owns_endpoint(request)
+    }
+
+    async fn handle_endpoint(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::endpoint::EndpointRequest,
+    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        self.inner.handle_endpoint(context, request).await
+    }
+
+    async fn resolve_endpoint(
+        &self,
+        context: &PrincipalContext,
+        endpoint_ref: &str,
+        operation_ref: &str,
+    ) -> Result<String, OperationError> {
+        self.inner
+            .resolve_endpoint(context, endpoint_ref, operation_ref)
+            .await
+    }
+
     async fn ready(&self) -> Result<(), BackendReadinessError> {
         self.inner
             .credential_store
@@ -1242,12 +1304,17 @@ impl MonitoringInner {
             observation_ref: observation_ref.to_owned(),
             resource_binding: observation.resource_binding,
         };
+        let previous = state.clone();
         state.children.insert(connection_ref.clone(), child.clone());
         state
             .observations
             .get_mut(observation_ref)
             .expect("observation was read from this map")
             .connection_ref = Some(connection_ref);
+        if self.persist_inventory(&state).is_err() {
+            *state = previous;
+            return Err(connection_unavailable());
+        }
         Ok(ConnectionDescription {
             summary: self.child_summary(&state, &child),
             channels: Vec::new(),
@@ -1318,6 +1385,7 @@ impl MonitoringInner {
             )
         );
         let mut state = lock(&self.state);
+        let previous = state.clone();
         state.evidence_generation = state.evidence_generation.saturating_add(1).max(1);
         let generation = state.evidence_generation;
         state.observations.clear();
@@ -1358,6 +1426,38 @@ impl MonitoringInner {
                     resource_binding,
                 },
             );
+        }
+        // Inventory includes unconfigured and unsupported datasource interfaces. Only configured
+        // target rows above own independent child Grants; visibility never creates one.
+        for ((observed_type, _), (uid, title)) in &discovered {
+            if state.observations.values().any(|observation| {
+                observation.resource_binding == *uid && observation.observed_type == *observed_type
+            }) {
+                continue;
+            }
+            let observation_ref = format!(
+                "observation:grafana:{}",
+                digest_prefix(format!("{source_connection_ref}\0{uid}").as_bytes())
+            );
+            state.observations.insert(
+                observation_ref.clone(),
+                StoredObservation {
+                    observation_ref,
+                    source_connection_ref: source_connection_ref.into(),
+                    observed_type: observed_type.clone(),
+                    title: title.clone(),
+                    resource_binding: uid.clone(),
+                    target_provider: target_provider(observed_type).map(str::to_owned),
+                    active: true,
+                    evidence_generation: generation,
+                    evidence_sha256: evidence_sha256.clone(),
+                    connection_ref: None,
+                },
+            );
+        }
+        if state.parent.is_some() && self.persist_inventory(&state).is_err() {
+            *state = previous;
+            return Err(operation_unavailable());
         }
         Ok(())
     }
@@ -1505,6 +1605,11 @@ impl MonitoringInner {
         }
         let connection_ref = parent.connection_ref.clone();
         lock(&self.state).parent = Some(parent);
+        let persisted = self.persist_inventory(&lock(&self.state));
+        if persisted.is_err() {
+            *lock(&self.state) = prior;
+            return Err(MonitoringError::new("inventory-state"));
+        }
         Ok(connection_ref)
     }
 
@@ -1545,6 +1650,7 @@ impl MonitoringInner {
             Sha256::digest(serde_json::to_vec(&normalized).map_err(|_| operation_invalid())?)
         );
         let mut state = lock(&self.state);
+        let previous = state.clone();
         state.evidence_generation = state.evidence_generation.saturating_add(1).max(1);
         let generation = state.evidence_generation;
         for observation in state.observations.values_mut() {
@@ -1587,6 +1693,10 @@ impl MonitoringInner {
                     );
                 }
             }
+        }
+        if state.parent.is_some() && self.persist_inventory(&state).is_err() {
+            *state = previous;
+            return Err(operation_unavailable());
         }
         Ok(())
     }

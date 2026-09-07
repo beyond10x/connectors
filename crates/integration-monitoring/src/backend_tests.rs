@@ -6,9 +6,186 @@ mod tests {
     use connector_secrets::{MemoryStore, StoreError};
     use monitoring_model::{GRAFANA_DASHBOARDS_LIST, PROMETHEUS_QUERY_RANGE};
     use protocol::connection::ConnectSessionState;
-    use service::{EgressHttpResponse, EgressTransportError, EgressTransportFailure, EgressWebSocket};
+    use service::{
+        EgressHttpResponse, EgressTransportError, EgressTransportFailure, EgressWebSocket,
+    };
     use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
     use tokio::net::UnixStream;
+
+    async fn endpoint_fixture(
+        inventory: Arc<dyn StateStore>,
+    ) -> (
+        tempfile::TempDir,
+        MonitoringBackend,
+        Arc<MemoryStore>,
+        Arc<FakeExecutor>,
+    ) {
+        let root = tempfile::tempdir().unwrap();
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let owner = owner();
+        let credential_ref = grafana_credential_ref(&owner).unwrap();
+        let credentials = Arc::new(MemoryStore::new());
+        let executor = Arc::new(FakeExecutor::default());
+        let mut backend = MonitoringBackend::with_executor(
+            owner,
+            policy(),
+            root.path(),
+            credentials.clone(),
+            credential_ref.clone(),
+            executor.clone(),
+        );
+        Arc::get_mut(&mut backend.inner).unwrap().inventory_state = Some(inventory);
+        lock(&backend.inner.state).parent = Some(ParentConnection {
+            connection_ref: "connection:grafana:endpoints".into(),
+            label: "Endpoint fixture".into(),
+        });
+        credentials
+            .put(
+                &credential_ref,
+                &Secret::new("SENTINEL-ENDPOINT-SOURCE-TOKEN"),
+            )
+            .await
+            .unwrap();
+        backend.inner.refresh_endpoint_inventory().await.unwrap();
+        (root, backend, credentials, executor)
+    }
+
+    #[tokio::test]
+    async fn endpoints_discover_unknown_datasources_and_lazily_invoke_through_grafana() {
+        use protocol::endpoint::{self, EndpointRequest, EndpointResult, EndpointState};
+        let (_root, backend, _, executor) =
+            endpoint_fixture(Arc::new(connector_state::MemoryState::new())).await;
+        let EndpointResult::List { endpoints, .. } = backend
+            .handle_endpoint(
+                &owner(),
+                EndpointRequest::List(endpoint::ListRequest {
+                    source_ref: None,
+                    query: String::new(),
+                    limit: 100,
+                    cursor: None,
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!()
+        };
+        assert_eq!(endpoints.len(), 3);
+        assert!(endpoints
+            .iter()
+            .any(|endpoint| endpoint.state == EndpointState::UnknownProvider));
+        assert!(!serde_json::to_string(&endpoints)
+            .unwrap()
+            .contains("SENTINEL"));
+        let endpoint = endpoints
+            .iter()
+            .find(|endpoint| endpoint.provider.as_deref() == Some("prometheus"))
+            .unwrap();
+        let connection = backend
+            .resolve_endpoint(&owner(), &endpoint.endpoint_ref, PROMETHEUS_QUERY_RANGE)
+            .await
+            .unwrap();
+        let description = backend.inner.describe_connection(&connection).unwrap();
+        assert!(matches!(
+            description.summary.route,
+            ConnectionRoute::ViaConnection {
+                route_adapter: RouteAdapter::GrafanaDatasourceProxyV1,
+                ..
+            }
+        ));
+        let OperationResult::Describe(description) = backend
+            .handle(
+                &owner(),
+                OperationRequest::Describe(DescribeRequest {
+                    operation_ref: PROMETHEUS_QUERY_RANGE.into(),
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!()
+        };
+        let resolved = backend
+            .resolve_endpoint(&owner(), &endpoint.endpoint_ref, PROMETHEUS_QUERY_RANGE)
+            .await
+            .unwrap();
+        assert_eq!(connection, resolved);
+        backend.handle(&owner(), OperationRequest::Invoke(InvokeRequest { operation_ref: PROMETHEUS_QUERY_RANGE.into(), connection_ref: resolved,
+            description_ref: description.description_ref, input: serde_json::json!({"query":"up","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:01:00Z","step":"15s"}), approval_evidence_ref: None,
+        })).await.unwrap();
+        assert!(lock(&executor.requests)
+            .last()
+            .unwrap()
+            .url
+            .contains("/api/datasources/proxy/uid/prom-main/"));
+    }
+
+    #[tokio::test]
+    async fn endpoint_inventory_restores_identity_but_rechecks_current_target_grants() {
+        use protocol::endpoint::{self, EndpointRequest, EndpointResult};
+        let inventory: Arc<dyn StateStore> = Arc::new(connector_state::MemoryState::new());
+        let (root, backend, credentials, executor) = endpoint_fixture(inventory.clone()).await;
+        let EndpointResult::List { endpoints, .. } = backend
+            .handle_endpoint(
+                &owner(),
+                EndpointRequest::List(endpoint::ListRequest {
+                    source_ref: None,
+                    query: String::new(),
+                    limit: 100,
+                    cursor: None,
+                }),
+            )
+            .await
+            .unwrap()
+        else {
+            panic!()
+        };
+        let endpoint = endpoints
+            .into_iter()
+            .find(|endpoint| endpoint.provider.as_deref() == Some("prometheus"))
+            .unwrap();
+        backend
+            .resolve_endpoint(&owner(), &endpoint.endpoint_ref, PROMETHEUS_QUERY_RANGE)
+            .await
+            .unwrap();
+        let mut changed_policy = policy();
+        changed_policy.target_grants.remove("prometheus");
+        let mut restored = MonitoringBackend::with_executor(
+            owner(),
+            changed_policy,
+            root.path(),
+            credentials,
+            grafana_credential_ref(&owner()).unwrap(),
+            executor.clone(),
+        );
+        Arc::get_mut(&mut restored.inner).unwrap().inventory_state = Some(inventory);
+        restored.inner.restore_inventory().unwrap();
+        assert_eq!(restored.connection_count(), 1);
+        let result = restored
+            .handle_endpoint(
+                &owner(),
+                EndpointRequest::Show(endpoint::ShowRequest {
+                    endpoint_ref: endpoint.endpoint_ref.clone(),
+                }),
+            )
+            .await
+            .unwrap();
+        let EndpointResult::Show {
+            endpoint: restored_endpoint,
+        } = result
+        else {
+            panic!()
+        };
+        assert_eq!(restored_endpoint.endpoint_ref, endpoint.endpoint_ref);
+        assert_eq!(restored_endpoint.state, endpoint::EndpointState::Denied);
+        assert!(restored
+            .resolve_endpoint(&owner(), &endpoint.endpoint_ref, PROMETHEUS_QUERY_RANGE)
+            .await
+            .is_err());
+        assert!(!lock(&executor.requests)
+            .iter()
+            .any(|request| request.url.contains("/proxy/")));
+    }
 
     #[derive(Default)]
     struct FakeExecutor {
@@ -69,9 +246,7 @@ mod tests {
                     ],
                     "metadata": {}
                 })
-            } else if request.url.contains("/api/datasources")
-                && !request.url.contains("/proxy/")
-            {
+            } else if request.url.contains("/api/datasources") && !request.url.contains("/proxy/") {
                 serde_json::json!([
                     {"id":1,"uid":"prom-main","name":"Metrics","type":"prometheus"},
                     {"id":2,"uid":"loki-main","name":"Logs","type":"loki"},
@@ -116,7 +291,10 @@ mod tests {
             _authority_ref: &str,
             _request: EgressHttpRequest,
         ) -> Result<EgressHttpResponse, EgressTransportError> {
-            match lock(&self.outcome).take().expect("a scripted outcome is set") {
+            match lock(&self.outcome)
+                .take()
+                .expect("a scripted outcome is set")
+            {
                 Ok(status) => Ok(EgressHttpResponse {
                     status,
                     headers: BTreeMap::new(),
@@ -1126,9 +1304,10 @@ alertmanager = "grant:alertmanager"
             request: Request,
         ) -> Result<Value, UpstreamFailure> {
             let query_value = |name: &str| {
-                request.url.split_once(&format!("{name}=")).map(|(_, rest)| {
-                    rest.split('&').next().unwrap_or_default().to_owned()
-                })
+                request
+                    .url
+                    .split_once(&format!("{name}="))
+                    .map(|(_, rest)| rest.split('&').next().unwrap_or_default().to_owned())
             };
             let page = query_value("continue")
                 .and_then(|token| token.strip_prefix('t').map(str::to_owned))
@@ -1170,14 +1349,14 @@ alertmanager = "grant:alertmanager"
             _connection_ref: &str,
             request: Request,
         ) -> Result<Value, UpstreamFailure> {
-            let output = if request.url.contains("/api/datasources") && !request.url.contains("/proxy/")
-            {
-                serde_json::json!([
-                    {"id":1,"uid":"am-main","name":"Alerts","type":"alertmanager"}
-                ])
-            } else {
-                serde_json::json!([])
-            };
+            let output =
+                if request.url.contains("/api/datasources") && !request.url.contains("/proxy/") {
+                    serde_json::json!([
+                        {"id":1,"uid":"am-main","name":"Alerts","type":"alertmanager"}
+                    ])
+                } else {
+                    serde_json::json!([])
+                };
             lock(&self.requests).push(request);
             Ok(output)
         }
@@ -1317,7 +1496,9 @@ alertmanager = "grant:alertmanager"
                     .iter()
                     .all(|request| request.url.contains("limit=5")),
                 "every upstream fetch carries the bounded page limit: {}",
-                requests.first().map_or(String::new(), |req| req.url.clone())
+                requests
+                    .first()
+                    .map_or(String::new(), |req| req.url.clone())
             );
             assert_eq!(requests.len(), 20, "the walk stops at the fetch budget");
         }
@@ -1353,10 +1534,7 @@ alertmanager = "grant:alertmanager"
         assert_eq!(requests.len(), 2);
         assert!(requests[0].url.contains("limit=5"), "{}", requests[0].url);
         assert!(requests[1].url.contains("limit=2"), "{}", requests[1].url);
-        assert_eq!(
-            invocation.output["dashboards"].as_array().unwrap().len(),
-            7
-        );
+        assert_eq!(invocation.output["dashboards"].as_array().unwrap().len(), 7);
     }
 
     /// S-066: the mediated Alertmanager dispatch resolves the v2 API sub-path. The live
