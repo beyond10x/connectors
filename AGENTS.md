@@ -269,11 +269,14 @@ catalog artifacts and the lockfile; that diff is the intended consequence, not c
 itself touches 184 pins across 27 manifests — every internal dependency is path-pinned to the exact
 version — so bump them together and re-run `catalog build`.
 
-Cutting a release is pushing a `v*` tag. `.github/workflows/release.yml` then runs, in order: the
-tag against the committed version and the CHANGELOG against the same version; the sharded gate, the
-history-wide secret scan and the `local-identity` refusal; a `--locked --release` build per target;
-and a GitHub release carrying the archives, `SHA256SUMS`, and notes read from the CHANGELOG section
-for that version. A tag that disagrees with the committed version is refused before anything builds.
+Cutting a release is pushing a `v*` tag. `.github/workflows/release.yml` checks the tag against the
+committed version and the CHANGELOG against that version, runs the sharded gate, the history-wide
+secret scan and the `local-identity` refusal, and builds every target with `--locked --release`
+concurrently. Every job checks out the same exact commit. Publication requires all checks, every
+gate shard and every native build to succeed before creating a GitHub release carrying the
+archives, `SHA256SUMS`, and notes from the CHANGELOG section for that version. A tag that disagrees
+with the committed version cannot publish. Manual dispatch builds and validates without publishing,
+including when dispatched against a tag.
 
 - **The published targets are Unix only**: x86_64 and aarch64 Linux, x86_64 and aarch64 macOS.
   `connectors` does not compile for Windows and that is a design position rather than a gap —
@@ -394,3 +397,24 @@ cargo run --manifest-path "$atlas_checkout/Cargo.toml" --locked -q -- \
 
 Keep internal plans, stories, ADRs, decisions, worklogs, security material, and research out of the public allowlist unless a repository authority explicitly declares them public.
 <!-- b10x-docs-operations:end -->
+
+<!-- b10x-release-operations:start -->
+## Release completion
+
+An ordinary release completes after this repository's exact tag, required source checks,
+published release and required artifacts are verified. A pushed tag with unfinished checks or
+uploads is queued; report it as released only after those requirements succeed.
+
+Atlas reconciliation and public documentation publication run asynchronously. Do not wait for
+Atlas or Website, update Website source locks or bootstrap snapshots, promote consumer pins,
+release shared docs tooling, or redeploy documentation façades as part of an ordinary source
+release. Report documentation as pending unless its publication was actually verified. A background
+documentation failure does not invalidate a successful source release.
+
+Keep this repository's provenance, correctness, security, compatibility and artifact verification
+requirements. Shared rendering, routing or delivery-control changes still require their relevant
+integration gates. A release request does not authorize deployment or downstream releases.
+Repositories without a release unit retain their existing publication policy. This completion
+boundary supersedes older instructions that attach synchronous documentation ceremony to each
+source release.
+<!-- b10x-release-operations:end -->

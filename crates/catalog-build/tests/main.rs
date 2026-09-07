@@ -17,8 +17,8 @@
 //!   stated once and parameterised, so the next connector is covered the moment it exists.
 //! - **The workspace fences** — [`architecture_fence`], [`dependency_fence`], [`engine_free`],
 //!   [`ess_citation_fence`], [`ess_claim_fence`], [`msrv_fence`], [`json_governance`],
-//!   [`no_network`]. Each is about the *workspace*, not about the catalogue, and each is its own
-//!   argument.
+//!   [`no_network`], [`release_workflow`]. Each is about the *workspace*, not about the catalogue,
+//!   and each is its own argument.
 
 mod common;
 
@@ -40,3 +40,5 @@ mod json_governance;
 mod msrv_fence;
 #[path = "main/no_network.rs"]
 mod no_network;
+#[path = "main/release_workflow.rs"]
+mod release_workflow;

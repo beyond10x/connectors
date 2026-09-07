@@ -4,7 +4,7 @@
 # `[workspace.package] version` is what `catalog-build` writes into every catalog document's
 # `generator` field, into every `connectors.lock` row, and into the wire User-Agent. A tag that
 # disagreed with the committed version would ship binaries whose self-reported identity is wrong and
-# whose lock rows nobody could reproduce, so `gate` refuses that before anything is built.
+# whose lock rows nobody could reproduce, so `checks` refuses publication of that candidate.
 #
 # `GITHUB_TOKEN` is enough here. AGENTS.md requires b10x-bot authorship for a workflow that
 # *creates or pushes a commit*; this one creates a release and uploads assets, and never writes to a
@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -41,6 +41,9 @@ jobs:
       workspaces: ${{ steps.list.outputs.workspaces }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - id: list
         run: |
           set -euo pipefail
@@ -54,6 +57,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
           # `check-secrets.sh` scans complete history; a shallow clone would report a clean tree
           # by seeing almost none of it.
           fetch-depth: 0
@@ -128,6 +133,9 @@ jobs:
         workspace: ${{ fromJSON(needs.plan.outputs.workspaces) }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       # A hosted runner starts with roughly 14 GB free and the largest single workspace needs about
       # 11 GB of `target/`. Reclaiming the preinstalled toolchains this build never touches buys
@@ -167,11 +175,8 @@ jobs:
 
   build:
     name: ${{ matrix.target }}
-    needs: [checks, gate]
-    # A tag must not build unless both halves of the gate are green. A manual dispatch builds
-    # regardless, because it exists to answer "do the five targets still compile" and a gate
-    # failure would hide that.
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (needs.checks.result == 'success' && needs.gate.result == 'success')) }}
+    # Build the exact candidate concurrently with validation. Only the publication job joins
+    # checks, the complete sharded gate, and every native build. Manual dispatch is build-only.
     runs-on: ${{ matrix.runner }}
     strategy:
       # One target failing must not hide whether the others build.
@@ -200,6 +205,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Toolchain
         shell: bash
@@ -262,11 +270,16 @@ jobs:
 
   release:
     name: publish
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [checks, gate, build]
+    if: ${{ always() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && needs.checks.result == 'success' && needs.gate.result == 'success' && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - uses: actions/download-artifact@v8
         with:
