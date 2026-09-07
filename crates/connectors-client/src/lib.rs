@@ -18,6 +18,7 @@ use zeroize::Zeroizing;
 mod admin;
 #[path = "endpoint.rs"]
 mod endpoint_client;
+mod event_v2;
 mod git_fetch_client;
 mod hosted_catalog;
 mod identity;

@@ -13,12 +13,38 @@ struct EndpointBackend {
     resolutions: AtomicUsize,
     invocations: AtomicUsize,
     target_descriptions: AtomicUsize,
+    subscriptions: AtomicUsize,
 }
 
 #[async_trait]
 impl ConnectorBackend for EndpointBackend {
     async fn ready(&self) -> Result<(), service::BackendReadinessError> {
         Ok(())
+    }
+    async fn handle_event_v2(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::event::v2::EventRequest,
+    ) -> Result<protocol::event::v2::EventResult, protocol::event::EventError> {
+        use protocol::event::v2::{EventRequest, EventResult};
+        assert_eq!(context.tenant_id(), "tenant-dev");
+        self.subscriptions.fetch_add(1, Ordering::SeqCst);
+        match request {
+            EventRequest::Subscribe(request) => Ok(EventResult::Subscribe {
+                subscription_ref: "subscription:fixture".into(),
+                channel: protocol::event::ChannelSummary {
+                    channel_ref: "channel:fixture".into(),
+                    connection_ref: "connection:resolved".into(),
+                    integration_ref: "asterisk".into(),
+                    binding_ref: request.channel_binding,
+                    events: vec!["ari.event".into()],
+                },
+            }),
+            EventRequest::Unsubscribe(request) => Ok(EventResult::Unsubscribe {
+                subscription_ref: request.subscription_ref,
+            }),
+            _ => unreachable!(),
+        }
     }
     async fn handle_endpoint(
         &self,
@@ -150,6 +176,88 @@ fn request(request: v4::OperationRequest) -> v4::RequestEnvelope {
         context: context(),
         request,
     }
+}
+
+#[tokio::test]
+async fn event_subscription_requires_operator_and_exact_tenant_before_backend_access() {
+    use protocol::event::v2;
+    let backend = Arc::new(EndpointBackend::default());
+    let mut request = v2::RequestEnvelope {
+        protocol: v2::CONTRACT.into(),
+        request_id: "request:subscribe".into(),
+        context: context(),
+        request: v2::EventRequest::Subscribe(v2::SubscribeRequest {
+            endpoint_ref: "endpoint:one".into(),
+            channel_binding: "ari-events".into(),
+            parameters: Default::default(),
+        }),
+    };
+    let denied = app(backend.clone(), false)
+        .oneshot(http("/events", &request))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    request.context.tenant_id = "another-tenant".into();
+    let denied = app(backend.clone(), true)
+        .oneshot(http("/events", &request))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    assert_eq!(backend.subscriptions.load(Ordering::SeqCst), 0);
+    request.context = context();
+    let response = app(backend.clone(), true)
+        .oneshot(http("/events", &request))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let response: v2::ResponseEnvelope = serde_json::from_slice(
+        &to_bytes(response.into_body(), v2::MAX_RESPONSE_BYTES)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    response.validate().unwrap();
+    assert!(response.response.unwrap().matches(&request.request));
+    request.request = v2::EventRequest::Unsubscribe(v2::UnsubscribeRequest {
+        subscription_ref: "subscription:fixture".into(),
+    });
+    let response = app(backend.clone(), true)
+        .oneshot(http("/events", &request))
+        .await
+        .unwrap();
+    let response: v2::ResponseEnvelope = serde_json::from_slice(
+        &to_bytes(response.into_body(), v2::MAX_RESPONSE_BYTES)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    response.validate().unwrap();
+    assert!(response.response.unwrap().matches(&request.request));
+    assert_eq!(backend.subscriptions.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn event_v2_reader_rejects_extra_and_duplicate_fields_before_dispatch() {
+    let backend = Arc::new(EndpointBackend::default());
+    let body = serde_json::json!({"protocol":protocol::event::v2::CONTRACT,"request_id":"request:subscribe","context":context(),"request":{"method":"unsubscribe","params":{"subscription_ref":"subscription:fixture","endpoint_ref":"unexpected"}}});
+    let response = app(backend.clone(), true)
+        .oneshot(http("/events", &body))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = format!(
+        "{{\"protocol\":\"{}\",\"protocol\":\"{}\",\"request_id\":\"request:subscribe\"}}",
+        protocol::event::CONTRACT,
+        protocol::event::v2::CONTRACT
+    );
+    let request = Request::post("/events")
+        .header("authorization", "Bearer access")
+        .header("content-type", "application/json")
+        .body(Body::from(body))
+        .unwrap();
+    let response = app(backend.clone(), true).oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(backend.subscriptions.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]

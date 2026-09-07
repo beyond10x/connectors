@@ -37,12 +37,14 @@ mod connection_route;
 mod docs;
 mod endpoint_route;
 mod enforcement;
+mod event_route;
 mod git_fetch;
 mod health;
 mod mcp;
 mod operation_transport;
 mod principal;
 pub(crate) mod remediation;
+use event_route::event;
 use operation_transport::operation;
 mod routing;
 mod subscription;
@@ -472,7 +474,7 @@ async fn operation_decided_at(
     Json(response).into_response()
 }
 
-async fn event(
+async fn legacy_event(
     State(state): State<HostedState>,
     headers: HeaderMap,
     Json(request): Json<EventRequestEnvelope>,
