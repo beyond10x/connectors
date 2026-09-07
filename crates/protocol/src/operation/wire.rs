@@ -3,7 +3,7 @@
 
 use super::legacy;
 pub use legacy::{
-    ApprovalPosture, ChannelSignal, ConnectionSummary, DescribeRequest, EffectClass,
+    ApprovalPosture, ChannelSignal, EndpointSummary, DescribeRequest, EffectClass,
     InvocationResult, InvokeRequest, OperationRequest, OperationSummary, OwnerContext,
     RequestedSessionTermination, ResponseStatus, SearchRequest, SessionRequest,
     SessionSignalRequest, SessionState, SessionStatus, SessionTerminateRequest, SessionTermination,
@@ -194,7 +194,7 @@ pub struct OperationDescription {
     pub output_schema: Value,
     pub effect: EffectClass,
     pub approval: ApprovalPosture,
-    pub connections: Vec<ConnectionSummary>,
+    pub endpoints: Vec<EndpointSummary>,
     pub description_ref: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_advice: Option<OperationRateAdvice>,
@@ -211,7 +211,7 @@ impl OperationDescription {
             output_schema: self.output_schema,
             effect: self.effect,
             approval: self.approval,
-            connections: self.connections,
+            endpoints: self.endpoints,
             description_ref: self.description_ref,
         }
     }
@@ -226,7 +226,7 @@ impl From<legacy::OperationDescription> for OperationDescription {
             output_schema: value.output_schema,
             effect: value.effect,
             approval: value.approval,
-            connections: value.connections,
+            endpoints: value.endpoints,
             description_ref: value.description_ref,
             rate_advice: None,
         }

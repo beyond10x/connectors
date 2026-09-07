@@ -178,13 +178,13 @@ pub struct DatasourceBinding {
     /// Opaque binding identity.
     pub binding_ref: String,
     /// Connector Connection supplying the owner access.
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     /// Safe scope label, such as one admitted namespace.
     pub label: String,
     /// When a caller should read through this binding rather than another of the same datasource.
     ///
     /// Free text the deployment or the operator wrote. One datasource can be bound to several
-    /// Connections that are genuinely different actors — a workspace bot, a person, an assistant —
+    /// Endpoints that are genuinely different actors — a workspace bot, a person, an assistant —
     /// and which one to read through is not answerable from a label alone.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
@@ -485,7 +485,7 @@ fn validate_result(result: &DatasourceResult) -> Result<(), DatasourceError> {
             for binding in bindings {
                 if !valid_ref(&binding.datasource_ref, MAX_REFERENCE_BYTES)
                     || !valid_ref(&binding.binding_ref, MAX_REFERENCE_BYTES)
-                    || !valid_ref(&binding.connection_ref, MAX_REFERENCE_BYTES)
+                    || !valid_ref(&binding.endpoint_ref, MAX_REFERENCE_BYTES)
                     || binding.label.is_empty()
                     || binding.label.len() > 1024
                     || binding.generation == 0

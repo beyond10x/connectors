@@ -24,7 +24,7 @@ pub enum VoiceError {
     #[error("voice session is already terminated")]
     Terminated,
     #[error("telephony endpoint failed: {0}")]
-    Endpoint(String),
+    EndpointInventoryEntry(String),
 }
 
 /// Opaque reference with no protocol or tenant meaning.

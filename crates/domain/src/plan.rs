@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{ConnectionAuthority, GrantDecision, RouteAdapter};
+use crate::{EndpointAuthority, GrantDecision, RouteAdapter};
 
 /// Closed built-in driver identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -87,7 +87,7 @@ pub struct AdmittedOperation {
     organization: String,
     principal: String,
     grant: String,
-    connection: ConnectionAuthority,
+    connection: EndpointAuthority,
 }
 
 impl AdmittedOperation {
@@ -127,7 +127,7 @@ impl AdmittedOperation {
         organization: impl Into<String>,
         principal: impl Into<String>,
         grant: impl Into<String>,
-        connection: ConnectionAuthority,
+        connection: EndpointAuthority,
     ) -> Self {
         Self {
             provider: provider.into(),
@@ -163,7 +163,7 @@ impl AdmittedOperation {
         self.connection.id()
     }
 
-    pub fn connection_authority(&self) -> &ConnectionAuthority {
+    pub fn connection_authority(&self) -> &EndpointAuthority {
         &self.connection
     }
 }
@@ -183,7 +183,7 @@ pub struct HttpPlan {
 pub struct MediatedHttpPlan {
     pub method: String,
     pub target_path_template: String,
-    pub parent_connection: String,
+    pub parent_endpoint: String,
     pub resource_binding: String,
     pub adapter: RouteAdapter,
 }
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn a_grant_decision_is_the_hosted_admission_path() {
         let connection =
-            ConnectionAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
+            EndpointAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
                 .expect("valid connection reference");
         // The only production route to a decision is the evaluator over a bound store; there
         // is no test builder to keep honest separately.
@@ -354,7 +354,7 @@ mod tests {
     #[test]
     fn the_local_owner_path_carries_the_same_evidence_shape() {
         let connection =
-            ConnectionAuthority::new("connection:local", InitiationPolicy::platform_only())
+            EndpointAuthority::new("connection:local", InitiationPolicy::platform_only())
                 .expect("valid connection reference");
         let admitted = AdmittedOperation::for_local_owner(
             "sip",

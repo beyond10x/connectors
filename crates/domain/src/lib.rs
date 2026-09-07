@@ -6,9 +6,9 @@
 
 mod approval;
 pub mod audio;
-mod connection;
+mod endpoint;
 mod discovery;
-pub mod endpoint;
+pub mod endpoint_inventory;
 mod evaluator;
 mod grant;
 mod plan;
@@ -18,12 +18,12 @@ pub use approval::{
     ApprovalAuditKind, ApprovalError, ApprovalGate, ApprovalInvocation, ApprovalOutcome,
     ApprovalRecord, ApprovalRedemption, RecoveredPresentation, APPROVAL_AUDIT_STATE_KEY,
 };
-pub use connection::{
-    ConnectionAuthority, ConnectionAuthorityError, ConnectionInitiator, ConnectionRoute,
+pub use endpoint::{
+    EndpointAuthority, EndpointAuthorityError, EndpointInitiator, EndpointRoute,
     InitiationPolicy, RouteAdapter,
 };
 pub use discovery::{
-    ConnectionCandidate, ConnectionCandidateSource, DiscoveryError, DiscoveryObservation,
+    EndpointCandidate, EndpointCandidateSource, DiscoveryError, DiscoveryObservation,
 };
 pub use evaluator::conformance as grant_conformance;
 pub use evaluator::{

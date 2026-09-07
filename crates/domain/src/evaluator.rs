@@ -26,7 +26,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use connector_state::StateStore;
 
 use crate::grant::{self, GrantFacts};
-use crate::ConnectionAuthority;
+use crate::EndpointAuthority;
 
 /// How long a decision stands before it refuses at use. Redemption and dispatch follow
 /// evaluation immediately; a decision that can sit around is a decision that can be replayed
@@ -79,7 +79,7 @@ pub struct GrantRequest {
     /// Target Provider of the operation or event.
     pub provider: String,
     /// The already-admitted Connection this request would exercise.
-    pub connection: ConnectionAuthority,
+    pub connection: EndpointAuthority,
     /// The served catalog content generation the caller described against.
     pub catalog_generation: String,
     /// The description lease (`description_ref`) the operation was re-described under.
@@ -153,7 +153,7 @@ pub struct GrantDecision {
     actor: Option<String>,
     provider: String,
     operation: String,
-    connection: ConnectionAuthority,
+    connection: EndpointAuthority,
     catalog_generation: String,
     description_ref: String,
     grant: String,
@@ -172,7 +172,7 @@ pub(crate) struct GrantDecisionParts {
     pub(crate) organization: String,
     pub(crate) principal: String,
     pub(crate) grant: String,
-    pub(crate) connection: ConnectionAuthority,
+    pub(crate) connection: EndpointAuthority,
 }
 
 impl GrantDecision {
@@ -227,7 +227,7 @@ impl GrantDecision {
     }
 
     #[must_use]
-    pub fn connection(&self) -> &ConnectionAuthority {
+    pub fn connection(&self) -> &EndpointAuthority {
         &self.connection
     }
 
@@ -427,13 +427,13 @@ pub mod conformance {
     };
 
     use super::{GrantAction, GrantEvaluator, GrantRefusal, GrantRequest, GrantRuling};
-    use crate::{ConnectionAuthority, InitiationPolicy};
+    use crate::{EndpointAuthority, InitiationPolicy};
 
     const TENANT: &str = "conformance.grants.tenant";
     const DAMAGED_TENANT: &str = "conformance.grants.damaged";
 
-    fn connection() -> ConnectionAuthority {
-        ConnectionAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
+    fn connection() -> EndpointAuthority {
+        EndpointAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
             .expect("valid connection reference")
     }
 
@@ -600,14 +600,14 @@ mod tests {
     use crate::grant::{
         Grant, GrantEffect, GrantFacts, GrantIdempotency, GrantRisk, GrantSelector, GrantSet,
     };
-    use crate::{AdmittedOperation, ConnectionAuthority, InitiationPolicy};
+    use crate::{AdmittedOperation, EndpointAuthority, InitiationPolicy};
 
     use super::*;
 
     const TENANT: &str = "tenant:acme";
 
-    fn connection() -> ConnectionAuthority {
-        ConnectionAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
+    fn connection() -> EndpointAuthority {
+        EndpointAuthority::new("connection:grafana:ops", InitiationPolicy::platform_only())
             .expect("valid connection reference")
     }
 
