@@ -58,6 +58,8 @@ use service::{
 use sha2::{Digest as _, Sha256};
 
 mod config;
+mod confluence_reads;
+mod incremental_reads;
 pub use config::DeclaredConfig;
 mod custody;
 mod oauth;
@@ -451,8 +453,9 @@ impl Inner {
             operation_ref: operation_ref.to_owned(),
             title: operation_ref.to_owned(),
             description: operation.description.to_owned(),
-            input_schema: serde_json::from_str(operation.input_schema)
-                .unwrap_or(serde_json::Value::Null),
+            input_schema: incremental_reads::input_schema(operation_ref).unwrap_or_else(|| {
+                serde_json::from_str(operation.input_schema).unwrap_or(serde_json::Value::Null)
+            }),
             output_schema: operation
                 .output_schema
                 .map(|schema| {
@@ -564,6 +567,8 @@ impl Inner {
             )
         })?;
 
+        incremental_reads::validate_input(operation_ref, &input)?;
+
         let assembly = connector_resolve::assemble_credentials(
             operation,
             binding.provider,
@@ -600,7 +605,7 @@ impl Inner {
             )
         })?;
 
-        let plan = connector_resolve::resolve(
+        let mut plan = connector_resolve::resolve(
             declared,
             base_url,
             &input,
@@ -614,6 +619,8 @@ impl Inner {
             )
         })?;
 
+        incremental_reads::prepare_request(operation_ref, &input, &mut plan.request)?;
+        let request_url = plan.request.url.clone();
         let response = self
             .egress
             .execute(
@@ -621,7 +628,7 @@ impl Inner {
                 EgressHttpRequest {
                     request: plan.request,
                     maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
-                    response_headers: vec!["retry-after".to_owned()],
+                    response_headers: incremental_reads::response_headers(operation_ref),
                 },
             )
             .await
@@ -655,6 +662,14 @@ impl Inner {
                     response.headers.get("retry-after").map(String::as_str),
                 ),
             ));
+        }
+        if incremental_reads::handles(operation_ref) {
+            return Ok(InvocationResult {
+                operation_ref: operation_ref.to_owned(),
+                output: incremental_reads::project(operation_ref, &input, &request_url, response)?,
+                connector_audit_ref: audit_ref(operation_ref, connection_ref),
+                execution_ref: None,
+            });
         }
         if !response.is_success() {
             // **The status code, because without it the message names no cause.** A wrong issue

@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: Jira incremental reads (repository-authored)
+  version: '2026-09-05'
+  description: Narrow source evidence for the native adapter's project inventory and changed issue reads; existing Jira credential custody and project admission remain authoritative.
+x-b10x-origin: repository-authored
+x-b10x-coverage: project search and enhanced issue search
+servers:
+  - url: https://api.atlassian.com/ex/jira/{cloud_id}
+    variables:
+      cloud_id:
+        default: '11111111-2222-3333-4444-555555555555'
+security:
+  - bearer: []
+paths:
+  /rest/api/2/search/jql:
+    get:
+      operationId: jira-issue-search
+      summary: Search changed issues from one admitted project
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-jql-get
+      x-b10x-projection: Native and personal public project_key and updated_since_ms become fixed project equality AND updated >= unquoted epoch milliseconds, ordered updated ASC then key ASC. limit becomes maxResults. No free JQL is admitted. Safe issue projection adds stable id; raw fields are never returned.
+      x-b10x-timestamp-reference: https://support.atlassian.com/jira-software-cloud/docs/jql-fields/#Updated
+      parameters:
+        - name: jql
+          in: query
+          required: true
+          schema: {type: string}
+        - name: nextPageToken
+          in: query
+          schema: {type: string}
+        - name: maxResults
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100}
+        - name: fields
+          in: query
+          schema: {type: string}
+      responses:
+        '200':
+          description: All issue records in this page; isLast=false requires nextPageToken, preserved as next_page_token. Repeated windows deliberately retain overlap.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issues: {type: array, items: {type: object, properties: {id: {type: string}, key: {type: string}, fields: {type: object}}}}
+                  isLast: {type: boolean}
+                  nextPageToken: {type: string}
+        '401': {description: Credential or permission expired; never an empty successful page}
+        '429': {description: Rate limited; retryable failure without a completed watermark}
+  /rest/api/2/project/search:
+    get:
+      operationId: jira-project-list
+      summary: List projects the principal can browse
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-projects/#api-rest-api-2-project-search-get
+      parameters:
+        - name: startAt
+          in: query
+          schema: {type: integer, minimum: 0}
+        - name: maxResults
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100}
+      responses:
+        '200':
+          description: Native projection retains configured admitted project keys only, without losing pagination when filtering removes a page. Next offset is startAt plus maxResults until isLast.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  values: {type: array, items: {type: object, properties: {id: {type: string}, key: {type: string}, name: {type: string}}}}
+                  isLast: {type: boolean}
+                  startAt: {type: integer}
+                  maxResults: {type: integer}
+                  total: {type: integer}
+  /rest/api/2/issue/{issueIdOrKey}/comment:
+    get:
+      operationId: jira-issue-comments-read
+      summary: Read a bounded page of comments without author identities
+      x-b10x-source-reference: https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-get
+      x-b10x-projection: Both runtimes retain id, body, created, updated, visibility type/value/identifier and jsd_public, omitting author objects. Comment visibility is principal-relative; downstream company storage must enforce its own scope. Jira timestamps retain timezone syntax including +0000. Legacy comment-list remains unchanged.
+      parameters:
+        - name: issueIdOrKey
+          in: path
+          required: true
+          schema: {type: string}
+        - name: startAt
+          in: query
+          schema: {type: integer, minimum: 0, maximum: 4294967295}
+        - name: maxResults
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1, maximum: 100}
+      responses:
+        '200':
+          description: Next offset is startAt plus returned comment count while that offset is below total. Missing or malformed continuation metadata fails closed. No empty nonterminal page is accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments: {type: array, items: {type: object}}
+                  startAt: {type: integer}
+                  maxResults: {type: integer}
+                  total: {type: integer}
+
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer, description: Existing Jira delegated or service credential with read:jira-work; no additional credential acquisition.}
