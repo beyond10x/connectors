@@ -17,6 +17,8 @@ use super::{
 };
 
 pub(super) const HEADER_V2: &str = "# codewandler-connector-secrets file store, v2";
+// Report the version from the same header the parser and writer use.
+pub(super) const VERSION: &str = HEADER_V2.split_at(super::VERSION_PREFIX.len()).1;
 const RETIRED_PREFIX: &str = "# retired-through ";
 const TRANSACTION_PREFIX: &str = "# transaction ";
 

@@ -94,6 +94,15 @@ const HEADER: &str = "# codewandler-connector-secrets file store, v1";
 const VERSION_PREFIX: &str = "# codewandler-connector-secrets file store, v";
 const VERSION: &str = "1";
 
+/// The file-format versions this store can read and write, without opening a store.
+///
+/// The first is the initial format, retained by ordinary writes to a legacy store. A
+/// prepared-transaction write switches that store to the second format; later writes retain it.
+#[must_use]
+pub const fn supported_format_versions() -> [&'static str; 2] {
+    [VERSION, prepared::VERSION]
+}
+
 /// Maximum encoded bytes accepted from or written to one durable store.
 ///
 /// The entire v1 store is intentionally held in memory for atomic whole-file replacement, so a
