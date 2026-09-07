@@ -23,6 +23,7 @@ domains:
   - connectors.catalog
   - connectors.connection
   - connectors.deployment
+  - connectors.endpoint
   - connectors.event
   - connectors.gitlab
   - connectors.inventory

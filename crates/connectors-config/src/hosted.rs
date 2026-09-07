@@ -226,6 +226,9 @@ pub struct HostedKubernetesConfig {
     /// Exact namespace and Identity-group grants. Wildcards are deliberately unsupported.
     #[serde(default)]
     pub namespace_access: Vec<KubernetesNamespaceAccessConfig>,
+    /// Explicit independent read grants for discovered provider interfaces.
+    #[serde(default)]
+    pub target_grants: std::collections::BTreeMap<String, String>,
     #[serde(default = "default_kubernetes_token_file")]
     pub token_file: PathBuf,
     #[serde(default = "default_kubernetes_ca_file")]

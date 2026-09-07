@@ -387,10 +387,16 @@ pub struct GrafanaIntegrationConfig {
 pub struct KubernetesIntegrationConfig {
     pub grant_ref: String,
     pub initiation: InitiationConfig,
-    /// Empty means cluster-wide discovery when the selected identity is allowed to list Services.
+    /// Explicit namespaces admitted for discovery and provider reads. Empty admits none.
     #[serde(default)]
     pub namespaces: Vec<String>,
-    /// Independent grants for monitoring Connections recognized behind Kubernetes Services.
+    /// Cluster-wide discovery is a separate, explicit owner choice.
+    #[serde(default)]
+    pub all_namespaces: bool,
+    /// The context selected during setup; authentication remains in kubeconfig.
+    #[serde(default)]
+    pub selected_context: Option<String>,
+    /// Independent read grants for provider interfaces recognized behind Kubernetes Services.
     pub target_grants: BTreeMap<String, String>,
     /// Exec and legacy auth-provider plugins can run local credential helpers and require opt-in.
     #[serde(default)]
@@ -616,9 +622,10 @@ impl PersonalConfig {
         }
     }
 
-    fn validate(&self) -> Result<(), ConfigError> {
+    /// Validate deployment policy before an owner-only setup transaction publishes it.
+    pub fn validate(&self) -> Result<(), ConfigError> {
         self.owner_context().validate_for_config()?;
-        let voice = self.voice()?;
+        self.voice()?;
         if let Some(slack) = &self.slack {
             slack.validate()?;
         }
@@ -633,15 +640,6 @@ impl PersonalConfig {
         }
         for provider in &self.catalog {
             provider.validate()?;
-        }
-        if voice.is_none()
-            && self.slack.is_none()
-            && self.grafana.is_none()
-            && self.kubernetes.is_none()
-            && self.platform.is_none()
-            && self.catalog.is_empty()
-        {
-            return Err(ConfigError::Invalid);
         }
         Ok(())
     }
@@ -1028,12 +1026,10 @@ impl KubernetesIntegrationConfig {
                 .namespaces
                 .iter()
                 .any(|namespace| !dns_label(namespace))
-            || self.target_grants.is_empty()
+            || (self.all_namespaces && !self.namespaces.is_empty())
+            || self.selected_context.as_ref().is_some_and(|context| !config_ref(context, 512))
             || self.target_grants.iter().any(|(provider, grant)| {
-                !matches!(
-                    provider.as_str(),
-                    "grafana" | "prometheus" | "loki" | "alertmanager"
-                ) || !config_ref(grant, 512)
+                !dns_label(provider) || !config_ref(grant, 512)
             })
             || !(1..=512).contains(&self.resource_limit)
         {

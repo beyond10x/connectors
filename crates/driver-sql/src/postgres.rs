@@ -37,11 +37,16 @@ const FETCH_BATCH: u32 = 64;
 async fn connect(
     config: &SqlConnectionConfig,
     secret: &ResolvedSecret,
-) -> Result<tokio_postgres::Client, SqlDriverError> {
+) -> Result<ConnectionGuard, SqlDriverError> {
     let timeout = config.statement_timeout_ms;
-    let (client, connection) = Config::new()
+    let mut configuration = Config::new();
+    configuration
         .host(&config.host)
-        .port(config.port)
+        .port(
+            config
+                .connect_address
+                .map_or(config.port, |address| address.port()),
+        )
         .dbname(&config.database)
         .user(&config.user)
         .password(secret.expose())
@@ -51,22 +56,109 @@ async fn connect(
         .options(format!(
             "-c statement_timeout={timeout} -c idle_in_transaction_session_timeout={timeout}"
         ))
-        .connect_timeout(std::time::Duration::from_millis(u64::from(timeout)))
-        .connect(NoTls)
-        .await
-        .map_err(|error| SqlDriverError::Connection {
-            detail: scrub(&error.to_string(), secret),
-        })?;
-    // The connection task owns the socket; it ends when the client drops.
-    tokio::spawn(async move {
-        let _ = connection.await;
-    });
-    Ok(client)
+        .connect_timeout(std::time::Duration::from_millis(u64::from(timeout)));
+    if let Some(address) = config.connect_address {
+        configuration.hostaddr(address.ip());
+    }
+    let error = |error: tokio_postgres::Error| SqlDriverError::Connection {
+        detail: scrub(&error.to_string(), secret),
+    };
+    let (client, task) = match &config.tls {
+        crate::SqlTls::Disabled => {
+            configuration.ssl_mode(tokio_postgres::config::SslMode::Disable);
+            let (client, connection) = configuration.connect(NoTls).await.map_err(error)?;
+            (
+                client,
+                tokio::spawn(async move {
+                    let _ = connection.await;
+                }),
+            )
+        }
+        tls => {
+            configuration.ssl_mode(tokio_postgres::config::SslMode::Require);
+            let connector = tokio_postgres_rustls::MakeRustlsConnect::new(tls.client_config()?);
+            let (client, connection) = configuration.connect(connector).await.map_err(error)?;
+            (
+                client,
+                tokio::spawn(async move {
+                    let _ = connection.await;
+                }),
+            )
+        }
+    };
+    Ok(ConnectionGuard { client, task })
+}
+
+struct ConnectionGuard {
+    client: tokio_postgres::Client,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl std::ops::Deref for ConnectionGuard {
+    type Target = tokio_postgres::Client;
+    fn deref(&self) -> &Self::Target {
+        &self.client
+    }
+}
+
+impl Drop for ConnectionGuard {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
 }
 
 fn query_error(error: &tokio_postgres::Error, secret: &ResolvedSecret) -> SqlDriverError {
     SqlDriverError::Query {
         detail: scrub(&error.to_string(), secret),
+    }
+}
+
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn admitted_address_dials_without_resolving_logical_host_and_tls_never_downgrades() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut ssl_request = [0_u8; 8];
+            stream.read_exact(&mut ssl_request).await.unwrap();
+            assert_eq!(ssl_request, [0, 0, 0, 8, 4, 210, 22, 47]);
+            stream.write_all(b"N").await.unwrap();
+            let mut startup = [0_u8; 1];
+            assert_eq!(
+                stream.read(&mut startup).await.unwrap(),
+                0,
+                "no plaintext startup after TLS refusal"
+            );
+        });
+        let config = SqlConnectionConfig {
+            engine: crate::SqlEngine::Postgres,
+            host: "database.internal.invalid".into(),
+            port: 5432,
+            connect_address: Some(address),
+            tls: crate::SqlTls::Required,
+            database: "fixture".into(),
+            user: "reader".into(),
+            credential: crate::credentials::CredentialReference::Env {
+                variable: "UNUSED_FIXTURE_REFERENCE".into(),
+            },
+            statement_timeout_ms: 1000,
+        };
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            connect(&config, &ResolvedSecret::new("fixture-password".into())),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(result, Err(SqlDriverError::Connection { .. })));
+        tokio::time::timeout(std::time::Duration::from_secs(3), server)
+            .await
+            .unwrap()
+            .unwrap();
     }
 }
 

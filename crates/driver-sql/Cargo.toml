@@ -23,12 +23,15 @@ zeroize = "1"
 # PostgreSQL dialects) plus a keyword-token fence — never from substring matching, which is the
 # hand-rolled-parser failure mode this repository bans for argv and this crate refuses for SQL.
 sqlparser = "0.62"
-# The canonical async PostgreSQL client (rust-postgres). No TLS backend is enabled: v1 speaks to
-# in-cluster databases over the private network, and a TLS feature would silently widen that.
+# Database TLS is mandatory unless the deployment explicitly selects plaintext.
 tokio-postgres = "0.7"
-# The maintained pure-Rust async MySQL client. `default-features = false` + `minimal` keeps the
-# tree to the protocol itself: no TLS backend, no derive, no histogram metrics.
-mysql_async = { version = "0.37", default-features = false, features = ["minimal"] }
+tokio-postgres-rustls = "0.14"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pemfile = "2"
+webpki-roots = "1"
+mysql_async = { version = "0.37", default-features = false, features = ["minimal", "rustls-tls", "ring", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tokio = { version = "1", default-features = false, features = ["rt", "net", "time"] }
 futures-util = "0.3"
 
