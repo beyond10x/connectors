@@ -164,7 +164,14 @@ The [Operation v3 contract](../../contracts/connector-operation/v0alpha3/README.
 
 ## The CLI at a glance
 
-The [shipped parser](../../crates/connectors-cli/src/lib.rs) defines eight top-level groups:
+Operation v0alpha4 accepts either a direct `connection_ref` or a discovered `endpoint_ref`.
+A target-aware description binds the operation lease to that selected target. Invocation rechecks
+its current source, policy, driver, route, and credential references before provider access.
+The [Endpoint contract](../../contracts/connector-endpoint/v0alpha1/README.md) owns inventory and
+bindings; the [Operation v4 contract](../../contracts/connector-operation/v0alpha4/README.md) owns
+execution. The CLI defaults to v4 and requires exactly one target for invocation.
+
+The [shipped parser](../../crates/connectors-cli/src/lib.rs) defines ten top-level groups:
 
 | Group | Responsibility | Example |
 |---|---|---|
@@ -172,7 +179,9 @@ The [shipped parser](../../crates/connectors-cli/src/lib.rs) defines eight top-l
 | `inspect` | Report installed versions, configuration, provider, and credential readiness | `connectors inspect doctor` |
 | `session` | Log in to or out of a hosted deployment | `connectors session logout` |
 | `serve` | Run local, hosted, or MCP service entry points | `connectors serve local` |
-| `connection` | List, discover, activate, and materialize Connections | `connectors connection list` |
+| `daemon` | Start, inspect, and stop the local daemon | `connectors daemon start` |
+| `endpoint` | List, inspect, refresh, and bind discovered service interfaces | `connectors endpoint list` |
+| `connection` | List direct Connections | `connectors connection list` |
 | `event` | Search, receive, and replay events | `connectors event search` |
 | `operation` | Search, describe, invoke, and signal operations | `connectors operation search` |
 | `admin` | Inspect hosted Integrations and supply administrative credentials | `connectors admin integrations status` |
@@ -194,20 +203,20 @@ Credential files support v1 and v2; prepared transactions use v2. The report doe
 migrate an existing file, check for a newer release, or install an update.
 
 Version 0.6.0 introduced this grouping. Bare `connectors serve` displays the group; running a local
-service requires `connectors serve local`. Use the current paths in scripts. The
+foreground service requires `connectors serve local`; use `daemon start` for background startup. The
 [specification status](specification.md) explains why the ESS outline is not the parser's implementation.
 
 ## Choose an interface
 
 | Interface | Access | Boundary |
 |---|---|---|
-| Local CLI/client | Explicit local configuration and runtime, including socket access | Owner-bound deployment; selected one-shot operations work without a standing daemon |
+| Local CLI/client | Explicit local configuration and daemon socket access | Owner-bound deployment; provider execution remains in the daemon |
 | Hosted HTTP | Configured base, usually `/api/connectors/v1` | Identity-authenticated contracts with route-specific admission |
 | Inbound MCP | Hosted `/mcp` or `connectors serve mcp` over stdio | Adapts admitted capabilities; discovery does not bypass grants or approval |
 | Outbound MCP | Reviewed remote-tool snapshot mapped to local operations | Provider adapter with deployment policy, Connection-bound egress, grants, and custody |
 | Direct byte planes | Dedicated admitted session paths | Voice/media or bounded Git bytes after control-plane admission |
 
-HTTP exposes Operation, Connection, Catalog, Event, Datasource, Approval, and administrative contracts.
+HTTP exposes Operation, Endpoint, Connection, Catalog, Event, Datasource, Approval, and administrative contracts.
 The hosted `{base_path}/approvals` endpoint issues approval for an exact human-decided request.
 For hosted clients, `connectors session login` records deployment selection and login continuity.
 Explicit local `--config` or `--state-root` options select local operation where supported. The

@@ -1,90 +1,116 @@
-# Connect local Kubernetes contexts
+# Discover services from Kubernetes
 
-Enable Kubernetes policy in the personal-local Connector configuration; the complete example is
-[`kubernetes-discovery.example.toml`](../../crates/connectors-config/examples/kubernetes-discovery.example.toml).
-No kubeconfig path or credential is copied into this file. The Connector uses the user's standard
-merged kubeconfig privately.
-
-Start the Connector daemon as usual. The normal Zwirn flow first lists detected contexts:
+Install Connectors, then enable Kubernetes using your existing local kubeconfig:
 
 ```bash
-zwirn connect kubernetes
+connectors setup connect kubernetes
+connectors endpoint list
 ```
 
-This step is passive. It does not contact a cluster and cannot execute an auth helper. If more than
-one context exists, choose the exact one:
+Setup reads the standard merged kubeconfig, selects its current context, saves an explicit
+namespace policy, and starts the local daemon. The default namespace is the context's namespace,
+or `default`. With several contexts and no current context, pass `--context`. Setup then
+checks the selected cluster and refreshes its endpoint inventory.
+
+For a repeatable development setup, select the context, namespaces, and providers explicitly:
 
 ```bash
-zwirn connect kubernetes --context dev-cluster
+connectors setup connect kubernetes --context development \
+  --namespace monitoring --namespace applications \
+  --read-provider loki --read-provider postgresql --read-provider asterisk
 ```
 
-That second command is the active boundary. It authenticates through the Connector, verifies the
-API-server identity view, checks read permission, and lists only bounded Service metadata in the
-configured namespace scope. It prints recognized Grafana, Prometheus, Loki, and Alertmanager
-observations. It never returns tokens, certificates, keys, API-server URLs, or kubeconfig user
-bindings.
+Repeat `--namespace` and `--read-provider` as needed. `--all-namespaces` is a separate explicit
+choice. A previously configured empty namespace scope is not silently widened. Contexts that run
+an external authentication helper require terminal consent or `--allow-exec-auth`. The selected
+context and consent are retained for daemon restarts. Credentials stay in kubeconfig.
 
-Then select exactly one supported Service:
+Setup writes a private backup before changing an existing configuration. It restarts the daemon
+when its configuration changes. Add `--config` and `--state-root` consistently when using paths
+other than the defaults.
+
+## Inspect the inventory
 
 ```bash
-zwirn connect kubernetes --context dev-cluster --service monitoring/prometheus
+connectors endpoint refresh
+connectors endpoint list --query loki --limit 25
+connectors endpoint show --endpoint-ref "$endpoint_ref"
 ```
 
-This materializes a child Prometheus, Loki, or Alertmanager Connection only when the Connector has
-an independent target Grant. Zwirn persists only opaque Connection references and compiles the
-separate, session-scoped Harness Endpoint Grant on its next start. Provider calls stay inside the
-Connector: it rechecks `get` on the exact Kubernetes Service and its `services/proxy` subresource,
-then verifies that the Service UID, recognized provider, and selected port still match the sealed
-observation. It permits only the catalog operation's fixed GET path through the API server. There
-is no arbitrary host, port, path, or generic proxy operation. Grafana Services remain observations
-in this slice because they need a separate credential acquisition step.
+Copy `endpoint_ref` from the list result. References are opaque and identify a specific discovered
+interface. A Kubernetes Service can expose several interfaces, one for each advertised port.
+Endpoint records include provenance, provider classification, route, and readiness reasons.
+Unknown services remain visible even when no installed driver can call them.
 
-Contexts using an exec or legacy auth-provider plugin are refused by default because kubeconfig can
-name local credential helpers. Review the context and set `allow_exec_auth = true` only if running
-that helper is intended. The helper still runs only during explicit activation. API-server routes
-must be canonical HTTPS; ambient and kubeconfig HTTP proxies are not used.
+List results have an opaque `next_cursor`; pass it as `--cursor` until the listing is complete.
+Use `--source` to restrict list or refresh to one source reference. Refresh reconciles
+the inventory against Kubernetes and reports warnings when the source cannot be read. Cached
+records remain distinguishable from current, ready endpoints.
 
-`connectors setup connect kubernetes` provides the lower-level diagnostic activation flow, and the
-generic `connection observations` / `connection materialize` methods expose the same value-free
-contract. Direct in-cluster satellite Connections remain the preferred zero-user-credential
-topology for deployed environments.
+Recognition and permission are separate. A known Loki, Asterisk ARI, or database interface still
+needs a compatible installed operation, admitted provider policy, a usable route, and any required
+credential binding. An AMI TCP port can be inventoried without implying an AMI driver.
 
-## Read an activated cluster's inventory
+## Bind an interface and call an operation
 
-The operation CLI can list admitted namespaces and Deployments without a deployment name. Keep
-the opaque Connection reference returned by activation, and obtain each operation's description
-lease before invoking it:
+Use a binding when discovery needs provider or credential metadata. Bindings contain references,
+not secret values. For example, a PostgreSQL Service can select an existing Secret:
 
 ```bash
-connectors operation search --query kubernetes
-connectors operation describe --operation kubernetes.namespace.list
-connectors operation invoke --operation kubernetes.namespace.list \
-  --connection "$connection_ref" --description-ref "$namespace_description_ref" \
-  --input-json '{}'
-
-connectors operation describe --operation kubernetes.workload.list
-connectors operation invoke --operation kubernetes.workload.list \
-  --connection "$connection_ref" --description-ref "$workload_description_ref" \
-  --input-json '{"namespace":"monitoring","limit":25}'
+connectors endpoint bind --endpoint-ref "$endpoint_ref" --provider postgresql \
+  --database application --tls required \
+  --credential-secret applications/database-access \
+  --credential-key username=username --credential-key password=password
 ```
 
-Set `connection_ref` to the activated Connection and the two description variables to the
-`description_ref` values returned by their respective describe calls. Every activated Connection
-is offered by these reads; choose the Connection explicitly for each invocation.
+The named Secret must be in the admitted namespace scope. Its credential fields must match the
+provider's declared authentication profile. HTTP bindings can additionally use `--scheme` and
+`--base-path`; an explicit externally routed destination uses `--direct-address`.
 
-`kubernetes.namespace.list` returns `connection_ref` and the namespaces admitted by the local
-configuration. It makes no cluster request. An empty configured namespace list admits no inventory
-namespaces; it does not expand to all namespaces. Kubernetes RBAC is checked by the API server when
-`kubernetes.workload.list` reads Deployments in an admitted namespace.
+Describe the intended operation against that endpoint, then invoke it with the returned
+description reference:
 
-The workload result contains `connection_ref`, `namespace`, and `deployments`. Each deployment
-has a name, container names and images from its Pod template, and desired and ready replica counts.
-Images are available even when replicas are zero. These operations do not read Pods or Secrets.
+```bash
+connectors operation describe --operation postgresql-query --endpoint-ref "$endpoint_ref"
+connectors operation invoke --operation postgresql-query --endpoint-ref "$endpoint_ref" \
+  --description-ref "$description_ref" \
+  --input-json '{"statement":"select 1"}'
+```
 
-`limit` defaults to 25 and accepts 1–100. A call fetches at most eight upstream pages of at most
-five Deployments each, so a page can be shorter than the requested limit. When `next_cursor` is
-present, pass it as `cursor` in the next workload input with the same Connection and namespace.
-Cursors are opaque, single use, and expire after five minutes; restarting the daemon also discards
-them. If a cursor expires, restart the listing. A result that exceeds the response byte bound is
-refused; retry from the start with a smaller limit. The existing `kubernetes.workloads` datasource
-retains its compact record format.
+Use the returned input schema for the operation's actual arguments. The same target form works
+for installed HTTP operations such as Loki or Asterisk ARI. Invoke accepts exactly one of
+`--endpoint-ref` and a direct `--connection`.
+
+At invocation, the daemon rechecks the source, current endpoint identity, provider policy, route,
+and credential reference. It fetches the named credential through Kubernetes and passes it
+privately to the driver. Endpoint descriptions and results never carry credential values.
+Crossplane connection details can contribute endpoint metadata and Secret references when their
+resources are readable. Discovery does not enumerate Secret contents.
+
+Local routes can use Kubernetes port forwarding owned by the daemon. Externally reachable routes
+require their explicit routing policy. A hosted deployment uses its configured cluster access
+and network placement; it does not gain access to your laptop's kubeconfig.
+
+## Manage the daemon
+
+```bash
+connectors daemon status
+connectors daemon stop
+connectors daemon start
+```
+
+Status identifies the running process, version, and configuration. Provider access uses
+the daemon; `--help` and `inspect providers` remain available offline. Use `serve local` for a
+foreground process or an existing supervisor.
+
+For a hosted deployment with Kubernetes enabled, the endpoint and operation contracts are the
+same. Select it explicitly after login:
+
+```bash
+connectors endpoint --target hosted list
+connectors operation --target hosted describe --operation postgresql-query --endpoint-ref "$endpoint_ref"
+```
+
+The hosted deployment supplies its own namespace policy, credentials, and caller authority.
+The old public `connection candidates`, `activate`, `observations`, and `materialize` workflow
+is retired. Use setup to configure a source and the endpoint API to inspect and bind its interfaces.
