@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:release-0-7-0
 kind: story
-status: active
+status: implemented
 title: Publish Connectors v0.7.0
 relations:
 - derived_from: runbook:cli-ten-slack-first
@@ -25,7 +25,7 @@ scope:
   path: connectors.lock
 - confidence: cited
   path: crates
-revision: 7
+revision: 8
 ---
 ## Outcome
 
