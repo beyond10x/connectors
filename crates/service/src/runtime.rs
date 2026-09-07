@@ -587,6 +587,36 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         ))
     }
 
+    /// Describe exactly one admitted Connection. Providers may have separately versioned target
+    /// projections; a target-aware caller must never receive another backend's schema or lease.
+    async fn describe_target(
+        &self,
+        context: &PrincipalContext,
+        operation_ref: &str,
+        connection_ref: &str,
+    ) -> Result<protocol::operation::OperationDescription, OperationError> {
+        let result = self
+            .handle(
+                context,
+                OperationRequest::Describe(protocol::operation::DescribeRequest {
+                    operation_ref: operation_ref.into(),
+                }),
+            )
+            .await?;
+        match crate::constrain_endpoint_description(result, Some(connection_ref))? {
+            OperationResult::Describe(description)
+                if description.operation_ref == operation_ref =>
+            {
+                Ok(description)
+            }
+            _ => Err(OperationError::new(
+                protocol::operation::OperationErrorCode::Protocol,
+                "target owner returned an unrelated operation description",
+                false,
+            )),
+        }
+    }
+
     /// Exact ownership only; performs no credential read, session work or provider access.
     fn owns_remediation(&self, _route: crate::RemediationRoute<'_>) -> bool {
         false
