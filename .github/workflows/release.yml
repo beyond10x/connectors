@@ -105,7 +105,7 @@ jobs:
       # Release behind it.
       - name: The ESS toolchain
         run: |
-          cargo install --locked --git https://github.com/beyond10x/ess.git --tag 0.18.0 ess-cli
+          cargo install --locked --git https://github.com/beyond10x/ess.git --tag 0.20.0 ess-cli
           ess --version
 
       - name: Catalog lock verifier and documentation checks
