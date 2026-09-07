@@ -12,6 +12,7 @@ struct EndpointBackend {
     management: AtomicUsize,
     resolutions: AtomicUsize,
     invocations: AtomicUsize,
+    target_descriptions: AtomicUsize,
 }
 
 #[async_trait]
@@ -64,26 +65,11 @@ impl ConnectorBackend for EndpointBackend {
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
         match request {
-            OperationRequest::Describe(request) => {
-                Ok(OperationResult::Describe(OperationDescription {
-                    operation_ref: request.operation_ref,
-                    title: "Fixture".into(),
-                    description: "Read fixture".into(),
-                    input_schema: serde_json::json!({"type":"object"}),
-                    output_schema: serde_json::json!({"type":"object"}),
-                    effect: EffectClass::ReadOnly,
-                    approval: ApprovalPosture::NotRequired,
-                    connections: vec![protocol::operation::ConnectionSummary {
-                        connection_ref: "connection:resolved".into(),
-                        label: "Fixture".into(),
-                        provider: "fixture".into(),
-                        audiences: Vec::new(),
-                        purpose: None,
-                    }],
-                    description_ref: "description:fixture".into(),
-                    rate_advice: None,
-                }))
-            }
+            OperationRequest::Describe(_) => Err(OperationError::new(
+                protocol::operation::OperationErrorCode::Protocol,
+                "the fixture has incompatible global contributors",
+                false,
+            )),
             OperationRequest::Invoke(request) => {
                 assert_eq!(request.connection_ref, "connection:resolved");
                 self.invocations.fetch_add(1, Ordering::SeqCst);
@@ -96,6 +82,33 @@ impl ConnectorBackend for EndpointBackend {
             }
             _ => unreachable!(),
         }
+    }
+    async fn describe_target(
+        &self,
+        _: &PrincipalContext,
+        operation_ref: &str,
+        connection_ref: &str,
+    ) -> Result<OperationDescription, OperationError> {
+        assert_eq!(connection_ref, "connection:resolved");
+        self.target_descriptions.fetch_add(1, Ordering::SeqCst);
+        Ok(OperationDescription {
+            operation_ref: operation_ref.into(),
+            title: "Fixture".into(),
+            description: "Read fixture".into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            output_schema: serde_json::json!({"type":"object"}),
+            effect: EffectClass::ReadOnly,
+            approval: ApprovalPosture::NotRequired,
+            connections: vec![protocol::operation::ConnectionSummary {
+                connection_ref: "connection:resolved".into(),
+                label: "Fixture".into(),
+                provider: "fixture".into(),
+                audiences: Vec::new(),
+                purpose: None,
+            }],
+            description_ref: "description:fixture".into(),
+            rate_advice: None,
+        })
     }
 }
 
@@ -228,6 +241,7 @@ async fn endpoint_describe_and_invoke_enter_existing_connection_dispatch() {
     );
     assert_eq!(backend.resolutions.load(Ordering::SeqCst), 2);
     assert_eq!(backend.invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.target_descriptions.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]

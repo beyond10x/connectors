@@ -33,6 +33,43 @@ pub struct BackendRegistry {
 }
 
 impl BackendRegistry {
+    fn target_owner(
+        &self,
+        operation_ref: &str,
+        connection_ref: &str,
+    ) -> Result<&Arc<dyn ConnectorBackend>, OperationError> {
+        unique_operation_claim(self.operation_claims(&OperationRequest::Invoke(
+            protocol::operation::InvokeRequest {
+                operation_ref: operation_ref.into(),
+                connection_ref: connection_ref.into(),
+                description_ref: "ownership-only".into(),
+                input: serde_json::Value::Null,
+                approval_evidence_ref: None,
+            },
+        )))
+    }
+
+    fn claim_event_reply(
+        &self,
+        description: &OperationDescription,
+        invoke: &protocol::operation::InvokeRequest,
+    ) -> Result<(), OperationError> {
+        if let Some(claims) = &self.event_reply_claims {
+            if description.approval == ApprovalPosture::Required {
+                if let Some(reference) = invoke
+                    .approval_evidence_ref
+                    .as_deref()
+                    .filter(|reference| reference.starts_with("event:"))
+                {
+                    claims
+                        .claim(reference, &invoke.operation_ref)
+                        .map_err(claim_refusal)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Register a closed backend set. Backend order cannot affect non-search dispatch.
     #[must_use]
     pub fn new(backends: Vec<Arc<dyn ConnectorBackend>>) -> Self {
@@ -182,6 +219,21 @@ impl BackendRegistry {
 
 #[async_trait]
 impl ConnectorBackend for BackendRegistry {
+    async fn describe_target(
+        &self,
+        context: &PrincipalContext,
+        operation_ref: &str,
+        connection_ref: &str,
+    ) -> Result<OperationDescription, OperationError> {
+        let backend = self.target_owner(operation_ref, connection_ref)?;
+        let mut description = backend
+            .describe_target(context, operation_ref, connection_ref)
+            .await?;
+        description.description_ref =
+            target_description_ref(context, connection_ref, &description)?;
+        Ok(description)
+    }
+
     fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
         self.backends
             .iter()
@@ -496,6 +548,28 @@ impl ConnectorBackend for BackendRegistry {
             OperationRequest::Invoke(mut invoke) => {
                 let claims = self.operation_claims(&OperationRequest::Invoke(invoke.clone()));
                 let backend = unique_operation_claim(claims)?;
+                if invoke
+                    .description_ref
+                    .starts_with(TARGET_DESCRIPTION_PREFIX)
+                {
+                    let description = backend
+                        .describe_target(context, &invoke.operation_ref, &invoke.connection_ref)
+                        .await?;
+                    let expected =
+                        target_description_ref(context, &invoke.connection_ref, &description)?;
+                    if invoke.description_ref != expected {
+                        return Err(OperationError::new(
+                            OperationErrorCode::StaleAuthority,
+                            "the target operation description lease is stale",
+                            false,
+                        ));
+                    }
+                    self.claim_event_reply(&description, &invoke)?;
+                    invoke.description_ref = description.description_ref;
+                    return backend
+                        .handle(context, OperationRequest::Invoke(invoke))
+                        .await;
+                }
                 let contributors = self
                     .describe_contributors(context, &invoke.operation_ref)
                     .await?;
@@ -531,19 +605,7 @@ impl ConnectorBackend for BackendRegistry {
                 // outward effect: at most one reply per triggering event, even when the claim's
                 // dispatch then fails. Only an approval-demanding operation presenting an
                 // `event:` reference is claimed — a reference nothing demands stays unspent.
-                if let Some(claims) = &self.event_reply_claims {
-                    if selected.1.approval == ApprovalPosture::Required {
-                        if let Some(reference) = invoke
-                            .approval_evidence_ref
-                            .as_deref()
-                            .filter(|reference| reference.starts_with("event:"))
-                        {
-                            claims
-                                .claim(reference, &invoke.operation_ref)
-                                .map_err(claim_refusal)?;
-                        }
-                    }
-                }
+                self.claim_event_reply(&selected.1, &invoke)?;
                 backend
                     .handle(context, OperationRequest::Invoke(invoke))
                     .await
@@ -877,13 +939,15 @@ fn merge_summary(
         operations.insert(incoming.operation_ref.clone(), incoming);
         return Ok(());
     };
-    if existing.title != incoming.title
-        || existing.effect != incoming.effect
-        || existing.approval != incoming.approval
-    {
+    if existing.effect != incoming.effect || existing.approval != incoming.approval {
         return Err(operation_protocol(
             "Integrations disagreed about one operation contract",
         ));
+    }
+    // A summary selects targets and states effects; schemas belong to a subsequent description.
+    // Different presentation titles are harmless and must not hide otherwise admitted targets.
+    if existing.title != incoming.title {
+        existing.title.clone_from(&existing.operation_ref);
     }
     existing.connections.append(&mut incoming.connections);
     existing
@@ -919,6 +983,36 @@ fn ensure_compatible_description(
 fn registry_contributor_ref(description: &OperationDescription) -> String {
     serde_json::to_string(&(&description.description_ref, &description.rate_advice))
         .expect("typed description advice serializes")
+}
+
+const TARGET_DESCRIPTION_PREFIX: &str = "description:target:v1:";
+
+fn target_description_ref(
+    context: &PrincipalContext,
+    connection_ref: &str,
+    description: &OperationDescription,
+) -> Result<String, OperationError> {
+    if description.connections.len() != 1
+        || description.connections[0].connection_ref != connection_ref
+    {
+        return Err(operation_protocol(
+            "target description is not bound to exactly one Connection",
+        ));
+    }
+    let mut digest = Sha256::new();
+    digest.update(TARGET_DESCRIPTION_PREFIX.as_bytes());
+    digest.update(context.stable_authority_seed());
+    digest.update(b"\0");
+    digest.update(connection_ref.as_bytes());
+    digest.update(b"\0");
+    digest.update(
+        serde_json::to_vec(description)
+            .map_err(|_| operation_protocol("target description cannot be encoded"))?,
+    );
+    Ok(format!(
+        "{TARGET_DESCRIPTION_PREFIX}{}",
+        hex_digest(digest.finalize())
+    ))
 }
 
 fn registry_description_ref(
