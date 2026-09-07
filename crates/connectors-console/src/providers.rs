@@ -79,9 +79,8 @@ pub fn run(query: &str) -> Value {
         .collect::<Vec<_>>();
     if needle.is_empty() || "kubernetes".contains(&needle) {
         rows.push(json!({
-            "provider": "kubernetes", "vendor": "Kubernetes", "native": true,
+            "provider": "kubernetes", "vendor": "Kubernetes",
             "credentials": ["kubeconfig"], "ready": true,
-            "setup": "connectors setup connect kubernetes",
             "operations": null,
         }));
     }
@@ -112,11 +111,9 @@ mod tests {
     fn native_kubernetes_is_available_in_the_setup_provider_list() {
         let value = run("kubernetes");
         assert_eq!(value["summary"]["listed"], 1);
-        assert_eq!(value["providers"][0]["native"], true);
-        assert_eq!(
-            value["providers"][0]["setup"],
-            "connectors setup connect kubernetes"
-        );
+        assert_eq!(value["providers"][0]["provider"], "kubernetes");
+        assert_eq!(value["providers"][0]["credentials"], json!(["kubeconfig"]));
+        assert_eq!(value["providers"][0]["ready"], true);
     }
 
     #[test]

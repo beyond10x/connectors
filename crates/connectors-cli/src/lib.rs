@@ -22,11 +22,11 @@ use connectors_runtime::{
     default_config_path, default_state_root, HostedRuntime, PersonalConfig, PersonalRuntime,
     RuntimeError,
 };
-use protocol::connection::{ConnectionRequest, SearchRequest as ConnectionSearchRequest};
+use protocol::endpoint::{EndpointRequest, SearchRequest as EndpointSearchRequest};
 use protocol::event::{
     EventRequest, ReceiveRequest, ReplayRequest, SearchRequest as EventSearchRequest,
 };
-use protocol::operation::v4::{
+use protocol::operation::v5::{
     DescribeRequest as OperationDescribeRequest, InvokeRequest as OperationInvokeRequest,
     OperationRequest,
 };
@@ -84,20 +84,20 @@ enum Command {
         command: daemon::DaemonCommand,
     },
     /// Discover service interfaces and manage their provider bindings.
-    Endpoint {
+    EndpointInventoryEntry {
         /// Deployment to reach. A saved login never changes the local default.
         #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
         target: Target,
         #[command(subcommand)]
-        command: endpoint::EndpointCommand,
+        command: endpoint::EndpointInventoryCommand,
     },
-    /// Manage durable Connections through the credential-free control socket.
+    /// Manage durable Endpoints through the credential-free control socket.
     Connection {
         /// Deployment to reach. A saved login never changes the local default.
         #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
         target: Target,
         #[command(subcommand)]
-        command: ConnectionCommand,
+        command: EndpointCommand,
     },
     /// Search or receive durable normalized data events.
     Event {
@@ -113,7 +113,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
         target: Target,
         /// Exact operation contract to send. There is no negotiation or fallback.
-        #[arg(long, value_enum, default_value_t = OperationVersion::V4, global = true)]
+        #[arg(long, value_enum, default_value_t = OperationVersion::V5, global = true)]
         protocol_version: OperationVersion,
         #[command(subcommand)]
         command: OperationCommand,
@@ -126,7 +126,7 @@ enum Command {
 enum OperationVersion {
     V2,
     V3,
-    V4,
+    V5,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -327,7 +327,7 @@ enum ServeCommand {
 }
 
 #[derive(Debug, Subcommand)]
-enum ConnectionCommand {
+enum EndpointCommand {
     /// List non-secret Connection summaries.
     List {
         #[arg(long)]
@@ -336,9 +336,9 @@ enum ConnectionCommand {
         query: String,
         #[arg(
             long,
-            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
-            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
-            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
+            default_value_t = protocol::endpoint::MAX_SEARCH_RESULTS,
+            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::endpoint::MAX_SEARCH_RESULTS)),
+            help = format!("Maximum results (1..={})", protocol::endpoint::MAX_SEARCH_RESULTS)
         )]
         limit: u16,
         #[arg(long)]
@@ -348,7 +348,7 @@ enum ConnectionCommand {
 
 #[derive(Debug, Subcommand)]
 enum OperationCommand {
-    /// List currently callable operations and their admitted Connections.
+    /// List currently callable operations and their admitted Endpoints.
     Search {
         #[arg(long)]
         config: Option<PathBuf>,
@@ -796,7 +796,7 @@ where
     let format = cli.output;
     let target = match &cli.command {
         Command::Connection { target, .. }
-        | Command::Endpoint { target, .. }
+        | Command::EndpointInventoryEntry { target, .. }
         | Command::Event { target, .. }
         | Command::Operation { target, .. } => Some(target.as_str()),
         _ => None,
@@ -939,7 +939,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     }
                 }
                 let personal = PersonalConfig::read(&config_path)?;
-                if let (Some(operation_ref), Some(connection_ref)) =
+                if let (Some(operation_ref), Some(endpoint_ref)) =
                     (oauth.operation, oauth.connection)
                 {
                     remediation::require_daemon(&state_root)?;
@@ -948,9 +948,9 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     let outcome = remediation::run(
                         &personal,
                         &state_root,
-                        protocol::connection_v2::RemediationStartRequest {
+                        protocol::endpoint_v2::RemediationStartRequest {
                             operation_ref,
-                            connection_ref,
+                            endpoint_ref,
                             input,
                         },
                         oauth.instruction_file.as_deref(),
@@ -1065,7 +1065,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
         },
         Command::Connection { target, command } => connection(format, target, command).await,
         Command::Daemon { command } => daemon::run(format, command).await,
-        Command::Endpoint { target, command } => endpoint::run(format, target, command).await,
+        Command::EndpointInventoryEntry { target, command } => endpoint::run(format, target, command).await,
         Command::Event { target, command } => event(format, target, command).await,
         Command::Operation {
             target,
@@ -1167,10 +1167,10 @@ async fn shutdown_signal() {
 async fn connection(
     format: Format,
     target: Target,
-    command: ConnectionCommand,
+    command: EndpointCommand,
 ) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
-        ConnectionCommand::List {
+        EndpointCommand::List {
             config,
             query,
             limit,
@@ -1178,7 +1178,7 @@ async fn connection(
         } => (
             config,
             state_root,
-            ConnectionRequest::Search(ConnectionSearchRequest { query, limit }),
+            EndpointRequest::Search(EndpointSearchRequest { query, limit }),
         ),
     };
     target.validate(&config_path, &state_root)?;
@@ -1314,7 +1314,7 @@ async fn operation(
             state_root,
             OperationRequest::Describe(OperationDescribeRequest {
                 operation_ref: operation,
-                connection_ref: connection,
+                endpoint_ref: connection,
                 endpoint_ref,
             }),
         ),
@@ -1349,7 +1349,7 @@ async fn operation(
                 state_root,
                 OperationRequest::Invoke(OperationInvokeRequest {
                     operation_ref: operation,
-                    connection_ref: connection,
+                    endpoint_ref: connection,
                     endpoint_ref,
                     description_ref,
                     input,
@@ -1369,8 +1369,8 @@ async fn operation(
                 client.operation(legacy_operation(request)?).await?,
                 operation
             )?,
-            OperationVersion::V4 => {
-                reduce_envelope!(client.operation_v4(request).await?.into_v3(), operation)?
+            OperationVersion::V5 => {
+                reduce_envelope!(client.operation_v5(request).await?.into_v3(), operation)?
             }
         };
         emit_targeted(format, &value, target.as_str())?;
@@ -1394,9 +1394,9 @@ async fn operation(
                 .await?,
             operation
         )?,
-        OperationVersion::V4 => reduce_envelope!(
+        OperationVersion::V5 => reduce_envelope!(
             client
-                .operation_v4(&config.owner_context(), request)
+                .operation_v5(&config.owner_context(), request)
                 .await?
                 .into_v3(),
             operation
@@ -1411,14 +1411,14 @@ fn legacy_operation(
 ) -> Result<protocol::operation::OperationRequest, MainError> {
     let has_target = match &request {
         OperationRequest::Describe(value) => {
-            value.endpoint_ref.is_some() || value.connection_ref.is_some()
+            value.endpoint_ref.is_some() || value.endpoint_ref.is_some()
         }
         OperationRequest::Invoke(value) => value.endpoint_ref.is_some(),
         _ => false,
     };
     if has_target {
         return Err(connectors_client::ClientError::InvalidRequest(
-            "endpoint and target-aware description requests require --protocol-version v4".into(),
+            "endpoint and target-aware description requests require --protocol-version v5".into(),
         )
         .into());
     }

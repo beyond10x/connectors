@@ -15,11 +15,11 @@ const SEARCHES: &[SearchSurface] = &[
     },
     SearchSurface {
         arguments: &["connection", "list"],
-        maximum: protocol::connection::MAX_SEARCH_RESULTS,
+        maximum: protocol::endpoint::MAX_SEARCH_RESULTS,
     },
     SearchSurface {
         arguments: &["endpoint", "list"],
-        maximum: protocol::endpoint::MAX_RESULTS,
+        maximum: protocol::endpoint_inventory::MAX_RESULTS,
     },
     SearchSurface {
         arguments: &["event", "search"],

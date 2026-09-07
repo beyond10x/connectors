@@ -174,7 +174,7 @@ fn subscription_commands_use_v2_and_keep_parameters_separate_from_endpoint_ident
                         subscription_ref: "subscription:fixture".into(),
                         channel: v2::ChannelSummary {
                             channel_ref: "channel:fixture".into(),
-                            connection_ref: "connection:fixture".into(),
+                            endpoint_ref: "connection:fixture".into(),
                             integration_ref: "asterisk".into(),
                             binding_ref: "asterisk.ari-events".into(),
                             events: vec!["ari.event".into()],

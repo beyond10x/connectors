@@ -152,7 +152,7 @@ pub async fn run(
             "provider": "slack",
             "connected": true,
             "connection": description.summary.label,
-            "connection_ref": description.summary.connection_ref,
+            "endpoint_ref": description.summary.endpoint_ref,
             "events": channel.events,
         }));
     }
@@ -161,7 +161,7 @@ pub async fn run(
         &client,
         &owner,
         "grafana",
-        Some(description.summary.connection_ref),
+        Some(description.summary.endpoint_ref),
     )
     .await
 }
@@ -172,11 +172,11 @@ async fn discovered(
     provider: &str,
     source_ref: Option<String>,
 ) -> Result<Value, ConnectError> {
-    use protocol::endpoint::{EndpointRequest, ListRequest, RefreshRequest};
+    use protocol::endpoint_inventory::{EndpointInventoryRequest, ListRequest, RefreshRequest};
     let refreshed = client
         .endpoint(
             owner,
-            EndpointRequest::Refresh(RefreshRequest {
+            EndpointInventoryRequest::Refresh(RefreshRequest {
                 source_ref: source_ref.clone(),
             }),
         )
@@ -185,10 +185,10 @@ async fn discovered(
     let endpoints = client
         .endpoint(
             owner,
-            EndpointRequest::List(ListRequest {
+            EndpointInventoryRequest::List(ListRequest {
                 source_ref: source_ref.clone(),
                 query: String::new(),
-                limit: protocol::endpoint::MAX_RESULTS,
+                limit: protocol::endpoint_inventory::MAX_RESULTS,
                 cursor: None,
             }),
         )
@@ -362,7 +362,7 @@ pub async fn dispatch_with_personal_oauth(
     };
     destination.clear()?;
     Ok(json!({ "provider": provider, "connected": true,
-        "connection_ref": connection.summary.connection_ref,
+        "endpoint_ref": connection.summary.endpoint_ref,
         "connection": display_label }))
 }
 

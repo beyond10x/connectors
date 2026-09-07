@@ -1,14 +1,14 @@
-//! Explicit endpoint inventory and v4 operation clients; neither negotiates nor retries versions.
+//! Explicit endpoint inventory and v5 operation clients; neither negotiates nor retries versions.
 
 use super::*;
-use protocol::{endpoint, operation::v4};
+use protocol::{endpoint_inventory as endpoint, operation::v5};
 
 impl LocalClient {
     /// Discover or manage non-secret endpoint bindings through the owner-only daemon socket.
     pub async fn endpoint(
         &self,
         context: &operation::OwnerContext,
-        request: endpoint::EndpointRequest,
+        request: endpoint::EndpointInventoryRequest,
     ) -> Result<endpoint::ResponseEnvelope, ClientError> {
         let envelope = endpoint_envelope(context, request)?;
         let bytes = serde_json::to_vec(&envelope)?;
@@ -18,12 +18,12 @@ impl LocalClient {
         endpoint_response(&bytes, &envelope)
     }
 
-    /// Invoke using one Connection or endpoint reference under the exact v4 contract.
-    pub async fn operation_v4(
+    /// Invoke using one Connection or endpoint reference under the exact v5 contract.
+    pub async fn operation_v5(
         &self,
         context: &operation::OwnerContext,
-        request: v4::OperationRequest,
-    ) -> Result<v4::ResponseEnvelope, ClientError> {
+        request: v5::OperationRequest,
+    ) -> Result<v5::ResponseEnvelope, ClientError> {
         let envelope = operation_envelope(context, request)?;
         let bytes = self
             .versioned_exchange(serde_json::to_vec(&envelope)?, operation::MAX_RESULT_BYTES)
@@ -38,7 +38,7 @@ impl HostedClient {
         &self,
         bearer: &str,
         context: &operation::OwnerContext,
-        request: endpoint::EndpointRequest,
+        request: endpoint::EndpointInventoryRequest,
     ) -> Result<endpoint::ResponseEnvelope, ClientError> {
         require_bearer(bearer)?;
         let envelope = endpoint_envelope(context, request)?;
@@ -54,13 +54,13 @@ impl HostedClient {
         endpoint_response(&bytes, &envelope)
     }
 
-    /// Select operation v4 exactly; authentication outcomes do not cause operation resends.
-    pub async fn operation_v4(
+    /// Select operation v5 exactly; authentication outcomes do not cause operation resends.
+    pub async fn operation_v5(
         &self,
         bearer: &str,
         context: &operation::OwnerContext,
-        request: v4::OperationRequest,
-    ) -> Result<v4::ResponseEnvelope, ClientError> {
+        request: v5::OperationRequest,
+    ) -> Result<v5::ResponseEnvelope, ClientError> {
         require_bearer(bearer)?;
         let envelope = operation_envelope(context, request)?;
         let (status, bytes) = self
@@ -76,7 +76,7 @@ impl HostedClient {
         let authentication = response
             .error
             .as_ref()
-            .is_some_and(|error| error.code == v4::OperationErrorCode::AuthenticationRequired);
+            .is_some_and(|error| error.code == v5::OperationErrorCode::AuthenticationRequired);
         if (status == reqwest::StatusCode::CONFLICT) != authentication {
             return Err(ClientError::InvalidResponse);
         }
@@ -86,7 +86,7 @@ impl HostedClient {
 
 fn endpoint_envelope(
     context: &operation::OwnerContext,
-    request: endpoint::EndpointRequest,
+    request: endpoint::EndpointInventoryRequest,
 ) -> Result<endpoint::RequestEnvelope, ClientError> {
     let envelope = endpoint::RequestEnvelope {
         protocol: endpoint::CONTRACT.into(),
@@ -117,10 +117,10 @@ fn endpoint_response(
 
 fn operation_envelope(
     context: &operation::OwnerContext,
-    request: v4::OperationRequest,
-) -> Result<v4::RequestEnvelope, ClientError> {
-    let envelope = v4::RequestEnvelope {
-        protocol: v4::CONTRACT.into(),
+    request: v5::OperationRequest,
+) -> Result<v5::RequestEnvelope, ClientError> {
+    let envelope = v5::RequestEnvelope {
+        protocol: v5::CONTRACT.into(),
         request_id: request_id(),
         context: context.clone(),
         request,
@@ -133,9 +133,9 @@ fn operation_envelope(
 
 fn operation_response(
     bytes: &[u8],
-    request: &v4::RequestEnvelope,
-) -> Result<v4::ResponseEnvelope, ClientError> {
-    let response: v4::ResponseEnvelope =
+    request: &v5::RequestEnvelope,
+) -> Result<v5::ResponseEnvelope, ClientError> {
+    let response: v5::ResponseEnvelope =
         serde_json::from_slice(bytes).map_err(|_| ClientError::InvalidResponse)?;
     if response.validate().is_err() || response.request_id != request.request_id {
         return Err(ClientError::InvalidResponse);
@@ -145,14 +145,11 @@ fn operation_response(
         .as_ref()
         .and_then(|error| error.authentication.as_ref())
     {
-        let v4::OperationRequest::Invoke(invoke) = &request.request else {
+        let v5::OperationRequest::Invoke(invoke) = &request.request else {
             return Err(ClientError::InvalidResponse);
         };
         if auth.operation_ref != invoke.operation_ref
-            || invoke
-                .connection_ref
-                .as_ref()
-                .is_some_and(|connection| &auth.connection_ref != connection)
+            || auth.endpoint_ref != invoke.endpoint_ref
         {
             return Err(ClientError::InvalidResponse);
         }
@@ -161,37 +158,37 @@ fn operation_response(
         let matches = match (result, &request.request) {
             (
                 operation::OperationResult::Search { operations },
-                v4::OperationRequest::Search(request),
+                v5::OperationRequest::Search(request),
             ) => operations.len() <= usize::from(request.limit),
             (
                 operation::OperationResult::Describe(result),
-                v4::OperationRequest::Describe(request),
+                v5::OperationRequest::Describe(request),
             ) => {
                 result.operation_ref == request.operation_ref
-                    && request.connection_ref.as_ref().is_none_or(|reference| {
-                        result.connections.len() == 1
-                            && result.connections[0].connection_ref == *reference
+                    && request.endpoint_ref.as_ref().is_none_or(|reference| {
+                        result.endpoints.len() == 1
+                            && result.endpoints[0].endpoint_ref == *reference
                     })
-                    && (request.endpoint_ref.is_none() || result.connections.len() == 1)
+                    && (request.endpoint_ref.is_none() || result.endpoints.len() == 1)
             }
-            (operation::OperationResult::Invoke(result), v4::OperationRequest::Invoke(request)) => {
+            (operation::OperationResult::Invoke(result), v5::OperationRequest::Invoke(request)) => {
                 result.operation_ref == request.operation_ref
             }
             (
                 operation::OperationResult::SessionStatus(result),
-                v4::OperationRequest::SessionStatus(request),
+                v5::OperationRequest::SessionStatus(request),
             ) => result.execution_ref == request.execution_ref,
             (
                 operation::OperationResult::SessionTerminate(result),
-                v4::OperationRequest::SessionTerminate(request),
+                v5::OperationRequest::SessionTerminate(request),
             ) => result.execution_ref == request.execution_ref,
             (
                 operation::OperationResult::SessionReconcile(result),
-                v4::OperationRequest::SessionReconcile(request),
+                v5::OperationRequest::SessionReconcile(request),
             ) => result.execution_ref == request.execution_ref,
             (
                 operation::OperationResult::SessionSignal(result),
-                v4::OperationRequest::SessionSignal(request),
+                v5::OperationRequest::SessionSignal(request),
             ) => result.execution_ref == request.execution_ref,
             _ => false,
         };
@@ -219,7 +216,7 @@ mod tests {
     fn endpoint_client_refuses_a_valid_response_to_another_method() {
         let request = endpoint_envelope(
             &owner(),
-            endpoint::EndpointRequest::List(endpoint::ListRequest {
+            endpoint::EndpointInventoryRequest::List(endpoint::ListRequest {
                 source_ref: None,
                 query: String::new(),
                 limit: 10,
@@ -229,7 +226,7 @@ mod tests {
         .unwrap();
         let response = endpoint::ResponseEnvelope::success(
             &request.request_id,
-            endpoint::EndpointResult::Refresh {
+            endpoint::EndpointInventoryResult::Refresh {
                 endpoints: 0,
                 warnings: Vec::new(),
             },
@@ -245,10 +242,9 @@ mod tests {
     fn endpoint_operation_client_refuses_wrong_operation_and_predecessor_identity() {
         let request = operation_envelope(
             &owner(),
-            v4::OperationRequest::Invoke(v4::InvokeRequest {
+            v5::OperationRequest::Invoke(v5::InvokeRequest {
                 operation_ref: "loki-query-range".into(),
-                endpoint_ref: Some("endpoint:loki".into()),
-                connection_ref: None,
+                endpoint_ref: "endpoint:loki".into(),
                 description_ref: "description:loki".into(),
                 input: serde_json::json!({}),
                 approval_evidence_ref: None,
@@ -261,7 +257,7 @@ mod tests {
             connector_audit_ref: "audit:one".into(),
             execution_ref: None,
         });
-        let response = v4::ResponseEnvelope::success(&request.request_id, result);
+        let response = v5::ResponseEnvelope::success(&request.request_id, result);
         assert!(response.validate().is_ok());
         assert!(matches!(
             operation_response(&serde_json::to_vec(&response).unwrap(), &request),

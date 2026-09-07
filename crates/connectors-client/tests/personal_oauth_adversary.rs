@@ -1,7 +1,7 @@
 //! Public Unix/loopback witnesses; all private values are synthetic and all listeners are local.
 
 use connectors_client::{ClientError, LocalClient};
-use protocol::{connection as c, operation};
+use protocol::{endpoint as c, operation};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
@@ -52,32 +52,32 @@ async fn daemon(
             expires_at_unix_ms: deadline,
             completion_endpoint: None,
             browser_completion_url: Some(format!("http://{authority}/#token={}", "z".repeat(43))),
-            connection_ref: None,
+            endpoint_ref: None,
         };
         let response = match request.request {
-            c::ConnectionRequest::ConnectSessionCreate(create) => {
+            c::EndpointRequest::ConnectSessionCreate(create) => {
                 calls.lock().unwrap().push("create");
                 assert_eq!(create.auth_profile.as_deref(), Some(PROFILE));
                 assert_eq!(create.label, "Trusted label");
                 c::ResponseEnvelope::success(
                     request.request_id,
-                    c::ConnectionResult::ConnectSessionCreate(status),
+                    c::EndpointResult::ConnectSessionCreate(status),
                 )
             }
-            c::ConnectionRequest::ConnectSessionStatus(poll) => {
+            c::EndpointRequest::ConnectSessionStatus(poll) => {
                 calls.lock().unwrap().push("status");
                 assert_eq!(poll.connect_session_ref, "session:configured");
                 polls += 1;
                 if polls == 1 {
                     c::ResponseEnvelope::failure(
                         request.request_id,
-                        c::ConnectionError::new(c::ConnectionErrorCode::Unavailable, PRIVATE, true),
+                        c::EndpointError::new(c::EndpointErrorCode::Unavailable, PRIVATE, true),
                     )
                 } else {
                     if polls >= 3 {
                         status.state = c::ConnectSessionState::Completed;
                         status.browser_completion_url = None;
-                        status.connection_ref = Some(
+                        status.endpoint_ref = Some(
                             if mismatch == "status_target" {
                                 "connection:OAUTH-PASS1-PRIVATE"
                             } else {
@@ -88,18 +88,18 @@ async fn daemon(
                     }
                     c::ResponseEnvelope::success(
                         request.request_id,
-                        c::ConnectionResult::ConnectSessionStatus(status),
+                        c::EndpointResult::ConnectSessionStatus(status),
                     )
                 }
             }
-            c::ConnectionRequest::Describe(describe) => {
+            c::EndpointRequest::Describe(describe) => {
                 calls.lock().unwrap().push("describe");
-                assert_eq!(describe.connection_ref, TARGET);
+                assert_eq!(describe.endpoint_ref, TARGET);
                 c::ResponseEnvelope::success(
                     request.request_id,
-                    c::ConnectionResult::Describe(c::ConnectionDescription {
-                        summary: c::ConnectionSummary {
-                            connection_ref: TARGET.into(),
+                    c::EndpointResult::Describe(c::EndpointDescription {
+                        summary: c::EndpointSummary {
+                            endpoint_ref: TARGET.into(),
                             integration_ref: if mismatch == "integration" {
                                 "other"
                             } else {
@@ -108,12 +108,12 @@ async fn daemon(
                             .into(),
                             label: PRIVATE.into(),
                             state: if mismatch == "authorized" {
-                                c::ConnectionState::Authorized
+                                c::EndpointState::Authorized
                             } else {
-                                c::ConnectionState::Callable
+                                c::EndpointState::Callable
                             },
-                            initiation: vec![c::ConnectionInitiator::Platform],
-                            route: c::ConnectionRoute::Direct,
+                            initiation: vec![c::EndpointInitiator::Platform],
+                            route: c::EndpointRoute::Direct,
                             scope: None,
                             actor: None,
                             auth_profile: Some(
@@ -215,7 +215,7 @@ async fn oauth_pass1_public_handoff_waits_for_bound_callable_success_without_rep
         assert_eq!(calls.iter().filter(|call| **call == "status").count(), 3);
         if mismatch == "none" {
             let result = result.unwrap();
-            assert_eq!(result.summary.connection_ref, TARGET);
+            assert_eq!(result.summary.endpoint_ref, TARGET);
             assert_eq!(
                 result.summary.label, PRIVATE,
                 "typed client retains received description; console owns trusted presentation"

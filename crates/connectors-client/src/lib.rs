@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub use protocol::{approval, catalog, datasource, endpoint, git_fetch, operation};
-use protocol::{connection, event};
+use protocol::{endpoint as connection, event};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::UnixStream;
@@ -39,7 +39,7 @@ pub use model::{
     AdminAuthMetadata, AdminConfigurationField, AdminCredentialState, AdminCredentialStatus,
     AdminCredentialWrite, AdminIntegrationStatus, AdminLoginMetadata, AdminStatus,
     CandidateActivationOutcome, ClientError, GitFetchSession, MaterializationOutcome,
-    PendingConnection, PendingPersonalOAuth, PendingRemediation, PersonalOAuthInstructions,
+    PendingEndpoint, PendingPersonalOAuth, PendingRemediation, PersonalOAuthInstructions,
     RedeemedSubscription, SubscriptionLease, SubscriptionOAuthStart, SubscriptionStatus,
 };
 use model::{
@@ -110,7 +110,7 @@ impl LocalClient {
     pub async fn connection(
         &self,
         context: &operation::OwnerContext,
-        request: connection::ConnectionRequest,
+        request: connection::EndpointRequest,
     ) -> Result<connection::ResponseEnvelope, ClientError> {
         let request_id = request_id();
         let envelope = connection::RequestEnvelope {
@@ -138,11 +138,11 @@ impl LocalClient {
         context: &operation::OwnerContext,
         integration_ref: String,
         label: String,
-    ) -> Result<PendingConnection, ClientError> {
+    ) -> Result<PendingEndpoint, ClientError> {
         let result = self
             .connection_result(
                 context,
-                connection::ConnectionRequest::ConnectSessionCreate(
+                connection::EndpointRequest::ConnectSessionCreate(
                     connection::ConnectSessionCreateRequest {
                         integration_ref,
                         label,
@@ -151,13 +151,13 @@ impl LocalClient {
                 ),
             )
             .await?;
-        let connection::ConnectionResult::ConnectSessionCreate(created) = result else {
+        let connection::EndpointResult::ConnectSessionCreate(created) = result else {
             return Err(ClientError::InvalidResponse);
         };
         if created.state != connection::ConnectSessionState::Pending {
             return Err(ClientError::InvalidResponse);
         }
-        Ok(PendingConnection {
+        Ok(PendingEndpoint {
             session_ref: created.connect_session_ref,
             completion_endpoint: created
                 .completion_endpoint
@@ -171,39 +171,39 @@ impl LocalClient {
         &self,
         context: &operation::OwnerContext,
         session_ref: String,
-    ) -> Result<connection::ConnectionDescription, ClientError> {
+    ) -> Result<connection::EndpointDescription, ClientError> {
         let result = self
             .connection_result(
                 context,
-                connection::ConnectionRequest::ConnectSessionStatus(
+                connection::EndpointRequest::ConnectSessionStatus(
                     connection::ConnectSessionStatusRequest {
                         connect_session_ref: session_ref,
                     },
                 ),
             )
             .await?;
-        let connection::ConnectionResult::ConnectSessionStatus(completed) = result else {
+        let connection::EndpointResult::ConnectSessionStatus(completed) = result else {
             return Err(ClientError::InvalidResponse);
         };
         if completed.state != connection::ConnectSessionState::Completed {
             return Err(ClientError::CompletionRefused);
         }
-        let connection_ref = completed
-            .connection_ref
+        let endpoint_ref = completed
+            .endpoint_ref
             .ok_or(ClientError::InvalidResponse)?;
         for _ in 0..20 {
             let result = self
                 .connection_result(
                     context,
-                    connection::ConnectionRequest::Describe(connection::DescribeRequest {
-                        connection_ref: connection_ref.clone(),
+                    connection::EndpointRequest::Describe(connection::DescribeRequest {
+                        endpoint_ref: endpoint_ref.clone(),
                     }),
                 )
                 .await?;
-            let connection::ConnectionResult::Describe(description) = result else {
+            let connection::EndpointResult::Describe(description) = result else {
                 return Err(ClientError::InvalidResponse);
             };
-            if description.summary.state == connection::ConnectionState::Callable {
+            if description.summary.state == connection::EndpointState::Callable {
                 return Ok(description);
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
@@ -222,7 +222,7 @@ impl LocalClient {
         let result = self
             .connection_result(
                 context,
-                connection::ConnectionRequest::CandidateSearch(
+                connection::EndpointRequest::CandidateSearch(
                     connection::CandidateSearchRequest {
                         integration_ref,
                         query: exact_title.clone().unwrap_or_default(),
@@ -231,7 +231,7 @@ impl LocalClient {
                 ),
             )
             .await?;
-        let connection::ConnectionResult::CandidateSearch { candidates } = result else {
+        let connection::EndpointResult::CandidateSearch { candidates } = result else {
             return Err(ClientError::InvalidResponse);
         };
         if exact_title.is_none() && candidates.len() != 1 {
@@ -255,7 +255,7 @@ impl LocalClient {
         let result = self
             .connection_result(
                 context,
-                connection::ConnectionRequest::CandidateActivate(
+                connection::EndpointRequest::CandidateActivate(
                     connection::CandidateActivateRequest {
                         candidate_ref: candidate.candidate_ref,
                         label: label.unwrap_or(candidate.title),
@@ -263,11 +263,11 @@ impl LocalClient {
                 ),
             )
             .await?;
-        let connection::ConnectionResult::CandidateActivate(connection) = result else {
+        let connection::EndpointResult::CandidateActivate(connection) = result else {
             return Err(ClientError::InvalidResponse);
         };
         let observations = self
-            .observations(context, connection.summary.connection_ref.clone())
+            .observations(context, connection.summary.endpoint_ref.clone())
             .await?;
         Ok(CandidateActivationOutcome::Connected {
             connection,
@@ -279,21 +279,21 @@ impl LocalClient {
     pub async fn observations(
         &self,
         context: &operation::OwnerContext,
-        source_connection_ref: String,
+        source_endpoint_ref: String,
     ) -> Result<Vec<connection::DiscoveryObservationSummary>, ClientError> {
         let result = self
             .connection_result(
                 context,
-                connection::ConnectionRequest::ObservationSearch(
+                connection::EndpointRequest::ObservationSearch(
                     connection::ObservationSearchRequest {
-                        source_connection_ref,
+                        source_endpoint_ref,
                         query: String::new(),
                         limit: connection::MAX_SEARCH_RESULTS,
                     },
                 ),
             )
             .await?;
-        let connection::ConnectionResult::ObservationSearch { observations } = result else {
+        let connection::EndpointResult::ObservationSearch { observations } = result else {
             return Err(ClientError::InvalidResponse);
         };
         Ok(observations)
@@ -304,16 +304,16 @@ impl LocalClient {
         &self,
         context: &operation::OwnerContext,
         observation_ref: String,
-    ) -> Result<connection::ConnectionDescription, ClientError> {
+    ) -> Result<connection::EndpointDescription, ClientError> {
         let result = self
             .connection_result(
                 context,
-                connection::ConnectionRequest::Materialize(connection::MaterializeRequest {
+                connection::EndpointRequest::Materialize(connection::MaterializeRequest {
                     observation_ref,
                 }),
             )
             .await?;
-        let connection::ConnectionResult::Materialize(connection) = result else {
+        let connection::EndpointResult::Materialize(connection) = result else {
             return Err(ClientError::InvalidResponse);
         };
         Ok(connection)
@@ -326,7 +326,7 @@ impl LocalClient {
         observations: Vec<connection::DiscoveryObservationSummary>,
     ) -> Result<MaterializationOutcome, ClientError> {
         let mut outcome = MaterializationOutcome {
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             unsupported: 0,
             not_granted: 0,
         };
@@ -340,7 +340,7 @@ impl LocalClient {
             let response = self
                 .connection(
                     context,
-                    connection::ConnectionRequest::Materialize(connection::MaterializeRequest {
+                    connection::EndpointRequest::Materialize(connection::MaterializeRequest {
                         observation_ref: observation.observation_ref,
                     }),
                 )
@@ -348,14 +348,14 @@ impl LocalClient {
             match (response.status, response.response, response.error) {
                 (
                     connection::ResponseStatus::Ok,
-                    Some(connection::ConnectionResult::Materialize(description)),
+                    Some(connection::EndpointResult::Materialize(description)),
                     None,
-                ) => outcome.connections.push(description.summary),
+                ) => outcome.endpoints.push(description.summary),
                 (
                     connection::ResponseStatus::Error,
                     None,
-                    Some(connection::ConnectionError {
-                        code: connection::ConnectionErrorCode::NotGranted,
+                    Some(connection::EndpointError {
+                        code: connection::EndpointErrorCode::NotGranted,
                         ..
                     }),
                 ) => outcome.not_granted += 1,
@@ -371,8 +371,8 @@ impl LocalClient {
     async fn connection_result(
         &self,
         context: &operation::OwnerContext,
-        request: connection::ConnectionRequest,
-    ) -> Result<connection::ConnectionResult, ClientError> {
+        request: connection::EndpointRequest,
+    ) -> Result<connection::EndpointResult, ClientError> {
         let response = self.connection(context, request).await?;
         match response.status {
             connection::ResponseStatus::Ok => response.response.ok_or(ClientError::InvalidResponse),
@@ -442,7 +442,7 @@ pub struct HostedClient {
     base: Url,
     catalog: Url,
     operations: Url,
-    connections: Url,
+    endpoints: Url,
     events: Url,
     datasources: Url,
     git_fetch_sessions: Url,
@@ -558,7 +558,7 @@ impl HostedClient {
         &self,
         bearer: &str,
         context: &operation::OwnerContext,
-        request: connection::ConnectionRequest,
+        request: connection::EndpointRequest,
     ) -> Result<connection::ResponseEnvelope, ClientError> {
         require_bearer(bearer)?;
         let request_id = request_id();
@@ -573,7 +573,7 @@ impl HostedClient {
             .map_err(|error| ClientError::InvalidRequest(error.to_string()))?;
         let response = self
             .exchange(
-                &self.connections,
+                &self.endpoints,
                 bearer,
                 &envelope,
                 connection::MAX_FRAME_BYTES,
@@ -796,7 +796,7 @@ impl HostedClient {
             base: base.clone(),
             catalog: endpoint(&base, "catalog"),
             operations: endpoint(&base, "operations"),
-            connections: endpoint(&base, "connections"),
+            endpoints: endpoint(&base, "endpoints"),
             events: endpoint(&base, "events"),
             datasources: endpoint(&base, "datasources"),
             git_fetch_sessions: endpoint(&base, "git-fetch-sessions"),

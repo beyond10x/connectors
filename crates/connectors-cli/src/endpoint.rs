@@ -1,6 +1,6 @@
-//! Endpoint discovery arguments and shared local/hosted client dispatch.
+//! EndpointInventoryEntry discovery arguments and shared local/hosted client dispatch.
 
-use protocol::endpoint::{self, EndpointRequest};
+use protocol::endpoint_inventory::{self, EndpointInventoryRequest};
 
 use super::*;
 
@@ -13,7 +13,7 @@ pub(super) struct LocalOptions {
 }
 
 #[derive(Debug, Subcommand)]
-pub(super) enum EndpointCommand {
+pub(super) enum EndpointInventoryCommand {
     /// List discovered service interfaces, including those without a supported driver.
     List {
         #[command(flatten)]
@@ -85,10 +85,10 @@ fn secret_reference(value: &str) -> Result<(String, String), String> {
 pub(super) async fn run(
     format: Format,
     target: Target,
-    command: EndpointCommand,
+    command: EndpointInventoryCommand,
 ) -> Result<(), MainError> {
     let (local, request) = match command {
-        EndpointCommand::List {
+        EndpointInventoryCommand::List {
             local,
             source,
             query,
@@ -96,25 +96,25 @@ pub(super) async fn run(
             cursor,
         } => (
             local,
-            EndpointRequest::List(endpoint::ListRequest {
+            EndpointInventoryRequest::List(endpoint::ListRequest {
                 source_ref: source,
                 query,
                 limit,
                 cursor,
             }),
         ),
-        EndpointCommand::Show {
+        EndpointInventoryCommand::Show {
             local,
             endpoint_ref,
         } => (
             local,
-            EndpointRequest::Show(endpoint::ShowRequest { endpoint_ref }),
+            EndpointInventoryRequest::Show(endpoint::ShowRequest { endpoint_ref }),
         ),
-        EndpointCommand::Refresh { local, source } => (
+        EndpointInventoryCommand::Refresh { local, source } => (
             local,
-            EndpointRequest::Refresh(endpoint::RefreshRequest { source_ref: source }),
+            EndpointInventoryRequest::Refresh(endpoint::RefreshRequest { source_ref: source }),
         ),
-        EndpointCommand::Bind {
+        EndpointInventoryCommand::Bind {
             local,
             endpoint_ref,
             provider,
@@ -145,7 +145,7 @@ pub(super) async fn run(
             });
             (
                 local,
-                EndpointRequest::Bind(endpoint::BindRequest {
+                EndpointInventoryRequest::Bind(endpoint::BindRequest {
                     endpoint_ref,
                     binding: endpoint::EndpointBinding {
                         provider,

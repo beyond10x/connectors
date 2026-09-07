@@ -3,7 +3,7 @@
 use std::io;
 use std::path::PathBuf;
 
-use protocol::connection;
+use protocol::endpoint as connection;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
@@ -128,23 +128,23 @@ pub struct AdminCredentialWrite {
 }
 
 /// Value-free result of beginning a Connector-owned credential acquisition session.
-pub struct PendingConnection {
+pub struct PendingEndpoint {
     pub session_ref: String,
     pub completion_endpoint: PathBuf,
 }
 
 /// Result of a generic candidate-selection and activation workflow.
 pub enum CandidateActivationOutcome {
-    SelectionRequired(Vec<connection::ConnectionCandidateSummary>),
+    SelectionRequired(Vec<connection::EndpointCandidateSummary>),
     Connected {
-        connection: connection::ConnectionDescription,
+        connection: connection::EndpointDescription,
         observations: Vec<connection::DiscoveryObservationSummary>,
     },
 }
 
 /// Value-free result of materializing the recognized observations admitted by the Connector.
 pub struct MaterializationOutcome {
-    pub connections: Vec<connection::ConnectionSummary>,
+    pub endpoints: Vec<connection::EndpointSummary>,
     pub unsupported: usize,
     pub not_granted: usize,
 }
@@ -380,7 +380,7 @@ pub struct PendingRemediation {
     pub(crate) receiver: PathBuf,
     pub(crate) owner: protocol::operation::OwnerContext,
     pub(crate) operation_ref: String,
-    pub(crate) connection_ref: String,
+    pub(crate) endpoint_ref: String,
     pub(crate) integration_ref: String,
     pub(crate) auth_profile: String,
     pub(crate) input: serde_json::Value,

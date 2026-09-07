@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use connectors_client::LocalClient;
 use connectors_config::PersonalConfig;
-use protocol::connection_v2::RemediationStartRequest;
+use protocol::endpoint_v2::RemediationStartRequest;
 use serde_json::{json, Value};
 
 /// Closed public failure classes. Daemon strings, inputs and private endpoints are never copied.
@@ -46,7 +46,7 @@ pub fn read_input(
     file: Option<PathBuf>,
     stdin: Option<String>,
 ) -> Result<Value, RemediationError> {
-    let maximum = protocol::connection_v2::MAX_INPUT_BYTES;
+    let maximum = protocol::endpoint_v2::MAX_INPUT_BYTES;
     let mut bytes = Vec::new();
     match (inline, file, stdin) {
         (Some(text), None, None) => {
@@ -96,7 +96,7 @@ pub async fn run(
         .filter(|entry| entry.oauth.is_some())
         .filter(|entry| {
             integration_catalog::personal_oauth_admitted_connection_ref(&principal, entry)
-                .is_ok_and(|reference| reference == request.connection_ref)
+                .is_ok_and(|reference| reference == request.endpoint_ref)
         })
         .collect();
     let [entry] = matches.as_slice() else {
