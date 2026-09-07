@@ -4,7 +4,7 @@ id: story:generic-endpoint-resolution
 kind: story
 status: active
 title: Discover service interfaces and resolve admitted operations on demand
-summary: Implement the approved generic endpoint registry, current-credential resolution, daemon-only local setup and coordinated client migration.
+summary: Superseded by the sequential domain-reconciliation and local-discovery stories; earlier consumer migration scope is withdrawn.
 relations:
 - decomposes: epic:local-product
 - informed_by: story:kubernetes-joins-the-catalog
@@ -39,8 +39,14 @@ scope:
   path: docs
 - confidence: cited
   path: ess/system
-revision: 5
+revision: 7
 ---
+## Superseded scope — 2026-09-07
+
+The operator withdrew the consumer-migration scope recorded below and requested two sequential Connectors-only stories: story:reconcile-connectors-domain-language, followed by story:local-endpoint-discovery-and-resolution. The second story supersedes this one as the delivery owner; the first owns the preceding naming/model and whole-codebase reconciliation. Both new drafts must be presented before any implementation resumes.
+
+The historical heading "Approved implementation" below must not be read as authorization to migrate Zwirn, agent-platform, platform/runtime consumers, or any other consumer repository. That expansion was the agent's mistake. This record and existing WIP are retained as history/evidence; its active status is not renewed execution approval and no work is to be scheduled from it while the replacement stories are under review.
+
 ## Acceptance
 
 A fresh Connectors installation with a valid Kubernetes context can start its daemon through setup, discover all Service interfaces, and invoke an admitted existing HTTP, WebSocket or SQL operation by endpoint reference with current credentials and an approved route, locally and hosted, without per-endpoint materialization.
