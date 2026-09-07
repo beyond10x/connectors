@@ -9,6 +9,9 @@ use serde_json::Value;
 
 use crate::operation::OwnerContext;
 
+pub mod schema_v2;
+pub mod v2;
+
 pub const CONTRACT: &str = "b10x.connector-event.v0alpha1";
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 pub const MAX_RESPONSE_BYTES: usize = 1024 * 1024;

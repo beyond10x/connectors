@@ -1,0 +1,22 @@
+{
+  "bundle": "b10x.connector-event",
+  "files": [
+    {
+      "bytes": 1013,
+      "path": "contracts/artifact-bundle.schema.json",
+      "sha256": "5e6fbffee97d998df53c94394de1c53c75a6066f2807c9c00374b6ea15ea969b"
+    },
+    {
+      "bytes": 1713,
+      "path": "contracts/connector-event/v0alpha2/README.md",
+      "sha256": "8ff1d7e722fda8fc70da9ab707cee2cfc64fd5bc4859d5fe595d7c784bc5ee7a"
+    },
+    {
+      "bytes": 16314,
+      "path": "contracts/connector-event/v0alpha2/connector-event.schema.json",
+      "sha256": "ce0c826358f73336983a91bf12e4d82bdb5d13078feb0350223c0277702f860a"
+    }
+  ],
+  "stability": "alpha",
+  "version": "v0alpha2"
+}

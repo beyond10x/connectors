@@ -341,3 +341,9 @@ schema = "contracts/connector-connection/v0alpha2/vectors.schema.json"
 [[document]]
 path = "contracts/connector-connection/v0alpha2/bundle.json"
 schema = "contracts/artifact-bundle.schema.json"
+[[schema]]
+path = "contracts/connector-event/v0alpha2/connector-event.schema.json"
+
+[[document]]
+path = "contracts/connector-event/v0alpha2/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"

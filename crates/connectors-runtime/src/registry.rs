@@ -660,6 +660,24 @@ impl ConnectorBackend for BackendRegistry {
             .await
     }
 
+    async fn handle_event_v2(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::event::v2::EventRequest,
+    ) -> Result<protocol::event::v2::EventResult, EventError> {
+        if let Some(read) = request.legacy_read() {
+            return self.handle_event(context, read).await.map(Into::into);
+        }
+        let claims = self
+            .backends
+            .iter()
+            .filter(|backend| backend.owns_event_v2(&request))
+            .collect();
+        unique_event_claim(claims)?
+            .handle_event_v2(context, request)
+            .await
+    }
+
     async fn handle_event(
         &self,
         context: &PrincipalContext,
