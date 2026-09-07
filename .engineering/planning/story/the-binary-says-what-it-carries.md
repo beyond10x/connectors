@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:the-binary-says-what-it-carries
 kind: story
-status: active
+status: implemented
 title: The binary says what it carries
 relations:
 - derived_from: epic:cli-surface
@@ -42,7 +42,7 @@ scope:
   path: docs/design/19-the-cli-surface.md
 - confidence: cited
   path: ess/system/components.yaml
-revision: 28
+revision: 29
 ---
 # Story: the binary says what it carries
 
