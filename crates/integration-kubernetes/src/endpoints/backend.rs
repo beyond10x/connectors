@@ -94,6 +94,7 @@ pub struct KubernetesEndpointBackend {
     policy: EndpointPrincipalPolicy,
     egress: Arc<dyn EndpointEgressFactory>,
     reconciliation: Option<tokio::task::JoinHandle<()>>,
+    initial_refresh: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl KubernetesEndpointBackend {
@@ -122,7 +123,19 @@ impl KubernetesEndpointBackend {
             policy,
             egress,
             reconciliation,
+            initial_refresh: None,
         }
+    }
+
+    /// Restore metadata immediately and validate the cluster in a task owned by this backend.
+    pub fn refresh_on_start(mut self) -> Self {
+        let weak = Arc::downgrade(&self.source);
+        self.initial_refresh = Some(tokio::spawn(async move {
+            if let Some(source) = weak.upgrade() {
+                let _ = source.refresh().await;
+            }
+        }));
+        self
     }
 
     pub fn source(&self) -> &Arc<KubernetesEndpointSource> {
@@ -171,13 +184,17 @@ impl KubernetesEndpointBackend {
     }
 
     fn description_ref(&self, context: &PrincipalContext, operation_ref: &str) -> String {
+        let binding = catalog::operation(catalog::OperationKey::id(operation_ref))
+            .and_then(|operation| self.source.binding_digest(operation.provider).ok())
+            .unwrap_or_default();
         format!(
             "description:endpoint:{}",
             hex::encode(Sha256::digest(format!(
-                "{}\0{}\0{}",
+                "{}\0{}\0{}\0{}",
                 context.authority_snapshot_sha256(),
                 self.source.source_ref(),
-                operation_ref
+                operation_ref,
+                binding,
             )))
         )
     }
@@ -351,6 +368,9 @@ impl Drop for KubernetesEndpointBackend {
         if let Some(task) = &self.reconciliation {
             task.abort();
         }
+        if let Some(task) = &self.initial_refresh {
+            task.abort();
+        }
     }
 }
 
@@ -453,10 +473,14 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                 let end = offset
                     .saturating_add(usize::from(request.limit))
                     .min(endpoints.len());
+                let mut warnings = self.source.warnings().map_err(endpoint_error)?;
+                if !self.policy.manages(context) && !warnings.is_empty() {
+                    warnings = vec!["Endpoint source refresh is incomplete".to_owned()];
+                }
                 Ok(EndpointResult::List {
                     endpoints: endpoints[offset..end].to_vec(),
                     next_cursor: (end < endpoints.len()).then(|| format!("{cursor_prefix}:{end}")),
-                    warnings: Vec::new(),
+                    warnings,
                 })
             }
             EndpointRequest::Show(request) => {

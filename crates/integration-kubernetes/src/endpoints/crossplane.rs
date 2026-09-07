@@ -11,8 +11,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use super::{
-    dns_name, routes::source_error, EndpointScan, EndpointSourceError, KubernetesEndpointSource,
-    MAX_PAGES, PAGE_SIZE,
+    dns_name, EndpointScan, EndpointSourceError, KubernetesEndpointSource, MAX_PAGES, PAGE_SIZE,
 };
 
 impl KubernetesEndpointSource {
@@ -67,19 +66,17 @@ impl KubernetesEndpointSource {
             if let Some(cursor) = cursor.as_deref() {
                 params = params.continue_token(cursor);
             }
-            let list = match api.list(&params).await {
+            let list = match super::api_call(api.list(&params)).await {
                 Ok(list) => list,
-                Err(kube::Error::Api(response)) if response.code == 404 && cursor.is_none() => {
+                Err(EndpointSourceError::Stale) if cursor.is_none() => {
                     // Distinguish an absent CRD from an incorrectly served collection. A known
                     // collection that returned 404 is incomplete, not an empty successful scan.
                     let request =
                         http::Request::get(format!("/apis/{engine}.sql.crossplane.io/v1alpha1"))
                             .body(Vec::new())
                             .map_err(|_| EndpointSourceError::Unavailable)?;
-                    match self.client.request::<Value>(request).await {
-                        Err(kube::Error::Api(response)) if response.code == 404 => {
-                            return Ok(Vec::new())
-                        }
+                    match super::api_call(self.client.request::<Value>(request)).await {
+                        Err(EndpointSourceError::Stale) => return Ok(Vec::new()),
                         Ok(discovery)
                             if !discovery
                                 .get("resources")
@@ -95,7 +92,7 @@ impl KubernetesEndpointSource {
                         _ => return Err(EndpointSourceError::Unavailable),
                     }
                 }
-                Err(error) => return Err(source_error(error)),
+                Err(error) => return Err(error),
             };
             if list.items.len() > PAGE_SIZE as usize {
                 return Err(EndpointSourceError::Capacity);
@@ -126,10 +123,7 @@ impl KubernetesEndpointSource {
             self.client.clone(),
             &resource(engine, "Database", "databases"),
         );
-        let database = api
-            .get(&endpoint.resource_name)
-            .await
-            .map_err(source_error)?;
+        let database = super::api_call(api.get(&endpoint.resource_name)).await?;
         if database.metadata.uid.as_deref() != Some(&endpoint.resource_uid) {
             return Err(EndpointSourceError::Stale);
         }
@@ -145,7 +139,7 @@ impl KubernetesEndpointSource {
             self.client.clone(),
             &resource(engine, "ProviderConfig", "providerconfigs"),
         );
-        let config = api.get(config_name).await.map_err(source_error)?;
+        let config = super::api_call(api.get(config_name)).await?;
         let current = project_database(
             &self.source_ref,
             engine,
