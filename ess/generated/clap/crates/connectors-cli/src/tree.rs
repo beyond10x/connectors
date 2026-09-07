@@ -1,6 +1,6 @@
 // generated from connectors v1
-// model digest b0fd4c1db05804ca75838542993f1ffec6fc9e03d37d9fc92b7a2b217aab2e0f
-// contract digest afc1c99e420e432371cb0bb48b200f48e3e2815b57363a1cb52f16cd394dcaad
+// model digest 92d00f77341a93351ebb20ce24412c86947ef6a36dfe66fa4cebae0cab13e13a
+// contract digest a721680ab8e341cf3170805a2fa8ab211d3965b1d68dc7ef001bb77709e339ae
 // do not edit: regenerate with `cargo xtask synth --target clap`
 
 
@@ -36,6 +36,18 @@ pub fn command() -> ::clap::Command {
                 .subcommand_required(true)
                 .arg_required_else_help(true)
                 .about("Run a Connector for this machine, for a hosted deployment, or over stdio."),
+        )
+        .subcommand(
+            ::clap::Command::new("daemon")
+                .subcommand_required(true)
+                .arg_required_else_help(true)
+                .about("Start, inspect, or stop the background local Connector."),
+        )
+        .subcommand(
+            ::clap::Command::new("endpoint")
+                .subcommand_required(true)
+                .arg_required_else_help(true)
+                .about("Discover service interfaces and manage their provider bindings."),
         )
         .subcommand(
             ::clap::Command::new("connection")

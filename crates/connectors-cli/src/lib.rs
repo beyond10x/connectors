@@ -6,6 +6,8 @@
 //! in a Zwirn build that carries the local placement. One implementation, so the alias cannot drift
 //! from the tool it aliases — a second parser would be a second product with the same name.
 
+mod daemon;
+mod endpoint;
 mod error;
 use error::MainError;
 
@@ -16,23 +18,21 @@ use std::path::{Path, PathBuf};
 use clap::{CommandFactory, Parser, Subcommand};
 use connectors_client::{AuthenticatedHostedClient, IdentityError, LocalClient, LoginOptions};
 use connectors_runtime::{
-    default_config_path, default_state_root, local_socket_absent, validate_state_root,
-    HostedRuntime, OneShotOperationV3Outcome, PersonalConfig, PersonalRuntime, RuntimeError,
+    default_config_path, default_state_root, validate_state_root, HostedRuntime, PersonalConfig,
+    PersonalRuntime, RuntimeError,
 };
-use protocol::connection::{
-    CandidateActivateRequest, CandidateSearchRequest, ConnectionRequest, MaterializeRequest,
-    ObservationSearchRequest, SearchRequest as ConnectionSearchRequest,
-};
+use protocol::connection::{ConnectionRequest, SearchRequest as ConnectionSearchRequest};
 use protocol::event::{
     EventRequest, ReceiveRequest, ReplayRequest, SearchRequest as EventSearchRequest,
 };
-use protocol::operation::{
+use protocol::operation::v4::{
     DescribeRequest as OperationDescribeRequest, InvokeRequest as OperationInvokeRequest,
-    OperationRequest, SearchRequest as OperationSearchRequest,
+    OperationRequest,
 };
+use protocol::operation::SearchRequest as OperationSearchRequest;
 
 use connectors_console::{
-    admin, auth, connect, doctor, enrol, init, input, output, reduce_envelope, remediation, Format,
+    admin, connect, doctor, enrol, init, input, output, reduce_envelope, remediation, Format,
 };
 
 #[derive(Debug, Parser)]
@@ -77,6 +77,19 @@ enum Command {
         #[command(subcommand)]
         command: ServeCommand,
     },
+    /// Start, inspect, or stop the background local Connector.
+    Daemon {
+        #[command(subcommand)]
+        command: daemon::DaemonCommand,
+    },
+    /// Discover service interfaces and manage their provider bindings.
+    Endpoint {
+        /// Deployment to reach. A saved login never changes the local default.
+        #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
+        target: Target,
+        #[command(subcommand)]
+        command: endpoint::EndpointCommand,
+    },
     /// Manage durable Connections through the credential-free control socket.
     Connection {
         /// Deployment to reach. A saved login never changes the local default.
@@ -99,7 +112,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
         target: Target,
         /// Exact operation contract to send. There is no negotiation or fallback.
-        #[arg(long, value_enum, default_value_t = OperationVersion::V3, global = true)]
+        #[arg(long, value_enum, default_value_t = OperationVersion::V4, global = true)]
         protocol_version: OperationVersion,
         #[command(subcommand)]
         command: OperationCommand,
@@ -112,6 +125,7 @@ enum Command {
 enum OperationVersion {
     V2,
     V3,
+    V4,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -170,6 +184,18 @@ enum SetupCommand {
         /// Exact detected kubeconfig context when connecting Kubernetes.
         #[arg(long)]
         context: Option<String>,
+        /// Namespace admitted for Kubernetes discovery and endpoint reads. Repeatable.
+        #[arg(long = "namespace", conflicts_with = "all_namespaces")]
+        namespaces: Vec<String>,
+        /// Explicitly admit discovery across all namespaces allowed by Kubernetes RBAC.
+        #[arg(long, conflicts_with = "namespaces")]
+        all_namespaces: bool,
+        /// Provider admitted for reads on discovered Kubernetes interfaces. Repeatable.
+        #[arg(long = "read-provider")]
+        read_providers: Vec<String>,
+        /// Permit this context's kubeconfig credential helper.
+        #[arg(long)]
+        allow_exec_auth: bool,
         /// Owner-only state root used by the running Connector.
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -301,35 +327,6 @@ enum ServeCommand {
 
 #[derive(Debug, Subcommand)]
 enum ConnectionCommand {
-    /// Passively list potential direct Connections without contacting their providers.
-    Candidates {
-        #[arg(long)]
-        config: Option<PathBuf>,
-        #[arg(long)]
-        integration: String,
-        #[arg(long, default_value = "")]
-        query: String,
-        #[arg(
-            long,
-            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
-            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
-            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
-        )]
-        limit: u16,
-        #[arg(long)]
-        state_root: Option<PathBuf>,
-    },
-    /// Explicitly contact and activate one opaque direct-Connection candidate.
-    Activate {
-        #[arg(long)]
-        config: Option<PathBuf>,
-        #[arg(long)]
-        candidate: String,
-        #[arg(long)]
-        label: String,
-        #[arg(long)]
-        state_root: Option<PathBuf>,
-    },
     /// List non-secret Connection summaries.
     List {
         #[arg(long)]
@@ -343,33 +340,6 @@ enum ConnectionCommand {
             help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
         )]
         limit: u16,
-        #[arg(long)]
-        state_root: Option<PathBuf>,
-    },
-    /// List the latest stored discovery observations for a source Connection.
-    Observations {
-        #[arg(long)]
-        config: Option<PathBuf>,
-        #[arg(long)]
-        source: String,
-        #[arg(long, default_value = "")]
-        query: String,
-        #[arg(
-            long,
-            default_value_t = protocol::connection::MAX_SEARCH_RESULTS,
-            value_parser = clap::value_parser!(u16).range(1..=i64::from(protocol::connection::MAX_SEARCH_RESULTS)),
-            help = format!("Maximum results (1..={})", protocol::connection::MAX_SEARCH_RESULTS)
-        )]
-        limit: u16,
-        #[arg(long)]
-        state_root: Option<PathBuf>,
-    },
-    /// Materialize one recognized observation as a callable mediated Connection.
-    Materialize {
-        #[arg(long)]
-        config: Option<PathBuf>,
-        #[arg(long)]
-        observation: String,
         #[arg(long)]
         state_root: Option<PathBuf>,
     },
@@ -399,6 +369,10 @@ enum OperationCommand {
         config: Option<PathBuf>,
         #[arg(long)]
         operation: String,
+        #[arg(long, conflicts_with = "endpoint_ref")]
+        connection: Option<String>,
+        #[arg(long, conflicts_with = "connection")]
+        endpoint_ref: Option<String>,
         #[arg(long)]
         state_root: Option<PathBuf>,
     },
@@ -421,8 +395,18 @@ enum OperationCommand {
         config: Option<PathBuf>,
         #[arg(long)]
         operation: String,
-        #[arg(long)]
-        connection: String,
+        #[arg(
+            long,
+            required_unless_present = "endpoint_ref",
+            conflicts_with = "endpoint_ref"
+        )]
+        connection: Option<String>,
+        #[arg(
+            long,
+            required_unless_present = "connection",
+            conflicts_with = "connection"
+        )]
+        endpoint_ref: Option<String>,
         #[arg(long)]
         description_ref: String,
         /// Strict JSON object of catalog-declared caller input. See also --input-file and --input.
@@ -807,6 +791,7 @@ where
     let format = cli.output;
     let target = match &cli.command {
         Command::Connection { target, .. }
+        | Command::Endpoint { target, .. }
         | Command::Event { target, .. }
         | Command::Operation { target, .. } => Some(target.as_str()),
         _ => None,
@@ -895,6 +880,10 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 config,
                 label,
                 context,
+                namespaces,
+                all_namespaces,
+                read_providers,
+                allow_exec_auth,
                 state_root,
                 credential,
                 oauth,
@@ -906,7 +895,38 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             } => {
                 let config_path = config.map_or_else(default_config_path, Ok)?;
                 let state_root = state_root.map_or_else(default_state_root, Ok)?;
-                validate_state_root(&state_root)?;
+                let bootstrap = if provider.as_deref() == Some("kubernetes") {
+                    Some(
+                        connectors_console::kubernetes_setup::prepare(
+                            &config_path,
+                            &state_root,
+                            connectors_console::kubernetes_setup::Options {
+                                context: context.clone(),
+                                namespaces,
+                                all_namespaces,
+                                read_providers,
+                                allow_exec_auth,
+                            },
+                        )
+                        .await?,
+                    )
+                } else {
+                    if !namespaces.is_empty()
+                        || all_namespaces
+                        || !read_providers.is_empty()
+                        || allow_exec_auth
+                    {
+                        return Err(connectors_client::ClientError::InvalidRequest(
+                            "Kubernetes policy options require provider kubernetes".into(),
+                        )
+                        .into());
+                    }
+                    None
+                };
+                if provider.is_some() && bootstrap.is_none() {
+                    init::ensure_owner(&config_path)?;
+                    connectors_console::daemon::start(&config_path, &state_root).await?;
+                }
                 let personal = PersonalConfig::read(&config_path)?;
                 if let (Some(operation_ref), Some(connection_ref)) =
                     (oauth.operation, oauth.connection)
@@ -937,16 +957,19 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     force: false,
                     credential_file,
                     instance,
-                    acquire: enrol::acquires(&provider)
-                        .then(|| connectors_runtime::argocd_acquisition(operator_network)),
                 };
-                let outcome = connect::dispatch_with_personal_oauth(
+                let mut outcome = connect::dispatch_with_personal_oauth(
                     &provider,
                     &personal,
                     &config_path,
                     &state_root,
                     label,
-                    context,
+                    context.or_else(|| {
+                        personal
+                            .kubernetes
+                            .as_ref()
+                            .and_then(|policy| policy.selected_context.clone())
+                    }),
                     connect::PersonalOAuthOptions {
                         enrol: options,
                         auth_profile: oauth.auth_profile,
@@ -954,6 +977,9 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                     },
                 )
                 .await?;
+                if let Some(bootstrap) = bootstrap {
+                    outcome["setup"] = bootstrap;
+                }
                 emit(format, &outcome)?;
                 Ok(())
             }
@@ -966,9 +992,15 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 Ok(())
             }
             InspectCommand::Auth { config, state_root } => {
-                let config = read_config(config)?;
+                let _config = read_config(config)?;
                 let state_root = state_root.map_or_else(default_state_root, Ok)?;
-                emit(format, &auth::status(&config, &state_root).await?)?;
+                connectors_console::daemon::require(&state_root).await?;
+                emit(
+                    format,
+                    &LocalClient::new(state_root.join("connectors.sock"))
+                        .auth_status()
+                        .await?,
+                )?;
                 Ok(())
             }
         },
@@ -1020,6 +1052,8 @@ async fn run(cli: Cli) -> Result<(), MainError> {
             }
         },
         Command::Connection { target, command } => connection(format, target, command).await,
+        Command::Daemon { command } => daemon::run(format, command).await,
+        Command::Endpoint { target, command } => endpoint::run(format, target, command).await,
         Command::Event { target, command } => event(format, target, command).await,
         Command::Operation {
             target,
@@ -1084,11 +1118,7 @@ fn initialize(
 async fn serve_hosted(config_path: &Path) -> Result<(), MainError> {
     let runtime = HostedRuntime::bind(config_path).await?;
     println!("{}", runtime.readiness());
-    runtime
-        .serve_until(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
-        .await?;
+    runtime.serve_until(shutdown_signal()).await?;
     Ok(())
 }
 
@@ -1109,12 +1139,17 @@ async fn serve(config_path: Option<PathBuf>, state_root: Option<PathBuf>) -> Res
     };
     let runtime = PersonalRuntime::bind(config_path.as_deref(), state_root).await?;
     println!("{}", runtime.readiness());
-    runtime
-        .serve_until(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
-        .await?;
+    runtime.serve_until(shutdown_signal()).await?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("install daemon termination signal");
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {},
+        _ = terminate.recv() => {},
+    }
 }
 
 async fn connection(
@@ -1123,34 +1158,6 @@ async fn connection(
     command: ConnectionCommand,
 ) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
-        ConnectionCommand::Candidates {
-            config,
-            integration,
-            query,
-            limit,
-            state_root,
-        } => (
-            config,
-            state_root,
-            ConnectionRequest::CandidateSearch(CandidateSearchRequest {
-                integration_ref: integration,
-                query,
-                limit,
-            }),
-        ),
-        ConnectionCommand::Activate {
-            config,
-            candidate,
-            label,
-            state_root,
-        } => (
-            config,
-            state_root,
-            ConnectionRequest::CandidateActivate(CandidateActivateRequest {
-                candidate_ref: candidate,
-                label,
-            }),
-        ),
         ConnectionCommand::List {
             config,
             query,
@@ -1160,32 +1167,6 @@ async fn connection(
             config,
             state_root,
             ConnectionRequest::Search(ConnectionSearchRequest { query, limit }),
-        ),
-        ConnectionCommand::Observations {
-            config,
-            source,
-            query,
-            limit,
-            state_root,
-        } => (
-            config,
-            state_root,
-            ConnectionRequest::ObservationSearch(ObservationSearchRequest {
-                source_connection_ref: source,
-                query,
-                limit,
-            }),
-        ),
-        ConnectionCommand::Materialize {
-            config,
-            observation,
-            state_root,
-        } => (
-            config,
-            state_root,
-            ConnectionRequest::Materialize(MaterializeRequest {
-                observation_ref: observation,
-            }),
         ),
     };
     target.validate(&config_path, &state_root)?;
@@ -1203,20 +1184,10 @@ async fn connection(
     let config_path = config_path.map_or_else(default_config_path, Ok)?;
     let config = PersonalConfig::read(&config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    let response = if local_socket_absent(&state_root)? {
-        PersonalRuntime::one_shot_connection(
-            &config_path,
-            state_root,
-            config.owner_context(),
-            request,
-        )
-        .await?
-    } else {
-        validate_state_root(&state_root)?;
-        LocalClient::new(state_root.join("connectors.sock"))
-            .connection(&config.owner_context(), request)
-            .await?
-    };
+    connectors_console::daemon::require(&state_root).await?;
+    let response = LocalClient::new(state_root.join("connectors.sock"))
+        .connection(&config.owner_context(), request)
+        .await?;
     emit_targeted(
         format,
         &reduce_envelope!(response, connection)?,
@@ -1272,10 +1243,7 @@ async fn event(format: Format, target: Target, command: EventCommand) -> Result<
     }
     let config = read_config(config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    if local_socket_absent(&state_root)? {
-        return Err(MainError::DaemonRequired);
-    }
-    validate_state_root(&state_root)?;
+    connectors_console::daemon::require(&state_root).await?;
     let response = LocalClient::new(state_root.join("connectors.sock"))
         .event(&config.owner_context(), request)
         .await?;
@@ -1320,12 +1288,16 @@ async fn operation(
         OperationCommand::Describe {
             config,
             operation,
+            connection,
+            endpoint_ref,
             state_root,
         } => (
             config,
             state_root,
             OperationRequest::Describe(OperationDescribeRequest {
                 operation_ref: operation,
+                connection_ref: connection,
+                endpoint_ref,
             }),
         ),
         OperationCommand::Signal {
@@ -1345,6 +1317,7 @@ async fn operation(
             config,
             operation,
             connection,
+            endpoint_ref,
             description_ref,
             input_json,
             input_file,
@@ -1359,6 +1332,7 @@ async fn operation(
                 OperationRequest::Invoke(OperationInvokeRequest {
                     operation_ref: operation,
                     connection_ref: connection,
+                    endpoint_ref,
                     description_ref,
                     input,
                     approval_evidence_ref,
@@ -1369,10 +1343,17 @@ async fn operation(
     if target == Target::Hosted {
         let client = AuthenticatedHostedClient::active()?;
         let value = match version {
-            OperationVersion::V2 => {
-                reduce_envelope!(client.operation_v2(request).await?, operation)?
+            OperationVersion::V2 => reduce_envelope!(
+                client.operation_v2(legacy_operation(request)?).await?,
+                operation
+            )?,
+            OperationVersion::V3 => reduce_envelope!(
+                client.operation(legacy_operation(request)?).await?,
+                operation
+            )?,
+            OperationVersion::V4 => {
+                reduce_envelope!(client.operation_v4(request).await?.into_v3(), operation)?
             }
-            OperationVersion::V3 => reduce_envelope!(client.operation(request).await?, operation)?,
         };
         emit_targeted(format, &value, target.as_str())?;
         return Ok(());
@@ -1380,58 +1361,52 @@ async fn operation(
     let config_path = config_path.map_or_else(default_config_path, Ok)?;
     let config = PersonalConfig::read(&config_path)?;
     let state_root = state_root.map_or_else(default_state_root, Ok)?;
-    let value = if local_socket_absent(&state_root)? {
-        match version {
-            OperationVersion::V2 => reduce_envelope!(
-                PersonalRuntime::one_shot_operation(
-                    &config_path,
-                    state_root,
-                    config.owner_context(),
-                    request,
-                )
+    connectors_console::daemon::require(&state_root).await?;
+    let client = LocalClient::new(state_root.join("connectors.sock"));
+    let value = match version {
+        OperationVersion::V2 => reduce_envelope!(
+            client
+                .operation_v2(&config.owner_context(), legacy_operation(request)?)
                 .await?,
-                operation
-            )?,
-            OperationVersion::V3 => match PersonalRuntime::one_shot_operation_v3_outcome(
-                &config_path,
-                state_root,
-                config.owner_context(),
-                request,
-            )
-            .await?
-            {
-                OneShotOperationV3Outcome::Reply(response) => {
-                    reduce_envelope!(response, operation)?
-                }
-                OneShotOperationV3Outcome::RequiresDaemon(_) => {
-                    return Err(connectors_console::envelope::ReducedError {
-                        code: "unavailable".into(),
-                        message: "this operation requires a persistent daemon; run `connectors serve local` with the same --config and --state-root".into(),
-                        retriable: false,
-                        retry_after_seconds: None,
-                        authentication: None,
-                    }.into());
-                }
-            },
-        }
-    } else {
-        validate_state_root(&state_root)?;
-        let client = LocalClient::new(state_root.join("connectors.sock"));
-        match version {
-            OperationVersion::V2 => reduce_envelope!(
-                client
-                    .operation_v2(&config.owner_context(), request)
-                    .await?,
-                operation
-            )?,
-            OperationVersion::V3 => reduce_envelope!(
-                client.operation(&config.owner_context(), request).await?,
-                operation
-            )?,
-        }
+            operation
+        )?,
+        OperationVersion::V3 => reduce_envelope!(
+            client
+                .operation(&config.owner_context(), legacy_operation(request)?)
+                .await?,
+            operation
+        )?,
+        OperationVersion::V4 => reduce_envelope!(
+            client
+                .operation_v4(&config.owner_context(), request)
+                .await?
+                .into_v3(),
+            operation
+        )?,
     };
     emit_targeted(format, &value, target.as_str())?;
     Ok(())
+}
+
+fn legacy_operation(
+    request: OperationRequest,
+) -> Result<protocol::operation::OperationRequest, MainError> {
+    let has_target = match &request {
+        OperationRequest::Describe(value) => {
+            value.endpoint_ref.is_some() || value.connection_ref.is_some()
+        }
+        OperationRequest::Invoke(value) => value.endpoint_ref.is_some(),
+        _ => false,
+    };
+    if has_target {
+        return Err(connectors_client::ClientError::InvalidRequest(
+            "endpoint and target-aware description requests require --protocol-version v4".into(),
+        )
+        .into());
+    }
+    request
+        .into_internal(None)
+        .map_err(|error| connectors_client::ClientError::InvalidRequest(error.to_string()).into())
 }
 
 /// Read the personal configuration, defaulting to the well-known path.

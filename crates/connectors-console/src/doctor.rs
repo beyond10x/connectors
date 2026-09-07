@@ -105,7 +105,7 @@ pub fn run(config_path: &Path, state_root: &Path) -> Report {
         "target",
         Status::Ok,
         format!(
-            "local by default: commands use {} when the daemon is running, otherwise bounded commands run in this local placement; a saved login never changes the target; choose --target hosted explicitly",
+            "local by default: all provider access uses the daemon at {}; a saved login never changes the target; choose --target hosted explicitly",
             state_root.join("connectors.sock").display()
         ),
     ));
@@ -219,7 +219,7 @@ fn check_state_root(path: &Path) -> Check {
             "state-root",
             Status::Warn,
             format!(
-                "{} does not exist yet; it is created by the first bounded operation or serve",
+                "{} does not exist yet; it is created by setup or daemon start",
                 path.display()
             ),
         );
@@ -316,7 +316,7 @@ fn check_daemon(state_root: &Path) -> Check {
         return Check::new(
             "daemon",
             Status::Warn,
-            "not running; operation search/describe and bounded invoke, plus connection metadata reads, work without a daemon; session operations, connection activation/materialization/connect sessions, and all event commands need `connectors serve local`",
+            "not running; all local provider access requires `connectors daemon start`; help and inspect providers remain available offline",
         );
     }
     match std::os::unix::net::UnixStream::connect(&socket) {

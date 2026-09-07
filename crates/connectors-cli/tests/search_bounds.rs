@@ -14,21 +14,12 @@ const SEARCHES: &[SearchSurface] = &[
         maximum: protocol::operation::MAX_SEARCH_RESULTS,
     },
     SearchSurface {
-        arguments: &["connection", "candidates", "--integration", "gitlab"],
-        maximum: protocol::connection::MAX_SEARCH_RESULTS,
-    },
-    SearchSurface {
         arguments: &["connection", "list"],
         maximum: protocol::connection::MAX_SEARCH_RESULTS,
     },
     SearchSurface {
-        arguments: &[
-            "connection",
-            "observations",
-            "--source",
-            "connection:fixture",
-        ],
-        maximum: protocol::connection::MAX_SEARCH_RESULTS,
+        arguments: &["endpoint", "list"],
+        maximum: protocol::endpoint::MAX_RESULTS,
     },
     SearchSurface {
         arguments: &["event", "search"],

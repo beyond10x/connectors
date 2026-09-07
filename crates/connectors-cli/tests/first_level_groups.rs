@@ -19,6 +19,8 @@ const TOP_LEVEL: &[&str] = &[
     "inspect",
     "session",
     "serve",
+    "daemon",
+    "endpoint",
     "connection",
     "event",
     "operation",
@@ -95,7 +97,7 @@ fn stderr(output: &Output) -> String {
 /// operator which of them they wanted. Both the set and its size are asserted: a ninth word added
 /// later is as much a regression as a missing one.
 #[test]
-fn the_first_level_is_eight_words() {
+fn the_first_level_matches_the_declared_groups() {
     let parser = connectors_cli::command();
     let carried: Vec<&str> = parser
         .get_subcommands()
