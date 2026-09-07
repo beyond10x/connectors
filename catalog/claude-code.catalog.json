@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v4.schema.json",
+  "$schema": "https://github.com/beyond10x/connectors/blob/main/catalog/connector-document-v5.schema.json",
   "auth": [
     {
       "description": "A user-bound Claude Code setup token stored for attempt-bounded Harness use",
