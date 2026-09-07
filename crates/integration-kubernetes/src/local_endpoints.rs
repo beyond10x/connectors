@@ -45,9 +45,12 @@ impl KubernetesLocalBackend {
         Ok(backend)
     }
 
-    /// Inject the runtime-owned HTTP/WebSocket route aperture before source activation.
-    pub fn with_endpoint_egress(mut self, egress: Arc<dyn EndpointEgressFactory>) -> Self {
-        self.endpoint_egress = Some(egress);
+    /// Inject runtime-owned provider execution before source activation.
+    pub fn with_endpoint_backend_factory(
+        mut self,
+        factory: Arc<dyn EndpointBackendFactory>,
+    ) -> Self {
+        self.endpoint_factory = Some(factory);
         self
     }
 
@@ -95,8 +98,8 @@ impl KubernetesLocalBackend {
             .endpoint_state
             .as_ref()
             .ok_or(KubernetesLocalError::EndpointSource)?;
-        let egress = self
-            .endpoint_egress
+        let factory = self
+            .endpoint_factory
             .as_ref()
             .ok_or(KubernetesLocalError::EndpointSource)?;
         let source = Arc::new(
@@ -111,12 +114,10 @@ impl KubernetesLocalBackend {
             )
             .map_err(|_| KubernetesLocalError::EndpointSource)?,
         );
-        let backend = KubernetesEndpointBackend::new(
+        let backend = factory.build(
             source,
             EndpointPrincipalPolicy::Local(Arc::new(self.owner.clone())),
-            egress.clone(),
-        )
-        .refresh_on_start();
+        );
         let description = ConnectionDescription {
             summary: ConnectionSummary {
                 connection_ref: connection_ref.clone(),
@@ -138,11 +139,11 @@ impl KubernetesLocalBackend {
         );
         state.clients.insert(connection_ref.clone(), client);
         state.connections.insert(connection_ref, description);
-        *lock(&self.endpoint_backend) = Some(Arc::new(backend));
+        *lock(&self.endpoint_backend) = Some(backend);
         Ok(())
     }
 
-    pub(super) fn endpoint_backend(&self) -> Option<Arc<KubernetesEndpointBackend>> {
+    pub(super) fn endpoint_backend(&self) -> Option<Arc<dyn ConnectorBackend>> {
         lock(&self.endpoint_backend).clone()
     }
 }
