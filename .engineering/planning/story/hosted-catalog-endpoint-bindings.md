@@ -9,6 +9,12 @@ relations:
 - informed_by: story:deployment-declared-destination-aperture
 scope:
 - confidence: cited
+  path: catalog/grafana.catalog.json
+- confidence: cited
+  path: connectors.lock
+- confidence: cited
+  path: crates/catalog-reader/catalog.pack
+- confidence: cited
   path: crates/connectors-config/src/hosted.rs
 - confidence: cited
   path: crates/connectors-config/src/hosted_catalog.rs
@@ -26,7 +32,9 @@ scope:
   path: crates/integration-catalog/src/lib.rs
 - confidence: cited
   path: docs/guides/administer-hosted-integrations.md
-revision: 11
+- confidence: cited
+  path: providers/grafana.toml
+revision: 15
 ---
 ## Outcome
 
@@ -62,3 +70,19 @@ The first broad run found the configuration module size fence; extracting hosted
 New endpoint metadata is additive to the existing v1 state and omitted for default fixed-origin records. Backward loading and serialization are tested. A connection created for a newly configurable provider needs this updated runtime; an older runtime has no implementation for spending its endpoint-bound credential. No change to provider declarations, canonical request/response schemas, SQL storage or Secrets protocols is made.
 
 Actual composed browser acceptance and the real provider credential remain the consuming deployment's next proof; this artifact remains active until that evidence arrives.
+
+## Credential entry clarity
+
+The actual hosted Grafana form still labels its single masked input only as Credential, which leads an SSO user to infer that the form asks for their browser password. The renderer must derive the label, help, authentication description and documentation link from the selected catalogue credential/config declaration. Grafana's declared service_account_token help must explicitly distinguish the API token from the SSO password and direct the owner to the Grafana service-account token page. Keep the generic renderer provider-neutral and preserve normal credential custody and endpoint pinning.
+
+Official sources checked on 2026-09-07: https://grafana.com/docs/grafana/latest/administration/service-accounts/ and https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/. These describe service accounts separately from Grafana users and service account tokens as bearer credentials for the HTTP API. This is acquisition copy only; provider endpoint, operation and request/response schemas remain unchanged.
+
+Acceptance: the real selected profile's form renders its matching credential label/help and official documentation; a second profile of the same provider renders its own copy; text is escaped and unsafe documentation links are omitted. Regenerate affected canonical artifacts and prove unchanged operation schemas, then run the required source gate. Actual deployment/credential changes remain with the consuming deployment.
+
+## Credential form verification
+
+The form now renders the exact selected credential's catalog label, help, canonical authentication description and safe HTTPS documentation link. Grafana asks for a Grafana service account token and explains that an SSO password is not an API token. The renderer contains no Grafana-specific selection rule. Tests also distinguish Anthropic's ordinary and administrative profiles and prove HTML escaping and unsafe-link refusal.
+
+Validation passed on 2026-09-07: 110 integration-catalog tests, all-target clippy for integration-catalog and connectors-runtime, formatting, the complete scripts/gate.sh run across all twelve workspaces and both runtime configurations, and its final catalog/docs/ESS lane. Both catalog build/diff rounds reached the same fixed point; catalog check verified 65 providers and 70 artifacts. Comparing the Grafana canonical document with config removed proves all operations, auth, services and schemas unchanged. Only declared credential help/docs and the resulting pack/lock hashes changed.
+
+The consuming deployment must still render the published form and complete its own real credential/read proof. This source change adds no admin credential requirement or programmatic provisioning endpoint to the generic catalog adapter.

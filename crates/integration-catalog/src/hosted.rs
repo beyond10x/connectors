@@ -766,7 +766,7 @@ impl ConnectorBackend for HostedCatalogBackend {
             .ok_or(HostedCompletionError::Unavailable)?;
         let origins = hosted_endpoints::origins(provider, &session.binding)
             .map_err(|_| HostedCompletionError::Unavailable)?;
-        Ok(completion_page(&session.provider, &origins))
+        Ok(completion_page(provider, &session.credential, &origins))
     }
 
     async fn complete_hosted_session(
@@ -906,8 +906,29 @@ fn connection_summary(connection: StoredConnection) -> ConnectionSummary {
     }
 }
 
-fn completion_page(provider: &str, origins: &[String]) -> HostedCompletionPage {
-    let title = html_escape(provider);
+fn completion_page(
+    provider: &catalog::Provider,
+    credential: &str,
+    origins: &[String],
+) -> HostedCompletionPage {
+    let title = html_escape(provider.id);
+    let binding = format!("credential.{credential}");
+    let field = provider.config.iter().find(|field| {
+        field.secret && (field.binds == binding || field.also_binds.contains(&binding.as_str()))
+    });
+    let label = html_escape(field.map_or(credential, |field| field.label));
+    let auth_description = credential_description(provider.id, credential);
+    let mut help = field.map_or_else(String::new, |field| html_escape(field.help));
+    if !auth_description.is_empty() && field.is_none_or(|field| field.help != auth_description) {
+        if !help.is_empty() {
+            help.push_str("</p><p>");
+        }
+        help.push_str(&html_escape(&auth_description));
+    }
+    let documentation = field
+        .and_then(|field| field.docs_url)
+        .and_then(documentation_link)
+        .unwrap_or_default();
     let destinations = if origins.is_empty() {
         String::new()
     } else {
@@ -920,12 +941,42 @@ fn completion_page(provider: &str, origins: &[String]) -> HostedCompletionPage {
         title: format!("Connect {title}"),
         html: format!(
             r#"<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect {title}</title>
-<style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}label,input,button{{display:block;width:100%;box-sizing:border-box}}input,button{{padding:.8rem;margin-top:.5rem}}button{{margin-top:1rem}}</style>
+<style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}label,input,button{{display:block;width:100%;box-sizing:border-box}}input,button{{padding:.8rem;margin-top:.5rem}}button{{margin-top:1rem}}a{{color:#93c5fd}}</style>
 <h1>Connect {title}</h1>{destinations}<p>Enter the provider credential once. Connectors verifies it with the provider and stores it in the configured credential store.</p>
-<form><label>Credential<input name="credential" type="password" autocomplete="off" maxlength="8192" required></label><button>Connect</button></form><p id="status"></p>
+<div id="credential-help"><p>{help}</p>{documentation}</div>
+<form><label>{label}<input name="credential" type="password" autocomplete="off" aria-describedby="credential-help" maxlength="8192" required></label><button>Connect</button></form><p id="status" role="status"></p>
 <script>const form=document.querySelector('form'),status=document.querySelector('#status'),button=document.querySelector('button');const capability=new URL(location.href).hash.match(/^#token=([A-Za-z0-9_-]{{32,256}})$/)?.[1];history.replaceState(null,'',location.pathname);form.addEventListener('submit',async event=>{{event.preventDefault();const field=form.elements.credential,value=field.value;if(!capability||!value||value.length>8192){{status.textContent='Check the credential value.';return;}}field.value='';button.disabled=true;status.textContent='Saving the credential…';try{{const response=await fetch(location.pathname,{{method:'POST',headers:{{'Content-Type':'application/octet-stream','X-Connect-Session':capability}},body:value}});if(response.ok){{status.textContent='{title} connected. You may close this tab.';return;}}status.textContent=response.status===503?'The credential store is unavailable. Start Connect again later.':'The connection was refused.';}}catch{{status.textContent='Hosted Connectors is unavailable. Start Connect again later.';}}button.disabled=false;}});</script>"#
         ),
     }
+}
+
+fn credential_description(provider: &str, credential: &str) -> String {
+    // Authentication descriptions belong to the canonical catalogue, including profiles without
+    // a form field. Reading that reviewed document avoids inventing provider-specific UI copy.
+    catalog::reader::provider(provider)
+        .and_then(|provider| serde_json::from_str::<serde_json::Value>(provider.document()).ok())
+        .and_then(|document| {
+            document.get("auth")?.as_array()?.iter().find_map(|auth| {
+                (auth.get("name")?.as_str()? == credential)
+                    .then(|| auth.get("description")?.as_str().map(str::to_owned))?
+            })
+        })
+        .unwrap_or_default()
+}
+
+fn documentation_link(value: &str) -> Option<String> {
+    let url = url::Url::parse(value).ok()?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return None;
+    }
+    Some(format!(
+        "<p><a href=\"{}\" target=\"_blank\" rel=\"noopener noreferrer\">Credential setup documentation</a></p>",
+        html_escape(url.as_str())
+    ))
 }
 
 fn proposal_digest(batch: &SecretBatch) -> SecretProposalDigest {
