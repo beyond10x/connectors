@@ -188,10 +188,6 @@ impl KubernetesStatusBackend {
             )
             .map_err(|_| KubernetesBackendError::InvalidPolicy)?,
         );
-        source
-            .refresh()
-            .await
-            .map_err(|_| KubernetesBackendError::HttpClient)?;
         let policy = crate::endpoints::EndpointPrincipalPolicy::Hosted {
             tenant: self.expected_tenant.clone(),
             namespace_groups: self
@@ -201,9 +197,10 @@ impl KubernetesStatusBackend {
                 .collect(),
             operator_groups: self.operator_groups.clone(),
         };
-        self.endpoint_backend = Some(Arc::new(crate::endpoints::KubernetesEndpointBackend::new(
-            source, policy, egress,
-        )));
+        self.endpoint_backend = Some(Arc::new(
+            crate::endpoints::KubernetesEndpointBackend::new(source, policy, egress)
+                .refresh_on_start(),
+        ));
         Ok(self)
     }
 

@@ -201,10 +201,25 @@ async fn ari_execution_resolves_the_current_named_secret_and_keeps_invalid_input
     );
     *generation.lock().unwrap() = "fixture-password-two".to_owned();
     assert_eq!(
-        backend.invoke(&context, request).await.unwrap().output,
+        backend
+            .invoke(&context, request.clone())
+            .await
+            .unwrap()
+            .output,
         serde_json::json!([])
     );
     let headers = transport.authorizations.lock().unwrap();
     assert_eq!(headers.len(), 2);
     assert_ne!(headers[0], headers[1]);
+    drop(headers);
+    let before = observed.lock().unwrap().len();
+    let mut binding = backend.source.show(&endpoint_ref).unwrap().binding.unwrap();
+    binding.direct_address = Some("https://new-ari.example.test".to_owned());
+    backend.source.bind(&endpoint_ref, binding).unwrap();
+    assert!(backend.invoke(&context, request).await.is_err());
+    assert_eq!(
+        observed.lock().unwrap().len(),
+        before,
+        "changed bindings invalidate old descriptions before any source or Secret I/O"
+    );
 }
