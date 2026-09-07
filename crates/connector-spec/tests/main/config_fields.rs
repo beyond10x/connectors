@@ -1011,7 +1011,7 @@ also_binds = ["header.X-Acme-Application-Id"]
     assert_eq!(
         field.bindings(),
         Some(vec![
-            Binding::Endpoint { variable: "app_id" },
+            Binding::EndpointInventoryEntry { variable: "app_id" },
             Binding::Request {
                 position: Position::Header,
                 name: "X-Acme-Application-Id",

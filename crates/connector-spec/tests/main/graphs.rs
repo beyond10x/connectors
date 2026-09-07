@@ -511,7 +511,7 @@ fn no_node_kind_carries_a_formula() {
         NodeKind::Schedule {
             cron: "0 9 * * *".into(),
         },
-        NodeKind::Endpoint {
+        NodeKind::EndpointInventoryEntry {
             binding: "hook".into(),
         },
     ];

@@ -411,7 +411,7 @@ mod tests {
     impl ConfigPort for MapPort {
         fn resolve(&self, field: ConfigField<'_>) -> Option<ConfigValue> {
             let name = match field {
-                ConfigField::Endpoint(name) | ConfigField::Username(name) => name,
+                ConfigField::EndpointInventoryEntry(name) | ConfigField::Username(name) => name,
                 // No operation-path credential reads a channel query; the assembler never asks.
                 ConfigField::ChannelQuery { parameter, .. } => parameter,
             };

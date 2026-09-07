@@ -32,7 +32,7 @@ fn adversary_gitlab_pass1_schema_versions_and_profiles_fail_closed() {
     let mut original: Value =
         serde_json::from_str(include_str!("../../../catalog/github.catalog.json")).unwrap();
     // Preserve the frozen v3 schema oracle over identical operation bytes. The current reader
-    // accepts v4; its positive and malformed-version/profile cases are tested separately below.
+    // accepts v5; its positive and malformed-version/profile cases are tested separately below.
     original["$schema"] = schema3["$id"].clone();
     original["schema_version"] = json!(3);
     assert!(v3.is_valid(&original));
@@ -86,14 +86,14 @@ fn adversary_gitlab_pass1_schema_versions_and_profiles_fail_closed() {
 #[test]
 fn current_schema_four_and_reader_keep_all_version_and_profile_refusal_classes() {
     let schema4: Value = serde_json::from_str(include_str!(
-        "../../../catalog/connector-document-v4.schema.json"
+        "../../../catalog/connector-document-v5.schema.json"
     ))
     .unwrap();
-    let v4 = jsonschema::validator_for(&schema4).unwrap();
+    let v5 = jsonschema::validator_for(&schema4).unwrap();
     let original: Value =
         serde_json::from_str(include_str!("../../../catalog/github.catalog.json")).unwrap();
     assert_eq!(original["schema_version"], json!(4));
-    assert!(v4.is_valid(&original));
+    assert!(v5.is_valid(&original));
     assert!(Document::parse(&original.to_string()).is_ok());
     for version in [
         json!(0),
@@ -107,7 +107,7 @@ fn current_schema_four_and_reader_keep_all_version_and_profile_refusal_classes()
     ] {
         let mut mutated = original.clone();
         mutated["schema_version"] = version;
-        assert!(!v4.is_valid(&mutated));
+        assert!(!v5.is_valid(&mutated));
         assert!(Document::parse(&mutated.to_string()).is_err());
     }
     for profile in [
@@ -123,7 +123,7 @@ fn current_schema_four_and_reader_keep_all_version_and_profile_refusal_classes()
         } else {
             operation.remove("request_semantics");
         }
-        assert!(!v4.is_valid(&mutated));
+        assert!(!v5.is_valid(&mutated));
         assert!(Document::parse(&mutated.to_string()).is_err());
     }
 }

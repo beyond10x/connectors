@@ -101,7 +101,7 @@ fn service_owns_the_backend_port_and_server_only_adapts_transport() {
         "pub trait ConnectorBackend",
         "`service` must publicly own the transport-neutral `ConnectorBackend` port",
     );
-    for ownership in ["owns_operation", "owns_connection", "owns_event"] {
+    for ownership in ["owns_operation", "owns_endpoint", "owns_event"] {
         assert_source_contains(
             &service_sources,
             &format!("fn {ownership}"),
@@ -211,7 +211,7 @@ fn runtime_is_the_only_adapter_composition_root() {
         "pub struct BackendRegistry",
         "the runtime must expose one exact-dispatch `BackendRegistry`",
     );
-    for ownership in ["owns_operation", "owns_connection", "owns_event"] {
+    for ownership in ["owns_operation", "owns_endpoint", "owns_event"] {
         assert_source_contains(
             &runtime_sources,
             ownership,
@@ -220,7 +220,7 @@ fn runtime_is_the_only_adapter_composition_root() {
     }
     for collision_error in [
         "OperationErrorCode::Protocol",
-        "ConnectionErrorCode::Protocol",
+        "EndpointErrorCode::Protocol",
         "EventErrorCode::Protocol",
     ] {
         assert_source_contains(
@@ -238,7 +238,7 @@ fn runtime_is_the_only_adapter_composition_root() {
     }
     for ordered_probe in [
         "Err(error) if error.code == OperationErrorCode::NotFound",
-        "Err(error) if error.code == ConnectionErrorCode::NotFound",
+        "Err(error) if error.code == EndpointErrorCode::NotFound",
         "Err(error) if error.code == EventErrorCode::NotFound",
     ] {
         assert_source_excludes(

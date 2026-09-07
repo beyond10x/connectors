@@ -471,7 +471,7 @@ fn released_http_integrations_cannot_bypass_connection_bound_egress() {
         server_sources.iter().any(|source| {
             std::fs::read_to_string(source)
                 .expect("server source")
-                .contains("impl EgressTransport for ConnectionEgress")
+                .contains("impl EgressTransport for EndpointEgress")
         }),
         "server must remain the physical implementation of the Connection-bound egress port"
     );

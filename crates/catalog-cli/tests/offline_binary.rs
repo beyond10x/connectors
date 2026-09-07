@@ -118,7 +118,7 @@ fn build_succeeds_with_networking_unavailable() {
     for artifact in [
         "catalog/connector-document.schema.json",
         "catalog/connector-document-v3.schema.json",
-        "catalog/connector-document-v4.schema.json",
+        "catalog/connector-document-v5.schema.json",
         "crates/catalog-reader/catalog.pack",
         "connectors.lock",
     ] {
