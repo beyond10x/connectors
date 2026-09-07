@@ -30,9 +30,9 @@
     {
       "approval": "none",
       "binds": "credential.grafana.service_account_token",
-      "docs_url": "https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/authentication/",
+      "docs_url": "https://grafana.com/docs/grafana/latest/administration/service-accounts/",
       "format": "token",
-      "help": "Supply this through the selected Connection's custody: local OS keychain, a wired secret provider, or satellite-local storage. The harness can write it but cannot read it back",
+      "help": "Paste a Grafana service account token for this instance. Your browser SSO password is not an API token. In Grafana, open Administration > Users and access > Service accounts, select a service account and add a token. Ask an administrator if you do not have permission. Connectors stores the token in credential custody.",
       "label": "Grafana service account token",
       "level": "connection",
       "name": "service_account_token",

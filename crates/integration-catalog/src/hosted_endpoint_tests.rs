@@ -119,6 +119,15 @@ async fn connect(backend: &HostedCatalogBackend, owner: &PrincipalContext) -> St
     let (session, capability) = pending(backend, owner);
     let page = backend.hosted_completion_page(&session).unwrap();
     assert!(page.html.contains(ORIGIN));
+    assert!(page
+        .html
+        .contains("<label>Grafana service account token<input"));
+    assert!(page
+        .html
+        .contains("Your browser SSO password is not an API token."));
+    assert!(page
+        .html
+        .contains("https://grafana.com/docs/grafana/latest/administration/service-accounts/"));
     assert!(!page.html.contains(SENTINEL));
     backend
         .complete_hosted_session(
@@ -134,6 +143,63 @@ async fn connect(backend: &HostedCatalogBackend, owner: &PrincipalContext) -> St
         .unwrap()
         .connection_ref
         .unwrap()
+}
+
+#[test]
+fn completion_copy_follows_the_selected_catalog_credential() {
+    let provider = catalog::provider(catalog::ProviderKey::id("anthropic")).unwrap();
+    let ordinary = completion_page(provider, "anthropic.api_key", &[]);
+    let admin = completion_page(provider, "anthropic.admin_key", &[]);
+    assert!(ordinary.html.contains("<label>API key<input"));
+    assert!(ordinary
+        .html
+        .contains("It authorizes the Models API surface."));
+    assert!(!ordinary
+        .html
+        .contains("It authorizes the Admin API surface only."));
+    assert!(admin.html.contains("<label>Admin API key<input"));
+    assert!(admin
+        .html
+        .contains("It authorizes the Admin API surface only."));
+    assert!(!admin.html.contains("It authorizes the Models API surface."));
+    let description = credential_description("anthropic", "anthropic.api_key");
+    assert!(!description.is_empty());
+    assert!(ordinary.html.contains(&html_escape(&description)));
+    assert!(credential_description("anthropic", "unknown.profile").is_empty());
+}
+
+#[test]
+fn form_copy_is_escaped_and_documentation_links_are_safe() {
+    let mut provider = *catalog::provider(catalog::ProviderKey::id("anthropic")).unwrap();
+    let mut field = provider
+        .config
+        .iter()
+        .find(|field| field.binds == "credential.anthropic.api_key")
+        .copied()
+        .unwrap();
+    field.label = "API <key> & \"account\"";
+    field.help = "<script>untrusted()</script>";
+    field.docs_url = Some("javascript:untrusted()");
+    provider.config = Box::leak(vec![field].into_boxed_slice());
+    let page = completion_page(&provider, "anthropic.api_key", &[]);
+    assert!(page
+        .html
+        .contains("API &lt;key&gt; &amp; &quot;account&quot;"));
+    assert!(page
+        .html
+        .contains("&lt;script&gt;untrusted()&lt;/script&gt;"));
+    assert!(!page.html.contains("<script>untrusted()</script>"));
+    assert!(!page.html.contains("javascript:"));
+    for invalid in [
+        "http://docs.example",
+        "javascript:alert(1)",
+        "https://user:pass@docs.example",
+    ] {
+        assert!(documentation_link(invalid).is_none());
+    }
+    assert!(documentation_link("https://docs.example/setup?a=1&b=2")
+        .unwrap()
+        .contains("?a=1&amp;b=2"));
 }
 
 async fn invoke(
