@@ -1,6 +1,6 @@
-# The deployment side of the three layers, docs/design/01-domain-model.md:178-283. `Connection`
-# belongs to this layer in the design document and is modelled in `connectors.connection`, beside
-# the other nouns `crates/protocol/src/connection.rs` declares.
+# The deployment side of the three layers, docs/design/01-domain-model.md:178-283. `Endpoint`
+# belongs to this layer in the design document and is modelled in `connectors.endpoint`, beside
+# the other nouns `crates/protocol/src/endpoint.rs` declares.
 domain: connectors.deployment
 
 summary: A tenant's configured enablement of a provider, and the vendor secret material backing the connections made from it.
@@ -21,7 +21,7 @@ types:
     kind: struct
     fields:
       - name: auth_profile
-        type: connectors.connection.AuthProfile
+        type: connectors.endpoint.AuthProfile
       - name: flow
         type: connectors.catalog.PersonalOAuthFlow
       - name: client_authentication
@@ -43,7 +43,7 @@ types:
       - name: session_ttl_seconds
         type: Integer
 
-  # Value-free evidence joined to existing Connection/credential metadata, not a new
+  # Value-free evidence joined to existing Endpoint/credential metadata, not a new
   # credential entity or a settlement of the held multi-credential cardinality question.
   - name: connectors.deployment.OAuthCredentialEvidence
     kind: struct
@@ -70,8 +70,8 @@ types:
     fields:
       - name: version
         type: Integer
-      - name: connection_ref
-        type: connectors.connection.ConnectionRef
+      - name: endpoint_ref
+        type: connectors.endpoint.EndpointRef
       - name: binding_sha256
         type: List<Integer>
       - name: previous_generation
@@ -91,7 +91,7 @@ types:
   # keyring/file routing, and production refusal for DevelopmentFile. Deployment policy
   # and runtime tests own these constraints; ESS does not establish encryption at rest.
   # UNMAPPED: a proven scope set authorizes only its exact credential generation and
-  # existing Connection grant. No field above creates or broadens that grant.
+  # existing Endpoint grant. No field above creates or broadens that grant.
 
   - name: connectors.deployment.IntegrationRef
     kind: newtype
@@ -130,7 +130,7 @@ types:
   # 2026-09-06. CatalogIntegrationConfig already declares these two axes for one credential
   # (crates/connectors-config/src/personal.rs); the story repeats them per local binding.
   # The name is a catalog credential selector, not secret material or a global entity identity.
-  # This does not settle the global Credential-to-Connection cardinality below.
+  # This does not settle the global Credential-to-Endpoint cardinality below.
   - name: connectors.deployment.LocalCredentialSelection
     kind: struct
     fields:
@@ -146,7 +146,7 @@ entities:
   # (docs/design/01-domain-model.md:182). The `enabled` field below is the closest thing to a
   # state the document names (docs/design/01-domain-model.md:183) and it is a boolean, not a
   # ladder. Settled by a state enum in `crates/protocol/src/`, or by a lifecycle drawn beside the
-  # Connection one.
+  # Endpoint one.
   # UNMAPPED: the Integration-to-Provider relation. docs/design/01-domain-model.md:189 says "an
   # integration configures a provider; it never extends one", which fixes the direction but not
   # the cardinality — nothing says whether one provider may be configured by two integrations of
@@ -178,10 +178,10 @@ entities:
   # authorization code, API key entry, …) or operator-entered"
   # (docs/design/01-domain-model.md:251-252). Settled by a state enum, or by the
   # "credential degraded" operational event at docs/design/01-domain-model.md:372 gaining a
-  # credential state to report rather than a Connection one.
-  # UNMAPPED: the Credential-to-Connection relation. docs/design/01-domain-model.md:274 puts
-  # capability evidence "on its Connection" and :281 forbids unioning scope sets "from different
-  # credentials on one Connection", so a Connection carries more than one — but nothing says how
+  # credential state to report rather than a Endpoint one.
+  # UNMAPPED: the Credential-to-Endpoint relation. docs/design/01-domain-model.md:274 puts
+  # capability evidence "on its Endpoint" and :281 forbids unioning scope sets "from different
+  # credentials on one Endpoint", so a Endpoint carries more than one — but nothing says how
   # many, or which one an invocation places. Settled by the credential-capability admission work
   # (docs/design/09-curation-and-credential-capability-admission.md).
   - name: connectors.deployment.Credential

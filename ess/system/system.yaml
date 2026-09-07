@@ -1,6 +1,6 @@
 # **A `naming.wire` on a command is the `method` tag, and nothing else.**
 #
-# `ConnectionRequest` (crates/protocol/src/connection.rs:28-48), `OperationRequest`
+# `EndpointRequest` (crates/protocol/src/endpoint.rs:28-48), `OperationRequest`
 # (crates/protocol/src/operation/legacy.rs:42-56), `CatalogRequest` (crates/protocol/src/catalog.rs:34-46)
 # and `EventRequest` (crates/protocol/src/event.rs:29-40) are each
 # `#[serde(tag = "method", content = "params", rename_all = "snake_case", deny_unknown_fields)]`,
@@ -12,7 +12,7 @@
 # `crates/catalog-build/tests/main/ess_claim_fence.rs` checks this over the whole document.
 format: ess/1
 system: connectors
-version: v1
+version: v2
 
 summary: >-
   The connector platform: a reviewed catalog of provider surfaces, tenant-configured
@@ -21,9 +21,8 @@ summary: >-
 
 domains:
   - connectors.catalog
-  - connectors.connection
-  - connectors.deployment
   - connectors.endpoint
+  - connectors.deployment
   - connectors.event
   - connectors.gitlab
   - connectors.inventory

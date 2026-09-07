@@ -77,7 +77,7 @@ types:
   # Rust loader/canonical schema and acquisition tests must enforce design 21; the
   # variants describe representable facts, not admission of every combination/vendor.
   # UNMAPPED: mandatory canonical-version migration for per-flow interpretation; this
-  # value-only patch changes neither canonical documents nor any Connection wire version.
+  # value-only patch changes neither canonical documents nor any Endpoint wire version.
 
   # Operator-selected rate-limit story, grounded in connector-spec::RateLimit and the
   # current Slack history/rate-limit references. Advice never grants access or selects
@@ -189,15 +189,15 @@ types:
 
   # `SetupProfileSummary`, crates/protocol/src/catalog.rs:100-105. "One credential-acquisition
   # flow a person may start for themselves" (crates/protocol/src/catalog.rs:97). The
-  # `auth_profile` field is typed as `connectors.connection.AuthProfile` because
+  # `auth_profile` field is typed as `connectors.endpoint.AuthProfile` because
   # crates/protocol/src/catalog.rs:101 states they are the same value: the id is carried "exactly
-  # as `ConnectSessionCreateRequest.auth_profile` accepts it"
-  # (crates/protocol/src/connection.rs:99-101).
+  # as `SetupSessionCreateRequest.auth_profile` accepts it"
+  # (crates/protocol/src/endpoint.rs:99-101).
   - name: connectors.catalog.SetupProfileSummary
     kind: struct
     fields:
       - name: auth_profile
-        type: connectors.connection.AuthProfile
+        type: connectors.endpoint.AuthProfile
       - name: actor
         type: connectors.catalog.SetupProfileActor
 
@@ -248,7 +248,7 @@ entities:
   # (docs/design/01-domain-model.md:143-160), so this is a single-state lifecycle. `Declared` is
   # the document's own word: "One declared, invocable unit of a provider"
   # (docs/design/01-domain-model.md:145). Settled by a state enum in `crates/protocol/src/` or a
-  # lifecycle drawn beside the Connection one.
+  # lifecycle drawn beside the Endpoint one.
   # Fields: `CatalogOperationSummary`, crates/protocol/src/catalog.rs:120-131.
   # UNMAPPED: the Provider-to-Operation relation. `ProviderDescription`
   # (crates/protocol/src/catalog.rs:136-141) carries a provider beside a list of operations, but
