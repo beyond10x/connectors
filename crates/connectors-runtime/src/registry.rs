@@ -196,8 +196,9 @@ impl ConnectorBackend for BackendRegistry {
         match self.remediation_owner(service::RemediationRoute::Target(target)) {
             Ok(backend) => backend.remediation_metadata(context, target),
             Err(service::RemediationError::Refused) => {
-                // Preserve ordinary defaults for an exact configured Connection owner. This is
-                // predicate-only routing, never a fallback after an operation was dispatched.
+                // Generated services can bind a Connection without exposing its separate API.
+                // Keep their ordinary unsupported metadata path, but never combine split owners.
+                // This selects metadata only; normal invocation still verifies the binding and Grant.
                 let connection =
                     ConnectionRequest::Describe(protocol::connection::DescribeRequest {
                         connection_ref: target.connection_ref.into(),
@@ -205,8 +206,13 @@ impl ConnectorBackend for BackendRegistry {
                 let operation = OperationRequest::Describe(protocol::operation::DescribeRequest {
                     operation_ref: target.operation_ref.into(),
                 });
+                let has_connection_owner = self
+                    .backends
+                    .iter()
+                    .any(|backend| backend.owns_connection(&connection));
                 let mut owners = self.backends.iter().filter(|backend| {
-                    backend.owns_connection(&connection) && backend.owns_operation(&operation)
+                    backend.owns_operation(&operation)
+                        && (!has_connection_owner || backend.owns_connection(&connection))
                 });
                 let first = owners.next().ok_or(service::RemediationError::Refused)?;
                 if owners.next().is_some() {
