@@ -86,6 +86,19 @@ pub struct EndpointBinding {
     /// SQL transport policy; absence requires TLS. HTTP profiles use their declared scheme.
     #[serde(default)]
     pub tls: Option<EndpointTls>,
+    /// Explicit HTTP scheme for a forwarded service; does not select a direct route.
+    #[serde(default)]
+    pub scheme: Option<EndpointScheme>,
+}
+
+/// HTTP transport scheme selected independently of route placement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EndpointScheme {
+    /// Unencrypted HTTP between the runtime and the service.
+    Http,
+    /// HTTP with TLS verified against the logical service hostname.
+    Https,
 }
 
 /// Operator-owned TLS policy, separate from Kubernetes authentication and tunnel encryption.
