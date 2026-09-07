@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:auth-as-tool-result
 kind: story
-status: active
+status: implemented
 title: An admitted Connection has a structured authentication next step
 tags:
 - ready
@@ -233,7 +233,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 49
+revision: 51
 ---
 ## Acceptance
 
@@ -453,3 +453,9 @@ Verification-report:cli-auth-review2-correction-20260907 preserves the complete 
 The retained matrix reproduced the two invalid older-version rows before correction, then all 12 rows passed with HTTP statuses unchanged. The complete server suite passed 118 tests with zero failures or ignores; strict all-target server Clippy and root formatting passed. All five owned process groups were empty before sealing, with no resource or sampler interruption. The earlier final review's production-reachability limit and undecided origin remain unchanged. Its sole remaining finding is now recorded fixed; no third attack occurred.
 
 Both ordinary authentication reviews and the required final correction verification are complete. CHANGELOG no longer labels authentication review pending. The full exact candidate CI, source main publication, normal documentation delivery and authorized installation remain outstanding; this active story makes no completed delivery claim.
+
+## Full implementation gate completed — 2026-09-07
+
+Manual release rehearsal 34069722221 completed successfully on exact published candidate 0837f79beb4202405942e669c417057f69aac58a. All twelve workspace gates, shared checks and four native Linux/macOS builds passed. Each native binary passed its version/help smoke checks and produced an unexpired development artifact. The publish job was skipped, as required for workflow_dispatch. Exact run, job and artifact responses are retained in coordinator evidence; the public run is https://github.com/beyond10x/connectors/actions/runs/34069722221 .
+
+Both remaining implementations completed their two ordinary review passes. Authentication's final one-file document correction is verified separately with every test byte preserved. The resulting source includes explicit development-only personal GitLab OAuth, bound authentication recovery, matching schema 4 readers and the stated predecessor protocol support. Implementation and executable verification are complete. The coordinator continues source main publication, normal Website/Atlas documentation delivery and the already authorized local installation; this record does not claim those delivery steps have finished. No version bump or release tag has been made.
