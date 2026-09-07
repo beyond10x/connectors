@@ -186,6 +186,18 @@
           "pattern": "^[a-z0-9._-]+$",
           "type": "string"
         },
+        "scheme": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndpointScheme"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Explicit HTTP scheme for a forwarded service; does not select a direct route."
+        },
         "tls": {
           "anyOf": [
             {
@@ -477,6 +489,21 @@
             "value"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "EndpointScheme": {
+      "description": "HTTP transport scheme selected independently of route placement.",
+      "oneOf": [
+        {
+          "const": "http",
+          "description": "Unencrypted HTTP between the runtime and the service.",
+          "type": "string"
+        },
+        {
+          "const": "https",
+          "description": "HTTP with TLS verified against the logical service hostname.",
+          "type": "string"
         }
       ]
     },

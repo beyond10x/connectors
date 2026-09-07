@@ -167,6 +167,11 @@ fn router_inner(
             )),
         )
         .route(
+            "/endpoints",
+            post(super::endpoint_route::handle)
+                .layer(DefaultBodyLimit::max(protocol::endpoint::MAX_FRAME_BYTES)),
+        )
+        .route(
             "/catalog",
             post(catalog_route::handle)
                 .layer(DefaultBodyLimit::max(protocol::catalog::MAX_FRAME_BYTES)),

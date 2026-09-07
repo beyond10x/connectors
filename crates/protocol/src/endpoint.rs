@@ -3,7 +3,7 @@
 
 use crate::operation::{self, OwnerContext};
 pub use domain::endpoint::{
-    Endpoint, EndpointBinding, EndpointCredentialReference, EndpointState, EndpointTls,
+    Endpoint, EndpointBinding, EndpointCredentialReference, EndpointScheme, EndpointState, EndpointTls,
     EndpointTransport,
 };
 use serde::{Deserialize, Serialize};
@@ -333,6 +333,7 @@ mod tests {
                 direct_address: Some(address.into()),
                 database: None,
                 tls: None,
+                scheme: None,
             };
             assert!(!binding.validate());
         }
@@ -343,6 +344,7 @@ mod tests {
             direct_address: None,
             database: None,
             tls: None,
+            scheme: None,
         };
         assert!(!binding.validate());
     }
