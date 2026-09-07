@@ -552,6 +552,40 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         false
     }
 
+    /// Exact inventory ownership, without resource, credential, or provider I/O.
+    fn owns_endpoint(&self, _request: &protocol::endpoint::EndpointRequest) -> bool {
+        false
+    }
+
+    /// Credential-free inventory and operator bindings; transport authority is independently checked.
+    async fn handle_endpoint(
+        &self,
+        _context: &PrincipalContext,
+        _request: protocol::endpoint::EndpointRequest,
+    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        Err(protocol::endpoint::EndpointError::new(
+            protocol::endpoint::EndpointErrorCode::Unavailable,
+            "endpoint discovery is not configured",
+            false,
+        ))
+    }
+
+    /// Validate endpoint policy and current immutable resource identity, then publish or reuse
+    /// non-secret Connection metadata. This is not invocation admission. Never fetch credentials,
+    /// open a tunnel, or dispatch an operation here; those happen behind the ordinary Grant seam.
+    async fn resolve_endpoint(
+        &self,
+        _context: &PrincipalContext,
+        _endpoint_ref: &str,
+        _operation_ref: &str,
+    ) -> Result<String, OperationError> {
+        Err(OperationError::new(
+            protocol::operation::OperationErrorCode::NotFound,
+            "the endpoint is not available to this operation",
+            false,
+        ))
+    }
+
     /// Exact ownership only; performs no credential read, session work or provider access.
     fn owns_remediation(&self, _route: crate::RemediationRoute<'_>) -> bool {
         false
