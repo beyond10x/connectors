@@ -80,7 +80,7 @@ The words a person really types under those groups — `list`, `search`, `activa
 
 - `UNSPECIFIED_PATHS` names each **path** the specification cannot yet carry, with a kind and a
   reason. A path is what a person types after the binary, at whatever depth: `connection activate`,
-  `admin credentials set`. It has **27 entries, 0 of them one word and 27 of them two or three**,
+  `admin credentials set`. It has **28 entries, 0 of them one word and 28 of them two or three**,
   which is the shape of the parser and not of the top of it — a list of first-level words would let
   `connectors connection harvest` and `connectors event invoke` through, and an earlier revision of
   this page described it as one. Nine of them were one word until
@@ -108,7 +108,7 @@ The words a person really types under those groups — `list`, `search`, `activa
   `crates/connectors-cli/tests/adversary_fence_probe.rs`. What holds now is three separate things,
   and it is worth being exact about which covers what:
 
-  - **13 of the 27** kinds are derived from the tree, by `kinds_the_tree_derives`. A path is
+  - **13 of the 28** kinds are derived from the tree, by `kinds_the_tree_derives`. A path is
     followed to the frames it puts on a socket — its own dispatch arm in
     `crates/connectors-cli/src/lib.rs`, and one hop into the `connectors-console` module that arm
     hands off to, whose `LocalClient` calls are read too. Several requests is a guided sequence of
@@ -118,7 +118,7 @@ The words a person really types under those groups — `list`, `search`, `activa
     `Unmodelled`.
   - **2 more** are `Grouping`, decided by the parser: the path carries subcommands, and no other
     kind may.
-  - **The remaining 12** — `inspect doctor`, `inspect providers`, `inspect auth`,
+  - **The remaining 13** — `inspect upgrade`, `inspect doctor`, `inspect providers`, `inspect auth`,
     `admin integrations status`, `setup completions` and the seven `Lifecycle` steps — reach no
     protocol request, in their own arm or through the module it calls, and the tree says nothing
     about them. Their kind is a **claim**, recorded in
@@ -269,3 +269,15 @@ text failures name it on stderr. `inspect doctor` explains the local default and
 socket. Target selection changes no protocol frame or grant authority. The countdown still derives
 its candidates from the protocol modules, and its mutation check now removes each group's target
 flag to prove that a regression is refused.
+
+## Compiled compatibility report — 2026-09-07
+
+`inspect upgrade` reports the calling CLI's package version, the embedded catalog's schema and
+digest, supported credential read/write formats and their prepared-transaction transition, and
+the session metadata version. These facts come from the existing catalog, credential and session
+owners. The report also names `task install`, the existing installation command for a source
+checkout. It opens no configuration or installation state and makes no network request.
+
+The new leaf is a `read` exception under the existing `inspect` group. The totals above now count
+28 exceptions: 13 kinds derived from protocol calls, two grouping paths and 13 residual claims.
+The eight top-level groups and generated clap tree remain unchanged.

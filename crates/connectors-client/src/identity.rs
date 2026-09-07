@@ -33,7 +33,8 @@ const EVENT_READ_SCOPE: &str = "connectors.events.read";
 const EVENT_SELF_SCOPE: &str = "connectors.events.self";
 const INVOKE_SCOPE: &str = "connectors.invoke";
 const KEYRING_SERVICE: &str = "dev.b10x.connectors.identity-session";
-const METADATA_VERSION: u32 = 1;
+/// The session metadata version this client reads and writes.
+pub const METADATA_VERSION: u32 = 1;
 const MAX_DISCOVERY_BYTES: usize = 16 * 1024;
 const MAX_CALLBACK_BYTES: usize = 16 * 1024;
 const MAX_MCP_FRAME_BYTES: usize = operation::MAX_FRAME_BYTES;

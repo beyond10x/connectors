@@ -71,6 +71,7 @@ use crate::{
     TenantLayout,
 };
 
+mod format;
 #[cfg(unix)]
 #[path = "file/unix.rs"]
 mod platform;
@@ -79,20 +80,11 @@ mod platform;
 mod platform;
 mod prepared;
 
+pub use format::supported_format_versions;
+use format::{HEADER, VERSION, VERSION_PREFIX};
+
 #[cfg(not(any(unix, windows)))]
 compile_error!("FileStore needs a platform-native owner-only filesystem implementation");
-
-/// The first line of every file this store writes.
-const HEADER: &str = "# codewandler-connector-secrets file store, v1";
-
-/// The prefix a version line begins with, and the version this store speaks.
-///
-/// Split out from [`HEADER`] so the version is **checked** rather than merely written. A header a
-/// reader skips as a comment is decoration: a future `v2` — one that encrypted the values, say, or
-/// changed the separator — would be loaded as `v1`, and the failure would be a wrong answer rather
-/// than a refusal. `v2` bytes read as `v1` is exactly the case a credential store must not guess at.
-const VERSION_PREFIX: &str = "# codewandler-connector-secrets file store, v";
-const VERSION: &str = "1";
 
 /// Maximum encoded bytes accepted from or written to one durable store.
 ///

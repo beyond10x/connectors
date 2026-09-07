@@ -9,7 +9,18 @@ refs:
   reference: S-025
 relations:
 - derived_from: epic:beyond-http
-revision: 1
+scope:
+- confidence: cited
+  path: crates/domain
+- confidence: inferred
+  path: crates/protocol
+- confidence: inferred
+  path: crates/server
+- confidence: inferred
+  path: crates/service
+- confidence: cited
+  path: docs/design/03-beyond-http.md
+revision: 4
 ---
 ## Acceptance
 
@@ -43,3 +54,16 @@ Migrated from `docs/stories/S-025-satellite-federation-has-a-threat-modeled-cont
 - First written 2026-08-13 · last touched 2026-08-13 · 2 revision(s)
 - Legacy id `S-025`, recorded as the reference `legacy:S-025`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` at released base 4d0cd308 — cited.
+
+- **Contract documentation:** `docs/design/03-beyond-http.md:79` — cited; outward federation, signed monotonic generations, bounded authority and separation from byte routing.
+- **Authority/placement model:** `crates/domain` — cited; existing FederatedSatellite placement and generation-bound grant facts provide the current model surface.
+- **Federation wire contract and conformance:** `crates/protocol` — inferred; bootstrap, tenant/deployment binding, generations, downgrade and partition outcomes need explicit contracts.
+- **Federation lifecycle enforcement:** `crates/service` — inferred; leases, revocation, stale-authority refusal and recovery must compose with existing authority services.
+- **Control transport:** `crates/server` — inferred; authenticated outward-established federation requires an implementation owner distinct from continuous-byte transport.
+- **Disposition:** architecture acceptance is recorded historically; implementation and conformance remain work, not a documentation-only closure — cited.
+- **Confidence:** medium; contract boundaries are explicit, but no concrete federation transport/module was located — inferred.
+- **Would collide with:** placement/authority types, protocol contracts, authority lifecycle or server control transport — inferred.

@@ -7,7 +7,14 @@ title: One connection config shape
 refs:
 - provider: legacy
   reference: S-051
-revision: 2
+scope:
+- confidence: cited
+  path: crates/connectors-config/src/lib.rs
+- confidence: cited
+  path: crates/connectors-config/src/personal.rs
+- confidence: cited
+  path: crates/integration-platform/src/tests.rs
+revision: 4
 ---
 ## Acceptance
 
@@ -39,3 +46,14 @@ Migrated from `docs/stories/S-051-one-connection-config-shape.md`, which is not 
 - First written 2026-08-23 · last touched 2026-08-23 · 1 revision(s)
 - Legacy id `S-051`, recorded as the reference `legacy:S-051`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` at released base 4d0cd308 — cited.
+
+- **Primary owner:** `crates/connectors-config/src/personal.rs` — cited; defines both shapes, their consumers and legacy parsing tests. Consolidate or document/test their intentional distinction without changing serialized fields.
+- **Public exports:** `crates/connectors-config/src/lib.rs:21` — cited; exports both current type names.
+- **Consumer regression:** `crates/integration-platform/src/tests.rs:31` — cited; constructs PlatformConnectionConfig directly.
+- **Compatibility:** preserve existing personal configuration fields, the legacy b10x section alias and initiation spelling — cited.
+- **Confidence:** high; duplicate definitions and direct consumers are located — cited.
+- **Would collide with:** personal configuration types/validation, config exports or platform integration fixtures — cited.
