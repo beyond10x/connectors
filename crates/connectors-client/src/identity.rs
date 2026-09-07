@@ -320,6 +320,60 @@ pub struct AuthenticatedHostedClient {
 }
 
 impl AuthenticatedHostedClient {
+    /// Discover or manage endpoints using exact catalog or connection-management token scope.
+    pub async fn endpoint(
+        &self,
+        request: protocol::endpoint::EndpointRequest,
+    ) -> Result<protocol::endpoint::ResponseEnvelope, AuthenticatedHostedError> {
+        let scope = match &request {
+            protocol::endpoint::EndpointRequest::List(_)
+            | protocol::endpoint::EndpointRequest::Show(_) => CATALOG_SCOPE,
+            protocol::endpoint::EndpointRequest::Refresh(_)
+            | protocol::endpoint::EndpointRequest::Bind(_) => CONNECTION_MANAGE_SCOPE,
+        };
+        let token = self.tokens.access_token(scope).await?;
+        match self
+            .hosted
+            .endpoint(&token, &self.context, request.clone())
+            .await
+        {
+            Err(ClientError::HostedAuthentication) => {
+                self.tokens.invalidate(scope)?;
+                let token = self.tokens.access_token(scope).await?;
+                Ok(self.hosted.endpoint(&token, &self.context, request).await?)
+            }
+            result => Ok(result?),
+        }
+    }
+
+    /// Select the endpoint-aware v4 contract with no version negotiation or invocation retry.
+    pub async fn operation_v4(
+        &self,
+        request: operation::v4::OperationRequest,
+    ) -> Result<operation::v4::ResponseEnvelope, AuthenticatedHostedError> {
+        let scope = match &request {
+            operation::v4::OperationRequest::Search(_)
+            | operation::v4::OperationRequest::Describe(_) => CATALOG_SCOPE,
+            _ => INVOKE_SCOPE,
+        };
+        let token = self.tokens.access_token(scope).await?;
+        match self
+            .hosted
+            .operation_v4(&token, &self.context, request.clone())
+            .await
+        {
+            Err(ClientError::HostedAuthentication) => {
+                self.tokens.invalidate(scope)?;
+                let token = self.tokens.access_token(scope).await?;
+                Ok(self
+                    .hosted
+                    .operation_v4(&token, &self.context, request)
+                    .await?)
+            }
+            result => Ok(result?),
+        }
+    }
+
     /// Open the selected hosted deployment. No network access occurs until a request is sent.
     pub fn active() -> Result<Self, IdentityError> {
         let session = active_session_metadata()?.ok_or(IdentityError::NoActiveLogin)?;

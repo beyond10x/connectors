@@ -35,6 +35,7 @@ mod catalog_route;
 mod connect;
 mod connection_route;
 mod docs;
+mod endpoint_route;
 mod enforcement;
 mod git_fetch;
 mod health;
@@ -627,6 +628,7 @@ mod tests {
     mod admin_routes;
     mod contract_validation;
     mod docs;
+    mod endpoints;
     mod enforcement;
     mod mcp;
     mod mcp_monitoring;

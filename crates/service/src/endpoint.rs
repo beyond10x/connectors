@@ -11,7 +11,7 @@ pub struct NormalizedEndpointOperation {
     pub description_connection: Option<String>,
 }
 
-/// Revalidate endpoint identity and policy before normal operation admission, without credentials.
+/// Revalidate endpoint identity and policy before normal admission, without target credentials.
 pub async fn normalize_endpoint_operation<B: ConnectorBackend + ?Sized>(
     backend: &B,
     context: &PrincipalContext,
