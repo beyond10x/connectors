@@ -204,6 +204,54 @@ impl ConnectorBackend for KubernetesStatusBackend {
             .await
     }
 
+    fn owns_event(&self, request: &protocol::event::EventRequest) -> bool {
+        self.endpoint_backend
+            .as_ref()
+            .is_some_and(|backend| backend.owns_event(request))
+    }
+
+    async fn handle_event(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::event::EventRequest,
+    ) -> Result<protocol::event::EventResult, protocol::event::EventError> {
+        self.endpoint_backend
+            .as_ref()
+            .ok_or_else(|| {
+                protocol::event::EventError::new(
+                    protocol::event::EventErrorCode::Unavailable,
+                    "Kubernetes endpoint discovery is not configured",
+                    false,
+                )
+            })?
+            .handle_event(context, request)
+            .await
+    }
+
+    fn owns_event_v2(&self, request: &protocol::event::v2::EventRequest) -> bool {
+        self.endpoint_backend
+            .as_ref()
+            .is_some_and(|backend| backend.owns_event_v2(request))
+    }
+
+    async fn handle_event_v2(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::event::v2::EventRequest,
+    ) -> Result<protocol::event::v2::EventResult, protocol::event::EventError> {
+        self.endpoint_backend
+            .as_ref()
+            .ok_or_else(|| {
+                protocol::event::EventError::new(
+                    protocol::event::EventErrorCode::Unavailable,
+                    "Kubernetes endpoint discovery is not configured",
+                    false,
+                )
+            })?
+            .handle_event_v2(context, request)
+            .await
+    }
+
     async fn ready(&self) -> Result<(), service::BackendReadinessError> {
         // Construction validates in-cluster trust and client configuration. Kubernetes API
         // availability is provider health and remains an operation-level degradation.
@@ -214,7 +262,7 @@ impl ConnectorBackend for KubernetesStatusBackend {
         BackendCapabilities {
             operations: true,
             connections: true,
-            events: false,
+            events: self.endpoint_backend.is_some(),
             datasources: true,
         }
     }
