@@ -233,7 +233,7 @@ scope:
   path: ess/system/domains/runtime.yaml
 - confidence: cited
   path: json-schemas.toml
-revision: 47
+revision: 49
 ---
 ## Acceptance
 
@@ -385,3 +385,71 @@ The expanded candidate 8243f6a7 public graph scan returned one new match in the 
 The initial empty-ignore-path attempt still suppressed historical matches and is not accepted as unignored evidence. Repeating with the repository .gitleaksignore physically absent yielded 56 findings with 55 unique fingerprints over 452 reachable commits, 42 public refs plus the candidate, 398 patch-bearing commits and 112,619,623 bytes. Exactly one fingerprint was outside the 91 existing entries. The original ignore bytes were restored after the scan. Both observations are retained. Add only that exact commit/path/rule/line fingerprint and its public explanation; retain all old entries, scanner configuration and script. Run the unchanged publication gate again on the committed result before pushing.
 
 The final reviewer also corrected a prior count label from the retained command logs: protocol 78 and service 68, the same 146 combined. The unique affected cohort remains 1,017 before its at-most-six new cases. This corrects the label without claiming any new execution.
+
+## Final authentication review routing — 2026-09-07
+
+The complete final review is recorded first in review-result:cli-auth-adversary-2-20260907. Its portable report SHA-256 is 78938fdb641f7c2a4287c0390f0d921eac14fcf141b21beea6c6e211273532ba. The coordinator verified all 236 sealed evidence members, 1,225 source hashes, 20,405 target file hashes and all ten original test prefixes. Six additive cases changed five test files by 478 lines. The affected executed cohort increased from 871 to 877, with one product failure. Unchanged protocol/service evidence is separate. All other affected full suites and all strict/fmt checks passed. The original zero-count selection, new-fixture oracle failure and uncollected-exit resource-monitor attempt remain explicit in the immutable report.
+
+The CLI comparison reports zero carried, one new and three resolved findings: the product finding count fell from three to one. The exact three lists follow unchanged.
+
+```json
+{
+  "artifact": "story:auth-as-tool-result",
+  "reviews": 2,
+  "from": "review-result:cli-auth-adversary-1-20260906",
+  "from_reviewer": "unattributed",
+  "to": "review-result:cli-auth-adversary-2-20260907",
+  "to_reviewer": "unattributed",
+  "carried": [],
+  "new": [
+    {
+      "file": "crates/server/src/hosted/docs/openapi.json",
+      "line": 730,
+      "category": "contract-drift",
+      "severity": "warning",
+      "verdict": "INFEASIBLE",
+      "origin": "undecided",
+      "message": "The served Operation 409 schema rejects the actual selected v1/v2 stale_authority envelopes from a grant-admitted stale description."
+    }
+  ],
+  "resolved": [
+    {
+      "file": "crates/connectors-client/src/remediation.rs",
+      "line": 430,
+      "category": "acceptance",
+      "severity": "blocker",
+      "verdict": "NEEDS-CHANGE",
+      "origin": "undecided",
+      "message": "The bound completion client accepts a fresh Operation binding with an explicitly conflicting credential purpose and reports readiness after acknowledgement."
+    },
+    {
+      "file": "crates/server/src/hosted/docs/openapi.json",
+      "line": 719,
+      "category": "contract-drift",
+      "severity": "warning",
+      "verdict": "INFEASIBLE",
+      "origin": "undecided",
+      "message": "With the explicit synthetic hosted readiness backend, selected v1/v2 neutral credential refusals return HTTP 409 but fail the served v3-only 409 response schema; no current production hosted acquisition producer was found."
+    },
+    {
+      "file": "crates/connectors-cli/src/lib.rs",
+      "line": 879,
+      "category": "acceptance",
+      "severity": "warning",
+      "verdict": "CONFIRMED",
+      "origin": "undecided",
+      "message": "Bound CLI setup with --input - blocks on stdin when connectors.sock is a regular file or symlink because the socket safety check happens after input acquisition."
+    }
+  ]
+}
+```
+
+Route the one remaining document-contract mismatch to the original runtime/server implementor. It is measured through the real hosted router with a synthetic metadata backend and real grant store; current built-in hosted production does not reach it. Its origin remains undecided because no base execution was run. Correct the served Operation 409 schema to admit the retained v1/v2 stale-authority envelopes while preserving v3 authentication responses and existing status behavior. Preserve every current assertion; rerun the existing deciding matrix, full server suite and strict/fmt. The coordinator will read the correction and verify exact test preservation. This is the correction verification required after the second pass, not a third attack.
+
+## Final correction verified — 2026-09-07
+
+Verification-report:cli-auth-review2-correction-20260907 preserves the complete final one-file correction report, SHA-256 c3cfbcb1dc62f15b43535bb93913c0a20f0cf79f36779b842278e469888b047d. Root verified all 77 evidence members, 1,225 source hashes and 20,405 target file hashes, including 415 executables. The only semantic JSON changes are the served Operation 409 description and its union of the existing v1, v2 and v3 response roots. Every other JSON value, every current test byte and all ten original test prefixes remain exact. The publication tree now contains the tested bytes.
+
+The retained matrix reproduced the two invalid older-version rows before correction, then all 12 rows passed with HTTP statuses unchanged. The complete server suite passed 118 tests with zero failures or ignores; strict all-target server Clippy and root formatting passed. All five owned process groups were empty before sealing, with no resource or sampler interruption. The earlier final review's production-reachability limit and undecided origin remain unchanged. Its sole remaining finding is now recorded fixed; no third attack occurred.
+
+Both ordinary authentication reviews and the required final correction verification are complete. CHANGELOG no longer labels authentication review pending. The full exact candidate CI, source main publication, normal documentation delivery and authorized installation remain outstanding; this active story makes no completed delivery claim.

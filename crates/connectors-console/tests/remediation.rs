@@ -440,3 +440,99 @@ async fn auth_adversary_presenter_error_clears_original_inode_after_path_replace
         }
     }
 }
+
+#[tokio::test]
+async fn auth_adversary2_instruction_fetch_cancellation_clears_reserved_destination_before_poll() {
+    use std::os::unix::fs::PermissionsExt as _;
+    use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
+    for partial_body in [false, true] {
+        let root = private_root();
+        let path = root.path().join("instructions");
+        let socket = root.path().join("connectors.sock");
+        let listener = tokio::net::UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let http = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = http.local_addr().unwrap();
+        let (entered, observing) = tokio::sync::oneshot::channel();
+        let (release, released) = tokio::sync::oneshot::channel::<()>();
+        let human = tokio::spawn(async move {
+            let (mut stream, _) = http.accept().await.unwrap();
+            let mut headers = Vec::new();
+            while !headers.ends_with(b"\r\n\r\n") {
+                headers.push(stream.read_u8().await.unwrap());
+                assert!(headers.len() < 8192);
+            }
+            let headers = String::from_utf8(headers).unwrap().to_ascii_lowercase();
+            assert!(headers.starts_with("get /instructions http/1.1\r\n"));
+            assert!(headers.contains(&format!("x-connect-session: {}\r\n", "p".repeat(43))));
+            if partial_body {
+                stream.write_all(b"HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Length: 1024\r\nConnection: close\r\n\r\n{\"kind\":\"device_authorization\",\"user_code\":\"SYNTHETIC_PRIVATE_INSTRUCTION").await.unwrap();
+            }
+            entered.send(()).unwrap();
+            released.await.unwrap();
+        });
+        let private_path = path.clone();
+        let expected = bound_request().connection_ref;
+        let daemon = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut line = String::new();
+            BufReader::new(&mut stream)
+                .read_line(&mut line)
+                .await
+                .unwrap();
+            let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(request["request"]["method"], "remediation_start");
+            assert!(std::fs::read(&private_path).unwrap().is_empty());
+            assert_eq!(
+                private_path.metadata().unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+            let deadline = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64
+                + 60_000;
+            let response = serde_json::json!({"protocol":protocol::connection_v2::CONTRACT,"request_id":request["request_id"],"status":"ok","response":{"result":"remediation_start","value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","connection_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":"pending","resume_state":"pending","expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":"pending","expires_at_unix_ms":deadline,"browser_completion_url":format!("http://{address}/#token={}","p".repeat(43))}}}});
+            let bytes = serde_json::to_vec(&response).unwrap();
+            protocol::connection_v2::decode_response(&bytes).unwrap();
+            stream.write_all(&bytes).await.unwrap();
+            stream.write_all(b"\n").await.unwrap();
+            listener
+        });
+        let output_path = path.clone();
+        let state_root = root.path().to_owned();
+        let acquisition = tokio::spawn(async move {
+            connectors_console::remediation::run(
+                &bound_config(),
+                &state_root,
+                bound_request(),
+                Some(&output_path),
+            )
+            .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(3), observing)
+            .await
+            .unwrap()
+            .unwrap();
+        let inode = std::fs::File::open(&path).unwrap();
+        assert_eq!(
+            inode.metadata().unwrap().len(),
+            0,
+            "partial HTTP instructions were published"
+        );
+        acquisition.abort();
+        assert!(acquisition.await.unwrap_err().is_cancelled());
+        release.send(()).unwrap();
+        human.await.unwrap();
+        let listener = daemon.await.unwrap();
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), listener.accept())
+                .await
+                .is_err(),
+            "cancelled instruction fetch started status/ack/invoke"
+        );
+        assert!(!path.exists());
+        assert_eq!(inode.metadata().unwrap().len(), 0);
+        eprintln!("instruction fetch cancelled partial_body={partial_body}: reserved inode cleared, no poll/ack/invoke");
+    }
+}

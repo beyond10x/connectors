@@ -616,3 +616,91 @@ async fn auth_adversary_hosted_selected_refusals_match_actual_status_schema_and_
         "served OpenAPI must admit the actual selected response at its actual HTTP status"
     );
 }
+
+#[tokio::test]
+async fn auth_adversary2_hosted_non_auth_conflict_and_outage_keep_selected_status_contracts() {
+    let document: serde_json::Value =
+        serde_json::from_str(crate::hosted::docs::document_json()).unwrap();
+    let mut observations = Vec::new();
+    for version in [
+        versions::Version::V0Alpha1,
+        versions::Version::V0Alpha2,
+        versions::Version::V0Alpha3,
+    ] {
+        for scenario in ["missing", "degraded", "outage", "stale"] {
+            let store = Arc::new(MemoryState::new());
+            grant(&store);
+            let need = match scenario {
+                "degraded" => CredentialReadiness::CredentialDegraded,
+                "outage" => CredentialReadiness::DependencyUnavailable,
+                _ => CredentialReadiness::MissingCredential,
+            };
+            let backend = Arc::new(RemediationBackend::new(need, false));
+            let app = application(backend.clone(), Some(&store));
+            let mut frame = request(READ, None);
+            if scenario == "stale" {
+                let OperationRequest::Invoke(invoke) = &mut frame.request else {
+                    unreachable!()
+                };
+                invoke.description_ref = "description:retired".into();
+            }
+            frame.protocol = protocol::operation::CONTRACT.into();
+            let encoded = version.encode_request(frame).unwrap();
+            let response = app
+                .oneshot(
+                    Request::post("/operations")
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .header(header::AUTHORIZATION, "Bearer access")
+                        .body(Body::from(encoded))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let status = response.status();
+            let raw = bytes(response).await;
+            let (selected, reply) = versions::decode_response(&raw).unwrap();
+            assert_eq!(selected, version);
+            let error = reply.error.unwrap();
+            let auth = matches!(scenario, "missing" | "degraded")
+                && version == versions::Version::V0Alpha3;
+            assert_eq!(error.authentication.is_some(), auth);
+            assert!(!error.retriable);
+            assert_eq!(
+                status,
+                if scenario == "stale" || auth {
+                    StatusCode::CONFLICT
+                } else {
+                    StatusCode::SERVICE_UNAVAILABLE
+                }
+            );
+            assert_eq!(
+                error.code,
+                if scenario == "stale" {
+                    v3::OperationErrorCode::StaleAuthority
+                } else if auth {
+                    v3::OperationErrorCode::AuthenticationRequired
+                } else {
+                    v3::OperationErrorCode::Unavailable
+                }
+            );
+            let mut schema = document["paths"]["/operations"]["post"]["responses"][status.as_str()]
+                ["content"]["application/json"]["schema"]
+                .clone();
+            schema["components"] = document["components"].clone();
+            schema["$schema"] = serde_json::json!("https://json-schema.org/draft/2020-12/schema");
+            let valid = jsonschema::validator_for(&schema)
+                .unwrap()
+                .is_valid(&serde_json::from_slice::<serde_json::Value>(&raw).unwrap());
+            observations.push((version, scenario, status.as_u16(), valid));
+            assert_eq!(
+                backend.readiness_calls.load(Ordering::SeqCst),
+                usize::from(scenario != "stale")
+            );
+            assert_eq!(backend.dispatches.load(Ordering::SeqCst), 0);
+            assert_eq!(backend.bound_calls.load(Ordering::SeqCst), 0);
+            assert!(audit(&store).is_none());
+        }
+    }
+    eprintln!("actual selected status/schema matrix, no dispatch: {observations:?}");
+    assert!(observations.iter().all(|(_, _, _, valid)| *valid), "every selected response must satisfy the schema served for its actual HTTP status, including non-authentication conflicts");
+}
