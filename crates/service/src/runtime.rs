@@ -571,8 +571,9 @@ pub trait ConnectorBackend: Send + Sync + 'static {
     }
 
     /// Validate endpoint policy and current immutable resource identity, then publish or reuse
-    /// non-secret Connection metadata. This is not invocation admission. Never fetch credentials,
-    /// open a tunnel, or dispatch an operation here; those happen behind the ordinary Grant seam.
+    /// non-secret Connection metadata. Source authentication may be used to validate inventory.
+    /// This is not invocation admission: never resolve target credentials, open a tunnel, or
+    /// dispatch the requested operation here; those happen behind the ordinary Grant seam.
     async fn resolve_endpoint(
         &self,
         _context: &PrincipalContext,

@@ -43,7 +43,7 @@ impl LocalClient {
         response::validate_connection_v2_response(&bytes, &request_id)
     }
 
-    async fn versioned_exchange(
+    pub(super) async fn versioned_exchange(
         &self,
         mut bytes: Vec<u8>,
         response_bound: usize,
@@ -138,7 +138,7 @@ impl HostedClient {
         response::validate_connection_v2_response(&bytes, &request_id)
     }
 
-    async fn versioned_exchange(
+    pub(super) async fn versioned_exchange(
         &self,
         endpoint: &Url,
         bearer: &str,
