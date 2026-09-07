@@ -9,12 +9,16 @@ relations:
 - derived_from: epic:subscription-custody
 scope:
 - confidence: cited
+  path: .gitleaksignore
+- confidence: cited
   path: crates/server/src/hosted.rs
 - confidence: cited
   path: crates/server/src/hosted/subscription.rs
 - confidence: cited
   path: crates/subscription-custody/src/lib.rs
-revision: 4
+- confidence: cited
+  path: docs/security/secret-scan-baseline.md
+revision: 6
 ---
 ## Outcome
 
@@ -31,3 +35,7 @@ Custody and hosted regression tests pass; no protocol, runtime configuration, de
 ## Scope
 
 Existing subscription-custody and hosted subscription HTTP error projection plus their regression tests.
+
+## Complete-history secret scan
+
+The compatibility branch retains the deployed protocol and runtime contract. The complete-history scan also reaches newer public mainline refs; two source-digest false positives were already individually reviewed on main. Apply only their exact `.gitleaksignore` fingerprints and the corresponding `docs/security/secret-scan-baseline.md` notes from main, preserving scanner configuration and earlier entries. No unrelated authentication implementation or planning commits are included.
