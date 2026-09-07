@@ -6,7 +6,6 @@ mod claims;
 mod composition;
 mod endpoint_egress;
 mod local_setup;
-mod one_shot;
 mod registry;
 mod service_bundle;
 mod tls_listener;
@@ -19,8 +18,6 @@ pub use composition::{
 pub use connectors_config::{ConfigError, PersonalConfig};
 /// Re-exported so the CLI can describe an acquisition without depending on the adapter directly.
 pub use integration_catalog::argocd;
-pub use one_shot::local_socket_absent;
-pub use server::local::OneShotOperationV3Outcome;
 /// Reviewed outbound MCP service profiles and the factory that binds them into a service bundle.
 pub mod mcp {
     pub use integration_mcp::{

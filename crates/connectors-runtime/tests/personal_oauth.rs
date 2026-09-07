@@ -124,19 +124,6 @@ async fn unsupported_production_registration_refuses_before_readiness_or_oauth_s
     assert!(!state.join("oauth").exists());
 }
 
-#[tokio::test]
-async fn one_shot_create_refuses_before_configuration_custody_and_listener() {
-    let root = tempfile::tempdir().unwrap();
-    let config = config_file(root.path(), "");
-    let state = root.path().join("state");
-    let response = PersonalRuntime::one_shot_connection(&config, &state, owner(), create())
-        .await
-        .unwrap();
-    assert_eq!(response.status, connection::ResponseStatus::Error);
-    assert!(!state.exists());
-    assert!(response.response.is_none());
-}
-
 #[derive(Default)]
 struct Egress {
     replies: Mutex<VecDeque<serde_json::Value>>,

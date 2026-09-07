@@ -5,6 +5,7 @@
 mod catalog_projection;
 pub mod egress;
 pub mod hosted;
+mod legacy_discovery;
 #[cfg(unix)]
 pub mod local;
 #[cfg(unix)]

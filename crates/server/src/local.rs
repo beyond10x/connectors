@@ -29,6 +29,10 @@ mod control;
 #[path = "local_lifecycle_tests.rs"]
 mod lifecycle_tests;
 
+#[cfg(test)]
+#[path = "legacy_discovery_tests.rs"]
+mod legacy_discovery_tests;
+
 /// Bound personal-local daemon. Binding completes before this value is returned, so callers can
 /// publish readiness without racing the accept loop.
 pub struct LocalOperationDaemon<B: ?Sized> {
@@ -63,16 +67,6 @@ impl LocalStateOwnership {
             owner_uid,
             _state_lock: state_lock,
         })
-    }
-
-    /// An ephemeral runtime requires absence even after acquiring the state lock. A socket that
-    /// appeared after the caller's probe is never removed or treated as permission to retry.
-    pub fn require_absent_socket(&self) -> Result<(), LocalDaemonError> {
-        match std::fs::symlink_metadata(&self.socket_path) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-            Ok(_) => Err(LocalDaemonError::AlreadyRunning),
-            Err(error) => Err(error.into()),
-        }
     }
 }
 
@@ -163,206 +157,6 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
         drop(self.listener);
         remove_owned_stale_socket(&self.socket_path, self.owner_uid)?;
         Ok(())
-    }
-}
-
-/// One bounded request using exactly the daemon's framing, principal and dispatch owners.
-pub struct LocalOneShot<B: ?Sized> {
-    backend: Arc<B>,
-    _ownership: LocalStateOwnership,
-}
-
-/// Local presentation provenance, never accepted from a wire or backend error message.
-#[derive(Debug)]
-pub enum OneShotOperationV3Outcome {
-    Reply(protocol::operation::v3::ResponseEnvelope),
-    RequiresDaemon(protocol::operation::v3::ResponseEnvelope),
-}
-impl OneShotOperationV3Outcome {
-    /// Preserve the existing envelope-only API without changing its wire response.
-    pub fn into_response(self) -> protocol::operation::v3::ResponseEnvelope {
-        match self {
-            Self::Reply(response) | Self::RequiresDaemon(response) => response,
-        }
-    }
-}
-
-impl<B: ConnectorBackend + ?Sized> LocalOneShot<B> {
-    pub fn new(ownership: LocalStateOwnership, backend: Arc<B>) -> Result<Self, LocalDaemonError> {
-        ownership.require_absent_socket()?;
-        Ok(Self {
-            backend,
-            _ownership: ownership,
-        })
-    }
-
-    pub async fn operation(
-        self,
-        request: RequestEnvelope,
-    ) -> Result<ResponseEnvelope, LocalDaemonError> {
-        let result = async {
-            if let Err(error) = validate_one_shot_operation(&request) {
-                return Ok(ResponseEnvelope::failure(&request.request_id, error));
-            }
-            if let protocol::operation::OperationRequest::Invoke(invoke) = &request.request {
-                if !self.backend.supports_ephemeral_invocation(invoke) {
-                    return Ok(ResponseEnvelope::failure(
-                        &request.request_id,
-                        daemon_required("operation invoke"),
-                    ));
-                }
-            }
-            let frame = serde_json::to_vec(&request).map_err(io::Error::other)?;
-            let bytes = dispatch_frame(&frame, protocol::operation::CONTRACT, self.backend.clone())
-                .await?
-                .ok_or_else(|| io::Error::other("invalid one-shot operation frame"))?;
-            serde_json::from_slice(&bytes).map_err(|error| io::Error::other(error).into())
-        }
-        .await;
-        self.backend.shutdown().await;
-        result
-    }
-
-    /// One explicit v3 operation, retaining the ordinary backend port and shutdown ownership.
-    pub async fn operation_v3(
-        self,
-        request: protocol::operation::v3::RequestEnvelope,
-    ) -> Result<protocol::operation::v3::ResponseEnvelope, LocalDaemonError> {
-        self.operation_v3_outcome(request)
-            .await
-            .map(OneShotOperationV3Outcome::into_response)
-    }
-
-    /// Retain only receiver-owned daemon requirements for trusted local presentation.
-    pub async fn operation_v3_outcome(
-        self,
-        request: protocol::operation::v3::RequestEnvelope,
-    ) -> Result<OneShotOperationV3Outcome, LocalDaemonError> {
-        use protocol::operation::v3;
-
-        let result = async {
-            if let Some(outcome) = preflight_one_shot_operation_v3(&request) {
-                return Ok(outcome);
-            }
-            if let protocol::operation::OperationRequest::Invoke(invoke) = &request.request {
-                if !self.backend.supports_ephemeral_invocation(invoke) {
-                    return Ok(OneShotOperationV3Outcome::RequiresDaemon(
-                        v3::ResponseEnvelope::failure(
-                            &request.request_id,
-                            daemon_required("operation invoke").into(),
-                        ),
-                    ));
-                }
-            }
-            let frame = serde_json::to_vec(&request).map_err(io::Error::other)?;
-            let bytes = dispatch_frame(&frame, v3::CONTRACT, self.backend.clone())
-                .await?
-                .ok_or_else(|| io::Error::other("invalid one-shot operation frame"))?;
-            let (version, response) = protocol::operation::versions::decode_response(&bytes)
-                .map_err(|_| io::Error::other("invalid one-shot operation response"))?;
-            if version != protocol::operation::versions::Version::V0Alpha3
-                || response.request_id != request.request_id
-            {
-                return Err(io::Error::other("uncorrelated one-shot operation response").into());
-            }
-            Ok(OneShotOperationV3Outcome::Reply(response))
-        }
-        .await;
-        self.backend.shutdown().await;
-        result
-    }
-
-    pub async fn connection(
-        self,
-        request: protocol::connection::RequestEnvelope,
-    ) -> Result<protocol::connection::ResponseEnvelope, LocalDaemonError> {
-        let result = async {
-            if let Err(error) = validate_one_shot_connection(&request) {
-                return Ok(protocol::connection::ResponseEnvelope::failure(
-                    &request.request_id,
-                    error,
-                ));
-            }
-            let frame = serde_json::to_vec(&request).map_err(io::Error::other)?;
-            let bytes =
-                dispatch_frame(&frame, protocol::connection::CONTRACT, self.backend.clone())
-                    .await?
-                    .ok_or_else(|| io::Error::other("invalid one-shot connection frame"))?;
-            serde_json::from_slice(&bytes).map_err(|error| io::Error::other(error).into())
-        }
-        .await;
-        self.backend.shutdown().await;
-        result
-    }
-}
-
-fn daemon_required(method: &str) -> protocol::operation::OperationError {
-    protocol::operation::OperationError::new(protocol::operation::OperationErrorCode::Unavailable,
-        format!("{method} requires a persistent daemon for this operation; run `connectors serve local` with the same --config and --state-root"), false)
-}
-
-/// Check before runtime composition, so known persistent commands cannot initialize adapters.
-pub fn validate_one_shot_operation(
-    request: &RequestEnvelope,
-) -> Result<(), protocol::operation::OperationError> {
-    request.validate()?;
-    persistent_operation_refusal(&request.request).map_or(Ok(()), Err)
-}
-
-fn persistent_operation_refusal(
-    request: &protocol::operation::OperationRequest,
-) -> Option<protocol::operation::OperationError> {
-    use protocol::operation::OperationRequest;
-    match request {
-        OperationRequest::Search(_)
-        | OperationRequest::Describe(_)
-        | OperationRequest::Invoke(_) => None,
-        OperationRequest::SessionStatus(_)
-        | OperationRequest::SessionTerminate(_)
-        | OperationRequest::SessionReconcile(_)
-        | OperationRequest::SessionSignal(_) => Some(daemon_required("operation session control")),
-    }
-}
-
-/// Validate before composition and identify only the shared persistent-command decision.
-pub fn preflight_one_shot_operation_v3(
-    request: &protocol::operation::v3::RequestEnvelope,
-) -> Option<OneShotOperationV3Outcome> {
-    use protocol::operation::v3::ResponseEnvelope;
-    if let Err(error) = request.validate() {
-        return Some(OneShotOperationV3Outcome::Reply(ResponseEnvelope::failure(
-            &request.request_id,
-            error,
-        )));
-    }
-    if let Err(error) = request.clone().into_v2().validate() {
-        return Some(OneShotOperationV3Outcome::Reply(ResponseEnvelope::failure(
-            &request.request_id,
-            error.into(),
-        )));
-    }
-    persistent_operation_refusal(&request.request).map(|error| {
-        OneShotOperationV3Outcome::RequiresDaemon(ResponseEnvelope::failure(
-            &request.request_id,
-            error.into(),
-        ))
-    })
-}
-
-/// Connection metadata is bounded. Activation, materialization and credential acquisition require
-/// the daemon until each adapter can prove custody and continuation survive process exit.
-pub fn validate_one_shot_connection(
-    request: &protocol::connection::RequestEnvelope,
-) -> Result<(), protocol::connection::ConnectionError> {
-    use protocol::connection::{ConnectionError, ConnectionErrorCode, ConnectionRequest};
-    request.validate()?;
-    match &request.request {
-        ConnectionRequest::Search(_) | ConnectionRequest::Describe(_) | ConnectionRequest::CandidateSearch(_)
-        | ConnectionRequest::ObservationSearch(_) => Ok(()),
-        ConnectionRequest::CandidateActivate(_) | ConnectionRequest::Materialize(_)
-        | ConnectionRequest::ConnectSessionCreate(_) | ConnectionRequest::ConnectSessionStatus(_) =>
-            Err(ConnectionError::new(ConnectionErrorCode::Unavailable,
-                "connection activation, materialization and connect sessions require a persistent daemon; run `connectors serve local` with the same --config and --state-root", false)),
     }
 }
 
@@ -503,6 +297,7 @@ async fn local_connection<B: ConnectorBackend + ?Sized>(
     use protocol::connection_v2::{ConnectionRequest as Request, ConnectionResult as Result};
     use service::{RemediationError, RemediationRequest, RemediationResult, RemediationTarget};
     if let Ok(ordinary) = request.clone().into_v1() {
+        crate::legacy_discovery::admit(&ordinary.request)?;
         return backend
             .handle_connection(context, ordinary.request)
             .await
@@ -1039,7 +834,7 @@ mod tests {
     pub(super) struct SyntheticBackend {
         pub(super) shutdown: AtomicBool,
         pub(super) operation_calls: AtomicU64,
-        connection_called: AtomicBool,
+        pub(super) connection_called: AtomicBool,
         event_called: AtomicBool,
     }
 
@@ -1109,101 +904,13 @@ mod tests {
         (root.join("connectors.sock"), root)
     }
 
-    fn context() -> OwnerContext {
+    pub(super) fn context() -> OwnerContext {
         OwnerContext {
             tenant_id: "tenant-local".to_owned(),
             agent_id: "agent-dev".to_owned(),
             agent_revision: 1,
             authority_snapshot_id: "authority-1".to_owned(),
             authority_snapshot_sha256: "a".repeat(64),
-        }
-    }
-
-    #[tokio::test]
-    async fn auth_one_shot_v3_serves_a_real_result_and_joins_shutdown() {
-        let (socket, root) = temporary_socket();
-        let backend = Arc::new(SyntheticBackend::default());
-        let request = protocol::operation::v3::RequestEnvelope {
-            protocol: protocol::operation::v3::CONTRACT.into(),
-            request_id: "one-shot-v3-search".into(),
-            context: context(),
-            request: OperationRequest::Search(SearchRequest {
-                query: "sip".into(),
-                limit: 10,
-            }),
-        };
-        let response = LocalOneShot::new(
-            LocalStateOwnership::acquire(&socket).unwrap(),
-            backend.clone(),
-        )
-        .unwrap()
-        .operation_v3(request)
-        .await
-        .unwrap();
-        response.validate().unwrap();
-        assert_eq!(response.protocol, protocol::operation::v3::CONTRACT);
-        assert_eq!(response.request_id, "one-shot-v3-search");
-        let Some(OperationResult::Search { operations }) = response.response else {
-            panic!("the real one-shot backend result must survive the v3 transport");
-        };
-        assert_eq!(operations.len(), 1);
-        assert_eq!(operations[0].operation_ref, "sip.dial");
-        assert_eq!(backend.operation_calls.load(Ordering::SeqCst), 1);
-        assert!(backend.shutdown.load(Ordering::Acquire));
-        assert!(!socket.exists());
-        std::fs::remove_file(root.join(".connectors.lock")).unwrap();
-        std::fs::remove_dir(root).unwrap();
-    }
-
-    #[tokio::test]
-    async fn auth_one_shot_v3_refuses_before_backend_work_and_joins_shutdown() {
-        use protocol::operation::v3::OperationErrorCode as Code;
-
-        for (protocol, request, expected) in [
-            (
-                protocol::operation::v3::CONTRACT,
-                OperationRequest::SessionStatus(protocol::operation::SessionRequest {
-                    execution_ref: "execution:fixture".into(),
-                }),
-                Code::Unavailable,
-            ),
-            (
-                "b10x.connector-operation.v0alpha99",
-                OperationRequest::Search(SearchRequest {
-                    query: "sip".into(),
-                    limit: 10,
-                }),
-                Code::Protocol,
-            ),
-        ] {
-            let (socket, root) = temporary_socket();
-            let backend = Arc::new(SyntheticBackend::default());
-            let response = LocalOneShot::new(
-                LocalStateOwnership::acquire(&socket).unwrap(),
-                backend.clone(),
-            )
-            .unwrap()
-            .operation_v3(protocol::operation::v3::RequestEnvelope {
-                protocol: protocol.into(),
-                request_id: "one-shot-v3-refusal".into(),
-                context: context(),
-                request,
-            })
-            .await
-            .unwrap();
-            response.validate().unwrap();
-            assert_eq!(response.protocol, protocol::operation::v3::CONTRACT);
-            assert_eq!(response.request_id, "one-shot-v3-refusal");
-            assert!(response.response.is_none());
-            let error = response.error.unwrap();
-            assert_eq!(error.code, expected);
-            assert!(!error.retriable);
-            assert!(error.authentication.is_none());
-            assert_eq!(backend.operation_calls.load(Ordering::SeqCst), 0);
-            assert!(backend.shutdown.load(Ordering::Acquire));
-            assert!(!socket.exists());
-            std::fs::remove_file(root.join(".connectors.lock")).unwrap();
-            std::fs::remove_dir(root).unwrap();
         }
     }
 
@@ -1334,17 +1041,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn auth_one_shot_v3_need_precedes_dispatch_and_joins_shutdown() {
+    async fn auth_socket_v3_need_precedes_dispatch_and_joins_shutdown() {
         let (socket, root) = temporary_socket();
         let backend = Arc::new(AuthenticationBackend {
             shutdown: false.into(),
             readiness: 0.into(),
             dispatch: 0.into(),
         });
-        let ownership = LocalStateOwnership::acquire(&socket).unwrap();
         let request = protocol::operation::v3::RequestEnvelope {
             protocol: protocol::operation::v3::CONTRACT.into(),
-            request_id: "auth:one-shot".into(),
+            request_id: "auth:socket".into(),
             context: context(),
             request: protocol::operation::OperationRequest::Invoke(
                 protocol::operation::InvokeRequest {
@@ -1356,11 +1062,26 @@ mod tests {
                 },
             ),
         };
-        let response = LocalOneShot::new(ownership, backend.clone())
-            .unwrap()
-            .operation_v3(request)
+        let daemon = LocalOperationDaemon::bind(&socket, backend.clone())
             .await
             .unwrap();
+        let (stop, stopped) = oneshot::channel();
+        let serving = tokio::spawn(daemon.serve_until(async {
+            let _ = stopped.await;
+        }));
+        let mut stream = UnixStream::connect(&socket).await.unwrap();
+        let mut bytes = serde_json::to_vec(&request).unwrap();
+        bytes.push(b'\n');
+        stream.write_all(&bytes).await.unwrap();
+        let mut response = String::new();
+        BufReader::new(stream)
+            .read_line(&mut response)
+            .await
+            .unwrap();
+        let response: protocol::operation::v3::ResponseEnvelope =
+            serde_json::from_str(&response).unwrap();
+        stop.send(()).unwrap();
+        serving.await.unwrap().unwrap();
         std::fs::remove_dir_all(root).unwrap();
         assert!(backend.shutdown.load(Ordering::SeqCst));
         assert!(!socket.exists());

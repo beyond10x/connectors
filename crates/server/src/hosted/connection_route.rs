@@ -158,6 +158,9 @@ async fn ordinary(
             StatusCode::FORBIDDEN,
         );
     }
+    if let Err(refusal) = crate::legacy_discovery::admit(&request.request) {
+        return failure(&request.request_id, refusal, StatusCode::GONE);
+    }
     let response = match state
         .backend
         .handle_connection(owner, request.request)
