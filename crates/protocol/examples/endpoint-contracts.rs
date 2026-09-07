@@ -22,6 +22,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (name, version, schema) in [
         (
+            "connector-event",
+            "v0alpha2",
+            protocol::event::schema_v2::event_v2_schema(),
+        ),
+        (
             "connector-endpoint",
             "v0alpha1",
             protocol::endpoint_schema::endpoint_schema(),
@@ -36,6 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let schema_path = format!("{directory}/{name}.schema.json");
         let schema = bytes(&schema);
         if args.write {
+            fs::create_dir_all(root.join(&directory))?;
             fs::write(root.join(&schema_path), &schema)?;
         }
         if fs::read(root.join(&schema_path))? != schema {
