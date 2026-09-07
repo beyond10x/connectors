@@ -62,7 +62,7 @@ impl EndpointEgressFactory for Factory {
     }
 }
 
-fn owner() -> PrincipalContext {
+pub(super) fn owner() -> PrincipalContext {
     PrincipalContext::local(&operation::OwnerContext {
         tenant_id: "tenant-endpoints".to_owned(),
         agent_id: "agent-endpoints".to_owned(),
@@ -227,7 +227,7 @@ use k8s_openapi::api::core::v1::Service;
 use kube::Client;
 use serde_json::{json, Value};
 
-fn service(name: &str, uid: &str, ports: Value) -> Service {
+pub(super) fn service(name: &str, uid: &str, ports: Value) -> Service {
     serde_json::from_value(
         json!({"metadata":{"name":name,"namespace":"apps","uid":uid},
         "spec":{"selector":{"app":name},"ports":ports}}),
@@ -235,7 +235,7 @@ fn service(name: &str, uid: &str, ports: Value) -> Service {
     .unwrap()
 }
 
-fn client(respond: impl Fn(&str) -> (u16, Value) + Send + Sync + 'static) -> Client {
+pub(super) fn client(respond: impl Fn(&str) -> (u16, Value) + Send + Sync + 'static) -> Client {
     let respond = Arc::new(respond);
     let service = tower::service_fn(move |request: http::Request<kube::client::Body>| {
         assert_eq!(request.method(), http::Method::GET);
@@ -253,14 +253,14 @@ fn client(respond: impl Fn(&str) -> (u16, Value) + Send + Sync + 'static) -> Cli
     Client::new(service, "apps")
 }
 
-fn absent() -> (u16, Value) {
+pub(super) fn absent() -> (u16, Value) {
     (
         404,
         json!({"apiVersion":"v1","kind":"Status","status":"Failure","reason":"NotFound","code":404,"message":"not installed"}),
     )
 }
 
-fn source(client: Client, store: Arc<dyn StateStore>) -> KubernetesEndpointSource {
+pub(super) fn source(client: Client, store: Arc<dyn StateStore>) -> KubernetesEndpointSource {
     KubernetesEndpointSource::new(
         client,
         "source:cluster".to_owned(),

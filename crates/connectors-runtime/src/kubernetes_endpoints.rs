@@ -20,6 +20,9 @@ use integration_kubernetes::endpoints::{
     ResolvedEndpointCredentials,
 };
 
+#[path = "kubernetes_endpoint_events.rs"]
+mod events;
+
 /// Runtime composition supplies the network aperture. Integrations do not create an HTTP client.
 pub trait EndpointEgressFactory: Send + Sync + 'static {
     fn transport(
@@ -36,6 +39,7 @@ pub struct KubernetesEndpointBackend {
     egress: Arc<dyn EndpointEgressFactory>,
     reconciliation: Option<tokio::task::JoinHandle<()>>,
     initial_refresh: Option<tokio::task::JoinHandle<()>>,
+    events: Arc<events::EndpointEvents>,
 }
 
 impl KubernetesEndpointBackend {
@@ -59,12 +63,14 @@ impl KubernetesEndpointBackend {
                 }
             })
         });
+        let events = Arc::new(events::EndpointEvents::new(&source));
         Self {
             source,
             policy,
             egress,
             reconciliation,
             initial_refresh: None,
+            events,
         }
     }
 
@@ -77,10 +83,6 @@ impl KubernetesEndpointBackend {
             }
         }));
         self
-    }
-
-    pub fn source(&self) -> &Arc<KubernetesEndpointSource> {
-        &self.source
     }
 
     fn endpoints(&self, context: &PrincipalContext) -> Result<Vec<Endpoint>, OperationError> {
@@ -306,6 +308,7 @@ impl KubernetesEndpointBackend {
 
 impl Drop for KubernetesEndpointBackend {
     fn drop(&mut self) {
+        self.events.stop_all();
         if let Some(task) = &self.reconciliation {
             task.abort();
         }
@@ -324,8 +327,33 @@ impl ConnectorBackend for KubernetesEndpointBackend {
     fn capabilities(&self) -> service::BackendCapabilities {
         service::BackendCapabilities {
             connections: true,
+            events: true,
             ..service::BackendCapabilities::OPERATIONS
         }
+    }
+
+    fn owns_event(&self, request: &protocol::event::EventRequest) -> bool {
+        self.owns_endpoint_event(request)
+    }
+
+    async fn handle_event(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::event::EventRequest,
+    ) -> Result<protocol::event::EventResult, protocol::event::EventError> {
+        self.endpoint_event(context, request).await
+    }
+
+    fn owns_event_v2(&self, request: &protocol::event::v2::EventRequest) -> bool {
+        self.owns_endpoint_event_v2(request)
+    }
+
+    async fn handle_event_v2(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::event::v2::EventRequest,
+    ) -> Result<protocol::event::v2::EventResult, protocol::event::EventError> {
+        self.endpoint_event_v2(context, request).await
     }
 
     fn owns_endpoint(&self, request: &EndpointRequest) -> bool {

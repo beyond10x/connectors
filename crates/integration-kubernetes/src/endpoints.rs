@@ -149,6 +149,11 @@ impl KubernetesEndpointSource {
         &self.source_ref
     }
 
+    /// The runtime-provided metadata port, shared with bounded endpoint event receipts.
+    pub fn metadata_store(&self) -> Arc<dyn StateStore> {
+        self.store.clone()
+    }
+
     pub fn admits_namespace(&self, namespace: &str) -> bool {
         dns_name(namespace) && (self.all_namespaces || self.namespaces.contains(namespace))
     }
