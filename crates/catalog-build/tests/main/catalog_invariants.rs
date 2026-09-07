@@ -796,7 +796,7 @@ fn every_canonical_document_validates_against_the_committed_schema() {
     let schema_text = planned(
         &workspace,
         &plan,
-        "catalog/connector-document-v4.schema.json",
+        "catalog/connector-document-v5.schema.json",
     );
     let schema: Value = serde_json::from_str(schema_text).expect("the schema is JSON");
     let validator = jsonschema::validator_for(&schema).expect("the schema compiles");
@@ -3010,7 +3010,7 @@ fn personal_acquisition_schema_four_preserves_actual_provider_uri_vectors_and_co
     };
     let baseline_operation = find(&baseline);
     let source_schema: Value = serde_json::from_str(include_str!(
-        "../../../../catalog/connector-document-v4.schema.json"
+        "../../../../catalog/connector-document-v5.schema.json"
     ))
     .unwrap();
     let validator = jsonschema::options()

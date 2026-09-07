@@ -349,7 +349,7 @@ fn refusal_coverage_refusals(
 ///
 /// `naming.wire` is not decoration: it is the address, taken verbatim, by everything downstream
 /// that turns this specification into an artifact. Each command that carries one is cited by this
-/// document to a variant of `ConnectionRequest` or `OperationRequest`, and both enums are
+/// document to a variant of `EndpointRequest` or `OperationRequest`, and both enums are
 /// `#[serde(tag = "method", rename_all = "snake_case")]`, so the word a caller puts on the wire is
 /// that variant in snake_case. The frozen contract vectors spell the same words out:
 /// `contracts/connector-connection/v0alpha1/vectors.json` carries
@@ -360,9 +360,9 @@ fn refusal_coverage_refusals(
 fn every_declared_wire_name_is_a_method_the_protocol_accepts() {
     let root = workspace_root();
 
-    let connection = read(&root, "crates/protocol/src/connection.rs");
+    let connection = read(&root, "crates/protocol/src/endpoint.rs");
     let operation = read(&root, "crates/protocol/src/operation/legacy.rs");
-    let mut accepted = variants(&connection, "ConnectionRequest")
+    let mut accepted = variants(&connection, "EndpointRequest")
         .iter()
         .chain(variants(&operation, "OperationRequest").iter())
         .map(|variant| snake_case(variant))
@@ -411,10 +411,10 @@ fn every_declared_wire_name_is_a_method_the_protocol_accepts() {
 /// `fn materialize` and the declaration that is a claim about it.
 fn materialize() -> (String, String, usize, Vec<(usize, String)>) {
     let root = workspace_root();
-    let declared = read(&root, "ess/system/domains/connection.yaml");
-    let (_, declaration) = declaration(&declared, "connectors.connection.MaterializeObservation");
+    let declared = read(&root, "ess/system/domains/endpoint.yaml");
+    let (_, declaration) = declaration(&declared, "connectors.endpoint.MaterializeObservation");
     let source = read(&root, "crates/integration-monitoring/src/backend.rs");
-    let (first, _, body) = item(&source, "fn materialize(&self, observation_ref: &str) -> Result<ConnectionDescription, ConnectionError> {")
+    let (first, _, body) = item(&source, "fn materialize(&self, observation_ref: &str) -> Result<EndpointDescription, EndpointError> {")
         .expect("`fn materialize` is declared in crates/integration-monitoring/src/backend.rs");
     (declared, declaration, first, refusal_sites(first, &body))
 }
@@ -437,9 +437,9 @@ fn session_terminate() -> (String, String, usize, Vec<(usize, String)>) {
 fn materialize_declares_or_marks_every_refusal_its_cited_function_performs() {
     let (_, declaration, first, sites) = materialize();
     let refusals = refusal_coverage_refusals(
-        "ess/system/domains/connection.yaml",
+        "ess/system/domains/endpoint.yaml",
         &declaration,
-        "connectors.connection.MaterializeObservation",
+        "connectors.endpoint.MaterializeObservation",
         "crates/integration-monitoring/src/backend.rs",
         "fn materialize",
         first,
@@ -451,7 +451,7 @@ fn materialize_declares_or_marks_every_refusal_its_cited_function_performs() {
 /// **Deleting `MaterializeObservation`'s declared refusal outcomes is refused.**
 ///
 /// The construction an independent review made against the shipped fence, which stayed green: the
-/// three refusal outcomes were removed from `ess/system/domains/connection.yaml` and nothing
+/// three refusal outcomes were removed from `ess/system/domains/endpoint.yaml` and nothing
 /// failed, because the assertion was `!declared.contains(claim) || …` and the claim had already
 /// left the document. The deletion is made here against the text rather than the file, so the
 /// case is permanent and needs no probe.
@@ -461,9 +461,9 @@ fn deleting_materializes_declared_refusal_outcomes_is_refused() {
     let cut = without_error_outcomes(&declaration);
     assert_ne!(cut, declaration, "the deletion has to change the text");
     let refusals = refusal_coverage_refusals(
-        "ess/system/domains/connection.yaml",
+        "ess/system/domains/endpoint.yaml",
         &cut,
-        "connectors.connection.MaterializeObservation",
+        "connectors.endpoint.MaterializeObservation",
         "crates/integration-monitoring/src/backend.rs",
         "fn materialize",
         first,
@@ -527,8 +527,8 @@ fn deleting_session_terminates_declared_refusal_outcomes_is_refused() {
 fn deleting_the_sentence_that_counts_the_refusal_sites_is_refused() {
     for (document, command, path, function, declaration, first, sites) in [
         (
-            "ess/system/domains/connection.yaml",
-            "connectors.connection.MaterializeObservation",
+            "ess/system/domains/endpoint.yaml",
+            "connectors.endpoint.MaterializeObservation",
             "crates/integration-monitoring/src/backend.rs",
             "fn materialize",
             materialize().1,
@@ -634,7 +634,7 @@ fn hosted_failed_writers() -> Vec<String> {
 
 /// **The hosted registry never reaches `Failed`, and the document says so in those words.**
 ///
-/// `ess/system/domains/connection.yaml` states that the hosted registry does not assign
+/// `ess/system/domains/endpoint.yaml` states that the hosted registry does not assign
 /// `ConnectSessionState::Failed`, while the service lifecycle owns that assignment. Both halves
 /// are asserted against the named service function, and the sentence itself
 /// is asserted to be there: an earlier revision of this check read
@@ -649,14 +649,14 @@ fn hosted_failed_refusals(declared: &str, writers: &[String], other_registry: &s
     let mut refusals = Vec::new();
     if !prose.contains(CLAIM) {
         refusals.push(format!(
-            "ess/system/domains/connection.yaml has to state \"{CLAIM}\"; the `ConnectSession` \
+            "ess/system/domains/endpoint.yaml has to state \"{CLAIM}\"; the `ConnectSession` \
              marker is what tells the next reader that half of the hosted terminal set is \
              unreachable, and a marker that stops saying it leaves the reader to guess"
         ));
     }
     if !prose.contains(ELSEWHERE) {
         refusals.push(format!(
-            "ess/system/domains/connection.yaml has to state \"{ELSEWHERE}\", which is the other \
+            "ess/system/domains/endpoint.yaml has to state \"{ELSEWHERE}\", which is the other \
              half of the same fact"
         ));
     }
@@ -680,7 +680,7 @@ fn hosted_failed_refusals(declared: &str, writers: &[String], other_registry: &s
 #[test]
 fn the_hosted_registry_never_reaches_the_state_its_marker_says_it_cannot() {
     let root = workspace_root();
-    let declared = read(&root, "ess/system/domains/connection.yaml");
+    let declared = read(&root, "ess/system/domains/endpoint.yaml");
     let other = read(&root, "crates/service/src/connect_session.rs");
     let (_, _, line) = item(&other, "pub fn fail_pending(&mut self) -> Vec<String> {")
         .expect("named service lifecycle owner");
@@ -693,7 +693,7 @@ fn the_hosted_registry_never_reaches_the_state_its_marker_says_it_cannot() {
 #[test]
 fn the_hosted_failed_claim_is_refused_from_either_side() {
     let root = workspace_root();
-    let declared = read(&root, "ess/system/domains/connection.yaml");
+    let declared = read(&root, "ess/system/domains/endpoint.yaml");
     let other = read(&root, "crates/service/src/connect_session.rs");
     let (_, _, line) = item(&other, "pub fn fail_pending(&mut self) -> Vec<String> {")
         .expect("named service lifecycle owner");

@@ -80,7 +80,7 @@ fn validate_graph_nodes(connector: &Connector, graph: &Graph, problems: &mut Vec
                     problems,
                 );
             }
-            NodeKind::Endpoint { binding } => {
+            NodeKind::EndpointInventoryEntry { binding } => {
                 resolve_member(
                     connector,
                     graph,

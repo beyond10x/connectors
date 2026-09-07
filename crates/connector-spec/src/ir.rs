@@ -2425,7 +2425,7 @@ impl Connector {
     /// # Errors
     ///
     /// A reason string when the tenant id is unusable, when `credential` is not one this connector
-    /// declares, or when the tenant holds several connections and the reference names none — that
+    /// declares, or when the tenant holds several endpoints and the reference names none — that
     /// last one lists the uuids that would have worked rather than picking one.
     pub fn credential_ref_for(
         &self,

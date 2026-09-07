@@ -84,7 +84,7 @@ pub(super) fn validate_config(connector: &Connector, problems: &mut Vec<String>)
                 ));
             }
             match field.binding() {
-                Some(Binding::Endpoint { variable }) => {
+                Some(Binding::EndpointInventoryEntry { variable }) => {
                     let base_url = connector.base_url_of(&field.service);
                     let placeholder = format!("{{{variable}}}");
                     if !base_url.starts_with(&placeholder)
@@ -333,7 +333,7 @@ fn validate_also_services(connector: &Connector, field: &ConfigField, problems: 
     }
     let name = field.name.as_str();
 
-    if !matches!(field.binding(), Some(Binding::Endpoint { .. })) {
+    if !matches!(field.binding(), Some(Binding::EndpointInventoryEntry { .. })) {
         problems.push(format!(
             "configuration field {name:?} declares `also_services`, but binds {:?} rather than an \
              `endpoint.<variable>`. Only a base-URL placeholder exists once per service and can \
@@ -443,7 +443,7 @@ fn validate_one_binding(
     };
 
     match binding {
-        Binding::Endpoint { variable } => {
+        Binding::EndpointInventoryEntry { variable } => {
             let declared: Vec<&str> = connector
                 .service_names()
                 .into_iter()
@@ -894,7 +894,7 @@ fn validate_every_template_variable_is_asked_for(
             // neither admits an `also_binds` — a further destination is a request position by
             // construction, so a header pin still does not bind a hostname.
             let bound = connector.config_filling(service).any(|field| {
-                matches!(field.binding(), Some(Binding::Endpoint { variable: v }) if v == variable)
+                matches!(field.binding(), Some(Binding::EndpointInventoryEntry { variable: v }) if v == variable)
             });
             if !bound {
                 let where_ = if service == DEFAULT_SERVICE {

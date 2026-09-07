@@ -77,6 +77,7 @@ mod request;
 mod resolve;
 mod slot;
 mod template;
+pub mod webhook;
 
 pub use channel::{channel_plan, channel_plan_for_endpoint, PreparedChannelPlan};
 pub use config::{ConfigField, ConfigPort, ConfigValue};

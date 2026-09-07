@@ -213,7 +213,7 @@ fn the_default_service_is_elided_and_the_elision_stays_unambiguous() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// One tenant, two connections to the same connector (C-406)
+// One tenant, two endpoints to the same connector (C-406)
 // ---------------------------------------------------------------------------------------------
 
 /// The tenant that holds them. A uuid, because a real one is.
@@ -257,7 +257,7 @@ fn two_instances_of_one_connector_for_one_tenant_render_different_addresses() {
     assert_ne!(
         TenantLayout.render(&us),
         TenantLayout.render(&eu),
-        "two connections of one connector, for one tenant, must not share an address"
+        "two endpoints of one connector, for one tenant, must not share an address"
     );
     assert_eq!(
         TenantLayout.render(&us),
@@ -318,7 +318,7 @@ fn a_single_instance_address_is_byte_identical_to_the_four_component_form() {
     );
 }
 
-/// **The ambiguous case refuses.** Two connections and a reference naming neither has no answer, and
+/// **The ambiguous case refuses.** Two endpoints and a reference naming neither has no answer, and
 /// the refusal names the ones that would have worked rather than picking one.
 #[test]
 fn several_instances_and_no_uuid_is_a_refusal_naming_what_would_have_worked() {
@@ -331,7 +331,7 @@ fn several_instances_and_no_uuid_is_a_refusal_naming_what_would_have_worked() {
             "zendesk.api_token",
             TenantInstances::held(&held, None),
         )
-        .expect_err("two connections and no uuid has no address");
+        .expect_err("two endpoints and no uuid has no address");
     let message = refusal.to_string();
 
     assert!(

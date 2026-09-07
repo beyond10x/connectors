@@ -42,7 +42,7 @@
 //! ```
 //!
 //! Two optional levels, and each stays unambiguous a different way. The service elides exactly as it
-//! does in a gid. The instance — which of a tenant's connections, when it holds more than one
+//! does in a gid. The instance — which of a tenant's endpoints, when it holds more than one
 //! (C-406) — is two segments led by `@instances`, a marker no component's grammar can spell, so the
 //! instanced and un-instanced forms cannot even be the same length. It carries **no `api_version`**,
 //! deliberately: a token must survive the vendor's v2 migration.
