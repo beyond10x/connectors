@@ -164,6 +164,46 @@ fn kubernetes_datasource_ref(reference: &str) -> bool {
 
 #[async_trait]
 impl ConnectorBackend for KubernetesStatusBackend {
+    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+        self.endpoint_backend
+            .as_ref()
+            .is_some_and(|backend| backend.owns_endpoint(request))
+    }
+
+    async fn handle_endpoint(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::endpoint::EndpointRequest,
+    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        let backend = self.endpoint_backend.as_ref().ok_or_else(|| {
+            protocol::endpoint::EndpointError::new(
+                protocol::endpoint::EndpointErrorCode::Unavailable,
+                "Kubernetes endpoint discovery is not configured",
+                false,
+            )
+        })?;
+        backend.handle_endpoint(context, request).await
+    }
+
+    async fn resolve_endpoint(
+        &self,
+        context: &PrincipalContext,
+        endpoint_ref: &str,
+        operation_ref: &str,
+    ) -> Result<String, OperationError> {
+        self.endpoint_backend
+            .as_ref()
+            .ok_or_else(|| {
+                OperationError::new(
+                    OperationErrorCode::Unavailable,
+                    "Kubernetes endpoint discovery is not configured",
+                    false,
+                )
+            })?
+            .resolve_endpoint(context, endpoint_ref, operation_ref)
+            .await
+    }
+
     async fn ready(&self) -> Result<(), service::BackendReadinessError> {
         // Construction validates in-cluster trust and client configuration. Kubernetes API
         // availability is provider health and remains an operation-level degradation.
@@ -180,6 +220,13 @@ impl ConnectorBackend for KubernetesStatusBackend {
     }
 
     fn owns_operation(&self, request: &OperationRequest) -> bool {
+        if self
+            .endpoint_backend
+            .as_ref()
+            .is_some_and(|backend| backend.owns_operation(request))
+        {
+            return true;
+        }
         match request {
             OperationRequest::Describe(request) => {
                 matches!(
@@ -202,6 +249,13 @@ impl ConnectorBackend for KubernetesStatusBackend {
     }
 
     fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+        if self
+            .endpoint_backend
+            .as_ref()
+            .is_some_and(|backend| backend.owns_connection(request))
+        {
+            return true;
+        }
         matches!(request, ConnectionRequest::Describe(request) if request.connection_ref == CONNECTION)
     }
 
@@ -224,6 +278,15 @@ impl ConnectorBackend for KubernetesStatusBackend {
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
         self.require_owner(context)?;
+        if !matches!(request, OperationRequest::Search(_)) {
+            if let Some(backend) = self
+                .endpoint_backend
+                .as_ref()
+                .filter(|backend| backend.owns_operation(&request))
+            {
+                return backend.handle(context, request).await;
+            }
+        }
         match request {
             OperationRequest::Search(search) => {
                 let query = search.query.to_ascii_lowercase();
@@ -249,6 +312,16 @@ impl ConnectorBackend for KubernetesStatusBackend {
                 if matches_query && self.has_restart_access(context) {
                     operations.push(restart_summary());
                 }
+                if let Some(backend) = &self.endpoint_backend {
+                    if let OperationResult::Search {
+                        operations: discovered,
+                    } = backend
+                        .handle(context, OperationRequest::Search(search.clone()))
+                        .await?
+                    {
+                        operations.extend(discovered);
+                    }
+                }
                 operations.truncate(usize::from(search.limit));
                 Ok(OperationResult::Search { operations })
             }
@@ -270,6 +343,15 @@ impl ConnectorBackend for KubernetesStatusBackend {
         request: ConnectionRequest,
     ) -> Result<ConnectionResult, ConnectionError> {
         self.require_connection_owner(context)?;
+        if !matches!(request, ConnectionRequest::Search(_)) {
+            if let Some(backend) = self
+                .endpoint_backend
+                .as_ref()
+                .filter(|backend| backend.owns_connection(&request))
+            {
+                return backend.handle_connection(context, request).await;
+            }
+        }
         if !self.has_read_access(context) {
             return Err(ConnectionError::new(
                 ConnectionErrorCode::NotGranted,
@@ -280,14 +362,25 @@ impl ConnectorBackend for KubernetesStatusBackend {
         match request {
             ConnectionRequest::Search(search) => {
                 let query = search.query.to_ascii_lowercase();
-                let connections = (query.is_empty()
+                let mut connections = (query.is_empty()
                     || ["kubernetes", "development", "cluster", "read-only"]
                         .iter()
                         .any(|term| query.contains(term)))
                 .then(control_connection)
                 .into_iter()
                 .take(usize::from(search.limit))
-                .collect();
+                .collect::<Vec<_>>();
+                if let Some(backend) = &self.endpoint_backend {
+                    if let ConnectionResult::Search {
+                        connections: discovered,
+                    } = backend
+                        .handle_connection(context, ConnectionRequest::Search(search.clone()))
+                        .await?
+                    {
+                        connections.extend(discovered);
+                    }
+                }
+                connections.truncate(usize::from(search.limit));
                 Ok(ConnectionResult::Search { connections })
             }
             ConnectionRequest::Describe(ConnectionDescribeRequest { connection_ref })

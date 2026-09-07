@@ -13,13 +13,18 @@ workspace = "../connectors-runtime"
 [dependencies]
 async-trait = "0.1"
 connector-resolve = { version = "0.7.2", path = "../connector-resolve" }
+connector-state = { version = "0.7.2", path = "../connector-state" }
+connector-secrets = { version = "0.7.2", path = "../connector-secrets" }
+integration-catalog = { version = "0.7.2", path = "../integration-catalog" }
+driver-sql = { version = "0.7.2", path = "../driver-sql" }
+catalog = { version = "0.7.2", path = "../catalog" }
 connectors-config = { version = "0.7.2", path = "../connectors-config" }
 domain = { version = "0.7.2", path = "../domain" }
 futures-util = "0.3"
 hex = "0.4"
 http = "1"
 k8s-openapi = { version = "0.28", features = ["v1_32"] }
-kube = { version = "4.0", default-features = false, features = ["client", "rustls-tls", "ring"] }
+kube = { version = "4.0", default-features = false, features = ["client", "rustls-tls", "ring", "ws"] }
 monitoring-model = { version = "0.7.2", path = "../monitoring-model" }
 protocol = { version = "0.7.2", path = "../protocol" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
@@ -28,7 +33,8 @@ serde_json = "1"
 service = { version = "0.7.2", path = "../service" }
 sha2 = "0.10"
 thiserror = "2"
-tokio = { version = "1", default-features = false, features = ["macros", "rt", "sync", "time"] }
+tokio = { version = "1", default-features = false, features = ["macros", "rt", "sync", "time", "net", "io-util"] }
+toml = "0.8"
 url = "2"
 zeroize = "1"
 

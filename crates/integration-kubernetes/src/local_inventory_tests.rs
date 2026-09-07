@@ -71,6 +71,8 @@ mod inventory_tests {
                 grant_ref: "grant:kubernetes:inventory".into(),
                 initiation: InitiationConfig::Platform,
                 namespaces: namespaces.iter().map(|value| (*value).to_owned()).collect(),
+                all_namespaces: false,
+                selected_context: None,
                 target_grants: BTreeMap::new(),
                 allow_exec_auth: false,
                 resource_limit: 256,
@@ -79,6 +81,9 @@ mod inventory_tests {
             state: Mutex::new(state),
             activation: tokio::sync::Mutex::new(()),
             workloads: WorkloadSurface::default(),
+            endpoint_state: None,
+            endpoint_egress: None,
+            endpoint_backend: Mutex::new(None),
         }
     }
 

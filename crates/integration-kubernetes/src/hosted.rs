@@ -68,6 +68,8 @@ pub struct KubernetesStatusBackend {
     /// Its own store: a paging cursor is issued by one datasource and must not resolve in the
     /// other, even for the same namespace and principal.
     database_cursors: CursorStore,
+    endpoint_backend: Option<Arc<crate::endpoints::KubernetesEndpointBackend>>,
+    endpoint_client_config: Option<kube::Config>,
 }
 
 #[derive(Clone)]
@@ -115,6 +117,15 @@ impl KubernetesStatusBackend {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|_| KubernetesBackendError::HttpClient)?;
+        let token_file = token_file.into();
+        let mut endpoint_client_config = kube::Config::new(
+            base.as_str()
+                .parse()
+                .map_err(|_| KubernetesBackendError::MissingService)?,
+        );
+        endpoint_client_config.root_cert_file = Some(ca_file.to_path_buf());
+        endpoint_client_config.auth_info.token_file =
+            Some(token_file.to_string_lossy().into_owned());
         Ok(Self {
             expected_tenant,
             namespace_access,
@@ -122,10 +133,12 @@ impl KubernetesStatusBackend {
             reader: Arc::new(InClusterReader {
                 client,
                 base,
-                token_file: token_file.into(),
+                token_file,
             }),
             cursors: CursorStore::default(),
             database_cursors: CursorStore::default(),
+            endpoint_backend: None,
+            endpoint_client_config: Some(endpoint_client_config),
         })
     }
 
@@ -145,7 +158,53 @@ impl KubernetesStatusBackend {
             reader,
             cursors: CursorStore::default(),
             database_cursors: CursorStore::default(),
+            endpoint_backend: None,
+            endpoint_client_config: None,
         })
+    }
+
+    /// Attach the same source/registry/resolver used locally with service-account authentication.
+    pub async fn with_endpoint_discovery(
+        mut self,
+        state: Arc<dyn connector_state::StateStore>,
+        target_grants: BTreeMap<String, String>,
+        egress: Arc<dyn crate::endpoints::EndpointEgressFactory>,
+    ) -> Result<Self, KubernetesBackendError> {
+        let config = self
+            .endpoint_client_config
+            .take()
+            .ok_or(KubernetesBackendError::MissingService)?;
+        let client =
+            kube::Client::try_from(config).map_err(|_| KubernetesBackendError::HttpClient)?;
+        let source = Arc::new(
+            crate::endpoints::KubernetesEndpointSource::new(
+                client,
+                CONNECTION.to_owned(),
+                self.namespace_access.keys().cloned().collect(),
+                false,
+                target_grants,
+                state,
+                crate::endpoints::EndpointPlacement::Hosted,
+            )
+            .map_err(|_| KubernetesBackendError::InvalidPolicy)?,
+        );
+        source
+            .refresh()
+            .await
+            .map_err(|_| KubernetesBackendError::HttpClient)?;
+        let policy = crate::endpoints::EndpointPrincipalPolicy::Hosted {
+            tenant: self.expected_tenant.clone(),
+            namespace_groups: self
+                .namespace_access
+                .iter()
+                .map(|(namespace, policy)| (namespace.clone(), policy.read_groups.clone()))
+                .collect(),
+            operator_groups: self.operator_groups.clone(),
+        };
+        self.endpoint_backend = Some(Arc::new(crate::endpoints::KubernetesEndpointBackend::new(
+            source, policy, egress,
+        )));
+        Ok(self)
     }
 
     fn require_owner(&self, context: &PrincipalContext) -> Result<(), OperationError> {
