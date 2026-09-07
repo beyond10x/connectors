@@ -8,7 +8,7 @@ tags:
 - wave-small
 relations:
 - delivers: story:the-binary-says-what-it-carries
-revision: 20
+revision: 22
 ---
 # Next small wave: inspect the installed binary
 
@@ -54,6 +54,17 @@ AEP compares declared path strings without directory containment. Its earlier co
 These exclusions derive from the scoper reports recorded in the corresponding story Scope sections and coordinator reading of the existing bodies and graph. No new decomposition was created, so the decomposition critic panel was skipped.
 
 ## Checkout and execution record
+
+Primary checkouts remain untouched. Integration `316d308657d9afc5714414fd476cda863c73bcf3` incorporated published main `5c93cc661e6dc634ebdd900981258c7bfab1b983` (0.7.1) before the final correction merge. The approved inspection release is now 0.7.2. Paths below use `~` for the operator home.
+
+| Role | Branch / source | Managed tree | Build / scratch | Current stage |
+|---|---|---|---|---|
+| Coordinator | `wave/inspect-upgrade-after-0.7.0` | `~/.local/state/worktree/trees/b10x/connectors/wt-83fe13d0c209` | Per-workspace targets; none built yet. Scratch `~/.cache/connectors-small-wave-20260907` | Final correction and second review integrated; full gate rerun next |
+| Inspection unit | `impl/the-binary-says-what-it-carries`, final `0f2f5c64a63bd05ec016207288e694e8dd2c21d8` | `~/.local/state/worktree/trees/b10x/connectors/wt-inspect-upgrade-20260907` | Root, CLI and console targets; `~/.cache/cw7/upgrade`, private TMPDIRs `~/.cache/cw7/a1` and `a2`, private compiler cache `~/.cache/cw7/sccache` | Implementor and both independent attacks complete; compiler lane released |
+| Atlas authority | detached `d10b7484d64c28830774c9dae0ec531fcc47acb2` | `~/.local/state/worktree/trees/b10x/atlas/wt-840d0a4626a0` | No build; coordinator scratch | Clean and verified against remote main |
+| Website delivery | `docs/connectors-0.7.1`, base `02271aa02022818a75a99ca3702c8cc00d135b1f` | `~/.local/state/worktree/trees/b10x/website/wt-connectors-071-docs-20260907` | Native Website output; coordinator scratch | Dependencies installed; visible delivery target 0.7.2, historical branch/path retained |
+
+The collaboration API has no role selector. Reused independent threads loaded the exact implementor and adversary charters. Only the coordinator writes planning and direct Git commits. Earlier preflight measurements below are historical; measured execution resources and corrections are recorded in the dated execution/review sections. Both review-result records carry explicit empty findings blocks, despite the native validator's previously recorded empty-list diagnostic limitation.
 
 ## Checkout and execution record
 
@@ -1697,3 +1708,28 @@ Final reported unit targets total 5,321,617,408 bytes (4.956 GiB); free disk at 
 Second and final adversary dispatch reuses resume_gitlab against corrected commit 0f2f5c64. Reports/probes use `~/.cache/cw7/upgrade/adversary-2`; the coordinator created private TMPDIR `~/.cache/cw7/a2` at mode 0700. It reuses the unit's targets and one compiler lane. No third attack is authorized by this wave's review budget. The adversary is instructed to compare the extraction and actual output with the retained prior source/bytes, without broad unrelated retesting or implementation edits.
 
 The first CI run is now observed terminal: `status=completed`, `conclusion=cancelled`, and no job remains running. Its eleven non-root workspace jobs and shared checks succeeded; root failed, and all four binary-build jobs were cancelled. Normal cancellation did not stop the workflow's always-conditioned build jobs; native `gh run cancel --force` completed their cancellation. Final job/step JSON is retained as `rehearsal-failed-final.json` in coordinator scratch. This superseded run is never treated as a full green gate.
+
+## Final correction and independent review
+
+The whole-gate size-fence failure was corrected at `0f2f5c64a63bd05ec016207288e694e8dd2c21d8` by extracting the existing v1 format constants and public helper into `file/format.rs`. The parent is 2617 lines under the unchanged 2625 ceiling. Implementor correction checks passed 243 cases: architecture fence 1, credential/client 125, console 111 and CLI upgrade 6; strict Clippy and formatting passed. No existing test or waiver changed.
+
+`review-result:inspect-upgrade-adversary-2-20260907` records the second and final attack. It found zero issues, as did pass 1: 0 → 0, carried 0, new 0, resolved 0. Four existing cases executed and passed (4 → 4); native source reconstruction and four output byte comparisons passed. No source/test change resulted. Two review outcomes are no-op; no third attack is opened. Raw report SHA256: `9a83dc8e3f3176fa9b56d91eb39a90bf5ebb7a296f8de2f4d7dd8ee00a3098e8`; 50-member evidence manifest SHA256: `d2726f0746feaa4ef071608f176ebac4f4bce45a6d10bc83d7f0a5b284f8adb6`.
+
+The final pass used four guarded commands, two Cargo invocations and 16 explicit binary invocations. Maximum aggregate unit targets: 5,342,310,400 bytes; minimum observed free disk: 70,906,621,952 bytes. All process groups finished. Aggregate harness tokens/tool counts/cost are unavailable; no estimates are presented as observations. The compiler lane is released.
+
+Native findings comparison, verbatim:
+
+```json
+{
+  "artifact": "story:the-binary-says-what-it-carries",
+  "reviews": 2,
+  "from": "review-result:inspect-upgrade-adversary-1-20260907",
+  "from_reviewer": "unattributed",
+  "to": "review-result:inspect-upgrade-adversary-2-20260907",
+  "to_reviewer": "unattributed",
+  "carried": [],
+  "new": [],
+  "resolved": []
+}
+
+```
