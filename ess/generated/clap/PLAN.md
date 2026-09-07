@@ -1,14 +1,14 @@
 <!--
   generated from connectors v1
-  model digest 92d00f77341a93351ebb20ce24412c86947ef6a36dfe66fa4cebae0cab13e13a
-  contract digest a721680ab8e341cf3170805a2fa8ab211d3965b1d68dc7ef001bb77709e339ae
+  model digest 28b7f4588abf0f2922e31dd0e2731da2dedc3b13e15798da7658566d5e9f489c
+  contract digest dad28d01b32983092de2e0ba4fd965b5c88a7c200d85f9185debc6d844d8d838
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — connectors v1
 
 Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synthesize`.
 
-207 capabilities: **191 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
+217 capabilities: **201 generated**, **16 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
 
 ## Generated
 
@@ -85,6 +85,15 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `connectors.deployment.PersonalOAuthRegistration` |
 | domain type | `connectors.deployment.ProviderRef` |
 | domain type | `connectors.deployment.Scope` |
+| domain type | `connectors.endpoint.Binding` |
+| domain type | `connectors.endpoint.CredentialKind` |
+| domain type | `connectors.endpoint.CredentialReference` |
+| domain type | `connectors.endpoint.Endpoint.State` |
+| domain type | `connectors.endpoint.EndpointRef` |
+| domain type | `connectors.endpoint.Scheme` |
+| domain type | `connectors.endpoint.State` |
+| domain type | `connectors.endpoint.Tls` |
+| domain type | `connectors.endpoint.Transport` |
 | domain type | `connectors.event.ChannelRef` |
 | domain type | `connectors.event.ConnectionRef` |
 | domain type | `connectors.event.Delivery.State` |
@@ -145,6 +154,7 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | entity lifecycle | `connectors.connection.DiscoveryObservation` |
 | entity lifecycle | `connectors.deployment.Credential` |
 | entity lifecycle | `connectors.deployment.Integration` |
+| entity lifecycle | `connectors.endpoint.Endpoint` |
 | entity lifecycle | `connectors.event.Delivery` |
 | entity lifecycle | `connectors.event.Event` |
 | entity lifecycle | `connectors.event.Subscription` |

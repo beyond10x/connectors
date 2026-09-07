@@ -2406,6 +2406,7 @@ dependencies = [
  "async-trait",
  "axum",
  "catalog",
+ "connector-resolve",
  "connector-secrets",
  "connector-state",
  "domain",

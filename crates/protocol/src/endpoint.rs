@@ -3,8 +3,8 @@
 
 use crate::operation::{self, OwnerContext};
 pub use domain::endpoint::{
-    Endpoint, EndpointBinding, EndpointCredentialReference, EndpointScheme, EndpointState, EndpointTls,
-    EndpointTransport,
+    Endpoint, EndpointBinding, EndpointCredentialReference, EndpointScheme, EndpointState,
+    EndpointTls, EndpointTransport,
 };
 use serde::{Deserialize, Serialize};
 

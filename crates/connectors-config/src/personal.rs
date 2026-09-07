@@ -1027,10 +1027,13 @@ impl KubernetesIntegrationConfig {
                 .iter()
                 .any(|namespace| !dns_label(namespace))
             || (self.all_namespaces && !self.namespaces.is_empty())
-            || self.selected_context.as_ref().is_some_and(|context| !config_ref(context, 512))
-            || self.target_grants.iter().any(|(provider, grant)| {
-                !dns_label(provider) || !config_ref(grant, 512)
+            || self.selected_context.as_ref().is_some_and(|context| {
+                context.is_empty() || context.len() > 512 || context.chars().any(char::is_control)
             })
+            || self
+                .target_grants
+                .iter()
+                .any(|(provider, grant)| !dns_label(provider) || !config_ref(grant, 512))
             || !(1..=512).contains(&self.resource_limit)
         {
             return Err(ConfigError::Invalid);

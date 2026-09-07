@@ -11,8 +11,8 @@ struct InventorySnapshot {
     state: MonitoringState,
 }
 use protocol::endpoint::{
-    Endpoint, EndpointBinding, EndpointError, EndpointErrorCode, EndpointRequest,
-    EndpointResult, EndpointState, EndpointTransport,
+    Endpoint, EndpointBinding, EndpointError, EndpointErrorCode, EndpointRequest, EndpointResult,
+    EndpointState, EndpointTransport,
 };
 
 impl MonitoringInner {

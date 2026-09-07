@@ -6,52 +6,92 @@ types:
   - name: connectors.endpoint.EndpointRef
     kind: newtype
     of: String
-  - name: connectors.endpoint.Readiness
+  - name: connectors.endpoint.State
     kind: enum
-    variants: [Ready, UnknownProvider, UnsupportedProtocol, MissingCredentials, Denied, UnavailableRoute, Stale, Ambiguous]
-  - name: connectors.endpoint.CredentialKeyReference
+    variants: [Ready, UnknownProvider, UnsupportedProtocol, MissingCredentials, Denied, UnavailableRoute, Stale]
+  - name: connectors.endpoint.Transport
+    kind: enum
+    variants: [Tcp, Udp, Sctp]
+  - name: connectors.endpoint.Tls
+    kind: enum
+    variants: [Required, Disabled]
+  - name: connectors.endpoint.Scheme
+    kind: enum
+    variants: [Http, Https]
+  - name: connectors.endpoint.CredentialKind
+    kind: enum
+    variants: [KubernetesSecret]
+  - name: connectors.endpoint.CredentialReference
     kind: struct
     fields:
+      - name: kind
+        type: connectors.endpoint.CredentialKind
       - name: namespace
         type: String
-      - name: secret_name
+      - name: name
         type: String
-      - name: key
+      - name: keys
+        type: Map<String, String>
+  - name: connectors.endpoint.Binding
+    kind: struct
+    fields:
+      - name: provider
         type: String
+      - name: base_path
+        type: Optional<String>
+      - name: credential
+        type: Optional<connectors.endpoint.CredentialReference>
+      - name: direct_address
+        type: Optional<String>
+      - name: database
+        type: Optional<String>
+      - name: tls
+        type: Optional<connectors.endpoint.Tls>
+      - name: scheme
+        type: Optional<connectors.endpoint.Scheme>
 
 entities:
-  # The approved 2026-09-07 discovery plan defines one source Connection to many interfaces.
-  # Registry entries reference the Connection; inventory grants no execution authority.
-  # This is an immutable inventory snapshot, not an invented operational lifecycle.
+  # Each entry is one immutable resource/interface identity in an inventory snapshot.
+  # Bindings and readiness can change; the endpoint identity cannot be reused after replacement.
   - name: connectors.endpoint.Endpoint
     identity:
       name: endpoint_ref
       type: connectors.endpoint.EndpointRef
     fields:
-      - name: source_connection_ref
+      - name: source_ref
         type: connectors.connection.ConnectionRef
       - name: namespace
         type: Optional<String>
+      - name: resource_kind
+        type: String
       - name: resource_name
         type: String
       - name: resource_uid
         type: String
+      - name: port_name
+        type: Optional<String>
+      - name: port
+        type: Optional<Integer>
+      - name: transport
+        type: connectors.endpoint.Transport
       - name: interface
         type: String
       - name: provider
         type: Optional<String>
-      - name: readiness
-        type: connectors.endpoint.Readiness
+      - name: state
+        type: connectors.endpoint.State
+      - name: binding
+        type: Optional<connectors.endpoint.Binding>
     relations:
       - name: source_connection
         kind: references
         target: connectors.connection.Connection
         cardinality: one
-        via: source_connection_ref
+        via: source_ref
     lifecycle:
       initial: Observed
       states: [Observed]
       terminal: [Observed]
 
-# Discovery refresh, partial-scan reconciliation, authorization and runtime credential custody
-# remain executable Rust obligations. A Ready value is a diagnosis, never an admission proof.
+# Refresh, partial-scan reconciliation, authorization, secret custody and native route lifetimes
+# are executable Rust obligations. A Ready diagnosis never constitutes invocation admission.

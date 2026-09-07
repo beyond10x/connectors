@@ -132,9 +132,16 @@ impl DestinationRule {
 #[derive(Debug, Clone)]
 pub struct ConnectionEgress {
     rules: Vec<DestinationRule>,
+    endpoint_route: Option<EndpointRoute>,
     // The policy is immutable; clones share only this bounded connection cache. Neither current
     // authority nor credentials are cached, and DNS/address policy runs before every lookup.
     clients: Arc<Mutex<BTreeMap<ClientKey, PooledClient>>>,
+}
+
+#[derive(Debug, Clone)]
+struct EndpointRoute {
+    authority_ref: String,
+    connect_address: Option<SocketAddr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -159,8 +166,68 @@ impl ConnectionEgress {
         }
         Ok(Self {
             rules,
+            endpoint_route: None,
             clients: Arc::new(Mutex::new(BTreeMap::new())),
         })
+    }
+
+    /// Bind a runtime-validated discovered interface to its logical authority and optional
+    /// short-lived native Kubernetes bridge. This capability is never decoded from an invocation.
+    pub fn for_endpoint_route(
+        authority_ref: &str,
+        logical_url: &str,
+        connect_address: Option<SocketAddr>,
+    ) -> Result<Self, EgressError> {
+        validate_authority_ref(authority_ref)?;
+        let url = Url::parse(logical_url).map_err(|_| EgressError::InvalidRule)?;
+        let host = url.host_str().ok_or(EgressError::InvalidRule)?;
+        let port = url
+            .port_or_known_default()
+            .ok_or(EgressError::InvalidRule)?;
+        if !matches!(url.scheme(), "http" | "https" | "ws" | "wss")
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+            || connect_address
+                .is_some_and(|address| !address.ip().is_loopback() || address.port() == 0)
+            || (connect_address.is_some() && !matches!(url.host(), Some(url::Host::Domain(_))))
+        {
+            return Err(EgressError::InvalidRule);
+        }
+        let schemes = if matches!(url.scheme(), "https" | "wss") {
+            ["https", "wss"]
+        } else {
+            ["http", "ws"]
+        };
+        Ok(Self {
+            rules: schemes
+                .into_iter()
+                .map(|scheme| DestinationRule {
+                    scheme: scheme.into(),
+                    host: HostRule::Exact(host.to_ascii_lowercase()),
+                    port,
+                    scope: AddressScope::OperatorNetwork,
+                })
+                .collect(),
+            endpoint_route: Some(EndpointRoute {
+                authority_ref: authority_ref.into(),
+                connect_address,
+            }),
+            clients: Arc::new(Mutex::new(BTreeMap::new())),
+        })
+    }
+
+    fn validate_owner(&self, authority_ref: &str) -> Result<(), EgressError> {
+        validate_authority_ref(authority_ref)?;
+        if self
+            .endpoint_route
+            .as_ref()
+            .is_some_and(|route| route.authority_ref != authority_ref)
+        {
+            return Err(EgressError::InvalidAuthority);
+        }
+        Ok(())
     }
 
     /// Resolve every exact rule during startup. Suffix rules are necessarily resolved only after
@@ -188,9 +255,26 @@ impl ConnectionEgress {
         url: Url,
         timeout: Duration,
     ) -> Result<RequestBuilder, EgressError> {
-        validate_authority_ref(authority_ref)?;
+        self.validate_owner(authority_ref)?;
         let destination = self.resolve(&url).await?;
         let client = self.client_for_resolved(authority_ref, &url, &destination)?;
+        if let Some(address) = self
+            .endpoint_route
+            .as_ref()
+            .and_then(|route| route.connect_address)
+        {
+            // reqwest's DNS override retains the URL port. Change only the physical port;
+            // the hostname still drives TLS verification and Host retains the logical authority.
+            let authority = url[url::Position::BeforeHost..url::Position::AfterPort].to_owned();
+            let mut dial_url = url;
+            dial_url
+                .set_port(Some(address.port()))
+                .map_err(|_| EgressError::DestinationDenied)?;
+            return Ok(client
+                .request(method, dial_url)
+                .header(reqwest::header::HOST, authority)
+                .timeout(timeout));
+        }
         Ok(client.request(method, url).timeout(timeout))
     }
 
@@ -258,8 +342,8 @@ impl ConnectionEgress {
         url: &Url,
         config: WebSocketConfig,
     ) -> Result<(PinnedWebSocket, Response), EgressError> {
-        validate_authority_ref(authority_ref)?;
-        if url.scheme() != "wss" {
+        self.validate_owner(authority_ref)?;
+        if url.scheme() != "wss" && !(self.endpoint_route.is_some() && url.scheme() == "ws") {
             return Err(EgressError::DestinationDenied);
         }
         let destination = self.resolve(url).await?;
@@ -283,7 +367,18 @@ impl ConnectionEgress {
     }
 
     async fn resolve(&self, url: &Url) -> Result<ResolvedDestination, EgressError> {
-        validate_url(url)?;
+        if self.endpoint_route.is_some() {
+            if !matches!(url.scheme(), "http" | "https" | "ws" | "wss")
+                || url.host_str().is_none()
+                || !url.username().is_empty()
+                || url.password().is_some()
+                || url.fragment().is_some()
+            {
+                return Err(EgressError::DestinationDenied);
+            }
+        } else {
+            validate_url(url)?;
+        }
         let rule = self
             .rules
             .iter()
@@ -293,6 +388,16 @@ impl ConnectionEgress {
         let port = url
             .port_or_known_default()
             .ok_or(EgressError::DestinationDenied)?;
+        if let Some(address) = self
+            .endpoint_route
+            .as_ref()
+            .and_then(|route| route.connect_address)
+        {
+            return Ok(ResolvedDestination {
+                host: host.into(),
+                addresses: vec![address],
+            });
+        }
         let mut addresses = tokio::time::timeout(CONNECT_TIMEOUT, lookup_host((host, port)))
             .await
             .map_err(|_| EgressError::Resolution)?
@@ -310,6 +415,10 @@ impl ConnectionEgress {
 
 pub type PinnedWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
+#[cfg(test)]
+#[path = "endpoint_egress_tests.rs"]
+mod endpoint_tests;
+
 #[async_trait]
 impl EgressTransport for ConnectionEgress {
     async fn execute(
@@ -323,7 +432,9 @@ impl EgressTransport for ConnectionEgress {
             || request.request.url.len() > MAX_URL_BYTES
             || request.request.headers.len() > MAX_REQUEST_HEADERS
             || request.request.headers.iter().any(|(name, value)| {
-                name.len() > MAX_RESPONSE_HEADER_BYTES || value.len() > MAX_RESPONSE_HEADER_BYTES
+                name.len() > MAX_RESPONSE_HEADER_BYTES
+                    || value.len() > MAX_RESPONSE_HEADER_BYTES
+                    || (self.endpoint_route.is_some() && name.eq_ignore_ascii_case("host"))
             })
             || request
                 .request
@@ -336,7 +447,7 @@ impl EgressTransport for ConnectionEgress {
         let method = Method::from_bytes(request.request.method.as_bytes())
             .map_err(|_| EgressTransportError::Refused)?;
         let url = Url::parse(&request.request.url).map_err(|_| EgressTransportError::Refused)?;
-        if url.scheme() != "https" {
+        if url.scheme() != "https" && !(self.endpoint_route.is_some() && url.scheme() == "http") {
             return Err(EgressTransportError::Refused);
         }
         let mut outbound = self
@@ -376,7 +487,9 @@ impl EgressTransport for ConnectionEgress {
             || request.url.len() > MAX_URL_BYTES
             || request.headers.len() > MAX_REQUEST_HEADERS
             || request.headers.iter().any(|(name, value)| {
-                name.len() > MAX_RESPONSE_HEADER_BYTES || value.len() > MAX_RESPONSE_HEADER_BYTES
+                name.len() > MAX_RESPONSE_HEADER_BYTES
+                    || value.len() > MAX_RESPONSE_HEADER_BYTES
+                    || (self.endpoint_route.is_some() && name.eq_ignore_ascii_case("host"))
             })
             || request
                 .body
@@ -388,7 +501,7 @@ impl EgressTransport for ConnectionEgress {
         let method = Method::from_bytes(request.method.as_bytes())
             .map_err(|_| EgressTransportError::Refused)?;
         let url = Url::parse(&request.url).map_err(|_| EgressTransportError::Refused)?;
-        if url.scheme() != "https" {
+        if url.scheme() != "https" && !(self.endpoint_route.is_some() && url.scheme() == "http") {
             return Err(EgressTransportError::Refused);
         }
         let mut outbound = self
