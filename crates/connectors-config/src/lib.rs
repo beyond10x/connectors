@@ -4,6 +4,7 @@
 
 mod file;
 mod hosted;
+mod hosted_catalog;
 mod hosted_git_fetch;
 mod personal;
 mod personal_oauth;
@@ -11,12 +12,13 @@ mod personal_oauth;
 mod personal_oauth_tests;
 
 pub use hosted::{
-    HostedAuthorityConfig, HostedCatalogConfig, HostedGrafanaConfig, HostedGrafanaTargetConfig,
-    HostedIdentityConfig, HostedJiraConfig, HostedKubernetesConfig, HostedListenerConfig,
-    HostedSecretsConfig, HostedServerConfig, HostedServerConfigError, HostedSipConfig,
-    HostedSipCredentialConfig, HostedSlackConfig, HostedStorageConfig, HostedVaultConfig,
-    JiraSharedAuth, KubernetesNamespaceAccessConfig,
+    HostedAuthorityConfig, HostedGrafanaConfig, HostedGrafanaTargetConfig, HostedIdentityConfig,
+    HostedJiraConfig, HostedKubernetesConfig, HostedListenerConfig, HostedSecretsConfig,
+    HostedServerConfig, HostedServerConfigError, HostedSipConfig, HostedSipCredentialConfig,
+    HostedSlackConfig, HostedStorageConfig, HostedVaultConfig, JiraSharedAuth,
+    KubernetesNamespaceAccessConfig,
 };
+pub use hosted_catalog::{HostedCatalogBinding, HostedCatalogConfig};
 pub use hosted_git_fetch::{HostedGitFetchOverride, HostedGitlabConfig, HostedTlsListenerConfig};
 pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, CatalogIntegrationConfig,

@@ -1,0 +1,423 @@
+//! Boundary tests use sentinel credentials and a recording transport, never a provider account.
+
+use super::*;
+use connector_secrets::MemoryStore;
+use connector_state::MemoryState;
+use connectors_config::NetworkScopeConfig;
+use service::{EgressHttpRequest, EgressHttpResponse, EgressTransportError, EgressWebSocket};
+
+const ORIGIN: &str = "https://grafana.monitoring.example";
+const SENTINEL: &str = "SENTINEL-NOT-A-REAL-SERVICE-ACCOUNT-TOKEN";
+
+#[derive(Default)]
+struct RecordingEgress {
+    urls: Mutex<Vec<String>>,
+    reject_credential: bool,
+}
+
+#[async_trait]
+impl EgressTransport for RecordingEgress {
+    async fn execute(
+        &self,
+        _authority_ref: &str,
+        request: EgressHttpRequest,
+    ) -> Result<EgressHttpResponse, EgressTransportError> {
+        assert_eq!(request.request.method, "GET");
+        assert_eq!(request.request.url, format!("{ORIGIN}/api/datasources"));
+        assert_eq!(
+            request
+                .request
+                .headers
+                .get("Authorization")
+                .map(String::as_str),
+            Some(format!("Bearer {SENTINEL}").as_str())
+        );
+        lock(&self.urls).push(request.request.url);
+        Ok(EgressHttpResponse {
+            status: if self.reject_credential { 401 } else { 200 },
+            headers: BTreeMap::new(),
+            body: b"[]".to_vec(),
+        })
+    }
+
+    async fn connect_websocket(
+        &self,
+        _authority_ref: &str,
+        _url: String,
+        _maximum_message_bytes: usize,
+    ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
+        Err(EgressTransportError::Refused)
+    }
+}
+
+fn policy(origin: Option<&str>) -> HostedCatalogConfig {
+    HostedCatalogConfig {
+        enabled: true,
+        public_origin: Some("https://connectors.example/api/connectors/v1".to_owned()),
+        grant_ref: Some("grant:catalog-read".to_owned()),
+        providers: vec!["grafana".to_owned()],
+        bindings: origin
+            .map(|origin| {
+                BTreeMap::from([(
+                    "grafana".to_owned(),
+                    HostedCatalogBinding {
+                        endpoints: BTreeMap::from([("origin".to_owned(), origin.to_owned())]),
+                        network: NetworkScopeConfig::Public,
+                    },
+                )])
+            })
+            .unwrap_or_default(),
+        ..Default::default()
+    }
+}
+
+async fn open(
+    policy: HostedCatalogConfig,
+    values: Arc<MemoryStore>,
+    state: Arc<MemoryState>,
+    egress: Arc<RecordingEgress>,
+) -> HostedCatalogBackend {
+    HostedCatalogBackend::open(
+        "tenant-test".to_owned(),
+        policy,
+        BTreeSet::new(),
+        BTreeSet::new(),
+        values.clone(),
+        values,
+        state,
+        egress,
+    )
+    .await
+    .expect("valid deployment policy")
+}
+
+fn principal(subject: &str) -> PrincipalContext {
+    tests::principal(subject)
+}
+
+fn pending(backend: &HostedCatalogBackend, owner: &PrincipalContext) -> (String, String) {
+    let created = backend
+        .inner
+        .create_session(
+            owner,
+            "grafana",
+            "grafana.service_account_token",
+            "Monitoring".to_owned(),
+        )
+        .expect("configured profile is connectable");
+    let url = url::Url::parse(created.browser_completion_url.as_deref().unwrap()).unwrap();
+    let capability = url
+        .fragment()
+        .unwrap()
+        .strip_prefix("token=")
+        .unwrap()
+        .to_owned();
+    (created.connect_session_ref, capability)
+}
+
+async fn connect(backend: &HostedCatalogBackend, owner: &PrincipalContext) -> String {
+    let (session, capability) = pending(backend, owner);
+    let page = backend.hosted_completion_page(&session).unwrap();
+    assert!(page.html.contains(ORIGIN));
+    assert!(!page.html.contains(SENTINEL));
+    backend
+        .complete_hosted_session(
+            &session,
+            &capability,
+            HostedCompletionSubmission::new(SENTINEL.as_bytes().to_vec()),
+        )
+        .await
+        .unwrap();
+    backend
+        .inner
+        .session_status(owner, &session)
+        .unwrap()
+        .connection_ref
+        .unwrap()
+}
+
+async fn invoke(
+    backend: &HostedCatalogBackend,
+    owner: &PrincipalContext,
+    connection: &str,
+    input: serde_json::Value,
+) -> Result<protocol::operation::InvocationResult, OperationError> {
+    let delegate = backend.inner.delegate(owner)?;
+    let description = delegate.inner.describe("grafana-datasources-list")?;
+    delegate
+        .inner
+        .invoke(
+            "grafana-datasources-list",
+            connection,
+            &description.description_ref,
+            input,
+        )
+        .await
+}
+
+#[tokio::test]
+async fn unconfigured_templates_have_no_setup_and_no_destination() {
+    let policy = policy(None);
+    assert!(hosted_admitted_origins(&policy).unwrap().is_empty());
+    let backend = open(
+        policy,
+        Arc::new(MemoryStore::new()),
+        Arc::new(MemoryState::new()),
+        Arc::new(RecordingEgress::default()),
+    )
+    .await;
+    assert!(backend.setup_profiles("grafana").is_empty());
+    assert!(backend
+        .inner
+        .create_session(
+            &principal("first"),
+            "grafana",
+            "grafana.service_account_token",
+            "Monitoring".to_owned()
+        )
+        .is_err());
+}
+
+#[test]
+fn only_declared_safe_endpoint_values_are_admitted() {
+    for value in [
+        "http://monitoring.example",
+        "https://user:pass@monitoring.example",
+        "https://monitoring.example/api",
+        "https://monitoring.example/",
+        "https://monitoring.example?token=x",
+        "https://monitoring.example#fragment",
+        "https://{caller}.example",
+        "https://monitoring.example\n",
+    ] {
+        assert!(hosted_admitted_origins(&policy(Some(value))).is_err());
+    }
+    let normalized = policy(Some("HTTPS://Grafana.Monitoring.Example:443"));
+    assert_eq!(hosted_admitted_origins(&normalized).unwrap(), vec![ORIGIN]);
+    let mut invalid = policy(Some(ORIGIN));
+    invalid
+        .bindings
+        .get_mut("grafana")
+        .unwrap()
+        .endpoints
+        .insert("unpublished".to_owned(), "x".to_owned());
+    assert!(hosted_admitted_origins(&invalid).is_err());
+    invalid = policy(Some(ORIGIN));
+    invalid.providers = vec!["anthropic".to_owned()];
+    assert!(hosted_admitted_origins(&invalid).is_err());
+    invalid = policy(Some(ORIGIN));
+    invalid.enabled = false;
+    assert!(hosted_admitted_origins(&invalid).is_err());
+    invalid = policy(Some(ORIGIN));
+    invalid.bindings.insert(
+        "unknown-provider".to_owned(),
+        HostedCatalogBinding::default(),
+    );
+    assert!(hosted_admitted_origins(&invalid).is_err());
+}
+
+#[test]
+fn private_reachability_requires_an_explicit_policy_and_conflicts_refuse() {
+    let mut configured = policy(Some(ORIGIN));
+    assert_eq!(
+        hosted_endpoints::hosted_admitted_destinations(&configured).unwrap(),
+        vec![(ORIGIN.to_owned(), NetworkScopeConfig::Public)]
+    );
+    configured.bindings.get_mut("grafana").unwrap().network = NetworkScopeConfig::Operator;
+    assert_eq!(
+        hosted_endpoints::hosted_admitted_destinations(&configured).unwrap(),
+        vec![(ORIGIN.to_owned(), NetworkScopeConfig::Operator)]
+    );
+    configured.providers.push("argocd".to_owned());
+    configured.bindings.insert(
+        "argocd".to_owned(),
+        HostedCatalogBinding {
+            endpoints: BTreeMap::from([("origin".to_owned(), ORIGIN.to_owned())]),
+            network: NetworkScopeConfig::Public,
+        },
+    );
+    assert!(hosted_endpoints::hosted_admitted_destinations(&configured).is_err());
+}
+
+#[test]
+fn fixed_origin_connection_metadata_without_bindings_still_loads() {
+    let state: StateFile = serde_json::from_value(serde_json::json!({
+        "version": 1,
+        "next_transaction_generation": 1,
+        "pending": [],
+        "connections": [{
+            "connection_ref": "catalog:anthropic:existing",
+            "provider": "anthropic",
+            "instance": "existing",
+            "credential": "anthropic.api_key",
+            "label": "Existing connection",
+            "owner_subject": "first",
+            "actor": "user"
+        }]
+    }))
+    .unwrap();
+    assert_eq!(
+        state.connections[0].binding,
+        HostedCatalogBinding::default()
+    );
+    let config = Inner::config(&state.connections[0], "grant:catalog-read");
+    assert!(config.endpoints.is_empty());
+    assert!(!config.operator_approved);
+    assert_eq!(config.network, NetworkScopeConfig::Public);
+    assert!(!serde_json::to_string(&state)
+        .unwrap()
+        .contains("\"binding\""));
+    let mut all_providers = policy(None);
+    all_providers.providers.clear();
+    let destinations = hosted_admitted_origins(&all_providers).unwrap();
+    assert!(destinations
+        .iter()
+        .any(|origin| origin == "https://api.anthropic.com"));
+    assert!(!destinations.iter().any(|origin| origin.contains('{')));
+}
+
+#[tokio::test]
+async fn acquisition_verifies_exact_destination_and_persists_owner_bound_transport() {
+    let store = Arc::new(MemoryStore::new());
+    let state = Arc::new(MemoryState::new());
+    let egress = Arc::new(RecordingEgress::default());
+    let owner = principal("first");
+    let backend = open(
+        policy(Some(ORIGIN)),
+        store.clone(),
+        state.clone(),
+        egress.clone(),
+    )
+    .await;
+    assert_eq!(
+        backend.setup_profiles("grafana")[0].auth_profile,
+        "grafana.service_account_token"
+    );
+    let connection = connect(&backend, &owner).await;
+    assert_eq!(lock(&egress.urls).len(), 1);
+    drop(backend);
+    let backend = open(policy(Some(ORIGIN)), store, state.clone(), egress.clone()).await;
+    invoke(&backend, &owner, &connection, serde_json::json!({}))
+        .await
+        .unwrap();
+    assert_eq!(lock(&egress.urls).len(), 2);
+    assert!(invoke(
+        &backend,
+        &principal("second"),
+        &connection,
+        serde_json::json!({})
+    )
+    .await
+    .is_err());
+    let other_tenant = PrincipalContext::hosted(
+        "another-tenant".to_owned(),
+        "first".to_owned(),
+        "first".to_owned(),
+        None,
+        "snapshot:test".to_owned(),
+        "0".repeat(64),
+    )
+    .unwrap();
+    assert!(
+        invoke(&backend, &other_tenant, &connection, serde_json::json!({}))
+            .await
+            .is_err()
+    );
+    assert_eq!(lock(&egress.urls).len(), 2);
+    let bytes = state.read(STATE_KEY, MAX_STATE_BYTES).unwrap().unwrap();
+    let serialized = String::from_utf8(bytes).unwrap();
+    assert!(serialized.contains(ORIGIN));
+    assert!(!serialized.contains(SENTINEL));
+    let connection = lock(&backend.inner.metadata).connections[0].clone();
+    assert!(connection.last_verified_at_unix_ms.is_some());
+}
+
+#[tokio::test]
+async fn destination_change_removal_or_stored_tampering_never_spends_the_old_credential() {
+    let store = Arc::new(MemoryStore::new());
+    let state = Arc::new(MemoryState::new());
+    let egress = Arc::new(RecordingEgress::default());
+    let owner = principal("first");
+    let backend = open(
+        policy(Some(ORIGIN)),
+        store.clone(),
+        state.clone(),
+        egress.clone(),
+    )
+    .await;
+    let connection = connect(&backend, &owner).await;
+    drop(backend);
+    for configured in [
+        policy(Some("https://other.monitoring.example")),
+        policy(None),
+    ] {
+        let backend = open(configured, store.clone(), state.clone(), egress.clone()).await;
+        assert!(invoke(&backend, &owner, &connection, serde_json::json!({}))
+            .await
+            .is_err());
+        let ConnectionResult::Search { connections } = tests::search(&backend, &owner).await else {
+            panic!("search")
+        };
+        assert_eq!(connections[0].state, ConnectionState::Degraded);
+        assert_eq!(lock(&egress.urls).len(), 1);
+    }
+    let backend = open(policy(Some(ORIGIN)), store, state, egress.clone()).await;
+    // A caller cannot replace deployment endpoint bindings through operation input. Even if the
+    // declared schema tolerates unused fields, the transport assertion still requires ORIGIN.
+    let _ = invoke(
+        &backend,
+        &owner,
+        &connection,
+        serde_json::json!({"origin":"https://attacker.example"}),
+    )
+    .await;
+    let count = lock(&egress.urls).len();
+    lock(&backend.inner.metadata).connections[0]
+        .binding
+        .endpoints
+        .insert("origin".to_owned(), "https://attacker.example".to_owned());
+    assert!(invoke(&backend, &owner, &connection, serde_json::json!({}))
+        .await
+        .is_err());
+    assert_eq!(lock(&egress.urls).len(), count);
+}
+
+#[tokio::test]
+async fn refused_verification_or_wrong_session_capability_commits_no_connection() {
+    let egress = Arc::new(RecordingEgress {
+        reject_credential: true,
+        ..Default::default()
+    });
+    let backend = open(
+        policy(Some(ORIGIN)),
+        Arc::new(MemoryStore::new()),
+        Arc::new(MemoryState::new()),
+        egress.clone(),
+    )
+    .await;
+    let owner = principal("first");
+    let (session, capability) = pending(&backend, &owner);
+    assert!(backend
+        .inner
+        .session_status(&principal("second"), &session)
+        .is_err());
+    assert!(backend
+        .complete_hosted_session(
+            &session,
+            &"x".repeat(64),
+            HostedCompletionSubmission::new(SENTINEL.as_bytes().to_vec())
+        )
+        .await
+        .is_err());
+    assert!(lock(&egress.urls).is_empty());
+    assert!(backend
+        .complete_hosted_session(
+            &session,
+            &capability,
+            HostedCompletionSubmission::new(SENTINEL.as_bytes().to_vec())
+        )
+        .await
+        .is_err());
+    assert!(backend.inner.owned_connections(&owner).is_empty());
+    assert!(lock(&backend.inner.metadata).pending.is_empty());
+}

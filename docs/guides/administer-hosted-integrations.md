@@ -43,3 +43,32 @@ running deployment.
 Every accepted write appends attempted/completed audit metadata containing the tenant, actor,
 request, Integration, and logical credential name. Neither audit records nor status and write
 responses contain credential bytes.
+
+## Deployment-selected catalog destinations
+
+For a catalog provider whose API base URL contains an endpoint variable, hosted configuration
+must select that endpoint before a Connect Session is offered. The binding belongs in the private
+deployment configuration. For example, an operator can enable the existing Grafana service account
+token profile with this non-secret policy, alongside the normal enabled `[catalog]` configuration:
+
+```toml
+[catalog.bindings.grafana]
+network = "public"
+
+[catalog.bindings.grafana.endpoints]
+origin = "https://grafana.monitoring.example"
+```
+
+The provider must also appear in `catalog.providers` when that allowlist is nonempty. Endpoint
+keys must be declared by the provider's catalogue, and origin values are exact HTTPS origins
+without an API path or trailing slash. Missing or invalid bindings never create a destination.
+`network = "public"` is the default and refuses private DNS answers. An explicit `"operator"`
+selection admits public or private addresses for the exact configured origin through the existing
+post-DNS transport policy; local, link-local and reserved addresses remain refused.
+
+The ordinary hosted Connect Session form displays the selected destination and accepts the token
+directly into Connector custody. Connectors calls the catalogue's declared verification operation
+before storing it. The caller cannot supply a replacement endpoint. Each connection retains its
+bindings across restarts; changing or removing a binding degrades incompatible connections and
+refuses their calls until the owner connects again. An existing credential is never redirected to
+a newly configured host. Fixed-origin providers continue to work without bindings.
