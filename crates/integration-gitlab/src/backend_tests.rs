@@ -113,6 +113,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn native_connect_advances_above_shared_retirement_without_reverification() {
+        for next_generation in [1, 8] {
+            let (backend, egress) = paged_backend("").await;
+            backend
+                .inner
+                .credential_store
+                .reclaim(
+                    SecretTransactionGeneration::from_protocol_bytes(7_u64.to_be_bytes()).unwrap(),
+                )
+                .await
+                .unwrap();
+            {
+                let mut metadata = lock(&backend.inner.metadata);
+                metadata.next_transaction_generation = next_generation;
+                backend.inner.persist(&metadata).unwrap();
+            }
+            let owner = PrincipalContext::hosted(
+                "tenant-one".to_owned(),
+                "person:owner".to_owned(),
+                "person:owner".to_owned(),
+                Some("owner@example.test".to_owned()),
+                "snapshot:test".to_owned(),
+                "a".repeat(64),
+            )
+            .unwrap();
+            let session = backend
+                .inner
+                .create_session(&owner, "GitLab".to_owned(), GitlabProfile::PersonalToken)
+                .unwrap();
+            let url = url::Url::parse(session.browser_completion_url.as_deref().unwrap()).unwrap();
+            backend
+                .complete_hosted_session(
+                    &session.connect_session_ref,
+                    url.fragment().unwrap().strip_prefix("token=").unwrap(),
+                    HostedCompletionSubmission::new(b"TEST-OWNED-NATIVE-TOKEN".to_vec()),
+                )
+                .await
+                .unwrap();
+            let connections = backend.inner.owned_connections(&owner);
+            assert_eq!(connections.len(), 1);
+            assert_eq!(connections[0].credential_generation, 8);
+            assert_eq!(lock(&backend.inner.metadata).next_transaction_generation, 9);
+            assert!(lock(&backend.inner.metadata).pending.is_empty());
+            assert_eq!(
+                egress.calls.load(Ordering::SeqCst),
+                2,
+                "exactly the two declared native verification reads"
+            );
+            backend.inner.recover_pending().await.unwrap();
+            assert_eq!(egress.calls.load(Ordering::SeqCst), 2);
+        }
+    }
+
+    #[tokio::test]
     async fn legacy_connection_starts_unusable_and_preserves_pending_custody() {
         let state = Arc::new(connector_state::MemoryState::new());
         let metadata = StateFile {

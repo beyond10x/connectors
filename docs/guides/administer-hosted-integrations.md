@@ -65,6 +65,8 @@ without an API path or trailing slash. Missing or invalid bindings never create 
 `network = "public"` is the default and refuses private DNS answers. An explicit `"operator"`
 selection admits public or private addresses for the exact configured origin through the existing
 post-DNS transport policy; local, link-local and reserved addresses remain refused.
+That Connector policy does not change the deployment's firewall or Kubernetes NetworkPolicy.
+The operator must also admit the exact provider destination through those network controls.
 
 The ordinary hosted Connect Session form displays the selected destination and accepts the token
 directly into Connector custody. Connectors calls the catalogue's declared verification operation
@@ -72,6 +74,36 @@ before storing it. The caller cannot supply a replacement endpoint. Each connect
 bindings across restarts; changing or removing a binding degrades incompatible connections and
 refuses their calls until the owner connects again. An existing credential is never redirected to
 a newly configured host. Fixed-origin providers continue to work without bindings.
+
+The form displays its session deadline and accepts one submission. After an uncertain response,
+check the application's Connections before starting again. Authentication rejection, HTTP 403
+permission refusal, rate limiting and network failure have distinct messages; a failed network
+exchange does not establish whether a token is valid. The operator log records only
+`connect_session_verification_failed`, a closed `class` and numeric `upstream_status` (zero when
+there was no HTTP response). Classes include `destination-refused` (including failed destination
+resolution/admission), `timeout`, `connect`, `tls`, `body-read`, `other`, `provider-status`,
+`response-too-large` and `preparation`. Credential values, session capabilities, destinations and
+provider response bodies are omitted. Invalid capabilities reveal no verification detail.
+
+Storage failures instead log `connect_session_custody_failed` with a closed `stage` and `class`.
+Stages distinguish transaction reservation, preparation, pending metadata persistence, commit,
+final Connection persistence and session finalization. For example, `stage=prepare class=retired`
+means the prepared store refused that transaction generation before publication. Commit or
+finalization failure is an unconfirmed outcome: inspect Connections and custody recovery before
+another acquisition. These logs never contain a credential address, value or underlying error text.
+
+Hosted catalog, GitLab, Slack and Jira share the prepared credential journal. Each reserves above
+its current retirement watermark and records its own pending intent before staging. The journal
+retains a committed or aborted outcome until that exact owner durably publishes or discards its
+metadata and acknowledges the transaction. Restart resolves these receipts without repeating
+provider verification. Existing journal and connection records load in place; do not reset generation
+counters or delete pending records to repair a refusal. Deploy this correction with the old writer
+stopped: an older writer still using broad retirement cannot preserve another owner's receipts.
+
+Grafana verifies a service account token by listing data sources. Its unchanged `GET /api/datasources`
+probe requires `datasources:read` with `datasources:*` where Grafana RBAC applies; dashboard read
+permissions alone do not establish that access. See the
+[official data source API permissions](https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/).
 
 ## Supply a catalog token without a browser form
 

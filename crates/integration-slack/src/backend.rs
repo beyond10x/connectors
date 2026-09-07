@@ -316,6 +316,12 @@ struct WorkspaceEvidence {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PendingCommit {
+    #[serde(default)]
+    published: bool,
+    #[serde(default)]
+    discarded: bool,
+    #[serde(default)]
+    intent: bool,
     transaction_id: String,
     connection: StoredConnection,
 }
