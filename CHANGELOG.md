@@ -11,6 +11,18 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+## 0.7.2 — 2026-09-07
+
+- Add `connectors inspect upgrade` to report the installed CLI version, embedded catalog schema
+  and digest, supported credential-file formats, and hosted session-metadata version. The command
+  supports text, compact, JSON and YAML output, needs no configured state or running service, and
+  includes source-installation guidance without checking remote releases or changing files.
+- Keep the report independent of async runtime startup, including its internal socket creation,
+  while preserving normal command dispatch, embedded use and output-error handling.
+
+Existing catalog-schema, credential-file and operation-protocol versions are preserved. The
+inspection command provides information; updating the binary remains a separate step.
+
 ## 0.7.1 — 2026-09-07
 
 - Add bounded Jira issue search, project inventory and paginated comment reads; Confluence

@@ -250,7 +250,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "catalog"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "catalog-reader",
  "serde",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-reader"
-version = "0.7.1"
+version = "0.7.2"
 
 [[package]]
 name = "cbc"
@@ -362,14 +362,14 @@ dependencies = [
 
 [[package]]
 name = "connector-address"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "thiserror 2.0.20",
 ]
 
 [[package]]
 name = "connector-resolve"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "catalog",
  "catalog-reader",
@@ -384,7 +384,7 @@ dependencies = [
 
 [[package]]
 name = "connector-secrets"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-trait",
  "connector-address",
@@ -397,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "connector-state"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "thiserror 2.0.20",
 ]
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "driver-sip"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -802,7 +802,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1904,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "domain",
  "fluent-uri",
@@ -1977,7 +1977,7 @@ dependencies = [
  "once_cell",
  "socket2 0.6.5",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2227,7 +2227,7 @@ dependencies = [
 
 [[package]]
 name = "rtvbp-voice-endpoint"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-trait",
  "domain",
@@ -2276,7 +2276,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2494,7 +2494,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-trait",
  "base64",
@@ -3247,7 +3247,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voice-runtime"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "async-trait",
  "connector-resolve",
@@ -3580,7 +3580,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
