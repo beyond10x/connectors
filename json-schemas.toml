@@ -9,6 +9,20 @@
 version = 1
 
 [[schema]]
+path = "contracts/connector-endpoint/v0alpha1/connector-endpoint.schema.json"
+
+[[document]]
+path = "contracts/connector-endpoint/v0alpha1/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[schema]]
+path = "contracts/connector-operation/v0alpha4/connector-operation.schema.json"
+
+[[document]]
+path = "contracts/connector-operation/v0alpha4/bundle.json"
+schema = "contracts/artifact-bundle.schema.json"
+
+[[schema]]
 path = "catalog/connector-document.schema.json"
 
 [[schema]]
