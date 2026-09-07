@@ -34,6 +34,9 @@ use crate::credentials::resolve_channel;
 use crate::plan::SensitiveText;
 use crate::{validate_templated_authority, Error, Slot};
 
+#[cfg(test)]
+mod tests;
+
 /// **A complete RFC 6455 handshake plan containing no client, socket, resolver or runtime.**
 ///
 /// The unit a host wraps and dispatches; deriving one edits nothing that reaches a wire. Its `Debug`
@@ -95,6 +98,44 @@ pub async fn channel_plan(
     secrets: &dyn SecretStore,
     config: &dyn ConfigPort,
 ) -> Result<PreparedChannelPlan, Error> {
+    channel_plan_inner(provider, channel, tenant, instance, secrets, config, None).await
+}
+
+/// Compose a declared channel against a runtime-admitted endpoint route.
+///
+/// The caller must admit the endpoint's provider, resource identity, binding and route before
+/// passing its credential-free HTTP(S) base URL. Catalog query, authentication and event semantics
+/// remain unchanged; this entry point performs no route discovery or network I/O.
+pub async fn channel_plan_for_endpoint(
+    provider: &'static catalog::Provider,
+    channel: &'static catalog::Channel,
+    tenant: &str,
+    instance: Option<&InstanceId>,
+    secrets: &dyn SecretStore,
+    config: &dyn ConfigPort,
+    base_url: &str,
+) -> Result<PreparedChannelPlan, Error> {
+    channel_plan_inner(
+        provider,
+        channel,
+        tenant,
+        instance,
+        secrets,
+        config,
+        Some(base_url),
+    )
+    .await
+}
+
+async fn channel_plan_inner(
+    provider: &'static catalog::Provider,
+    channel: &'static catalog::Channel,
+    tenant: &str,
+    instance: Option<&InstanceId>,
+    secrets: &dyn SecretStore,
+    config: &dyn ConfigPort,
+    endpoint_base: Option<&str>,
+) -> Result<PreparedChannelPlan, Error> {
     let operation = format!("{}#{}", provider.id, channel.name);
     if channel.transport != ChannelTransport::Socket {
         return Err(Error::NotSocketChannel {
@@ -118,7 +159,10 @@ pub async fn channel_plan(
         operation: &operation,
     };
 
-    let mut base = substitute_endpoint(channel.base_url, &settings, &operation)?;
+    let mut base = match endpoint_base {
+        Some(base) => validated_endpoint_base(base, &operation)?,
+        None => substitute_endpoint(channel.base_url, &settings, &operation)?,
+    };
     if let Some(rest) = base.strip_prefix("https://") {
         base = format!("wss://{rest}");
     } else if let Some(rest) = base.strip_prefix("http://") {
@@ -229,6 +273,28 @@ pub async fn channel_plan(
         payload: channel.payload,
         payload_root: channel.payload_root,
     })
+}
+
+fn validated_endpoint_base(base: &str, operation: &str) -> Result<String, Error> {
+    let refuse = || Error::Unbuildable {
+        operation: operation.to_owned(),
+        message: "the admitted channel endpoint must be a credential-free HTTP(S) base URL"
+            .to_owned(),
+    };
+    let after_scheme = base
+        .strip_prefix("https://")
+        .or_else(|| base.strip_prefix("http://"))
+        .ok_or_else(refuse)?;
+    if base.contains(['?', '#', '{', '}', '\\'])
+        || base
+            .chars()
+            .any(|value| value.is_whitespace() || value.is_control())
+    {
+        return Err(refuse());
+    }
+    let authority = after_scheme.split('/').next().ok_or_else(refuse)?;
+    connector_address::HttpsOrigin::parse(&format!("https://{authority}")).map_err(|_| refuse())?;
+    Ok(base.to_owned())
 }
 
 /// **A channel handshake's connection settings, with the declared defaults overlaid** (C-558).
