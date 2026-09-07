@@ -164,32 +164,18 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
         Unspecified::Lifecycle,
         "supplies a credential a hosted Integration requires; no entity of this specification moves",
     ),
+    ("daemon start", Unspecified::Lifecycle, "starts the local daemon process"),
+    ("daemon status", Unspecified::Read, "reads local daemon lifecycle status"),
+    ("daemon stop", Unspecified::Lifecycle, "stops the local daemon process"),
+    ("endpoint list", Unspecified::Read, "reads discovered service interfaces"),
+    ("endpoint show", Unspecified::Read, "reads one endpoint and its readiness"),
+    ("endpoint refresh", Unspecified::Flow, "reconciles configured discovery sources"),
+    ("endpoint bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
     // Under `connection`.
-    (
-        "connection candidates",
-        Unspecified::Read,
-        "a read of potential direct Connections; no provider is contacted",
-    ),
-    (
-        "connection activate",
-        Unspecified::Forwarded,
-        "forwards `connectors.connection.ActivateCandidate`, which `connectors-service` accepts",
-    ),
     (
         "connection list",
         Unspecified::Read,
         "a read of non-secret Connection summaries",
-    ),
-    (
-        "connection observations",
-        Unspecified::Read,
-        "a read of the latest stored discovery observations",
-    ),
-    (
-        "connection materialize",
-        Unspecified::Forwarded,
-        "forwards `connectors.connection.MaterializeObservation`, which `connectors-service` \
-         accepts",
     ),
     // Under `event`.
     (
@@ -630,6 +616,12 @@ fn kinds_the_tree_derives() -> BTreeMap<String, Unspecified> {
             continue;
         }
         let text = read(&path);
+        // Process control is a separate lifecycle protocol. Calls such as daemon::require do
+        // not forward all lifecycle methods or turn every provider read into a multi-step flow.
+        // Its externally defined CLI leaves remain explicit residual claims in the accounting.
+        if path.file_stem().and_then(|stem| stem.to_str()) == Some("daemon") {
+            continue;
+        }
         let mut reached = requests_built_by(&text, &enums);
         for (name, body) in &methods {
             if text.contains(&format!(".{name}(")) {
@@ -754,7 +746,9 @@ fn kinds_the_tree_derives() -> BTreeMap<String, Unspecified> {
     }
 
     assert!(
-        derived.len() >= 13,
+        // Four legacy discovery leaves were retired; the nine remaining measured arms must
+        // still be visible. New endpoint/lifecycle modules are recorded as residual claims.
+        derived.len() >= 9,
         "only {} dispatch arms of crates/connectors-cli/src/lib.rs were followed to a protocol \
          request; the dispatch moved, so read it again before believing any result from a check \
          that uses this: {derived:?}",
