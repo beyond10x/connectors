@@ -11,6 +11,10 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+- Include native Kubernetes in provider inspection while keeping every provider ID visible in
+  text output. With this additional row, 67 of the 72 lines exceed the 120-column table budget;
+  the longest remains 237 columns because the final column preserves its complete value.
+
 ## 0.7.2 — 2026-09-07
 
 - Add `connectors inspect upgrade` to report the installed CLI version, embedded catalog schema
