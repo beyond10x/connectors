@@ -1,6 +1,6 @@
 # The event nouns of the runtime side, docs/design/01-domain-model.md:366-399, and the wire shapes
-# `crates/protocol/src/event.rs` projects for them. `Channel` is in `connectors.connection`, with
-# the other nouns `crates/protocol/src/connection.rs` declares.
+# `crates/protocol/src/event.rs` projects for them. `EventReceiver` is in `connectors.endpoint`, with
+# the other nouns `crates/protocol/src/endpoint.rs` declares.
 domain: connectors.event
 
 summary: One normalized unit of something happening, the inbound transport that receives it, and the two ways it reaches a client.
@@ -10,11 +10,11 @@ types:
     kind: newtype
     of: String
 
-  - name: connectors.event.ChannelRef
+  - name: connectors.event.EventReceiverRef
     kind: newtype
     of: String
 
-  - name: connectors.event.ConnectionRef
+  - name: connectors.event.EndpointRef
     kind: newtype
     of: String
 
@@ -44,7 +44,7 @@ types:
   # The two disjoint families of docs/design/01-domain-model.md:368-373. They are never mixed and
   # carry separate subscriptions, which is why this is a declared axis and not a label.
   # UNMAPPED: the family is not projected on the wire. `DataEvent`
-  # (crates/protocol/src/event.rs:84-93) is the data family and the protocol has no operational
+  # (crates/protocol/src/event.rs:87-96) is the data family and the protocol has no operational
   # counterpart at all, so nothing carries this discriminant. Settled by the operational event
   # stream gaining a wire shape.
   - name: connectors.event.EventFamily
@@ -57,7 +57,7 @@ entities:
   # the document's own word: "One normalized unit of something happening"
   # (docs/design/01-domain-model.md:368). An event is a fact and facts do not move, so this one is
   # unlikely to gain a second state. Settled by a state enum in `crates/protocol/src/`.
-  # Fields: `DataEvent`, crates/protocol/src/event.rs:84-93.
+  # Fields: `DataEvent`, crates/protocol/src/event.rs:87-96.
   - name: connectors.event.Event
 
     identity:
@@ -65,10 +65,10 @@ entities:
       type: connectors.event.EventRef
 
     fields:
-      - name: channel_ref
-        type: connectors.event.ChannelRef
-      - name: connection_ref
-        type: connectors.event.ConnectionRef
+      - name: event_receiver_ref
+        type: connectors.event.EventReceiverRef
+      - name: endpoint_ref
+        type: connectors.event.EndpointRef
       - name: integration_ref
         type: connectors.event.IntegrationRef
       - name: event_type
@@ -90,7 +90,7 @@ entities:
   # the document's own word: verification and attribution are "declared in the catalog"
   # (docs/design/01-domain-model.md:381). Settled by a state enum, or by the registration path
   # becoming observable.
-  # UNMAPPED: the Webhook-to-Channel relation. docs/design/01-domain-model.md:380 calls a Webhook
+  # UNMAPPED: the Webhook-to-EventReceiver relation. docs/design/01-domain-model.md:380 calls a Webhook
   # "the webhook transport of channels" and says there is "one platform endpoint", which states
   # neither how many channels one endpoint serves nor whether a channel has more than one
   # transport. Settled by the declarative routing grammar
