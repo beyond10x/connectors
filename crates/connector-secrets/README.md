@@ -52,6 +52,16 @@ generation-fenced state machine; Vault returns the separate payload-free
 `PreparedSecretError::Unsupported`. The batch stays private, reads retain the old committed image
 until `commit`, and explicit reclamation bounds the durable terminal ledger.
 
+Coordinators sharing a prepared store read `retirement_watermark` when allocating a generation and
+acknowledge only their own terminal transaction with `acknowledge(id)`, after durable metadata
+publication. Acknowledgement retains other owners' recovery outcomes, including transactions with
+the same generation. The inclusive fence advances only past acknowledged outcomes; a racing
+`Retired` prepare stages nothing. `reclaim(through)` remains for an exclusive owner that can certify
+every outcome in that range. File-backed acknowledgement may return `Busy` while a prepared image
+exists; retain the publication receipt and drain acknowledgements after pending recovery finishes.
+Old file journals remain readable and unacknowledged. New acknowledged terminal markers are
+understood by the current reader and refused by earlier readers, preserving their fail-closed gate.
+
 ## Portable durable storage
 
 `FileStore` is the same public `SecretStore` backend on Linux, macOS and Windows. Clean v1 files

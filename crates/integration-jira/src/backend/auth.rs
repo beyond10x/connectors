@@ -313,7 +313,6 @@ impl JiraInner {
             },
             |connection| Ok((connection.instance_id, connection.connection_ref)),
         )?;
-        let (transaction, generation) = self.reserve_transaction()?;
         let connection = StoredConnection {
             connection_ref: connection_ref.clone(),
             instance_id,
@@ -324,20 +323,17 @@ impl JiraInner {
             display_name: evidence.display_name,
             email_sha256: email_sha256(&owner.email),
             scopes: evidence.scopes,
-            credential_generation: u64::from_be_bytes(generation.protocol_bytes()),
+            credential_generation: 0,
             observed_at_unix_ms: now_ms().ok_or_else(|| JiraError::new("clock"))?,
             expires_at_unix_ms: credentials.expires_at_unix_ms,
         };
-        self.commit_credentials(transaction, generation, connection, credentials)
-            .await?;
+        self.commit_credentials(connection, credentials).await?;
         Ok(connection_ref)
     }
 
     async fn commit_credentials(
         &self,
-        transaction: SecretTransactionId,
-        generation: SecretTransactionGeneration,
-        connection: StoredConnection,
+        mut connection: StoredConnection,
         credentials: CredentialValues,
     ) -> Result<(), JiraError> {
         let mut batch = SecretBatch::new(
@@ -356,49 +352,83 @@ impl JiraInner {
                 credentials.refresh_token,
             )
             .map_err(|_| JiraError::new("credential-batch"))?;
-        self.credential_store
-            .prepare(transaction, proposal_digest(&batch), &batch)
-            .await
-            .map_err(|_| JiraError::new("credential-prepare"))?;
-        let transaction_id = hex::encode(transaction.protocol_bytes());
-        let persisted = {
-            let mut state = lock(&self.metadata);
-            state.pending.push(PendingCommit {
-                transaction_id: transaction_id.clone(),
-                connection: connection.clone(),
-            });
-            let result = self.persist(&state);
-            if result.is_err() {
-                state
-                    .pending
-                    .retain(|pending| pending.transaction_id != transaction_id);
+        let mut current_intent = None;
+        let prepared = service::prepare_credential_batch(
+            self.credential_store.as_ref(),
+            proposal_digest(&batch),
+            &batch,
+            |minimum| {
+                let (transaction, generation) = self.reserve_transaction(minimum)?;
+                connection.credential_generation = u64::from_be_bytes(generation.protocol_bytes());
+                let transaction_id = hex::encode(transaction.protocol_bytes());
+                let mut state = lock(&self.metadata);
+                // A repeated callback means the preceding prepare returned Retired, proving
+                // it had no effects. Replace only that exact write-ahead intent.
+                if let Some(previous) = current_intent {
+                    let previous = hex::encode(SecretTransactionId::protocol_bytes(previous));
+                    state
+                        .pending
+                        .retain(|pending| pending.transaction_id != previous);
+                }
+                current_intent = Some(transaction);
+                state.pending.push(PendingCommit {
+                    transaction_id,
+                    published: false,
+                    discarded: false,
+                    intent: true,
+                    connection: connection.clone(),
+                });
+                self.persist(&state)?;
+                Ok((transaction, generation))
+            },
+        )
+        .await;
+        let (transaction, _) = match prepared {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                if let Some(transaction) = current_intent {
+                    self.discard_pending(transaction, &hex::encode(transaction.protocol_bytes()))
+                        .await;
+                }
+                return Err(match error {
+                    service::CredentialPreparationError::Reservation(error) => error,
+                    service::CredentialPreparationError::Store(_) => {
+                        JiraError::new("credential-prepare")
+                    }
+                });
             }
-            result
         };
-        if let Err(error) = persisted {
-            let _ = self.credential_store.abort(transaction).await;
-            return Err(error);
-        }
+        let transaction_id = hex::encode(transaction.protocol_bytes());
         self.credential_store
             .commit(transaction)
             .await
             .map_err(|_| JiraError::new("credential-commit"))?;
         {
             let mut state = lock(&self.metadata);
-            state
+            let prior = state.clone();
+            if let Some(pending) = state
                 .pending
-                .retain(|pending| pending.transaction_id != transaction_id);
+                .iter_mut()
+                .find(|pending| pending.transaction_id == transaction_id)
+            {
+                pending.published = true;
+            }
             upsert_connection(&mut state.connections, connection);
-            self.persist(&state)?;
+            if let Err(error) = self.persist(&state) {
+                *state = prior;
+                return Err(error);
+            }
         }
-        let _ = self.credential_store.reclaim(generation).await;
+        self.acknowledge_publications().await;
         Ok(())
     }
 
     fn reserve_transaction(
         &self,
+        minimum: u64,
     ) -> Result<(SecretTransactionId, SecretTransactionGeneration), JiraError> {
         let mut state = lock(&self.metadata);
+        state.next_transaction_generation = state.next_transaction_generation.max(minimum);
         let generation = SecretTransactionGeneration::from_protocol_bytes(
             state.next_transaction_generation.to_be_bytes(),
         )
@@ -414,39 +444,125 @@ impl JiraInner {
     }
 
     pub(super) async fn recover_pending(&self) -> Result<(), JiraError> {
-        let pending_commits = { lock(&self.metadata).pending.clone() };
-        for pending in pending_commits {
-            let transaction = decode_transaction(&pending.transaction_id)?;
-            match self
-                .credential_store
-                .state(transaction)
-                .await
-                .map_err(|_| JiraError::new("credential-recovery"))?
-            {
-                SecretTransactionState::Prepared => {
-                    self.credential_store
-                        .commit(transaction)
-                        .await
-                        .map_err(|_| JiraError::new("credential-recovery"))?;
-                }
-                SecretTransactionState::Committed => {}
-                SecretTransactionState::Absent => {
+        for pass in 0..2 {
+            let pending_commits = { lock(&self.metadata).pending.clone() };
+            for pending in pending_commits {
+                let transaction = decode_transaction(&pending.transaction_id)?;
+                if !pending.published && !pending.discarded {
+                    match service::recover_credential_intent(
+                        self.credential_store.as_ref(),
+                        transaction,
+                        pending.intent,
+                    )
+                    .await
+                    .map_err(|_| JiraError::new("credential-recovery"))?
+                    {
+                        service::CredentialRecovery::Committed => {}
+                        service::CredentialRecovery::Deferred => {
+                            if pass == 1 {
+                                return Err(JiraError::new("credential-recovery"));
+                            }
+                            continue;
+                        }
+                        service::CredentialRecovery::Discarded => {
+                            let mut state = lock(&self.metadata);
+                            let prior = state.clone();
+                            if let Some(receipt) = state
+                                .pending
+                                .iter_mut()
+                                .find(|receipt| receipt.transaction_id == pending.transaction_id)
+                            {
+                                receipt.discarded = true;
+                            }
+                            if let Err(error) = self.persist(&state) {
+                                *state = prior;
+                                return Err(error);
+                            }
+                            continue;
+                        }
+                    }
                     let mut state = lock(&self.metadata);
-                    state
+                    let prior = state.clone();
+                    if let Some(receipt) = state
                         .pending
-                        .retain(|candidate| candidate.transaction_id != pending.transaction_id);
-                    self.persist(&state)?;
-                    continue;
+                        .iter_mut()
+                        .find(|candidate| candidate.transaction_id == pending.transaction_id)
+                    {
+                        receipt.published = true;
+                    }
+                    upsert_connection(&mut state.connections, pending.connection);
+                    if let Err(error) = self.persist(&state) {
+                        *state = prior;
+                        return Err(error);
+                    }
                 }
+                self.acknowledge_publications().await;
             }
-            let mut state = lock(&self.metadata);
-            state
-                .pending
-                .retain(|candidate| candidate.transaction_id != pending.transaction_id);
-            upsert_connection(&mut state.connections, pending.connection);
-            self.persist(&state)?;
+            self.acknowledge_publications().await;
         }
         Ok(())
+    }
+
+    async fn discard_pending(&self, transaction: SecretTransactionId, transaction_id: &str) {
+        // This path owns a newly persisted write-ahead intent, never a legacy receipt.
+        let absent = matches!(
+            self.credential_store.abort(transaction).await,
+            Ok(SecretTransactionState::Absent)
+                | Err(connector_secrets::PreparedSecretError::Retired)
+        );
+        let durable = {
+            let mut state = lock(&self.metadata);
+            let prior = state.clone();
+            if absent {
+                if let Some(receipt) = state
+                    .pending
+                    .iter_mut()
+                    .find(|receipt| receipt.transaction_id == transaction_id)
+                {
+                    receipt.discarded = true;
+                }
+            }
+            if self.persist(&state).is_ok() {
+                true
+            } else {
+                *state = prior;
+                false
+            }
+        };
+        if absent && durable {
+            self.acknowledge_publications().await;
+        }
+    }
+
+    async fn acknowledge_publications(&self) {
+        let receipts = {
+            lock(&self.metadata)
+                .pending
+                .iter()
+                .filter(|pending| pending.published || pending.discarded)
+                .map(|pending| pending.transaction_id.clone())
+                .collect::<Vec<_>>()
+        };
+        for transaction_id in receipts {
+            let Ok(transaction) = decode_transaction(&transaction_id) else {
+                continue;
+            };
+            if service::acknowledge_credential_publication(
+                self.credential_store.as_ref(),
+                transaction,
+            )
+            .await
+            {
+                let mut state = lock(&self.metadata);
+                let prior = state.clone();
+                state
+                    .pending
+                    .retain(|pending| pending.transaction_id != transaction_id);
+                if self.persist(&state).is_err() {
+                    *state = prior;
+                }
+            }
+        }
     }
 
     pub(super) fn connection_credential_ref(
@@ -546,15 +662,12 @@ impl JiraInner {
         let (resources, me) = self
             .verify_refresh_subject(&credentials.access_token, &connection)
             .await?;
-        let (transaction, generation) = self.reserve_transaction()?;
         let mut updated = connection;
         updated.scopes = resources;
         updated.display_name = bounded_string(&me.name, 256);
         updated.observed_at_unix_ms = now_ms().ok_or_else(|| JiraError::new("clock"))?;
         updated.expires_at_unix_ms = credentials.expires_at_unix_ms;
-        updated.credential_generation = u64::from_be_bytes(generation.protocol_bytes());
-        self.commit_credentials(transaction, generation, updated, credentials)
-            .await
+        self.commit_credentials(updated, credentials).await
     }
 
     async fn verify_refresh_subject(

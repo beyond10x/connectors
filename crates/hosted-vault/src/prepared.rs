@@ -4,6 +4,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -26,6 +27,10 @@ pub struct PreparedVaultStore {
     inner: Arc<dyn SecretStore>,
     storage: JournalStorage,
     journal: Mutex<Journal>,
+    /// Serialize admission and mutation through remote staging/publication. The journal lock
+    /// alone cannot protect a check that is followed by asynchronous secret-store work.
+    mutation: Mutex<()>,
+    uncertain: AtomicBool,
 }
 
 enum JournalStorage {
@@ -65,6 +70,13 @@ struct Transaction {
     digest: String,
     phase: Phase,
     entries: Vec<Entry>,
+    /// Old journals retain every outcome until its original coordinator acknowledges it.
+    #[serde(default, skip_serializing_if = "is_false")]
+    acknowledged: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,6 +116,8 @@ impl PreparedVaultStore {
             inner,
             storage: JournalStorage::File(journal_path),
             journal: Mutex::new(journal),
+            mutation: Mutex::new(()),
+            uncertain: AtomicBool::new(false),
         })
     }
 
@@ -129,10 +143,30 @@ impl PreparedVaultStore {
             inner,
             storage: JournalStorage::Shared { state, key },
             journal: Mutex::new(journal),
+            mutation: Mutex::new(()),
+            uncertain: AtomicBool::new(false),
         })
     }
 
     fn persist(&self, journal: &Journal) -> Result<(), StoreError> {
+        let result = self.persist_inner(journal);
+        if result.is_err() {
+            // A failed write may have reached durable state. Until reopened, no later write
+            // may replace it using an older in-memory retirement fence or transaction phase.
+            self.uncertain.store(true, Ordering::SeqCst);
+        }
+        result
+    }
+
+    fn require_certain(&self) -> Result<(), PreparedSecretError> {
+        if self.uncertain.load(Ordering::SeqCst) {
+            Err(PreparedSecretError::Backend)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn persist_inner(&self, journal: &Journal) -> Result<(), StoreError> {
         match &self.storage {
             JournalStorage::File(path) => write_journal(path, journal),
             JournalStorage::Shared { state, key } => {
@@ -148,6 +182,13 @@ impl PreparedVaultStore {
 
     /// Resolve incomplete commits and remove incomplete staging before the store is exposed.
     pub async fn initialize(&self) -> Result<(), StoreError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain().map_err(|_| {
+            journal_error_label(
+                SHARED_JOURNAL_LABEL,
+                "journal requires reopening for recovery",
+            )
+        })?;
         let mut journal = self.journal.lock().await;
         let mut journal_changed = false;
         for index in 0..journal.transactions.len() {
@@ -219,6 +260,13 @@ impl SecretStore for PreparedVaultStore {
     }
 
     async fn put(&self, reference: &CredentialRef, secret: &Secret) -> Result<(), StoreError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain().map_err(|_| {
+            journal_error_label(
+                SHARED_JOURNAL_LABEL,
+                "journal requires reopening for recovery",
+            )
+        })?;
         if self.has_live_transaction().await {
             return Err(StoreError::Conflict {
                 path: "<vault-prepared-store>".to_owned(),
@@ -229,6 +277,13 @@ impl SecretStore for PreparedVaultStore {
     }
 
     async fn delete(&self, reference: &CredentialRef) -> Result<(), StoreError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain().map_err(|_| {
+            journal_error_label(
+                SHARED_JOURNAL_LABEL,
+                "journal requires reopening for recovery",
+            )
+        })?;
         if self.has_live_transaction().await {
             return Err(StoreError::Conflict {
                 path: "<vault-prepared-store>".to_owned(),
@@ -252,12 +307,24 @@ impl SecretStore for PreparedVaultStore {
 
 #[async_trait]
 impl PreparedSecretStore for PreparedVaultStore {
+    async fn retirement_watermark(
+        &self,
+    ) -> Result<Option<SecretTransactionGeneration>, PreparedSecretError> {
+        let journal = self.journal.lock().await;
+        self.require_certain()?;
+        Ok(SecretTransactionGeneration::from_protocol_bytes(
+            journal.retired_through.to_be_bytes(),
+        ))
+    }
+
     async fn prepare(
         &self,
         id: SecretTransactionId,
         digest: SecretProposalDigest,
         batch: &SecretBatch,
     ) -> Result<SecretTransactionState, PreparedSecretError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain()?;
         let key = hex::encode(id.protocol_bytes());
         let generation = generation_value(id);
         let digest = hex::encode(digest.protocol_bytes());
@@ -315,6 +382,7 @@ impl PreparedSecretStore for PreparedVaultStore {
                 digest,
                 phase: Phase::Staging,
                 entries,
+                acknowledged: false,
             });
             self.persist(&journal)
                 .map_err(|_| PreparedSecretError::Backend)?;
@@ -359,6 +427,7 @@ impl PreparedSecretStore for PreparedVaultStore {
         id: SecretTransactionId,
     ) -> Result<SecretTransactionState, PreparedSecretError> {
         let journal = self.journal.lock().await;
+        self.require_certain()?;
         if generation_value(id) <= journal.retired_through {
             return Err(PreparedSecretError::Retired);
         }
@@ -382,6 +451,8 @@ impl PreparedSecretStore for PreparedVaultStore {
         &self,
         id: SecretTransactionId,
     ) -> Result<SecretTransactionState, PreparedSecretError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain()?;
         let key = hex::encode(id.protocol_bytes());
         let transaction = {
             let mut journal = self.journal.lock().await;
@@ -426,6 +497,8 @@ impl PreparedSecretStore for PreparedVaultStore {
         &self,
         id: SecretTransactionId,
     ) -> Result<SecretTransactionState, PreparedSecretError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain()?;
         let key = hex::encode(id.protocol_bytes());
         let transaction = {
             let mut journal = self.journal.lock().await;
@@ -441,13 +514,10 @@ impl PreparedSecretStore for PreparedVaultStore {
                 }
                 existing.clone()
             } else {
-                if journal.transactions.iter().any(|transaction| {
-                    matches!(
-                        transaction.phase,
-                        Phase::Staging | Phase::Prepared | Phase::Committing
-                    )
-                }) {
-                    return Err(PreparedSecretError::Busy);
+                // This value-free tombstone fences a delayed prepare without modifying another
+                // transaction's staged candidate. Its live record already reserves its capacity.
+                if journal.transactions.len() >= MAX_TERMINAL_TRANSACTIONS {
+                    return Err(PreparedSecretError::Capacity);
                 }
                 journal.transactions.push(Transaction {
                     id: key,
@@ -455,6 +525,7 @@ impl PreparedSecretStore for PreparedVaultStore {
                     digest: String::new(),
                     phase: Phase::Aborted,
                     entries: Vec::new(),
+                    acknowledged: false,
                 });
                 self.persist(&journal)
                     .map_err(|_| PreparedSecretError::Backend)?;
@@ -476,10 +547,55 @@ impl PreparedSecretStore for PreparedVaultStore {
         Ok(SecretTransactionState::Absent)
     }
 
+    async fn acknowledge(&self, id: SecretTransactionId) -> Result<(), PreparedSecretError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain()?;
+        let mut journal = self.journal.lock().await;
+        if generation_value(id) <= journal.retired_through {
+            return Ok(());
+        }
+        // Publish in memory only after persistence succeeds. An uncertain write requires reopening
+        // the durable journal before idempotent acknowledgement can continue.
+        let mut next = journal.clone();
+        let transaction = next
+            .transactions
+            .iter_mut()
+            .find(|transaction| transaction.id == hex::encode(id.protocol_bytes()))
+            .ok_or(PreparedSecretError::NotPrepared)?;
+        if !matches!(transaction.phase, Phase::Committed | Phase::Aborted) {
+            return Err(PreparedSecretError::Busy);
+        }
+        transaction.acknowledged = true;
+        let mut acknowledged_through = next.retired_through;
+        let mut first_unacknowledged: Option<u64> = None;
+        for transaction in &next.transactions {
+            if transaction.acknowledged {
+                acknowledged_through = acknowledged_through.max(transaction.generation);
+            } else {
+                first_unacknowledged = Some(
+                    first_unacknowledged.map_or(transaction.generation, |prior| {
+                        prior.min(transaction.generation)
+                    }),
+                );
+            }
+        }
+        next.retired_through = acknowledged_through
+            .min(first_unacknowledged.map_or(u64::MAX, |generation| generation - 1));
+        let fence = next.retired_through;
+        next.transactions
+            .retain(|transaction| transaction.generation > fence);
+        self.persist(&next)
+            .map_err(|_| PreparedSecretError::Backend)?;
+        *journal = next;
+        Ok(())
+    }
+
     async fn reclaim(
         &self,
         through: SecretTransactionGeneration,
     ) -> Result<(), PreparedSecretError> {
+        let _mutation = self.mutation.lock().await;
+        self.require_certain()?;
         let through = u64::from_be_bytes(through.protocol_bytes());
         let mut journal = self.journal.lock().await;
         if journal.transactions.iter().any(|transaction| {
@@ -575,6 +691,26 @@ fn decode_journal(bytes: &[u8], location: &str) -> Result<Journal, StoreError> {
             "journal version is unsupported",
         ));
     }
+    let mut ids = std::collections::BTreeSet::new();
+    if journal.transactions.len() > MAX_TERMINAL_TRANSACTIONS
+        || journal.transactions.iter().any(|transaction| {
+            let valid_id = hex::decode(&transaction.id)
+                .ok()
+                .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
+                .and_then(SecretTransactionId::from_protocol_bytes)
+                .is_some_and(|id| generation_value(id) == transaction.generation);
+            !valid_id
+                || transaction.generation <= journal.retired_through
+                || !ids.insert(&transaction.id)
+                || transaction.acknowledged
+                    && !matches!(transaction.phase, Phase::Committed | Phase::Aborted)
+        })
+    {
+        return Err(journal_error_label(
+            location,
+            "journal transaction evidence is invalid",
+        ));
+    }
     Ok(journal)
 }
 
@@ -659,6 +795,10 @@ fn journal_error_label(location: &str, reason: &str) -> StoreError {
 /// journal rather than a file beside the socket, and the reason.
 const SHARED_JOURNAL_LABEL: &str = "<shared-state>";
 
+#[cfg(test)]
+#[path = "prepared_acknowledgement_tests.rs"]
+mod acknowledgement_tests;
+
 fn shared_journal_error(error: connector_state::StateError) -> StoreError {
     journal_error_label(SHARED_JOURNAL_LABEL, &error.to_string())
 }
@@ -668,8 +808,8 @@ mod tests {
     use super::*;
     use connector_secrets::MemoryStore;
 
-    const OLD: &str = "SENTINEL-NOT-A-REAL-SECRET-old";
-    const NEW: &str = "SENTINEL-NOT-A-REAL-SECRET-new";
+    pub(super) const OLD: &str = "SENTINEL-NOT-A-REAL-SECRET-old";
+    pub(super) const NEW: &str = "SENTINEL-NOT-A-REAL-SECRET-new";
 
     fn transaction() -> SecretTransactionId {
         let generation = SecretTransactionGeneration::from_protocol_bytes(1_u64.to_be_bytes())
@@ -677,7 +817,7 @@ mod tests {
         SecretTransactionId::new(generation, [7; 24])
     }
 
-    fn reference() -> CredentialRef {
+    pub(super) fn reference() -> CredentialRef {
         CredentialRef::for_instance(
             "tenant-dev",
             "com.slack.api",
@@ -688,7 +828,7 @@ mod tests {
         .expect("valid reference")
     }
 
-    fn batch(value: &str) -> SecretBatch {
+    pub(super) fn batch(value: &str) -> SecretBatch {
         let reference = reference();
         let mut batch = SecretBatch::new(
             CredentialScope::new(reference.tenant(), reference.authority()).expect("valid scope"),

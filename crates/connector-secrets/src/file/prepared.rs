@@ -25,6 +25,17 @@ pub(super) enum FileRecord {
     Prepared(SecretProposalDigest),
     Committed(SecretProposalDigest),
     Aborted,
+    AcknowledgedCommitted(SecretProposalDigest),
+    AcknowledgedAborted,
+}
+
+impl FileRecord {
+    fn acknowledged(&self) -> bool {
+        matches!(
+            self,
+            Self::AcknowledgedCommitted(_) | Self::AcknowledgedAborted
+        )
+    }
 }
 
 pub(super) struct Candidate {
@@ -39,6 +50,8 @@ pub(super) struct FileTransactions {
     pub(super) retired_through: u64,
     pub(super) records: BTreeMap<[u8; 32], FileRecord>,
     pub(super) candidate: Option<Candidate>,
+    /// An uncertain acknowledgement must be read back or reopened before another write.
+    pub(super) acknowledgement_uncertain: bool,
 }
 
 impl FileTransactions {
@@ -49,7 +62,10 @@ impl FileTransactions {
                     .expect("v2 parsing rejects zero-generation ids"),
                 *digest,
             )),
-            FileRecord::Committed(_) | FileRecord::Aborted => None,
+            FileRecord::Committed(_)
+            | FileRecord::Aborted
+            | FileRecord::AcknowledgedCommitted(_)
+            | FileRecord::AcknowledgedAborted => None,
         })
     }
 
@@ -104,6 +120,11 @@ pub(super) fn encode_v2(
                 rendered.push_str(&hex_encode(&digest.protocol_bytes()));
             }
             FileRecord::Aborted => rendered.push_str(" aborted"),
+            FileRecord::AcknowledgedCommitted(digest) => {
+                rendered.push_str(" acknowledged-committed ");
+                rendered.push_str(&hex_encode(&digest.protocol_bytes()));
+            }
+            FileRecord::AcknowledgedAborted => rendered.push_str(" acknowledged-aborted"),
         }
         rendered.push('\n');
     }
@@ -224,6 +245,14 @@ pub(super) fn parse_v2<L: Layout>(
                     ))
                 }
                 ("aborted", None) => FileRecord::Aborted,
+                ("acknowledged-committed", Some(encoded)) => {
+                    FileRecord::AcknowledgedCommitted(SecretProposalDigest::from_protocol_bytes(
+                        decode_array::<32>(encoded).ok_or_else(|| {
+                            backend(file, &format!("line {number} has an invalid digest"))
+                        })?,
+                    ))
+                }
+                ("acknowledged-aborted", None) => FileRecord::AcknowledgedAborted,
                 _ => {
                     return Err(backend(
                         file,
@@ -305,6 +334,7 @@ pub(super) fn parse_v2<L: Layout>(
         retired_through,
         records,
         candidate: None,
+        acknowledgement_uncertain: false,
     };
     let canonical = encode_v2(&entries, &transactions).map_err(|reason| backend(file, &reason))?;
     if canonical != contents {
@@ -354,6 +384,16 @@ fn backend(file: &Path, reason: &str) -> StoreError {
 
 #[async_trait]
 impl<L: Layout + Send + Sync> PreparedSecretStore for FileStore<L> {
+    async fn retirement_watermark(
+        &self,
+    ) -> Result<Option<SecretTransactionGeneration>, PreparedSecretError> {
+        let transactions = self.locked_transactions();
+        require_certain(&transactions)?;
+        Ok(SecretTransactionGeneration::from_protocol_bytes(
+            transactions.retired_through.to_be_bytes(),
+        ))
+    }
+
     async fn prepare(
         &self,
         id: SecretTransactionId,
@@ -361,6 +401,7 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for FileStore<L> {
         mutations: &SecretBatch,
     ) -> Result<SecretTransactionState, PreparedSecretError> {
         let mut transactions = self.locked_transactions();
+        require_certain(&transactions)?;
         if retired(&transactions, id) {
             return Err(PreparedSecretError::Retired);
         }
@@ -376,11 +417,17 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for FileStore<L> {
         }
         if let Some(record) = transactions.records.get(&id.key()) {
             return match record {
-                FileRecord::Committed(existing) if *existing == digest => {
+                FileRecord::Committed(existing) | FileRecord::AcknowledgedCommitted(existing)
+                    if *existing == digest =>
+                {
                     Ok(SecretTransactionState::Committed)
                 }
-                FileRecord::Committed(_) => Err(PreparedSecretError::DigestMismatch),
-                FileRecord::Aborted => Err(PreparedSecretError::TransactionIdReused),
+                FileRecord::Committed(_) | FileRecord::AcknowledgedCommitted(_) => {
+                    Err(PreparedSecretError::DigestMismatch)
+                }
+                FileRecord::Aborted | FileRecord::AcknowledgedAborted => {
+                    Err(PreparedSecretError::TransactionIdReused)
+                }
                 FileRecord::Prepared(_) => unreachable!("prepared() handled this record"),
             };
         }
@@ -452,8 +499,12 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for FileStore<L> {
         }
         Ok(match transactions.records.get(&id.key()) {
             Some(FileRecord::Prepared(_)) => SecretTransactionState::Prepared,
-            Some(FileRecord::Committed(_)) => SecretTransactionState::Committed,
-            Some(FileRecord::Aborted) | None => SecretTransactionState::Absent,
+            Some(FileRecord::Committed(_) | FileRecord::AcknowledgedCommitted(_)) => {
+                SecretTransactionState::Committed
+            }
+            Some(FileRecord::Aborted | FileRecord::AcknowledgedAborted) | None => {
+                SecretTransactionState::Absent
+            }
         })
     }
 
@@ -462,13 +513,18 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for FileStore<L> {
         id: SecretTransactionId,
     ) -> Result<SecretTransactionState, PreparedSecretError> {
         let mut transactions = self.locked_transactions();
+        require_certain(&transactions)?;
         if retired(&transactions, id) {
             return Err(PreparedSecretError::Retired);
         }
         if let Some(record) = transactions.records.get(&id.key()) {
             match record {
-                FileRecord::Committed(_) => return Ok(SecretTransactionState::Committed),
-                FileRecord::Aborted => return Err(PreparedSecretError::TransactionIdReused),
+                FileRecord::Committed(_) | FileRecord::AcknowledgedCommitted(_) => {
+                    return Ok(SecretTransactionState::Committed)
+                }
+                FileRecord::Aborted | FileRecord::AcknowledgedAborted => {
+                    return Err(PreparedSecretError::TransactionIdReused)
+                }
                 FileRecord::Prepared(_) => {}
             }
         } else {
@@ -517,13 +573,18 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for FileStore<L> {
         id: SecretTransactionId,
     ) -> Result<SecretTransactionState, PreparedSecretError> {
         let mut transactions = self.locked_transactions();
+        require_certain(&transactions)?;
         if retired(&transactions, id) {
             return Err(PreparedSecretError::Retired);
         }
         if let Some(record) = transactions.records.get(&id.key()) {
             match record {
-                FileRecord::Committed(_) => return Err(PreparedSecretError::AlreadyCommitted),
-                FileRecord::Aborted => return Ok(SecretTransactionState::Absent),
+                FileRecord::Committed(_) | FileRecord::AcknowledgedCommitted(_) => {
+                    return Err(PreparedSecretError::AlreadyCommitted)
+                }
+                FileRecord::Aborted | FileRecord::AcknowledgedAborted => {
+                    return Ok(SecretTransactionState::Absent)
+                }
                 FileRecord::Prepared(_) => {}
             }
         }
@@ -558,11 +619,57 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for FileStore<L> {
         Ok(SecretTransactionState::Absent)
     }
 
+    async fn acknowledge(&self, id: SecretTransactionId) -> Result<(), PreparedSecretError> {
+        let mut transactions = self.locked_transactions();
+        require_certain(&transactions)?;
+        if retired(&transactions, id) {
+            return Ok(());
+        }
+        // Acknowledgement changes the live ledger. Keep the exact prepared image and its
+        // recovery comparison untouched until its transaction resolves.
+        if transactions.prepared().is_some() {
+            return Err(PreparedSecretError::Busy);
+        }
+        let mut records = transactions.records.clone();
+        let record = records
+            .get_mut(&id.key())
+            .ok_or(PreparedSecretError::NotPrepared)?;
+        *record = match record {
+            FileRecord::Committed(digest) | FileRecord::AcknowledgedCommitted(digest) => {
+                FileRecord::AcknowledgedCommitted(*digest)
+            }
+            FileRecord::Aborted | FileRecord::AcknowledgedAborted => {
+                FileRecord::AcknowledgedAborted
+            }
+            FileRecord::Prepared(_) => unreachable!("the prepared slot was checked above"),
+        };
+        let next_fence = crate::transaction::acknowledged_fence(
+            transactions.retired_through,
+            records
+                .iter()
+                .map(|(key, record)| (generation_of(*key), record.acknowledged())),
+        );
+        records.retain(|key, _| generation_of(*key) > next_fence);
+        let next = ledger(next_fence, records.clone());
+        let entries = self.locked();
+        verify_live(self, &entries, &transactions)?;
+        let rendered = encode_v2(&entries, &next).map_err(capacity_or_invalid)?;
+        if self.write_rendered_to(&self.path, &rendered, true).is_err() {
+            transactions.acknowledgement_uncertain = true;
+            return Err(PreparedSecretError::Backend);
+        }
+        transactions.version_two = true;
+        transactions.retired_through = next_fence;
+        transactions.records = records;
+        Ok(())
+    }
+
     async fn reclaim(
         &self,
         through: SecretTransactionGeneration,
     ) -> Result<(), PreparedSecretError> {
         let mut transactions = self.locked_transactions();
+        require_certain(&transactions)?;
         if transactions.prepared().is_some() {
             return Err(PreparedSecretError::Busy);
         }
@@ -590,11 +697,20 @@ fn ledger(retired_through: u64, records: BTreeMap<[u8; 32], FileRecord>) -> File
         retired_through,
         records,
         candidate: None,
+        acknowledgement_uncertain: false,
     }
 }
 
 fn retired(transactions: &FileTransactions, id: SecretTransactionId) -> bool {
     id.generation().value() <= transactions.retired_through
+}
+
+fn require_certain(transactions: &FileTransactions) -> Result<(), PreparedSecretError> {
+    if transactions.acknowledgement_uncertain {
+        Err(PreparedSecretError::Backend)
+    } else {
+        Ok(())
+    }
 }
 
 fn capacity_or_invalid(reason: String) -> PreparedSecretError {
@@ -658,6 +774,8 @@ mod tests {
             FileRecord::Prepared(proposal),
             FileRecord::Committed(proposal),
             FileRecord::Aborted,
+            FileRecord::AcknowledgedCommitted(proposal),
+            FileRecord::AcknowledgedAborted,
         ] {
             let mut records = BTreeMap::new();
             records.insert(transaction.key(), record);
@@ -666,6 +784,7 @@ mod tests {
                 retired_through: 1,
                 records,
                 candidate: None,
+                acknowledgement_uncertain: false,
             };
             assert!(encode_v2(&BTreeMap::new(), &ledger)
                 .expect_err("encoder must refuse every retired record state")

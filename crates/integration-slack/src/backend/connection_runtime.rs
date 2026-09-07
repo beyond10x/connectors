@@ -440,7 +440,6 @@ impl SlackInner {
             self.connection_credential_ref(&connection, USER_TOKEN_CREDENTIAL)?;
         let refresh_credential_ref =
             self.connection_credential_ref(&connection, OAUTH_REFRESH_TOKEN_CREDENTIAL)?;
-        let (transaction, generation) = self.reserve_transaction()?;
         let mut batch = SecretBatch::new(
             CredentialScope::new(self.tenant_id(), AUTHORITY)
                 .map_err(|_| SlackError::new("credential-address"))?,
@@ -466,31 +465,52 @@ impl SlackInner {
                 .map_err(|_| SlackError::new("credential-batch"))?;
         }
         let digest = proposal_digest(&batch);
-        self.credential_store
-            .prepare(transaction, digest, &batch)
-            .await
-            .map_err(|_| SlackError::new("credential-prepare"))?;
-
-        let transaction_hex = hex::encode(transaction.protocol_bytes());
-        let pending_persisted = {
-            let mut state = lock(&self.metadata);
-            state.pending.push(PendingCommit {
-                transaction_id: transaction_hex.clone(),
-                connection: connection.clone(),
-            });
-            let persisted = self.persist_metadata(&state).is_ok();
-            if !persisted {
-                state
-                    .pending
-                    .retain(|pending| pending.transaction_id != transaction_hex);
+        let mut current_intent = None;
+        let prepared = service::prepare_credential_batch(
+            self.credential_store.as_ref(),
+            digest,
+            &batch,
+            |minimum| {
+                let (transaction, generation) = self.reserve_transaction(minimum)?;
+                let transaction_id = hex::encode(transaction.protocol_bytes());
+                let mut state = lock(&self.metadata);
+                // A repeated callback means the preceding prepare returned Retired, proving
+                // it had no effects. Replace only that exact write-ahead intent.
+                if let Some(previous) = current_intent {
+                    let previous = hex::encode(SecretTransactionId::protocol_bytes(previous));
+                    state
+                        .pending
+                        .retain(|pending| pending.transaction_id != previous);
+                }
+                current_intent = Some(transaction);
+                state.pending.push(PendingCommit {
+                    transaction_id,
+                    published: false,
+                    discarded: false,
+                    intent: true,
+                    connection: connection.clone(),
+                });
+                self.persist_metadata(&state)?;
+                Ok((transaction, generation))
+            },
+        )
+        .await;
+        let (transaction, _) = match prepared {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                if let Some(transaction) = current_intent {
+                    self.discard_pending(transaction, &hex::encode(transaction.protocol_bytes()))
+                        .await;
+                }
+                return Err(match error {
+                    service::CredentialPreparationError::Reservation(error) => error,
+                    service::CredentialPreparationError::Store(_) => {
+                        SlackError::new("credential-prepare")
+                    }
+                });
             }
-            persisted
         };
-        if !pending_persisted {
-            let _ = self.credential_store.abort(transaction).await;
-            return Err(SlackError::new("connection-state"));
-        }
-
+        let transaction_id = hex::encode(transaction.protocol_bytes());
         self.credential_store
             .commit(transaction)
             .await
@@ -498,9 +518,13 @@ impl SlackInner {
         {
             let mut state = lock(&self.metadata);
             let prior = state.clone();
-            state
+            if let Some(pending) = state
                 .pending
-                .retain(|pending| pending.transaction_id != transaction_hex);
+                .iter_mut()
+                .find(|pending| pending.transaction_id == transaction_id)
+            {
+                pending.published = true;
+            }
             state.connections.push(connection.clone());
             state
                 .connections
@@ -510,7 +534,7 @@ impl SlackInner {
                 return Err(error);
             }
         }
-        let _ = self.credential_store.reclaim(generation).await;
+        self.acknowledge_publications().await;
         if connection.profile.receives_events() {
             self.start_supervisor(connection);
         }
@@ -519,9 +543,10 @@ impl SlackInner {
 
     pub(super) fn reserve_transaction(
         &self,
+        minimum: u64,
     ) -> Result<(SecretTransactionId, SecretTransactionGeneration), SlackError> {
         let mut state = lock(&self.metadata);
-        let generation_value = state.next_transaction_generation;
+        let generation_value = state.next_transaction_generation.max(minimum);
         let generation =
             SecretTransactionGeneration::from_protocol_bytes(generation_value.to_be_bytes())
                 .ok_or_else(|| SlackError::new("transaction-generation"))?;
@@ -535,48 +560,132 @@ impl SlackInner {
     }
 
     pub(super) async fn recover_pending(&self) -> Result<(), SlackError> {
-        let pending = lock(&self.metadata).pending.clone();
-        for record in pending {
-            let transaction = decode_transaction(&record.transaction_id)?;
-            match self
-                .credential_store
-                .state(transaction)
-                .await
-                .map_err(|_| SlackError::new("credential-recovery"))?
-            {
-                SecretTransactionState::Prepared => {
-                    self.credential_store
-                        .commit(transaction)
-                        .await
-                        .map_err(|_| SlackError::new("credential-recovery"))?;
-                }
-                SecretTransactionState::Committed => {}
-                SecretTransactionState::Absent => {
+        for pass in 0..2 {
+            let pending = lock(&self.metadata).pending.clone();
+            for record in pending {
+                let transaction = decode_transaction(&record.transaction_id)?;
+                if !record.published && !record.discarded {
+                    match service::recover_credential_intent(
+                        self.credential_store.as_ref(),
+                        transaction,
+                        record.intent,
+                    )
+                    .await
+                    .map_err(|_| SlackError::new("credential-recovery"))?
+                    {
+                        service::CredentialRecovery::Committed => {}
+                        service::CredentialRecovery::Deferred => {
+                            if pass == 1 {
+                                return Err(SlackError::new("credential-recovery"));
+                            }
+                            continue;
+                        }
+                        service::CredentialRecovery::Discarded => {
+                            let mut state = lock(&self.metadata);
+                            let prior = state.clone();
+                            if let Some(receipt) = state
+                                .pending
+                                .iter_mut()
+                                .find(|receipt| receipt.transaction_id == record.transaction_id)
+                            {
+                                receipt.discarded = true;
+                            }
+                            if let Err(error) = self.persist_metadata(&state) {
+                                *state = prior;
+                                return Err(error);
+                            }
+                            continue;
+                        }
+                    }
                     let mut state = lock(&self.metadata);
-                    state
+                    let prior = state.clone();
+                    if let Some(pending) = state
                         .pending
-                        .retain(|candidate| candidate.transaction_id != record.transaction_id);
-                    self.persist_metadata(&state)?;
-                    continue;
+                        .iter_mut()
+                        .find(|pending| pending.transaction_id == record.transaction_id)
+                    {
+                        pending.published = true;
+                    }
+                    if !state.connections.iter().any(|connection| {
+                        connection.connection_ref == record.connection.connection_ref
+                    }) {
+                        state.connections.push(record.connection);
+                        state
+                            .connections
+                            .sort_by(|a, b| a.connection_ref.cmp(&b.connection_ref));
+                    }
+                    if let Err(error) = self.persist_metadata(&state) {
+                        *state = prior;
+                        return Err(error);
+                    }
                 }
+                self.acknowledge_publications().await;
             }
-            let mut state = lock(&self.metadata);
-            state
-                .pending
-                .retain(|candidate| candidate.transaction_id != record.transaction_id);
-            if !state
-                .connections
-                .iter()
-                .any(|connection| connection.connection_ref == record.connection.connection_ref)
-            {
-                state.connections.push(record.connection);
-                state
-                    .connections
-                    .sort_by(|a, b| a.connection_ref.cmp(&b.connection_ref));
-            }
-            self.persist_metadata(&state)?;
+            self.acknowledge_publications().await;
         }
         Ok(())
+    }
+
+    async fn discard_pending(&self, transaction: SecretTransactionId, transaction_id: &str) {
+        // This path owns a newly persisted write-ahead intent, never a legacy receipt.
+        let absent = matches!(
+            self.credential_store.abort(transaction).await,
+            Ok(SecretTransactionState::Absent)
+                | Err(connector_secrets::PreparedSecretError::Retired)
+        );
+        let durable = {
+            let mut state = lock(&self.metadata);
+            let prior = state.clone();
+            if absent {
+                if let Some(receipt) = state
+                    .pending
+                    .iter_mut()
+                    .find(|receipt| receipt.transaction_id == transaction_id)
+                {
+                    receipt.discarded = true;
+                }
+            }
+            if self.persist_metadata(&state).is_ok() {
+                true
+            } else {
+                *state = prior;
+                false
+            }
+        };
+        if absent && durable {
+            self.acknowledge_publications().await;
+        }
+    }
+
+    async fn acknowledge_publications(&self) {
+        let receipts = {
+            lock(&self.metadata)
+                .pending
+                .iter()
+                .filter(|pending| pending.published || pending.discarded)
+                .map(|pending| pending.transaction_id.clone())
+                .collect::<Vec<_>>()
+        };
+        for transaction_id in receipts {
+            let Ok(transaction) = decode_transaction(&transaction_id) else {
+                continue;
+            };
+            if service::acknowledge_credential_publication(
+                self.credential_store.as_ref(),
+                transaction,
+            )
+            .await
+            {
+                let mut state = lock(&self.metadata);
+                let prior = state.clone();
+                state
+                    .pending
+                    .retain(|pending| pending.transaction_id != transaction_id);
+                if self.persist_metadata(&state).is_err() {
+                    *state = prior;
+                }
+            }
+        }
     }
 
     pub(super) async fn verify_companion_credentials(

@@ -67,6 +67,8 @@ pub use oauth::{
 };
 mod hosted;
 mod hosted_endpoints;
+mod hosted_form;
+mod hosted_verification;
 pub use hosted::{hosted_admitted_origins, HostedCatalogBackend, HostedCatalogError};
 pub use hosted_endpoints::hosted_admitted_destinations;
 

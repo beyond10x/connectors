@@ -172,6 +172,12 @@ pub(super) struct StoredConnection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct PendingCommit {
+    #[serde(default)]
+    pub(super) published: bool,
+    #[serde(default)]
+    pub(super) discarded: bool,
+    #[serde(default)]
+    pub(super) intent: bool,
     pub(super) transaction_id: String,
     pub(super) connection: StoredConnection,
 }

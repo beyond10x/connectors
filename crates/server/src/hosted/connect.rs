@@ -63,7 +63,11 @@ pub(super) async fn oauth_callback(
             StatusCode::NOT_FOUND,
             "This authorization is unknown or expired.",
         ),
-        Err(HostedCompletionError::Unavailable) => (
+        Err(
+            HostedCompletionError::Unavailable
+            | HostedCompletionError::Verification(_)
+            | HostedCompletionError::Custody(_),
+        ) => (
             StatusCode::SERVICE_UNAVAILABLE,
             "Authorization is temporarily unavailable. Start Connect again later.",
         ),
@@ -86,7 +90,11 @@ pub(super) async fn completion_page(
         Err(HostedCompletionError::Invalid) => {
             error(StatusCode::BAD_REQUEST, "connect-session-invalid")
         }
-        Err(HostedCompletionError::Unavailable) => error(
+        Err(
+            HostedCompletionError::Unavailable
+            | HostedCompletionError::Verification(_)
+            | HostedCompletionError::Custody(_),
+        ) => error(
             StatusCode::SERVICE_UNAVAILABLE,
             "connect-session-unavailable",
         ),
@@ -150,8 +158,73 @@ pub(super) async fn complete_session(
             StatusCode::SERVICE_UNAVAILABLE,
             "connect-session-unavailable",
         ),
+        Err(HostedCompletionError::Verification(failure)) => verification_failure_response(failure),
+        Err(HostedCompletionError::Custody(failure)) => custody_failure_response(failure),
     };
     secure_completion_response(response)
+}
+
+fn custody_failure_response(failure: service::HostedCustodyFailure) -> Response {
+    eprintln!(
+        "connect_session_custody_failed stage={} class={}",
+        failure.stage(),
+        failure.diagnostic_code()
+    );
+    error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        if failure.completion_unconfirmed() {
+            "connect-session-custody-unconfirmed"
+        } else {
+            "connect-session-custody-unavailable"
+        },
+    )
+}
+
+fn verification_failure_response(failure: service::HostedVerificationFailure) -> Response {
+    use service::HostedVerificationFailure;
+    // Only these fixed tokens and a numeric upstream status survive. Never log the session
+    // capability, submitted value, URL, provider body or a generic error Display string.
+    let upstream_status = match failure {
+        HostedVerificationFailure::ProviderStatus(status) => status,
+        _ => 0,
+    };
+    eprintln!(
+        "connect_session_verification_failed class={} upstream_status={upstream_status}",
+        failure.diagnostic_code()
+    );
+    let (status, code) = match failure {
+        HostedVerificationFailure::ProviderStatus(401) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "connect-session-credential-rejected",
+        ),
+        HostedVerificationFailure::ProviderStatus(403) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "connect-session-credential-permission",
+        ),
+        HostedVerificationFailure::ProviderStatus(429) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "connect-session-provider-rate-limited",
+        ),
+        HostedVerificationFailure::ProviderStatus(_) => {
+            (StatusCode::BAD_GATEWAY, "connect-session-provider-refused")
+        }
+        // Both failures have one public answer: do not expose whether a private address exists.
+        HostedVerificationFailure::DestinationRefused | HostedVerificationFailure::Transport(_) => {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "connect-session-provider-unreachable",
+            )
+        }
+        HostedVerificationFailure::ResponseTooLarge => (
+            StatusCode::BAD_GATEWAY,
+            "connect-session-provider-response-invalid",
+        ),
+        HostedVerificationFailure::Preparation => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "connect-session-verification-unavailable",
+        ),
+    };
+    error(status, code)
 }
 
 pub(super) async fn read_completion_submission(
@@ -196,4 +269,129 @@ fn secure_completion_response(mut response: Response) -> Response {
             .expect("static header"),
     );
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use service::{EgressTransportFailure, HostedVerificationFailure};
+
+    #[tokio::test]
+    async fn custody_failures_do_not_claim_a_committed_outcome_or_recommend_replay() {
+        use connector_secrets::PreparedSecretError;
+        use service::HostedCustodyFailure;
+        for failure in [
+            HostedCustodyFailure::Setup,
+            HostedCustodyFailure::ReserveState,
+            HostedCustodyFailure::Prepare(PreparedSecretError::Retired),
+            HostedCustodyFailure::Prepare(PreparedSecretError::Backend),
+            HostedCustodyFailure::PersistPending,
+            HostedCustodyFailure::Commit(PreparedSecretError::Backend),
+            HostedCustodyFailure::PersistConnection,
+            HostedCustodyFailure::SessionFinalization,
+        ] {
+            let response = secure_completion_response(custody_failure_response(failure));
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            let body = axum::body::to_bytes(response.into_body(), 1024)
+                .await
+                .unwrap();
+            let code = if failure.completion_unconfirmed() {
+                "connect-session-custody-unconfirmed"
+            } else {
+                "connect-session-custody-unavailable"
+            };
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+                serde_json::json!({"error": code})
+            );
+        }
+        assert_eq!(
+            HostedCustodyFailure::Prepare(PreparedSecretError::Retired).diagnostic_code(),
+            "retired"
+        );
+    }
+
+    #[tokio::test]
+    async fn verification_responses_are_closed_and_keep_private_transport_details_out() {
+        let cases = [
+            (
+                HostedVerificationFailure::ProviderStatus(401),
+                422,
+                "connect-session-credential-rejected",
+            ),
+            (
+                HostedVerificationFailure::ProviderStatus(403),
+                422,
+                "connect-session-credential-permission",
+            ),
+            (
+                HostedVerificationFailure::ProviderStatus(429),
+                503,
+                "connect-session-provider-rate-limited",
+            ),
+            (
+                HostedVerificationFailure::ProviderStatus(302),
+                502,
+                "connect-session-provider-refused",
+            ),
+            (
+                HostedVerificationFailure::ProviderStatus(500),
+                502,
+                "connect-session-provider-refused",
+            ),
+            (
+                HostedVerificationFailure::DestinationRefused,
+                503,
+                "connect-session-provider-unreachable",
+            ),
+            (
+                HostedVerificationFailure::Transport(EgressTransportFailure::Timeout),
+                503,
+                "connect-session-provider-unreachable",
+            ),
+            (
+                HostedVerificationFailure::Transport(EgressTransportFailure::Connect),
+                503,
+                "connect-session-provider-unreachable",
+            ),
+            (
+                HostedVerificationFailure::Transport(EgressTransportFailure::Tls),
+                503,
+                "connect-session-provider-unreachable",
+            ),
+            (
+                HostedVerificationFailure::Transport(EgressTransportFailure::BodyRead),
+                503,
+                "connect-session-provider-unreachable",
+            ),
+            (
+                HostedVerificationFailure::Transport(EgressTransportFailure::Other),
+                503,
+                "connect-session-provider-unreachable",
+            ),
+            (
+                HostedVerificationFailure::ResponseTooLarge,
+                502,
+                "connect-session-provider-response-invalid",
+            ),
+            (
+                HostedVerificationFailure::Preparation,
+                503,
+                "connect-session-verification-unavailable",
+            ),
+        ];
+        for (failure, status, code) in cases {
+            let response = secure_completion_response(verification_failure_response(failure));
+            assert_eq!(response.status().as_u16(), status);
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            assert_eq!(response.headers()["referrer-policy"], "no-referrer");
+            let body = axum::body::to_bytes(response.into_body(), 1024)
+                .await
+                .unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+                serde_json::json!({"error": code})
+            );
+        }
+    }
 }

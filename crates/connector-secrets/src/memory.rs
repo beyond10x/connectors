@@ -20,6 +20,17 @@ const MEMORY_PATH: &str = "<memory-store>";
 enum Terminal {
     Committed(SecretProposalDigest),
     Aborted,
+    AcknowledgedCommitted(SecretProposalDigest),
+    AcknowledgedAborted,
+}
+
+impl Terminal {
+    fn acknowledged(&self) -> bool {
+        matches!(
+            self,
+            Self::AcknowledgedCommitted(_) | Self::AcknowledgedAborted
+        )
+    }
 }
 
 struct Prepared {
@@ -182,6 +193,14 @@ impl<L: Layout + Send + Sync> SecretStore for MemoryStore<L> {
 
 #[async_trait]
 impl<L: Layout + Send + Sync> PreparedSecretStore for MemoryStore<L> {
+    async fn retirement_watermark(
+        &self,
+    ) -> Result<Option<SecretTransactionGeneration>, PreparedSecretError> {
+        Ok(SecretTransactionGeneration::from_protocol_bytes(
+            self.locked().retired_through.to_be_bytes(),
+        ))
+    }
+
     async fn prepare(
         &self,
         id: SecretTransactionId,
@@ -204,11 +223,17 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for MemoryStore<L> {
         }
         if let Some(terminal) = state.terminals.get(&id.key()) {
             return match terminal {
-                Terminal::Committed(existing) if *existing == digest => {
+                Terminal::Committed(existing) | Terminal::AcknowledgedCommitted(existing)
+                    if *existing == digest =>
+                {
                     Ok(SecretTransactionState::Committed)
                 }
-                Terminal::Committed(_) => Err(PreparedSecretError::DigestMismatch),
-                Terminal::Aborted => Err(PreparedSecretError::TransactionIdReused),
+                Terminal::Committed(_) | Terminal::AcknowledgedCommitted(_) => {
+                    Err(PreparedSecretError::DigestMismatch)
+                }
+                Terminal::Aborted | Terminal::AcknowledgedAborted => {
+                    Err(PreparedSecretError::TransactionIdReused)
+                }
             };
         }
         if state.terminals.len() >= MAX_TERMINAL_TRANSACTIONS {
@@ -243,8 +268,12 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for MemoryStore<L> {
             return Ok(SecretTransactionState::Prepared);
         }
         Ok(match state.terminals.get(&id.key()) {
-            Some(Terminal::Committed(_)) => SecretTransactionState::Committed,
-            Some(Terminal::Aborted) | None => SecretTransactionState::Absent,
+            Some(Terminal::Committed(_) | Terminal::AcknowledgedCommitted(_)) => {
+                SecretTransactionState::Committed
+            }
+            Some(Terminal::Aborted | Terminal::AcknowledgedAborted) | None => {
+                SecretTransactionState::Absent
+            }
         })
     }
 
@@ -258,8 +287,12 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for MemoryStore<L> {
         }
         if let Some(terminal) = state.terminals.get(&id.key()) {
             return match terminal {
-                Terminal::Committed(_) => Ok(SecretTransactionState::Committed),
-                Terminal::Aborted => Err(PreparedSecretError::TransactionIdReused),
+                Terminal::Committed(_) | Terminal::AcknowledgedCommitted(_) => {
+                    Ok(SecretTransactionState::Committed)
+                }
+                Terminal::Aborted | Terminal::AcknowledgedAborted => {
+                    Err(PreparedSecretError::TransactionIdReused)
+                }
             };
         }
         let Some(prepared) = state.prepared.as_ref() else {
@@ -286,20 +319,27 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for MemoryStore<L> {
         }
         if let Some(terminal) = state.terminals.get(&id.key()) {
             return match terminal {
-                Terminal::Committed(_) => Err(PreparedSecretError::AlreadyCommitted),
-                Terminal::Aborted => Ok(SecretTransactionState::Absent),
+                Terminal::Committed(_) | Terminal::AcknowledgedCommitted(_) => {
+                    Err(PreparedSecretError::AlreadyCommitted)
+                }
+                Terminal::Aborted | Terminal::AcknowledgedAborted => {
+                    Ok(SecretTransactionState::Absent)
+                }
             };
         }
-        if let Some(prepared) = &state.prepared {
-            if prepared.id != id {
-                return Err(PreparedSecretError::Busy);
-            }
-        }
-        if state.terminals.len() >= MAX_TERMINAL_TRANSACTIONS {
+        // An absent intent can be fenced without changing another transaction's candidate.
+        // Keep its future terminal slot and encoded-image capacity reserved until it resolves.
+        let other_prepared = state.prepared.as_ref().filter(|prepared| prepared.id != id);
+        let terminal_count = state.terminals.len() + usize::from(other_prepared.is_some()) + 1;
+        if terminal_count > MAX_TERMINAL_TRANSACTIONS {
             return Err(PreparedSecretError::Capacity);
         }
-        crate::file::validate_transactional_bounds(&state.entries, state.terminals.len() + 1)
+        crate::file::validate_transactional_bounds(&state.entries, terminal_count)
             .map_err(|_| PreparedSecretError::Capacity)?;
+        if let Some(prepared) = other_prepared {
+            crate::file::validate_transactional_bounds(&prepared.candidate, terminal_count)
+                .map_err(|_| PreparedSecretError::Capacity)?;
+        }
         if state
             .prepared
             .as_ref()
@@ -309,6 +349,60 @@ impl<L: Layout + Send + Sync> PreparedSecretStore for MemoryStore<L> {
         }
         state.terminals.insert(id.key(), Terminal::Aborted);
         Ok(SecretTransactionState::Absent)
+    }
+
+    async fn acknowledge(&self, id: SecretTransactionId) -> Result<(), PreparedSecretError> {
+        let mut state = self.locked();
+        if Self::is_retired(&state, id) {
+            return Ok(());
+        }
+        if state
+            .prepared
+            .as_ref()
+            .is_some_and(|prepared| prepared.id == id)
+        {
+            return Err(PreparedSecretError::Busy);
+        }
+        let terminal = state
+            .terminals
+            .get_mut(&id.key())
+            .ok_or(PreparedSecretError::NotPrepared)?;
+        *terminal = match terminal {
+            Terminal::Committed(digest) | Terminal::AcknowledgedCommitted(digest) => {
+                Terminal::AcknowledgedCommitted(*digest)
+            }
+            Terminal::Aborted | Terminal::AcknowledgedAborted => Terminal::AcknowledgedAborted,
+        };
+        state.retired_through = crate::transaction::acknowledged_fence(
+            state.retired_through,
+            state
+                .terminals
+                .iter()
+                .map(|(key, terminal)| {
+                    (
+                        SecretTransactionId::from_protocol_bytes(*key)
+                            .expect("valid id")
+                            .generation()
+                            .value(),
+                        terminal.acknowledged(),
+                    )
+                })
+                .chain(
+                    state
+                        .prepared
+                        .iter()
+                        .map(|prepared| (prepared.id.generation().value(), false)),
+                ),
+        );
+        let fence = state.retired_through;
+        state.terminals.retain(|key, _| {
+            SecretTransactionId::from_protocol_bytes(*key)
+                .expect("valid id")
+                .generation()
+                .value()
+                > fence
+        });
+        Ok(())
     }
 
     async fn reclaim(

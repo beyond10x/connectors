@@ -103,6 +103,23 @@ impl fmt::Debug for SecretTransactionId {
     }
 }
 
+pub(crate) fn acknowledged_fence(
+    retired_through: u64,
+    outcomes: impl Iterator<Item = (u64, bool)>,
+) -> u64 {
+    let mut acknowledged_through = retired_through;
+    let mut first_unacknowledged: Option<u64> = None;
+    for (generation, acknowledged) in outcomes {
+        if acknowledged {
+            acknowledged_through = acknowledged_through.max(generation);
+        } else {
+            first_unacknowledged =
+                Some(first_unacknowledged.map_or(generation, |prior| prior.min(generation)));
+        }
+    }
+    acknowledged_through.min(first_unacknowledged.map_or(u64::MAX, |generation| generation - 1))
+}
+
 /// A caller-computed SHA-256 proposal digest whose domain this crate never interprets.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SecretProposalDigest([u8; 32]);
@@ -167,6 +184,15 @@ pub enum PreparedSecretError {
 /// below; callers receive a typed refusal and must never emulate preparation with point writes.
 #[async_trait]
 pub trait PreparedSecretStore: SecretStore {
+    /// Inclusive generation fence shared by every coordinator using this store.
+    /// `None` means no generation has been retired. This is an observation, not a reservation:
+    /// a later prepare may still return `Retired` without staging any candidate.
+    async fn retirement_watermark(
+        &self,
+    ) -> Result<Option<SecretTransactionGeneration>, PreparedSecretError> {
+        Err(PreparedSecretError::Unsupported)
+    }
+
     async fn prepare(
         &self,
         _id: SecretTransactionId,
@@ -197,6 +223,16 @@ pub trait PreparedSecretStore: SecretStore {
         Err(PreparedSecretError::Unsupported)
     }
 
+    /// Acknowledge one terminal outcome after its owning metadata is durably published or aborted.
+    /// Other owners' outcomes remain recoverable, including peers in the same generation. The
+    /// acknowledgement is idempotent after retirement; it is never proof that a commit occurred.
+    /// A live prepared image may temporarily refuse acknowledgement with `Busy`.
+    async fn acknowledge(&self, _id: SecretTransactionId) -> Result<(), PreparedSecretError> {
+        Err(PreparedSecretError::Unsupported)
+    }
+
+    /// Retire an inclusive range only when one owner can certify that every outcome through it
+    /// is no longer needed for recovery. Independent coordinators must use `acknowledge` instead.
     async fn reclaim(
         &self,
         _through: SecretTransactionGeneration,
