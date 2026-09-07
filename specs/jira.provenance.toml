@@ -17,3 +17,13 @@ references = [
   "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-id-put",
   "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-links/#api-rest-api-2-issuelink-post",
 ]
+
+[[spec]]
+path = "specs/jira/incremental-reads.openapi.yaml"
+origin = "repository-authored"
+authored_at = "2026-09-05"
+reviewed_at = "2026-09-06"
+sha256 = "93061a7534d964c8d238b612502fb507c7d02933a787170eaaf94b52693f377d"
+coverage = "exact-added-incremental-read-surface"
+purpose = "Source-grounded incremental reads and explicit continuation, projected through the existing provider and native or generic catalog runtime. Exact official endpoint references are recorded on each OpenAPI operation."
+references = ["https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-comments/#api-rest-api-2-issue-issueidorkey-comment-get", "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-jql-get", "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-projects/#api-rest-api-2-project-search-get", "https://support.atlassian.com/jira-software-cloud/docs/jql-fields/#Updated"]

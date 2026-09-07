@@ -170,11 +170,10 @@ fn operation_selection_stays_curated() {
         // deal get. The cut is the query-encoding gap again — HubSpot's search endpoints and every
         // `properties=` projection are excluded. See `providers/hubspot.toml`.
         ("hubspot", 5),
-        // Jira curates 9 of the Jira Cloud platform API's several hundred, all on the v2 issue
-        // resource tree. JQL remains outside this legacy catalog path pending encoded queries; the
-        // one issue edit is a closed summary-only body so callers cannot submit free-form fields or
-        // clear omitted data. See the header comment in `providers/jira.toml`.
-        ("jira", 9),
+        // Jira retains nine legacy operations and adds three bounded reads: project inventory,
+        // updated issue search and paginated comments. The incremental catalog handler validates
+        // and encodes their queries before dispatch. Existing mutation contracts stay unchanged.
+        ("jira", 12),
         // C-73 curates 5: contact get and create, conversation get and reply, contact note. The cut
         // is the same query-encoding gap — every listing endpoint pages with an opaque
         // `starting_after` cursor — plus C-56, which is why every declared body field is required.
