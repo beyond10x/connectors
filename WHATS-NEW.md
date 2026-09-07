@@ -4,6 +4,16 @@ This page explains what the latest release means for people using Connectors and
 built on it. The [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md)
 keeps the detailed history and compatibility notes.
 
+## v0.7.2 — 7 September 2026
+
+**See what you have installed.** Run `connectors inspect upgrade` to see the CLI version, its
+embedded catalog, and supported credential and session formats. It works without setup or a
+running service. Use `-o json` when a script needs the report.
+
+The command also points to the existing source installation procedure. It reports information
+without opening your configuration or credential files, contacting a service, or updating the
+binary. Existing stored formats remain compatible.
+
 ## v0.7.1 — 7 September 2026
 
 Applications can now collect changed Jira issues and comments, Confluence pages, and GitLab
