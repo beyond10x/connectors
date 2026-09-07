@@ -980,3 +980,127 @@ async fn auth_adversary_fresh_operation_binding_rejects_conflicting_purpose() {
         "an explicitly conflicting purpose must not be accepted as fresh matching binding"
     );
 }
+
+async fn auth_adversary2_completion_fixture(case: &'static str) -> (bool, Vec<String>) {
+    use protocol::connection_v2 as v2;
+    let temporary = tempdir().unwrap();
+    let socket = temporary.path().join("fresh.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let methods = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let observed = methods.clone();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let serving = tokio::spawn(async move {
+        let deadline = unix_time_ms()
+            + if case.starts_with("late-") {
+                2_000
+            } else {
+                60_000
+            };
+        let mut stopped = Some(stopped);
+        for step in 0..5 {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut line = String::new();
+            BufReader::new(&mut stream)
+                .read_line(&mut line)
+                .await
+                .unwrap();
+            let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+            let method = request["request"]["method"].as_str().unwrap();
+            observed.lock().unwrap().push(method.to_owned());
+            assert_ne!(method, "invoke");
+            if (case == "late-ack" && step == 2) || (case == "late-description" && step == 4) {
+                stopped.take().unwrap().await.unwrap();
+                return;
+            }
+            let value = match step {
+                0 => auth_stage2_bound_status(deadline, false),
+                1 => auth_stage2_bound_status(deadline, true),
+                2 => {
+                    serde_json::json!({"connect_session_ref":"session:fixture","operation_ref":"fixture.write","connection_ref":"connection:fixture","next_action":"fresh_description_then_explicit_invoke"})
+                }
+                3 => {
+                    serde_json::json!({"connection_ref":"connection:fixture","integration_ref":"fixture","label":"SYNTHETIC_PRIVATE_INSTRUCTION","state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]})
+                }
+                4 => {
+                    let schema = serde_json::json!({"$schema":"https://json-schema.org/draft/2020-12/schema", "$id":"https://private.invalid/SYNTHETIC_PRIVATE_INSTRUCTION", "$defs":{"input":{"type":"object","required":["synthetic"],"properties":{"synthetic":{"type":"boolean"}},"additionalProperties":false}}, "$ref":"#/$defs/input", "if":{"properties":{"synthetic":{"const":true}}}, "then":if case == "changed-composition" { serde_json::json!(false) } else { serde_json::json!({}) }});
+                    serde_json::json!({"operation_ref":"fixture.write","title":"SYNTHETIC_PRIVATE_INSTRUCTION","description":"fixture","input_schema":schema,"output_schema":{},"effect":"read_only","approval":"not_required","connections":[{"connection_ref":"connection:fixture","label":"fixture","provider":"fixture","purpose":"fixture.user","audiences":[]}],"description_ref":"description:fresh"})
+                }
+                _ => unreachable!(),
+            };
+            let response = serde_json::json!({"protocol":request["protocol"],"request_id":request["request_id"],"status":"ok","response":{"result":method,"value":value}});
+            let bytes = serde_json::to_vec(&response).unwrap();
+            if step == 4 {
+                operation::versions::decode_response(&bytes).unwrap();
+            } else {
+                v2::decode_response(&bytes).unwrap();
+            }
+            stream.write_all(&bytes).await.unwrap();
+            stream.write_all(b"\n").await.unwrap();
+        }
+    });
+    let client = LocalClient::new(&socket);
+    let result = tokio::time::timeout(Duration::from_secs(5), async {
+        let pending = client
+            .begin_remediation(
+                &context(),
+                v2::RemediationStartRequest {
+                    operation_ref: "fixture.write".into(),
+                    connection_ref: "connection:fixture".into(),
+                    input: serde_json::json!({"synthetic":true}),
+                },
+                "fixture",
+                "fixture.user",
+            )
+            .await?;
+        client.finish_remediation(&context(), pending).await
+    })
+    .await;
+    let _ = stop.send(());
+    tokio::time::timeout(Duration::from_secs(1), serving)
+        .await
+        .unwrap()
+        .unwrap();
+    let result = result.expect("the captured session deadline must bound completion");
+    if let Err(error) = &result {
+        assert!(!error.to_string().contains("SYNTHETIC_PRIVATE_INSTRUCTION"));
+    }
+    let observed = methods.lock().unwrap().clone();
+    (result.is_ok(), observed)
+}
+
+#[tokio::test]
+async fn auth_adversary2_fresh_internal_schema_composition_validates_captured_input() {
+    for (case, expected) in [("internal-reference", true), ("changed-composition", false)] {
+        let (accepted, methods) = auth_adversary2_completion_fixture(case).await;
+        eprintln!("fresh schema {case}: accepted={accepted}, methods={methods:?}");
+        assert_eq!(
+            methods,
+            [
+                "remediation_start",
+                "remediation_status",
+                "remediation_acknowledge",
+                "describe",
+                "describe"
+            ]
+        );
+        assert_eq!(accepted, expected);
+    }
+}
+
+#[tokio::test]
+async fn auth_adversary2_deadline_after_ready_bounds_ack_and_fresh_description_without_resend() {
+    for (case, expected_methods) in [("late-ack", 3), ("late-description", 5)] {
+        let (accepted, methods) = auth_adversary2_completion_fixture(case).await;
+        eprintln!("captured deadline {case}: accepted={accepted}, methods={methods:?}");
+        assert!(!accepted);
+        assert_eq!(methods.len(), expected_methods);
+        assert_eq!(
+            methods
+                .iter()
+                .filter(|method| method.as_str() == "remediation_acknowledge")
+                .count(),
+            1
+        );
+        assert!(methods.iter().all(|method| method != "invoke"));
+    }
+}

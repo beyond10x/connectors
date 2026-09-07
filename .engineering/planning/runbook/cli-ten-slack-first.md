@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 39
+revision: 40
 ---
 ## Authorization and objective
 
@@ -3420,3 +3420,11 @@ Candidate77a5857cb3cd37ebb6fd17886926029240338a01 integrates the verified first-
 Original auth implementation history and corrected product bytes are retained locally at35ad91c3fb1dbaab42b6d3de8c391851149b0f70 on impl/auth-protocol-remediation-resumed. It is not a publication branch. The existing managed review tree ~/.local/state/worktree/trees/b10x/connectors/wt-78f189927231 is clean and detached at candidate77a5857c. Its private target remains /dev/shm/b10x-cli-wave-wt-78f189927231-urhrmq5y/runtime-target. New assigned scratch is ~/.cache/connectors-cli-wave-20260906/auth-as-tool-result/whole-unit-adversary-2, with owner-only TMPDIR ~/.cache/cw6/av2. The frozen source inventory has1225trackedfiles, SHA256421b5167c5adf9fdfdd4ffb20c74af8c5253684bd1764df7c6b4bbeea3febb7f; all tracked bytes matched the publication tree before this planning-only record.
 
 The reviewer receives the sole compiler and only additive ownership of the same10existing test files, at most6new bounded deciding cases. Preserve every old and first-review assertion. The same private target retains12GiBcap and continuous12GiBdisk/8GiBtmpfs/16GiBmemory reserves plus128MiBtemporary cap. No third ordinary auth review is authorized. OAuth completed its own two reviews and unchanged OAuth stays out of this attack; several-credentials stays held. The complete frozen brief owns source scope, current acceptance, first-case/full-suite order and reporting requirements.
+
+## Final auth review and correction ownership — 2026-09-07
+
+Review-result:cli-auth-adversary-2-20260907 contains the complete second and final ordinary review. Root verified its 236-member seal, 1,225 source files, 20,405 target file hashes, 415 executables and ten original test prefixes. The affected cohort increased from 871 to 877 executed cases with one product failure. The CLI trend is zero carried, one new and three resolved findings; the exact lists are retained in the auth story. The earlier protocol/service count-label correction does not add new executions.
+
+The remaining served-document mismatch is routed to the original server implementor. It is measured in the real hosted router with synthetic metadata and remains unreachable through current built-in hosted production. No base execution establishes origin. The original A managed tree ~/.local/state/worktree/trees/b10x/connectors/wt-78f189927231 remains detached at 77a5857c with exactly five retained additive test files. Only crates/server/src/hosted/docs/openapi.json may change for this final correction. Every test byte and HTTP status/body behavior stays preserved; the deciding matrix, full server suite and strict/fmt verify the correction. No third attack is opened.
+
+The implementor receives the sole compiler and the same private tmpfs target. New scratch is ~/.cache/connectors-cli-wave-20260906/auth-as-tool-result/stage2-runtime-implementation/review2-correction, with owner-only TMPDIR ~/.cache/cw6/ac2. One job, no incremental/debug or wrapper, target cap 12 GiB, reserves of 12 GiB disk, 8 GiB tmpfs and 16 GiB available memory, and a 128 MiB temporary cap remain in force. The first-review reserve exception is not inherited. Root transferred the five exact reviewed test files into the publication tree after verifying each original preimage and prefix. Final source CI, main publication, documentation delivery and authorized installation remain outstanding.
