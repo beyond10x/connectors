@@ -29,7 +29,7 @@ const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 pub struct PersonalConfig {
     pub owner: OwnerConfig,
     #[serde(default)]
-    pub connection: Option<ConnectionConfig>,
+    pub connection: Option<EndpointConfig>,
     #[serde(default)]
     pub authority: Option<AuthorityConfig>,
     #[serde(default)]
@@ -162,7 +162,7 @@ pub struct PersonalVoiceConfig {
     /// Exact personal owner and current authority snapshot.
     pub owner: OwnerConfig,
     /// Connection and Grant facts selected outside caller input.
-    pub connection: ConnectionConfig,
+    pub connection: EndpointConfig,
     /// Session-authority issuer identity and private-key location.
     ///
     /// Absent for a raw SIP Connection. A session authority exists to let an application channel
@@ -202,8 +202,8 @@ pub struct OwnerConfig {
 /// still invent a value for.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ConnectionConfig {
-    pub connection_ref: String,
+pub struct EndpointConfig {
+    pub endpoint_ref: String,
     pub label: String,
     pub grant_ref: String,
     pub initiation: InitiationConfig,
@@ -217,8 +217,8 @@ pub struct ConnectionConfig {
 /// personal placement is the owner's own admission over their 0700 socket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct PlatformConnectionConfig {
-    pub connection_ref: String,
+pub struct PlatformEndpointConfig {
+    pub endpoint_ref: String,
     pub label: String,
     pub grant_ref: String,
     pub initiation: InitiationConfig,
@@ -368,7 +368,7 @@ impl SlackInstanceProfile {
 }
 
 /// Value-free Grafana policy. The service-account token arrives only through a Connect Session.
-/// Target grants are independent authority for mediated Connections, keyed by target Provider id.
+/// Target grants are independent authority for mediated Endpoints, keyed by target Provider id.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GrafanaIntegrationConfig {
@@ -409,7 +409,7 @@ pub struct KubernetesIntegrationConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformIntegrationConfig {
-    pub connection: PlatformConnectionConfig,
+    pub connection: PlatformEndpointConfig,
     /// Modules granted by default to every Identity-verified member of the hosted tenant.
     /// `None` preserves the pre-policy behavior for personal and existing hosted configurations.
     #[serde(default)]
@@ -741,7 +741,7 @@ impl PlatformIntegrationConfig {
     #[must_use]
     pub fn audio_route(&self) -> Option<AudioDeploymentRoute> {
         self.audio.as_ref().map(|audio| AudioDeploymentRoute {
-            connection: self.connection.connection_ref.clone(),
+            connection: self.connection.endpoint_ref.clone(),
             synthesizer: audio.synthesizer.clone(),
             voice: audio.voice.clone(),
             voice_config: audio.voice_config.clone(),
@@ -756,7 +756,7 @@ impl PlatformIntegrationConfig {
     #[must_use]
     pub fn browser_route(&self) -> Option<BrowserDeploymentRoute> {
         self.browser.as_ref().map(|browser| BrowserDeploymentRoute {
-            connection: self.connection.connection_ref.clone(),
+            connection: self.connection.endpoint_ref.clone(),
             executable: browser.executable.clone(),
             user_data_dir: browser.user_data_dir.clone(),
             artifacts_dir: browser.artifacts_dir.clone(),
@@ -841,8 +841,8 @@ impl PlatformIntegrationConfig {
     }
 }
 
-fn valid_connection(connection: &PlatformConnectionConfig) -> bool {
-    config_ref(&connection.connection_ref, 512)
+fn valid_connection(connection: &PlatformEndpointConfig) -> bool {
+    config_ref(&connection.endpoint_ref, 512)
         && !connection.label.is_empty()
         && connection.label.len() <= 1024
         && config_ref(&connection.grant_ref, 512)
@@ -1108,7 +1108,7 @@ impl PersonalVoiceConfig {
             .iter()
             .map(|target| {
                 let route = SipDeploymentRoute {
-                    connection: self.connection.connection_ref.clone(),
+                    connection: self.connection.endpoint_ref.clone(),
                     signaling_bind: target.signaling_bind,
                     sent_by: target.sent_by.clone(),
                     target: signaling_target(&target.target)?,
@@ -1136,7 +1136,7 @@ impl PersonalVoiceConfig {
             })
             .collect::<Result<Vec<_>, ConfigError>>()?;
         SipDialRouteTable::with_default(
-            &self.connection.connection_ref,
+            &self.connection.endpoint_ref,
             routes,
             self.sip.default.clone(),
         )
@@ -1178,7 +1178,7 @@ impl PersonalVoiceConfig {
         let owner = self.owner_context();
         owner.validate_for_config()?;
         // The Connection and its SIP targets: everything a raw SIP call needs and nothing more.
-        if !config_ref(&self.connection.connection_ref, 512)
+        if !config_ref(&self.connection.endpoint_ref, 512)
             || self.connection.label.is_empty()
             || self.connection.label.len() > 1024
             || !config_ref(&self.connection.grant_ref, 512)
@@ -1458,7 +1458,7 @@ authority_snapshot_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 work = "/run/platform/work.sock"
 
 [b10x.connection]
-connection_ref = "connection-platform"
+endpoint_ref = "connection-platform"
 label = "platform local"
 grant_ref = "grant-platform"
 initiation = "b10x"

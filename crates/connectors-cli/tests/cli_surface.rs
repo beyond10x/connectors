@@ -2035,7 +2035,7 @@ fn an_exception_whose_kind_the_tree_contradicts_is_refused() {
     let mut forwards_nothing = UNSPECIFIED_PATHS.to_vec();
     for entry in &mut forwards_nothing {
         if entry.0 == "operation invoke" {
-            entry.2 = "forwards `connectors.connection.PruneConnections`, which \
+            entry.2 = "forwards `connectors.connection.PruneEndpoints`, which \
                        `connectors-service` accepts";
         }
     }
@@ -2080,7 +2080,7 @@ fn an_exception_whose_kind_the_tree_contradicts_is_refused() {
         "this specification names a command whose typed word is `invoke`",
     );
 
-    // The one the tree answers on its own. `connection list` builds a `ConnectionRequest::Search`,
+    // The one the tree answers on its own. `connection list` builds a `EndpointRequest::Search`,
     // which `ess/system/components.yaml` enumerates as a read verb that changes no entity, so it
     // is a `Read` whatever anybody writes beside it. Nothing here volunteers a string that
     // incriminates the entry: the kind moves and the reason stays a sentence about a read.
@@ -2665,7 +2665,7 @@ fn local_success_and_protocol_refusals_report_the_selected_target() {
     use std::io::{BufRead as _, Write as _};
     use std::os::unix::net::UnixListener;
     for (group, verb, field) in [
-        ("connection", "list", "connections"),
+        ("connection", "list", "endpoints"),
         ("event", "search", "channels"),
         ("operation", "search", "operations"),
     ] {
@@ -3349,19 +3349,19 @@ allowed_scopes = ["read_api"]
             std::io::BufReader::new(&stream)
                 .read_line(&mut line)
                 .unwrap();
-            let request: protocol::connection::RequestEnvelope =
+            let request: protocol::endpoint::RequestEnvelope =
                 serde_json::from_str(&line).unwrap();
             request.validate().unwrap();
-            let protocol::connection::ConnectionRequest::ConnectSessionCreate(create) =
+            let protocol::endpoint::EndpointRequest::ConnectSessionCreate(create) =
                 request.request
             else {
                 panic!("exact setup Create")
             };
             assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
-            let response = protocol::connection::ResponseEnvelope::failure(
+            let response = protocol::endpoint::ResponseEnvelope::failure(
                 request.request_id,
-                protocol::connection::ConnectionError::new(
-                    protocol::connection::ConnectionErrorCode::InvalidInput,
+                protocol::endpoint::EndpointError::new(
+                    protocol::endpoint::EndpointErrorCode::InvalidInput,
                     "OAUTH-PASS1-PRIVATE-DAEMON https://gitlab.example/authorize?state=PRIVATE",
                     false,
                 ),

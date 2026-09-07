@@ -228,17 +228,17 @@ fn a_wide_character_cell_leaves_the_column_after_it_ragged() {
     let value = json!({
         "provider": "grafana",
         "connected": true,
-        "connection_ref": "connection:grafana:main",
+        "endpoint_ref": "connection:grafana:main",
         "targets": [
             {
                 "label": "本番Prometheus",
                 "integration_ref": "integration:prometheus",
-                "connection_ref": "connection:prom:a",
+                "endpoint_ref": "connection:prom:a",
             },
             {
                 "label": "staging",
                 "integration_ref": "integration:prometheus",
-                "connection_ref": "connection:prom:b",
+                "endpoint_ref": "connection:prom:b",
             },
         ],
     });
@@ -268,8 +268,8 @@ fn an_unranked_table_lets_a_cell_sit_where_the_severity_marker_sits() {
     // in the one position the acceptance reserves for severity.
     let value = json!({
         "targets": [
-            {"label": "x marks the spot", "connection_ref": "connection:prom:a"},
-            {"label": "ok", "connection_ref": "connection:prom:b"},
+            {"label": "x marks the spot", "endpoint_ref": "connection:prom:a"},
+            {"label": "ok", "endpoint_ref": "connection:prom:b"},
         ],
     });
     let rendered = rendered("text", &value);

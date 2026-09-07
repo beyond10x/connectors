@@ -1138,7 +1138,7 @@ fn rate_final_cli_describe_spelling_and_invalid_advice_never_resend() {
                             calls += 1;
                             assert_eq!(request["protocol"], "b10x.connector-operation.v0alpha2");
                             assert_eq!(request["request"]["method"], "describe");
-                            let description = json!({"operation_ref":"fixture.read","title":"Fixture read","description":"Fixture metadata","input_schema":{"type":"object","additionalProperties":false},"output_schema":{"type":"object","properties":{"vendor":{"const":"retained"}}},"effect":"read_only","approval":"not_required","connections":[],"description_ref":"fixture-description","rate_advice":{"alternatives":[{"declaration":{"applies_when":"Fixture category","source_url":source}}]}});
+                            let description = json!({"operation_ref":"fixture.read","title":"Fixture read","description":"Fixture metadata","input_schema":{"type":"object","additionalProperties":false},"output_schema":{"type":"object","properties":{"vendor":{"const":"retained"}}},"effect":"read_only","approval":"not_required","endpoints":[],"description_ref":"fixture-description","rate_advice":{"alternatives":[{"declaration":{"applies_when":"Fixture category","source_url":source}}]}});
                             let reply = json!({"protocol":request["protocol"],"request_id":request["request_id"],"status":"ok","response":{"result":"describe","value":description}});
                             writeln!(stream, "{reply}").unwrap();
                         }

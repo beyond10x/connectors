@@ -151,7 +151,7 @@ fn read_verbs_named_by(document: &str) -> BTreeSet<String> {
 fn requests_built_by(body: &str) -> BTreeSet<String> {
     let mut found = BTreeSet::new();
     for marker in [
-        "ConnectionRequest::",
+        "EndpointRequest::",
         "EventRequest::",
         "OperationRequest::",
     ] {
@@ -295,7 +295,7 @@ fn local_client_methods() -> BTreeMap<String, String> {
 ///
 /// That sentence was false. `Command::Connect` dispatches to `connect::dispatch` in
 /// `crates/connectors-console`, which drives a `LocalClient`, and those client methods build seven
-/// `ConnectionRequest` variants — three of them carrying a `method` that is the `naming.wire` of a
+/// `EndpointRequest` variants — three of them carrying a `method` that is the `naming.wire` of a
 /// command `ess/system/components.yaml` says `connectors-service` accepts, which is the
 /// derivation's own definition of `Forwarded`. `kinds_the_tree_derives` could not see it because
 /// it read one file and stopped at the first call boundary.

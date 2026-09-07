@@ -67,11 +67,11 @@ macro_rules! reduce_envelope {
 /// Trusted acquisition consumes the original typed response through its private client workflow.
 #[must_use]
 pub fn without_instruction_endpoints(
-    mut envelope: protocol::connection::ResponseEnvelope,
-) -> protocol::connection::ResponseEnvelope {
+    mut envelope: protocol::endpoint::ResponseEnvelope,
+) -> protocol::endpoint::ResponseEnvelope {
     if let Some(
-        protocol::connection::ConnectionResult::ConnectSessionCreate(status)
-        | protocol::connection::ConnectionResult::ConnectSessionStatus(status),
+        protocol::endpoint::EndpointResult::ConnectSessionCreate(status)
+        | protocol::endpoint::EndpointResult::ConnectSessionStatus(status),
     ) = envelope.response.as_mut()
     {
         status.browser_completion_url = None;
@@ -212,13 +212,13 @@ mod tests {
     fn a_result_loses_its_envelope_and_its_discriminant() {
         let envelope = Envelope {
             status: "ok",
-            response: Some(json!({"result": "search", "value": {"connections": []}})),
+            response: Some(json!({"result": "search", "value": {"endpoints": []}})),
             error: None,
         };
         let reduced = reduce_envelope!(envelope).expect("a result reduces");
         assert_eq!(
             reduced,
-            json!({"connections": []}),
+            json!({"endpoints": []}),
             "neither the transport envelope nor the enum tag reaches the caller"
         );
     }
@@ -237,7 +237,7 @@ mod tests {
 
 #[cfg(test)]
 mod personal_oauth_tests {
-    use protocol::connection::*;
+    use protocol::endpoint::*;
 
     #[test]
     fn ordinary_connection_result_payload_has_no_private_instruction_endpoint() {
@@ -251,12 +251,12 @@ mod personal_oauth_tests {
                 browser_completion_url: Some(
                     "http://127.0.0.1:18423/#token=PRIVATE-SENTINEL".into(),
                 ),
-                connection_ref: None,
+                endpoint_ref: None,
             };
             let result = if create {
-                ConnectionResult::ConnectSessionCreate(status)
+                EndpointResult::ConnectSessionCreate(status)
             } else {
-                ConnectionResult::ConnectSessionStatus(status)
+                EndpointResult::ConnectSessionStatus(status)
             };
             let reduced = crate::reduce_envelope!(
                 ResponseEnvelope::success("request:fixture", result),

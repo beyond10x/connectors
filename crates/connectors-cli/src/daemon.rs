@@ -16,7 +16,7 @@ pub(super) enum DaemonCommand {
         #[arg(long)]
         state_root: Option<PathBuf>,
     },
-    /// Gracefully stop the daemon and its active connections.
+    /// Gracefully stop the daemon and its active endpoints.
     Stop {
         #[arg(long)]
         state_root: Option<PathBuf>,

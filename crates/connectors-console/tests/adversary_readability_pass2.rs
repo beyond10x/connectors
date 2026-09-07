@@ -176,7 +176,7 @@ fn compact_drops_the_name_of_the_array_a_report_carries() {
         "provider": "slack",
         "connected": true,
         "connection": "beyond10x",
-        "connection_ref": "connection:slack:T1",
+        "endpoint_ref": "connection:slack:T1",
         "events": ["message", "reaction_added"],
     });
     let rendered = rendered("compact", &value);

@@ -19,8 +19,8 @@ impl LocalClient {
             protocol: connection::CONTRACT.into(),
             request_id: request_id(),
             context: context.clone(),
-            request: connection::ConnectionRequest::Describe(connection::DescribeRequest {
-                connection_ref: expected_connection_ref.clone(),
+            request: connection::EndpointRequest::Describe(connection::DescribeRequest {
+                endpoint_ref: expected_connection_ref.clone(),
             }),
         }
         .validate()
@@ -28,7 +28,7 @@ impl LocalClient {
         let result = self
             .connection_result(
                 context,
-                connection::ConnectionRequest::ConnectSessionCreate(
+                connection::EndpointRequest::ConnectSessionCreate(
                     connection::ConnectSessionCreateRequest {
                         integration_ref: integration_ref.clone(),
                         label,
@@ -38,7 +38,7 @@ impl LocalClient {
             )
             .await
             .map_err(|_| ClientError::PersonalOAuthRefused)?;
-        let connection::ConnectionResult::ConnectSessionCreate(created) = result else {
+        let connection::EndpointResult::ConnectSessionCreate(created) = result else {
             return Err(ClientError::InvalidResponse);
         };
         let now = oauth_now()?;
@@ -90,7 +90,7 @@ impl LocalClient {
         &self,
         context: &operation::OwnerContext,
         pending: &PendingPersonalOAuth,
-    ) -> Result<connection::ConnectionDescription, ClientError> {
+    ) -> Result<connection::EndpointDescription, ClientError> {
         let maximum = pending
             .deadline
             .checked_add(Duration::from_secs(15))
@@ -103,7 +103,7 @@ impl LocalClient {
                 maximum,
                 self.connection(
                     context,
-                    connection::ConnectionRequest::ConnectSessionStatus(
+                    connection::EndpointRequest::ConnectSessionStatus(
                         connection::ConnectSessionStatusRequest {
                             connect_session_ref: pending.session_ref.clone(),
                         },
@@ -116,7 +116,7 @@ impl LocalClient {
             match (response.status, response.response, response.error) {
                 (
                     connection::ResponseStatus::Ok,
-                    Some(connection::ConnectionResult::ConnectSessionStatus(status)),
+                    Some(connection::EndpointResult::ConnectSessionStatus(status)),
                     None,
                 ) => {
                     if status.connect_session_ref != pending.session_ref
@@ -127,33 +127,33 @@ impl LocalClient {
                     }
                     match status.state {
                         connection::ConnectSessionState::Completed => {
-                            let connection_ref = status
-                                .connection_ref
+                            let endpoint_ref = status
+                                .endpoint_ref
                                 .ok_or(ClientError::PersonalOAuthRefused)?;
-                            if connection_ref != pending.expected_connection_ref {
+                            if endpoint_ref != pending.expected_connection_ref {
                                 return Err(ClientError::PersonalOAuthRefused);
                             }
                             let result = tokio::time::timeout_at(
                                 maximum,
                                 self.connection_result(
                                     context,
-                                    connection::ConnectionRequest::Describe(
-                                        connection::DescribeRequest { connection_ref },
+                                    connection::EndpointRequest::Describe(
+                                        connection::DescribeRequest { endpoint_ref },
                                     ),
                                 ),
                             )
                             .await
                             .map_err(|_| ClientError::PersonalOAuthRefused)?
                             .map_err(|_| ClientError::PersonalOAuthRefused)?;
-                            let connection::ConnectionResult::Describe(description) = result else {
+                            let connection::EndpointResult::Describe(description) = result else {
                                 return Err(ClientError::PersonalOAuthRefused);
                             };
-                            if description.summary.connection_ref != pending.expected_connection_ref
+                            if description.summary.endpoint_ref != pending.expected_connection_ref
                                 || description.summary.integration_ref != pending.integration_ref
                                 || description.summary.auth_profile.as_deref()
                                     != Some(pending.auth_profile.as_str())
                                 || description.summary.state
-                                    != connection::ConnectionState::Callable
+                                    != connection::EndpointState::Callable
                             {
                                 return Err(ClientError::PersonalOAuthRefused);
                             }
@@ -164,7 +164,7 @@ impl LocalClient {
                     }
                 }
                 (connection::ResponseStatus::Error, None, Some(error))
-                    if error.code == connection::ConnectionErrorCode::Unavailable => {}
+                    if error.code == connection::EndpointErrorCode::Unavailable => {}
                 _ => return Err(ClientError::PersonalOAuthRefused),
             }
             tokio::time::sleep(Duration::from_millis(250)).await;
@@ -530,7 +530,7 @@ mod personal_oauth_tests {
                     .unwrap();
                 let request: connection::RequestEnvelope = serde_json::from_str(&line).unwrap();
                 request.validate().unwrap();
-                let status = |state, browser_completion_url, connection_ref| {
+                let status = |state, browser_completion_url, endpoint_ref| {
                     connection::ConnectSessionStatus {
                         connect_session_ref: "session:fixture".into(),
                         integration_ref: "gitlab".into(),
@@ -538,56 +538,56 @@ mod personal_oauth_tests {
                         expires_at_unix_ms: deadline,
                         completion_endpoint: None,
                         browser_completion_url,
-                        connection_ref,
+                        endpoint_ref,
                     }
                 };
                 let response = match (turn, request.request) {
-                    (0, connection::ConnectionRequest::ConnectSessionCreate(create)) => {
+                    (0, connection::EndpointRequest::ConnectSessionCreate(create)) => {
                         assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
                         connection::ResponseEnvelope::success(
                             request.request_id,
-                            connection::ConnectionResult::ConnectSessionCreate(status(
+                            connection::EndpointResult::ConnectSessionCreate(status(
                                 connection::ConnectSessionState::Pending,
                                 Some(format!("http://127.0.0.1:47193/#token={}", "p".repeat(43))),
                                 None,
                             )),
                         )
                     }
-                    (1, connection::ConnectionRequest::ConnectSessionStatus(poll)) => {
+                    (1, connection::EndpointRequest::ConnectSessionStatus(poll)) => {
                         assert_eq!(poll.connect_session_ref, "session:fixture");
                         connection::ResponseEnvelope::failure(
                             request.request_id,
-                            connection::ConnectionError::new(
-                                connection::ConnectionErrorCode::Unavailable,
+                            connection::EndpointError::new(
+                                connection::EndpointErrorCode::Unavailable,
                                 "completion is guarded",
                                 true,
                             ),
                         )
                     }
-                    (2, connection::ConnectionRequest::ConnectSessionStatus(poll)) => {
+                    (2, connection::EndpointRequest::ConnectSessionStatus(poll)) => {
                         assert_eq!(poll.connect_session_ref, "session:fixture");
                         connection::ResponseEnvelope::success(
                             request.request_id,
-                            connection::ConnectionResult::ConnectSessionStatus(status(
+                            connection::EndpointResult::ConnectSessionStatus(status(
                                 connection::ConnectSessionState::Completed,
                                 None,
                                 Some("connection:fixture".into()),
                             )),
                         )
                     }
-                    (3, connection::ConnectionRequest::Describe(describe)) => {
-                        assert_eq!(describe.connection_ref, "connection:fixture");
+                    (3, connection::EndpointRequest::Describe(describe)) => {
+                        assert_eq!(describe.endpoint_ref, "connection:fixture");
                         connection::ResponseEnvelope::success(
                             request.request_id,
-                            connection::ConnectionResult::Describe(
-                                connection::ConnectionDescription {
-                                    summary: connection::ConnectionSummary {
-                                        connection_ref: describe.connection_ref,
+                            connection::EndpointResult::Describe(
+                                connection::EndpointDescription {
+                                    summary: connection::EndpointSummary {
+                                        endpoint_ref: describe.endpoint_ref,
                                         integration_ref: "gitlab".into(),
                                         label: "Display only".into(),
-                                        state: connection::ConnectionState::Callable,
-                                        initiation: vec![connection::ConnectionInitiator::Platform],
-                                        route: connection::ConnectionRoute::Direct,
+                                        state: connection::EndpointState::Callable,
+                                        initiation: vec![connection::EndpointInitiator::Platform],
+                                        route: connection::EndpointRoute::Direct,
                                         scope: None,
                                         actor: None,
                                         auth_profile: Some("gitlab.oauth_token".into()),
@@ -629,7 +629,7 @@ mod personal_oauth_tests {
             .finish_personal_oauth(&context, &pending)
             .await
             .unwrap();
-        assert_eq!(description.summary.connection_ref, "connection:fixture");
+        assert_eq!(description.summary.endpoint_ref, "connection:fixture");
         serving.await.unwrap();
     }
 
@@ -646,14 +646,14 @@ mod personal_oauth_tests {
                 .await
                 .unwrap();
             let request: connection::RequestEnvelope = serde_json::from_str(&line).unwrap();
-            let connection::ConnectionRequest::ConnectSessionCreate(create) = request.request
+            let connection::EndpointRequest::ConnectSessionCreate(create) = request.request
             else {
                 panic!("one Create")
             };
             assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
             let response = connection::ResponseEnvelope::success(
                 request.request_id,
-                connection::ConnectionResult::ConnectSessionCreate(
+                connection::EndpointResult::ConnectSessionCreate(
                     connection::ConnectSessionStatus {
                         connect_session_ref: "session:fixture".into(),
                         integration_ref: "gitlab".into(),
@@ -668,7 +668,7 @@ mod personal_oauth_tests {
                             "http://127.0.0.1:47193/#token={}",
                             "p".repeat(43)
                         )),
-                        connection_ref: None,
+                        endpoint_ref: None,
                     },
                 ),
             );
@@ -717,12 +717,12 @@ mod personal_oauth_tests {
             let request: connection::RequestEnvelope = serde_json::from_str(&line).unwrap();
             assert!(matches!(
                 request.request,
-                connection::ConnectionRequest::ConnectSessionCreate(_)
+                connection::EndpointRequest::ConnectSessionCreate(_)
             ));
             let response = connection::ResponseEnvelope::failure(
                 request.request_id,
-                connection::ConnectionError::new(
-                    connection::ConnectionErrorCode::InvalidInput,
+                connection::EndpointError::new(
+                    connection::EndpointErrorCode::InvalidInput,
                     "PRIVATE-AUTHORIZATION-DAEMON-FIXTURE",
                     false,
                 ),
@@ -783,11 +783,11 @@ mod personal_oauth_tests {
                     let response = if describe && turn == 0 {
                         assert!(matches!(
                             request.request,
-                            connection::ConnectionRequest::ConnectSessionStatus(_)
+                            connection::EndpointRequest::ConnectSessionStatus(_)
                         ));
                         connection::ResponseEnvelope::success(
                             request.request_id,
-                            connection::ConnectionResult::ConnectSessionStatus(
+                            connection::EndpointResult::ConnectSessionStatus(
                                 connection::ConnectSessionStatus {
                                     connect_session_ref: "session:fixture".into(),
                                     integration_ref: "gitlab".into(),
@@ -795,7 +795,7 @@ mod personal_oauth_tests {
                                     expires_at_unix_ms,
                                     completion_endpoint: None,
                                     browser_completion_url: None,
-                                    connection_ref: Some("connection:fixture".into()),
+                                    endpoint_ref: Some("connection:fixture".into()),
                                 },
                             ),
                         )
@@ -803,13 +803,13 @@ mod personal_oauth_tests {
                         if describe {
                             assert!(matches!(
                                 request.request,
-                                connection::ConnectionRequest::Describe(_)
+                                connection::EndpointRequest::Describe(_)
                             ));
                         }
                         connection::ResponseEnvelope::failure(
                             request.request_id,
-                            connection::ConnectionError::new(
-                                connection::ConnectionErrorCode::InvalidInput,
+                            connection::EndpointError::new(
+                                connection::EndpointErrorCode::InvalidInput,
                                 "PRIVATE-AUTHORIZATION-DAEMON-FIXTURE",
                                 false,
                             ),
@@ -885,10 +885,10 @@ mod personal_oauth_tests {
                     "connection:fixture"
                 };
                 let result = match request.request {
-                    connection::ConnectionRequest::ConnectSessionCreate(create) => {
+                    connection::EndpointRequest::ConnectSessionCreate(create) => {
                         assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
                         assert_eq!(create.label, "Trusted display");
-                        connection::ConnectionResult::ConnectSessionCreate(
+                        connection::EndpointResult::ConnectSessionCreate(
                             connection::ConnectSessionStatus {
                                 connect_session_ref: "session:fixture".into(),
                                 integration_ref: "gitlab".into(),
@@ -899,13 +899,13 @@ mod personal_oauth_tests {
                                     "http://127.0.0.1:47193/#token={}",
                                     "p".repeat(43)
                                 )),
-                                connection_ref: None,
+                                endpoint_ref: None,
                             },
                         )
                     }
-                    connection::ConnectionRequest::ConnectSessionStatus(poll) => {
+                    connection::EndpointRequest::ConnectSessionStatus(poll) => {
                         assert_eq!(poll.connect_session_ref, "session:fixture");
-                        connection::ConnectionResult::ConnectSessionStatus(
+                        connection::EndpointResult::ConnectSessionStatus(
                             connection::ConnectSessionStatus {
                                 connect_session_ref: if matches!(
                                     fixture,
@@ -930,16 +930,16 @@ mod personal_oauth_tests {
                                     + u64::from(matches!(fixture, SuccessFixture::ChangedDeadline)),
                                 completion_endpoint: None,
                                 browser_completion_url: None,
-                                connection_ref: Some(target.into()),
+                                endpoint_ref: Some(target.into()),
                             },
                         )
                     }
-                    connection::ConnectionRequest::Describe(describe) => {
+                    connection::EndpointRequest::Describe(describe) => {
                         observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        assert_eq!(describe.connection_ref, target);
-                        connection::ConnectionResult::Describe(connection::ConnectionDescription {
-                            summary: connection::ConnectionSummary {
-                                connection_ref: if matches!(
+                        assert_eq!(describe.endpoint_ref, target);
+                        connection::EndpointResult::Describe(connection::EndpointDescription {
+                            summary: connection::EndpointSummary {
+                                endpoint_ref: if matches!(
                                     fixture,
                                     SuccessFixture::WrongDescribeTarget
                                 ) {
@@ -951,14 +951,14 @@ mod personal_oauth_tests {
                                 integration_ref: "gitlab".into(),
                                 label: "Daemon display".into(),
                                 state: match fixture {
-                                    SuccessFixture::Created => connection::ConnectionState::Created,
+                                    SuccessFixture::Created => connection::EndpointState::Created,
                                     SuccessFixture::Degraded => {
-                                        connection::ConnectionState::Degraded
+                                        connection::EndpointState::Degraded
                                     }
-                                    _ => connection::ConnectionState::Callable,
+                                    _ => connection::EndpointState::Callable,
                                 },
-                                initiation: vec![connection::ConnectionInitiator::Platform],
-                                route: connection::ConnectionRoute::Direct,
+                                initiation: vec![connection::EndpointInitiator::Platform],
+                                route: connection::EndpointRoute::Direct,
                                 scope: None,
                                 actor: None,
                                 auth_profile: Some(
@@ -1007,7 +1007,7 @@ mod personal_oauth_tests {
         serving.await.unwrap();
         if matches!(fixture, SuccessFixture::Valid) {
             let description = result.unwrap();
-            assert_eq!(description.summary.connection_ref, "connection:fixture");
+            assert_eq!(description.summary.endpoint_ref, "connection:fixture");
             assert_eq!(
                 description.summary.label, "Daemon display",
                 "a returned description retains its received meaning"

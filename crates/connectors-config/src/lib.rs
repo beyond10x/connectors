@@ -20,9 +20,9 @@ pub use hosted::{
 pub use hosted_git_fetch::{HostedGitFetchOverride, HostedGitlabConfig, HostedTlsListenerConfig};
 pub use personal::{
     AudioIntegrationConfig, AuthorityConfig, BrowserIntegrationConfig, CatalogIntegrationConfig,
-    ConfigError, ConnectionConfig, GrafanaIntegrationConfig, InitiationConfig,
+    ConfigError, EndpointConfig, GrafanaIntegrationConfig, InitiationConfig,
     KubernetesIntegrationConfig, NetworkScopeConfig, OwnerConfig, PersonalConfig,
-    PersonalVoiceConfig, PlatformConnectionConfig, PlatformIntegrationConfig, SlackInstanceConfig,
+    PersonalVoiceConfig, PlatformEndpointConfig, PlatformIntegrationConfig, SlackInstanceConfig,
     SlackInstanceProfile, SlackIntegrationConfig,
 };
 pub use personal_oauth::{
