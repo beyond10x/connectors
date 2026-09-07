@@ -1608,6 +1608,12 @@ fn kinds_the_tree_derives() -> BTreeMap<String, Unspecified> {
             continue;
         }
         let text = read(&path);
+        // Process control is a separate lifecycle protocol. Calls such as daemon::require do
+        // not forward all lifecycle methods or turn every provider read into a multi-step flow.
+        // Its externally defined CLI leaves remain explicit residual claims in the accounting.
+        if path.file_stem().and_then(|stem| stem.to_str()) == Some("daemon") {
+            continue;
+        }
         let mut reached = requests_built_by(&text, &enums);
         for (name, body) in &methods {
             if text.contains(&format!(".{name}(")) {
@@ -1732,7 +1738,9 @@ fn kinds_the_tree_derives() -> BTreeMap<String, Unspecified> {
     }
 
     assert!(
-        derived.len() >= 13,
+        // Four legacy discovery leaves were retired; the nine remaining measured arms must
+        // still be visible. New endpoint/lifecycle modules are recorded as residual claims.
+        derived.len() >= 9,
         "only {} dispatch arms of crates/connectors-cli/src/lib.rs were followed to a protocol \
          request; the dispatch moved, so read it again before believing any result from a check \
          that uses this: {derived:?}",
@@ -2249,7 +2257,7 @@ fn the_kinds_the_tree_derives_are_the_kinds_the_list_carries() {
     // derives — which is exactly how `connect` came to be described as measured by nothing.
     let sentence = one_line
         .rsplit("**The remaining ")
-        .nth(1)
+        .next()
         .map(|rest| {
             rest.split(" reach no protocol request")
                 .next()
