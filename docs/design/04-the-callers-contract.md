@@ -141,3 +141,21 @@ The schema-2 artifact and operation-v1 bundle remain historical authorities with
 Retain deterministic generation, source-to-caller-schema and schema-to-request fixtures, explicit
 old-reader refusal, and complete repository-gate evidence for the assembled publication revision.
 The earlier schema-3 amendment's source-validity limits and legacy-profile distinction still apply.
+
+### Amendment — 2026-09-07: preserve declared legacy response schemas
+
+Legacy operations already retain their effective `response_schema` in the canonical document,
+including the credential-handle projection for a credential-producing operation. Their historical
+contract omits `contract.output_schema`. The typed catalogue previously read only the latter, so
+public descriptions reported null even when an exact response schema was available. Capability
+consumers could not register those descriptions; an array response still needs an object containing
+its JSON Schema, such as `{"type":"array","items":...}`.
+
+The typed reader now uses a declared contract output first and otherwise preserves the existing
+effective response schema for `legacy_v1` operations. OpenAPI 3 operations continue to use only
+their translated contract output; the literal source is not substituted for a missing translation.
+Absent declarations remain absent. No constraints, response types or dialect keywords are invented
+or removed, and this does not claim that a retained legacy source is validated under a newer dialect.
+Canonical document, pack and protocol shapes remain unchanged. Consumers of legacy descriptions
+now receive their declared schema in the existing output field instead of null. Request semantics,
+provider execution and credential custody remain governed by their existing owners.

@@ -275,6 +275,9 @@ struct RawOperation {
     /// description and the lowered, caller-typed input schema, as the build computed them.
     #[serde(default)]
     contract: Option<RawContract>,
+    /// The canonical effective response, including credential-handle projection where needed.
+    #[serde(default)]
+    response_schema: Option<Value>,
     #[serde(default)]
     expose: bool,
     /// The minting join (S-001), when this operation's call mints a declared credential.
@@ -682,6 +685,12 @@ fn build_operation(
             .contract
             .as_ref()
             .and_then(|contract| contract.output_schema.as_ref())
+            .or(match raw.request_semantics {
+                // Legacy contracts omit a translated output. Preserve their already-declared
+                // effective schema rather than describing a known response as absent.
+                crate::RequestSemantics::LegacyV1 => raw.response_schema.as_ref(),
+                crate::RequestSemantics::OpenApi30JsonV1 => None,
+            })
             .map(|schema| leak_str(schema.to_string())),
         expose: raw.expose,
     }
@@ -1213,6 +1222,42 @@ mod tests {
             withheld.operations[0].credential_requirement,
             CredentialRequirement::Withheld
         );
+    }
+
+    #[test]
+    fn output_schema_uses_the_declared_profile_without_inventing_a_missing_contract() {
+        let original: Value = serde_json::from_str(&document(
+            r#", "credential_requirement": "no-credential-required""#,
+            "[]",
+        ))
+        .unwrap();
+        let legacy = serde_json::json!({"type":"array","items":{"type":"string","minLength":3},"maxItems":7});
+        let translated = serde_json::json!({"type":"object","properties":{"value":{"type":["string","null"]}},"required":["value"],"additionalProperties":false});
+        for semantics in ["legacy_v1", "openapi_3_0_json_v1"] {
+            for response in [None, Some(legacy.clone()), Some(Value::Bool(false))] {
+                for contract in [None, Some(translated.clone()), Some(Value::Bool(true))] {
+                    let mut document = original.clone();
+                    let operation = &mut document["operations"][0];
+                    operation["request_semantics"] = Value::String(semantics.to_owned());
+                    if let Some(schema) = &response {
+                        operation["response_schema"] = schema.clone();
+                    }
+                    if let Some(schema) = &contract {
+                        operation["contract"]["output_schema"] = schema.clone();
+                    }
+                    let provider = build("t", &document.to_string());
+                    let actual = provider.operations[0]
+                        .output_schema
+                        .map(|schema| serde_json::from_str::<Value>(schema).unwrap());
+                    let expected = contract.as_ref().or_else(|| {
+                        (semantics == "legacy_v1")
+                            .then_some(response.as_ref())
+                            .flatten()
+                    });
+                    assert_eq!(actual.as_ref(), expected, "{semantics}");
+                }
+            }
+        }
     }
 
     #[test]
