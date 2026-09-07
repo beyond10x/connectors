@@ -77,6 +77,8 @@ pub async fn dispatch(
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectError {
+    #[error("hosted token setup requires a catalog-declared Connect Session profile with one secret entry; OAuth, native multi-field and unknown profiles need their declared acquisition flow or a matching CLI release")]
+    HostedTokenProfile,
     #[error("personal OAuth needs exactly one configured binding and its declared profile")]
     PersonalOAuthConfiguration,
     #[error(
@@ -93,6 +95,36 @@ pub enum ConnectError {
     Prompt(#[from] std::io::Error),
     #[error("the Connector returned an invalid connection response")]
     InvalidResponse,
+}
+
+/// Preflight hosted token setup against the CLI's pinned declarations, before reading a file.
+/// Runtime admission remains authoritative; the reusable protocol client does not embed a catalog.
+pub fn validate_hosted_token_profile(provider: &str, profile: &str) -> Result<(), ConnectError> {
+    let provider = catalog::provider(catalog::ProviderKey::id(provider))
+        .filter(|provider| provider.authority.is_some())
+        .ok_or(ConnectError::HostedTokenProfile)?;
+    let credential = provider
+        .auth
+        .iter()
+        .find(|credential| credential.name == profile)
+        .filter(|credential| {
+            matches!(credential.acquire, catalog::Acquisition::ConnectSession)
+                && !matches!(credential.subject, catalog::Subject::Unstated)
+        })
+        .ok_or(ConnectError::HostedTokenProfile)?;
+    let binding = format!("credential.{}", credential.name);
+    if provider
+        .config
+        .iter()
+        .filter(|field| {
+            field.secret && (field.binds == binding || field.also_binds.contains(&binding.as_str()))
+        })
+        .count()
+        != 1
+    {
+        return Err(ConnectError::HostedTokenProfile);
+    }
+    Ok(())
 }
 
 /// Run one guided flow and return what happened, without printing it.
@@ -485,6 +517,26 @@ mod personal_oauth_tests {
     use super::*;
     use std::io::Write as _;
     use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+
+    #[test]
+    fn hosted_token_preflight_uses_declarations_without_provider_branches() {
+        for (provider, profile) in [
+            ("grafana", "grafana.service_account_token"),
+            ("anthropic", "anthropic.api_key"),
+        ] {
+            assert!(validate_hosted_token_profile(provider, profile).is_ok());
+        }
+        for (provider, profile) in [
+            ("slack", "slack.companion_bot"),
+            ("slack", "slack.user_token"),
+            ("jira", "jira.api_token"),
+        ] {
+            assert!(matches!(
+                validate_hosted_token_profile(provider, profile),
+                Err(ConnectError::HostedTokenProfile)
+            ));
+        }
+    }
 
     #[test]
     fn instruction_file_is_exclusive_owner_only_and_cleared_on_drop() {

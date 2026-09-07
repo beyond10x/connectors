@@ -72,3 +72,53 @@ before storing it. The caller cannot supply a replacement endpoint. Each connect
 bindings across restarts; changing or removing a binding degrades incompatible connections and
 refuses their calls until the owner connects again. An existing credential is never redirected to
 a newly configured host. Fixed-origin providers continue to work without bindings.
+
+## Supply a catalog token without a browser form
+
+The same principal-owned Connect Session can read a token from an owner-only file. Sign in to the
+exact public Connector API base through normal Identity once:
+
+```shell-session
+connectors session login https://connectors.example/api/connectors/v1
+connectors setup connect grafana --target hosted \
+  --auth-profile grafana.service_account_token \
+  --credential-file /private/grafana-token --label Monitoring
+```
+
+This path supports the hosted catalogue's declared profiles with one secret credential entry,
+including service-account tokens and API keys. It uses the active saved Identity login and creates
+a Connection owned by that principal. It does not create a Grafana service account, mint a token,
+or install a shared administrative credential. OAuth consent and native flows requiring multiple
+fields retain their declared acquisition routes. Local setup remains the default without
+`--target hosted`; local configuration, provider settings, network overrides and instruction files
+cannot be combined with hosted token setup.
+
+The CLI checks the selected profile against its pinned catalogue before reading the credential
+file or creating a session. Unknown profiles and incompatible acquisition shapes are refused;
+profiles introduced by a newer catalogue need a matching CLI release. The running Connector
+still decides whether that profile is currently admitted by its deployment.
+
+The file must be regular, owned by the invoking user, have no group/other permission bits, contain
+nonempty UTF-8, and be at most 8192 bytes. Final symlinks are refused and the same opened handle is
+checked and read. Neither the credential nor the one-use completion capability appears in output.
+The client sends it once to the exact returned session route beneath the selected API base, with
+redirects and automatic retries disabled. The existing server performs provider verification,
+credential custody, owner checks and endpoint pinning. Success requires both completed session
+status and a callable principal-owned Connection with the requested provider and profile. If
+submission cannot be confirmed, inspect hosted Connections before starting again: the first
+submission may already have stored the credential.
+
+For automation that already has a short-lived Identity bearer, the reusable Rust
+`HostedClient::connect_with_credential_file` accepts that bearer, its ordinary `OwnerContext`, the
+existing `ConnectSessionCreateRequest`, and the private file path. The bearer needs
+`connectors.connections.self` and `connectors.catalog.read`; the server derives its actual tenant
+and owner from Identity. No desktop login or OS keyring is required by this client method. Its caller
+must select a declared token profile with one secret entry; the reusable protocol client embeds no
+catalogue and the server remains responsible for admission and credential verification. For
+callers already implementing session creation and status checks,
+`HostedClient::complete_connect_session` submits an issued token session directly. It acknowledges
+submission only and must be followed by the normal owner-scoped status/description checks.
+
+Private development CAs use the platform trust store or `SSL_CERT_FILE` pointing to the retained
+PEM CA bundle. Certificate and hostname verification remain enabled. Use the same trusted public
+API base for login and acquisition; a returned completion origin or API prefix change is refused.

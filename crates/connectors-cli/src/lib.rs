@@ -158,6 +158,9 @@ enum SetupCommand {
     },
     /// Add a provider through one guided, secret-safe flow.
     Connect {
+        /// Deployment to reach. Hosted token setup uses the current Identity login.
+        #[arg(long, value_enum, default_value_t = Target::Local)]
+        target: Target,
         /// Provider to add. `connectors inspect providers` lists every one the catalogue declares.
         #[arg(required_unless_present = "operation", conflicts_with = "operation")]
         provider: Option<String>,
@@ -188,6 +191,8 @@ enum SetupCommand {
         #[arg(long)]
         operator_network: bool,
         /// Read the credential from an owner-only file rather than prompting.
+        /// Hosted mode supports declared catalog token profiles with one secret entry;
+        /// browser OAuth and native flows with multiple fields keep their acquisition routes.
         #[arg(long)]
         credential_file: Option<PathBuf>,
         /// Which instance, when this placement holds one provider more than once.
@@ -208,7 +213,7 @@ enum SetupCommand {
 
 #[derive(Debug, clap::Args)]
 struct PersonalOAuthArgs {
-    /// Start the configured personal OAuth credential purpose.
+    /// Exact hosted token profile, or the configured personal OAuth credential purpose.
     #[arg(long, conflicts_with = "credential")]
     auth_profile: Option<String>,
     /// Private OAuth instructions in a new owner-only file; otherwise use the controlling terminal.
@@ -852,6 +857,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 force,
             ),
             SetupCommand::Connect {
+                target,
                 provider,
                 config,
                 label,
@@ -865,6 +871,46 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 credential_file,
                 instance,
             } => {
+                target.validate(&config, &state_root)?;
+                if target == Target::Hosted {
+                    if context.is_some()
+                        || credential.is_some()
+                        || oauth.instruction_file.is_some()
+                        || oauth.operation.is_some()
+                        || !settings.is_empty()
+                        || allow.is_some()
+                        || operator_network
+                        || instance.is_some()
+                    {
+                        return Err(MainError::HostedSetupOptions);
+                    }
+                    let provider = provider.ok_or(MainError::HostedSetupOptions)?;
+                    let auth_profile = oauth.auth_profile.ok_or(MainError::HostedSetupOptions)?;
+                    let credential_file = credential_file.ok_or(MainError::HostedSetupOptions)?;
+                    connect::validate_hosted_token_profile(&provider, &auth_profile)?;
+                    let description = AuthenticatedHostedClient::active()?
+                        .connect_with_credential_file(
+                            protocol::connection::ConnectSessionCreateRequest {
+                                integration_ref: provider.clone(),
+                                label: label.unwrap_or_else(|| provider.clone()),
+                                auth_profile: Some(auth_profile),
+                            },
+                            &credential_file,
+                        )
+                        .await?;
+                    emit_targeted(
+                        format,
+                        &serde_json::json!({
+                            "provider": provider,
+                            "connected": true,
+                            "connection": description.summary.label,
+                            "connection_ref": description.summary.connection_ref,
+                            "auth_profile": description.summary.auth_profile,
+                        }),
+                        target.as_str(),
+                    )?;
+                    return Ok(());
+                }
                 let config_path = config.map_or_else(default_config_path, Ok)?;
                 let state_root = state_root.map_or_else(default_state_root, Ok)?;
                 validate_state_root(&state_root)?;

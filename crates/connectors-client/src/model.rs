@@ -10,6 +10,14 @@ use zeroize::Zeroizing;
 /// A transport, framing, or protocol validation failure.
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
+    #[error("hosted token acquisition requires an exact provider auth profile")]
+    HostedConnectProfile,
+    #[error("credential input must be a nonempty UTF-8 regular file, owned by this user, with no group/other permissions and at most 8192 bytes")]
+    UnsafeCredentialFile,
+    #[error("the Connect Session does not provide a current token completion route at the selected Connector API base")]
+    UnsafeHostedCompletion,
+    #[error("credential submission could not be confirmed; inspect hosted Connections before starting another session, because the credential may already be stored")]
+    CompletionUnconfirmed,
     #[error("authentication remediation was refused, expired, or returned invalid evidence")]
     RemediationRefused,
     #[error("personal OAuth instructions are unavailable or invalid")]
