@@ -9,6 +9,7 @@ use connector_address::credential::CredentialRef;
 
 use crate::hosted_git_fetch::{HostedGitlabConfig, HostedTlsListenerConfig};
 use crate::personal::{InitiationConfig, PlatformIntegrationConfig, SlackIntegrationConfig};
+use crate::HostedCatalogConfig;
 
 pub(crate) const MAX_CONFIG_BYTES: u64 = 256 * 1024;
 const NATIVE_SIP_AUTHORITY: &str = "io.b10x";
@@ -66,38 +67,6 @@ pub struct HostedEgressConfig {
 pub struct HostedClaudeCodeConfig {
     #[serde(default)]
     pub enabled: bool,
-}
-
-/// Generic, catalog-driven self-service connections.
-///
-/// The provider list is deployment policy, not a second catalog: every credential name, address,
-/// request template and destination still comes from the compiled Connector catalog. An empty
-/// list admits every catalog provider whose credential explicitly declares Connect Session entry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HostedCatalogConfig {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub public_origin: Option<String>,
-    #[serde(default)]
-    pub grant_ref: Option<String>,
-    #[serde(default)]
-    pub providers: Vec<String>,
-    #[serde(default = "default_connect_session_ttl_seconds")]
-    pub connect_session_ttl_seconds: u64,
-}
-
-impl Default for HostedCatalogConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            public_origin: None,
-            grant_ref: None,
-            providers: Vec::new(),
-            connect_session_ttl_seconds: default_connect_session_ttl_seconds(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -538,11 +507,21 @@ impl HostedServerConfig {
                     .is_some_and(|value| valid_ref(value, 512))
                 && providers == self.catalog.providers
                 && providers.iter().all(|provider| valid_ref(provider, 128))
+                && self.catalog.bindings.iter().all(|(provider, binding)| {
+                    valid_ref(provider, 128)
+                        && (providers.is_empty() || providers.contains(provider))
+                        && binding.endpoints.len() <= 32
+                        && binding
+                            .endpoints
+                            .iter()
+                            .all(|(name, value)| valid_ref(name, 128) && valid_ref(value, 2048))
+                })
                 && (60..=900).contains(&self.catalog.connect_session_ttl_seconds)
         } else {
             self.catalog.public_origin.is_none()
                 && self.catalog.grant_ref.is_none()
                 && self.catalog.providers.is_empty()
+                && self.catalog.bindings.is_empty()
                 && self.catalog.connect_session_ttl_seconds == default_connect_session_ttl_seconds()
         };
         let vault_required = self.claude_code.enabled
@@ -776,7 +755,7 @@ fn default_vault_mount() -> String {
     "secret".to_owned()
 }
 
-fn default_connect_session_ttl_seconds() -> u64 {
+pub(super) fn default_connect_session_ttl_seconds() -> u64 {
     300
 }
 

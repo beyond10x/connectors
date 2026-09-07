@@ -17,7 +17,7 @@ use hosted_state::PostgresState;
 use hosted_vault::{HostedVaultStore, PreparedVaultStore};
 use identity_http::IdentityHttpVerifier;
 use integration_catalog::{
-    hosted_admitted_origins, CatalogBackend, CatalogIntegrationError, HostedCatalogBackend,
+    hosted_admitted_destinations, CatalogBackend, CatalogIntegrationError, HostedCatalogBackend,
     HostedCatalogError,
 };
 use integration_gitlab::GitlabBackend;
@@ -962,9 +962,17 @@ impl HostedRuntime {
                 .as_ref()
                 .ok_or(connectors_config::HostedServerConfigError::Invalid)?
                 .clone();
-            let rules = hosted_admitted_origins(&catalog_policy)?
+            let rules = hosted_admitted_destinations(&catalog_policy)?
                 .into_iter()
-                .map(|origin| DestinationRule::exact_origin(&origin, AddressScope::Public))
+                .map(|(origin, network)| {
+                    let scope = match network {
+                        connectors_config::NetworkScopeConfig::Public => AddressScope::Public,
+                        connectors_config::NetworkScopeConfig::Operator => {
+                            AddressScope::OperatorNetwork
+                        }
+                    };
+                    DestinationRule::exact_origin(&origin, scope)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
             backends.push(Arc::new(

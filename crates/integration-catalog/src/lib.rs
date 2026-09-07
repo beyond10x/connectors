@@ -66,7 +66,9 @@ pub use oauth::{
     PersonalOAuthError,
 };
 mod hosted;
+mod hosted_endpoints;
 pub use hosted::{hosted_admitted_origins, HostedCatalogBackend, HostedCatalogError};
+pub use hosted_endpoints::hosted_admitted_destinations;
 
 /// Minting an Argo CD API token from an operator's password, so the `argocd` CLI is not a
 /// prerequisite for connecting Argo CD.
