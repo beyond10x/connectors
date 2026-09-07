@@ -15,6 +15,14 @@ scope:
 - confidence: cited
   path: connectors.lock
 - confidence: cited
+  path: contracts/connector-connection/v0alpha2/README.md
+- confidence: cited
+  path: contracts/connector-connection/v0alpha2/bundle.json
+- confidence: cited
+  path: contracts/connector-connection/v0alpha2/connector-connection.schema.json
+- confidence: cited
+  path: contracts/connector-connection/v0alpha2/vectors.json
+- confidence: cited
   path: crates/catalog-reader/catalog.pack
 - confidence: cited
   path: crates/connector-secrets/README.md
@@ -73,6 +81,8 @@ scope:
 - confidence: cited
   path: crates/integration-catalog/src/hosted_custody.rs
 - confidence: cited
+  path: crates/integration-catalog/src/hosted_dispatch_tests.rs
+- confidence: cited
   path: crates/integration-catalog/src/hosted_endpoint_tests.rs
 - confidence: cited
   path: crates/integration-catalog/src/hosted_endpoints.rs
@@ -97,6 +107,16 @@ scope:
 - confidence: cited
   path: crates/integration-slack/src/backend/connection_runtime.rs
 - confidence: cited
+  path: crates/protocol/src/connection.rs
+- confidence: cited
+  path: crates/protocol/src/connection_v2.rs
+- confidence: cited
+  path: crates/protocol/src/connection_v2_schema.rs
+- confidence: cited
+  path: crates/protocol/tests/bundles.rs
+- confidence: cited
+  path: crates/protocol/tests/connect_session_status.rs
+- confidence: cited
   path: crates/server/src/hosted/connect.rs
 - confidence: cited
   path: crates/service/src/credential_commit.rs
@@ -110,7 +130,7 @@ scope:
   path: docs/guides/administer-hosted-integrations.md
 - confidence: cited
   path: providers/grafana.toml
-revision: 39
+revision: 47
 ---
 ## Outcome
 
@@ -228,3 +248,25 @@ The exact generic form JavaScript passes 18 real Chromium cases against controll
 The first root gate caught existing source-size ceilings. Extracting FileStore crash tests and GitLab custody methods restored the bounds without raising a waiver. A following compile caught an incorrect extracted impl type name; it was corrected and the affected package/runtime checks passed. All failed logs remain retained. The complete gate was run in bounded workspace lanes, with exact completed test executables and inactive task-owned incremental cache reclaimed between lanes to preserve local cluster disk headroom; source, libraries, actual CLI and deployment state were retained.
 
 The existing shared journal is loaded in place. Legacy outcomes remain unacknowledged; legacy pending receipts with lost Retired outcomes remain refused, never invented as successful commits. The additive write-ahead marker applies only to new intents. Mixed writers using the old broad-reclaim algorithm are unsupported; the consuming deployment has confirmed a single replica and Recreate upgrade strategy. Real owner Grafana completion and a governed read remain deployment acceptance, so this story remains active. No release, merge, deployment or private-state generation patch was performed here.
+
+## Hosted operation lease continuity
+
+The consuming deployment now reports successful owner Grafana credential acquisition, but separate describe and invoke requests immediately return stale_authority. The hosted adapter constructs a fresh CatalogBackend for every handle call, discarding that backend's description leases. The earlier endpoint test helper reused one private delegate and therefore did not exercise the actual public request boundary.
+
+Retain a bounded delegate cache keyed by the existing stable principal authority seed and the current owner-filtered binding configuration, including grant, credential profile, endpoint and network policy. Recompute that configuration from current metadata and deployment policy on every request. Normal verified-token/request rotation preserves continuity; real principal/delegation/group or binding changes select a fresh lease map. No authority checks, credential custody or provider schemas change. Replace the endpoint test helper with separate HostedCatalogBackend handle calls and add focused renewal, wrong owner/tenant, changed authority/binding and cache-capacity regressions. Source gates remain required; do not access or replay the owner's credential or claim a live provider read from controlled tests.
+
+## Pending status without capability replay
+
+The consuming deployment also reproduces HTTP503 when polling a newly created pending Connect Session. The producer correctly omits its one-use completion capability after Create, but the validator applies the Create locator requirement to Status as well. The delegated protocol correction distinguishes acquisition responses from status-only responses, retaining the Create and pending remediation-start locator requirement while allowing pending status to omit it. Add an actual hosted producer-to-envelope regression. The existing v1 schema already admits this omission; update only v2 projections and generated schema/bundle/vector outputs that declare the stricter shared rule, using their established deterministic generation path. No caller capability is replayed and no completion authority expands.
+
+The focused protocol gate exposed a predecessor source-byte pin for connection.rs. Apply one documented compatibility exception for correcting its existing status validator to the already-declared v1 response schema: update only that reader's reviewed hash in bundles.rs, retaining all other reader hashes and every v1 contract artifact byte. New tests keep Create locator requirements and malformed/terminal refusal explicit. This repairs the current hosted producer/reader mismatch without changing v1 wire shapes or authentication authority.
+
+## Public request recovery verification
+
+The corrected candidate passes the authoritative gate across all twelve Cargo workspaces, both hosted runtime feature configurations, catalog verification for 65 providers and 70 artifacts, portable links and story checks, ESS 0.18.0 validation and exact clap projection. Formatting passes across every workspace; root and hosted-runtime workspace all-target clippy pass with warnings denied. Final protocol tests include the reviewed predecessor source pin and the new create/status distinction. All 155 v2 vectors agree with their declared Rust-reader and Draft 2020-12 outcomes, and deterministic bundle generation matches the committed schema and manifest. Every v1 contract artifact remains byte-identical.
+
+The full catalog suite passes 120 tests. Separate public HostedCatalogBackend describe and invoke requests now preserve their lease across verified scope-token, snapshot, request and trace rotation. Wrong owner, tenant, group or realm; changed delegated attempt, delegation, grant identity or grant revision; changed or removed binding; and delegate-cache eviction refuse the stale description before provider egress. Changed authority can obtain its own fresh description without using a foreign lease. A producer-to-envelope regression creates an actual hosted pending session and validates repeated status responses that omit completion capabilities; creation still supplies its route and malformed or terminal capabilities remain refused.
+
+These use controlled value/state adapters and provider transport, not the operator's real provider account. The consuming deployment has reported durable credential acquisition, but the new pinned runtime and BFF still require local composition and a real governed provider read before acceptance is complete. No credential was read, replayed or requested by this upstream subtask, and no deployment or release was performed. The story remains active for that acceptance.
+
+After verification, 102 exact completed test executables were reclaimed from the retained task target, excluding all top-level executable inodes and all libraries, source and evidence. This restored about 7.38 GiB for the consuming composition. The successful gate logs, earlier refusal evidence and exact cleanup inventory are retained privately with the task handoff.
