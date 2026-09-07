@@ -15,26 +15,32 @@ scope:
 - confidence: cited
   path: crates/connectors-cli/src/lib.rs
 - confidence: cited
+  path: crates/connectors-cli/src/main.rs
+- confidence: cited
   path: crates/connectors-cli/tests/adversary_fence_probe.rs
 - confidence: cited
   path: crates/connectors-cli/tests/cli_surface.rs
 - confidence: cited
   path: crates/connectors-cli/tests/cli_surface_drift.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-cli/tests/upgrade.rs
 - confidence: cited
+  path: crates/connectors-cli/tests/upgrade_adversary.rs
+- confidence: cited
   path: crates/connectors-client/src/identity.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-client/src/lib.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-console/src/lib.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-console/src/upgrade.rs
+- confidence: cited
+  path: crates/connectors-console/tests/upgrade_adversary.rs
 - confidence: cited
   path: docs/design/19-the-cli-surface.md
 - confidence: cited
   path: ess/system/components.yaml
-revision: 18
+revision: 24
 ---
 # Story: the binary says what it carries
 
@@ -81,19 +87,44 @@ Serves O1 (governed reach) and O5 (generic platform), as declared in `AGENTS.md:
 The scoper's original section below is retained. Coordinator source review adds `crates/connector-secrets/src/file/prepared.rs` as cited scope: reporting only the v1 `VERSION` would omit the shipped v2 parser and writer. Acceptance now resolves the scoper's ambiguity; overall implementation confidence remains medium until the public reporting exports are verified by the implementor. Catalog access and installation text reuse existing owners without changes to those owners.
 ## Scope
 
-Derived 2026-09-07 by `story-scoper` through read-only inspection of base `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+## Scope
 
-- **Primary surface:** `crates/connectors-cli/src/lib.rs:235` — cited; extend `InspectCommand` and its dispatch at line 922.
-- **Console registration:** `crates/connectors-console/src/lib.rs:35` — inferred; register the reusable report module.
-- **Console implementation:** `crates/connectors-console/src/upgrade.rs` — inferred; new module collecting compiled version facts and installation guidance.
-- **Credential authority:** `crates/connector-secrets/src/file.rs:95` — cited; its format constant is private, requiring a public reporting surface.
-- **Session authority:** `crates/connectors-client/src/identity.rs:36` — cited; `METADATA_VERSION` is private.
-- **Session export:** `crates/connectors-client/src/lib.rs:28` — inferred; expose the session-format reporting surface through the existing identity exports.
-- **CLI contract:** `crates/connectors-cli/tests/cli_surface.rs:98` — cited; add the read exception to `UNSPECIFIED_PATHS`.
-- **Contract copies:** `crates/connectors-cli/tests/cli_surface_drift.rs:521` and `crates/connectors-cli/tests/adversary_fence_probe.rs:1164` — cited; tests require their copied exception declarations to remain byte-identical.
-- **Behavior verification:** `crates/connectors-cli/tests/upgrade.rs` — inferred; new integration coverage for reported facts and execution with absent state.
-- **Specification:** `ess/system/components.yaml:162` — cited; add `unspecified-path: inspect upgrade — read`; the existing mechanism uses a checked comment enumeration, not an ESS command declaration.
-- **Documents:** `docs/design/19-the-cli-surface.md:83` — cited; exception totals and residual-path accounting at lines 111 and 121 must include the new leaf.
-- **Symbols:** `InspectCommand`, `UNSPECIFIED_PATHS`, `VERSION`, `METADATA_VERSION` — cited.
-- **Confidence:** medium — inferred; landing sites are established, but acceptance leaves credential-format reporting ambiguous.
-- **Would collide with:** changes to CLI parser/dispatch, its exception declaration and copied contract tests, console module registration, credential-format exports, session metadata exports, and CLI specification/design accounting — inferred.
+Confirmed by the implementor against unit commit `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. This replaces the original mixed cited/inferred scope: all four inferred locations were confirmed, credential ambiguity was resolved in the approved brief, and main.rs was added after a measured startup socketpair. These corrections supersede the earlier medium-confidence scoping language.
+
+| Scope hypothesis | Source confirmation |
+| --- | --- |
+| Inferred console registration | Confirmed existing registry; new registration `crates/connectors-console/src/lib.rs:47`. |
+| Inferred console report owner | Confirmed reporting pattern in `crates/connectors-console/src/providers.rs`; new report `crates/connectors-console/src/upgrade.rs:11`. |
+| Inferred session export | Existing identity exports `crates/connectors-client/src/lib.rs:28`; alias at line 31 uses owning constant `identity.rs:37`. |
+| Inferred real CLI test location | Confirmed existing integration suite; new tests `crates/connectors-cli/tests/upgrade.rs:67,106,122,142,159,179`. |
+| Cited parser and output owner | `crates/connectors-cli/src/lib.rs:235,769,817,853,962`; shared output handling preserves closed-pipe success and other write failures. |
+| Cited credential owners | `crates/connector-secrets/src/file.rs:102` exports both formats; `file/prepared.rs:19,21` derives v2 from the unchanged parser/writer header. |
+| Cited catalog owner, unchanged | `crates/catalog-reader/src/lib.rs:316,321,561`; metadata comes from embedded bytes. |
+| Cited contract/accounting | Three assigned exception copies updated; `ess/system/components.yaml:172` and `docs/design/19-the-cli-surface.md:83,111,121,273` account for 28 exceptions. |
+| Measured scope correction | Unconditional Tokio in `crates/connectors-cli/src/main.rs` created a socketpair. Coordinator applied the exact `main-runtime.patch`; main now uses the same clap tree before constructing Tokio. |
+
+Every inferred location was confirmed; none was wrong. The approved brief had already resolved credential-format ambiguity. Public async `run_from`, moved-path notices, help/errors and the normal fallback remain; no broad startup refactoring was made.
+
+The independent adversary added `crates/connectors-cli/tests/upgrade_adversary.rs` (embedding, parser ownership, output-option placement) and `crates/connectors-console/tests/upgrade_adversary.rs` (actual credential transition and reopening), committed at `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`. These two cited verification paths bring the final typed scope to 16 paths. The native syscall probe remains a recorded external verifier rather than adding an undeclared strace prerequisite to Cargo tests.
+
+## Scope
+
+Confirmed by the implementor against unit commit `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. This replaces the original mixed cited/inferred scope: all four inferred locations were confirmed, credential ambiguity was resolved in the approved brief, and main.rs was added after a measured startup socketpair. These corrections supersede the earlier medium-confidence scoping language.
+
+| Scope hypothesis | Source confirmation |
+| --- | --- |
+| Inferred console registration | Confirmed existing registry; new registration `crates/connectors-console/src/lib.rs:47`. |
+| Inferred console report owner | Confirmed reporting pattern in `crates/connectors-console/src/providers.rs`; new report `crates/connectors-console/src/upgrade.rs:11`. |
+| Inferred session export | Existing identity exports `crates/connectors-client/src/lib.rs:28`; alias at line 31 uses owning constant `identity.rs:37`. |
+| Inferred real CLI test location | Confirmed existing integration suite; new tests `crates/connectors-cli/tests/upgrade.rs:67,106,122,142,159,179`. |
+| Cited parser and output owner | `crates/connectors-cli/src/lib.rs:235,769,817,853,962`; shared output handling preserves closed-pipe success and other write failures. |
+| Cited credential owners | `crates/connector-secrets/src/file.rs:102` exports both formats; `file/prepared.rs:19,21` derives v2 from the unchanged parser/writer header. |
+| Cited catalog owner, unchanged | `crates/catalog-reader/src/lib.rs:316,321,561`; metadata comes from embedded bytes. |
+| Cited contract/accounting | Three assigned exception copies updated; `ess/system/components.yaml:172` and `docs/design/19-the-cli-surface.md:83,111,121,273` account for 28 exceptions. |
+| Measured scope correction | Unconditional Tokio in `crates/connectors-cli/src/main.rs` created a socketpair. Coordinator applied the exact `main-runtime.patch`; main now uses the same clap tree before constructing Tokio. |
+
+Every inferred location was confirmed; none was wrong. The approved brief had already resolved credential-format ambiguity. Public async `run_from`, moved-path notices, help/errors and the normal fallback remain; no broad startup refactoring was made.
+
+## Runtime-startup scope correction, 2026-09-07
+
+The implementor measured an AF_UNIX socket pair created by unconditional Tokio startup in `crates/connectors-cli/src/main.rs:5`, before command dispatch. Its pre-change executable also fails with exit 101 when `TOKIO_WORKER_THREADS=0`; the raw evidence is retained in the unit scratch `red-runtime-startup.log`. This violates the accepted socket-free diagnostic behavior even though the report itself is pure. Add `crates/connectors-cli/src/main.rs` as cited scope: use the same clap tree to dispatch this synchronous report before starting Tokio, while preserving the public async embedding entry point and normal fallback behavior. The coordinator applies the implementor's reviewed main-entry patch; this is a bounded implementation correction within the approved story.

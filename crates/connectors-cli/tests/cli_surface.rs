@@ -115,6 +115,11 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
     ),
     // Under `inspect`.
     (
+        "inspect upgrade",
+        Unspecified::Read,
+        "a read of compiled versions and supported formats; no installation state is opened",
+    ),
+    (
         "inspect doctor",
         Unspecified::Read,
         "a read of the installation; no entity moves",
@@ -1132,8 +1137,8 @@ fn no_word_of_the_parser_answers_to_a_name_the_specification_cannot_declare() {
 ///
 /// The kind is carried here and not only in the Rust list because an adversary pass measured what
 /// the Rust list alone was worth: relabelling nineteen entries one at a time produced two
-/// refusals. Thirteen of the twenty-seven kinds are derived from the tree by
-/// [`kinds_the_tree_derives`] and rest on nothing anybody wrote down; the other fourteen are a
+/// refusals. Thirteen of the twenty-eight kinds are derived from the tree by
+/// [`kinds_the_tree_derives`] and rest on nothing anybody wrote down; the other fifteen are a
 /// claim, and a claim belongs in the reviewed document rather than in the test that reads it.
 fn paths_the_specification_names() -> BTreeSet<String> {
     let document = read(&repository_root().join("ess/system/components.yaml"));
