@@ -637,6 +637,105 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
     backend: Arc<B>,
 ) -> Result<Option<Vec<u8>>, LocalDaemonError> {
     let bytes = match protocol_name {
+        protocol::endpoint::CONTRACT => {
+            if frame.len() > protocol::endpoint::MAX_FRAME_BYTES {
+                return Ok(None);
+            }
+            let request: protocol::endpoint::RequestEnvelope = match serde_json::from_slice(frame) {
+                Ok(value) => value,
+                Err(_) => return Ok(None),
+            };
+            if request.validate().is_err() {
+                return Ok(None);
+            }
+            let context = match PrincipalContext::local(&request.context) {
+                Ok(value) => value,
+                Err(_) => return Ok(None),
+            };
+            let response = match backend.handle_endpoint(&context, request.request).await {
+                Ok(result) => {
+                    protocol::endpoint::ResponseEnvelope::success(&request.request_id, result)
+                }
+                Err(error) => {
+                    protocol::endpoint::ResponseEnvelope::failure(&request.request_id, error)
+                }
+            };
+            let response = match response.validate() {
+                Ok(()) => response,
+                Err(error) => {
+                    protocol::endpoint::ResponseEnvelope::failure(request.request_id, error)
+                }
+            };
+            serde_json::to_vec(&response).map_err(io::Error::other)?
+        }
+        protocol::operation::v4::CONTRACT => {
+            let request: protocol::operation::v4::RequestEnvelope =
+                match serde_json::from_slice(frame) {
+                    Ok(value) => value,
+                    Err(_) => return Ok(None),
+                };
+            if request.validate().is_err() {
+                return Ok(None);
+            }
+            let context = match PrincipalContext::local(&request.context) {
+                Ok(value) => value,
+                Err(_) => return Ok(None),
+            };
+            let request_id = request.request_id;
+            let response =
+                match service::normalize_endpoint_operation(&*backend, &context, request.request)
+                    .await
+                {
+                    Err(error) => {
+                        protocol::operation::v4::ResponseEnvelope::failure(&request_id, error)
+                    }
+                    Ok(normalized) => {
+                        let preflight =
+                            if let protocol::operation::OperationRequest::Invoke(invoke) =
+                                &normalized.request
+                            {
+                                local_auth_preflight(&*backend, &context, invoke).await
+                            } else {
+                                Ok(None)
+                            };
+                        match preflight {
+                            Ok(Some(auth)) => protocol::operation::v4::ResponseEnvelope::failure(
+                                &request_id,
+                                protocol::operation::v3::OperationError::authentication_required(
+                                    auth,
+                                ),
+                            ),
+                            Err(error) => protocol::operation::v4::ResponseEnvelope::failure(
+                                &request_id,
+                                error,
+                            ),
+                            Ok(None) => match backend
+                                .handle(&context, normalized.request)
+                                .await
+                                .and_then(|result| {
+                                    service::constrain_endpoint_description(
+                                        result,
+                                        normalized.description_connection.as_deref(),
+                                    )
+                                }) {
+                                Ok(result) => protocol::operation::v4::ResponseEnvelope::success(
+                                    &request_id,
+                                    result,
+                                ),
+                                Err(error) => protocol::operation::v4::ResponseEnvelope::failure(
+                                    &request_id,
+                                    error.into(),
+                                ),
+                            },
+                        }
+                    }
+                };
+            let response = match response.validate() {
+                Ok(()) => response,
+                Err(error) => protocol::operation::v4::ResponseEnvelope::failure(request_id, error),
+            };
+            serde_json::to_vec(&response).map_err(io::Error::other)?
+        }
         protocol::operation::legacy::CONTRACT
         | protocol::operation::wire::CONTRACT
         | protocol::operation::v3::CONTRACT => {
