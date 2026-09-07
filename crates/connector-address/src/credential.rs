@@ -23,10 +23,10 @@
 //! tenants/9f3a…/com.slack.api/signing_secret         ← `default` service elided
 //! tenants/9f3a…/com.zendesk.api/support/api_token
 //! tenants/9f3a…/com.amazonaws/s3/access_key
-//! tenants/9f3a…/com.zendesk.api/@instances/7c1e…/api_token   ← one of several connections
+//! tenants/9f3a…/com.zendesk.api/@instances/7c1e…/api_token   ← one of several endpoints
 //! ```
 //!
-//! # One tenant, two connections to the same vendor
+//! # One tenant, two endpoints to the same vendor
 //!
 //! A tenant may hold two Zendesk subdomains, or a sandbox and a production Jira. Without a component
 //! that varies per connection both render one address: the second write overwrites the first, and
@@ -43,7 +43,7 @@
 //! - It is carried **only when the tenant holds more than one connection of the same kind**
 //!   ([`TenantInstances`]). One connection renders exactly the address it rendered before this
 //!   existed, byte for byte, because a shifted address strands every credential already stored.
-//! - The ambiguous case — several connections and no uuid — **refuses**, naming the uuids that would
+//! - The ambiguous case — several endpoints and no uuid — **refuses**, naming the uuids that would
 //!   have worked. Never a default, never the first match.
 //!
 //! The marker segment [`INSTANCES_SEGMENT`] is `@instances`, and the `@` is doing work: no tenant id,
@@ -93,7 +93,7 @@ pub const INSTANCES_SEGMENT: &str = "@instances";
 /// the pathological. A bound exists at all because the value is untrusted and ends up in a path.
 pub const MAX_TENANT: usize = 128;
 
-/// One of a tenant's connections to a connector, named by uuid.
+/// One of a tenant's endpoints to a connector, named by uuid.
 ///
 /// Validated on the way in, so a value of this type is always spellable into a path — the same
 /// guarantee [`CredentialRef`] gives for every other component, hoisted into a type because a host
@@ -167,7 +167,7 @@ impl CredentialScope {
     }
 }
 
-/// The connections one tenant holds to one connector, and which of them an address names.
+/// The endpoints one tenant holds to one connector, and which of them an address names.
 ///
 /// This is the input `connector_spec::Connector::credential_ref_for` needs and cannot derive: a
 /// connector knows what it declares, never how many times a tenant has connected it. The host holds
@@ -187,7 +187,7 @@ impl CredentialScope {
 ///
 /// # The one migration this implies, stated rather than discovered
 ///
-/// The address is a function of how many connections the tenant holds, so the day a second one
+/// The address is a function of how many endpoints the tenant holds, so the day a second one
 /// appears the first credential's address gains a segment and the host must move the stored value.
 /// That is the cost of the alternative being worse: qualifying every address would strand every
 /// credential already stored, everywhere, at once. The refusal above is what makes the migration
@@ -222,7 +222,7 @@ impl<'a> TenantInstances<'a> {
     ///
     /// # Errors
     ///
-    /// A reason string when several connections are held and none is named — listing the uuids that
+    /// A reason string when several endpoints are held and none is named — listing the uuids that
     /// would have worked — or when the named one is not among those held.
     pub fn resolve(&self) -> Result<Option<&'a InstanceId>, String> {
         match (self.held, self.named) {
@@ -233,7 +233,7 @@ impl<'a> TenantInstances<'a> {
                  — an address is not a way to create one"
             )),
             (held, None) => Err(format!(
-                "this tenant holds {} connections to this connector and the reference names none, \
+                "this tenant holds {} endpoints to this connector and the reference names none, \
                  so there is no address to render: pass one of {}. A default or a first match would \
                  answer from whichever account happened to be stored, which is a `200` from the \
                  wrong instance rather than a refusal",
@@ -241,7 +241,7 @@ impl<'a> TenantInstances<'a> {
                 uuid_list(held)
             )),
             (held, Some(named)) if !held.contains(named) => Err(format!(
-                "instance {named} is not one of the {} connections this tenant holds: {}",
+                "instance {named} is not one of the {} endpoints this tenant holds: {}",
                 held.len(),
                 uuid_list(held)
             )),
@@ -291,7 +291,7 @@ impl CredentialRef {
         Self::build(tenant, authority, None, service, credential)
     }
 
-    /// Build a reference to one of a tenant's several connections, validating every component.
+    /// Build a reference to one of a tenant's several endpoints, validating every component.
     ///
     /// The components are in path order: the instance sits directly under the authority, above the
     /// service, because a connection is a connection to the *connector* and every one of its
@@ -361,7 +361,7 @@ impl CredentialRef {
         &self.authority
     }
 
-    /// Which of the tenant's connections this addresses, when it holds more than one.
+    /// Which of the tenant's endpoints this addresses, when it holds more than one.
     ///
     /// `None` is the ordinary case and the one every stored credential is in: a tenant with a single
     /// connection needs nothing to tell it apart, so the address carries nothing.

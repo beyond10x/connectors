@@ -35,7 +35,7 @@ pub const DOCUMENTS_DIR: &str = "catalog";
 pub const DOCUMENT_SUFFIX: &str = "catalog.json";
 
 /// The committed JSON Schema the documents validate against, beside them under [`DOCUMENTS_DIR`].
-pub const DOCUMENT_SCHEMA_FILE: &str = "connector-document-v4.schema.json";
+pub const DOCUMENT_SCHEMA_FILE: &str = "connector-document-v5.schema.json";
 
 /// The dependency-free reader crate, which embeds the compiled catalog pack (C-537).
 pub const READER_DIR: &str = "crates/catalog-reader";

@@ -828,7 +828,7 @@ pub struct AuthRequirement {
     /// The map key is deliberately a credential name rather than a loose operation-level list:
     /// one auth mechanism may carry several credentials, and scopes granted to one must never be
     /// credited to another. Slack makes that boundary concrete: `slack.app_token` may carry
-    /// `connections:write`, while `slack.bot_token` carries `chat:write`; combining those into one
+    /// `endpoints:write`, while `slack.bot_token` carries `chat:write`; combining those into one
     /// bag would let the transport token appear to authorize message posting.
     #[serde(
         default,

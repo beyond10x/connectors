@@ -73,11 +73,11 @@
 //! *not* consulted when a stored value is read back and substituted into a request. A connection
 //! configured with a host the connector no longer lists keeps working; the next edit of that field
 //! is where the operator is asked to pick again. The alternative, refusing at read time, converts a
-//! catalogue update into an outage on connections that were never wrong.
+//! catalogue update into an outage on endpoints that were never wrong.
 //!
 //! # An operator can pin a tenant scope, not only a host (C-187)
 //!
-//! [`Binding::Endpoint`] reaches a `{placeholder}` in a service's `base_url` and nothing else. That
+//! [`Binding::EndpointInventoryEntry`] reaches a `{placeholder}` in a service's `base_url` and nothing else. That
 //! covered every vendor whose tenancy is a *hostname* — `{subdomain}.zendesk.com` — and none whose
 //! tenancy sits further down the request. Two shipped connectors measured the gap in one wave:
 //! Cloudflare's `zone_id` is a **path** segment on every scoped operation (C-169), Vercel's `teamId`
@@ -522,7 +522,7 @@ pub fn validate_host_value(value: &str) -> Result<(), String> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Binding<'a> {
     /// A `{variable}` in the service's base URL — `endpoint.subdomain`.
-    Endpoint {
+    EndpointInventoryEntry {
         /// The template variable name, without braces.
         variable: &'a str,
     },
@@ -619,7 +619,7 @@ impl<'a> Binding<'a> {
             Self::OAuthClientId | Self::OAuthClientSecret | Self::OAuthRedirectUri => {
                 Level::Operator
             }
-            Self::Endpoint { .. }
+            Self::EndpointInventoryEntry { .. }
             | Self::Request { .. }
             | Self::ChannelQuery { .. }
             | Self::Credential { .. }
@@ -636,7 +636,7 @@ impl<'a> Binding<'a> {
     /// distinction subtly wrong.
     pub fn kind(self) -> &'static str {
         match self {
-            Self::Endpoint { .. } => "endpoint",
+            Self::EndpointInventoryEntry { .. } => "endpoint",
             Self::Request { position, .. } => position.word(),
             Self::ChannelQuery { .. } => "channel_query",
             Self::Credential { .. } => "credential",
@@ -649,7 +649,7 @@ impl<'a> Binding<'a> {
     /// of a pin, or the OAuth half.
     pub fn target(self) -> &'a str {
         match self {
-            Self::Endpoint { variable } => variable,
+            Self::EndpointInventoryEntry { variable } => variable,
             Self::Request { name, .. } | Self::Credential { name } | Self::Username { name } => {
                 name
             }
@@ -675,7 +675,7 @@ impl<'a> Binding<'a> {
             // same split, and it is why zendesk's agent email may appear in a log where its token
             // may not. A pinned request value is the same category and for a sharper reason: it
             // travels in a URL or a header the module itself composes, where a secret must never be.
-            Self::Endpoint { .. }
+            Self::EndpointInventoryEntry { .. }
             | Self::Request { .. }
             | Self::ChannelQuery { .. }
             | Self::Username { .. }
@@ -701,7 +701,7 @@ impl<'a> Binding<'a> {
     /// The reason, phrased for whoever wrote the declaration.
     pub fn validate_value(self, value: &str) -> Result<(), String> {
         match self {
-            Self::Endpoint { .. } => validate_host_value(value),
+            Self::EndpointInventoryEntry { .. } => validate_host_value(value),
             Self::Request { position, .. } => position.validate_value(value),
             Self::ChannelQuery { .. } => Position::Query.validate_value(value),
             Self::Credential { .. }
@@ -723,7 +723,7 @@ pub fn parse_binding(binds: &str) -> Result<Binding<'_>, String> {
         if variable.is_empty() {
             return Err("`endpoint.` names no variable".to_owned());
         }
-        return Ok(Binding::Endpoint { variable });
+        return Ok(Binding::EndpointInventoryEntry { variable });
     }
     if let Some(name) = binds.strip_prefix("credential.") {
         if name.is_empty() {
@@ -1114,7 +1114,7 @@ mod tests {
     fn bindings_parse_and_carry_their_level_and_secrecy() {
         assert_eq!(
             parse_binding("endpoint.subdomain"),
-            Ok(Binding::Endpoint {
+            Ok(Binding::EndpointInventoryEntry {
                 variable: "subdomain"
             })
         );
@@ -1277,7 +1277,7 @@ mod tests {
         // And the dispatcher agrees with each of its arms, which is what lets the loader check every
         // destination of a field from one loop.
         assert_eq!(
-            Binding::Endpoint { variable: "app_id" }.validate_value(moves_the_origin),
+            Binding::EndpointInventoryEntry { variable: "app_id" }.validate_value(moves_the_origin),
             validate_host_value(moves_the_origin)
         );
         assert_eq!(
@@ -1321,7 +1321,7 @@ mod tests {
         assert_eq!(
             field.bindings(),
             Some(vec![
-                Binding::Endpoint { variable: "app_id" },
+                Binding::EndpointInventoryEntry { variable: "app_id" },
                 Binding::Request {
                     position: Position::Header,
                     name: "X-Algolia-Application-Id"
@@ -1341,7 +1341,7 @@ mod tests {
         // before this landed reads exactly what it read before.
         assert_eq!(
             field.binding(),
-            Some(Binding::Endpoint { variable: "app_id" })
+            Some(Binding::EndpointInventoryEntry { variable: "app_id" })
         );
         assert_eq!(field.level(), Some(Level::Connection));
         assert_eq!(field.pin(), None);

@@ -287,7 +287,7 @@ fn field_citations_span_the_struct_they_name() {
 #[test]
 fn every_connect_session_state_write_is_cited() {
     let root = workspace_root();
-    let specification = read(&root.join("ess/system/domains/connection.yaml"));
+    let specification = read(&root.join("ess/system/domains/endpoint.yaml"));
     let mut unread = Vec::new();
     for file in implementation_sources(&root.join("crates")) {
         let source = read(&file);
@@ -316,22 +316,22 @@ fn every_connect_session_state_write_is_cited() {
     );
 }
 
-/// **The `ChannelSummary` that carries a `connection_ref` is cited, and modelled.**
+/// **The `ChannelSummary` that carries a `endpoint_ref` is cited, and modelled.**
 ///
 /// The protocol declares two projections named `ChannelSummary` and they differ: the one in
-/// `connection.rs` is nested inside `ConnectionDescription`, where the Connection is already
-/// named, and the one in `event.rs` carries `pub connection_ref: String`, not optional. A
+/// `connection.rs` is nested inside `EndpointDescription`, where the Connection is already
+/// named, and the one in `event.rs` carries `pub endpoint_ref: String`, not optional. A
 /// specification that reads only the first one leaves the Channel-to-Connection direction
 /// unmapped when the tree states it.
 ///
-/// This replaces the case that asserted no `ChannelSummary` carries a `connection_ref`. That
+/// This replaces the case that asserted no `ChannelSummary` carries a `endpoint_ref`. That
 /// assertion could only ever hold by deleting the field from a frozen protocol projection: the
 /// finding was that the document's *marker* was wrong, and the marker is gone, so the check now
 /// pins what the corrected document has to keep saying.
 #[test]
 fn the_channel_summary_that_carries_a_connection_ref_is_cited_and_modelled() {
     let root = workspace_root();
-    let specification = read(&root.join("ess/system/domains/connection.yaml"));
+    let specification = read(&root.join("ess/system/domains/endpoint.yaml"));
 
     let mut carriers = Vec::new();
     for file in implementation_sources(&root.join("crates/protocol")) {
@@ -343,7 +343,7 @@ fn the_channel_summary_that_carries_a_connection_ref_is_cited_and_modelled() {
             .lines()
             .take(end)
             .skip(start)
-            .any(|line| line.trim().starts_with("pub connection_ref"))
+            .any(|line| line.trim().starts_with("pub endpoint_ref"))
         {
             carriers.push(
                 file.strip_prefix(&root)
@@ -355,7 +355,7 @@ fn the_channel_summary_that_carries_a_connection_ref_is_cited_and_modelled() {
     }
     assert!(
         !carriers.is_empty(),
-        "this check exists for the `ChannelSummary` that carries a `connection_ref`; no \
+        "this check exists for the `ChannelSummary` that carries a `endpoint_ref`; no \
          projection in `crates/protocol` carries one any more, so the finding it guards is gone"
     );
 
@@ -366,27 +366,27 @@ fn the_channel_summary_that_carries_a_connection_ref_is_cited_and_modelled() {
         .collect::<Vec<_>>();
     assert!(
         uncited.is_empty(),
-        "a `ChannelSummary` in the tree carries a `connection_ref`, and the specification does \
+        "a `ChannelSummary` in the tree carries a `endpoint_ref`, and the specification does \
          not read the file that declares it:\n  {}",
         uncited.join("\n  ")
     );
 
     let channel = specification
-        .split("- name: connectors.connection.Channel\n")
+        .split("- name: connectors.endpoint.EventReceiver\n")
         .nth(1)
         .expect("the Channel entity");
     let channel = &channel[..channel.find("\n  - name: ").unwrap_or(channel.len())];
     let field = channel
         .lines()
-        .position(|line| line.trim() == "- name: connection_ref")
+        .position(|line| line.trim() == "- name: endpoint_ref")
         .expect(
-            "the Channel entity carries a `connection_ref`: the tree states the relation, so \
+            "the Channel entity carries a `endpoint_ref`: the tree states the relation, so \
              leaving it off the entity states the opposite",
         );
     let declared = channel.lines().nth(field + 1).unwrap_or("").trim();
     assert!(
         !declared.contains("Optional<"),
-        "`crates/protocol/src/event.rs` declares `pub connection_ref: String`, which is not \
+        "`crates/protocol/src/event.rs` declares `pub endpoint_ref: String`, which is not \
          optional; the entity declares it as `{declared}`"
     );
 }
@@ -396,7 +396,7 @@ fn the_channel_summary_that_carries_a_connection_ref_is_cited_and_modelled() {
 /// `DiscoveryObservation.reobserve` is declared `Withdrawn -> Observed`, read from the line of the
 /// refresh pass that re-activates an observation it saw again. The state is not stored: it is
 /// derived, and the derivation reaches `Materialized` before it reaches `Observed`, from a
-/// `connection_ref` the re-activating branch never clears. So a materialized observation that was
+/// `endpoint_ref` the re-activating branch never clears. So a materialized observation that was
 /// withdrawn and then seen again returns to `Materialized`, and that transition is not declared.
 #[test]
 fn the_reobserve_site_leaves_a_connection_ref_and_the_specification_says_so() {
@@ -421,7 +421,7 @@ fn the_reobserve_site_leaves_a_connection_ref_and_the_specification_says_so() {
         .expect("the derivation reaches Observed");
     assert!(
         materialized < observed,
-        "this check assumes `connection_ref` outranks `target_provider` in the derivation; it no \
+        "this check assumes `endpoint_ref` outranks `target_provider` in the derivation; it no \
          longer does, so the finding it guards has changed shape"
     );
 
@@ -446,7 +446,7 @@ fn the_reobserve_site_leaves_a_connection_ref_and_the_specification_says_so() {
     let branch = lines[branch_start..=branch_end].join("\n");
 
     // Pinned to what the adapter does **today**, deliberately, and not to what it arguably should
-    // do. The re-seen branch does not clear `connection_ref`, and `observation_summary` reads that
+    // do. The re-seen branch does not clear `endpoint_ref`, and `observation_summary` reads that
     // field before `target_provider` — so a withdrawn observation that had been materialized comes
     // back as `Materialized`, not `Observed`. The specification carries that as `rematerialize`
     // rather than declaring a transition the tree does not perform.
@@ -455,27 +455,27 @@ fn the_reobserve_site_leaves_a_connection_ref_and_the_specification_says_so() {
     // `story:reobserve-returns-a-withdrawn-observation-to-materialized`. That is a behaviour change
     // to a shipping adapter with an uncovered surface — clearing the reference leaves the child in
     // `state.children`, and `child_is_current` (`backend.rs:1684-1690`) never reads
-    // `connection_ref`, so a later `materialize` may mint a duplicate — and it is not this unit's
+    // `endpoint_ref`, so a later `materialize` may mint a duplicate — and it is not this unit's
     // to take.
     //
     // **When that story lands this case goes red**, which is the point. The fix then is to drop
     // `rematerialize` from `connection.yaml`, restore `reobserve: Withdrawn -> Observed`, and
     // invert the first assertion below.
     assert!(
-        !branch.contains("connection_ref"),
+        !branch.contains("endpoint_ref"),
         "the re-seen branch at crates/integration-monitoring/src/backend.rs:{} now mentions \
-         `connection_ref`, so the behaviour this case pins has changed. Read \
+         `endpoint_ref`, so the behaviour this case pins has changed. Read \
          `story:reobserve-returns-a-withdrawn-observation-to-materialized`, then drop \
-         `rematerialize` from ess/system/domains/connection.yaml and invert this \
+         `rematerialize` from ess/system/domains/endpoint.yaml and invert this \
          assertion:\n{branch}",
         reactivation + 1
     );
 
-    let specification = read(&root.join("ess/system/domains/connection.yaml"));
+    let specification = read(&root.join("ess/system/domains/endpoint.yaml"));
     assert!(
         specification.contains("rematerialize"),
         "the adapter still re-derives a materialized observation into `Materialized` — \
-         `connection_ref` is read at crates/integration-monitoring/src/backend.rs:{} before \
+         `endpoint_ref` is read at crates/integration-monitoring/src/backend.rs:{} before \
          `target_provider` — so the specification has to carry `rematerialize`. Declaring only \
          `reobserve: Withdrawn -> Observed` states a transition the tree does not perform.",
         derivation + materialized + 1

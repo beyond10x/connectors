@@ -5,7 +5,7 @@ struct Settings;
 impl ConfigPort for Settings {
     fn resolve(&self, field: ConfigField<'_>) -> Option<ConfigValue> {
         let value = match field {
-            ConfigField::Endpoint("host") => "ari.example.test",
+            ConfigField::EndpointInventoryEntry("host") => "ari.example.test",
             ConfigField::Username("asterisk.password") => "fixture-user",
             ConfigField::ChannelQuery {
                 channel: "ari-events",

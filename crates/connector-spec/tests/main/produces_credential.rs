@@ -327,7 +327,7 @@ fn a_produces_credential_operation_on_a_connector_with_no_authority_is_refused()
 ///
 /// The catalogue records the mint as "this credential is minted by *that* operation", so two
 /// producers have no representation — and a downstream operation naming the credential could not say
-/// which login it needs. The same ambiguity C-406 refuses for two connections of one vendor, one
+/// which login it needs. The same ambiguity C-406 refuses for two endpoints of one vendor, one
 /// level down.
 #[test]
 fn two_operations_minting_one_credential_are_refused() {

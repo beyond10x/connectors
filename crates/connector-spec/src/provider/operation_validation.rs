@@ -160,7 +160,7 @@ pub(super) fn validate_operations(connector: &Connector, problems: &mut Vec<Stri
             OperationRequest::SqlV1 => {
                 // A database answers one bounded request and returns: no direct-byte session is
                 // established and nothing is leased across calls — the driver may pool
-                // connections, but that is an implementation fact below this seam, not a
+                // endpoints, but that is an implementation fact below this seam, not a
                 // lifecycle a caller can observe. Admitting `sql_v1` under any other shape would
                 // promise a lifecycle the driver does not implement.
                 if operation.interaction_shape != InteractionShape::Unary {
@@ -544,7 +544,7 @@ fn validate_credential_response(operation: &Operation, problems: &mut Vec<String
 /// credential the connector does not declare has no leaf and therefore no address; a connector with
 /// no `authority` has no second path segment, so nothing composes; and two operations minting one
 /// credential leave "which call put the value there" unanswerable, which is the same ambiguity
-/// C-406 refuses for two connections of one vendor.
+/// C-406 refuses for two endpoints of one vendor.
 fn validate_produces_credential(
     connector: &Connector,
     operation: &Operation,

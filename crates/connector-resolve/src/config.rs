@@ -31,7 +31,7 @@
 pub enum ConfigField<'a> {
     /// A `{var}` in a service's `base_url` — `subdomain`, `shop`, `account_host`. The name is the
     /// placeholder as the connector's own document spells it, with no braces.
-    Endpoint(&'a str),
+    EndpointInventoryEntry(&'a str),
     /// The **non-secret** user half of a `basic` credential, named by the credential it joins —
     /// `zendesk.api_token`, `jira.api_token`. The connector's declared suffix is appended by the
     /// assembler, not asked of the host.
@@ -61,7 +61,7 @@ impl<'a> ConfigField<'a> {
             .strip_prefix("username.")
             .filter(|name| !name.is_empty())
             .map(ConfigField::Username)
-            .unwrap_or(ConfigField::Endpoint(variable))
+            .unwrap_or(ConfigField::EndpointInventoryEntry(variable))
     }
 }
 
@@ -140,7 +140,7 @@ mod tests {
     fn a_username_prefix_is_the_one_reserved_qualifier() {
         assert_eq!(
             ConfigField::from_placeholder("subdomain"),
-            ConfigField::Endpoint("subdomain")
+            ConfigField::EndpointInventoryEntry("subdomain")
         );
         assert_eq!(
             ConfigField::from_placeholder("username.zendesk.api_token"),
@@ -149,7 +149,7 @@ mod tests {
         // An empty username is not a username; it stays an endpoint variable spelled `username.`.
         assert_eq!(
             ConfigField::from_placeholder("username."),
-            ConfigField::Endpoint("username.")
+            ConfigField::EndpointInventoryEntry("username.")
         );
     }
 

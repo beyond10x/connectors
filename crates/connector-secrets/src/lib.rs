@@ -2,7 +2,7 @@
 //!
 //! [`connector_address::credential`] owns the address:
 //! `tenants/<tenant>/<authority>[/@instances/<uuid>][/<service>]/<credential>`, pure and validated —
-//! the instance being which of a tenant's connections, present only when it holds more than one
+//! the instance being which of a tenant's endpoints, present only when it holds more than one
 //! (C-406), so a single-connection address is exactly what it always was. It deliberately owns
 //! nothing else — `docs/vision.md`'s non-goal is load-bearing: *"A runtime. This repo compiles; flux
 //! executes."* This crate is the other half, and it is a **host library**.

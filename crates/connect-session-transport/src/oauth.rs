@@ -62,7 +62,7 @@ pub struct OAuthCallback {
     pub redirect_uri: String,
 }
 
-// One active request and at most 64 accepted connections per authorization. These local
+// One active request and at most 64 accepted endpoints per authorization. These local
 // resource limits supplement the design's byte/time bounds and never trigger a new flow.
 const MAX_REQUESTS: usize = 64;
 const MAX_HEADERS: usize = 8 * 1024;

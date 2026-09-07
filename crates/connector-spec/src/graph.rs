@@ -42,7 +42,7 @@
 //!
 //! flux lifts **only `op` declarations** from `~/.flux/flows`; `channel` and `trigger` are Program
 //! members an operator writes. So [`NodeKind::Trigger`], [`NodeKind::Schedule`] and
-//! [`NodeKind::Endpoint`] are the graph's **boundary**: they declare what wakes it, become the op's
+//! [`NodeKind::EndpointInventoryEntry`] are the graph's **boundary**: they declare what wakes it, become the op's
 //! parameters, and are **emitted nowhere**. The operator writes the two-line program that binds them.
 //! Same strict split channel bindings already hold.
 //!
@@ -266,7 +266,7 @@ pub enum NodeKind {
         cron: String,
     },
     /// **Boundary.** A channel binding of this connector wakes the graph. Emitted nowhere.
-    Endpoint {
+    EndpointInventoryEntry {
         /// The [`ChannelBinding::name`](crate::ChannelBinding::name).
         binding: String,
     },
@@ -287,7 +287,7 @@ impl NodeKind {
             Self::Throttle { .. } => "throttle",
             Self::Trigger { .. } => "trigger",
             Self::Schedule { .. } => "schedule",
-            Self::Endpoint { .. } => "endpoint",
+            Self::EndpointInventoryEntry { .. } => "endpoint",
         }
     }
 
@@ -303,7 +303,7 @@ impl NodeKind {
     pub fn is_boundary(&self) -> bool {
         matches!(
             self,
-            Self::Trigger { .. } | Self::Schedule { .. } | Self::Endpoint { .. }
+            Self::Trigger { .. } | Self::Schedule { .. } | Self::EndpointInventoryEntry { .. }
         )
     }
 
@@ -368,7 +368,7 @@ impl NodeKind {
                 let _ = cron;
                 vec![("cron", TextRole::Schedule)]
             }
-            Self::Endpoint { binding } => {
+            Self::EndpointInventoryEntry { binding } => {
                 let _ = binding;
                 vec![("binding", TextRole::Reference)]
             }
@@ -462,7 +462,7 @@ pub struct Graph {
     pub expose: bool,
     /// The nodes.
     pub nodes: Vec<GraphNode>,
-    /// The connections.
+    /// The endpoints.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub edges: Vec<Edge>,
 }

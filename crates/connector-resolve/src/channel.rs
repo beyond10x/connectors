@@ -356,7 +356,7 @@ impl ConfigPort for ChannelSettings<'_> {
 /// The `binds` target one [`ConfigField`] addresses, as the connector's `[[config]]` spells it.
 fn binds_of(field: ConfigField<'_>) -> String {
     match field {
-        ConfigField::Endpoint(name) => format!("endpoint.{name}"),
+        ConfigField::EndpointInventoryEntry(name) => format!("endpoint.{name}"),
         ConfigField::Username(name) => format!("username.{name}"),
         ConfigField::ChannelQuery { channel, parameter } => {
             format!("channel.{channel}.query.{parameter}")
@@ -385,7 +385,7 @@ fn substitute_endpoint(
         let variable = &after[..close];
         first_variable.get_or_insert(variable.to_owned());
         let raw = settings.require(
-            ConfigField::Endpoint(variable),
+            ConfigField::EndpointInventoryEntry(variable),
             format!("endpoint.{variable}"),
         )?;
         let value = Slot::Unplaced
