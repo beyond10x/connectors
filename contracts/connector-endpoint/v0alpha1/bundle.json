@@ -1,0 +1,22 @@
+{
+  "bundle": "b10x.connector-endpoint",
+  "files": [
+    {
+      "bytes": 1013,
+      "path": "contracts/artifact-bundle.schema.json",
+      "sha256": "5e6fbffee97d998df53c94394de1c53c75a6066f2807c9c00374b6ea15ea969b"
+    },
+    {
+      "bytes": 1815,
+      "path": "contracts/connector-endpoint/v0alpha1/README.md",
+      "sha256": "9a5a5fb600acc726982b2052e24995702872a56b8d2c6c42f91479a51076c2d4"
+    },
+    {
+      "bytes": 20146,
+      "path": "contracts/connector-endpoint/v0alpha1/connector-endpoint.schema.json",
+      "sha256": "e6baa9bc224794cc668b4c820adc6663f54d1b4ae8aa1653b25d90d6bf3682be"
+    }
+  ],
+  "stability": "alpha",
+  "version": "v0alpha1"
+}
