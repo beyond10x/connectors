@@ -1,6 +1,6 @@
 use super::*;
 use crate::kubernetes_endpoints::tests::{absent, client, owner as context, service, source};
-use domain::endpoint::{EndpointBinding, EndpointCredentialReference};
+use domain::endpoint_inventory::{EndpointBinding, EndpointCredentialReference};
 use serde_json::json;
 use service::{EgressHttpRequest, EgressHttpResponse, EgressTransportError};
 use std::sync::{

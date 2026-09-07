@@ -5,8 +5,8 @@
 //! deployed shape design 15 measures: one central Grafana connection and several configured
 //! Prometheus/Loki/Alertmanager targets per operation. They prove the requirement-driven
 //! projection (a monitoring-read principal sees the tools, a group-less one sees none), the
-//! honest `target` argument (enumerated from the caller's own described connections, resolved
-//! to the chosen `connection_ref` at invoke, never hardcoded), and the design-14 refusal
+//! honest `target` argument (enumerated from the caller's own described endpoints, resolved
+//! to the chosen `endpoint_ref` at invoke, never hardcoded), and the design-14 refusal
 //! patterns on the invoke path.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -20,7 +20,7 @@ use super::*;
 const MONITORING_LEASE: &str = "mon-lease-1";
 const ISSUER: &str = "https://identity.example.test";
 
-/// One advertised operation: `(operation_ref, title, [(connection_ref, label), …])`.
+/// One advertised operation: `(operation_ref, title, [(endpoint_ref, label), …])`.
 type FakeOperation = (
     &'static str,
     &'static str,
@@ -124,7 +124,7 @@ impl IdentityVerifier for MonitoringVerifier {
 /// monitoring twin of `tests/mcp.rs`'s kubernetes fake. Search filters by the query the seam
 /// hands it, exactly like the real monitoring backend's haystack, so the toolset's
 /// requirement queries are exercised rather than assumed. The invoke arm records the
-/// dispatched `connection_ref` and input, refuses any lease other than the served one, and
+/// dispatched `endpoint_ref` and input, refuses any lease other than the served one, and
 /// optionally answers `stale_authority` a configured number of times first. The kubernetes
 /// workloads datasource deliberately does not exist here.
 #[derive(Default)]
@@ -133,7 +133,7 @@ struct MonitoringBackend {
     stale_invokes: AtomicUsize,
     describes: AtomicUsize,
     invokes: AtomicUsize,
-    /// Every `(operation_ref, connection_ref, input)` that reached the invoke arm.
+    /// Every `(operation_ref, endpoint_ref, input)` that reached the invoke arm.
     dispatched: Mutex<Vec<(String, String, Value)>>,
 }
 
@@ -151,15 +151,15 @@ impl MonitoringBackend {
             .find(|(candidate, _, _)| *candidate == operation_ref)
     }
 
-    fn connections(
-        connections: &[(&str, &str)],
+    fn endpoints(
+        endpoints: &[(&str, &str)],
         provider: &str,
-    ) -> Vec<protocol::operation::ConnectionSummary> {
-        connections
+    ) -> Vec<protocol::operation::EndpointSummary> {
+        endpoints
             .iter()
             .map(
-                |(connection_ref, label)| protocol::operation::ConnectionSummary {
-                    connection_ref: (*connection_ref).to_owned(),
+                |(endpoint_ref, label)| protocol::operation::EndpointSummary {
+                    endpoint_ref: (*endpoint_ref).to_owned(),
                     label: (*label).to_owned(),
                     provider: provider.to_owned(),
                     audiences: Vec::new(),
@@ -192,14 +192,14 @@ impl ConnectorBackend for MonitoringBackend {
                             let haystack = format!("{operation_ref} {title}").to_ascii_lowercase();
                             needle.is_empty() || haystack.contains(&needle)
                         })
-                        .map(|(operation_ref, title, connections)| {
+                        .map(|(operation_ref, title, endpoints)| {
                             protocol::operation::OperationSummary {
                                 operation_ref: (*operation_ref).to_owned(),
                                 title: (*title).to_owned(),
                                 effect: EffectClass::ReadOnly,
                                 approval: ApprovalPosture::NotRequired,
-                                connections: Self::connections(
-                                    connections,
+                                endpoints: Self::endpoints(
+                                    endpoints,
                                     provider_of(operation_ref),
                                 ),
                             }
@@ -221,7 +221,7 @@ impl ConnectorBackend for MonitoringBackend {
                             false,
                         )
                     })?;
-                let (operation_ref, title, connections) = described;
+                let (operation_ref, title, endpoints) = described;
                 Ok(OperationResult::Describe(OperationDescription {
                     rate_advice: None,
                     operation_ref: (*operation_ref).to_owned(),
@@ -231,20 +231,20 @@ impl ConnectorBackend for MonitoringBackend {
                     output_schema: json!({"type": "object"}),
                     effect: EffectClass::ReadOnly,
                     approval: ApprovalPosture::NotRequired,
-                    connections: Self::connections(connections, provider_of(operation_ref)),
+                    endpoints: Self::endpoints(endpoints, provider_of(operation_ref)),
                     description_ref: MONITORING_LEASE.to_owned(),
                 }))
             }
             OperationRequest::Invoke(request) => {
                 self.invokes.fetch_add(1, Ordering::SeqCst);
-                let (_, _, connections) = Self::operation(&request.operation_ref)
+                let (_, _, endpoints) = Self::operation(&request.operation_ref)
                     .expect("only advertised operations are invoked");
                 assert!(
-                    connections
+                    endpoints
                         .iter()
-                        .any(|(connection_ref, _)| *connection_ref == request.connection_ref),
+                        .any(|(endpoint_ref, _)| *endpoint_ref == request.endpoint_ref),
                     "the dispatched connection must be one the describe advertised: {}",
-                    request.connection_ref
+                    request.endpoint_ref
                 );
                 if request.description_ref != MONITORING_LEASE {
                     return Err(OperationError::new(
@@ -263,7 +263,7 @@ impl ConnectorBackend for MonitoringBackend {
                 }
                 self.dispatched.lock().expect("dispatch lock").push((
                     request.operation_ref.clone(),
-                    request.connection_ref.clone(),
+                    request.endpoint_ref.clone(),
                     request.input.clone(),
                 ));
                 Ok(OperationResult::Invoke(InvocationResult {
@@ -374,7 +374,7 @@ async fn tool_describe_enumerates_the_callers_configured_targets_without_a_lease
     assert_eq!(projection["name"], "prometheus_query_range");
     assert_eq!(projection["effect"], "read_only");
     assert_eq!(projection["approval"], "not_required");
-    // The `target` argument enumerates exactly the caller's own described connections —
+    // The `target` argument enumerates exactly the caller's own described endpoints —
     // never a hardcoded cluster list.
     assert_eq!(
         projection["input_schema"]["properties"]["target"]["enum"],
@@ -420,7 +420,7 @@ async fn a_monitoring_invoke_routes_the_chosen_target_through_the_decided_seam()
     .await;
     assert_eq!(result["isError"], json!(false), "{result}");
     assert_eq!(result["structuredContent"], json!({"observed": true}));
-    // The chosen target resolved to its connection_ref, and `target` itself never travelled
+    // The chosen target resolved to its endpoint_ref, and `target` itself never travelled
     // into the operation input.
     assert_eq!(
         backend.dispatched.lock().unwrap().clone(),
@@ -483,7 +483,7 @@ async fn a_monitoring_invoke_refuses_dishonest_targets_before_any_dispatch() {
     assert_eq!(ambiguous["isError"], json!(true), "{ambiguous}");
     assert_eq!(ambiguous["structuredContent"]["code"], "invalid_input");
 
-    // A target outside the caller's own described connections does not exist.
+    // A target outside the caller's own described endpoints does not exist.
     let unknown = call_tool(
         app(backend.clone()),
         "obs-token",
@@ -550,7 +550,7 @@ async fn a_stale_monitoring_invoke_re_resolves_the_same_target_exactly_once() {
 
 /// S-064: the projected monitoring schemas tell the truth. `required` matches what the invoke
 /// path enforces — the document's own required parameters, plus `target` exactly when several
-/// connections are configured — cursors are optional, and range timestamps admit integer
+/// endpoints are configured — cursors are optional, and range timestamps admit integer
 /// epoch seconds beside strings.
 #[tokio::test]
 async fn monitoring_tool_schemas_state_the_documents_contract() {

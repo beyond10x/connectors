@@ -5,7 +5,7 @@ use connector_resolve::document::{
     RequiredCapability,
 };
 use domain::{
-    AdmittedOperation, AudioPlan, BrowserPlan, Capability, ConnectionInitiator, ConnectionRoute,
+    AdmittedOperation, AudioPlan, BrowserPlan, Capability, EndpointInitiator, EndpointRoute,
     DriverId, HttpPlan, Implementation, Interaction, MediatedHttpPlan, OperationFacts, Placement,
     ProtocolPlan, RouteAdapter, SipPlan, SqlPlan, ZeroIoPlan,
 };
@@ -35,7 +35,7 @@ pub enum PlanError {
     #[error("operation has no reviewed permission subject")]
     PermissionSubjectMissing,
     #[error("Connection does not permit the platform to initiate operations")]
-    ConnectionInitiationRefused,
+    EndpointInitiationRefused,
     #[error("mediated route adapter `{0}` is not available in this deployment")]
     RouteAdapterUnavailable(&'static str),
     #[error("a mediated Connection cannot execute this protocol driver")]
@@ -66,9 +66,9 @@ pub fn plan_operation(
     if !admission
         .connection_authority()
         .initiation()
-        .allows(ConnectionInitiator::Platform)
+        .allows(EndpointInitiator::Platform)
     {
-        return Err(PlanError::ConnectionInitiationRefused);
+        return Err(PlanError::EndpointInitiationRefused);
     }
 
     let driver = driver_of(operation);
@@ -93,31 +93,31 @@ pub fn plan_operation(
     }
 
     let protocol = match (admission.connection_authority().route(), &operation.request) {
-        (ConnectionRoute::Direct, ProtocolRequestTemplate::HttpV1(request)) => {
+        (EndpointRoute::Direct, ProtocolRequestTemplate::HttpV1(request)) => {
             ProtocolPlan::HttpV1(HttpPlan {
                 method: request.method.clone(),
                 url_template: request.url.clone(),
             })
         }
-        (ConnectionRoute::Direct, ProtocolRequestTemplate::SipV1) => ProtocolPlan::SipV1(SipPlan {
+        (EndpointRoute::Direct, ProtocolRequestTemplate::SipV1) => ProtocolPlan::SipV1(SipPlan {
             connection: admission.connection().to_owned(),
         }),
-        (ConnectionRoute::Direct, ProtocolRequestTemplate::AudioV1) => {
+        (EndpointRoute::Direct, ProtocolRequestTemplate::AudioV1) => {
             ProtocolPlan::AudioV1(AudioPlan {
                 connection: admission.connection().to_owned(),
             })
         }
-        (ConnectionRoute::Direct, ProtocolRequestTemplate::CdpV1) => {
+        (EndpointRoute::Direct, ProtocolRequestTemplate::CdpV1) => {
             ProtocolPlan::CdpV1(BrowserPlan {
                 connection: admission.connection().to_owned(),
             })
         }
-        (ConnectionRoute::Direct, ProtocolRequestTemplate::SqlV1) => ProtocolPlan::SqlV1(SqlPlan {
+        (EndpointRoute::Direct, ProtocolRequestTemplate::SqlV1) => ProtocolPlan::SqlV1(SqlPlan {
             connection: admission.connection().to_owned(),
         }),
         (
-            ConnectionRoute::ViaConnection {
-                parent_connection,
+            EndpointRoute::ViaEndpoint {
+                parent_endpoint,
                 resource_binding,
                 adapter,
             },
@@ -134,13 +134,13 @@ pub fn plan_operation(
             ProtocolPlan::MediatedHttpV1(MediatedHttpPlan {
                 method: request.method.clone(),
                 target_path_template: target_path_template.to_owned(),
-                parent_connection: parent_connection.clone(),
+                parent_endpoint: parent_endpoint.clone(),
                 resource_binding: resource_binding.clone(),
                 adapter: *adapter,
             })
         }
         (
-            ConnectionRoute::ViaConnection { .. },
+            EndpointRoute::ViaEndpoint { .. },
             ProtocolRequestTemplate::SipV1
             | ProtocolRequestTemplate::AudioV1
             | ProtocolRequestTemplate::CdpV1
@@ -224,7 +224,7 @@ fn capability_word(value: Capability) -> &'static str {
 mod tests {
     use super::*;
     use connector_resolve::document::Document;
-    use domain::{ConnectionAuthority, InitiationPolicy};
+    use domain::{EndpointAuthority, InitiationPolicy};
 
     fn document(driver: &str, shape: &str, request: &str) -> Document {
         Document::parse(&format!(
@@ -252,7 +252,7 @@ mod tests {
             "org-1",
             "principal-1",
             "grant-1",
-            ConnectionAuthority::new("connection-1", initiation).unwrap(),
+            EndpointAuthority::new("connection-1", initiation).unwrap(),
         )
     }
 
@@ -308,7 +308,7 @@ mod tests {
             &environment(DriverId::SipV1),
         )
         .expect_err("provider-only connection refuses outbound start");
-        assert_eq!(error, PlanError::ConnectionInitiationRefused);
+        assert_eq!(error, PlanError::EndpointInitiationRefused);
     }
 
     #[test]
@@ -339,7 +339,7 @@ mod tests {
             "org-1",
             "principal-1",
             "child-grant",
-            ConnectionAuthority::mediated(
+            EndpointAuthority::mediated(
                 "prometheus-via-grafana",
                 InitiationPolicy::platform_only(),
                 "grafana-infra",
@@ -364,7 +364,7 @@ mod tests {
             panic!("expected a mediated HTTP plan")
         };
         assert_eq!(http.target_path_template, "/api/v1/query");
-        assert_eq!(http.parent_connection, "grafana-infra");
+        assert_eq!(http.parent_endpoint, "grafana-infra");
         assert!(!format!("{http:?}").contains("prometheus.example"));
     }
 }

@@ -1,16 +1,16 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use protocol::connection::{
-    ConnectionInitiator, ConnectionRoute, ConnectionState,
-    ConnectionSummary as ResourceConnectionSummary, DescribeRequest as ConnectionDescribe,
-    SearchRequest as ConnectionSearch,
+use protocol::endpoint::{
+    EndpointInitiator, EndpointRoute, EndpointState,
+    EndpointSummary as ResourceEndpointSummary, DescribeRequest as EndpointDescribe,
+    SearchRequest as EndpointSearch,
 };
 use protocol::event::{
     ChannelSummary as EventChannelSummary, ReceiveRequest, SearchRequest as EventSearch,
 };
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, DescribeRequest, EffectClass,
+    ApprovalPosture, EndpointSummary as OperationEndpointSummary, DescribeRequest, EffectClass,
     InvocationResult, InvokeRequest, SearchRequest, SessionRequest,
 };
 use serde_json::json;
@@ -33,7 +33,7 @@ struct SyntheticBackend {
     description: Option<OperationDescription>,
     invoke_connection: Option<String>,
     claims_direct_operation: bool,
-    connections: Vec<ResourceConnectionSummary>,
+    endpoints: Vec<ResourceEndpointSummary>,
     claims_connection: bool,
     channels: Vec<EventChannelSummary>,
     claims_event: bool,
@@ -66,7 +66,7 @@ impl SyntheticBackend {
             description: None,
             invoke_connection: None,
             claims_direct_operation: false,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             claims_connection: false,
             channels: Vec::new(),
             claims_event: false,
@@ -82,7 +82,7 @@ impl SyntheticBackend {
             description: None,
             invoke_connection: None,
             claims_direct_operation: false,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             claims_connection: false,
             channels: Vec::new(),
             claims_event: false,
@@ -91,18 +91,18 @@ impl SyntheticBackend {
         })
     }
 
-    fn contributor(connection_ref: &str, local_lease: &str) -> Arc<Self> {
+    fn contributor(endpoint_ref: &str, local_lease: &str) -> Arc<Self> {
         Arc::new(Self {
             capabilities: BackendCapabilities::OPERATIONS,
-            operations: vec![operation_summary("tickets.read", connection_ref)],
+            operations: vec![operation_summary("tickets.read", endpoint_ref)],
             description: Some(operation_description(
                 "tickets.read",
-                connection_ref,
+                endpoint_ref,
                 local_lease,
             )),
-            invoke_connection: Some(connection_ref.to_owned()),
+            invoke_connection: Some(endpoint_ref.to_owned()),
             claims_direct_operation: false,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             claims_connection: false,
             channels: Vec::new(),
             claims_event: false,
@@ -111,11 +111,11 @@ impl SyntheticBackend {
         })
     }
 
-    fn with_connections(connections: Vec<ResourceConnectionSummary>) -> Arc<Self> {
+    fn with_connections(endpoints: Vec<ResourceEndpointSummary>) -> Arc<Self> {
         Arc::new(Self {
             capabilities: BackendCapabilities {
                 operations: false,
-                connections: true,
+                endpoints: true,
                 events: false,
                 datasources: false,
             },
@@ -123,7 +123,7 @@ impl SyntheticBackend {
             description: None,
             invoke_connection: None,
             claims_direct_operation: false,
-            connections,
+            endpoints,
             claims_connection: false,
             channels: Vec::new(),
             claims_event: false,
@@ -136,7 +136,7 @@ impl SyntheticBackend {
         Arc::new(Self {
             capabilities: BackendCapabilities {
                 operations: false,
-                connections: false,
+                endpoints: false,
                 events: true,
                 datasources: false,
             },
@@ -144,7 +144,7 @@ impl SyntheticBackend {
             description: None,
             invoke_connection: None,
             claims_direct_operation: false,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             claims_connection: false,
             channels,
             claims_event: false,
@@ -157,7 +157,7 @@ impl SyntheticBackend {
         Arc::new(Self {
             capabilities: BackendCapabilities {
                 operations: true,
-                connections: true,
+                endpoints: true,
                 events: true,
                 datasources: false,
             },
@@ -165,7 +165,7 @@ impl SyntheticBackend {
             description: None,
             invoke_connection: None,
             claims_direct_operation: true,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             claims_connection: true,
             channels: Vec::new(),
             claims_event: true,
@@ -196,7 +196,7 @@ impl ConnectorBackend for SyntheticBackend {
                 self.description
                     .as_ref()
                     .is_some_and(|description| description.operation_ref == request.operation_ref)
-                    && self.invoke_connection.as_deref() == Some(&request.connection_ref)
+                    && self.invoke_connection.as_deref() == Some(&request.endpoint_ref)
             }
             OperationRequest::SessionStatus(_)
             | OperationRequest::SessionTerminate(_)
@@ -206,8 +206,8 @@ impl ConnectorBackend for SyntheticBackend {
         }
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
-        !matches!(request, ConnectionRequest::Search(_)) && self.claims_connection
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
+        !matches!(request, EndpointRequest::Search(_)) && self.claims_connection
     }
 
     fn owns_event(&self, request: &EventRequest) -> bool {
@@ -240,7 +240,7 @@ impl ConnectorBackend for SyntheticBackend {
                     .push(request.description_ref);
                 Ok(OperationResult::Invoke(InvocationResult {
                     operation_ref: request.operation_ref,
-                    output: json!({"selected_connection": request.connection_ref}),
+                    output: json!({"selected_connection": request.endpoint_ref}),
                     connector_audit_ref: "audit:test".to_owned(),
                     execution_ref: None,
                 }))
@@ -257,22 +257,22 @@ impl ConnectorBackend for SyntheticBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         _context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         match request {
-            ConnectionRequest::Search(_) => {
+            EndpointRequest::Search(_) => {
                 self.calls.connection_search.fetch_add(1, Ordering::SeqCst);
-                Ok(ConnectionResult::Search {
-                    connections: self.connections.clone(),
+                Ok(EndpointResult::Search {
+                    endpoints: self.endpoints.clone(),
                 })
             }
             _ => {
                 self.calls.connection_direct.fetch_add(1, Ordering::SeqCst);
-                Err(ConnectionError::new(
-                    ConnectionErrorCode::NotFound,
+                Err(EndpointError::new(
+                    EndpointErrorCode::NotFound,
                     "synthetic Connection was not found",
                     false,
                 ))
@@ -413,10 +413,10 @@ fn the_registry_lease_ignores_request_scoped_provenance() {
     );
 }
 
-fn operation_connection(connection_ref: &str) -> OperationConnectionSummary {
-    OperationConnectionSummary {
-        connection_ref: connection_ref.to_owned(),
-        label: connection_ref.to_owned(),
+fn operation_connection(endpoint_ref: &str) -> OperationEndpointSummary {
+    OperationEndpointSummary {
+        endpoint_ref: endpoint_ref.to_owned(),
+        label: endpoint_ref.to_owned(),
         provider: "tickets".to_owned(),
         audiences: vec!["operations".to_owned()],
         purpose: None,
@@ -449,19 +449,19 @@ fn rate_stage2_advice_changes_refuse_merging_and_invalidate_the_registry_lease()
     );
 }
 
-fn operation_summary(operation_ref: &str, connection_ref: &str) -> OperationSummary {
+fn operation_summary(operation_ref: &str, endpoint_ref: &str) -> OperationSummary {
     OperationSummary {
         operation_ref: operation_ref.to_owned(),
         title: format!("Operation {operation_ref}"),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        connections: vec![operation_connection(connection_ref)],
+        endpoints: vec![operation_connection(endpoint_ref)],
     }
 }
 
 fn operation_description(
     operation_ref: &str,
-    connection_ref: &str,
+    endpoint_ref: &str,
     lease: &str,
 ) -> OperationDescription {
     OperationDescription {
@@ -473,19 +473,19 @@ fn operation_description(
         output_schema: json!({"type": "object"}),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        connections: vec![operation_connection(connection_ref)],
+        endpoints: vec![operation_connection(endpoint_ref)],
         description_ref: lease.to_owned(),
     }
 }
 
-fn resource_connection(connection_ref: &str) -> ResourceConnectionSummary {
-    ResourceConnectionSummary {
-        connection_ref: connection_ref.to_owned(),
+fn resource_connection(endpoint_ref: &str) -> ResourceEndpointSummary {
+    ResourceEndpointSummary {
+        endpoint_ref: endpoint_ref.to_owned(),
         integration_ref: "tickets".to_owned(),
-        label: connection_ref.to_owned(),
-        state: ConnectionState::Callable,
-        initiation: vec![ConnectionInitiator::Platform],
-        route: ConnectionRoute::Direct,
+        label: endpoint_ref.to_owned(),
+        state: EndpointState::Callable,
+        initiation: vec![EndpointInitiator::Platform],
+        route: EndpointRoute::Direct,
         scope: None,
         actor: None,
         auth_profile: None,
@@ -495,7 +495,7 @@ fn resource_connection(connection_ref: &str) -> ResourceConnectionSummary {
 fn event_channel(channel_ref: &str) -> EventChannelSummary {
     EventChannelSummary {
         channel_ref: channel_ref.to_owned(),
-        connection_ref: "connection:a".to_owned(),
+        endpoint_ref: "connection:a".to_owned(),
         integration_ref: "tickets".to_owned(),
         binding_ref: "binding:a".to_owned(),
         events: vec!["ticket.updated".to_owned()],
@@ -529,7 +529,7 @@ async fn search_aggregates_compatible_operations_and_deduplicates_the_operation(
         SyntheticBackend::with_operations(vec![operation_summary("tickets.read", "connection:a")]);
     let connection_only = SyntheticBackend::empty(BackendCapabilities {
         operations: false,
-        connections: true,
+        endpoints: true,
         events: false,
         datasources: false,
     });
@@ -559,9 +559,9 @@ async fn search_aggregates_compatible_operations_and_deduplicates_the_operation(
     );
     assert_eq!(
         operations[1]
-            .connections
+            .endpoints
             .iter()
-            .map(|connection| connection.connection_ref.as_str())
+            .map(|connection| connection.endpoint_ref.as_str())
             .collect::<Vec<_>>(),
         ["connection:a", "connection:b"]
     );
@@ -613,15 +613,15 @@ async fn ambiguous_exclusive_claims_fail_with_typed_protocol_errors_before_dispa
     assert_eq!(operation.code, OperationErrorCode::Protocol);
 
     let connection = registry
-        .handle_connection(
+        .handle_endpoint(
             &context(),
-            ConnectionRequest::Describe(ConnectionDescribe {
-                connection_ref: "connection:1".to_owned(),
+            EndpointRequest::Describe(EndpointDescribe {
+                endpoint_ref: "connection:1".to_owned(),
             }),
         )
         .await
         .unwrap_err();
-    assert_eq!(connection.code, ConnectionErrorCode::Protocol);
+    assert_eq!(connection.code, EndpointErrorCode::Protocol);
 
     let event = registry
         .handle_event(
@@ -663,9 +663,9 @@ async fn describe_merges_connections_and_invoke_receives_the_selected_local_leas
     };
     assert_eq!(
         description
-            .connections
+            .endpoints
             .iter()
-            .map(|connection| connection.connection_ref.as_str())
+            .map(|connection| connection.endpoint_ref.as_str())
             .collect::<Vec<_>>(),
         ["connection:a", "connection:b"]
     );
@@ -680,7 +680,7 @@ async fn describe_merges_connections_and_invoke_receives_the_selected_local_leas
             &context(),
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: "tickets.read".to_owned(),
-                connection_ref: "connection:a".to_owned(),
+                endpoint_ref: "connection:a".to_owned(),
                 description_ref: description.description_ref,
                 input: json!({}),
                 approval_evidence_ref: None,
@@ -734,19 +734,19 @@ async fn exact_target_keeps_distinct_schemas_and_rejects_cross_target_leases() {
         panic!("expected search")
     };
     assert_eq!(operations.len(), 1);
-    assert_eq!(operations[0].connections.len(), 2);
+    assert_eq!(operations[0].endpoints.len(), 2);
     let description = registry
         .describe_target(&context(), "tickets.read", "connection:b")
         .await
         .unwrap();
     assert_eq!(description.output_schema, json!({"type":"array"}));
     assert_eq!(
-        description.connections,
+        description.endpoints,
         vec![operation_connection("connection:b")]
     );
     let mut invoke = InvokeRequest {
         operation_ref: "tickets.read".into(),
-        connection_ref: "connection:a".into(),
+        endpoint_ref: "connection:a".into(),
         description_ref: description.description_ref,
         input: json!({}),
         approval_evidence_ref: None,
@@ -759,7 +759,7 @@ async fn exact_target_keeps_distinct_schemas_and_rejects_cross_target_leases() {
             .code,
         OperationErrorCode::StaleAuthority
     );
-    invoke.connection_ref = "connection:b".into();
+    invoke.endpoint_ref = "connection:b".into();
     registry
         .handle(&context(), OperationRequest::Invoke(invoke))
         .await
@@ -796,16 +796,16 @@ async fn duplicate_connection_references_fail_search() {
     let second =
         SyntheticBackend::with_connections(vec![resource_connection("connection:duplicate")]);
     let error = registry(vec![first, second])
-        .handle_connection(
+        .handle_endpoint(
             &context(),
-            ConnectionRequest::Search(ConnectionSearch {
+            EndpointRequest::Search(EndpointSearch {
                 query: String::new(),
                 limit: 10,
             }),
         )
         .await
         .unwrap_err();
-    assert_eq!(error.code, ConnectionErrorCode::Protocol);
+    assert_eq!(error.code, EndpointErrorCode::Protocol);
 }
 
 #[tokio::test]

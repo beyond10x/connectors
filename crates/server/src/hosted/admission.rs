@@ -34,7 +34,7 @@ pub(super) async fn dispatch_admitted(
     invoke: InvokeRequest,
 ) -> Result<OperationResult, OperationError> {
     if operation.operation() != invoke.operation_ref
-        || operation.connection() != invoke.connection_ref
+        || operation.connection() != invoke.endpoint_ref
     {
         return Err(OperationError::new(
             OperationErrorCode::NotGranted,
@@ -64,7 +64,7 @@ pub(super) async fn dispatch_admitted_signal(
         return Err(signal_proof_gap());
     };
     if operation.operation() != session.operation_ref
-        || operation.connection() != session.connection_ref
+        || operation.connection() != session.endpoint_ref
         || session.execution_ref != signal.execution_ref
     {
         return Err(signal_proof_gap());
@@ -167,17 +167,17 @@ fn wrong_recheck_result() -> OperationError {
     )
 }
 
-/// Re-describe the exact Connection selected by a v4 request, preserving its owner schema.
+/// Re-describe the exact Connection selected by a v5 request, preserving its owner schema.
 pub(super) async fn redescribe_target(
     state: &HostedState,
     owner: &PrincipalContext,
     request_id: &str,
     operation_ref: &str,
-    connection_ref: &str,
+    endpoint_ref: &str,
 ) -> Result<OperationDescription, Box<Response>> {
     state
         .backend
-        .describe_target(owner, operation_ref, connection_ref)
+        .describe_target(owner, operation_ref, endpoint_ref)
         .await
         .map_err(|error| {
             Box::new(operation_failure(

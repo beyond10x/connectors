@@ -106,7 +106,7 @@ pub(super) fn routes() -> Router<HostedState> {
 }
 
 pub(super) async fn status(State(state): State<HostedState>, headers: HeaderMap) -> Response {
-    let principal = match principal(&state, &headers, "connectors.connections.self").await {
+    let principal = match principal(&state, &headers, "connectors.endpoints.self").await {
         Ok(principal) => principal,
         Err(response) => return response,
     };
@@ -130,7 +130,7 @@ pub(super) async fn connect(
     headers: HeaderMap,
     Json(request): Json<ConnectRequest>,
 ) -> Response {
-    let principal = match principal(&state, &headers, "connectors.connections.self").await {
+    let principal = match principal(&state, &headers, "connectors.endpoints.self").await {
         Ok(principal) => principal,
         Err(response) => return response,
     };
@@ -154,7 +154,7 @@ pub(super) async fn connect(
 }
 
 pub(super) async fn disconnect(State(state): State<HostedState>, headers: HeaderMap) -> Response {
-    let principal = match principal(&state, &headers, "connectors.connections.self").await {
+    let principal = match principal(&state, &headers, "connectors.endpoints.self").await {
         Ok(principal) => principal,
         Err(response) => return response,
     };
@@ -174,7 +174,7 @@ pub(super) async fn disconnect(State(state): State<HostedState>, headers: Header
 }
 
 pub(super) async fn start_oauth(State(state): State<HostedState>, headers: HeaderMap) -> Response {
-    let principal = match principal(&state, &headers, "connectors.connections.self").await {
+    let principal = match principal(&state, &headers, "connectors.endpoints.self").await {
         Ok(principal) => principal,
         Err(response) => return response,
     };
@@ -199,7 +199,7 @@ pub(super) async fn complete_oauth(
     headers: HeaderMap,
     Json(request): Json<CompleteOAuthRequest>,
 ) -> Response {
-    let principal = match principal(&state, &headers, "connectors.connections.self").await {
+    let principal = match principal(&state, &headers, "connectors.endpoints.self").await {
         Ok(principal) => principal,
         Err(response) => return response,
     };

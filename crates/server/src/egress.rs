@@ -131,7 +131,7 @@ impl DestinationRule {
 
 /// Closed destination policy shared by the HTTP and WebSocket egress paths.
 #[derive(Debug, Clone)]
-pub struct ConnectionEgress {
+pub struct EndpointEgress {
     rules: Vec<DestinationRule>,
     endpoint_route: Option<EndpointRoute>,
     // The policy is immutable; clones share only this bounded connection cache. Neither current
@@ -160,7 +160,7 @@ struct PooledClient {
     used_at: Instant,
 }
 
-impl ConnectionEgress {
+impl EndpointEgress {
     pub fn new(rules: Vec<DestinationRule>) -> Result<Self, EgressError> {
         if rules.is_empty() {
             return Err(EgressError::InvalidRule);
@@ -450,7 +450,7 @@ pub type PinnedWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 mod endpoint_tests;
 
 #[async_trait]
-impl EgressTransport for ConnectionEgress {
+impl EgressTransport for EndpointEgress {
     async fn execute(
         &self,
         authority_ref: &str,
@@ -1072,8 +1072,8 @@ mod tests {
         }
     }
 
-    fn pool() -> ConnectionEgress {
-        ConnectionEgress::new(vec![DestinationRule::exact_origin(
+    fn pool() -> EndpointEgress {
+        EndpointEgress::new(vec![DestinationRule::exact_origin(
             "https://provider.example.test",
             AddressScope::Public,
         )
@@ -1126,7 +1126,7 @@ mod tests {
                 .client_for_resolved("connection:one", &changed_port, &destination)
                 .unwrap()
         ));
-        let another_policy = ConnectionEgress::new(pool.rules.clone()).unwrap();
+        let another_policy = EndpointEgress::new(pool.rules.clone()).unwrap();
         assert!(!Arc::ptr_eq(
             &client,
             &another_policy
@@ -1151,7 +1151,7 @@ mod tests {
     #[tokio::test]
     async fn cached_client_cannot_bypass_current_address_policy() {
         let url = Url::parse("https://127.0.0.1/test").unwrap();
-        let pool = ConnectionEgress::new(vec![DestinationRule::exact_origin(
+        let pool = EndpointEgress::new(vec![DestinationRule::exact_origin(
             "https://127.0.0.1",
             AddressScope::Public,
         )

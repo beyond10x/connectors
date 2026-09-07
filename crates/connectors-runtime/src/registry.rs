@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use protocol::connection::{
-    ConnectionError, ConnectionErrorCode, ConnectionRequest, ConnectionResult,
+use protocol::endpoint::{
+    EndpointError, EndpointErrorCode, EndpointRequest, EndpointResult,
 };
 use protocol::datasource::{
     DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult, DatasourceSummary,
@@ -36,12 +36,12 @@ impl BackendRegistry {
     fn target_owner(
         &self,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
     ) -> Result<&Arc<dyn ConnectorBackend>, OperationError> {
         unique_operation_claim(self.operation_claims(&OperationRequest::Invoke(
             protocol::operation::InvokeRequest {
                 operation_ref: operation_ref.into(),
-                connection_ref: connection_ref.into(),
+                endpoint_ref: endpoint_ref.into(),
                 description_ref: "ownership-only".into(),
                 input: serde_json::Value::Null,
                 approval_evidence_ref: None,
@@ -119,10 +119,10 @@ impl BackendRegistry {
             .collect()
     }
 
-    fn connection_claims(&self, request: &ConnectionRequest) -> Vec<&Arc<dyn ConnectorBackend>> {
+    fn endpoint_claims(&self, request: &EndpointRequest) -> Vec<&Arc<dyn ConnectorBackend>> {
         self.backends
             .iter()
-            .filter(|backend| backend.owns_connection(request))
+            .filter(|backend| backend.owns_endpoint(request))
             .collect()
     }
 
@@ -223,21 +223,21 @@ impl ConnectorBackend for BackendRegistry {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
     ) -> Result<OperationDescription, OperationError> {
-        let backend = self.target_owner(operation_ref, connection_ref)?;
+        let backend = self.target_owner(operation_ref, endpoint_ref)?;
         let mut description = backend
-            .describe_target(context, operation_ref, connection_ref)
+            .describe_target(context, operation_ref, endpoint_ref)
             .await?;
         description.description_ref =
-            target_description_ref(context, connection_ref, &description)?;
+            target_description_ref(context, endpoint_ref, &description)?;
         Ok(description)
     }
 
-    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+    fn owns_endpoint_inventory(&self, request: &protocol::endpoint_inventory::EndpointInventoryRequest) -> bool {
         self.backends
             .iter()
-            .any(|backend| backend.owns_endpoint(request))
+            .any(|backend| backend.owns_endpoint_inventory(request))
     }
 
     async fn resolve_endpoint(
@@ -246,13 +246,13 @@ impl ConnectorBackend for BackendRegistry {
         endpoint_ref: &str,
         operation_ref: &str,
     ) -> Result<String, OperationError> {
-        let request = protocol::endpoint::EndpointRequest::Show(protocol::endpoint::ShowRequest {
+        let request = protocol::endpoint_inventory::EndpointInventoryRequest::Show(protocol::endpoint_inventory::ShowRequest {
             endpoint_ref: endpoint_ref.into(),
         });
         let mut owners = self
             .backends
             .iter()
-            .filter(|backend| backend.owns_endpoint(&request));
+            .filter(|backend| backend.owns_endpoint_inventory(&request));
         let owner = owners
             .next()
             .ok_or_else(|| operation_not_found("no Integration owns this endpoint"))?;
@@ -266,56 +266,56 @@ impl ConnectorBackend for BackendRegistry {
             .await
     }
 
-    async fn handle_endpoint(
+    async fn handle_endpoint_inventory(
         &self,
         context: &PrincipalContext,
-        request: protocol::endpoint::EndpointRequest,
-    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
-        use protocol::endpoint::{
-            EndpointError, EndpointErrorCode, EndpointRequest, EndpointResult,
+        request: protocol::endpoint_inventory::EndpointInventoryRequest,
+    ) -> Result<protocol::endpoint_inventory::EndpointInventoryResult, protocol::endpoint_inventory::EndpointInventoryError> {
+        use protocol::endpoint_inventory::{
+            EndpointInventoryError, EndpointInventoryErrorCode, EndpointInventoryRequest, EndpointInventoryResult,
         };
         let owners: Vec<_> = self
             .backends
             .iter()
-            .filter(|backend| backend.owns_endpoint(&request))
+            .filter(|backend| backend.owns_endpoint_inventory(&request))
             .collect();
         let refusal = || {
-            EndpointError::new(
-                EndpointErrorCode::Protocol,
+            EndpointInventoryError::new(
+                EndpointInventoryErrorCode::Protocol,
                 "endpoint source returned inconsistent inventory",
                 false,
             )
         };
         if owners.is_empty() {
             return match request {
-                EndpointRequest::List(_) => Ok(EndpointResult::List {
+                EndpointInventoryRequest::List(_) => Ok(EndpointInventoryResult::List {
                     endpoints: Vec::new(),
                     next_cursor: None,
                     warnings: Vec::new(),
                 }),
-                _ => Err(EndpointError::new(
-                    EndpointErrorCode::NotFound,
+                _ => Err(EndpointInventoryError::new(
+                    EndpointInventoryErrorCode::NotFound,
                     "no Integration owns this endpoint source",
                     false,
                 )),
             };
         }
         match request {
-            EndpointRequest::List(list) => {
+            EndpointInventoryRequest::List(list) => {
                 let mut inventory = BTreeMap::new();
                 let mut warnings = std::collections::BTreeSet::new();
                 for owner in owners {
                     let mut page = list.clone();
-                    page.limit = protocol::endpoint::MAX_RESULTS;
+                    page.limit = protocol::endpoint_inventory::MAX_RESULTS;
                     page.cursor = None;
                     let mut cursors = std::collections::BTreeSet::new();
                     loop {
-                        let EndpointResult::List {
+                        let EndpointInventoryResult::List {
                             endpoints,
                             next_cursor,
                             warnings: found_warnings,
                         } = owner
-                            .handle_endpoint(context, EndpointRequest::List(page.clone()))
+                            .handle_endpoint_inventory(context, EndpointInventoryRequest::List(page.clone()))
                             .await?
                         else {
                             return Err(refusal());
@@ -353,21 +353,21 @@ impl ConnectorBackend for BackendRegistry {
                 } else {
                     None
                 };
-                Ok(EndpointResult::List {
+                Ok(EndpointInventoryResult::List {
                     endpoints,
                     next_cursor,
                     warnings: warnings.into_iter().take(100).collect(),
                 })
             }
-            EndpointRequest::Refresh(refresh) => {
+            EndpointInventoryRequest::Refresh(refresh) => {
                 let mut count = 0_usize;
                 let mut warnings = std::collections::BTreeSet::new();
                 for owner in owners {
-                    let EndpointResult::Refresh {
+                    let EndpointInventoryResult::Refresh {
                         endpoints,
                         warnings: found,
                     } = owner
-                        .handle_endpoint(context, EndpointRequest::Refresh(refresh.clone()))
+                        .handle_endpoint_inventory(context, EndpointInventoryRequest::Refresh(refresh.clone()))
                         .await?
                     else {
                         return Err(refusal());
@@ -375,7 +375,7 @@ impl ConnectorBackend for BackendRegistry {
                     count = count.checked_add(endpoints).ok_or_else(refusal)?;
                     warnings.extend(found);
                 }
-                Ok(EndpointResult::Refresh {
+                Ok(EndpointInventoryResult::Refresh {
                     endpoints: count,
                     warnings: warnings.into_iter().take(100).collect(),
                 })
@@ -384,7 +384,7 @@ impl ConnectorBackend for BackendRegistry {
                 if owners.len() != 1 {
                     return Err(refusal());
                 }
-                owners[0].handle_endpoint(context, request).await
+                owners[0].handle_endpoint_inventory(context, request).await
             }
         }
     }
@@ -407,8 +407,8 @@ impl ConnectorBackend for BackendRegistry {
                 // Keep their ordinary unsupported metadata path, but never combine split owners.
                 // This selects metadata only; normal invocation still verifies the binding and Grant.
                 let connection =
-                    ConnectionRequest::Describe(protocol::connection::DescribeRequest {
-                        connection_ref: target.connection_ref.into(),
+                    EndpointRequest::Describe(protocol::endpoint::DescribeRequest {
+                        endpoint_ref: target.endpoint_ref.into(),
                     });
                 let operation = OperationRequest::Describe(protocol::operation::DescribeRequest {
                     operation_ref: target.operation_ref.into(),
@@ -416,10 +416,10 @@ impl ConnectorBackend for BackendRegistry {
                 let has_connection_owner = self
                     .backends
                     .iter()
-                    .any(|backend| backend.owns_connection(&connection));
+                    .any(|backend| backend.owns_endpoint(&connection));
                 let mut owners = self.backends.iter().filter(|backend| {
                     backend.owns_operation(&operation)
-                        && (!has_connection_owner || backend.owns_connection(&connection))
+                        && (!has_connection_owner || backend.owns_endpoint(&connection))
                 });
                 let first = owners.next().ok_or(service::RemediationError::Refused)?;
                 if owners.next().is_some() {
@@ -462,7 +462,7 @@ impl ConnectorBackend for BackendRegistry {
             service::RemediationRequest::Start(binding) => {
                 service::RemediationRoute::Target(service::RemediationTarget {
                     operation_ref: &binding.operation_ref,
-                    connection_ref: &binding.connection_ref,
+                    endpoint_ref: &binding.endpoint_ref,
                 })
             }
             service::RemediationRequest::Status(request) => {
@@ -533,14 +533,14 @@ impl ConnectorBackend for BackendRegistry {
                 for description in descriptions {
                     ensure_compatible_description(&merged, &description)?;
                     local_refs.push(registry_contributor_ref(&description));
-                    merged.connections.extend(description.connections);
+                    merged.endpoints.extend(description.endpoints);
                 }
                 merged
-                    .connections
-                    .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+                    .endpoints
+                    .sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
                 merged
-                    .connections
-                    .dedup_by(|left, right| left.connection_ref == right.connection_ref);
+                    .endpoints
+                    .dedup_by(|left, right| left.endpoint_ref == right.endpoint_ref);
                 merged.description_ref =
                     registry_description_ref(context, &merged.operation_ref, &mut local_refs)?;
                 Ok(OperationResult::Describe(merged))
@@ -553,10 +553,10 @@ impl ConnectorBackend for BackendRegistry {
                     .starts_with(TARGET_DESCRIPTION_PREFIX)
                 {
                     let description = backend
-                        .describe_target(context, &invoke.operation_ref, &invoke.connection_ref)
+                        .describe_target(context, &invoke.operation_ref, &invoke.endpoint_ref)
                         .await?;
                     let expected =
-                        target_description_ref(context, &invoke.connection_ref, &description)?;
+                        target_description_ref(context, &invoke.endpoint_ref, &description)?;
                     if invoke.description_ref != expected {
                         return Err(OperationError::new(
                             OperationErrorCode::StaleAuthority,
@@ -617,46 +617,46 @@ impl ConnectorBackend for BackendRegistry {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
-        if let ConnectionRequest::Search(search) = request {
-            let mut connections = BTreeMap::new();
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
+        if let EndpointRequest::Search(search) = request {
+            let mut endpoints = BTreeMap::new();
             for backend in &self.backends {
-                if !backend.capabilities().connections {
+                if !backend.capabilities().endpoints {
                     continue;
                 }
                 let result = backend
-                    .handle_connection(context, ConnectionRequest::Search(search.clone()))
+                    .handle_endpoint(context, EndpointRequest::Search(search.clone()))
                     .await?;
-                let ConnectionResult::Search { connections: found } = result else {
-                    return Err(connection_protocol(
+                let EndpointResult::Search { endpoints: found } = result else {
+                    return Err(endpoint_protocol(
                         "search backend returned a wrong result",
                     ));
                 };
                 for connection in found {
-                    if connections
-                        .insert(connection.connection_ref.clone(), connection)
+                    if endpoints
+                        .insert(connection.endpoint_ref.clone(), connection)
                         .is_some()
                     {
-                        return Err(connection_protocol(
+                        return Err(endpoint_protocol(
                             "multiple Integrations published one Connection reference",
                         ));
                     }
                 }
             }
-            return Ok(ConnectionResult::Search {
-                connections: connections
+            return Ok(EndpointResult::Search {
+                endpoints: endpoints
                     .into_values()
                     .take(usize::from(search.limit))
                     .collect(),
             });
         }
-        let claims = self.connection_claims(&request);
-        unique_connection_claim(claims)?
-            .handle_connection(context, request)
+        let claims = self.endpoint_claims(&request);
+        unique_endpoint_claim(claims)?
+            .handle_endpoint(context, request)
             .await
     }
 
@@ -778,10 +778,10 @@ impl ConnectorBackend for BackendRegistry {
                 .backends
                 .iter()
                 .any(|backend| backend.capabilities().operations),
-            connections: self
+            endpoints: self
                 .backends
                 .iter()
-                .any(|backend| backend.capabilities().connections),
+                .any(|backend| backend.capabilities().endpoints),
             events: self
                 .backends
                 .iter()
@@ -797,17 +797,17 @@ impl ConnectorBackend for BackendRegistry {
         matches!(request, OperationRequest::Search(_)) || !self.operation_claims(request).is_empty()
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
-        matches!(request, ConnectionRequest::Search(_))
-            || !self.connection_claims(request).is_empty()
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
+        matches!(request, EndpointRequest::Search(_))
+            || !self.endpoint_claims(request).is_empty()
     }
 
     fn connect_session_access(
         &self,
-        request: &protocol::connection::ConnectSessionCreateRequest,
+        request: &protocol::endpoint::ConnectSessionCreateRequest,
     ) -> ConnectSessionAccess {
-        let wrapped = ConnectionRequest::ConnectSessionCreate(request.clone());
-        match unique_connection_claim(self.connection_claims(&wrapped)) {
+        let wrapped = EndpointRequest::ConnectSessionCreate(request.clone());
+        match unique_endpoint_claim(self.endpoint_claims(&wrapped)) {
             Ok(backend) => backend.connect_session_access(request),
             Err(_) => ConnectSessionAccess::Operator,
         }
@@ -917,17 +917,17 @@ fn unique_operation_claim(
     }
 }
 
-fn unique_connection_claim(
+fn unique_endpoint_claim(
     claims: Vec<&Arc<dyn ConnectorBackend>>,
-) -> Result<&Arc<dyn ConnectorBackend>, ConnectionError> {
+) -> Result<&Arc<dyn ConnectorBackend>, EndpointError> {
     match claims.as_slice() {
-        [] => Err(ConnectionError::new(
-            ConnectionErrorCode::NotFound,
+        [] => Err(EndpointError::new(
+            EndpointErrorCode::NotFound,
             "no Integration owns this Connection request",
             false,
         )),
         [backend] => Ok(backend),
-        _ => Err(connection_protocol(
+        _ => Err(endpoint_protocol(
             "multiple Integrations claimed one Connection request",
         )),
     }
@@ -967,13 +967,13 @@ fn merge_summary(
     if existing.title != incoming.title {
         existing.title.clone_from(&existing.operation_ref);
     }
-    existing.connections.append(&mut incoming.connections);
+    existing.endpoints.append(&mut incoming.endpoints);
     existing
-        .connections
-        .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+        .endpoints
+        .sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
     existing
-        .connections
-        .dedup_by(|left, right| left.connection_ref == right.connection_ref);
+        .endpoints
+        .dedup_by(|left, right| left.endpoint_ref == right.endpoint_ref);
     Ok(())
 }
 
@@ -1007,11 +1007,11 @@ const TARGET_DESCRIPTION_PREFIX: &str = "description:target:v1:";
 
 fn target_description_ref(
     context: &PrincipalContext,
-    connection_ref: &str,
+    endpoint_ref: &str,
     description: &OperationDescription,
 ) -> Result<String, OperationError> {
-    if description.connections.len() != 1
-        || description.connections[0].connection_ref != connection_ref
+    if description.endpoints.len() != 1
+        || description.endpoints[0].endpoint_ref != endpoint_ref
     {
         return Err(operation_protocol(
             "target description is not bound to exactly one Connection",
@@ -1021,7 +1021,7 @@ fn target_description_ref(
     digest.update(TARGET_DESCRIPTION_PREFIX.as_bytes());
     digest.update(context.stable_authority_seed());
     digest.update(b"\0");
-    digest.update(connection_ref.as_bytes());
+    digest.update(endpoint_ref.as_bytes());
     digest.update(b"\0");
     digest.update(
         serde_json::to_vec(description)
@@ -1099,8 +1099,8 @@ fn datasource_protocol(message: &'static str) -> DatasourceError {
     DatasourceError::new(DatasourceErrorCode::Protocol, message, false)
 }
 
-fn connection_protocol(message: &'static str) -> ConnectionError {
-    ConnectionError::new(ConnectionErrorCode::Protocol, message, false)
+fn endpoint_protocol(message: &'static str) -> EndpointError {
+    EndpointError::new(EndpointErrorCode::Protocol, message, false)
 }
 
 fn event_protocol(message: &'static str) -> EventError {

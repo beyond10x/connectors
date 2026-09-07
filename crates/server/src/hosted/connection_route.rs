@@ -4,10 +4,10 @@ use axum::body::{Body, Bytes};
 use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse as _, Json, Response};
-use protocol::connection::{
-    ConnectionError, ConnectionErrorCode, ConnectionRequest, RequestEnvelope, ResponseEnvelope,
+use protocol::endpoint::{
+    EndpointError, EndpointErrorCode, EndpointRequest, RequestEnvelope, ResponseEnvelope,
 };
-use protocol::connection_v2 as v2;
+use protocol::endpoint_v2 as v2;
 use service::{ConnectSessionAccess, PrincipalContext};
 
 use super::{
@@ -34,7 +34,7 @@ pub(super) async fn handle(
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
     let version = match probe.get("protocol").and_then(serde_json::Value::as_str) {
-        Some(protocol::connection::CONTRACT) => v2::Version::V0Alpha1,
+        Some(protocol::endpoint::CONTRACT) => v2::Version::V0Alpha1,
         Some(v2::CONTRACT) => v2::Version::V0Alpha2,
         _ => return StatusCode::BAD_REQUEST.into_response(),
     };
@@ -85,22 +85,22 @@ pub(super) async fn handle(
         };
         let (code, status) = match refusal {
             service::RemediationError::Refused => {
-                (ConnectionErrorCode::NotGranted, StatusCode::FORBIDDEN)
+                (EndpointErrorCode::NotGranted, StatusCode::FORBIDDEN)
             }
             service::RemediationError::InvalidInput => {
-                (ConnectionErrorCode::InvalidInput, StatusCode::BAD_REQUEST)
+                (EndpointErrorCode::InvalidInput, StatusCode::BAD_REQUEST)
             }
             service::RemediationError::Conflict => {
-                (ConnectionErrorCode::Conflict, StatusCode::CONFLICT)
+                (EndpointErrorCode::Conflict, StatusCode::CONFLICT)
             }
             _ => (
-                ConnectionErrorCode::Unavailable,
+                EndpointErrorCode::Unavailable,
                 StatusCode::SERVICE_UNAVAILABLE,
             ),
         };
         failure(
             &request.request_id,
-            ConnectionError::new(code, refusal.to_string(), false),
+            EndpointError::new(code, refusal.to_string(), false),
             status,
         )
     };
@@ -115,25 +115,25 @@ async fn ordinary(
 ) -> Response {
     let self_service = matches!(
         &request.request,
-        ConnectionRequest::ConnectSessionCreate(request)
+        EndpointRequest::ConnectSessionCreate(request)
             if state.backend.connect_session_access(request) == ConnectSessionAccess::SelfService
     );
     let required_scope = match &request.request {
-        ConnectionRequest::CandidateSearch(_)
-        | ConnectionRequest::Search(_)
-        | ConnectionRequest::Describe(_)
-        | ConnectionRequest::ObservationSearch(_)
-        | ConnectionRequest::ConnectSessionStatus(_) => "connectors.catalog.read",
-        ConnectionRequest::ConnectSessionCreate(_) if self_service => "connectors.connections.self",
-        ConnectionRequest::CandidateActivate(_)
-        | ConnectionRequest::Materialize(_)
-        | ConnectionRequest::ConnectSessionCreate(_) => "connectors.connections.manage",
+        EndpointRequest::CandidateSearch(_)
+        | EndpointRequest::Search(_)
+        | EndpointRequest::Describe(_)
+        | EndpointRequest::ObservationSearch(_)
+        | EndpointRequest::ConnectSessionStatus(_) => "connectors.catalog.read",
+        EndpointRequest::ConnectSessionCreate(_) if self_service => "connectors.endpoints.self",
+        EndpointRequest::CandidateActivate(_)
+        | EndpointRequest::Materialize(_)
+        | EndpointRequest::ConnectSessionCreate(_) => "connectors.endpoints.manage",
     };
     if principal.tenant_id != request.context.tenant_id || !principal.allows(required_scope) {
         return failure(
             &request.request_id,
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "the verified authority does not admit this Connector connection request family",
                 false,
             ),
@@ -142,16 +142,16 @@ async fn ordinary(
     }
     if matches!(
         &request.request,
-        ConnectionRequest::CandidateActivate(_)
-            | ConnectionRequest::Materialize(_)
-            | ConnectionRequest::ConnectSessionCreate(_)
+        EndpointRequest::CandidateActivate(_)
+            | EndpointRequest::Materialize(_)
+            | EndpointRequest::ConnectSessionCreate(_)
     ) && !self_service
         && !state.policy.admits_operator(principal)
     {
         return failure(
             &request.request_id,
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "the Connector-owned management policy does not admit this principal",
                 false,
             ),
@@ -163,7 +163,7 @@ async fn ordinary(
     }
     let response = match state
         .backend
-        .handle_connection(owner, request.request)
+        .handle_endpoint(owner, request.request)
         .await
     {
         Ok(result) => ResponseEnvelope::success(&request.request_id, result),
@@ -172,7 +172,7 @@ async fn ordinary(
     Json(response).into_response()
 }
 
-fn failure(request_id: &str, error: ConnectionError, status: StatusCode) -> Response {
+fn failure(request_id: &str, error: EndpointError, status: StatusCode) -> Response {
     (status, Json(ResponseEnvelope::failure(request_id, error))).into_response()
 }
 

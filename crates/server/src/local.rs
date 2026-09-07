@@ -180,7 +180,7 @@ fn private_binding(
     use sha2::{Digest as _, Sha256};
     service::RemediationBinding {
         operation_ref: metadata.operation.id().into(),
-        connection_ref: metadata.connection.id().into(),
+        endpoint_ref: metadata.connection.id().into(),
         integration_ref: metadata.integration_ref.clone(),
         auth_profile: metadata.auth_profile.clone(),
         need,
@@ -219,7 +219,7 @@ async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
     use service::{CredentialReadiness, RemediationError, RemediationTarget};
     let target = RemediationTarget {
         operation_ref: &invoke.operation_ref,
-        connection_ref: &invoke.connection_ref,
+        endpoint_ref: &invoke.endpoint_ref,
     };
     if !backend.owns_remediation(service::RemediationRoute::Target(target)) {
         return Ok(None);
@@ -236,7 +236,7 @@ async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
         .map_err(operation_error)?;
     let described = if target_specific {
         backend
-            .describe_target(context, &invoke.operation_ref, &invoke.connection_ref)
+            .describe_target(context, &invoke.operation_ref, &invoke.endpoint_ref)
             .await
             .map(protocol::operation::OperationResult::Describe)
     } else {
@@ -261,8 +261,8 @@ async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
     if description.operation_ref != invoke.operation_ref
         || description.description_ref != invoke.description_ref
         || description.input_schema != record["contract"]["input_schema"]
-        || !description.connections.iter().any(|connection| {
-            connection.connection_ref == invoke.connection_ref
+        || !description.endpoints.iter().any(|connection| {
+            connection.endpoint_ref == invoke.endpoint_ref
                 && connection.provider == metadata.operation.provider()
                 && connection.purpose.as_deref() == Some(metadata.auth_profile.as_str())
         })
@@ -286,15 +286,15 @@ async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
 
 fn connection_remediation_error(
     error: service::RemediationError,
-) -> protocol::connection::ConnectionError {
-    use protocol::connection::{ConnectionError, ConnectionErrorCode};
+) -> protocol::endpoint::EndpointError {
+    use protocol::endpoint::{EndpointError, EndpointErrorCode};
     let code = match error {
-        service::RemediationError::Refused => ConnectionErrorCode::NotGranted,
-        service::RemediationError::InvalidInput => ConnectionErrorCode::InvalidInput,
-        service::RemediationError::Conflict => ConnectionErrorCode::Conflict,
-        _ => ConnectionErrorCode::Unavailable,
+        service::RemediationError::Refused => EndpointErrorCode::NotGranted,
+        service::RemediationError::InvalidInput => EndpointErrorCode::InvalidInput,
+        service::RemediationError::Conflict => EndpointErrorCode::Conflict,
+        _ => EndpointErrorCode::Unavailable,
     };
-    ConnectionError::new(code, error.to_string(), false)
+    EndpointError::new(code, error.to_string(), false)
 }
 
 // Status and acknowledgement resolve the existing session's retained current-authority
@@ -314,15 +314,15 @@ impl service::RemediationAuthority for NoNewAdmission {
 async fn local_connection<B: ConnectorBackend + ?Sized>(
     backend: &B,
     context: &PrincipalContext,
-    request: protocol::connection_v2::RequestEnvelope,
-) -> Result<protocol::connection_v2::ConnectionResult, protocol::connection::ConnectionError> {
+    request: protocol::endpoint_v2::RequestEnvelope,
+) -> Result<protocol::endpoint_v2::EndpointResult, protocol::endpoint::EndpointError> {
     use crate::hosted::remediation::{authentication, validate_input, validated_metadata};
-    use protocol::connection_v2::{ConnectionRequest as Request, ConnectionResult as Result};
+    use protocol::endpoint_v2::{EndpointRequest as Request, EndpointResult as Result};
     use service::{RemediationError, RemediationRequest, RemediationResult, RemediationTarget};
     if let Ok(ordinary) = request.clone().into_v1() {
         crate::legacy_discovery::admit(&ordinary.request)?;
         return backend
-            .handle_connection(context, ordinary.request)
+            .handle_endpoint(context, ordinary.request)
             .await
             .map(Into::into);
     }
@@ -330,13 +330,13 @@ async fn local_connection<B: ConnectorBackend + ?Sized>(
         Request::RemediationStart(value) => (
             0_u8,
             None,
-            Some((value.operation_ref.clone(), value.connection_ref.clone())),
+            Some((value.operation_ref.clone(), value.endpoint_ref.clone())),
         ),
         Request::RemediationStatus(value) => (1, Some(value.connect_session_ref.clone()), None),
         Request::RemediationAcknowledge(value) => (
             2,
             Some(value.connect_session_ref.clone()),
-            Some((value.operation_ref.clone(), value.connection_ref.clone())),
+            Some((value.operation_ref.clone(), value.endpoint_ref.clone())),
         ),
         _ => return Err(connection_remediation_error(RemediationError::InvalidInput)),
     };
@@ -344,7 +344,7 @@ async fn local_connection<B: ConnectorBackend + ?Sized>(
         Request::RemediationStart(start) => {
             let target = RemediationTarget {
                 operation_ref: &start.operation_ref,
-                connection_ref: &start.connection_ref,
+                endpoint_ref: &start.endpoint_ref,
             };
             let metadata = backend
                 .remediation_metadata(context, target)
@@ -404,7 +404,7 @@ async fn local_connection<B: ConnectorBackend + ?Sized>(
                     .as_deref()
                     .is_none_or(|reference| reference == status.connect_session_ref)
                 && expected.2.as_ref().is_none_or(|(operation, connection)| {
-                    operation == &status.operation_ref && connection == &status.connection_ref
+                    operation == &status.operation_ref && connection == &status.endpoint_ref
                 }) =>
         {
             if start {
@@ -417,7 +417,7 @@ async fn local_connection<B: ConnectorBackend + ?Sized>(
             if expected.0 == 2
                 && expected.1.as_deref() == Some(value.connect_session_ref.as_str())
                 && expected.2.as_ref().is_some_and(|(operation, connection)| {
-                    operation == &value.operation_ref && connection == &value.connection_ref
+                    operation == &value.operation_ref && connection == &value.endpoint_ref
                 }) =>
         {
             Ok(Result::RemediationAcknowledge(value))
@@ -487,11 +487,11 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
     backend: Arc<B>,
 ) -> Result<Option<Vec<u8>>, LocalDaemonError> {
     let bytes = match protocol_name {
-        protocol::endpoint::CONTRACT => {
-            if frame.len() > protocol::endpoint::MAX_FRAME_BYTES {
+        protocol::endpoint_inventory::CONTRACT => {
+            if frame.len() > protocol::endpoint_inventory::MAX_FRAME_BYTES {
                 return Ok(None);
             }
-            let request: protocol::endpoint::RequestEnvelope = match serde_json::from_slice(frame) {
+            let request: protocol::endpoint_inventory::RequestEnvelope = match serde_json::from_slice(frame) {
                 Ok(value) => value,
                 Err(_) => return Ok(None),
             };
@@ -502,24 +502,24 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                 Ok(value) => value,
                 Err(_) => return Ok(None),
             };
-            let response = match backend.handle_endpoint(&context, request.request).await {
+            let response = match backend.handle_endpoint_inventory(&context, request.request).await {
                 Ok(result) => {
-                    protocol::endpoint::ResponseEnvelope::success(&request.request_id, result)
+                    protocol::endpoint_inventory::ResponseEnvelope::success(&request.request_id, result)
                 }
                 Err(error) => {
-                    protocol::endpoint::ResponseEnvelope::failure(&request.request_id, error)
+                    protocol::endpoint_inventory::ResponseEnvelope::failure(&request.request_id, error)
                 }
             };
             let response = match response.validate() {
                 Ok(()) => response,
                 Err(error) => {
-                    protocol::endpoint::ResponseEnvelope::failure(request.request_id, error)
+                    protocol::endpoint_inventory::ResponseEnvelope::failure(request.request_id, error)
                 }
             };
             serde_json::to_vec(&response).map_err(io::Error::other)?
         }
-        protocol::operation::v4::CONTRACT => {
-            let request: protocol::operation::v4::RequestEnvelope =
+        protocol::operation::v5::CONTRACT => {
+            let request: protocol::operation::v5::RequestEnvelope =
                 match serde_json::from_slice(frame) {
                     Ok(value) => value,
                     Err(_) => return Ok(None),
@@ -537,7 +537,7 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                     .await
                 {
                     Err(error) => {
-                        protocol::operation::v4::ResponseEnvelope::failure(&request_id, error)
+                        protocol::operation::v5::ResponseEnvelope::failure(&request_id, error)
                     }
                     Ok(normalized) => {
                         let preflight =
@@ -549,13 +549,13 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                                 Ok(None)
                             };
                         match preflight {
-                            Ok(Some(auth)) => protocol::operation::v4::ResponseEnvelope::failure(
+                            Ok(Some(auth)) => protocol::operation::v5::ResponseEnvelope::failure(
                                 &request_id,
                                 protocol::operation::v3::OperationError::authentication_required(
                                     auth,
                                 ),
                             ),
-                            Err(error) => protocol::operation::v4::ResponseEnvelope::failure(
+                            Err(error) => protocol::operation::v5::ResponseEnvelope::failure(
                                 &request_id,
                                 error,
                             ),
@@ -564,7 +564,7 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                                     protocol::operation::OperationRequest::Describe(describe),
                                     Some(connection),
                                 ) =
-                                    (&normalized.request, &normalized.description_connection)
+                                    (&normalized.request, &normalized.description_endpoint)
                                 {
                                     backend
                                         .describe_target(
@@ -580,17 +580,17 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                                 match outcome.and_then(|result| {
                                     service::constrain_endpoint_description(
                                         result,
-                                        normalized.description_connection.as_deref(),
+                                        normalized.description_endpoint.as_deref(),
                                     )
                                 }) {
                                     Ok(result) => {
-                                        protocol::operation::v4::ResponseEnvelope::success(
+                                        protocol::operation::v5::ResponseEnvelope::success(
                                             &request_id,
                                             result,
                                         )
                                     }
                                     Err(error) => {
-                                        protocol::operation::v4::ResponseEnvelope::failure(
+                                        protocol::operation::v5::ResponseEnvelope::failure(
                                             &request_id,
                                             error.into(),
                                         )
@@ -602,7 +602,7 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                 };
             let response = match response.validate() {
                 Ok(()) => response,
-                Err(error) => protocol::operation::v4::ResponseEnvelope::failure(request_id, error),
+                Err(error) => protocol::operation::v5::ResponseEnvelope::failure(request_id, error),
             };
             serde_json::to_vec(&response).map_err(io::Error::other)?
         }
@@ -650,8 +650,8 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
                 .encode_response(response)
                 .map_err(io::Error::other)?
         }
-        protocol::connection::CONTRACT | protocol::connection_v2::CONTRACT => {
-            let (version, request) = match protocol::connection_v2::decode_request(frame) {
+        protocol::endpoint::CONTRACT | protocol::endpoint_v2::CONTRACT => {
+            let (version, request) = match protocol::endpoint_v2::decode_request(frame) {
                 Ok(value) => value,
                 Err(_) => return Ok(None),
             };
@@ -662,15 +662,15 @@ async fn dispatch_frame<B: ConnectorBackend + ?Sized>(
             let request_id = request.request_id.clone();
             let response = match local_connection(&*backend, &context, request).await {
                 Ok(result) => {
-                    protocol::connection_v2::ResponseEnvelope::success(&request_id, result)
+                    protocol::endpoint_v2::ResponseEnvelope::success(&request_id, result)
                 }
                 Err(error) => {
-                    protocol::connection_v2::ResponseEnvelope::failure(&request_id, error)
+                    protocol::endpoint_v2::ResponseEnvelope::failure(&request_id, error)
                 }
             };
             let response = match response.validate() {
                 Ok(()) => response,
-                Err(_) => protocol::connection_v2::ResponseEnvelope::failure(
+                Err(_) => protocol::endpoint_v2::ResponseEnvelope::failure(
                     &request_id,
                     connection_remediation_error(service::RemediationError::Unavailable),
                 ),
@@ -900,7 +900,7 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
     use async_trait::async_trait;
-    use protocol::connection::{ConnectionError, ConnectionRequest, ConnectionResult};
+    use protocol::endpoint::{EndpointError, EndpointRequest, EndpointResult};
     use protocol::event::{EventError, EventRequest, EventResult};
     use protocol::operation::{
         ApprovalPosture, EffectClass, OperationError, OperationRequest, OperationResult,
@@ -943,20 +943,20 @@ mod tests {
                     title: "Dial SIP".to_owned(),
                     effect: EffectClass::Mutating,
                     approval: ApprovalPosture::Required,
-                    connections: Vec::new(),
+                    endpoints: Vec::new(),
                 }],
             })
         }
 
-        async fn handle_connection(
+        async fn handle_endpoint(
             &self,
             _context: &PrincipalContext,
-            request: ConnectionRequest,
-        ) -> Result<ConnectionResult, ConnectionError> {
-            assert!(matches!(request, ConnectionRequest::Search(_)));
+            request: EndpointRequest,
+        ) -> Result<EndpointResult, EndpointError> {
+            assert!(matches!(request, EndpointRequest::Search(_)));
             self.connection_called.store(true, Ordering::Release);
-            Ok(ConnectionResult::Search {
-                connections: Vec::new(),
+            Ok(EndpointResult::Search {
+                endpoints: Vec::new(),
             })
         }
 
@@ -1010,7 +1010,7 @@ mod tests {
             _: u64,
         ) -> Result<(), service::RemediationError> {
             if binding.grant_ref == "grant:local-fixture"
-                && binding.connection_ref == "connection:local-fixture"
+                && binding.endpoint_ref == "connection:local-fixture"
             {
                 Ok(())
             } else {
@@ -1023,7 +1023,7 @@ mod tests {
         fn owns_remediation(&self, route: service::RemediationRoute<'_>) -> bool {
             matches!(route, service::RemediationRoute::Target(target)
                 if target.operation_ref == "slack-conversations-history"
-                    && target.connection_ref == "connection:local-fixture")
+                    && target.endpoint_ref == "connection:local-fixture")
         }
         async fn ready(&self) -> Result<(), service::BackendReadinessError> {
             Ok(())
@@ -1037,14 +1037,14 @@ mod tests {
             target: service::RemediationTarget<'_>,
         ) -> Result<service::RemediationMetadata<'a>, service::RemediationError> {
             if target.operation_ref != "slack-conversations-history"
-                || target.connection_ref != "connection:local-fixture"
+                || target.endpoint_ref != "connection:local-fixture"
             {
                 return Err(service::RemediationError::Refused);
             }
             Ok(service::RemediationMetadata {
                 operation: catalog::reader::operation(target.operation_ref).unwrap(),
-                connection: domain::ConnectionAuthority::new(
-                    target.connection_ref,
+                connection: domain::EndpointAuthority::new(
+                    target.endpoint_ref,
                     domain::InitiationPolicy::platform_only(),
                 )
                 .unwrap(),
@@ -1106,8 +1106,8 @@ mod tests {
                     output_schema: serde_json::json!({}),
                     effect: protocol::operation::EffectClass::ReadOnly,
                     approval: protocol::operation::ApprovalPosture::NotRequired,
-                    connections: vec![protocol::operation::ConnectionSummary {
-                        connection_ref: "connection:local-fixture".into(),
+                    endpoints: vec![protocol::operation::EndpointSummary {
+                        endpoint_ref: "connection:local-fixture".into(),
                         label: "fixture".into(),
                         provider: "slack".into(),
                         audiences: vec![],
@@ -1137,7 +1137,7 @@ mod tests {
             request: protocol::operation::OperationRequest::Invoke(
                 protocol::operation::InvokeRequest {
                     operation_ref: "slack-conversations-history".into(),
-                    connection_ref: "connection:local-fixture".into(),
+                    endpoint_ref: "connection:local-fixture".into(),
                     description_ref: "description:local-fixture".into(),
                     input: serde_json::json!({"channel":"C123"}),
                     approval_evidence_ref: None,
@@ -1228,7 +1228,7 @@ mod tests {
             "b10x.connector-operation.v0alpha99",
         ] {
             let frame = serde_json::json!({"protocol":version,"request_id":"rate-local","context":context(),
-                "request":{"method":"invoke","params":{"operation_ref":"fixture.read","connection_ref":"connection:fixture","description_ref":"description:fixture","input":{}}}});
+                "request":{"method":"invoke","params":{"operation_ref":"fixture.read","endpoint_ref":"connection:fixture","description_ref":"description:fixture","input":{}}}});
             let mut stream = UnixStream::connect(&socket).await.unwrap();
             let mut bytes = serde_json::to_vec(&frame).unwrap();
             bytes.push(b'\n');
@@ -1315,21 +1315,21 @@ mod tests {
     #[tokio::test]
     async fn one_socket_dispatches_the_value_free_connection_and_event_contracts() {
         let backend = Arc::new(SyntheticBackend::default());
-        let connection = protocol::connection::RequestEnvelope {
-            protocol: protocol::connection::CONTRACT.to_owned(),
+        let connection = protocol::endpoint::RequestEnvelope {
+            protocol: protocol::endpoint::CONTRACT.to_owned(),
             request_id: "connection-request-1".to_owned(),
             context: context(),
-            request: ConnectionRequest::Search(protocol::connection::SearchRequest {
+            request: EndpointRequest::Search(protocol::endpoint::SearchRequest {
                 query: String::new(),
                 limit: 10,
             }),
         };
         let bytes = serde_json::to_vec(&connection).unwrap();
-        let response = dispatch_frame(&bytes, protocol::connection::CONTRACT, Arc::clone(&backend))
+        let response = dispatch_frame(&bytes, protocol::endpoint::CONTRACT, Arc::clone(&backend))
             .await
             .unwrap()
             .unwrap();
-        let response: protocol::connection::ResponseEnvelope =
+        let response: protocol::endpoint::ResponseEnvelope =
             serde_json::from_slice(&response).unwrap();
         response.validate().unwrap();
 

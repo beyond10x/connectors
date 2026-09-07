@@ -23,7 +23,7 @@ impl ConnectorBackend for RemediationBackend {
     }
     fn owns_remediation(&self, route: RemediationRoute<'_>) -> bool {
         self.owns
-            && matches!(route, RemediationRoute::Target(target) if target.operation_ref == "slack-conversations-history" && target.connection_ref == "connection:configured")
+            && matches!(route, RemediationRoute::Target(target) if target.operation_ref == "slack-conversations-history" && target.endpoint_ref == "connection:configured")
     }
     fn remediation_metadata<'a>(
         &'a self,
@@ -54,7 +54,7 @@ fn principal() -> PrincipalContext {
 fn target() -> RemediationTarget<'static> {
     RemediationTarget {
         operation_ref: "slack-conversations-history",
-        connection_ref: "connection:configured",
+        endpoint_ref: "connection:configured",
     }
 }
 #[tokio::test]
@@ -97,7 +97,7 @@ async fn remediation_registry_ambiguity_and_absence_do_not_probe_any_owner() {
     let absent = BackendRegistry::new(vec![first.clone()]);
     let unknown = RemediationTarget {
         operation_ref: "unknown",
-        connection_ref: "connection:configured",
+        endpoint_ref: "connection:configured",
     };
     assert_eq!(
         absent.credential_readiness(&principal(), unknown).await,
@@ -126,7 +126,7 @@ impl ConnectorBackend for AuthAdversaryOptionalRoute {
     fn owns_operation(&self, _: &OperationRequest) -> bool {
         self.operation
     }
-    fn owns_connection(&self, _: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, _: &EndpointRequest) -> bool {
         self.connection
     }
     fn owns_remediation(&self, _: RemediationRoute<'_>) -> bool {
@@ -261,7 +261,7 @@ impl service::RemediationAuthority for AuthAdversary2NoAdmission {
 }
 #[tokio::test]
 async fn auth_adversary2_session_routing_refuses_ambiguity_and_never_falls_back_after_claim() {
-    use protocol::connection_v2::{RemediationAcknowledgeRequest, RemediationStatusRequest};
+    use protocol::endpoint_v2::{RemediationAcknowledgeRequest, RemediationStatusRequest};
     for scenario in [
         "single-refused",
         "single-unavailable",
@@ -299,7 +299,7 @@ async fn auth_adversary2_session_routing_refuses_ambiguity_and_never_falls_back_
                 service::RemediationRequest::Acknowledge(RemediationAcknowledgeRequest {
                     connect_session_ref: reference.into(),
                     operation_ref: target().operation_ref.into(),
-                    connection_ref: target().connection_ref.into(),
+                    endpoint_ref: target().endpoint_ref.into(),
                 })
             } else {
                 service::RemediationRequest::Status(RemediationStatusRequest {

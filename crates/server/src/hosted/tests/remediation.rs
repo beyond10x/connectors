@@ -67,8 +67,8 @@ impl RemediationBackend {
             } else {
                 ApprovalPosture::Required
             },
-            connections: vec![protocol::operation::ConnectionSummary {
-                connection_ref: CONNECTION.into(),
+            endpoints: vec![protocol::operation::EndpointSummary {
+                endpoint_ref: CONNECTION.into(),
                 label: "Fixture Connection".into(),
                 provider: operation.provider.into(),
                 audiences: Vec::new(),
@@ -99,7 +99,7 @@ impl ConnectorBackend for RemediationBackend {
 
     fn owns_remediation(&self, route: RemediationRoute<'_>) -> bool {
         matches!(route, RemediationRoute::Target(target)
-            if matches!(target.operation_ref, READ | WRITE) && target.connection_ref == CONNECTION)
+            if matches!(target.operation_ref, READ | WRITE) && target.endpoint_ref == CONNECTION)
     }
 
     fn remediation_metadata<'a>(
@@ -114,7 +114,7 @@ impl ConnectorBackend for RemediationBackend {
         }
         Ok(RemediationMetadata {
             operation: catalog::reader::operation(target.operation_ref).unwrap(),
-            connection: domain::ConnectionAuthority::new(
+            connection: domain::EndpointAuthority::new(
                 CONNECTION,
                 domain::InitiationPolicy::platform_only(),
             )
@@ -308,7 +308,7 @@ async fn auth_v3_need_precedes_real_approval_redemption_and_dispatch() {
             v3::AuthenticationNextAction::StartTrustedRemediation
         );
         assert_eq!(authentication.operation_ref, WRITE);
-        assert_eq!(authentication.connection_ref, CONNECTION);
+        assert_eq!(authentication.endpoint_ref, CONNECTION);
         assert_eq!(authentication.integration_ref, INTEGRATION);
         assert_eq!(authentication.auth_profile, PURPOSE);
         assert_eq!(backend.dispatches.load(Ordering::SeqCst), 0);
@@ -366,7 +366,7 @@ async fn auth_v3_requires_a_real_grant_and_keeps_unknown_targets_opaque() {
     let unknown_operation = request("auth-unconfigured-operation", None);
     let mut unknown_connection = request(READ, None);
     if let OperationRequest::Invoke(invoke) = &mut unknown_connection.request {
-        invoke.connection_ref = "connection:unknown".into();
+        invoke.endpoint_ref = "connection:unknown".into();
     }
     let mut bodies = Vec::new();
     for frame in [unadmitted, unknown_operation, unknown_connection] {
@@ -397,7 +397,7 @@ async fn auth_v3_does_not_publish_a_structurally_valid_private_backend_reference
     // Source-level validity is checked with the actual committed DTO, not a string heuristic.
     v3::AuthenticationRequired {
         operation_ref: READ.into(),
-        connection_ref: CONNECTION.into(),
+        endpoint_ref: CONNECTION.into(),
         integration_ref: PRIVATE.into(),
         auth_profile: PURPOSE.into(),
         need: v3::AuthenticationNeed::AuthorizeConfigured,
@@ -428,8 +428,8 @@ async fn auth_v3_does_not_publish_a_structurally_valid_private_backend_reference
     assert_eq!(audit(&store), None);
 }
 
-fn connection_http(request: &protocol::connection_v2::RequestEnvelope) -> Request<Body> {
-    Request::post("/connections")
+fn connection_http(request: &protocol::endpoint_v2::RequestEnvelope) -> Request<Body> {
+    Request::post("/endpoints")
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::AUTHORIZATION, "Bearer access")
         .body(Body::from(serde_json::to_vec(request).unwrap()))
@@ -438,7 +438,7 @@ fn connection_http(request: &protocol::connection_v2::RequestEnvelope) -> Reques
 
 #[tokio::test]
 async fn auth_connection_v2_ordinary_requests_select_exact_identity_and_refuse_duplicates() {
-    use protocol::connection_v2 as v2;
+    use protocol::endpoint_v2 as v2;
     let app = router(
         Arc::new(Verifier),
         Arc::new(Backend),
@@ -449,7 +449,7 @@ async fn auth_connection_v2_ordinary_requests_select_exact_identity_and_refuse_d
         protocol: v2::CONTRACT.into(),
         request_id: "connection:versions".into(),
         context: envelope("tenant-dev").context,
-        request: v2::ConnectionRequest::Search(protocol::connection::SearchRequest {
+        request: v2::EndpointRequest::Search(protocol::endpoint::SearchRequest {
             query: String::new(),
             limit: 10,
         }),
@@ -459,7 +459,7 @@ async fn auth_connection_v2_ordinary_requests_select_exact_identity_and_refuse_d
         let response = app
             .clone()
             .oneshot(
-                Request::post("/connections")
+                Request::post("/endpoints")
                     .header(header::CONTENT_TYPE, "application/json")
                     .header(header::AUTHORIZATION, "Bearer access")
                     .body(Body::from(body))
@@ -473,7 +473,7 @@ async fn auth_connection_v2_ordinary_requests_select_exact_identity_and_refuse_d
         assert_eq!(response.request_id, request.request_id);
         assert!(matches!(
             response.response,
-            Some(v2::ConnectionResult::Search { .. })
+            Some(v2::EndpointResult::Search { .. })
         ));
     }
     let body = serde_json::to_string(&request).unwrap().replacen(
@@ -483,7 +483,7 @@ async fn auth_connection_v2_ordinary_requests_select_exact_identity_and_refuse_d
     );
     let response = app
         .oneshot(
-            Request::post("/connections")
+            Request::post("/endpoints")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::AUTHORIZATION, "Bearer access")
                 .body(Body::from(body))
@@ -496,7 +496,7 @@ async fn auth_connection_v2_ordinary_requests_select_exact_identity_and_refuse_d
 
 #[tokio::test]
 async fn auth_connection_v2_hosted_start_has_real_grants_and_no_production_acquisition() {
-    use protocol::connection_v2 as v2;
+    use protocol::endpoint_v2 as v2;
     let backend = Arc::new(RemediationBackend::new(
         CredentialReadiness::MissingCredential,
         false,
@@ -505,17 +505,17 @@ async fn auth_connection_v2_hosted_start_has_real_grants_and_no_production_acqui
         protocol: v2::CONTRACT.into(),
         request_id: "connection:bound".into(),
         context: envelope("tenant-dev").context,
-        request: v2::ConnectionRequest::RemediationStart(v2::RemediationStartRequest {
+        request: v2::EndpointRequest::RemediationStart(v2::RemediationStartRequest {
             operation_ref: READ.into(),
-            connection_ref: CONNECTION.into(),
+            endpoint_ref: CONNECTION.into(),
             input: serde_json::json!({"channel":"C123"}),
         }),
     };
     let store = Arc::new(MemoryState::new());
     let app = application(backend.clone(), Some(&store));
     let mut unknown = request.clone();
-    if let v2::ConnectionRequest::RemediationStart(value) = &mut unknown.request {
-        value.connection_ref = "connection:unknown".into();
+    if let v2::EndpointRequest::RemediationStart(value) = &mut unknown.request {
+        value.endpoint_ref = "connection:unknown".into();
     }
     let mut refusals = Vec::new();
     for frame in [&request, &unknown] {
@@ -530,7 +530,7 @@ async fn auth_connection_v2_hosted_start_has_real_grants_and_no_production_acqui
     let (_, response) = v2::decode_response(&bytes(response).await).unwrap();
     assert_eq!(
         response.error.unwrap().code,
-        protocol::connection::ConnectionErrorCode::Unavailable
+        protocol::endpoint::EndpointErrorCode::Unavailable
     );
     assert!(response.response.is_none());
     assert_eq!(backend.bound_calls.load(Ordering::SeqCst), 0);

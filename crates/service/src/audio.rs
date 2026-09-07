@@ -55,7 +55,7 @@ pub enum AudioAdmissionError {
     InvalidIdentity,
     /// The deployment route belongs to a different Connection.
     #[error("deployment audio route belongs to another Connection")]
-    ConnectionMismatch,
+    EndpointMismatch,
     /// A device path is relative, so what it resolves to would depend on ambient state.
     #[error("audio route path is not absolute")]
     RelativePath,
@@ -134,7 +134,7 @@ pub fn admit_audio_plan(
         return Err(AudioAdmissionError::InvalidIdentity);
     }
     if audio.connection != route.connection || plan.admission().connection() != route.connection {
-        return Err(AudioAdmissionError::ConnectionMismatch);
+        return Err(AudioAdmissionError::EndpointMismatch);
     }
     validate_audio_deployment_route(&route)?;
     Ok(AdmittedAudioPlan {
@@ -256,7 +256,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use domain::{
-        AdmittedOperation, AudioPlan, Capability, ConnectionAuthority, Implementation,
+        AdmittedOperation, AudioPlan, Capability, EndpointAuthority, Implementation,
         InitiationPolicy, OperationFacts, Placement,
     };
 
@@ -293,7 +293,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
+                EndpointAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::AudioV1(AudioPlan {
@@ -320,7 +320,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
+                EndpointAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::SipV1(domain::SipPlan {
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(
             admit_audio_plan(&plan(SPEECH_SPEAK_OPERATION), elsewhere)
                 .expect_err("another Connection's route is refused"),
-            AudioAdmissionError::ConnectionMismatch
+            AudioAdmissionError::EndpointMismatch
         );
     }
 

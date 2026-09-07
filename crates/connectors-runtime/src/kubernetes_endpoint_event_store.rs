@@ -14,7 +14,7 @@ const MAX_SUBSCRIPTIONS: usize = 64;
 #[serde(deny_unknown_fields)]
 pub(in crate::kubernetes_endpoints) struct Subscription {
     pub owner: String,
-    pub endpoint: Endpoint,
+    pub endpoint: EndpointInventoryEntry,
     pub channel: event::ChannelSummary,
     pub authority: String,
 }
@@ -207,7 +207,7 @@ impl EndpointEvents {
                 )))
             ),
             channel_ref: subscription.channel.channel_ref.clone(),
-            connection_ref: subscription.channel.connection_ref.clone(),
+            endpoint_ref: subscription.channel.endpoint_ref.clone(),
             integration_ref: subscription.channel.integration_ref.clone(),
             event_type,
             provenance: event::EventProvenance::Native,

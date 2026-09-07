@@ -225,10 +225,10 @@ fn connection(root: &Path, name: &str, allow_writes: bool) -> CatalogIntegration
     }
 }
 
-fn invoke(description: &OperationDescription, connection_ref: &str) -> OperationRequest {
+fn invoke(description: &OperationDescription, endpoint_ref: &str) -> OperationRequest {
     OperationRequest::Invoke(InvokeRequest {
         operation_ref: POST.to_owned(),
-        connection_ref: connection_ref.to_owned(),
+        endpoint_ref: endpoint_ref.to_owned(),
         description_ref: description.description_ref.clone(),
         input: serde_json::json!({"channel":"C-FIXTURE", "text":"fixture post"}),
         // Local owner authority and the selected grant admit this fixture. Required metadata is
@@ -253,8 +253,8 @@ async fn mixed_connections(writable_first: bool) {
     assert_eq!(operations[0].operation_ref, POST);
     assert_eq!(operations[0].effect, EffectClass::Mutating);
     assert_eq!(operations[0].approval, ApprovalPosture::Required);
-    assert_eq!(operations[0].connections.len(), 1);
-    assert_eq!(operations[0].connections[0].label, "writer");
+    assert_eq!(operations[0].endpoints.len(), 1);
+    assert_eq!(operations[0].endpoints[0].label, "writer");
 
     let description = fixture
         .describe(POST)
@@ -262,8 +262,8 @@ async fn mixed_connections(writable_first: bool) {
         .expect("an admitted write is describable");
     assert_eq!(description.effect, EffectClass::Mutating);
     assert_eq!(description.approval, ApprovalPosture::Required);
-    assert_eq!(description.connections, operations[0].connections);
-    let writer = &description.connections[0].connection_ref;
+    assert_eq!(description.endpoints, operations[0].endpoints);
+    let writer = &description.endpoints[0].endpoint_ref;
     let result = fixture.request(invoke(&description, writer)).await.unwrap();
     let OperationResult::Invoke(result) = result else {
         panic!("invoke must return its fixture result")
@@ -278,11 +278,11 @@ async fn mixed_connections(writable_first: bool) {
 
     let reads = fixture.describe(READ).await.unwrap();
     let reader = &reads
-        .connections
+        .endpoints
         .iter()
         .find(|row| row.label == "reader")
         .unwrap()
-        .connection_ref;
+        .endpoint_ref;
     let refused = fixture
         .request(invoke(&description, reader))
         .await
@@ -314,8 +314,8 @@ async fn describing_a_write_directly_skips_the_first_read_only_connection() {
     let fixture = Fixture::start(false, true).await;
     let description = fixture.describe(POST).await.unwrap();
     assert_eq!(description.approval, ApprovalPosture::Required);
-    assert_eq!(description.connections.len(), 1);
-    assert_eq!(description.connections[0].label, "writer");
+    assert_eq!(description.endpoints.len(), 1);
+    assert_eq!(description.endpoints[0].label, "writer");
     assert!(fixture.egress.calls.lock().unwrap().is_empty());
     fixture.finish().await;
 }
@@ -349,7 +349,7 @@ async fn only_read_only_connections_hide_the_write_and_describe_its_missing_gran
 async fn stale_description_and_provider_refusal_have_distinct_actionable_results() {
     let fixture = Fixture::start(true, true).await;
     let description = fixture.describe(POST).await.unwrap();
-    let writer = &description.connections[0].connection_ref;
+    let writer = &description.endpoints[0].endpoint_ref;
     let mut stale = description.clone();
     stale.description_ref = "description:obsolete-fixture".to_owned();
     let refused = fixture.request(invoke(&stale, writer)).await.unwrap_err();
@@ -381,7 +381,7 @@ async fn adversary_http_200_application_refusal_survives_the_documented_socket_p
     *fixture.egress.body_override.lock().unwrap() =
         Some(serde_json::to_vec(&provider_refusal).unwrap());
     let description = fixture.describe(POST).await.unwrap();
-    let writer = &description.connections[0].connection_ref;
+    let writer = &description.endpoints[0].endpoint_ref;
 
     let result = fixture.request(invoke(&description, writer)).await.unwrap();
     let OperationResult::Invoke(result) = result else {
@@ -399,7 +399,7 @@ async fn adversary_a_read_description_cannot_authorize_a_different_write_operati
     let fixture = Fixture::start(false, true).await;
     let reads = fixture.describe(READ).await.unwrap();
     let writes = fixture.describe(POST).await.unwrap();
-    let writer = &writes.connections[0].connection_ref;
+    let writer = &writes.endpoints[0].endpoint_ref;
 
     let refused = fixture.request(invoke(&reads, writer)).await.unwrap_err();
     assert_eq!(refused.code, OperationErrorCode::StaleAuthority);
@@ -413,11 +413,11 @@ async fn adversary_an_approval_reference_cannot_raise_the_selected_read_only_gra
     let reads = fixture.describe(READ).await.unwrap();
     let writes = fixture.describe(POST).await.unwrap();
     let reader = &reads
-        .connections
+        .endpoints
         .iter()
         .find(|connection| connection.label == "reader")
         .unwrap()
-        .connection_ref;
+        .endpoint_ref;
     let OperationRequest::Invoke(mut request) = invoke(&writes, reader) else {
         unreachable!()
     };
