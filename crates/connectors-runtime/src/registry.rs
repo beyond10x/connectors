@@ -182,6 +182,161 @@ impl BackendRegistry {
 
 #[async_trait]
 impl ConnectorBackend for BackendRegistry {
+    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+        self.backends
+            .iter()
+            .any(|backend| backend.owns_endpoint(request))
+    }
+
+    async fn resolve_endpoint(
+        &self,
+        context: &PrincipalContext,
+        endpoint_ref: &str,
+        operation_ref: &str,
+    ) -> Result<String, OperationError> {
+        let request = protocol::endpoint::EndpointRequest::Show(protocol::endpoint::ShowRequest {
+            endpoint_ref: endpoint_ref.into(),
+        });
+        let mut owners = self
+            .backends
+            .iter()
+            .filter(|backend| backend.owns_endpoint(&request));
+        let owner = owners
+            .next()
+            .ok_or_else(|| operation_not_found("no Integration owns this endpoint"))?;
+        if owners.next().is_some() {
+            return Err(operation_protocol(
+                "multiple Integrations own this endpoint",
+            ));
+        }
+        owner
+            .resolve_endpoint(context, endpoint_ref, operation_ref)
+            .await
+    }
+
+    async fn handle_endpoint(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::endpoint::EndpointRequest,
+    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        use protocol::endpoint::{
+            EndpointError, EndpointErrorCode, EndpointRequest, EndpointResult,
+        };
+        let owners: Vec<_> = self
+            .backends
+            .iter()
+            .filter(|backend| backend.owns_endpoint(&request))
+            .collect();
+        let refusal = || {
+            EndpointError::new(
+                EndpointErrorCode::Protocol,
+                "endpoint source returned inconsistent inventory",
+                false,
+            )
+        };
+        if owners.is_empty() {
+            return match request {
+                EndpointRequest::List(_) => Ok(EndpointResult::List {
+                    endpoints: Vec::new(),
+                    next_cursor: None,
+                    warnings: Vec::new(),
+                }),
+                _ => Err(EndpointError::new(
+                    EndpointErrorCode::NotFound,
+                    "no Integration owns this endpoint source",
+                    false,
+                )),
+            };
+        }
+        match request {
+            EndpointRequest::List(list) => {
+                let mut inventory = BTreeMap::new();
+                let mut warnings = std::collections::BTreeSet::new();
+                for owner in owners {
+                    let mut page = list.clone();
+                    page.limit = protocol::endpoint::MAX_RESULTS;
+                    page.cursor = None;
+                    let mut cursors = std::collections::BTreeSet::new();
+                    loop {
+                        let EndpointResult::List {
+                            endpoints,
+                            next_cursor,
+                            warnings: found_warnings,
+                        } = owner
+                            .handle_endpoint(context, EndpointRequest::List(page.clone()))
+                            .await?
+                        else {
+                            return Err(refusal());
+                        };
+                        for endpoint in endpoints {
+                            if inventory
+                                .insert(endpoint.endpoint_ref.clone(), endpoint)
+                                .is_some()
+                            {
+                                return Err(refusal());
+                            }
+                        }
+                        warnings.extend(found_warnings);
+                        if next_cursor.is_none() {
+                            break;
+                        }
+                        if !cursors.insert(next_cursor.clone()) {
+                            return Err(refusal());
+                        }
+                        page.cursor = next_cursor;
+                    }
+                }
+                let mut endpoints: Vec<_> = inventory
+                    .into_values()
+                    .filter(|endpoint| {
+                        list.cursor
+                            .as_deref()
+                            .is_none_or(|after| endpoint.endpoint_ref.as_str() > after)
+                    })
+                    .take(usize::from(list.limit) + 1)
+                    .collect();
+                let next_cursor = if endpoints.len() > usize::from(list.limit) {
+                    endpoints.truncate(usize::from(list.limit));
+                    endpoints.last().map(|value| value.endpoint_ref.clone())
+                } else {
+                    None
+                };
+                Ok(EndpointResult::List {
+                    endpoints,
+                    next_cursor,
+                    warnings: warnings.into_iter().take(100).collect(),
+                })
+            }
+            EndpointRequest::Refresh(refresh) => {
+                let mut count = 0_usize;
+                let mut warnings = std::collections::BTreeSet::new();
+                for owner in owners {
+                    let EndpointResult::Refresh {
+                        endpoints,
+                        warnings: found,
+                    } = owner
+                        .handle_endpoint(context, EndpointRequest::Refresh(refresh.clone()))
+                        .await?
+                    else {
+                        return Err(refusal());
+                    };
+                    count = count.checked_add(endpoints).ok_or_else(refusal)?;
+                    warnings.extend(found);
+                }
+                Ok(EndpointResult::Refresh {
+                    endpoints: count,
+                    warnings: warnings.into_iter().take(100).collect(),
+                })
+            }
+            request => {
+                if owners.len() != 1 {
+                    return Err(refusal());
+                }
+                owners[0].handle_endpoint(context, request).await
+            }
+        }
+    }
+
     fn owns_remediation(&self, route: service::RemediationRoute<'_>) -> bool {
         self.backends
             .iter()

@@ -7,7 +7,7 @@ use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, PermissionsExt as _}
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub use protocol::{approval, catalog, datasource, git_fetch, operation};
+pub use protocol::{approval, catalog, datasource, endpoint, git_fetch, operation};
 use protocol::{connection, event};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
@@ -16,6 +16,8 @@ use url::Url;
 use zeroize::Zeroizing;
 
 mod admin;
+#[path = "endpoint.rs"]
+mod endpoint_client;
 mod git_fetch_client;
 mod hosted_catalog;
 mod identity;

@@ -14,8 +14,9 @@ contain exact Secret references and key mappings, never values. Direct routes ar
 operator bindings. SQL requires TLS unless the operator explicitly selects `disabled`.
 
 Inventory readiness is advisory. Invocation revalidates source policy and immutable resource
-identity, then follows ordinary Connection and Grant admission. Discovery reads no credential
-values and starts no provider calls, subscriptions, or tunnels.
+identity, then follows ordinary Connection and Grant admission. Source authentication may be used
+to refresh inventory; discovery reads no discovered target credential values and starts no target
+operations, subscriptions, or tunnels.
 
 Requests are limited to 65,536 bytes and responses to 524,288 bytes. List pages contain at most
 100 endpoints. Clients must validate the original frame, response correlation, result method,
