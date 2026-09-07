@@ -720,6 +720,10 @@ fn kinds_the_tree_derives() -> BTreeMap<String, Unspecified> {
             .get(position + 1)
             .map_or(source.len(), |(next, _, _)| *next);
         let arm = &source[*index..end];
+        // The final arm of a function ends before the following helper declaration. Pattern
+        // matches in a version-conversion helper are not requests this CLI leaf constructs.
+        let arm = arm.split("\nfn ").next().unwrap_or(arm);
+        let arm = arm.split("\nasync fn ").next().unwrap_or(arm);
         let mut reached = requests_built_by(arm, &enums);
         for (module, requests) in &modules {
             if arm.contains(&format!("{module}::")) {
@@ -1108,12 +1112,12 @@ fn every_entry_that_is_not_a_lifecycle_step_is_refused_when_it_claims_to_be_one(
 /// **The reason the contract refuses under `Forwarded` is still refused one word later.**
 ///
 /// `cli_surface.rs::an_exception_whose_kind_the_tree_contradicts_is_refused` builds exactly this
-/// entry — `connection materialize` excused with "the service handles it and this frontend passes
+/// entry — `operation invoke` excused with "the service handles it and this frontend passes
 /// it along" — and asserts the contract refuses it for naming no command of the specification.
 /// That case passes. This one changes nothing but the kind column: the same path, the same false
 /// sentence, relabelled from `Forwarded` to `Lifecycle`.
 ///
-/// `connection materialize` forwards `connectors.connection.MaterializeObservation`, which
+/// `operation invoke` forwards `connectors.runtime.InvokeOperation`, which
 /// `ess/system/components.yaml` lists under `accepts.commands`, so the entry is false about the
 /// tree either way.
 #[test]
@@ -1122,7 +1126,7 @@ fn a_forwarding_reason_that_names_no_command_is_refused_whatever_kind_it_carries
     let relabelled: Vec<(&str, Unspecified, &str)> = UNSPECIFIED_PATHS
         .iter()
         .map(|(path, kind, reason)| {
-            if *path == "connection materialize" {
+            if *path == "operation invoke" {
                 (
                     *path,
                     Unspecified::Lifecycle,
@@ -1145,8 +1149,8 @@ fn a_forwarding_reason_that_names_no_command_is_refused_whatever_kind_it_carries
     assert!(
         refusals
             .iter()
-            .any(|refusal| refusal.contains("connection materialize")),
-        "`connection materialize` forwards `connectors.connection.MaterializeObservation`, and \
+            .any(|refusal| refusal.contains("operation invoke")),
+        "`operation invoke` forwards `connectors.runtime.InvokeOperation`, and \
          the contract refuses this exact sentence under `Forwarded`. Under `Lifecycle` it raises: \
          {refusals:?}"
     );
