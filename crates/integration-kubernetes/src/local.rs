@@ -2,7 +2,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
+
+use crate::endpoints::{
+    EndpointEgressFactory, EndpointPlacement, EndpointPrincipalPolicy, KubernetesEndpointBackend,
+    KubernetesEndpointSource,
+};
 
 use crate::local_services::{
     can_get_service, can_proxy_service, discover_services, normalize_services, proxy_json,
@@ -11,6 +16,8 @@ use crate::local_services::{
 use crate::local_workloads::{KubeconfigReader, WorkloadSurface};
 #[path = "local_inventory.rs"]
 mod inventory;
+#[cfg(test)]
+use crate::local_services::recognize_service;
 use crate::workloads::{
     restart_operation, status_operation, DeploymentInput, DeploymentReader as _, RestartInput,
     RESTART_OPERATION, STATUS_OPERATION,
@@ -23,6 +30,7 @@ use domain::{
     RouteAdapter as DomainRouteAdapter,
 };
 use inventory::{namespace_operation, workload_operation, NAMESPACE_OPERATION, WORKLOAD_OPERATION};
+#[cfg(test)]
 use k8s_openapi::api::core::v1::Service;
 use kube::config::{KubeConfigOptions, Kubeconfig};
 use kube::{Client, Config};
@@ -60,7 +68,13 @@ pub(crate) const MAX_PROXY_RESULT_BYTES: usize = protocol::operation::MAX_RESULT
 pub enum KubernetesLocalError {
     #[error("standard kubeconfig contexts could not be discovered")]
     Kubeconfig,
+    #[error("the configured Kubernetes endpoint source could not be restored")]
+    EndpointSource,
 }
+
+#[path = "local_endpoints.rs"]
+mod endpoint_surface;
+pub use endpoint_surface::{local_contexts, LocalContextSummary};
 
 #[derive(Debug, Clone)]
 struct CandidateBinding {
@@ -136,6 +150,9 @@ pub struct KubernetesLocalBackend {
     /// `kubernetes.workloads`, the same projection the deployment publishes. See
     /// `crate::local_workloads`.
     workloads: WorkloadSurface,
+    endpoint_state: Option<Arc<dyn connector_state::StateStore>>,
+    endpoint_egress: Option<Arc<dyn EndpointEgressFactory>>,
+    endpoint_backend: Mutex<Option<Arc<KubernetesEndpointBackend>>>,
 }
 
 impl KubernetesLocalBackend {
@@ -155,6 +172,9 @@ impl KubernetesLocalBackend {
             state: Mutex::new(KubernetesState::default()),
             activation: tokio::sync::Mutex::new(()),
             workloads: WorkloadSurface::default(),
+            endpoint_state: None,
+            endpoint_egress: None,
+            endpoint_backend: Mutex::new(None),
         })
     }
 
@@ -221,17 +241,21 @@ impl KubernetesLocalBackend {
 
     /// Namespaces this placement offers as datasource bindings.
     ///
-    /// Configuration is the only source. An empty `namespaces` means cluster-wide *discovery* for
-    /// Services, which is a different question from which namespaces a person may page workloads
-    /// in — enumerating every namespace on a shared cluster would offer hundreds of bindings, most
-    /// of which the operator's own RBAC would then refuse one read at a time.
-    fn readable_namespaces(&self) -> Vec<String> {
-        self.policy
+    /// Empty explicit namespaces admit none. All-namespace enumeration is independently opted in.
+    async fn readable_namespaces(&self) -> Result<Vec<String>, DatasourceError> {
+        if self.policy.all_namespaces {
+            let (_, client) = self.attached_cluster().ok_or_else(|| {
+                crate::workloads::datasource_unavailable("no Kubernetes context is attached")
+            })?;
+            return KubeconfigReader::new(client).list_namespaces().await;
+        }
+        Ok(self
+            .policy
             .namespaces
             .iter()
             .filter(|namespace| valid_dns_label(namespace, 253))
             .cloned()
-            .collect()
+            .collect())
     }
 
     fn search_candidates(
@@ -330,9 +354,19 @@ impl KubernetesLocalBackend {
         // The kubeconfig-selected API server is the only admitted destination in this slice.
         // Ambient or kubeconfig proxy routing requires its own reviewed route contract.
         config.proxy_url = None;
+        config.connect_timeout = Some(std::time::Duration::from_secs(5));
         let client = Client::try_from(config).map_err(|_| connection_unavailable())?;
-        verify_identity(client.clone()).await?;
-        let services = discover_services(client.clone(), &self.policy).await?;
+        tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            verify_identity(client.clone()),
+        )
+        .await
+        .map_err(|_| connection_unavailable())??;
+        let services = if self.endpoint_state.is_some() {
+            Vec::new()
+        } else {
+            discover_services(client.clone(), &self.policy).await?
+        };
 
         let connection_ref = opaque_ref(
             "connection:kubernetes:",
@@ -356,6 +390,29 @@ impl KubernetesLocalBackend {
             channels: Vec::new(),
         };
         let observations = normalize_services(&connection_ref, services);
+        if let (Some(store), Some(egress)) = (&self.endpoint_state, &self.endpoint_egress) {
+            let source = Arc::new(
+                KubernetesEndpointSource::new(
+                    client.clone(),
+                    connection_ref.clone(),
+                    self.policy.namespaces.iter().cloned().collect(),
+                    self.policy.all_namespaces,
+                    self.policy.target_grants.clone(),
+                    store.clone(),
+                    EndpointPlacement::Local,
+                )
+                .map_err(|_| connection_unavailable())?,
+            );
+            source
+                .refresh()
+                .await
+                .map_err(|_| connection_unavailable())?;
+            *lock(&self.endpoint_backend) = Some(Arc::new(KubernetesEndpointBackend::new(
+                source,
+                EndpointPrincipalPolicy::Local(Arc::new(self.owner.clone())),
+                egress.clone(),
+            )));
+        }
         let mut state = lock(&self.state);
         state
             .candidate_connections
@@ -708,12 +765,20 @@ impl KubernetesLocalBackend {
             STATUS_OPERATION => {
                 let input: DeploymentInput =
                     serde_json::from_value(request.input).map_err(|_| operation_invalid())?;
+                if !self.policy.all_namespaces && !self.policy.namespaces.contains(&input.namespace)
+                {
+                    return Err(operation_not_granted());
+                }
                 serde_json::to_value(reader.read(&input.namespace, &input.name).await?)
                     .map_err(|_| operation_unavailable())?
             }
             RESTART_OPERATION => {
                 let input: RestartInput =
                     serde_json::from_value(request.input).map_err(|_| operation_invalid())?;
+                if !self.policy.all_namespaces && !self.policy.namespaces.contains(&input.namespace)
+                {
+                    return Err(operation_not_granted());
+                }
                 serde_json::to_value(
                     reader
                         .restart(
@@ -861,6 +926,38 @@ impl KubernetesLocalBackend {
 
 #[async_trait]
 impl ConnectorBackend for KubernetesLocalBackend {
+    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+        self.endpoint_backend()
+            .is_some_and(|backend| backend.owns_endpoint(request))
+    }
+
+    async fn handle_endpoint(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::endpoint::EndpointRequest,
+    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        let backend = self.endpoint_backend().ok_or_else(|| {
+            protocol::endpoint::EndpointError::new(
+                protocol::endpoint::EndpointErrorCode::Unavailable,
+                "select a Kubernetes context with setup connect kubernetes",
+                false,
+            )
+        })?;
+        backend.handle_endpoint(context, request).await
+    }
+
+    async fn resolve_endpoint(
+        &self,
+        context: &PrincipalContext,
+        endpoint_ref: &str,
+        operation_ref: &str,
+    ) -> Result<String, OperationError> {
+        self.endpoint_backend()
+            .ok_or_else(operation_not_found)?
+            .resolve_endpoint(context, endpoint_ref, operation_ref)
+            .await
+    }
+
     async fn ready(&self) -> Result<(), service::BackendReadinessError> {
         // Construction validates kubeconfig and local state. Cluster reachability is provider
         // health and remains an operation-level degradation.
@@ -881,6 +978,12 @@ impl ConnectorBackend for KubernetesLocalBackend {
     }
 
     fn owns_operation(&self, request: &OperationRequest) -> bool {
+        if self
+            .endpoint_backend()
+            .is_some_and(|backend| backend.owns_operation(request))
+        {
+            return true;
+        }
         match request {
             OperationRequest::Describe(request) => !self
                 .connections_for_operation(&request.operation_ref)
@@ -914,6 +1017,12 @@ impl ConnectorBackend for KubernetesLocalBackend {
     }
 
     fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+        if self
+            .endpoint_backend()
+            .is_some_and(|backend| backend.owns_connection(request))
+        {
+            return true;
+        }
         match request {
             ConnectionRequest::CandidateSearch(request) => request.integration_ref == KUBERNETES,
             ConnectionRequest::CandidateActivate(request) => {
@@ -937,6 +1046,14 @@ impl ConnectorBackend for KubernetesLocalBackend {
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError> {
         self.check_operation_context(context)?;
+        if !matches!(request, OperationRequest::Search(_)) {
+            if let Some(backend) = self
+                .endpoint_backend()
+                .filter(|backend| backend.owns_operation(&request))
+            {
+                return backend.handle(context, request).await;
+            }
+        }
         match request {
             OperationRequest::Search(search) => {
                 let query = search.query.to_ascii_lowercase();
@@ -950,6 +1067,16 @@ impl ConnectorBackend for KubernetesLocalBackend {
                     })
                     .filter_map(|operation_ref| self.operation_summary(operation_ref))
                     .collect::<Vec<_>>();
+                if let Some(backend) = self.endpoint_backend() {
+                    if let OperationResult::Search {
+                        operations: discovered,
+                    } = backend
+                        .handle(context, OperationRequest::Search(search.clone()))
+                        .await?
+                    {
+                        operations.extend(discovered);
+                    }
+                }
                 operations.truncate(usize::from(search.limit));
                 Ok(OperationResult::Search { operations })
             }
@@ -989,7 +1116,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
                 context,
                 request,
                 self.attached_cluster(),
-                &self.readable_namespaces(),
+                &self.readable_namespaces().await?,
             )
             .await
     }
@@ -1000,6 +1127,14 @@ impl ConnectorBackend for KubernetesLocalBackend {
         request: ConnectionRequest,
     ) -> Result<ConnectionResult, ConnectionError> {
         self.check_context(context)?;
+        if !matches!(request, ConnectionRequest::Search(_)) {
+            if let Some(backend) = self
+                .endpoint_backend()
+                .filter(|backend| backend.owns_connection(&request))
+            {
+                return backend.handle_connection(context, request).await;
+            }
+        }
         match request {
             ConnectionRequest::CandidateSearch(request)
                 if request.integration_ref == KUBERNETES =>
@@ -1017,6 +1152,16 @@ impl ConnectorBackend for KubernetesLocalBackend {
             }
             ConnectionRequest::Search(request) => {
                 let mut connections = self.search_connections(&request.query);
+                if let Some(backend) = self.endpoint_backend() {
+                    if let ConnectionResult::Search {
+                        connections: discovered,
+                    } = backend
+                        .handle_connection(context, ConnectionRequest::Search(request.clone()))
+                        .await?
+                    {
+                        connections.extend(discovered);
+                    }
+                }
                 connections.truncate(usize::from(request.limit));
                 Ok(ConnectionResult::Search { connections })
             }
@@ -1197,63 +1342,6 @@ pub(crate) fn valid_dns_label(value: &str, maximum: usize) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
-}
-
-/// Every Service name or identity label that names **exactly one** component, so a substring test
-/// would recognize its siblings too.
-///
-/// A default Argo CD install ships eight Services whose names contain `argocd`, and only
-/// `argocd-server` is the API. `argocd-repo-server` speaks a private gRPC protocol,
-/// `argocd-server-metrics` serves Prometheus text on a different port, and `argocd-redis` is a
-/// cache holding session state. `haystack.contains("argocd")` would offer all eight as Argo CD
-/// Connection candidates, and `contains("argocd-server")` would still take the metrics Service —
-/// which shares `app.kubernetes.io/component: server` — so this arm matches whole tokens and runs
-/// before the substring arms below.
-///
-/// Whole-token rather than name-only because a Helm release renames the Service: `argo-cd` chart
-/// installs it as `<release>-argocd-server` while keeping `app.kubernetes.io/name: argocd-server`,
-/// so the label is the stable identity and the name is not.
-const EXACT_IDENTITIES: [(&str, &str); 1] = [("argocd-server", "argocd")];
-
-pub(crate) fn recognize_service(service: &Service) -> Option<&'static str> {
-    let name = service
-        .metadata
-        .name
-        .as_deref()
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    let identity_labels = service
-        .metadata
-        .labels
-        .as_ref()
-        .into_iter()
-        .flat_map(|labels| {
-            ["app.kubernetes.io/name", "app", "k8s-app", "name"]
-                .into_iter()
-                .filter_map(|key| labels.get(key))
-                .map(|value| value.to_ascii_lowercase())
-        });
-    let identities = std::iter::once(name)
-        .chain(identity_labels)
-        .collect::<Vec<_>>();
-    if let Some((_, provider)) = EXACT_IDENTITIES
-        .iter()
-        .find(|(token, _)| identities.iter().any(|identity| identity == token))
-    {
-        return Some(provider);
-    }
-    let haystack = identities.join(" ");
-    if haystack.contains("grafana") {
-        Some("grafana")
-    } else if haystack.contains("alertmanager") {
-        Some("alertmanager")
-    } else if haystack.contains("loki") {
-        Some("loki")
-    } else if haystack.contains("prometheus") {
-        Some("prometheus")
-    } else {
-        None
-    }
 }
 
 /// Every operation this placement can publish: cluster workload and inventory operations, then the
