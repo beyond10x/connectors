@@ -7,7 +7,7 @@ use std::os::unix::fs::{
 };
 use std::os::unix::process::CommandExt as _;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use connectors_client::{ClientError, LocalClient};
@@ -16,6 +16,20 @@ use serde_json::{json, Value};
 
 const START_TIMEOUT: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
+
+struct StartingChild {
+    process: Child,
+    ready: bool,
+}
+
+impl Drop for StartingChild {
+    fn drop(&mut self) {
+        if !self.ready {
+            let _ = self.process.kill();
+            let _ = self.process.wait();
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum DaemonError {
@@ -161,27 +175,28 @@ pub async fn start(config: &Path, root: &Path) -> Result<Value, DaemonError> {
         .stdout(log.try_clone()?)
         .stderr(log)
         .process_group(0);
-    let mut child = command.spawn()?;
+    let mut child = StartingChild {
+        process: command.spawn()?,
+        ready: false,
+    };
     let deadline = tokio::time::Instant::now() + START_TIMEOUT;
     while tokio::time::Instant::now() < deadline {
-        if child.try_wait()?.is_some() {
+        if child.process.try_wait()?.is_some() {
             return Err(DaemonError::StartFailed(log_path));
         }
         if let Some(status) = inspect(&root).await? {
-            if status.process_id != child.id() || status.configuration.as_deref() != config.to_str()
+            if status.process_id != child.process.id()
+                || status.configuration.as_deref() != config.to_str()
             {
                 // Only the process handle returned by our spawn may be terminated on a race.
-                let _ = child.kill();
-                let _ = child.wait();
                 return Err(DaemonError::ConfigurationConflict);
             }
+            child.ready = true;
             return Ok(json!({"running": true, "started": true, "state_root": root,
                 "log": log_path, "daemon": status}));
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    let _ = child.kill();
-    let _ = child.wait();
     Err(DaemonError::StartFailed(log_path))
 }
 

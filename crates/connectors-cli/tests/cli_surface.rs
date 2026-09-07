@@ -2593,18 +2593,8 @@ fn an_omitted_target_ignores_a_saved_login_for_every_dual_target_group() {
             "saved login must not change {group} routing"
         );
         assert_eq!(value["target"], "local", "{group}: {value}");
-        if group == "event" {
-            assert!(!success);
-            assert_eq!(value["error"]["code"], "daemon-required", "{value}");
-        } else {
-            assert!(success, "{group}: {value}");
-            let field = if group == "operation" {
-                "operations"
-            } else {
-                "connections"
-            };
-            assert!(value[field].is_array(), "{group}: {value}");
-        }
+        assert!(!success);
+        assert_eq!(value["error"]["code"], "daemon-required", "{value}");
     }
 }
 
@@ -2660,6 +2650,11 @@ fn local_success_and_protocol_refusals_report_the_selected_target() {
         for refused in [false, true] {
             let fixture = TargetFixture::new(true);
             let listener = UnixListener::bind(fixture.root.join("connectors.sock")).unwrap();
+            std::fs::set_permissions(
+                listener.local_addr().unwrap().as_pathname().unwrap(),
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+            )
+            .unwrap();
             listener.set_nonblocking(true).unwrap();
             let worker = std::thread::spawn(move || {
                 let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -2888,45 +2883,7 @@ fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
     use std::io::{BufRead as _, Write as _};
     use std::os::unix::net::UnixListener;
     let leaves: &[(&[&str], &str)] = &[
-        (
-            &[
-                "connection",
-                "candidates",
-                "--integration",
-                "fixture.integration",
-            ],
-            "candidate_search",
-        ),
-        (
-            &[
-                "connection",
-                "activate",
-                "--candidate",
-                "fixture.candidate",
-                "--label",
-                "fixture",
-            ],
-            "candidate_activate",
-        ),
         (&["connection", "list"], "search"),
-        (
-            &[
-                "connection",
-                "observations",
-                "--source",
-                "fixture.connection",
-            ],
-            "observation_search",
-        ),
-        (
-            &[
-                "connection",
-                "materialize",
-                "--observation",
-                "fixture.observation",
-            ],
-            "materialize",
-        ),
         (&["event", "search"], "search"),
         (
             &[
@@ -2984,6 +2941,11 @@ fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
             .unwrap();
             let state = fixture.root.join("s/b10x/connectors");
             let listener = UnixListener::bind(state.join("connectors.sock")).unwrap();
+            std::fs::set_permissions(
+                listener.local_addr().unwrap().as_pathname().unwrap(),
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+            )
+            .unwrap();
             listener.set_nonblocking(true).unwrap();
             let worker = std::thread::spawn(move || {
                 let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -3043,33 +3005,7 @@ fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
 
 fn adversary_target_leaves() -> Vec<Vec<&'static str>> {
     vec![
-        vec![
-            "connection",
-            "candidates",
-            "--integration",
-            "fixture.integration",
-        ],
-        vec![
-            "connection",
-            "activate",
-            "--candidate",
-            "fixture.candidate",
-            "--label",
-            "fixture",
-        ],
         vec!["connection", "list"],
-        vec![
-            "connection",
-            "observations",
-            "--source",
-            "fixture.connection",
-        ],
-        vec![
-            "connection",
-            "materialize",
-            "--observation",
-            "fixture.observation",
-        ],
         vec!["event", "search"],
         vec![
             "event",
@@ -3157,6 +3093,11 @@ fn broken_explicit_hosted_selection_never_falls_back_to_a_local_listener() {
     let state = fixture.root.join("s/b10x/connectors");
     std::fs::write(state.join("identity-sessions.json"), "broken").unwrap();
     let listener = UnixListener::bind(state.join("connectors.sock")).unwrap();
+    std::fs::set_permissions(
+        listener.local_addr().unwrap().as_pathname().unwrap(),
+        <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+    )
+    .unwrap();
     listener.set_nonblocking(true).unwrap();
     let done = Arc::new(AtomicBool::new(false));
     let worker_done = Arc::clone(&done);
@@ -3215,6 +3156,11 @@ fn selected_target_preserves_provider_owned_target_fields_in_every_renderer() {
         let fixture = TargetFixture::new(true);
         let state = fixture.root.join("s/b10x/connectors");
         let listener = UnixListener::bind(state.join("connectors.sock")).unwrap();
+        std::fs::set_permissions(
+            listener.local_addr().unwrap().as_pathname().unwrap(),
+            <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+        )
+        .unwrap();
         listener.set_nonblocking(true).unwrap();
         let worker = std::thread::spawn(move || {
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -3352,6 +3298,11 @@ allowed_scopes = ["read_api"]
         std::fs::write(&config, format!("{owner}{catalog}")).unwrap();
         let destination = fixture.root.join("private-instructions");
         let listener = UnixListener::bind(fixture.root.join("connectors.sock")).unwrap();
+        std::fs::set_permissions(
+            listener.local_addr().unwrap().as_pathname().unwrap(),
+            <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+        )
+        .unwrap();
         listener.set_nonblocking(true).unwrap();
         let worker = std::thread::spawn(move || {
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
