@@ -18,6 +18,9 @@ inside the service and checks each request against the caller's authority and se
 operations depend on the deployment, provider adapter, Connection, and Grant. Full SaaS and
 satellite federation remain outside the current support claim.
 
+Read [what's new in v0.7.0](https://github.com/beyond10x/connectors/blob/main/WHATS-NEW.md)
+for user-facing release highlights and upgrade notes.
+
 ## See the system
 
 ```mermaid

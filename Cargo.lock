@@ -409,7 +409,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "catalog"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "catalog-reader",
  "serde",
@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-build"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "catalog-reader",
@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-cli"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "catalog-build",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "catalog-reader"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
@@ -568,14 +568,14 @@ dependencies = [
 
 [[package]]
 name = "connector-address"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "connector-oauth"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "base64",
  "getrandom 0.3.4",
@@ -587,7 +587,7 @@ dependencies = [
 
 [[package]]
 name = "connector-resolve"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "catalog",
  "catalog-reader",
@@ -603,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "connector-secrets"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "connector-address",
@@ -620,7 +620,7 @@ dependencies = [
 
 [[package]]
 name = "connector-spec"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "connector-address",
  "fluent-uri",
@@ -635,14 +635,14 @@ dependencies = [
 
 [[package]]
 name = "connector-state"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "connectors-client"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "axum",
  "base64",
@@ -827,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "connector-state",
@@ -1849,7 +1849,7 @@ dependencies = [
 
 [[package]]
 name = "protocol"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "clap",
  "domain",
@@ -2400,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -2576,7 +2576,7 @@ dependencies = [
 
 [[package]]
 name = "subscription-custody"
-version = "0.6.5"
+version = "0.7.0"
 dependencies = [
  "axum",
  "connector-oauth",
