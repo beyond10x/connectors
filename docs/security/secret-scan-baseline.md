@@ -1,7 +1,42 @@
 # Historical secret-scan baseline
 
-Gitleaks 8.30.1 reports 91 findings represented by 90 exact fingerprints in the repository's
-history. The current tree carries no credential material.
+The historical inventory below records earlier reviewed findings. Counts depend on the scanned
+graph and scanner configuration; dated observations identify their exact scope.
+
+## Authentication verification report — 2026-09-07
+
+On candidate `8243f6a75103dafd2f2a1ff926385a9001bdfa31`, Gitleaks 8.30.1 scanned
+452 reachable commits across 42 advertised public refs and the publication candidate: 398
+patch-bearing commits and 112,619,623 bytes. With `.gitleaksignore` physically absent and the
+published scanner configuration unchanged, it reported 56 findings with 55 unique fingerprints.
+Exactly one fingerprint was outside the existing baseline. The original ignore file was restored
+byte for byte after that scan.
+
+The new match is line 66 of the immutable authentication correction verification report at commit
+`77a5857cb3cd37ebb6fd17886926029240338a01`. It is the SHA-256 of
+`crates/server/src/hosted/docs/openapi.json`, recomputed from that commit's file and verified against
+the report. The filename beside the digest triggers the generic API key detector. This value is a
+public source content identity, not an issued credential. One exact commit/path/rule/line
+fingerprint is added; the prior 91 entries and scanner configuration are retained.
+
+An initial attempt using an empty `--gitleaks-ignore-path` file still suppressed historical
+findings. That result is retained as an unsuccessful attempt to disable exclusions; only the scan
+with the repository ignore file absent supports the unignored counts above.
+
+## Final authentication correction report — 2026-09-07
+
+The final correction at `f2f0dd006a5500d030cab0d622af5d006ff8c092` adds one further match of
+the same class: its immutable verification report records the new OpenAPI file's SHA-256 at
+line 72. Recomputing the digest from that commit's source verifies the reported value exactly.
+It is a public content identity. The ordinary scan reports that one new match. With the ignore
+file physically absent, the scan reports 57 findings with 56 unique fingerprints over 454
+reachable commits, 42 public refs plus the candidate, 400 patch-bearing commits and 114,299,689
+bytes. Exactly one fingerprint falls outside the preceding baseline. The ignore file was restored
+exactly, then only the new commit/path/rule/line fingerprint was added. Both authentication
+report fingerprints are individually reviewed; all earlier entries and detector configuration
+are retained.
+
+## Historical inventory
 
 **Regenerated 2026-08-25 after the history rewrites.** Regenerate from a scan run with
 `.gitleaksignore` **removed**. Scanning with it in place and then asking which of its entries still
