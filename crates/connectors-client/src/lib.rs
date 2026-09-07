@@ -28,6 +28,7 @@ pub use admin::AdminIdentityClient;
 pub use identity::{
     active_session_metadata, login, logout, run_mcp_bridge, AuthenticatedHostedClient,
     AuthenticatedHostedError, IdentityError, LoginOptions, SessionMetadata,
+    METADATA_VERSION as SESSION_METADATA_VERSION,
 };
 pub use model::{
     AdminAuthMetadata, AdminConfigurationField, AdminCredentialState, AdminCredentialStatus,

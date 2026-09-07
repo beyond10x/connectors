@@ -8,19 +8,17 @@ tags:
 - wave-small
 relations:
 - delivers: story:the-binary-says-what-it-carries
-revision: 4
+revision: 14
 ---
 # Next small wave: inspect the installed binary
 
 ## Proposal and authorization
 
-Interactive stage 1, requested on 2026-09-07: suggest the next wave and keep it smaller. **N = 1**, selecting `story:the-binary-says-what-it-carries`. Implementation has not started; no new-wave commits, pushes or releases have been made.
+## Proposal and authorization
 
-**Skill version 0.8.0** — the version in `.claude-plugin/plugin.json`; the stage-1 proposal quotes it.
+The user requested a smaller next wave on 2026-09-07 and then explicitly approved: “approved, do it, then cut release with that”. Approval is recorded in `approval-record:inspect-upgrade-and-release-20260907`. **N = 1** selects `story:the-binary-says-what-it-carries`; implementation and necessary verification are underway. The same instruction authorizes its commits, integration, publication, the subsequent v0.7.1 release, consumer documentation delivery, and safe cleanup of this run’s published managed trees. Existing recovery trees remain preserved.
 
-Approval authorizes the opening planning commit, one reviewed unit commit (with necessary corrections), its integration merge, the closing evidence/store commit, and merge into the base after the full gate; it authorizes no push, tag, version bump, release or second wave.
-
-The user’s managed-worktree and bot-delivery instructions govern all execution. Direct commits must use the verified current Atlas `scripts/as-bot.sh`, with both author and committer checked. Publication needs its own authorization before `worktree finish` can safely retire wanted local commits. The completed v0.7.0 release grant is not reused for new work.
+The applied wave skill is version 0.8.0. The feature wave closes before release work begins; release delivery is separately tracked by `story:release-0-7-1` and its task. All direct commits and pushes use the clean, exact-current Atlas bot wrapper, with author and committer checked. No further publication approval is pending.
 
 ## Consumer outcome
 
@@ -32,13 +30,15 @@ Objectives proposed: **O1 — governed reach** and **O5 — generic platform**, 
 
 ## Selection and scope
 
-Native selection path: `aep plan artifact list`, `graph`, `blocked`, `scope`, and `waves`, using `aep --version` output `protocol 0.54.0`. Every one of the 21 initially unassessed draft stories received a read-only scoper report. The coordinator recorded each Scope section and its typed entries through AEP. Existing five proposed stories were already assessed. Full recalculated outputs follow verbatim in the appendices, including every collision and the empty unassessed/cycle sets.
+## Selection and scope
 
-The selected story is draft, has no declared blocker, and its sole declared prerequisite `story:cli-first-level-groups` is implemented. It appears in computed draft wave 2. Scope is **medium confidence, mixed cited/inferred**: CLI parser and contract tests, console module/export, credential-format exports, session metadata exports, the existing ESS exception enumeration and design accounting. The exact 13 paths are in the story’s typed scope and appendix. The coordinator added the v2 prepared-store source after reviewing the scoper’s v1-only authority reference; the original report and correction are both retained.
+Native selection used `aep plan artifact list`, `graph`, `blocked`, `scope` and `waves` with `protocol 0.54.0`. All 21 initially unassessed draft stories received read-only scoper reports, recorded through AEP together with typed scope; five proposed stories were already assessed. Full computed outputs and collisions remain verbatim in the stage-1 appendices. They are historical scheduling input, not the live execution status.
 
-One package would be smaller, but this is one bounded consumer feature across four existing crates, with no new dependency. N=1 limits implementation and review concurrency. The small configuration-shape cleanup is a reasonable later wave; it is deliberately not added merely because its files are disjoint.
+The selected singleton `story:the-binary-says-what-it-carries` is now active. Its prerequisite `story:cli-first-level-groups` is implemented. Its final 16 cited paths cover the CLI, console report, existing credential/session owners, CLI specification/design accounting and verification cases. The implementor confirmed all four initially inferred locations; coordinator source review had added the v2 owner, and measured Tokio startup added main.rs. The adversary added two test files. The story’s current Scope section preserves those corrections explicitly.
 
-Computed sets are scheduling input, not acceptance decisions. AEP compares declared path strings without directory containment: for example, it puts `story:m2-the-platform-skeleton-serves` (`crates/connectors-runtime`) with `story:one-composed-local-placement` (files under that directory). Source review finds potential containment coupling. That limitation is reported here without replacing the computed output or inventing another scheduler; the selected singleton does not rely on that pair being safe.
+N=1 follows the user’s smaller-wave request. This is one consumer feature across four existing crates, with no dependency or domain entity added. The configuration-shape cleanup and broader provider/importer work remain outside this wave.
+
+AEP compares declared path strings without directory containment. Its earlier computed set paired `story:m2-the-platform-skeleton-serves` at `crates/connectors-runtime` with `story:one-composed-local-placement` at files inside that directory. Coordinator source review found potential containment coupling. This limitation is reported without inventing a replacement scheduler; the selected singleton does not rely on that pair being safe.
 
 ## Deliberately excluded
 
@@ -55,17 +55,20 @@ These exclusions derive from the scoper reports recorded in the corresponding st
 
 ## Checkout and execution record
 
-Connectors base is exact published remote main `4d0cd30872533da40f209274f936eaeae9bf01d7`. The primary was clean but stale; it was not changed. Current proposal tree was created by `worktree create` at that exact base. Atlas authority was checked against `git ls-remote origin refs/heads/main`: its clean managed HEAD is `d10b7484d64c28830774c9dae0ec531fcc47acb2`; the dirty/stale primary Atlas is not authority.
+## Checkout and execution record
 
-Portable paths below use `~` for the operator’s home; stage 2 resolves them before dispatch. The manager’s printed path is authoritative for any new tree and must replace the planned path before an agent starts.
+Opening commit `a4bff98c6f6166529ad727179ecfd5828a765392` started from published main `4d0cd30872533da40f209274f936eaeae9bf01d7`. While planning, main advanced to `9f2a361b5751ac1d1fcbdce06a0a09e9ce741db1`. Integration commit `80c7666f4a36dc3b8902a1c8106a5edfe7afefe1` incorporates that source before unit dispatch. The native Git union merge of disjoint appended AEP histories validated successfully; details remain in Approved execution. Planning/source-doc checkpoint `7ae11444e04a6836d49cfcf1e23f8bc8382e287a` is published. Primary checkouts remain untouched.
 
-| Role | Branch | HEAD | Worktree | Build directory | Scratch | Stage |
-|---|---|---|---|---|---|---|
-| Coordinator | `plan/small-wave-after-0.7.0`; planned integration `wave/inspect-upgrade-after-0.7.0` | `4d0cd30872533da40f209274f936eaeae9bf01d7` | `~/.local/state/worktree/trees/b10x/connectors/wt-83fe13d0c209` | Per-workspace `target/` inside this tree; none created | `~/.cache/connectors-small-wave-20260907` | Proposal, uncommitted |
-| Binary inspection unit | planned `impl/inspect-upgrade-after-0.7.0` | not created; fork after opening gate | planned `~/.local/state/worktree/trees/b10x/connectors/wt-inspect-upgrade-20260907`, subject to CLI output | `target/`, `crates/connectors-cli/target`, `crates/connectors-console/target` inside unit tree, sequentially | planned `~/.cache/cw7/upgrade` | Awaiting approval and preflight |
-| Atlas authority | detached | `d10b7484d64c28830774c9dae0ec531fcc47acb2` | `~/.local/state/worktree/trees/b10x/atlas/wt-840d0a4626a0` | none | coordinator scratch | Clean authority only |
+Paths use `~` for the operator’s home. These are actual managed paths returned by the CLI.
 
-Intended full plugin roles: `aep-drive:story-scoper`, `aep-drive:implementor`, `aep-drive:adversary`. The collaboration API has no `subagent_type` selector, so agents load the exact named plugin charter from disk. This is an explicit harness adaptation. Three existing agent threads handled one read-only scoping assignment at a time; a further spawn was refused by the thread limit, so completed threads were reused. Stage 2 dispatches one implementor and then an independent adversary, with the coordinator alone owning all AEP writes and direct commits. No implementor/adversary has been dispatched for this wave yet.
+| Role | Branch / base | Worktree | Build directory | Scratch | Stage |
+|---|---|---|---|---|---|
+| Coordinator | `wave/inspect-upgrade-after-0.7.0`, checkpoint `7ae11444` | `~/.local/state/worktree/trees/b10x/connectors/wt-83fe13d0c209` | Per-workspace in-tree targets; none created yet | `~/.cache/connectors-small-wave-20260907` | Published checkpoint; further planning edits pending |
+| Binary inspection unit | `impl/the-binary-says-what-it-carries`, base `80c7666f` | `~/.local/state/worktree/trees/b10x/connectors/wt-inspect-upgrade-20260907` | `target`, `crates/connectors-cli/target`, `crates/connectors-console/target` | `~/.cache/cw7/upgrade` | Implementor verifying uncommitted feature |
+| Atlas authority | detached `d10b7484d64c28830774c9dae0ec531fcc47acb2` | `~/.local/state/worktree/trees/b10x/atlas/wt-840d0a4626a0` | None | Coordinator scratch | Clean, matches remote main |
+| Website delivery | `docs/connectors-0.7.1`, base `02271aa02022818a75a99ca3702c8cc00d135b1f` | `~/.local/state/worktree/trees/b10x/website/wt-connectors-071-docs-20260907` | Native Website build output | Coordinator scratch | AEP story active; npm ci succeeded |
+
+The collaboration API has no subagent_type selector. Existing threads load the exact plugin charters: `scope_build_information` implements this unit as `aep-drive:implementor`; a separate reused thread will attack it as `aep-drive:adversary`. Only the coordinator writes AEP artifacts and direct Git commits. This is the recorded harness adaptation, with one compiler lane.
 
 ## Preflight observations and remaining conditions
 
@@ -1465,3 +1468,202 @@ A private sccache server is active on127.0.0.1:49387 with cache ~/.cache/cw7/scc
 The CLI/lib.rs and client/lib.rs area can overlap conceptually with this wave, but the preserved tree is frozen history, not an implementation branch to merge. The new unit starts from published main and does not copy those changes. This is the explicitly approved recovery preservation exception.
 
 Default PATH selected ESS0.9.2, which refused the required specify command. The exact pinned ESS0.18.0 at ~/.cache/ess-rel/ess-0.18.0-x86_64-unknown-linux-gnu/ess validated the base: connectors v1 —10file(s), valid; compile succeeded. Coordinator uses that version for the projection check. Cargo set-version is installed and its offline root-workspace dry-run supports the approved0.7.1 identity bump; no version bytes have changed yet.
+
+## Runtime-startup scope correction, 2026-09-07
+
+The implementor measured an AF_UNIX socket pair created by unconditional Tokio startup in `crates/connectors-cli/src/main.rs:5`, before command dispatch. Its pre-change executable also fails with exit 101 when `TOKIO_WORKER_THREADS=0`; the raw evidence is retained in the unit scratch `red-runtime-startup.log`. This violates the accepted socket-free diagnostic behavior even though the report itself is pure. Add `crates/connectors-cli/src/main.rs` as cited scope: use the same clap tree to dispatch this synchronous report before starting Tokio, while preserving the public async embedding entry point and normal fallback behavior. The coordinator applies the implementor's reviewed main-entry patch; this is a bounded implementation correction within the approved story.
+
+## ESS projection verification
+
+Coordinator ran pinned ESS 0.18.0 against the completed unit specification comments. `specify validate --path ess/system` exited 0 and printed `connectors v1 — 10 file(s), valid`. `generate synthesize --path ess/system --target clap` exited 0 and printed `207 capabilities: 191 generated, 16 obligation(s), 0 refused` and `8 artifact(s)`. After removing only the uncommitted plan/target sidecars, `diff -ru ess/generated/clap <fresh-output>` exited 0 with no differences. No generated source was hand-edited.
+
+## Implementor handoff
+
+Unit commit: `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`; both author and committer verified as b10x-bot[bot]. The report below is retained with only the local home prefix rendered as `~/` for repository portability; raw output remains in the assigned scratch. Harness token/tool-use metrics were not exposed, so no numbers are inferred.
+
+unit:                   story:the-binary-says-what-it-carries — The binary says what it carries
+verdict:                green
+cases:                  executed 376→383, red 4
+origin:                 n/a
+wrote-outside-worktree: ~/.cache/cw7/upgrade/ (full inventory in part 6); assigned private compiler cache ~/.cache/cw7/sccache/
+needs-coordinator:      no
+
+Root stayed 125→125 because no root cases were added. All seven added cases executed in CLI/console. Three pre-existing live Vault cases remain ignored in both root runs. The coordinator requested this concise handoff with raw-log paths; all complete native outputs are retained.
+
+## 1. Unit and confirmed scope
+
+`connectors inspect upgrade` reports compiled CLI/catalog/credential/session facts and source-checkout installation guidance in text, compact, JSON and YAML, without configuration/state access, sockets or external calls; eight groups and existing serialized formats are preserved.
+
+Base: `80c7666f4a36dc3b8902a1c8106a5edfe7afefe1`. Worktree: `~/.local/state/worktree/trees/b10x/connectors/wt-inspect-upgrade-20260907`. The complete story and graph were read before edits; prerequisite `story:cli-first-level-groups` is implemented.
+
+| Scope hypothesis | Source confirmation |
+| --- | --- |
+| Inferred console registration | Confirmed existing registry; new registration `crates/connectors-console/src/lib.rs:47`. |
+| Inferred console report owner | Confirmed reporting pattern in `crates/connectors-console/src/providers.rs`; new report `crates/connectors-console/src/upgrade.rs:11`. |
+| Inferred session export | Existing identity exports `crates/connectors-client/src/lib.rs:28`; alias at line 31 uses owning constant `identity.rs:37`. |
+| Inferred real CLI test location | Confirmed existing integration suite; new tests `crates/connectors-cli/tests/upgrade.rs:67,106,122,142,159,179`. |
+| Cited parser and output owner | `crates/connectors-cli/src/lib.rs:235,769,817,853,962`; shared output handling preserves closed-pipe success and other write failures. |
+| Cited credential owners | `crates/connector-secrets/src/file.rs:102` exports both formats; `file/prepared.rs:19,21` derives v2 from the unchanged parser/writer header. |
+| Cited catalog owner, unchanged | `crates/catalog-reader/src/lib.rs:316,321,561`; metadata comes from embedded bytes. |
+| Cited contract/accounting | Three assigned exception copies updated; `ess/system/components.yaml:172` and `docs/design/19-the-cli-surface.md:83,111,121,273` account for 28 exceptions. |
+| Measured scope correction | Unconditional Tokio in `crates/connectors-cli/src/main.rs` created a socketpair. Coordinator applied the exact `main-runtime.patch`; main now uses the same clap tree before constructing Tokio. |
+
+Every inferred location was confirmed; none was wrong. The approved brief had already resolved credential-format ambiguity. Public async `run_from`, moved-path notices, help/errors and the normal fallback remain; no broad startup refactoring was made.
+
+## 2. Actual diff shape
+
+The coordinator has begun committing the frozen source. This Git measurement compares the reviewed worktree with the assigned base, covering staged or committed changes as well:
+
+`git --no-pager diff --stat 80c7666f4a36dc3b8902a1c8106a5edfe7afefe1`
+
+```text
+ crates/connector-secrets/src/file.rs               |   9 +
+ crates/connector-secrets/src/file/prepared.rs      |   2 +
+ crates/connectors-cli/src/lib.rs                   |  46 ++++-
+ crates/connectors-cli/src/main.rs                  |  16 +-
+ .../connectors-cli/tests/adversary_fence_probe.rs  |   5 +
+ crates/connectors-cli/tests/cli_surface.rs         |   9 +-
+ crates/connectors-cli/tests/cli_surface_drift.rs   |   5 +
+ crates/connectors-cli/tests/upgrade.rs             | 194 +++++++++++++++++++++
+ crates/connectors-client/src/identity.rs           |   3 +-
+ crates/connectors-client/src/lib.rs                |   1 +
+ crates/connectors-console/src/lib.rs               |   2 +
+ crates/connectors-console/src/upgrade.rs           |  61 +++++++
+ docs/design/19-the-cli-surface.md                  |  18 +-
+ ess/system/components.yaml                         |   3 +-
+ 14 files changed, 360 insertions(+), 14 deletions(-)
+```
+
+Before coordinator staging, `git --no-pager diff --stat` reported 12 tracked files, 105 insertions and 14 deletions. Native `git diff --no-index --stat` separately measured the new CLI test file at 194 lines and console report at 61 lines. Total scope: 14 source paths; main.rs was coordinator-applied.
+
+## 3. Red evidence
+
+Before production edits, `cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked --test upgrade` executed five cases: one passed, four failed, exit 101. Complete command/output/resources: `~/.cache/cw7/upgrade/red-upgrade.log`.
+
+```text
+status: exit status: 2; stderr: error: unrecognized subcommand 'upgrade'
+
+Usage: connectors inspect [OPTIONS] <COMMAND>
+
+For more information, try '--help'.
+
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+```
+
+After the first implementation, the native syscall verifier exited 1 on this startup defect. Full original evidence remains in `~/.cache/cw7/upgrade/trace-verification.log` and `~/.cache/cw7/upgrade/upgrade-syscalls.log`:
+
+```text
+243783 socketpair(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0, [6, 7]) = 0
+```
+
+The added no-runtime regression has a native pre-patch reproduction retained in `~/.cache/cw7/upgrade/red-runtime-startup.log`: `env TOKIO_WORKER_THREADS=0 crates/connectors-cli/target/debug/connectors inspect upgrade --output json` panicked before dispatch and exited 101.
+
+Correction class: a compiled report must execute before runtime I/O initialization. This leaf now dispatches through clap before Tokio; all four output modes pass with Tokio startup made invalid. Existing commands retain the async path and pass the full CLI suite. The final real-process trace has no socket/network call.
+
+## 4. Final verification
+
+Counts are sums of the runner's own `test result:` summaries for identical before/after commands, excluding ignored cases. Each log includes its exact command, full output, exit and disk/target measurements. Raw logs are under `~/.cache/cw7/upgrade/`.
+
+| Exact command | Executed before → after | Exit | Raw logs |
+| --- | --- | --- | --- |
+| `cargo test --manifest-path crates/connectors-cli/Cargo.toml --workspace --locked` | 142 → 148 | 0 | `baseline-cli.log`, `green-cli-final.log` |
+| `cargo test --manifest-path crates/connectors-console/Cargo.toml --workspace --locked` | 109 → 110 | 0 | `baseline-console.log`, `green-console.log` |
+| `cargo test --locked -p connector-secrets -p connectors-client` | 125 → 125 | 0 | `baseline-root.log`, `green-root.log` |
+| `cargo test --manifest-path crates/connectors-cli/Cargo.toml --locked --test upgrade` | 5 → 6 | 0 | `red-upgrade.log` (verifier on base), `green-upgrade-final.log` |
+| `cargo clippy --locked -p connector-secrets -p connectors-client --all-targets -- -D warnings` | n/a | 0 | `clippy-root.log` |
+| `cargo clippy --manifest-path crates/connectors-console/Cargo.toml --workspace --locked --all-targets -- -D warnings` | n/a | 0 | `clippy-console.log` |
+| `cargo clippy --manifest-path crates/connectors-cli/Cargo.toml --workspace --locked --all-targets -- -D warnings` | n/a | 0 | `clippy-cli.log` |
+| `cargo fmt --all --check` | n/a | 0 | `fmt.log` |
+| `cargo fmt --manifest-path crates/connectors-cli/Cargo.toml --all --check` | n/a | 0 | `fmt.log` |
+| `cargo fmt --manifest-path crates/connectors-console/Cargo.toml --all --check` | n/a | 0 | `fmt.log` |
+| `git --no-pager diff --check` | n/a | 0 | `final-resources.log` |
+
+Earlier passing iterations are retained in `green-upgrade.log` (5 cases) and `green-cli.log` (147 cases), before the runtime case was added. They are not the final counts.
+
+Final syscall verification: `~/.cache/cw7/upgrade/green-trace-verification.log`, command and verifier exits 0. Full trace: `~/.cache/cw7/upgrade/upgrade-syscalls-final.log`. Only loader cache/libraries and `/proc/self/maps` are opened; no configuration, credential or session files, state writes, or socket/network syscalls occur. Final JSON is `~/.cache/cw7/upgrade/upgrade-report-final.json`; `~/.cache/cw7/upgrade/upgrade-stderr-final.log` is empty.
+
+The coordinator separately ran pinned ESS 0.18.0 validation and regeneration comparison: committed clap bytes were unchanged. Its evidence is `~/.cache/cw7/upgrade/ess-result.md`; this implementor did not run the generator.
+
+Final resources and whitespace check, verbatim:
+
+```text
+git --no-pager diff --check
+exit: 0
+Filesystem        1B-blocks         Used    Available Use% Mounted on
+/dev/nvme0n1p2 910126964736 763622264832 100197347328  89% /
+863875072	target
+2602455040	crates/connectors-cli/target
+1278705664	crates/connectors-console/target
+Combined owned targets: 4745035776 bytes (4.419 GiB)
+```
+
+## 5. Deliberately not done
+
+- No implementor Git/AEP mutation, commit, publication or release operation. Source edits are frozen and ownership is handed back to the coordinator.
+- No generated edit, new dependency/entity, credential/session byte change, local-file diagnosis, updater or release lookup.
+- No provider/live Vault call; existing ignored Vault cases are unchanged and local suites use synthetic fixtures.
+- The full 12-workspace release gate and adversary belong to the coordinator's next stage; this report does not claim they ran here.
+- No worktree or target cleanup. The sole compiler lane is idle and handed back.
+
+## 6. External artifacts
+
+Full retained paths, including synthetic test fixtures and coordinator artifacts sharing this scratch directory: `~/.cache/cw7/upgrade/external-paths.txt`. Native temporary children removed by their own fixture destructors stayed under the assigned TMPDIR.
+
+Implementor-authored retained artifacts:
+
+- ~/.cache/cw7/upgrade/planning-graph.dot
+- ~/.cache/cw7/upgrade/upgrade-test.rs
+- ~/.cache/cw7/upgrade/baseline-cli.log
+- ~/.cache/cw7/upgrade/baseline-console.log
+- ~/.cache/cw7/upgrade/baseline-root.log
+- ~/.cache/cw7/upgrade/red-upgrade.log
+- ~/.cache/cw7/upgrade/red-runtime-startup.log
+- ~/.cache/cw7/upgrade/green-upgrade.log
+- ~/.cache/cw7/upgrade/green-upgrade-final.log
+- ~/.cache/cw7/upgrade/green-cli.log
+- ~/.cache/cw7/upgrade/green-cli-final.log
+- ~/.cache/cw7/upgrade/green-console.log
+- ~/.cache/cw7/upgrade/green-root.log
+- ~/.cache/cw7/upgrade/clippy-root.log
+- ~/.cache/cw7/upgrade/clippy-console.log
+- ~/.cache/cw7/upgrade/clippy-cli.log
+- ~/.cache/cw7/upgrade/fmt.log
+- ~/.cache/cw7/upgrade/trace-verification.log
+- ~/.cache/cw7/upgrade/green-trace-verification.log
+- ~/.cache/cw7/upgrade/upgrade-syscalls.log
+- ~/.cache/cw7/upgrade/upgrade-syscalls-final.log
+- ~/.cache/cw7/upgrade/upgrade-report.json
+- ~/.cache/cw7/upgrade/upgrade-report-final.json
+- ~/.cache/cw7/upgrade/upgrade-stderr.log
+- ~/.cache/cw7/upgrade/upgrade-stderr-final.log
+- ~/.cache/cw7/upgrade/main-runtime.patch
+- ~/.cache/cw7/upgrade/final-resources.log
+- ~/.cache/cw7/upgrade/external-paths.txt
+- ~/.cache/cw7/upgrade/implementation-report.md
+
+Cargo also used the explicitly assigned private cache `~/.cache/cw7/sccache/`, under the coordinator's environment and 1 GiB cap. Build artifacts stayed in the three permitted worktree targets; no alternate target directory or compiler lane was used.
+
+## Adversary pass 1 dispatch
+
+
+Separate thread resume_gitlab loads the aep-drive:adversary charter against the clean committed unit above. It owns only test changes and one compiler lane, reusing the unit targets. Its assigned scratch is `~/.cache/cw7/upgrade/adversary-1`; raw brief and report stay there. Baseline counts are the implementor’s 148 CLI, 110 console and 125 root cases. No AEP/Git/implementation mutations are delegated.
+
+## Adversary environment correction
+
+Pass 1 wrote four CLI candidates and one console candidate before running them. All four CLI probes passed alone. The first console attempt correctly hit the existing private-directory rule because its fixture was mode 0755; the test alone now sets its owned directory to 0700. That is fixture setup, not a product defect.
+
+The first broader CLI run used the longer report scratch as TMPDIR and executed 152 cases: 150 passed, two existing doctor fixtures failed, one with a 115-byte Connect Session socket path against a 107-byte limit. The implementor's shorter-TMPDIR suite had already passed these unchanged cases. The coordinator therefore assigned a new private TMPDIR `~/.cache/cw7/a1`, created at mode 0700, for remaining fixtures. Reports remain under `~/.cache/cw7/upgrade/adversary-1`; both are this run's owned cleanup roots. Raw failed outputs are preserved. This is an environment correction, not a product finding.
+
+The four-mode native syscall probe is retained in review scratch rather than committed as an unconditional `/usr/bin/strace` dependency of the Rust suite. Its actual successful executions remain evidence; no skip or ignore is added. Final retained regressions are three CLI cases and one console storage-transition case, and final suite counts must reflect that source.
+
+## Concurrent release preparation
+
+Read-only inspection found another active managed checkout, `~/.local/state/worktree/trees/b10x/connectors/connectors-upgrade-20260907`, based on `9f2a361b5751ac1d1fcbdce06a0a09e9ce741db1`, with uncommitted Cargo version 0.7.1 and a CHANGELOG section for broader incremental Jira/Confluence/GitLab reads. Those changes are owned by another session; this run does not copy, reset, merge or clean that worktree.
+
+v0.7.1 remains this task's provisional release number, not a reserved tag. The coordinator will recheck remote main and published tags immediately before release work. If v0.7.1 has already shipped, this approved feature uses the next available patch release, with planning and notes updated to the actual version. No published tag is replaced. The user authorized releasing the approved feature, without requiring a particular version number, and has been informed of this concurrency handling.
+
+## Green unit integration checkpoint
+
+Separate adversary thread resume_gitlab returned no product findings and released the compiler lane. Final native suites executed 151 CLI and 111 console cases, all passing; strict Clippy and formatting exited 0. The final test fixture lifetime correction was checked by its single case, test-target Clippy and formatting without repeating the full suite. The raw report is being finalized in the assigned review scratch; no further source/build work is delegated.
+
+Retained independent cases are committed at `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`, following implementation `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. Both commits have the verified bot author and committer. No product correction or second attack was required. Integration proceeds on that green unit, with the full 12-workspace native release-workflow rehearsal next. The release number is still provisional pending concurrent publication.
