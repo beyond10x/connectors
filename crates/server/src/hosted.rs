@@ -678,7 +678,7 @@ mod tests {
         );
     }
 
-    struct Verifier;
+    pub(super) struct Verifier;
 
     #[async_trait]
     impl IdentityVerifier for Verifier {
@@ -722,7 +722,7 @@ mod tests {
         }
     }
 
-    struct Backend;
+    pub(super) struct Backend;
 
     #[async_trait]
     impl ConnectorBackend for Backend {
