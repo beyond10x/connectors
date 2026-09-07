@@ -1191,7 +1191,7 @@ fn authentication_new_nested_dtos_refuse_original_duplicate_fields() {
 }
 
 #[test]
-fn authentication_predecessor_artifacts_and_readers_stay_frozen() {
+fn authentication_predecessor_artifacts_and_reviewed_readers_stay_pinned() {
     for (path, expected) in [
         (
             "contracts/artifact-bundle.schema.json",
@@ -1263,7 +1263,10 @@ fn authentication_predecessor_artifacts_and_readers_stay_frozen() {
         ),
         (
             "crates/protocol/src/connection.rs",
-            "ec17c66e948242350a160a0aa7692092c08498253846af60b1198de136c6a38c",
+            // Reviewed compatibility correction: pending status may omit the completion
+            // capability. Creation, URL and terminal checks remain strict; the v1
+            // bundle above is unchanged. connect_session_status.rs checks both readers.
+            "de405ce18fa32ed14c33255642ad3750c61d55bd671c4cb5025cc047cfb19f5d",
         ),
         (
             "crates/protocol/src/operation/legacy.rs",
@@ -1282,7 +1285,7 @@ fn authentication_predecessor_artifacts_and_readers_stay_frozen() {
         assert_eq!(
             format!("{:x}", Sha256::digest(&bytes)),
             expected,
-            "frozen predecessor {path}"
+            "pinned predecessor {path}"
         );
     }
 }

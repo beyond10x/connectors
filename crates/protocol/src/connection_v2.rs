@@ -1,5 +1,5 @@
 //! Additive trusted bound remediation contracts and pure v1/v2 adapters.
-// Field-level documentation is generated into the new bundle; predecessor source stays frozen.
+// Field-level documentation is generated into the new bundle; predecessor artifacts stay frozen.
 #![allow(missing_docs)]
 use crate::{
     connection as old,
@@ -157,7 +157,7 @@ impl RequestEnvelope {
         if self.protocol != CONTRACT {
             return Err(protocol_refusal());
         }
-        // The frozen reader owns all common context and ordinary command semantics.
+        // The inherited reader owns all common context and ordinary command semantics.
         old::RequestEnvelope {
             protocol: old::CONTRACT.into(),
             request_id: self.request_id.clone(),
@@ -335,6 +335,15 @@ impl ResponseEnvelope {
                 None,
             ) => {
                 value.validate()?;
+                if matches!(&self.response, Some(ConnectionResult::RemediationStart(_))) {
+                    // Starting acquisition must deliver a usable completion route. Later status
+                    // polls can omit the one-use capability without invalidating Pending.
+                    old::ResponseEnvelope::success(
+                        self.request_id.clone(),
+                        old::ConnectionResult::ConnectSessionCreate(value.session.clone()),
+                    )
+                    .validate()?;
+                }
                 old::ResponseEnvelope::success(
                     self.request_id.clone(),
                     old::ConnectionResult::Search {

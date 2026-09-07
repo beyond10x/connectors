@@ -541,7 +541,8 @@ fn validate_result(result: &ConnectionResult) -> Result<(), ConnectionError> {
             }
             match session.state {
                 ConnectSessionState::Pending
-                    if (session.completion_endpoint.is_some()
+                    if (matches!(result, ConnectionResult::ConnectSessionStatus(_))
+                        || session.completion_endpoint.is_some()
                         || session.browser_completion_url.is_some())
                         && session.connection_ref.is_none() => {}
                 ConnectSessionState::Completed
