@@ -9,6 +9,10 @@ mod browser;
 mod connect_session;
 mod dispatch;
 mod egress;
+mod endpoint;
+pub use endpoint::{
+    constrain_endpoint_description, normalize_endpoint_operation, NormalizedEndpointOperation,
+};
 mod rate_limit;
 pub use rate_limit::operation_rate_advice;
 mod factory;
