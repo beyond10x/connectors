@@ -128,3 +128,139 @@ fn binding_accepts_named_secret_keys_and_refuses_values_without_a_secret_referen
         .try_get_matches_from(arguments)
         .is_ok());
 }
+
+#[test]
+fn subscription_commands_use_v2_and_keep_parameters_separate_from_endpoint_identity() {
+    use protocol::event::v2;
+    use std::io::{BufRead as _, Write as _};
+    let fixture = Fixture::new();
+    fs::create_dir(&fixture.state).unwrap();
+    fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
+    let socket = fixture.state.join("connectors.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let server = std::thread::spawn(move || {
+        let mut requests = Vec::new();
+        for _ in 0..2 {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let (mut stream, _) = loop {
+                match listener.accept() {
+                    Ok(pair) => break pair,
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::WouldBlock
+                            && std::time::Instant::now() < deadline =>
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(10))
+                    }
+                    Err(error) => panic!("subscription command did not send one request: {error}"),
+                }
+            };
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&mut stream)
+                .read_line(&mut line)
+                .unwrap();
+            let request: v2::RequestEnvelope = serde_json::from_str(&line).unwrap();
+            request.validate().unwrap();
+            let result = match &request.request {
+                v2::EventRequest::Subscribe(value) => {
+                    assert_eq!(value.endpoint_ref, "endpoint:fixture");
+                    assert_eq!(value.channel_binding, "asterisk.ari-events");
+                    assert_eq!(value.parameters["app"], "developer");
+                    v2::EventResult::Subscribe {
+                        subscription_ref: "subscription:fixture".into(),
+                        channel: v2::ChannelSummary {
+                            channel_ref: "channel:fixture".into(),
+                            connection_ref: "connection:fixture".into(),
+                            integration_ref: "asterisk".into(),
+                            binding_ref: "asterisk.ari-events".into(),
+                            events: vec!["ari.event".into()],
+                        },
+                    }
+                }
+                v2::EventRequest::Unsubscribe(value) => {
+                    assert_eq!(value.subscription_ref, "subscription:fixture");
+                    v2::EventResult::Unsubscribe {
+                        subscription_ref: value.subscription_ref.clone(),
+                    }
+                }
+                _ => panic!("unexpected subscription method"),
+            };
+            writeln!(
+                stream,
+                "{}",
+                serde_json::to_string(&v2::ResponseEnvelope::success(&request.request_id, result))
+                    .unwrap()
+            )
+            .unwrap();
+            requests.push(request.request);
+        }
+        requests
+    });
+    let config = fixture.config.to_str().unwrap();
+    let subscribed = fixture.success(&[
+        "event",
+        "subscribe",
+        "--config",
+        config,
+        "--endpoint-ref",
+        "endpoint:fixture",
+        "--channel-binding",
+        "asterisk.ari-events",
+        "--parameters-json",
+        r#"{"app":"developer"}"#,
+    ]);
+    assert_eq!(subscribed["subscription_ref"], "subscription:fixture");
+    assert_eq!(subscribed["target"], "local");
+    let stopped = fixture.success(&[
+        "event",
+        "unsubscribe",
+        "--config",
+        config,
+        "--subscription-ref",
+        "subscription:fixture",
+    ]);
+    assert_eq!(stopped["subscription_ref"], "subscription:fixture");
+    assert_eq!(server.join().unwrap().len(), 2);
+    fs::remove_file(socket).unwrap();
+}
+
+#[test]
+fn subscription_target_conflicts_and_bad_parameters_refuse_before_state() {
+    let fixture = Fixture::new();
+    for parameters in ["[]".to_owned(), "{".to_owned(), " ".repeat(16 * 1024 + 1)] {
+        let output = fixture.run(&[
+            "event",
+            "subscribe",
+            "--endpoint-ref",
+            "endpoint:fixture",
+            "--channel-binding",
+            "asterisk.ari-events",
+            "--parameters-json",
+            &parameters,
+        ]);
+        assert!(!output.status.success());
+        let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(value["error"]["code"], "invalid-argument");
+        assert!(!fixture.state.exists());
+    }
+    let output = fixture.run(&[
+        "event",
+        "--target",
+        "hosted",
+        "subscribe",
+        "--endpoint-ref",
+        "endpoint:fixture",
+        "--channel-binding",
+        "asterisk.ari-events",
+        "--parameters-json",
+        "{",
+    ]);
+    assert!(!output.status.success());
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["error"]["code"], "target-conflict");
+    assert!(!fixture.state.exists());
+}

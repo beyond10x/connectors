@@ -66,19 +66,17 @@ fn unspecified_paths(contract: &str) -> Vec<String> {
         .expect("cli_surface.rs declares UNSPECIFIED_PATHS")
         .1;
     let block = block.split_once("\n];").expect("the list closes").0;
-    let lines: Vec<&str> = block.lines().collect();
-    let mut paths = Vec::new();
-    for (index, line) in lines.iter().enumerate() {
-        if line.trim() != "(" {
-            continue;
-        }
-        let entry = lines[index + 1].trim().trim_end_matches(',');
-        let path = entry
-            .strip_prefix('"')
-            .and_then(|rest| rest.strip_suffix('"'))
-            .unwrap_or_else(|| panic!("the first field of an entry is a string literal: {entry}"));
-        paths.push(path.to_owned());
-    }
+    let paths: Vec<String> = block
+        .split('(')
+        .filter_map(|entry| entry.trim_start().strip_prefix('"'))
+        .map(|entry| {
+            entry
+                .split_once('"')
+                .expect("the path literal closes")
+                .0
+                .to_owned()
+        })
+        .collect();
     assert!(
         !paths.is_empty(),
         "no entry of `UNSPECIFIED_PATHS` was read out of cli_surface.rs; the extraction is wrong \

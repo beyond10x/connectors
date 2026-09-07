@@ -249,6 +249,8 @@ fn auth_stage2_real_cli_auth_refusals_keep_every_format_private_without_resend()
                 &[
                     "operation",
                     "invoke",
+                    "--protocol-version",
+                    "v3",
                     "--operation",
                     "fixture.write",
                     "--connection",
@@ -503,7 +505,8 @@ fn auth_stage2_v3_refusal_keeps_failure_and_privacy_with_open_or_closed_output()
                 }
                 calls
             });
-            let mut command = fixture.command(format, &["operation", "search"]);
+            let mut command =
+                fixture.command(format, &["operation", "--protocol-version", "v3", "search"]);
             if closed {
                 let (writer, reader) = UnixStream::pair().unwrap();
                 drop(reader);
@@ -638,11 +641,7 @@ fn auth_adversary2_cli_socket_permissions_refuse_before_open_stdin_in_every_form
             assert!(!output.status.success());
             let text = String::from_utf8_lossy(&output.stdout).to_string()
                 + &String::from_utf8_lossy(&output.stderr);
-            let expected_code = if root_mode == 0o700 {
-                "configuration"
-            } else {
-                "runtime"
-            };
+            let expected_code = "configuration";
             assert!(text.contains(expected_code), "actual refusal: {text}");
             assert!(!text.contains("SYNTHETIC_PRIVATE_INSTRUCTION"));
             assert!(!destination.exists());

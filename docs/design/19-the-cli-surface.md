@@ -289,11 +289,12 @@ activation, observation and materialization leaves are retired. Endpoint list/sh
 and daemon start/status/stop replace that setup surface. The generated clap outline is regenerated
 from the same ten groups.
 
-The current exception list has **31 entries, 0 of them one word and 31 of them two or three**.
-**9 of the 31** kinds are derived from the tree, and **2 more** are `Grouping`.
-**The remaining 20** — `inspect upgrade`, `inspect doctor`, `inspect providers`, `inspect auth`,
+The current exception list has **33 entries, 0 of them one word and 33 of them two or three**.
+**9 of the 33** kinds are derived from the tree, and **2 more** are `Grouping`.
+**The remaining 22** — `inspect upgrade`, `inspect doctor`, `inspect providers`, `inspect auth`,
 `admin integrations status`, `setup completions`, `daemon start`, `daemon status`, `daemon stop`,
-`endpoint list`, `endpoint show`, `endpoint refresh`, `endpoint bind`, and the seven `Lifecycle`
+`endpoint list`, `endpoint show`, `endpoint refresh`, `endpoint bind`, `event subscribe`,
+`event unsubscribe`, and the seven `Lifecycle`
 steps — reach no protocol request in the current source walker. Their classifications remain
 reviewed claims; the new leaf handlers live in separate CLI modules that the walker does not yet
 follow. Process lifecycle helpers are excluded from its provider-frame inference, so a
@@ -304,3 +305,9 @@ Local operation, connection, event and endpoint commands now use the daemon excl
 starts the daemon if needed, then refreshes inventory through the Endpoint protocol. Enrollment
 and credential inspection use the confidential local setup protocol; provider credentials and
 acquisition calls stay in the daemon. Static help and installed-provider inspection remain offline.
+
+The current model was checked with the same command-name extraction, and it produced `ActivateCandidate`,
+`MaterializeObservation`, `SuperviseChannel`, `connect_session_create`,
+`invoke` and `session_terminate` as words at a shell. Legacy internal normalization commands no
+longer claim a public discovery wire method. Event subscribe/unsubscribe use the explicit v2
+subscription lifecycle; their leaf handlers are included among the residual module claims above.

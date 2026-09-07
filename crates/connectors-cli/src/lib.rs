@@ -9,6 +9,7 @@
 mod daemon;
 mod endpoint;
 mod error;
+mod event_stream;
 use error::MainError;
 
 use std::ffi::OsString;
@@ -427,6 +428,10 @@ enum OperationCommand {
 
 #[derive(Debug, Subcommand)]
 enum EventCommand {
+    /// Start a declared event stream from a discovered endpoint.
+    Subscribe(event_stream::Subscribe),
+    /// Stop a subscription and release its provider connection.
+    Unsubscribe(event_stream::Unsubscribe),
     /// List admitted Connector channels.
     Search {
         #[arg(long)]
@@ -1205,6 +1210,12 @@ async fn connection(
 
 async fn event(format: Format, target: Target, command: EventCommand) -> Result<(), MainError> {
     let (config_path, state_root, request) = match command {
+        EventCommand::Subscribe(options) => {
+            return event_stream::subscribe(format, target, options).await
+        }
+        EventCommand::Unsubscribe(options) => {
+            return event_stream::unsubscribe(format, target, options).await
+        }
         EventCommand::Search {
             config,
             query,

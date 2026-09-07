@@ -62,16 +62,17 @@ components:
     # `CandidateSearch`, `Search`, `Describe`, `ObservationSearch`, `ConnectSessionStatus`
     # (crates/protocol/src/connection.rs:35-48), `SessionStatus`, `SessionReconcile`
     # (crates/protocol/src/operation/legacy.rs:49-56), `Receive`, `Replay`
-    # (crates/protocol/src/event.rs:36-39) — change no entity, and ESS models a read as a `views:`
+    # (crates/protocol/src/event.rs:40-42) — change no entity, and ESS models a read as a `views:`
     # declaration carrying a consistency claim (`read_your_writes` or `eventual`). Nothing in the
     # tree states that claim for any of them, so declaring one would invent it. Settled by the
     # consistency each read actually offers being written down, which the caller's contract
     # (docs/design/04-the-callers-contract.md) is where it would go.
     #
-    # Neither an accepted command nor a read — `SessionSignal`
-    # (crates/protocol/src/operation/legacy.rs:56) — sends DTMF into a live call. It moves no entity this
-    # document declares and no command above names it, so it is in neither half of the sentence
-    # before this one, and `connectors operation signal` is excused as `unmodelled` below.
+    # Neither an accepted command nor a read — `SessionSignal`, `CandidateActivate`, `Materialize`
+    # (crates/protocol/src/operation/legacy.rs:56) — sends a runtime signal or refuses a retired
+    # discovery method. SessionSignal sends DTMF into a live call; no entity this document declares
+    # moves, and `connectors operation signal` is excused as `unmodelled` below. CandidateActivate
+    # and Materialize remain in frozen wire models; public dispatch returns migration refusals.
     #
     # Those three parts are a partition, not three lists: every variant of the three request enums
     # cited above is in exactly one of them, and
@@ -193,6 +194,8 @@ components:
     #   unspecified-path: event search — read
     #   unspecified-path: event receive — read
     #   unspecified-path: event replay — read
+    #   unspecified-path: event subscribe — flow
+    #   unspecified-path: event unsubscribe — flow
     #   unspecified-path: operation search — read
     #   unspecified-path: operation describe — read
     #   unspecified-path: operation signal — unmodelled

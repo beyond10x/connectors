@@ -43,6 +43,8 @@ pub(super) enum MainError {
     McpOutput,
     #[error("--target hosted cannot be combined with local-only --config or --state-root")]
     TargetConflict,
+    #[error("--parameters-json must be a JSON object with at most 32 fields and 16 KiB")]
+    EventParameters,
     #[error(transparent)]
     Daemon(#[from] connectors_console::daemon::DaemonError),
     #[error(transparent)]
@@ -75,6 +77,7 @@ impl MainError {
             Self::Unhealthy => "unhealthy",
             Self::McpOutput => "invalid-argument",
             Self::TargetConflict => "target-conflict",
+            Self::EventParameters => "invalid-argument",
             Self::Daemon(connectors_console::daemon::DaemonError::Required) => "daemon-required",
             Self::Daemon(_) => "daemon",
             Self::KubernetesSetup(_) => "kubernetes-setup",
