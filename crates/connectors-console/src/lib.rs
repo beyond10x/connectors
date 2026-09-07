@@ -22,6 +22,7 @@
 //! - [`enrol`] — connect any catalogued provider: prompt for what the catalogue cannot answer.
 //! - [`providers`] — what the embedded catalogue can reach, as a measured fact.
 //! - [`auth`] — which providers are connected, answered without reading a credential.
+//! - [`upgrade`] — compiled versions, supported storage formats, and installation guidance.
 //! - [`connect`] — the guided provider flows, returning their outcome as data so `-o json` works.
 //! - [`envelope`] — reducing a transport envelope to its payload, or to a refusal that exits non-zero.
 //! - [`input`] — where one operation's caller input comes from.
@@ -43,5 +44,6 @@ pub mod input;
 pub mod output;
 pub mod providers;
 pub mod remediation;
+pub mod upgrade;
 
 pub use output::{emit, emit_error, payload, Format, OutputError};
