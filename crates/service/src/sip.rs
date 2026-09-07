@@ -232,7 +232,7 @@ pub enum SipAdmissionError {
     #[error("admitted SIP identity is incomplete")]
     InvalidIdentity,
     #[error("deployment SIP route belongs to another Connection")]
-    ConnectionMismatch,
+    EndpointMismatch,
     #[error("SIP route has an invalid socket aperture")]
     InvalidAperture,
     #[error("SIP signaling target is outside its admitted aperture")]
@@ -326,7 +326,7 @@ impl SipDialRouteTable {
     /// # Errors
     ///
     /// [`SipAdmissionError::InvalidTargetAlias`] for an alias outside the closed grammar,
-    /// [`SipAdmissionError::ConnectionMismatch`] for a route belonging elsewhere,
+    /// [`SipAdmissionError::EndpointMismatch`] for a route belonging elsewhere,
     /// [`SipAdmissionError::DuplicateTargetAlias`] for a repeated alias, and
     /// [`SipAdmissionError::UnknownTargetAlias`] when the named default is not in the table.
     pub fn with_default<I>(
@@ -347,7 +347,7 @@ impl SipDialRouteTable {
             .validate()
             .map_err(|_| SipAdmissionError::InvalidTargetAlias)?;
             if route.connection != connection {
-                return Err(SipAdmissionError::ConnectionMismatch);
+                return Err(SipAdmissionError::EndpointMismatch);
             }
             if admitted.insert(alias, route).is_some() {
                 return Err(SipAdmissionError::DuplicateTargetAlias);
@@ -596,7 +596,7 @@ pub fn admit_sip_plan(
         return Err(SipAdmissionError::InvalidIdentity);
     }
     if sip.connection != route.connection || plan.admission().connection() != route.connection {
-        return Err(SipAdmissionError::ConnectionMismatch);
+        return Err(SipAdmissionError::EndpointMismatch);
     }
     // Nothing unresolved reaches a driver. `validate_sip_deployment_route` tolerates a name so a
     // deployment can declare one; admission is where that tolerance ends.
@@ -682,7 +682,7 @@ mod tests {
     use std::net::{Ipv4Addr, SocketAddrV4};
 
     use domain::{
-        AdmittedOperation, Capability, ConnectionAuthority, Implementation, InitiationPolicy,
+        AdmittedOperation, Capability, EndpointAuthority, Implementation, InitiationPolicy,
         OperationFacts, Placement, SipPlan,
     };
 
@@ -706,7 +706,7 @@ mod tests {
                 organization,
                 "principal",
                 "grant",
-                ConnectionAuthority::new("connection", InitiationPolicy::platform_only()).unwrap(),
+                EndpointAuthority::new("connection", InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {
                 connection: "connection".to_owned(),

@@ -161,15 +161,15 @@ fn router_inner(
             post(approval::issue).layer(DefaultBodyLimit::max(protocol::approval::MAX_FRAME_BYTES)),
         )
         .route(
-            "/connections",
+            "/endpoints",
             post(connection_route::handle).layer(DefaultBodyLimit::max(
-                protocol::connection_v2::MAX_FRAME_BYTES,
+                protocol::endpoint_v2::MAX_FRAME_BYTES,
             )),
         )
         .route(
             "/endpoints",
             post(super::endpoint_route::handle)
-                .layer(DefaultBodyLimit::max(protocol::endpoint::MAX_FRAME_BYTES)),
+                .layer(DefaultBodyLimit::max(protocol::endpoint_inventory::MAX_FRAME_BYTES)),
         )
         .route(
             "/catalog",

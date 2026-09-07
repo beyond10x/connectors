@@ -68,7 +68,7 @@ pub enum BrowserAdmissionError {
     InvalidIdentity,
     /// The deployment route belongs to a different Connection.
     #[error("deployment browser route belongs to another Connection")]
-    ConnectionMismatch,
+    EndpointMismatch,
     /// A host path is relative, so what it resolves to would depend on ambient state.
     #[error("browser route path is not absolute")]
     RelativePath,
@@ -169,7 +169,7 @@ pub fn admit_browser_plan(
         return Err(BrowserAdmissionError::InvalidIdentity);
     }
     if browser.connection != route.connection || plan.admission().connection() != route.connection {
-        return Err(BrowserAdmissionError::ConnectionMismatch);
+        return Err(BrowserAdmissionError::EndpointMismatch);
     }
     validate_browser_deployment_route(&route)?;
     Ok(AdmittedBrowserPlan {
@@ -277,7 +277,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use domain::{
-        AdmittedOperation, BrowserPlan, Capability, ConnectionAuthority, Implementation,
+        AdmittedOperation, BrowserPlan, Capability, EndpointAuthority, Implementation,
         InitiationPolicy, OperationFacts, Placement,
     };
 
@@ -315,7 +315,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
+                EndpointAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::CdpV1(BrowserPlan {
@@ -344,7 +344,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
+                EndpointAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::SipV1(domain::SipPlan {
@@ -374,7 +374,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new("connection-1", InitiationPolicy::platform_only())
+                EndpointAuthority::new("connection-1", InitiationPolicy::platform_only())
                     .unwrap(),
             ),
             ProtocolPlan::CdpV1(BrowserPlan {
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(
             admit_browser_plan(&plan(BROWSER_OPEN_OPERATION), elsewhere)
                 .expect_err("another Connection's route is refused"),
-            BrowserAdmissionError::ConnectionMismatch
+            BrowserAdmissionError::EndpointMismatch
         );
     }
 

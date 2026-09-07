@@ -64,9 +64,9 @@ pub(super) async fn issue(
         Err(response) => return *response,
     };
     let exact_connection = described
-        .connections
+        .endpoints
         .iter()
-        .any(|connection| connection.connection_ref == request.request.connection_ref);
+        .any(|connection| connection.endpoint_ref == request.request.endpoint_ref);
     if described.description_ref != request.request.description_ref
         || described.approval != ApprovalPosture::Required
         || !exact_connection
@@ -98,7 +98,7 @@ pub(super) async fn issue(
         issuer: principal.issuer,
         subject: principal.subject,
         operation: request.request.operation_ref,
-        connection: request.request.connection_ref,
+        connection: request.request.endpoint_ref,
         input_digest: canonical_input_digest(&request.request.input),
         expires_at_seconds,
     };

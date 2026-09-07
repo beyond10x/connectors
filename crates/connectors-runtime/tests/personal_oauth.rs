@@ -73,8 +73,8 @@ allowed_scopes = ["read_api"]
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     path
 }
-fn create() -> connection::ConnectionRequest {
-    connection::ConnectionRequest::ConnectSessionCreate(connection::ConnectSessionCreateRequest {
+fn create() -> connection::EndpointRequest {
+    connection::EndpointRequest::ConnectSessionCreate(connection::ConnectSessionCreateRequest {
         integration_ref: "gitlab".into(),
         label: "Display label".into(),
         auth_profile: Some("gitlab.oauth_token".into()),
@@ -181,8 +181,8 @@ async fn http(authority: &str, path: &str, extra: &str) -> String {
     response
 }
 async fn authorize(backend: &dyn ConnectorBackend) -> String {
-    let connection::ConnectionResult::ConnectSessionCreate(status) = backend
-        .handle_connection(&principal(), create())
+    let connection::EndpointResult::ConnectSessionCreate(status) = backend
+        .handle_endpoint(&principal(), create())
         .await
         .unwrap()
     else {
@@ -216,18 +216,18 @@ async fn authorize(backend: &dyn ConnectorBackend) -> String {
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let result = backend
-                .handle_connection(
+                .handle_endpoint(
                     &principal(),
-                    connection::ConnectionRequest::ConnectSessionStatus(
+                    connection::EndpointRequest::ConnectSessionStatus(
                         connection::ConnectSessionStatusRequest {
                             connect_session_ref: status.connect_session_ref.clone(),
                         },
                     ),
                 )
                 .await;
-            if let Ok(connection::ConnectionResult::ConnectSessionStatus(status)) = result {
+            if let Ok(connection::EndpointResult::ConnectSessionStatus(status)) = result {
                 if status.state == connection::ConnectSessionState::Completed {
-                    break status.connection_ref.unwrap();
+                    break status.endpoint_ref.unwrap();
                 }
                 assert_eq!(status.state, connection::ConnectSessionState::Pending);
             }
@@ -278,12 +278,12 @@ async fn mixed_raw_and_oauth_bindings_have_exactly_one_invoke_owner_and_keep_agg
         egress.clone()
     )
     .is_err());
-    let connection::ConnectionResult::Search {
-        connections: raw_connections,
+    let connection::EndpointResult::Search {
+        endpoints: raw_connections,
     } = raw_backend
-        .handle_connection(
+        .handle_endpoint(
             &principal(),
-            connection::ConnectionRequest::Search(connection::SearchRequest {
+            connection::EndpointRequest::Search(connection::SearchRequest {
                 query: String::new(),
                 limit: 1,
             }),
@@ -293,7 +293,7 @@ async fn mixed_raw_and_oauth_bindings_have_exactly_one_invoke_owner_and_keep_agg
     else {
         panic!("raw connection metadata")
     };
-    let raw_ref = raw_connections[0].connection_ref.clone();
+    let raw_ref = raw_connections[0].endpoint_ref.clone();
     let registry = BackendRegistry::new(vec![raw_backend.clone(), oauth.clone()]);
     let oauth_ref = authorize(&registry).await;
     let operation::OperationResult::Describe(description) = registry
@@ -309,14 +309,14 @@ async fn mixed_raw_and_oauth_bindings_have_exactly_one_invoke_owner_and_keep_agg
         panic!("description")
     };
     assert_eq!(
-        description.connections.len(),
+        description.endpoints.len(),
         2,
         "both independent configured bindings remain described"
     );
     for reference in [oauth_ref.clone(), raw_ref] {
         let request = operation::OperationRequest::Invoke(operation::InvokeRequest {
             operation_ref: description.operation_ref.clone(),
-            connection_ref: reference.clone(),
+            endpoint_ref: reference.clone(),
             description_ref: description.description_ref.clone(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
@@ -339,7 +339,7 @@ async fn mixed_raw_and_oauth_bindings_have_exactly_one_invoke_owner_and_keep_agg
         let before = egress.count();
         let request = operation::OperationRequest::Invoke(operation::InvokeRequest {
             operation_ref: description.operation_ref.clone(),
-            connection_ref: reference.into(),
+            endpoint_ref: reference.into(),
             description_ref: description.description_ref.clone(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
@@ -392,7 +392,7 @@ async fn oauth_pass1_daemon_refuses_ambiguous_v1_profile_without_using_label_as_
             protocol: connection::CONTRACT.into(),
             request_id: "request:adversary".into(),
             context: owner(),
-            request: connection::ConnectionRequest::ConnectSessionCreate(
+            request: connection::EndpointRequest::ConnectSessionCreate(
                 connection::ConnectSessionCreateRequest {
                     integration_ref: "gitlab".into(),
                     label: "another".into(),
@@ -423,7 +423,7 @@ async fn oauth_pass1_daemon_refuses_ambiguous_v1_profile_without_using_label_as_
 
 async fn connection_v2_frame(
     socket: &Path,
-    request: &protocol::connection_v2::RequestEnvelope,
+    request: &protocol::endpoint_v2::RequestEnvelope,
 ) -> Vec<u8> {
     let mut stream = tokio::net::UnixStream::connect(socket).await.unwrap();
     let mut bytes = serde_json::to_vec(request).unwrap();
@@ -440,7 +440,7 @@ async fn connection_v2_frame(
 
 #[tokio::test]
 async fn remediation_local_v2_routes_a_created_binding_and_joins_its_endpoint() {
-    use protocol::connection_v2 as v2;
+    use protocol::endpoint_v2 as v2;
     let root = tempfile::tempdir().unwrap();
     let configured = registration();
     let target =
@@ -467,13 +467,13 @@ async fn remediation_local_v2_routes_a_created_binding_and_joins_its_endpoint() 
     let serving = tokio::spawn(daemon.serve_until(async {
         let _ = stopped.await;
     }));
-    let start = |connection_ref: &str, input| v2::RequestEnvelope {
+    let start = |endpoint_ref: &str, input| v2::RequestEnvelope {
         protocol: v2::CONTRACT.into(),
         request_id: "remediation:local".into(),
         context: owner(),
-        request: v2::ConnectionRequest::RemediationStart(v2::RemediationStartRequest {
+        request: v2::EndpointRequest::RemediationStart(v2::RemediationStartRequest {
             operation_ref: "gitlab-project-list".into(),
-            connection_ref: connection_ref.into(),
+            endpoint_ref: endpoint_ref.into(),
             input,
         }),
     };
@@ -483,12 +483,12 @@ async fn remediation_local_v2_routes_a_created_binding_and_joins_its_endpoint() 
     let pending = connection_v2_frame(&socket, &start(&target, serde_json::json!({}))).await;
     let decoded = v2::decode_response(&pending);
     let status = if let Ok((_, envelope)) = &decoded {
-        if let Some(v2::ConnectionResult::RemediationStart(pending)) = &envelope.response {
+        if let Some(v2::EndpointResult::RemediationStart(pending)) = &envelope.response {
             let request = v2::RequestEnvelope {
                 protocol: v2::CONTRACT.into(),
                 request_id: "remediation:status".into(),
                 context: owner(),
-                request: v2::ConnectionRequest::RemediationStatus(v2::RemediationStatusRequest {
+                request: v2::EndpointRequest::RemediationStatus(v2::RemediationStatusRequest {
                     connect_session_ref: pending.connect_session_ref.clone(),
                 }),
             };
@@ -510,25 +510,25 @@ async fn remediation_local_v2_routes_a_created_binding_and_joins_its_endpoint() 
     let (_, unknown) = v2::decode_response(&unknown).expect("selected v2 refusal");
     assert_eq!(
         unknown.error.unwrap().code,
-        connection::ConnectionErrorCode::NotGranted
+        connection::EndpointErrorCode::NotGranted
     );
     let (_, invalid) = v2::decode_response(&invalid).expect("selected v2 invalid input");
     assert_eq!(
         invalid.error.unwrap().code,
-        connection::ConnectionErrorCode::InvalidInput
+        connection::EndpointErrorCode::InvalidInput
     );
     let (_, envelope) = decoded.expect("selected v2 bound start");
-    let Some(v2::ConnectionResult::RemediationStart(pending)) = envelope.response else {
+    let Some(v2::EndpointResult::RemediationStart(pending)) = envelope.response else {
         panic!("bound pending session")
     };
     assert_eq!(pending.resume_state, v2::RemediationResumeState::Pending);
-    assert_eq!(pending.connection_ref, target);
+    assert_eq!(pending.endpoint_ref, target);
     assert_eq!(pending.integration_ref, "gitlab");
     assert_eq!(pending.auth_profile, "gitlab.oauth_token");
     let (_, status) = v2::decode_response(status.as_deref().expect("status requested")).unwrap();
     assert!(matches!(
         status.response,
-        Some(v2::ConnectionResult::RemediationStatus(_))
+        Some(v2::EndpointResult::RemediationStatus(_))
     ));
     let endpoint =
         url::Url::parse(pending.session.browser_completion_url.as_deref().unwrap()).unwrap();
@@ -565,7 +565,7 @@ async fn operation_v3_frame(
 
 #[tokio::test]
 async fn remediation_local_completion_dispatches_only_a_later_explicit_invocation() {
-    use protocol::connection_v2 as v2;
+    use protocol::endpoint_v2 as v2;
     let root = tempfile::tempdir().unwrap();
     let configured = registration();
     let connection =
@@ -604,16 +604,16 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
             context: owner(),
             request,
         };
-        let start = frame(v2::ConnectionRequest::RemediationStart(
+        let start = frame(v2::EndpointRequest::RemediationStart(
             v2::RemediationStartRequest {
                 operation_ref: "gitlab-project-list".into(),
-                connection_ref: connection.clone(),
+                endpoint_ref: connection.clone(),
                 input: serde_json::json!({}),
             },
         ));
         let (_, response) =
             v2::decode_response(&connection_v2_frame(socket, &start).await).unwrap();
-        let Some(v2::ConnectionResult::RemediationStart(start)) = response.response else {
+        let Some(v2::EndpointResult::RemediationStart(start)) = response.response else {
             panic!("bound start: {:?}", response.error)
         };
         assert_eq!(start.resume_state, v2::RemediationResumeState::Pending);
@@ -645,7 +645,7 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
         )
         .await
         .starts_with("HTTP/1.1 200"));
-        let status_request = frame(v2::ConnectionRequest::RemediationStatus(
+        let status_request = frame(v2::EndpointRequest::RemediationStatus(
             v2::RemediationStatusRequest {
                 connect_session_ref: start.connect_session_ref.clone(),
             },
@@ -653,7 +653,7 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
         loop {
             let (_, response) =
                 v2::decode_response(&connection_v2_frame(socket, &status_request).await).unwrap();
-            let Some(v2::ConnectionResult::RemediationStatus(status)) = response.response else {
+            let Some(v2::EndpointResult::RemediationStatus(status)) = response.response else {
                 panic!("bound status: {:?}", response.error)
             };
             if status.resume_state == v2::RemediationResumeState::Ready {
@@ -667,22 +667,22 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
             2,
             "completion made only token and evidence requests"
         );
-        let acknowledgement = frame(v2::ConnectionRequest::RemediationAcknowledge(
+        let acknowledgement = frame(v2::EndpointRequest::RemediationAcknowledge(
             v2::RemediationAcknowledgeRequest {
                 connect_session_ref: start.connect_session_ref.clone(),
                 operation_ref: "gitlab-project-list".into(),
-                connection_ref: connection.clone(),
+                endpoint_ref: connection.clone(),
             },
         ));
         let (_, response) =
             v2::decode_response(&connection_v2_frame(socket, &acknowledgement).await).unwrap();
         assert!(matches!(
             response.response,
-            Some(v2::ConnectionResult::RemediationAcknowledge(_))
+            Some(v2::EndpointResult::RemediationAcknowledge(_))
         ));
         let (_, response) =
             v2::decode_response(&connection_v2_frame(socket, &status_request).await).unwrap();
-        let Some(v2::ConnectionResult::RemediationStatus(status)) = response.response else {
+        let Some(v2::EndpointResult::RemediationStatus(status)) = response.response else {
             panic!("consumed status")
         };
         assert_eq!(status.resume_state, v2::RemediationResumeState::Consumed);
@@ -702,9 +702,9 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
             panic!("fresh description: {:?}", response.error)
         };
         assert!(description
-            .connections
+            .endpoints
             .iter()
-            .any(|candidate| candidate.connection_ref == connection));
+            .any(|candidate| candidate.endpoint_ref == connection));
         assert_eq!(
             egress.count(),
             2,
@@ -715,7 +715,7 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
             socket,
             operation::OperationRequest::Invoke(operation::InvokeRequest {
                 operation_ref: description.operation_ref,
-                connection_ref: connection.clone(),
+                endpoint_ref: connection.clone(),
                 description_ref: description.description_ref,
                 input: serde_json::json!({}),
                 approval_evidence_ref: None,
@@ -754,7 +754,7 @@ async fn remediation_local_completion_dispatches_only_a_later_explicit_invocatio
 
 #[tokio::test]
 async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exact() {
-    use protocol::connection_v2 as v2;
+    use protocol::endpoint_v2 as v2;
     let root = tempfile::tempdir().unwrap();
     let other = registration();
     let other_connection =
@@ -798,16 +798,16 @@ async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exac
             context: owner(),
             request,
         };
-        let start = frame(v2::ConnectionRequest::RemediationStart(
+        let start = frame(v2::EndpointRequest::RemediationStart(
             v2::RemediationStartRequest {
                 operation_ref: "gitlab-project-list".into(),
-                connection_ref: connection.clone(),
+                endpoint_ref: connection.clone(),
                 input: serde_json::json!({}),
             },
         ));
         let (_, response) =
             v2::decode_response(&connection_v2_frame(socket, &start).await).unwrap();
-        let Some(v2::ConnectionResult::RemediationStart(start)) = response.response else {
+        let Some(v2::EndpointResult::RemediationStart(start)) = response.response else {
             panic!("bound start: {:?}", response.error)
         };
         assert_eq!(start.resume_state, v2::RemediationResumeState::Pending);
@@ -839,7 +839,7 @@ async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exac
         )
         .await
         .starts_with("HTTP/1.1 200"));
-        let status_request = frame(v2::ConnectionRequest::RemediationStatus(
+        let status_request = frame(v2::EndpointRequest::RemediationStatus(
             v2::RemediationStatusRequest {
                 connect_session_ref: start.connect_session_ref.clone(),
             },
@@ -847,7 +847,7 @@ async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exac
         loop {
             let (_, response) =
                 v2::decode_response(&connection_v2_frame(socket, &status_request).await).unwrap();
-            let Some(v2::ConnectionResult::RemediationStatus(status)) = response.response else {
+            let Some(v2::EndpointResult::RemediationStatus(status)) = response.response else {
                 panic!("bound status: {:?}", response.error)
             };
             if status.resume_state == v2::RemediationResumeState::Ready {
@@ -866,11 +866,11 @@ async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exac
         let (_, refused) =
             v2::decode_response(&connection_v2_frame(socket, &wrong_owner).await).unwrap();
         assert!(refused.response.is_none());
-        let wrong_ack = frame(v2::ConnectionRequest::RemediationAcknowledge(
+        let wrong_ack = frame(v2::EndpointRequest::RemediationAcknowledge(
             v2::RemediationAcknowledgeRequest {
                 connect_session_ref: start.connect_session_ref.clone(),
                 operation_ref: "gitlab-project-list".into(),
-                connection_ref: other_connection.clone(),
+                endpoint_ref: other_connection.clone(),
             },
         ));
         let (_, refused) =
@@ -879,22 +879,22 @@ async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exac
             refused.response.is_none(),
             "another configured same-profile binding cannot acknowledge this session"
         );
-        let acknowledgement = frame(v2::ConnectionRequest::RemediationAcknowledge(
+        let acknowledgement = frame(v2::EndpointRequest::RemediationAcknowledge(
             v2::RemediationAcknowledgeRequest {
                 connect_session_ref: start.connect_session_ref.clone(),
                 operation_ref: "gitlab-project-list".into(),
-                connection_ref: connection.clone(),
+                endpoint_ref: connection.clone(),
             },
         ));
         let (_, response) =
             v2::decode_response(&connection_v2_frame(socket, &acknowledgement).await).unwrap();
         assert!(matches!(
             response.response,
-            Some(v2::ConnectionResult::RemediationAcknowledge(_))
+            Some(v2::EndpointResult::RemediationAcknowledge(_))
         ));
         let (_, response) =
             v2::decode_response(&connection_v2_frame(socket, &status_request).await).unwrap();
-        let Some(v2::ConnectionResult::RemediationStatus(status)) = response.response else {
+        let Some(v2::EndpointResult::RemediationStatus(status)) = response.response else {
             panic!("consumed status")
         };
         assert_eq!(status.resume_state, v2::RemediationResumeState::Consumed);
@@ -914,9 +914,9 @@ async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exac
             panic!("fresh description: {:?}", response.error)
         };
         assert!(description
-            .connections
+            .endpoints
             .iter()
-            .any(|candidate| candidate.connection_ref == connection));
+            .any(|candidate| candidate.endpoint_ref == connection));
         assert_eq!(
             egress.count(),
             2,
@@ -924,9 +924,9 @@ async fn auth_adversary_local_same_profile_bindings_keep_completion_and_ack_exac
         );
         assert!(
             !description
-                .connections
+                .endpoints
                 .iter()
-                .any(|candidate| candidate.connection_ref == other_connection),
+                .any(|candidate| candidate.endpoint_ref == other_connection),
             "the uncompleted configured peer stays out of callable discovery"
         );
         assert_eq!(

@@ -72,11 +72,11 @@ pub(in crate::hosted) fn document_json() -> &'static str {
             ),
             (
                 "connection.request_envelope",
-                generated::<protocol::connection::RequestEnvelope>(&settings),
+                generated::<protocol::endpoint::RequestEnvelope>(&settings),
             ),
             (
                 "connection.response_envelope",
-                generated::<protocol::connection::ResponseEnvelope>(&settings),
+                generated::<protocol::endpoint::ResponseEnvelope>(&settings),
             ),
             (
                 "catalog.requestEnvelope",
@@ -110,11 +110,11 @@ pub(in crate::hosted) fn document_json() -> &'static str {
             ("operation.responseEnvelope", protocol::operation::CONTRACT),
             (
                 "connection.request_envelope",
-                protocol::connection::CONTRACT,
+                protocol::endpoint::CONTRACT,
             ),
             (
                 "connection.response_envelope",
-                protocol::connection::CONTRACT,
+                protocol::endpoint::CONTRACT,
             ),
             ("catalog.requestEnvelope", protocol::catalog::CONTRACT),
             ("catalog.responseEnvelope", protocol::catalog::CONTRACT),
@@ -190,7 +190,7 @@ pub(in crate::hosted) fn document_json() -> &'static str {
         insert_protocol_schema(
             table,
             "connection.v2.frame",
-            protocol::connection_v2_schema::connection_v2_schema(),
+            protocol::endpoint_v2_schema::connection_v2_schema(),
             [
                 ("connection.v2.request_envelope", "RequestEnvelope"),
                 ("connection.v2.response_envelope", "ResponseEnvelope"),
@@ -255,7 +255,7 @@ fn insert_protocol_schema(
 const ENVELOPE_SECTIONS: [(&str, &str, &str); 6] = [
     ("/approvals", "issue", "success"),
     ("/operations", "search", "success"),
-    ("/connections", "search", "success"),
+    ("/endpoints", "search", "success"),
     ("/catalog", "search", "success"),
     ("/events", "search", "success"),
     ("/datasources", "search", "success"),

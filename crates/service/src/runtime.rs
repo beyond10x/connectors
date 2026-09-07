@@ -4,8 +4,8 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU64;
 
 use async_trait::async_trait;
-use protocol::connection::{
-    ConnectionError, ConnectionErrorCode, ConnectionRequest, ConnectionResult,
+use protocol::endpoint::{
+    EndpointError, EndpointErrorCode, EndpointRequest, EndpointResult,
 };
 use protocol::datasource::{
     DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult,
@@ -421,7 +421,7 @@ fn valid_ref(value: &str, maximum: usize) -> bool {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BackendCapabilities {
     pub operations: bool,
-    pub connections: bool,
+    pub endpoints: bool,
     pub events: bool,
     pub datasources: bool,
 }
@@ -514,7 +514,7 @@ pub enum ConnectSessionAccess {
 impl BackendCapabilities {
     pub const OPERATIONS: Self = Self {
         operations: true,
-        connections: false,
+        endpoints: false,
         events: false,
         datasources: false,
     };
@@ -548,23 +548,23 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         false
     }
 
-    fn owns_connection(&self, _request: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, _request: &EndpointRequest) -> bool {
         false
     }
 
     /// Exact inventory ownership, without resource, credential, or provider I/O.
-    fn owns_endpoint(&self, _request: &protocol::endpoint::EndpointRequest) -> bool {
+    fn owns_endpoint_inventory(&self, _request: &protocol::endpoint_inventory::EndpointInventoryRequest) -> bool {
         false
     }
 
     /// Credential-free inventory and operator bindings; transport authority is independently checked.
-    async fn handle_endpoint(
+    async fn handle_endpoint_inventory(
         &self,
         _context: &PrincipalContext,
-        _request: protocol::endpoint::EndpointRequest,
-    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
-        Err(protocol::endpoint::EndpointError::new(
-            protocol::endpoint::EndpointErrorCode::Unavailable,
+        _request: protocol::endpoint_inventory::EndpointInventoryRequest,
+    ) -> Result<protocol::endpoint_inventory::EndpointInventoryResult, protocol::endpoint_inventory::EndpointInventoryError> {
+        Err(protocol::endpoint_inventory::EndpointInventoryError::new(
+            protocol::endpoint_inventory::EndpointInventoryErrorCode::Unavailable,
             "endpoint discovery is not configured",
             false,
         ))
@@ -593,7 +593,7 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
     ) -> Result<protocol::operation::OperationDescription, OperationError> {
         let result = self
             .handle(
@@ -603,7 +603,7 @@ pub trait ConnectorBackend: Send + Sync + 'static {
                 }),
             )
             .await?;
-        match crate::constrain_endpoint_description(result, Some(connection_ref))? {
+        match crate::constrain_endpoint_description(result, Some(endpoint_ref))? {
             OperationResult::Describe(description)
                 if description.operation_ref == operation_ref =>
             {
@@ -675,7 +675,7 @@ pub trait ConnectorBackend: Send + Sync + 'static {
     /// Declare who may start a backend-owned Connect Session profile.
     fn connect_session_access(
         &self,
-        _request: &protocol::connection::ConnectSessionCreateRequest,
+        _request: &protocol::endpoint::ConnectSessionCreateRequest,
     ) -> ConnectSessionAccess {
         ConnectSessionAccess::Operator
     }
@@ -745,13 +745,13 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         request: OperationRequest,
     ) -> Result<OperationResult, OperationError>;
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         _context: &PrincipalContext,
-        _request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
-        Err(ConnectionError::new(
-            ConnectionErrorCode::Unavailable,
+        _request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
+        Err(EndpointError::new(
+            EndpointErrorCode::Unavailable,
             "connection management is not configured",
             false,
         ))
@@ -985,7 +985,7 @@ mod remediation_contract_tests {
     };
 
     use async_trait::async_trait;
-    use protocol::connection_v2::{
+    use protocol::endpoint_v2::{
         RemediationAcknowledgeRequest, RemediationAcknowledgement, RemediationNextAction,
         RemediationStatusRequest,
     };
@@ -1053,7 +1053,7 @@ mod remediation_contract_tests {
         // Synthetic test data, never asserted to name production authority or real digests.
         RemediationBinding {
             operation_ref: PRIVATE.into(),
-            connection_ref: PRIVATE.into(),
+            endpoint_ref: PRIVATE.into(),
             integration_ref: PRIVATE.into(),
             auth_profile: "oauth".into(),
             need: AuthenticationNeed::AuthorizeConfigured,
@@ -1070,12 +1070,12 @@ mod remediation_contract_tests {
     fn personal_remediation_factory_defaults_to_refusal_without_backend_work() {
         let work = Arc::new(AtomicUsize::new(0));
         let backend: Arc<dyn ConnectorBackend> = Arc::new(OrdinaryBackend(work.clone()));
-        for (operation_ref, connection_ref) in [("unknown", "unknown"), (PRIVATE, PRIVATE)] {
+        for (operation_ref, endpoint_ref) in [("unknown", "unknown"), (PRIVATE, PRIVATE)] {
             let result = backend.personal_remediation_admission(
                 &context(),
                 RemediationTarget {
                     operation_ref,
-                    connection_ref,
+                    endpoint_ref,
                 },
             );
             assert_eq!(result.unwrap_err(), RemediationError::Unsupported);
@@ -1088,13 +1088,13 @@ mod remediation_contract_tests {
         let work = Arc::new(AtomicUsize::new(0));
         let backend: Arc<dyn ConnectorBackend> = Arc::new(OrdinaryBackend(work.clone()));
         let context = context();
-        for (operation_ref, connection_ref) in [
+        for (operation_ref, endpoint_ref) in [
             ("unknown-operation", "unknown-connection"),
             (PRIVATE, PRIVATE),
         ] {
             let target = RemediationTarget {
                 operation_ref,
-                connection_ref,
+                endpoint_ref,
             };
             assert!(!backend.owns_remediation(RemediationRoute::Target(target)));
             assert_eq!(
@@ -1125,7 +1125,7 @@ mod remediation_contract_tests {
             RemediationRequest::Acknowledge(RemediationAcknowledgeRequest {
                 connect_session_ref: PRIVATE.into(),
                 operation_ref: PRIVATE.into(),
-                connection_ref: PRIVATE.into(),
+                endpoint_ref: PRIVATE.into(),
             }),
         ];
         for request in requests {
@@ -1148,7 +1148,7 @@ mod remediation_contract_tests {
     fn remediation_internal_diagnostics_do_not_trust_printable_reference_fields() {
         let facts = protocol::operation::v3::AuthenticationRequired {
             operation_ref: PRIVATE.into(),
-            connection_ref: PRIVATE.into(),
+            endpoint_ref: PRIVATE.into(),
             integration_ref: PRIVATE.into(),
             auth_profile: "oauth".into(),
             need: AuthenticationNeed::AuthorizeConfigured,
@@ -1176,7 +1176,7 @@ mod remediation_contract_tests {
         let result = RemediationResult::Acknowledged(RemediationAcknowledgement {
             connect_session_ref: PRIVATE.into(),
             operation_ref: PRIVATE.into(),
-            connection_ref: PRIVATE.into(),
+            endpoint_ref: PRIVATE.into(),
             next_action: RemediationNextAction::FreshDescriptionThenExplicitInvoke,
         });
         assert_eq!(format!("{result:?}"), "RemediationResult(<redacted>)");

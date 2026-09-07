@@ -62,10 +62,10 @@ enum Target {
     /// Server-side describe, then invoke, of one hosted operation with the args as input.
     OperationInvoke {
         operation_ref: &'static str,
-        connection_ref: &'static str,
+        endpoint_ref: &'static str,
     },
     /// Server-side describe, then invoke, of one hosted operation whose Connection is chosen
-    /// by the caller's `target` argument from their own described connections — the shape for
+    /// by the caller's `target` argument from their own described endpoints — the shape for
     /// operations with several configured targets (design 15), where a static table can never
     /// honestly name one Connection.
     TargetedOperationInvoke { operation_ref: &'static str },
@@ -117,7 +117,7 @@ const TOOLSET: &[McpTool] = &[
         requires: Requirement::Operation("kubernetes.deployment.status"),
         target: Target::OperationInvoke {
             operation_ref: "kubernetes.deployment.status",
-            connection_ref: KUBERNETES_CONNECTION,
+            endpoint_ref: KUBERNETES_CONNECTION,
         },
         input_schema: deployment_status_schema,
     },
@@ -137,14 +137,14 @@ const TOOLSET: &[McpTool] = &[
         requires: Requirement::Operation("kubernetes.pod.logs"),
         target: Target::OperationInvoke {
             operation_ref: "kubernetes.pod.logs",
-            connection_ref: KUBERNETES_CONNECTION,
+            endpoint_ref: KUBERNETES_CONNECTION,
         },
         input_schema: pod_logs_schema,
     },
     // The monitoring entries (S-060, design 15): six catalogued read-only operations riding
     // the read path. Every argument below mirrors the underlying operation's published
     // caller parameters exactly; the toolset adds only the `target` choice, whose admitted
-    // values come from the caller's own described connections at describe/invoke time —
+    // values come from the caller's own described endpoints at describe/invoke time —
     // never from this table.
     McpTool {
         name: "grafana_dashboards_list",
@@ -295,7 +295,7 @@ fn target_only_schema() -> Value {
 // the document (and therefore `monitoring-model`'s validator) requires — so a schema-valid
 // call is an input-valid invocation and nothing is defaulted on the caller's behalf.
 // `tool_describe` then adds the caller-moment truth: the `target` enum, and `target` in
-// `required` while several connections are configured.
+// `required` while several endpoints are configured.
 
 fn grafana_dashboards_list_schema() -> Value {
     json!({
@@ -540,20 +540,20 @@ pub(super) async fn tool_describe(
                     Ok(description) => description,
                     Err(error) => return Ok(operation_refusal(&error)),
                 };
-            // The honest `target` surface: exactly the caller's own described connections,
+            // The honest `target` surface: exactly the caller's own described endpoints,
             // by label, at this moment — a rotated deployment target changes the enum, never
             // a table.
             input_schema["properties"]["target"]["enum"] = Value::Array(
                 description
-                    .connections
+                    .endpoints
                     .iter()
                     .map(|connection| Value::String(connection.label.clone()))
                     .collect(),
             );
-            // And the honest `required`: with several connections configured the resolver
+            // And the honest `required`: with several endpoints configured the resolver
             // refuses a target-less call, so the schema says so; a sole connection needs no
             // choice and the argument stays omittable (S-064).
-            if description.connections.len() > 1 {
+            if description.endpoints.len() > 1 {
                 let required = &mut input_schema["required"];
                 if required.is_null() {
                     *required = Value::Array(Vec::new());
@@ -651,14 +651,14 @@ pub(super) async fn tool_invoke(
     Ok(match &tool.target {
         Target::OperationInvoke {
             operation_ref,
-            connection_ref,
+            endpoint_ref,
         } => {
             invoke_operation(
                 state,
                 principal,
                 request_id,
                 operation_ref,
-                &ConnectionChoice::Fixed(connection_ref),
+                &EndpointChoice::Fixed(endpoint_ref),
                 &invoke.args,
                 invoke.approval_evidence_ref.as_deref(),
             )
@@ -674,7 +674,7 @@ pub(super) async fn tool_invoke(
                 principal,
                 request_id,
                 operation_ref,
-                &ConnectionChoice::Target(target),
+                &EndpointChoice::Target(target),
                 &input,
                 invoke.approval_evidence_ref.as_deref(),
             )
@@ -689,11 +689,11 @@ pub(super) async fn tool_invoke(
 }
 
 /// How an op-backed entry picks the Connection its invoke names.
-enum ConnectionChoice {
+enum EndpointChoice {
     /// The one static Connection the table names.
     Fixed(&'static str),
     /// The caller's `target` argument, resolved against their own freshly described
-    /// connections — or the sole described Connection when the argument is absent.
+    /// endpoints — or the sole described Connection when the argument is absent.
     Target(Option<String>),
 }
 
@@ -712,27 +712,27 @@ fn split_target(args: &Value) -> Result<(Option<String>, Value), Value> {
     Ok((target, input))
 }
 
-/// Resolve one [`ConnectionChoice`] against a fresh description's connections. Everything
+/// Resolve one [`EndpointChoice`] against a fresh description's endpoints. Everything
 /// named here is the caller's own admitted view, so a refusal may honestly list the labels.
 fn resolve_connection(
-    choice: &ConnectionChoice,
+    choice: &EndpointChoice,
     description: &OperationDescription,
 ) -> Result<String, Value> {
     let target = match choice {
-        ConnectionChoice::Fixed(connection_ref) => return Ok((*connection_ref).to_owned()),
-        ConnectionChoice::Target(target) => target.as_deref(),
+        EndpointChoice::Fixed(endpoint_ref) => return Ok((*endpoint_ref).to_owned()),
+        EndpointChoice::Target(target) => target.as_deref(),
     };
     let labels = || {
         description
-            .connections
+            .endpoints
             .iter()
             .map(|connection| connection.label.as_str())
             .collect::<Vec<_>>()
             .join(", ")
     };
     match target {
-        None => match description.connections.as_slice() {
-            [connection] => Ok(connection.connection_ref.clone()),
+        None => match description.endpoints.as_slice() {
+            [connection] => Ok(connection.endpoint_ref.clone()),
             _ => Err(invalid_args(format!(
                 "several targets are configured; pass target as one of: {}",
                 labels()
@@ -740,17 +740,17 @@ fn resolve_connection(
         },
         Some(target) => {
             let mut matched = description
-                .connections
+                .endpoints
                 .iter()
                 .filter(|connection| connection.label == target);
             match (matched.next(), matched.next()) {
-                (Some(connection), None) => Ok(connection.connection_ref.clone()),
+                (Some(connection), None) => Ok(connection.endpoint_ref.clone()),
                 (None, _) => Err(invalid_args(format!(
-                    "the target is not among the configured connections: {}",
+                    "the target is not among the configured endpoints: {}",
                     labels()
                 ))),
                 (Some(_), Some(_)) => Err(invalid_args(format!(
-                    "the target is ambiguous among the configured connections: {}",
+                    "the target is ambiguous among the configured endpoints: {}",
                     labels()
                 ))),
             }
@@ -767,7 +767,7 @@ async fn invoke_operation(
     principal: &HostedPrincipal,
     request_id: &str,
     operation_ref: &str,
-    choice: &ConnectionChoice,
+    choice: &EndpointChoice,
     input: &Value,
     evidence: Option<&str>,
 ) -> Value {
@@ -776,8 +776,8 @@ async fn invoke_operation(
             Ok(description) => description,
             Err(error) => return operation_refusal(&error),
         };
-    let mut connection_ref = match resolve_connection(choice, &description) {
-        Ok(connection_ref) => connection_ref,
+    let mut endpoint_ref = match resolve_connection(choice, &description) {
+        Ok(endpoint_ref) => endpoint_ref,
         Err(refused) => return refused,
     };
     let mut retried = false;
@@ -797,7 +797,7 @@ async fn invoke_operation(
             request_id,
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: operation_ref.to_owned(),
-                connection_ref: connection_ref.clone(),
+                endpoint_ref: endpoint_ref.clone(),
                 description_ref: description.description_ref.clone(),
                 input: input.clone(),
                 approval_evidence_ref: evidence.map(str::to_owned),
@@ -814,8 +814,8 @@ async fn invoke_operation(
                         Ok(description) => description,
                         Err(error) => return operation_refusal(&error),
                     };
-                connection_ref = match resolve_connection(choice, &description) {
-                    Ok(connection_ref) => connection_ref,
+                endpoint_ref = match resolve_connection(choice, &description) {
+                    Ok(endpoint_ref) => endpoint_ref,
                     Err(refused) => return refused,
                 };
             }
@@ -1287,7 +1287,7 @@ fn authentication_projection_closes_valid_private_reference_and_message_fields()
     let private = "https://private.example.test/SYNTHETIC_AUTH_INSTRUCTION";
     let mut error = v3::OperationError::authentication_required(v3::AuthenticationRequired {
         operation_ref: "grafana-dashboards-list".into(),
-        connection_ref: private.into(),
+        endpoint_ref: private.into(),
         integration_ref: private.into(),
         auth_profile: "synthetic_private_instruction".into(),
         need: v3::AuthenticationNeed::ReauthorizeExisting,
@@ -1316,7 +1316,7 @@ fn authentication_projection_closes_valid_private_reference_and_message_fields()
     assert!(!output.to_string().contains("synthetic_private_instruction"));
     for reference in [
         "operation_ref",
-        "connection_ref",
+        "endpoint_ref",
         "integration_ref",
         "auth_profile",
     ] {

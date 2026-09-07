@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use connector_secrets::{CredentialRef, MemoryStore, Secret, SecretStore};
-use domain::endpoint::{Endpoint, EndpointCredentialReference, EndpointState, EndpointTls};
+use domain::endpoint_inventory::{EndpointInventoryEntry, EndpointCredentialReference, EndpointReadiness, EndpointTls};
 use integration_catalog::endpoint as catalog_endpoint;
-use protocol::connection;
-use protocol::endpoint::{EndpointError, EndpointErrorCode, EndpointRequest, EndpointResult};
+use protocol::endpoint;
+use protocol::endpoint_inventory::{EndpointInventoryError, EndpointInventoryErrorCode, EndpointInventoryRequest, EndpointInventoryResult};
 use protocol::operation::{
     self, InvocationResult, OperationError, OperationErrorCode, OperationRequest, OperationResult,
 };
@@ -27,7 +27,7 @@ mod events;
 pub trait EndpointEgressFactory: Send + Sync + 'static {
     fn transport(
         &self,
-        connection_ref: &str,
+        endpoint_ref: &str,
         route: &EndpointRouteLease,
     ) -> Result<Arc<dyn EgressTransport>, EndpointSourceError>;
 }
@@ -85,7 +85,7 @@ impl KubernetesEndpointBackend {
         self
     }
 
-    fn endpoints(&self, context: &PrincipalContext) -> Result<Vec<Endpoint>, OperationError> {
+    fn endpoints(&self, context: &PrincipalContext) -> Result<Vec<EndpointInventoryEntry>, OperationError> {
         if !self.policy.owns(context) {
             return Err(operation_refused());
         }
@@ -98,7 +98,7 @@ impl KubernetesEndpointBackend {
             .collect())
     }
 
-    fn callable(&self, context: &PrincipalContext) -> Result<Vec<Endpoint>, OperationError> {
+    fn callable(&self, context: &PrincipalContext) -> Result<Vec<EndpointInventoryEntry>, OperationError> {
         Ok(self
             .endpoints(context)?
             .into_iter()
@@ -106,10 +106,10 @@ impl KubernetesEndpointBackend {
                 endpoint.provider.is_some()
                     && !matches!(
                         endpoint.state,
-                        EndpointState::Stale
-                            | EndpointState::Denied
-                            | EndpointState::UnknownProvider
-                            | EndpointState::UnsupportedProtocol
+                        EndpointReadiness::Stale
+                            | EndpointReadiness::Denied
+                            | EndpointReadiness::UnknownProvider
+                            | EndpointReadiness::UnsupportedProtocol
                     )
             })
             .collect())
@@ -119,10 +119,10 @@ impl KubernetesEndpointBackend {
         &self,
         context: &PrincipalContext,
         reference: &str,
-    ) -> Result<Endpoint, OperationError> {
+    ) -> Result<EndpointInventoryEntry, OperationError> {
         self.callable(context)?
             .into_iter()
-            .find(|endpoint| connection_ref(endpoint) == reference)
+            .find(|endpoint| endpoint_ref(endpoint) == reference)
             .ok_or_else(operation_refused)
     }
 
@@ -146,7 +146,7 @@ impl KubernetesEndpointBackend {
         &self,
         context: &PrincipalContext,
         provider: &str,
-    ) -> Result<Vec<operation::ConnectionSummary>, OperationError> {
+    ) -> Result<Vec<operation::EndpointSummary>, OperationError> {
         Ok(self
             .callable(context)?
             .iter()
@@ -160,7 +160,7 @@ impl KubernetesEndpointBackend {
         context: &PrincipalContext,
         request: operation::InvokeRequest,
     ) -> Result<InvocationResult, OperationError> {
-        let endpoint = self.by_connection(context, &request.connection_ref)?;
+        let endpoint = self.by_connection(context, &request.endpoint_ref)?;
         if request.description_ref != self.description_ref(context, &request.operation_ref) {
             return Err(operation_refused());
         }
@@ -235,7 +235,7 @@ impl KubernetesEndpointBackend {
                     .map(|ca| driver_sql::SqlTls::WithCa(ca.as_bytes().to_vec()))
                     .unwrap_or(driver_sql::SqlTls::Required),
             };
-            let config = driver_sql::SqlConnectionConfig {
+            let config = driver_sql::SqlEndpointConfig {
                 engine,
                 host: route
                     .logical_url
@@ -271,7 +271,7 @@ impl KubernetesEndpointBackend {
                 connector_audit_ref: audit(
                     context,
                     &request.operation_ref,
-                    &request.connection_ref,
+                    &request.endpoint_ref,
                 ),
                 execution_ref: None,
             });
@@ -291,12 +291,12 @@ impl KubernetesEndpointBackend {
         let (config, secrets) = http_credentials(context, provider, &credentials).await?;
         let egress = self
             .egress
-            .transport(&request.connection_ref, &route)
+            .transport(&request.endpoint_ref, &route)
             .map_err(operation_error)?;
         admitted
             .execute(
                 context.tenant_id(),
-                &request.connection_ref,
+                &request.endpoint_ref,
                 route.logical_url.as_str(),
                 &config,
                 &secrets,
@@ -326,7 +326,7 @@ impl ConnectorBackend for KubernetesEndpointBackend {
 
     fn capabilities(&self) -> service::BackendCapabilities {
         service::BackendCapabilities {
-            connections: true,
+            endpoints: true,
             events: true,
             ..service::BackendCapabilities::OPERATIONS
         }
@@ -356,31 +356,31 @@ impl ConnectorBackend for KubernetesEndpointBackend {
         self.endpoint_event_v2(context, request).await
     }
 
-    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
+    fn owns_endpoint_inventory(&self, request: &EndpointInventoryRequest) -> bool {
         match request {
-            EndpointRequest::List(request) => request
+            EndpointInventoryRequest::List(request) => request
                 .source_ref
                 .as_deref()
                 .is_none_or(|source| source == self.source.source_ref()),
-            EndpointRequest::Refresh(request) => request
+            EndpointInventoryRequest::Refresh(request) => request
                 .source_ref
                 .as_deref()
                 .is_none_or(|source| source == self.source.source_ref()),
-            EndpointRequest::Show(request) => self.source.show(&request.endpoint_ref).is_ok(),
-            EndpointRequest::Bind(request) => self.source.show(&request.endpoint_ref).is_ok(),
+            EndpointInventoryRequest::Show(request) => self.source.show(&request.endpoint_ref).is_ok(),
+            EndpointInventoryRequest::Bind(request) => self.source.show(&request.endpoint_ref).is_ok(),
         }
     }
 
-    async fn handle_endpoint(
+    async fn handle_endpoint_inventory(
         &self,
         context: &PrincipalContext,
-        request: EndpointRequest,
-    ) -> Result<EndpointResult, EndpointError> {
+        request: EndpointInventoryRequest,
+    ) -> Result<EndpointInventoryResult, EndpointInventoryError> {
         if !self.policy.owns(context) {
             return Err(endpoint_error(EndpointSourceError::Denied));
         }
         match request {
-            EndpointRequest::List(request) => {
+            EndpointInventoryRequest::List(request) => {
                 if request
                     .source_ref
                     .as_deref()
@@ -424,8 +424,8 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                         .rsplit_once(':')
                         .ok_or_else(|| endpoint_error(EndpointSourceError::InvalidBinding))?;
                     if prefix != cursor_prefix {
-                        return Err(EndpointError::new(
-                            EndpointErrorCode::Conflict,
+                        return Err(EndpointInventoryError::new(
+                            EndpointInventoryErrorCode::Conflict,
                             "endpoint inventory changed; restart listing",
                             false,
                         ));
@@ -444,15 +444,15 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                     .min(endpoints.len());
                 let mut warnings = self.source.warnings().map_err(endpoint_error)?;
                 if !self.policy.manages(context) && !warnings.is_empty() {
-                    warnings = vec!["Endpoint source refresh is incomplete".to_owned()];
+                    warnings = vec!["EndpointInventoryEntry source refresh is incomplete".to_owned()];
                 }
-                Ok(EndpointResult::List {
+                Ok(EndpointInventoryResult::List {
                     endpoints: endpoints[offset..end].to_vec(),
                     next_cursor: (end < endpoints.len()).then(|| format!("{cursor_prefix}:{end}")),
                     warnings,
                 })
             }
-            EndpointRequest::Show(request) => {
+            EndpointInventoryRequest::Show(request) => {
                 let endpoint = self
                     .source
                     .show(&request.endpoint_ref)
@@ -460,20 +460,20 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                 if !self.policy.reads(context, &endpoint) {
                     return Err(endpoint_error(EndpointSourceError::Denied));
                 }
-                Ok(EndpointResult::Show { endpoint })
+                Ok(EndpointInventoryResult::Show { endpoint })
             }
-            EndpointRequest::Bind(request) => {
+            EndpointInventoryRequest::Bind(request) => {
                 if !self.policy.manages(context) {
                     return Err(endpoint_error(EndpointSourceError::Denied));
                 }
-                Ok(EndpointResult::Bind {
+                Ok(EndpointInventoryResult::Bind {
                     endpoint: self
                         .source
                         .bind(&request.endpoint_ref, request.binding)
                         .map_err(endpoint_error)?,
                 })
             }
-            EndpointRequest::Refresh(request) => {
+            EndpointInventoryRequest::Refresh(request) => {
                 if !self.policy.manages(context)
                     || request
                         .source_ref
@@ -483,7 +483,7 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                     return Err(endpoint_error(EndpointSourceError::Denied));
                 }
                 let scan = self.source.refresh().await.map_err(endpoint_error)?;
-                Ok(EndpointResult::Refresh {
+                Ok(EndpointInventoryResult::Refresh {
                     endpoints: scan.endpoints.len(),
                     warnings: scan.warnings.into_iter().take(100).collect(),
                 })
@@ -513,7 +513,7 @@ impl ConnectorBackend for KubernetesEndpointBackend {
             .validate(reference)
             .await
             .map_err(operation_error)?;
-        Ok(connection_ref(&endpoint))
+        Ok(endpoint_ref(&endpoint))
     }
 
     fn owns_operation(&self, request: &OperationRequest) -> bool {
@@ -535,7 +535,7 @@ impl ConnectorBackend for KubernetesEndpointBackend {
             .is_some_and(|operation| {
                 self.source.list().is_ok_and(|endpoints| {
                     endpoints.iter().any(|endpoint| {
-                        connection_ref(endpoint) == request.connection_ref
+                        endpoint_ref(endpoint) == request.endpoint_ref
                             && endpoint.provider.as_deref() == Some(operation.provider)
                     })
                 })
@@ -582,14 +582,14 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                 let operation =
                     catalog::operation(catalog::OperationKey::id(&request.operation_ref))
                         .ok_or_else(operation_refused)?;
-                let connections = self.connections_for(context, operation.provider)?;
-                if connections.is_empty() {
+                let endpoints = self.connections_for(context, operation.provider)?;
+                if endpoints.is_empty() {
                     return Err(operation_refused());
                 }
                 Ok(OperationResult::Describe(catalog_endpoint::describe(
                     operation.provider,
                     operation.id,
-                    connections,
+                    endpoints,
                     self.description_ref(context, operation.id),
                 )?))
             }
@@ -601,35 +601,35 @@ impl ConnectorBackend for KubernetesEndpointBackend {
         }
     }
 
-    fn owns_connection(&self, request: &connection::ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &connection::EndpointRequest) -> bool {
         match request {
-            connection::ConnectionRequest::Search(_) => true,
-            connection::ConnectionRequest::Describe(request) => {
+            connection::EndpointRequest::Search(_) => true,
+            connection::EndpointRequest::Describe(request) => {
                 self.source.list().is_ok_and(|endpoints| {
                     endpoints
                         .iter()
-                        .any(|endpoint| connection_ref(endpoint) == request.connection_ref)
+                        .any(|endpoint| endpoint_ref(endpoint) == request.endpoint_ref)
                 })
             }
             _ => false,
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: connection::ConnectionRequest,
-    ) -> Result<connection::ConnectionResult, connection::ConnectionError> {
+        request: connection::EndpointRequest,
+    ) -> Result<connection::EndpointResult, connection::EndpointError> {
         let refused = || {
-            connection::ConnectionError::new(
-                connection::ConnectionErrorCode::NotGranted,
+            connection::EndpointError::new(
+                connection::EndpointErrorCode::NotGranted,
                 "endpoint Connection is not admitted",
                 false,
             )
         };
         match request {
-            connection::ConnectionRequest::Search(request) => {
-                let connections = self
+            connection::EndpointRequest::Search(request) => {
+                let endpoints = self
                     .callable(context)
                     .map_err(|_| refused())?
                     .iter()
@@ -640,17 +640,17 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                             .contains(&request.query.to_ascii_lowercase())
                     })
                     .take(usize::from(request.limit))
-                    .map(connection_summary)
+                    .map(endpoint_summary)
                     .collect();
-                Ok(connection::ConnectionResult::Search { connections })
+                Ok(connection::EndpointResult::Search { endpoints })
             }
-            connection::ConnectionRequest::Describe(request) => {
+            connection::EndpointRequest::Describe(request) => {
                 let endpoint = self
-                    .by_connection(context, &request.connection_ref)
+                    .by_connection(context, &request.endpoint_ref)
                     .map_err(|_| refused())?;
-                Ok(connection::ConnectionResult::Describe(
-                    connection::ConnectionDescription {
-                        summary: connection_summary(&endpoint),
+                Ok(connection::EndpointResult::Describe(
+                    connection::EndpointDescription {
+                        summary: endpoint_summary(&endpoint),
                         channels: Vec::new(),
                     },
                 ))
@@ -660,16 +660,16 @@ impl ConnectorBackend for KubernetesEndpointBackend {
     }
 }
 
-fn connection_ref(endpoint: &Endpoint) -> String {
+fn endpoint_ref(endpoint: &EndpointInventoryEntry) -> String {
     format!(
         "connection:endpoint:{}",
         hex::encode(Sha256::digest(endpoint.endpoint_ref.as_bytes()))
     )
 }
 
-fn operation_connection(endpoint: &Endpoint) -> operation::ConnectionSummary {
-    operation::ConnectionSummary {
-        connection_ref: connection_ref(endpoint),
+fn operation_connection(endpoint: &EndpointInventoryEntry) -> operation::EndpointSummary {
+    operation::EndpointSummary {
+        endpoint_ref: endpoint_ref(endpoint),
         label: endpoint.resource_name.clone(),
         provider: endpoint.provider.clone().unwrap_or_default(),
         audiences: Vec::new(),
@@ -677,14 +677,14 @@ fn operation_connection(endpoint: &Endpoint) -> operation::ConnectionSummary {
     }
 }
 
-fn connection_summary(endpoint: &Endpoint) -> connection::ConnectionSummary {
-    connection::ConnectionSummary {
-        connection_ref: connection_ref(endpoint),
+fn endpoint_summary(endpoint: &EndpointInventoryEntry) -> connection::EndpointSummary {
+    connection::EndpointSummary {
+        endpoint_ref: endpoint_ref(endpoint),
         integration_ref: endpoint.provider.clone().unwrap_or_default(),
         label: endpoint.resource_name.clone(),
-        state: connection::ConnectionState::Authorized,
-        initiation: vec![connection::ConnectionInitiator::Platform],
-        route: connection::ConnectionRoute::Direct,
+        state: connection::EndpointState::Authorized,
+        initiation: vec![connection::EndpointInitiator::Platform],
+        route: connection::EndpointRoute::Direct,
         scope: None,
         actor: None,
         auth_profile: None,
@@ -758,14 +758,14 @@ fn audit(context: &PrincipalContext, operation: &str, connection: &str) -> Strin
     )
 }
 
-pub(super) fn endpoint_error(error: EndpointSourceError) -> EndpointError {
+pub(super) fn endpoint_error(error: EndpointSourceError) -> EndpointInventoryError {
     let code = match error {
-        EndpointSourceError::Denied => EndpointErrorCode::NotGranted,
-        EndpointSourceError::Stale => EndpointErrorCode::NotFound,
-        EndpointSourceError::InvalidBinding => EndpointErrorCode::InvalidInput,
-        _ => EndpointErrorCode::Unavailable,
+        EndpointSourceError::Denied => EndpointInventoryErrorCode::NotGranted,
+        EndpointSourceError::Stale => EndpointInventoryErrorCode::NotFound,
+        EndpointSourceError::InvalidBinding => EndpointInventoryErrorCode::InvalidInput,
+        _ => EndpointInventoryErrorCode::Unavailable,
     };
-    EndpointError::new(
+    EndpointInventoryError::new(
         code,
         error.to_string(),
         matches!(error, EndpointSourceError::Unavailable),

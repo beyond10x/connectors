@@ -1,5 +1,5 @@
 use super::*;
-use domain::endpoint::{EndpointBinding, EndpointCredentialReference};
+use domain::endpoint_inventory::{EndpointBinding, EndpointCredentialReference};
 use service::{EgressHttpRequest, EgressHttpResponse, EgressTransportError, EgressWebSocket};
 use std::sync::Mutex;
 
@@ -157,7 +157,7 @@ async fn ari_execution_resolves_the_current_named_secret_and_keeps_invalid_input
         EndpointPrincipalPolicy::Local(Arc::new(context.clone())),
         Arc::new(Factory(transport.clone())),
     );
-    let connection_ref = backend
+    let endpoint_ref = backend
         .resolve_endpoint(&context, &endpoint_ref, OPERATION)
         .await
         .unwrap();
@@ -175,7 +175,7 @@ async fn ari_execution_resolves_the_current_named_secret_and_keeps_invalid_input
     };
     let request = operation::InvokeRequest {
         operation_ref: OPERATION.to_owned(),
-        connection_ref,
+        endpoint_ref,
         description_ref: description.description_ref,
         input: serde_json::json!({}),
         approval_evidence_ref: None,

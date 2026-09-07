@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use domain::Grant;
-use protocol::connection::{ConnectionError, ConnectionRequest, ConnectionResult};
+use protocol::endpoint::{EndpointError, EndpointRequest, EndpointResult};
 use protocol::datasource::{DatasourceError, DatasourceRequest, DatasourceResult};
 use protocol::event::{EventError, EventRequest, EventResult};
 use protocol::operation::{
@@ -40,7 +40,7 @@ pub enum ServiceBundleError {
     #[error("a permanent provider authority was assigned more than once")]
     ProviderAuthorityCollision,
     #[error("a permanent service Connection was assigned more than once")]
-    ConnectionIdentityCollision,
+    EndpointIdentityCollision,
     #[error("a deployment-owned Grant reference was assigned to more than one service")]
     GrantIdentityCollision,
     #[error("a deployment operation policy or resource reference is invalid")]
@@ -135,8 +135,8 @@ impl ServiceBundleBuilder {
             if other.provider.authority == deployment.provider.authority {
                 return Err(ServiceBundleError::ProviderAuthorityCollision);
             }
-            if other.provider.connection_ref == deployment.provider.connection_ref {
-                return Err(ServiceBundleError::ConnectionIdentityCollision);
+            if other.provider.endpoint_ref == deployment.provider.endpoint_ref {
+                return Err(ServiceBundleError::EndpointIdentityCollision);
             }
             let other_grants = deployment_grant_refs(other);
             if deployment_grant_refs(&deployment)
@@ -297,14 +297,14 @@ impl ServiceBundle {
                     let grant = grants.entry(grant_ref.clone()).or_insert_with(|| Grant {
                         grant: grant_ref.clone(),
                         provider: service.deployment.provider.provider_ref.clone(),
-                        connection: service.deployment.provider.connection_ref.clone(),
+                        connection: service.deployment.provider.endpoint_ref.clone(),
                         selector: None,
                         allow: BTreeSet::new(),
                         deny: BTreeSet::new(),
                         inbound_events: BTreeSet::new(),
                     });
                     if grant.provider != service.deployment.provider.provider_ref
-                        || grant.connection != service.deployment.provider.connection_ref
+                        || grant.connection != service.deployment.provider.endpoint_ref
                     {
                         // This cannot happen after provider/Connection collision validation, but
                         // retaining only the first closed Grant is safer than widening one record.
@@ -362,7 +362,7 @@ fn validate_deployment(
 ) -> Result<(), ServiceBundleError> {
     if !valid_provider_ref(&deployment.provider.provider_ref)
         || !valid_authority(&deployment.provider.authority)
-        || !valid_ref(&deployment.provider.connection_ref)
+        || !valid_ref(&deployment.provider.endpoint_ref)
     {
         return Err(ServiceBundleError::InvalidProviderIdentity);
     }
@@ -468,20 +468,20 @@ impl ConnectorBackend for DeployedServiceBackend {
         self.owns_declared_operation(request)
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
-        self.inner.owns_connection(request)
-    }
-
-    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
         self.inner.owns_endpoint(request)
     }
 
-    async fn handle_endpoint(
+    fn owns_endpoint_inventory(&self, request: &protocol::endpoint_inventory::EndpointInventoryRequest) -> bool {
+        self.inner.owns_endpoint_inventory(request)
+    }
+
+    async fn handle_endpoint_inventory(
         &self,
         context: &PrincipalContext,
-        request: protocol::endpoint::EndpointRequest,
-    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
-        self.inner.handle_endpoint(context, request).await
+        request: protocol::endpoint_inventory::EndpointInventoryRequest,
+    ) -> Result<protocol::endpoint_inventory::EndpointInventoryResult, protocol::endpoint_inventory::EndpointInventoryError> {
+        self.inner.handle_endpoint_inventory(context, request).await
     }
 
     async fn resolve_endpoint(
@@ -497,7 +497,7 @@ impl ConnectorBackend for DeployedServiceBackend {
 
     fn connect_session_access(
         &self,
-        request: &protocol::connection::ConnectSessionCreateRequest,
+        request: &protocol::endpoint::ConnectSessionCreateRequest,
     ) -> ConnectSessionAccess {
         self.inner.connect_session_access(request)
     }
@@ -626,12 +626,12 @@ impl ConnectorBackend for DeployedServiceBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
-        self.inner.handle_connection(context, request).await
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
+        self.inner.handle_endpoint(context, request).await
     }
 
     async fn handle_event(
@@ -774,7 +774,7 @@ mod tests {
                             title: "backend title is replaced".to_owned(),
                             effect: EffectClass::ReadOnly,
                             approval: ApprovalPosture::NotRequired,
-                            connections: Vec::new(),
+                            endpoints: Vec::new(),
                         })
                         .collect(),
                 }),
@@ -788,7 +788,7 @@ mod tests {
                         output_schema: json!(true),
                         effect: EffectClass::ReadOnly,
                         approval: ApprovalPosture::NotRequired,
-                        connections: Vec::new(),
+                        endpoints: Vec::new(),
                         description_ref: "description:synthetic".to_owned(),
                     }))
                 }
@@ -829,7 +829,7 @@ mod tests {
             provider: ProviderIdentity {
                 provider_ref: provider_ref.to_owned(),
                 authority: authority.to_owned(),
-                connection_ref: format!("connection:{provider_ref}"),
+                endpoint_ref: format!("connection:{provider_ref}"),
             },
             operations: operations
                 .iter()
@@ -916,7 +916,7 @@ mod tests {
                     &context(),
                     service::RemediationTarget {
                         operation_ref: SECOND_OPERATION,
-                        connection_ref: "connection:provider:usage",
+                        endpoint_ref: "connection:provider:usage",
                     },
                 ),
                 Err(service::RemediationError::Unsupported)
@@ -1070,11 +1070,11 @@ mod tests {
             "dev.b10x.b",
             &[(SECOND_OPERATION, true)],
         );
-        second.provider.connection_ref = first.provider.connection_ref.clone();
+        second.provider.endpoint_ref = first.provider.endpoint_ref.clone();
         connection_collision.deploy(first).unwrap();
         assert_eq!(
             connection_collision.deploy(second).err(),
-            Some(ServiceBundleError::ConnectionIdentityCollision)
+            Some(ServiceBundleError::EndpointIdentityCollision)
         );
 
         let mut grant_collision = ServiceBundleBuilder::new();

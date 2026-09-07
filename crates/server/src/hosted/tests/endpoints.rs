@@ -2,8 +2,8 @@
 
 use super::*;
 use protocol::{
-    endpoint,
-    operation::{self, v4},
+    endpoint_inventory as endpoint,
+    operation::{self, v5},
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -34,7 +34,7 @@ impl ConnectorBackend for EndpointBackend {
                 subscription_ref: "subscription:fixture".into(),
                 channel: protocol::event::ChannelSummary {
                     channel_ref: "channel:fixture".into(),
-                    connection_ref: "connection:resolved".into(),
+                    endpoint_ref: "connection:resolved".into(),
                     integration_ref: "asterisk".into(),
                     binding_ref: request.channel_binding,
                     events: vec!["ari.event".into()],
@@ -46,24 +46,24 @@ impl ConnectorBackend for EndpointBackend {
             _ => unreachable!(),
         }
     }
-    async fn handle_endpoint(
+    async fn handle_endpoint_inventory(
         &self,
         _: &PrincipalContext,
-        request: endpoint::EndpointRequest,
-    ) -> Result<endpoint::EndpointResult, endpoint::EndpointError> {
+        request: endpoint::EndpointInventoryRequest,
+    ) -> Result<endpoint::EndpointInventoryResult, endpoint::EndpointInventoryError> {
         self.management.fetch_add(1, Ordering::SeqCst);
         match request {
-            endpoint::EndpointRequest::Refresh(_) => Ok(endpoint::EndpointResult::Refresh {
+            endpoint::EndpointInventoryRequest::Refresh(_) => Ok(endpoint::EndpointInventoryResult::Refresh {
                 endpoints: 0,
                 warnings: Vec::new(),
             }),
-            endpoint::EndpointRequest::List(_) => Ok(endpoint::EndpointResult::List {
+            endpoint::EndpointInventoryRequest::List(_) => Ok(endpoint::EndpointInventoryResult::List {
                 endpoints: Vec::new(),
                 next_cursor: None,
                 warnings: Vec::new(),
             }),
-            _ => Err(endpoint::EndpointError::new(
-                endpoint::EndpointErrorCode::NotFound,
+            _ => Err(endpoint::EndpointInventoryError::new(
+                endpoint::EndpointInventoryErrorCode::NotFound,
                 "fixture endpoint unavailable",
                 false,
             )),
@@ -97,7 +97,7 @@ impl ConnectorBackend for EndpointBackend {
                 false,
             )),
             OperationRequest::Invoke(request) => {
-                assert_eq!(request.connection_ref, "connection:resolved");
+                assert_eq!(request.endpoint_ref, "connection:resolved");
                 self.invocations.fetch_add(1, Ordering::SeqCst);
                 Ok(OperationResult::Invoke(InvocationResult {
                     operation_ref: request.operation_ref,
@@ -113,9 +113,9 @@ impl ConnectorBackend for EndpointBackend {
         &self,
         _: &PrincipalContext,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
     ) -> Result<OperationDescription, OperationError> {
-        assert_eq!(connection_ref, "connection:resolved");
+        assert_eq!(endpoint_ref, "connection:resolved");
         self.target_descriptions.fetch_add(1, Ordering::SeqCst);
         Ok(OperationDescription {
             operation_ref: operation_ref.into(),
@@ -125,8 +125,8 @@ impl ConnectorBackend for EndpointBackend {
             output_schema: serde_json::json!({"type":"object"}),
             effect: EffectClass::ReadOnly,
             approval: ApprovalPosture::NotRequired,
-            connections: vec![protocol::operation::ConnectionSummary {
-                connection_ref: "connection:resolved".into(),
+            endpoints: vec![protocol::operation::EndpointSummary {
+                endpoint_ref: "connection:resolved".into(),
                 label: "Fixture".into(),
                 provider: "fixture".into(),
                 audiences: Vec::new(),
@@ -169,9 +169,9 @@ fn http(path: &str, value: &impl serde::Serialize) -> Request<Body> {
         .body(Body::from(serde_json::to_vec(value).unwrap()))
         .unwrap()
 }
-fn request(request: v4::OperationRequest) -> v4::RequestEnvelope {
-    v4::RequestEnvelope {
-        protocol: v4::CONTRACT.into(),
+fn request(request: v5::OperationRequest) -> v5::RequestEnvelope {
+    v5::RequestEnvelope {
+        protocol: v5::CONTRACT.into(),
         request_id: "request:endpoint".into(),
         context: context(),
         request,
@@ -264,8 +264,8 @@ async fn event_v2_reader_rejects_extra_and_duplicate_fields_before_dispatch() {
 async fn endpoint_management_requires_operator_even_with_management_scope() {
     let backend = Arc::new(EndpointBackend::default());
     for request in [
-        endpoint::EndpointRequest::Refresh(endpoint::RefreshRequest { source_ref: None }),
-        endpoint::EndpointRequest::Bind(endpoint::BindRequest {
+        endpoint::EndpointInventoryRequest::Refresh(endpoint::RefreshRequest { source_ref: None }),
+        endpoint::EndpointInventoryRequest::Bind(endpoint::BindRequest {
             endpoint_ref: "endpoint:one".into(),
             binding: endpoint::EndpointBinding {
                 provider: "fixture".into(),
@@ -301,16 +301,15 @@ async fn endpoint_describe_and_invoke_enter_existing_connection_dispatch() {
     let response = app(backend.clone(), true)
         .oneshot(http(
             "/operations",
-            &request(v4::OperationRequest::Describe(v4::DescribeRequest {
+            &request(v5::OperationRequest::Describe(v5::DescribeRequest {
                 operation_ref: "fixture.read".into(),
-                connection_ref: None,
                 endpoint_ref: Some("endpoint:one".into()),
             })),
         ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    let response: v4::ResponseEnvelope = serde_json::from_slice(
+    let response: v5::ResponseEnvelope = serde_json::from_slice(
         &to_bytes(response.into_body(), operation::MAX_RESULT_BYTES)
             .await
             .unwrap(),
@@ -320,14 +319,13 @@ async fn endpoint_describe_and_invoke_enter_existing_connection_dispatch() {
     let Some(OperationResult::Describe(description)) = response.response else {
         panic!("expected target description")
     };
-    assert_eq!(description.connections.len(), 1);
+    assert_eq!(description.endpoints.len(), 1);
     let response = app(backend.clone(), true)
         .oneshot(http(
             "/operations",
-            &request(v4::OperationRequest::Invoke(v4::InvokeRequest {
+            &request(v5::OperationRequest::Invoke(v5::InvokeRequest {
                 operation_ref: "fixture.read".into(),
-                connection_ref: None,
-                endpoint_ref: Some("endpoint:one".into()),
+                endpoint_ref: "endpoint:one".into(),
                 description_ref: description.description_ref,
                 input: serde_json::json!({}),
                 approval_evidence_ref: None,
@@ -336,7 +334,7 @@ async fn endpoint_describe_and_invoke_enter_existing_connection_dispatch() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    let response: v4::ResponseEnvelope = serde_json::from_slice(
+    let response: v5::ResponseEnvelope = serde_json::from_slice(
         &to_bytes(response.into_body(), operation::MAX_RESULT_BYTES)
             .await
             .unwrap(),
@@ -358,10 +356,9 @@ async fn denied_invocation_does_not_even_resolve_the_endpoint() {
     let response = app(backend.clone(), false)
         .oneshot(http(
             "/operations",
-            &request(v4::OperationRequest::Invoke(v4::InvokeRequest {
+            &request(v5::OperationRequest::Invoke(v5::InvokeRequest {
                 operation_ref: "fixture.read".into(),
-                connection_ref: None,
-                endpoint_ref: Some("endpoint:one".into()),
+                endpoint_ref: "endpoint:one".into(),
                 description_ref: "description:fixture".into(),
                 input: serde_json::json!({}),
                 approval_evidence_ref: None,
@@ -386,7 +383,7 @@ async fn endpoint_inventory_refuses_cross_tenant_before_backend_access() {
                 protocol: endpoint::CONTRACT.into(),
                 request_id: "request:inventory".into(),
                 context: owner,
-                request: endpoint::EndpointRequest::List(endpoint::ListRequest {
+                request: endpoint::EndpointInventoryRequest::List(endpoint::ListRequest {
                     source_ref: None,
                     query: String::new(),
                     limit: 10,

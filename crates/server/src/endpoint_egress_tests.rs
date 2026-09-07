@@ -4,7 +4,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 #[tokio::test]
 async fn forwarded_websocket_retains_logical_host_and_declared_authentication() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let transport = ConnectionEgress::for_endpoint_route(
+    let transport = EndpointEgress::for_endpoint_route(
         "connection:ari",
         "http://asterisk.voice.svc:8088/",
         Some(listener.local_addr().unwrap()),
@@ -64,7 +64,7 @@ async fn forwarded_websocket_retains_logical_host_and_declared_authentication() 
 #[tokio::test]
 async fn endpoint_headers_cannot_replace_the_logical_host() {
     use service::EgressTransport;
-    let transport = ConnectionEgress::for_endpoint_route(
+    let transport = EndpointEgress::for_endpoint_route(
         "connection:fixture",
         "http://loki.monitoring.svc:3100/",
         Some("127.0.0.1:1".parse().unwrap()),
@@ -98,7 +98,7 @@ async fn endpoint_headers_cannot_replace_the_logical_host() {
 async fn forwarded_http_retains_logical_host_and_refuses_another_authority_or_origin() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let route = listener.local_addr().unwrap();
-    let transport = ConnectionEgress::for_endpoint_route(
+    let transport = EndpointEgress::for_endpoint_route(
         "connection:fixture",
         "http://loki.monitoring.svc:3100/",
         Some(route),
@@ -177,9 +177,9 @@ fn endpoint_route_cannot_smuggle_a_destination_or_secret_into_its_capability() {
         "http://service.local/#fragment",
         "file:///etc/passwd",
     ] {
-        assert!(ConnectionEgress::for_endpoint_route("connection:fixture", origin, None).is_err());
+        assert!(EndpointEgress::for_endpoint_route("connection:fixture", origin, None).is_err());
     }
-    assert!(ConnectionEgress::for_endpoint_route(
+    assert!(EndpointEgress::for_endpoint_route(
         "connection:fixture",
         "http://service.local/",
         Some("10.0.0.2:8080".parse().unwrap())
