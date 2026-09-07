@@ -3,7 +3,7 @@ use super::*;
 
 #[tokio::test]
 async fn old_discovery_contracts_refuse_before_backend_dispatch() {
-    use protocol::connection::*;
+    use protocol::endpoint::*;
     let backend = Arc::new(SyntheticBackend::default());
     let (socket, root) = temporary_socket();
     let daemon = LocalOperationDaemon::bind(&socket, backend.clone())
@@ -13,23 +13,23 @@ async fn old_discovery_contracts_refuse_before_backend_dispatch() {
     let serving = tokio::spawn(daemon.serve_until(async {
         let _ = stopped.await;
     }));
-    for version in [CONTRACT, protocol::connection_v2::CONTRACT] {
+    for version in [CONTRACT, protocol::endpoint_v2::CONTRACT] {
         for request in [
-            ConnectionRequest::CandidateSearch(CandidateSearchRequest {
+            EndpointRequest::CandidateSearch(CandidateSearchRequest {
                 integration_ref: "kubernetes".into(),
                 query: String::new(),
                 limit: 1,
             }),
-            ConnectionRequest::CandidateActivate(CandidateActivateRequest {
+            EndpointRequest::CandidateActivate(CandidateActivateRequest {
                 candidate_ref: "candidate:fixture".into(),
                 label: "fixture".into(),
             }),
-            ConnectionRequest::ObservationSearch(ObservationSearchRequest {
-                source_connection_ref: "connection:fixture".into(),
+            EndpointRequest::ObservationSearch(ObservationSearchRequest {
+                source_endpoint_ref: "connection:fixture".into(),
                 query: String::new(),
                 limit: 1,
             }),
-            ConnectionRequest::Materialize(MaterializeRequest {
+            EndpointRequest::Materialize(MaterializeRequest {
                 observation_ref: "observation:fixture".into(),
             }),
         ] {
@@ -49,7 +49,7 @@ async fn old_discovery_contracts_refuse_before_backend_dispatch() {
                 .await
                 .unwrap();
             let (_, response) =
-                protocol::connection_v2::decode_response(response.as_bytes()).unwrap();
+                protocol::endpoint_v2::decode_response(response.as_bytes()).unwrap();
             let error = response.error.unwrap();
             assert!(!error.retriable);
             assert!(error.message.contains("legacy discovery is retired"));

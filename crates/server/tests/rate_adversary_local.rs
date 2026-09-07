@@ -59,7 +59,7 @@ async fn rate_adversary_local_versions_validate_before_single_dispatch() {
             (Some(30), true, false),
             (Some(30), false, true),
         ] {
-            let frame = json!({"protocol":version,"request_id":"local-adversary","context":{"tenant_id":"local","agent_id":"agent","agent_revision":if bad_context {0}else{1},"authority_snapshot_id":"snapshot","authority_snapshot_sha256":"a".repeat(64)},"request":{"method":"invoke","params":{"operation_ref":"fixture.read","connection_ref":"connection:fixture","description_ref":"description:fixture","input":{"delay":delay,"bad":bad_response}}}});
+            let frame = json!({"protocol":version,"request_id":"local-adversary","context":{"tenant_id":"local","agent_id":"agent","agent_revision":if bad_context {0}else{1},"authority_snapshot_id":"snapshot","authority_snapshot_sha256":"a".repeat(64)},"request":{"method":"invoke","params":{"operation_ref":"fixture.read","endpoint_ref":"connection:fixture","description_ref":"description:fixture","input":{"delay":delay,"bad":bad_response}}}});
             let mut stream = tokio::net::UnixStream::connect(&socket).await.unwrap();
             stream
                 .write_all(format!("{frame}\n").as_bytes())
@@ -141,7 +141,7 @@ impl ConnectorBackend for FinalDescribeBackend {
                 output_schema: serde_json::json!({"type":"object","properties":{"vendor":{"const":"retained"}}}),
                 effect: EffectClass::ReadOnly,
                 approval: ApprovalPosture::NotRequired,
-                connections: vec![],
+                endpoints: vec![],
                 description_ref: "fixture-description".into(),
                 rate_advice: Some(protocol::operation::OperationRateAdvice {
                     fixed: None,

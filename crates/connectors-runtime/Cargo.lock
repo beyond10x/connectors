@@ -729,6 +729,7 @@ version = "0.7.2"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
  "catalog",
  "connector-resolve",
  "connector-secrets",
@@ -771,6 +772,7 @@ dependencies = [
  "tokio-rustls",
  "toml",
  "tower",
+ "tungstenite 0.28.0",
  "url",
  "zeroize",
 ]

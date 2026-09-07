@@ -28,7 +28,7 @@ fn doc_json() -> &'static str {
 const ENVELOPE_EXAMPLE_FLOORS: [(&str, usize); 6] = [
     ("/approvals", 1),
     ("/operations", 7),
-    ("/connections", 8),
+    ("/endpoints", 8),
     ("/catalog", 2),
     ("/events", 3),
     ("/datasources", 4),
@@ -100,12 +100,12 @@ fn assert_request_example_accepted(path: &str, name: &str, value: Value) {
             protocol::operation::versions::decode_request(&serde_json::to_vec(&value).unwrap())
                 .unwrap_or_else(|error| refused("validation", error.to_string()));
         }
-        "/connections" => {
-            if value["protocol"] == protocol::connection_v2::CONTRACT {
-                protocol::connection_v2::decode_request(&serde_json::to_vec(&value).unwrap())
+        "/endpoints" => {
+            if value["protocol"] == protocol::endpoint_v2::CONTRACT {
+                protocol::endpoint_v2::decode_request(&serde_json::to_vec(&value).unwrap())
                     .unwrap_or_else(|error| refused("validation", error.to_string()));
             } else {
-                serde_json::from_value::<ConnectionRequestEnvelope>(value)
+                serde_json::from_value::<EndpointRequestEnvelope>(value)
                     .unwrap_or_else(|error| refused("type", error.to_string()))
                     .validate()
                     .unwrap_or_else(|error| refused("validation", error.to_string()));
@@ -230,7 +230,7 @@ fn every_documented_refusal_example_names_a_real_error_code() {
                         operation_codes
                             .insert(code_string.unwrap_or_else(|| refused("no code".to_owned())))
                     }
-                    "/connections" => serde_json::from_value::<ConnectionError>(error)
+                    "/endpoints" => serde_json::from_value::<EndpointError>(error)
                         .map(|_| true)
                         .unwrap_or_else(|error| refused(error.to_string())),
                     "/events" => serde_json::from_value::<EventError>(error)
@@ -359,7 +359,7 @@ fn the_document_pins_the_exact_wire_contract_identities_and_audience() {
         ("operation.requestEnvelope", protocol::operation::CONTRACT),
         (
             "connection.request_envelope",
-            protocol::connection::CONTRACT,
+            protocol::endpoint::CONTRACT,
         ),
         ("catalog.requestEnvelope", protocol::catalog::CONTRACT),
         ("event.request_envelope", protocol::event::CONTRACT),
@@ -384,8 +384,8 @@ fn the_document_pins_the_exact_wire_contract_identities_and_audience() {
     for scope in [
         "connectors.catalog.read",
         "connectors.invoke",
-        "connectors.connections.manage",
-        "connectors.connections.self",
+        "connectors.endpoints.manage",
+        "connectors.endpoints.self",
         "connectors.events.read",
         "connectors.events.self",
     ] {
@@ -532,7 +532,7 @@ async fn every_docs_page_example_is_the_documents_example_after_json_normalizati
     }
     for path in [
         "/operations",
-        "/connections",
+        "/endpoints",
         "/catalog",
         "/events",
         "/datasources",
@@ -681,7 +681,7 @@ fn auth_openapi_selects_each_supported_identity_explicitly() {
             ],
         ),
         (
-            "/connections",
+            "/endpoints",
             vec![
                 "connection.request_envelope",
                 "connection.v2.request_envelope",
@@ -766,7 +766,7 @@ fn auth_openapi_remediation_examples_keep_the_operation_unattempted() {
         "remediation_acknowledge",
     ] {
         let examples: std::collections::BTreeMap<_, _> =
-            request_examples(&doc, "/connections").into_iter().collect();
+            request_examples(&doc, "/endpoints").into_iter().collect();
         let example = examples
             .get(name)
             .expect("each explicit bound command is documented");
@@ -776,7 +776,7 @@ fn auth_openapi_remediation_examples_keep_the_operation_unattempted() {
             .get("approval_evidence_ref")
             .is_none());
     }
-    let description = doc["paths"]["/connections"]["post"]["description"]
+    let description = doc["paths"]["/endpoints"]["post"]["description"]
         .as_str()
         .unwrap();
     assert!(description.contains("hosted acquisition remains Unsupported"));
@@ -827,7 +827,7 @@ fn auth_openapi_schema_projection_preserves_protocol_vector_results() {
 
 #[tokio::test]
 async fn auth_openapi_503_schemas_admit_all_supported_unavailable_versions() {
-    use protocol::{connection_v2, operation::versions};
+    use protocol::{endpoint_v2 as connection_v2, operation::versions};
 
     let response = test_router()
         .oneshot(Request::get("/openapi.json").body(Body::empty()).unwrap())
@@ -883,7 +883,7 @@ async fn auth_openapi_503_schemas_admit_all_supported_unavailable_versions() {
             "/operations",
             vec![operation_v1, operation_v2, operation_v3],
         ),
-        ("/connections", vec![connection_v1, connection_v2]),
+        ("/endpoints", vec![connection_v1, connection_v2]),
     ] {
         let mut schema = doc["paths"][path]["post"]["responses"]["503"]["content"]
             ["application/json"]["schema"]

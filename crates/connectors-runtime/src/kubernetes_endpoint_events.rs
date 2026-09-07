@@ -248,7 +248,7 @@ impl KubernetesEndpointBackend {
         let subscription_ref = format!("subscription:endpoint:{identity}");
         let summary = event::ChannelSummary {
             channel_ref: format!("channel:endpoint:{identity}"),
-            connection_ref: connection_ref(&endpoint),
+            endpoint_ref: endpoint_ref(&endpoint),
             integration_ref: provider.id.to_owned(),
             binding_ref: channel.name.to_owned(),
             events: channel
@@ -317,12 +317,12 @@ impl KubernetesEndpointBackend {
         );
         let transport = self
             .egress
-            .transport(&summary.connection_ref, &route)
+            .transport(&summary.endpoint_ref, &route)
             .map_err(source_error)?;
         let socket = tokio::time::timeout(
             Duration::from_secs(15),
             transport.connect_websocket_with_headers(
-                &summary.connection_ref,
+                &summary.endpoint_ref,
                 plan.url.expose_secret().to_owned(),
                 headers,
                 event::MAX_EVENT_BYTES,
@@ -377,7 +377,7 @@ fn current_subscription(
     if endpoint.binding != subscription.endpoint.binding
         || source.grant_for(provider).is_none()
         || source.binding_digest(provider).map_err(source_error)? != subscription.authority
-        || matches!(endpoint.state, EndpointState::Denied | EndpointState::Stale)
+        || matches!(endpoint.state, EndpointReadiness::Denied | EndpointReadiness::Stale)
     {
         return Err(stale());
     }

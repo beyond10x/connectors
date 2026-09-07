@@ -87,8 +87,8 @@ fn a_hosted_placement_keeps_its_state_in_a_file_when_no_database_is_offered() {
         Some(path.to_str().expect("a UTF-8 test path").to_owned()),
     )
     .expect("a named SQLite file is a complete answer to where hosted state lives");
-    store.replace("connections", b"one", 64).unwrap();
-    let read_back = store.read("connections", 64).unwrap();
+    store.replace("endpoints", b"one", 64).unwrap();
+    let read_back = store.read("endpoints", 64).unwrap();
     assert_eq!(read_back.as_deref(), Some(&b"one"[..]));
     assert!(path.exists(), "the bookkeeping went to the named file");
 }

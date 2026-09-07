@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use protocol::connection_v2::{
+use protocol::endpoint_v2::{
     BoundRemediationStatus, RemediationAcknowledgeRequest, RemediationAcknowledgement,
     RemediationStatusRequest,
 };
@@ -47,7 +47,7 @@ pub enum RemediationError {
 #[derive(Clone, Copy)]
 pub struct RemediationTarget<'a> {
     pub operation_ref: &'a str,
-    pub connection_ref: &'a str,
+    pub endpoint_ref: &'a str,
 }
 
 impl fmt::Debug for RemediationTarget<'_> {
@@ -78,7 +78,7 @@ impl fmt::Debug for RemediationRoute<'_> {
 /// No constructor here invents a Connection initiation policy, route, generation or purpose.
 pub struct RemediationMetadata<'a> {
     pub operation: catalog::reader::Operation<'a>,
-    pub connection: domain::ConnectionAuthority,
+    pub connection: domain::EndpointAuthority,
     pub integration_ref: String,
     pub auth_profile: String,
     pub catalog_generation: String,
@@ -105,7 +105,7 @@ impl fmt::Debug for RemediationMetadata<'_> {
 #[derive(Clone, PartialEq, Eq)]
 pub struct RemediationBinding {
     pub operation_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub integration_ref: String,
     pub auth_profile: String,
     pub need: AuthenticationNeed,

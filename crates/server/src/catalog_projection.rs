@@ -215,7 +215,7 @@ mod tests {
         };
         let json = serde_json::to_string(&description).unwrap();
         assert!(!json.contains("callable"));
-        assert!(!json.contains("connection_ref"));
+        assert!(!json.contains("endpoint_ref"));
     }
 
     #[test]

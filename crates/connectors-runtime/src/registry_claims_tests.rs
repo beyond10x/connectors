@@ -1,20 +1,20 @@
     /// A companion contributor: the Slack-shaped write whose description demands approval, the
     /// operation a companion mention's `event:` reference stands in for.
-    fn companion_contributor(connection_ref: &str, local_lease: &str) -> Arc<SyntheticBackend> {
-        let mut summary = operation_summary("slack-chat-post-message", connection_ref);
+    fn companion_contributor(endpoint_ref: &str, local_lease: &str) -> Arc<SyntheticBackend> {
+        let mut summary = operation_summary("slack-chat-post-message", endpoint_ref);
         summary.effect = EffectClass::Mutating;
         summary.approval = ApprovalPosture::Required;
         let mut description =
-            operation_description("slack-chat-post-message", connection_ref, local_lease);
+            operation_description("slack-chat-post-message", endpoint_ref, local_lease);
         description.effect = EffectClass::Mutating;
         description.approval = ApprovalPosture::Required;
         Arc::new(SyntheticBackend {
             capabilities: BackendCapabilities::OPERATIONS,
             operations: vec![summary],
             description: Some(description),
-            invoke_connection: Some(connection_ref.to_owned()),
+            invoke_connection: Some(endpoint_ref.to_owned()),
             claims_direct_operation: false,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             claims_connection: false,
             channels: Vec::new(),
             claims_event: false,
@@ -69,7 +69,7 @@
                         &context(),
                         OperationRequest::Invoke(InvokeRequest {
                             operation_ref: "slack-chat-post-message".to_owned(),
-                            connection_ref: "connection:slack:companion".to_owned(),
+                            endpoint_ref: "connection:slack:companion".to_owned(),
                             description_ref: lease,
                             input: json!({"text": "Hello from the companion"}),
                             approval_evidence_ref: Some("event:slack:companion-1".to_owned()),
@@ -124,7 +124,7 @@
             ],
             claims,
         );
-        for (operation_ref, connection_ref, evidence, counted) in [
+        for (operation_ref, endpoint_ref, evidence, counted) in [
             // A read demanding nothing: the same reference presented twice, never spent.
             (
                 "tickets.read",
@@ -169,7 +169,7 @@
                     &context(),
                     OperationRequest::Invoke(InvokeRequest {
                         operation_ref: operation_ref.to_owned(),
-                        connection_ref: connection_ref.to_owned(),
+                        endpoint_ref: endpoint_ref.to_owned(),
                         description_ref: description.description_ref,
                         input: json!({}),
                         approval_evidence_ref: evidence.map(str::to_owned),

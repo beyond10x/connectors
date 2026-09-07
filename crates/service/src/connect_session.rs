@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use protocol::connection::{ConnectSessionState, ConnectSessionStatus};
+use protocol::endpoint::{ConnectSessionState, ConnectSessionStatus};
 
 #[derive(Debug, Clone)]
 struct SessionRecord {
@@ -13,7 +13,7 @@ struct SessionRecord {
     expires_at_unix_ms: u64,
     completion_endpoint: Option<String>,
     browser_completion_url: Option<String>,
-    connection_ref: Option<String>,
+    endpoint_ref: Option<String>,
     bound_connection: Option<String>,
     completion: Option<Completion>,
 }
@@ -27,7 +27,7 @@ struct Completion {
 /// Allowed terminal outcomes for a pending Connect Session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConnectSessionTerminal {
-    Completed { connection_ref: String },
+    Completed { endpoint_ref: String },
     Expired,
     Failed,
 }
@@ -95,9 +95,9 @@ impl ConnectSessionLifecycle {
     pub fn bind_completion_target(
         &mut self,
         session_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
     ) -> Result<(), ConnectSessionLifecycleError> {
-        if !valid_ref(connection_ref) {
+        if !valid_ref(endpoint_ref) {
             return Err(ConnectSessionLifecycleError::Invalid);
         }
         self.pending_label(session_ref)?;
@@ -108,7 +108,7 @@ impl ConnectSessionLifecycle {
         if session.bound_connection.is_some() {
             return Err(ConnectSessionLifecycleError::Duplicate);
         }
-        session.bound_connection = Some(connection_ref.to_owned());
+        session.bound_connection = Some(endpoint_ref.to_owned());
         Ok(())
     }
 
@@ -118,14 +118,14 @@ impl ConnectSessionLifecycle {
     pub fn begin_completion(
         &mut self,
         session_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
     ) -> Result<Vec<String>, ConnectSessionLifecycleError> {
         self.pending_label(session_ref)?;
         let session = self
             .sessions
             .get_mut(session_ref)
             .ok_or(ConnectSessionLifecycleError::NotFound)?;
-        if session.bound_connection.as_deref() != Some(connection_ref) {
+        if session.bound_connection.as_deref() != Some(endpoint_ref) {
             return Err(ConnectSessionLifecycleError::Invalid);
         }
         session.completion = Some(Completion {
@@ -142,7 +142,7 @@ impl ConnectSessionLifecycle {
     pub fn claim_completion(
         &mut self,
         session_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
         recheck: impl FnOnce(u64) -> bool,
     ) -> Result<(u64, u64), ConnectSessionLifecycleError> {
         let session = self
@@ -155,7 +155,7 @@ impl ConnectSessionLifecycle {
             .ok_or(ConnectSessionLifecycleError::NotPending)?;
         if completion.authorized_at.is_some()
             || completion.recovery_required
-            || session.bound_connection.as_deref() != Some(connection_ref)
+            || session.bound_connection.as_deref() != Some(endpoint_ref)
         {
             return Err(ConnectSessionLifecycleError::NotPending);
         }
@@ -190,7 +190,7 @@ impl ConnectSessionLifecycle {
     pub fn resolve_completion(
         &mut self,
         session_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
         published: bool,
     ) -> Result<(), ConnectSessionLifecycleError> {
         let session = self
@@ -201,14 +201,14 @@ impl ConnectSessionLifecycle {
             .completion
             .as_ref()
             .ok_or(ConnectSessionLifecycleError::NotPending)?;
-        if session.bound_connection.as_deref() != Some(connection_ref)
+        if session.bound_connection.as_deref() != Some(endpoint_ref)
             || published && completion.authorized_at.is_none()
         {
             return Err(ConnectSessionLifecycleError::Invalid);
         }
         let terminal = if published {
             ConnectSessionTerminal::Completed {
-                connection_ref: connection_ref.to_owned(),
+                endpoint_ref: endpoint_ref.to_owned(),
             }
         } else if completion.authorized_at.is_none()
             && (self.clock)().is_ok_and(|now| now >= session.expires_at_unix_ms)
@@ -313,7 +313,7 @@ impl ConnectSessionLifecycle {
                 expires_at_unix_ms,
                 completion_endpoint,
                 browser_completion_url,
-                connection_ref: None,
+                endpoint_ref: None,
                 bound_connection: None,
                 completion: None,
             },
@@ -340,7 +340,7 @@ impl ConnectSessionLifecycle {
             expires_at_unix_ms: session.expires_at_unix_ms,
             completion_endpoint: session.completion_endpoint.clone(),
             browser_completion_url: session.browser_completion_url.clone(),
-            connection_ref: session.connection_ref.clone(),
+            endpoint_ref: session.endpoint_ref.clone(),
         })
     }
 
@@ -367,9 +367,9 @@ impl ConnectSessionLifecycle {
         if session.state != ConnectSessionState::Pending || session.completion.is_some() {
             return Err(ConnectSessionLifecycleError::NotPending);
         }
-        let (state, connection_ref) = match terminal {
-            ConnectSessionTerminal::Completed { connection_ref } if valid_ref(&connection_ref) => {
-                (ConnectSessionState::Completed, Some(connection_ref))
+        let (state, endpoint_ref) = match terminal {
+            ConnectSessionTerminal::Completed { endpoint_ref } if valid_ref(&endpoint_ref) => {
+                (ConnectSessionState::Completed, Some(endpoint_ref))
             }
             ConnectSessionTerminal::Completed { .. } => {
                 return Err(ConnectSessionLifecycleError::Invalid)
@@ -380,7 +380,7 @@ impl ConnectSessionLifecycle {
         session.state = state;
         session.completion_endpoint = None;
         session.browser_completion_url = None;
-        session.connection_ref = connection_ref;
+        session.endpoint_ref = endpoint_ref;
         Ok(())
     }
 
@@ -646,14 +646,14 @@ mod tests {
             .finish(
                 "connect-session:one",
                 ConnectSessionTerminal::Completed {
-                    connection_ref: "connection:one".to_owned(),
+                    endpoint_ref: "connection:one".to_owned(),
                 },
             )
             .unwrap();
         let status = sessions.status("connect-session:one").unwrap();
         assert_eq!(status.state, ConnectSessionState::Completed);
         assert_eq!(status.completion_endpoint, None);
-        assert_eq!(status.connection_ref.as_deref(), Some("connection:one"));
+        assert_eq!(status.endpoint_ref.as_deref(), Some("connection:one"));
         assert_eq!(
             sessions.finish("connect-session:one", ConnectSessionTerminal::Failed),
             Err(ConnectSessionLifecycleError::NotPending)

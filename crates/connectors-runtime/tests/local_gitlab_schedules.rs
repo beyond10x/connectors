@@ -226,12 +226,12 @@ impl Fixture {
         }
     }
 
-    async fn connections(&self, query: &str) -> Vec<connection_api::ConnectionSummary> {
+    async fn endpoints(&self, query: &str) -> Vec<connection_api::EndpointSummary> {
         let request = connection_api::RequestEnvelope {
             protocol: connection_api::CONTRACT.to_owned(),
             request_id: "fixture-connection".to_owned(),
             context: context(),
-            request: connection_api::ConnectionRequest::Search(connection_api::SearchRequest {
+            request: connection_api::EndpointRequest::Search(connection_api::SearchRequest {
                 query: query.to_owned(),
                 limit: 64,
             }),
@@ -242,11 +242,11 @@ impl Fixture {
         response.validate().unwrap();
         assert_eq!(response.request_id, "fixture-connection");
         assert!(response.error.is_none(), "{response:?}");
-        let Some(connection_api::ConnectionResult::Search { connections }) = response.response
+        let Some(connection_api::EndpointResult::Search { endpoints }) = response.response
         else {
             panic!("connection search response")
         };
-        connections
+        endpoints
     }
 
     async fn search(&self, query: &str) -> Vec<operation_api::OperationSummary> {
@@ -323,7 +323,7 @@ fn invoke(
 ) -> operation_api::OperationRequest {
     operation_api::OperationRequest::Invoke(operation_api::InvokeRequest {
         operation_ref: description.operation_ref.clone(),
-        connection_ref: description.connections[0].connection_ref.clone(),
+        endpoint_ref: description.endpoints[0].endpoint_ref.clone(),
         description_ref: description.description_ref.clone(),
         input,
         approval_evidence_ref: None,
@@ -333,8 +333,8 @@ fn invoke(
 #[tokio::test]
 async fn read_only_connection_refuses_schedule_mutations_before_custody_or_egress() {
     let fixture = Fixture::start_with_reader(true, true, true).await;
-    let connections = fixture.connections("gitlab").await;
-    let reader = connections
+    let endpoints = fixture.endpoints("gitlab").await;
+    let reader = endpoints
         .iter()
         .find(|connection| connection.label == "Read-only GitLab")
         .unwrap();
@@ -344,10 +344,10 @@ async fn read_only_connection_refuses_schedule_mutations_before_custody_or_egres
             description.approval,
             operation_api::ApprovalPosture::Required
         );
-        assert_eq!(description.connections.len(), 1);
+        assert_eq!(description.endpoints.len(), 1);
         assert_ne!(
-            description.connections[0].connection_ref,
-            reader.connection_ref
+            description.endpoints[0].endpoint_ref,
+            reader.endpoint_ref
         );
         let operation_api::OperationRequest::Invoke(mut request) = invoke(
             &description,
@@ -355,7 +355,7 @@ async fn read_only_connection_refuses_schedule_mutations_before_custody_or_egres
         ) else {
             unreachable!()
         };
-        request.connection_ref = reader.connection_ref.clone();
+        request.endpoint_ref = reader.endpoint_ref.clone();
         assert_eq!(
             fixture
                 .operations(operation_api::OperationRequest::Invoke(request))
@@ -373,16 +373,16 @@ async fn read_only_connection_refuses_schedule_mutations_before_custody_or_egres
 async fn configured_gitlab_connection_is_the_same_passive_reference_in_both_discovery_surfaces() {
     for with_token in [false, true] {
         let fixture = Fixture::start(false, with_token).await;
-        let connections = fixture.connections("GITLAB").await;
-        assert_eq!(connections.len(), 1);
-        let connection = &connections[0];
+        let endpoints = fixture.endpoints("GITLAB").await;
+        assert_eq!(endpoints.len(), 1);
+        let connection = &endpoints[0];
         assert_eq!(connection.label, "Personal GitLab");
         assert_eq!(connection.integration_ref, "gitlab");
-        assert_eq!(connection.state, connection_api::ConnectionState::Created);
-        assert_eq!(connection.route, connection_api::ConnectionRoute::Direct);
+        assert_eq!(connection.state, connection_api::EndpointState::Created);
+        assert_eq!(connection.route, connection_api::EndpointRoute::Direct);
         assert_eq!(
             connection.initiation,
-            vec![connection_api::ConnectionInitiator::Platform]
+            vec![connection_api::EndpointInitiator::Platform]
         );
         assert!(
             connection.scope.is_none()
@@ -392,12 +392,12 @@ async fn configured_gitlab_connection_is_the_same_passive_reference_in_both_disc
         let operations = fixture.search(LIST).await;
         assert_eq!(operations.len(), 1);
         assert_eq!(
-            operations[0].connections[0].connection_ref,
-            connection.connection_ref
+            operations[0].endpoints[0].endpoint_ref,
+            connection.endpoint_ref
         );
-        assert!(connection.connection_ref.starts_with("connection:gitlab:"));
-        assert_ne!(connection.connection_ref, "connection:gitlab:personal");
-        assert!(fixture.connections("absent-provider").await.is_empty());
+        assert!(connection.endpoint_ref.starts_with("connection:gitlab:"));
+        assert_ne!(connection.endpoint_ref, "connection:gitlab:personal");
+        assert!(fixture.endpoints("absent-provider").await.is_empty());
         fixture.assert_passive();
         fixture.finish().await;
     }
@@ -516,7 +516,7 @@ async fn schedule_requests_preserve_complete_json_values_and_optional_update_omi
         assert_eq!(requests.len(), 5);
         assert!(requests
             .iter()
-            .all(|request| request.authority == create.connections[0].connection_ref));
+            .all(|request| request.authority == create.endpoints[0].endpoint_ref));
         assert_eq!(requests[0].method, "POST");
         assert_eq!(
             requests[0].url,
@@ -558,28 +558,28 @@ async fn schedule_requests_preserve_complete_json_values_and_optional_update_omi
 #[tokio::test]
 async fn adversary_gitlab_pass1_missing_credentials_and_forged_approval_never_widen_a_placement() {
     let fixture = Fixture::start_with_reader(true, false, true).await;
-    let connections = fixture.connections("gitlab read-only").await;
-    assert_eq!(connections.len(), 1);
-    let reader = &connections[0];
+    let endpoints = fixture.endpoints("gitlab read-only").await;
+    assert_eq!(endpoints.len(), 1);
+    let reader = &endpoints[0];
     assert_eq!(reader.label, "Read-only GitLab");
     assert!(fixture
-        .connections("read-only missing-word")
+        .endpoints("read-only missing-word")
         .await
         .is_empty());
     let listed = fixture.search("schedule PIPELINE").await;
     assert_eq!(listed.len(), 4);
     for id in [CREATE, UPDATE, DELETE] {
         let description = fixture.describe(id).await.unwrap();
-        assert_eq!(description.connections.len(), 1);
+        assert_eq!(description.endpoints.len(), 1);
         assert_ne!(
-            description.connections[0].connection_ref,
-            reader.connection_ref
+            description.endpoints[0].endpoint_ref,
+            reader.endpoint_ref
         );
         let error = fixture
             .operations(operation_api::OperationRequest::Invoke(
                 operation_api::InvokeRequest {
                     operation_ref: id.to_owned(),
-                    connection_ref: reader.connection_ref.clone(),
+                    endpoint_ref: reader.endpoint_ref.clone(),
                     description_ref: description.description_ref,
                     // Both a supplied approval token and deliberately invalid input must lose to
                     // the selected placement's refusal before credential availability is consulted.

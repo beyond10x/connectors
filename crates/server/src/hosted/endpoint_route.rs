@@ -1,4 +1,4 @@
-//! Endpoint inventory management and endpoint-aware operation normalization.
+//! EndpointInventoryEntry inventory management and endpoint-aware operation normalization.
 
 use super::{
     bearer, error, HostedPrincipal, HostedState, IdentityVerificationError, CONNECTORS_AUDIENCE,
@@ -8,8 +8,8 @@ use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use protocol::{
-    endpoint,
-    operation::{self, v4},
+    endpoint_inventory as endpoint,
+    operation::{self, v5},
 };
 use service::{constrain_endpoint_description, normalize_endpoint_operation};
 
@@ -63,10 +63,10 @@ pub(super) async fn handle(
     };
     let management = matches!(
         request.request,
-        endpoint::EndpointRequest::Bind(_) | endpoint::EndpointRequest::Refresh(_)
+        endpoint::EndpointInventoryRequest::Bind(_) | endpoint::EndpointInventoryRequest::Refresh(_)
     );
     let scope = if management {
-        "connectors.connections.manage"
+        "connectors.endpoints.manage"
     } else {
         "connectors.catalog.read"
     };
@@ -78,8 +78,8 @@ pub(super) async fn handle(
             StatusCode::FORBIDDEN,
             Json(endpoint::ResponseEnvelope::failure(
                 request.request_id,
-                endpoint::EndpointError::new(
-                    endpoint::EndpointErrorCode::NotGranted,
+                endpoint::EndpointInventoryError::new(
+                    endpoint::EndpointInventoryErrorCode::NotGranted,
                     "endpoint management or inventory is not admitted",
                     false,
                 ),
@@ -91,7 +91,7 @@ pub(super) async fn handle(
         Ok(owner) => owner,
         Err(_) => return error(StatusCode::UNAUTHORIZED, "identity-access-token-refused"),
     };
-    let response = match state.backend.handle_endpoint(&owner, request.request).await {
+    let response = match state.backend.handle_endpoint_inventory(&owner, request.request).await {
         Ok(result) => endpoint::ResponseEnvelope::success(&request.request_id, result),
         Err(error) => endpoint::ResponseEnvelope::failure(&request.request_id, error),
     };
@@ -105,19 +105,19 @@ pub(super) async fn handle(
     Json(response).into_response()
 }
 
-pub(super) async fn operation_v4(
+pub(super) async fn operation_v5(
     state: &HostedState,
     headers: &HeaderMap,
     body: &[u8],
 ) -> Response {
-    let request: v4::RequestEnvelope = match serde_json::from_slice(body) {
+    let request: v5::RequestEnvelope = match serde_json::from_slice(body) {
         Ok(request) => request,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
     if let Err(error) = request.validate() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(v4::ResponseEnvelope::failure(request.request_id, error)),
+            Json(v5::ResponseEnvelope::failure(request.request_id, error)),
         )
             .into_response();
     }
@@ -127,7 +127,7 @@ pub(super) async fn operation_v4(
     };
     let reading = matches!(
         request.request,
-        v4::OperationRequest::Search(_) | v4::OperationRequest::Describe(_)
+        v5::OperationRequest::Search(_) | v5::OperationRequest::Describe(_)
     );
     let scope = if reading {
         "connectors.catalog.read"
@@ -139,7 +139,7 @@ pub(super) async fn operation_v4(
     let policy_request = match request.request.clone().into_internal(Some("policy-only")) {
         Ok(value) => value,
         Err(error) => {
-            return Json(v4::ResponseEnvelope::failure(request.request_id, error)).into_response()
+            return Json(v5::ResponseEnvelope::failure(request.request_id, error)).into_response()
         }
     };
     if principal.tenant_id != request.context.tenant_id
@@ -148,10 +148,10 @@ pub(super) async fn operation_v4(
     {
         return (
             StatusCode::FORBIDDEN,
-            Json(v4::ResponseEnvelope::failure(
+            Json(v5::ResponseEnvelope::failure(
                 request.request_id,
-                v4::OperationError::new(
-                    v4::OperationErrorCode::NotGranted,
+                v5::OperationError::new(
+                    v5::OperationErrorCode::NotGranted,
                     "the operation is not admitted",
                     false,
                 ),
@@ -168,26 +168,26 @@ pub(super) async fn operation_v4(
     {
         Ok(value) => value,
         Err(error) => {
-            return Json(v4::ResponseEnvelope::failure(request.request_id, error)).into_response()
+            return Json(v5::ResponseEnvelope::failure(request.request_id, error)).into_response()
         }
     };
     if let (operation::OperationRequest::Describe(describe), Some(connection)) =
-        (&normalized.request, &normalized.description_connection)
+        (&normalized.request, &normalized.description_endpoint)
     {
         let response = match state
             .backend
             .describe_target(&owner, &describe.operation_ref, connection)
             .await
         {
-            Ok(description) => v4::ResponseEnvelope::success(
+            Ok(description) => v5::ResponseEnvelope::success(
                 &request.request_id,
                 operation::OperationResult::Describe(description),
             ),
-            Err(error) => v4::ResponseEnvelope::failure(&request.request_id, error.into()),
+            Err(error) => v5::ResponseEnvelope::failure(&request.request_id, error.into()),
         };
         let response = match response.validate() {
             Ok(()) => response,
-            Err(error) => v4::ResponseEnvelope::failure(&request.request_id, error),
+            Err(error) => v5::ResponseEnvelope::failure(&request.request_id, error),
         };
         return Json(response).into_response();
     }
@@ -215,7 +215,7 @@ pub(super) async fn operation_v4(
     if let Some(result) = response.response.take() {
         response = match constrain_endpoint_description(
             result,
-            normalized.description_connection.as_deref(),
+            normalized.description_endpoint.as_deref(),
         ) {
             Ok(result) => operation::v3::ResponseEnvelope::success(&request.request_id, result),
             Err(error) => {
@@ -223,7 +223,7 @@ pub(super) async fn operation_v4(
             }
         };
     }
-    let response = v4::ResponseEnvelope::from(response);
+    let response = v5::ResponseEnvelope::from(response);
     let bytes = match serde_json::to_vec(&response) {
         Ok(value) if response.validate().is_ok() => value,
         _ => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),

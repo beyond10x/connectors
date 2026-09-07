@@ -156,20 +156,20 @@ async fn daemon_catalog_uses_the_described_credential_and_rejects_read_only_writ
         panic!("{read:?}")
     };
     let reader = read
-        .connections
+        .endpoints
         .iter()
         .find(|connection| connection.label == "reader")
         .unwrap()
-        .connection_ref
+        .endpoint_ref
         .clone();
     let writer = read
-        .connections
+        .endpoints
         .iter()
         .find(|connection| connection.label == "writer")
         .unwrap()
-        .connection_ref
+        .endpoint_ref
         .clone();
-    assert_eq!(read.connections.len(), 2);
+    assert_eq!(read.endpoints.len(), 2);
     assert_ne!(
         reader, writer,
         "named instances must have distinct Connection identities"
@@ -179,7 +179,7 @@ async fn daemon_catalog_uses_the_described_credential_and_rejects_read_only_writ
         egress.clone(),
         OperationRequest::Invoke(operation::InvokeRequest {
             operation_ref: read.operation_ref,
-            connection_ref: reader.clone(),
+            endpoint_ref: reader.clone(),
             description_ref: read.description_ref,
             input: serde_json::json!({"limit":1}),
             approval_evidence_ref: None,
@@ -202,7 +202,7 @@ async fn daemon_catalog_uses_the_described_credential_and_rejects_read_only_writ
         egress.clone(),
         OperationRequest::Invoke(operation::InvokeRequest {
             operation_ref: write.operation_ref,
-            connection_ref: reader,
+            endpoint_ref: reader,
             description_ref: write.description_ref,
             input: serde_json::json!({"channel":"C-FIXTURE", "text":"fixture"}),
             approval_evidence_ref: None,

@@ -61,12 +61,12 @@ pub struct ProviderIdentity {
     pub provider_ref: String,
     pub authority: String,
     /// Deployment-owned credential-free Connection through which this service is invoked.
-    pub connection_ref: String,
+    pub endpoint_ref: String,
 }
 
 /// Deployment policy and value-free resource bindings for one operation.
 ///
-/// Endpoint values and credential bytes do not belong here. The maps bind names emitted by the
+/// EndpointInventoryEntry values and credential bytes do not belong here. The maps bind names emitted by the
 /// service definition to opaque deployment-owned references. `grant_refs` assigns stable records
 /// owned by this generated-service deployment; hosted composition derives their closed operation
 /// sets and merges them into the tenant's durable authority state only when the bundle activates.

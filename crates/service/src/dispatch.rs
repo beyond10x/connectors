@@ -147,7 +147,7 @@ mod tests {
     use std::sync::Mutex;
 
     use domain::{
-        AdmittedOperation, Capability, ConnectionAuthority, Implementation, InitiationPolicy,
+        AdmittedOperation, Capability, EndpointAuthority, Implementation, InitiationPolicy,
         Interaction, OperationFacts, Placement, ProtocolPlan, SipPlan,
     };
 
@@ -212,7 +212,7 @@ mod tests {
                 "org",
                 "principal",
                 "grant",
-                ConnectionAuthority::new("connection", InitiationPolicy::platform_only()).unwrap(),
+                EndpointAuthority::new("connection", InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::SipV1(SipPlan {
                 connection: "connection".to_owned(),

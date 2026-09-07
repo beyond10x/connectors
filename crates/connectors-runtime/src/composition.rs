@@ -31,7 +31,7 @@ use integration_sip::{
 };
 use integration_slack::SlackBackend;
 use serde_json::{json, Value};
-use server::egress::{AddressScope, ConnectionEgress, DestinationRule};
+use server::egress::{AddressScope, EndpointEgress, DestinationRule};
 use server::local::{LocalOperationDaemon, LocalStateOwnership};
 #[cfg(feature = "sip")]
 use service::CredentialSet;
@@ -477,7 +477,7 @@ impl PersonalRuntime {
                         rules.push(DestinationRule::exact_origin(&origin, scope)?);
                     }
                 }
-                let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
+                let egress: Arc<dyn EgressTransport> = Arc::new(EndpointEgress::new(rules)?);
                 let backend = CatalogBackend::open(
                     owner.clone(),
                     &ordinary_catalog,
@@ -504,7 +504,7 @@ impl PersonalRuntime {
                         rules.push(DestinationRule::exact_origin(&origin, scope)?);
                     }
                 }
-                let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
+                let egress: Arc<dyn EgressTransport> = Arc::new(EndpointEgress::new(rules)?);
                 let backend = integration_catalog::PersonalOAuthBackend::open(
                     owner.clone(),
                     &oauth_catalog,
@@ -542,11 +542,11 @@ impl PersonalRuntime {
         ));
         let readiness = json!({
             "ready": true,
-            "protocol": protocol::operation::v4::CONTRACT,
+            "protocol": protocol::operation::v5::CONTRACT,
             "protocols": [
-                protocol::operation::CONTRACT, protocol::operation::v4::CONTRACT,
-                protocol::connection::CONTRACT, protocol::event::CONTRACT,
-                protocol::endpoint::CONTRACT, protocol::lifecycle::CONTRACT,
+                protocol::operation::CONTRACT, protocol::operation::v5::CONTRACT,
+                protocol::endpoint::CONTRACT, protocol::event::CONTRACT,
+                protocol::endpoint_inventory::CONTRACT, protocol::lifecycle::CONTRACT,
                 protocol::local_setup::CONTRACT,
             ],
             "socket": state_root.join("connectors.sock"),
@@ -1007,7 +1007,7 @@ impl HostedRuntime {
                 .into_iter()
                 .map(|origin| DestinationRule::exact_origin(&origin, AddressScope::Public))
                 .collect::<Result<Vec<_>, _>>()?;
-            let egress: Arc<dyn EgressTransport> = Arc::new(ConnectionEgress::new(rules)?);
+            let egress: Arc<dyn EgressTransport> = Arc::new(EndpointEgress::new(rules)?);
             backends.push(Arc::new(
                 HostedCatalogBackend::open(
                     config.tenant_id.clone(),
@@ -1180,12 +1180,12 @@ async fn wait_for_shutdown(mut shutdown: tokio::sync::watch::Receiver<bool>) {
 
 fn monitoring_egress(origin: &str) -> Result<Arc<dyn EgressTransport>, RuntimeError> {
     let rule = DestinationRule::exact_origin(origin, AddressScope::OperatorNetwork)?;
-    Ok(Arc::new(ConnectionEgress::new(vec![rule])?))
+    Ok(Arc::new(EndpointEgress::new(vec![rule])?))
 }
 
 fn gitlab_egress(origin: &str) -> Result<Arc<dyn EgressTransport>, RuntimeError> {
     let rule = DestinationRule::exact_origin(origin, AddressScope::OperatorNetwork)?;
-    Ok(Arc::new(ConnectionEgress::new(vec![rule])?))
+    Ok(Arc::new(EndpointEgress::new(vec![rule])?))
 }
 
 /// The Argo CD acquisition, packaged so a frontend can hand it to the console without unpacking it.
@@ -1238,7 +1238,7 @@ pub async fn acquire_argocd_token(
         AddressScope::Public
     };
     let rule = DestinationRule::exact_origin(request.origin.trim_end_matches('/'), scope)?;
-    let egress = ConnectionEgress::new(vec![rule])?;
+    let egress = EndpointEgress::new(vec![rule])?;
     integration_catalog::argocd::acquire(&egress, request)
         .await
         .map_err(RuntimeError::ArgoCdAcquisition)
@@ -1252,7 +1252,7 @@ fn slack_egress() -> Result<Arc<dyn EgressTransport>, RuntimeError> {
     ]
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-    Ok(Arc::new(ConnectionEgress::new(rules)?))
+    Ok(Arc::new(EndpointEgress::new(rules)?))
 }
 
 pub fn default_state_root() -> Result<PathBuf, RuntimeError> {
@@ -1280,7 +1280,7 @@ pub fn default_config_path() -> Result<PathBuf, RuntimeError> {
 /// # Why two environment variables rather than a derived path
 ///
 /// A hosted Connector in the cluster keeps this in PostgreSQL because several replicas must agree
-/// on which Connections exist. A person running the whole product on their own machine has one
+/// on which Endpoints exist. A person running the whole product on their own machine has one
 /// replica and no reason to keep a database server alive for it — and keeping one alive is what
 /// went wrong: a stale volume was recreated underneath a signed-in session, Identity was wiped, and
 /// the workbench started refusing with `NotGranted` for reasons invisible from the page.

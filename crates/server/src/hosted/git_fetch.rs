@@ -462,7 +462,7 @@ mod tests {
             },
             request: protocol::git_fetch::CreateRequest {
                 idempotency_key: "coding-session-one".to_owned(),
-                connection_ref: "connection:gitlab:one".to_owned(),
+                endpoint_ref: "connection:gitlab:one".to_owned(),
                 project_id: 42,
                 reference: "trunk".to_owned(),
                 expected_commit: "c".repeat(40),

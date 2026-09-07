@@ -364,7 +364,7 @@ async fn operation_decided_at(
                 &owner,
                 &request.request_id,
                 &invoke.operation_ref,
-                &invoke.connection_ref,
+                &invoke.endpoint_ref,
             )
             .await
         } else {
@@ -638,9 +638,9 @@ mod tests {
     use axum::http::Request;
     use protocol::approval::{IssuedApproval, RequestEnvelope as ApprovalRequestEnvelope};
     use protocol::catalog::RequestEnvelope as CatalogRequestEnvelope;
-    use protocol::connection::{
-        ConnectionError, ConnectionRequest, ConnectionResult,
-        RequestEnvelope as ConnectionRequestEnvelope,
+    use protocol::endpoint::{
+        EndpointError, EndpointRequest, EndpointResult,
+        RequestEnvelope as EndpointRequestEnvelope,
     };
     use protocol::datasource::{
         DatasourceRequest, DatasourceResult, RequestEnvelope as DatasourceRequestEnvelope,
@@ -725,8 +725,8 @@ mod tests {
                 scopes: BTreeSet::from([
                     "connectors.approvals.issue".to_owned(),
                     "connectors.catalog.read".to_owned(),
-                    "connectors.connections.manage".to_owned(),
-                    "connectors.connections.self".to_owned(),
+                    "connectors.endpoints.manage".to_owned(),
+                    "connectors.endpoints.self".to_owned(),
                     "connectors.credentials.lease".to_owned(),
                     "connectors.invoke".to_owned(),
                     "connectors.events.read".to_owned(),
@@ -759,14 +759,14 @@ mod tests {
             Ok(OperationResult::Search { operations: vec![] })
         }
 
-        async fn handle_connection(
+        async fn handle_endpoint(
             &self,
             context: &PrincipalContext,
-            _request: ConnectionRequest,
-        ) -> Result<ConnectionResult, ConnectionError> {
+            _request: EndpointRequest,
+        ) -> Result<EndpointResult, EndpointError> {
             assert_eq!(context.agent_revision(), None);
-            Ok(ConnectionResult::Search {
-                connections: Vec::new(),
+            Ok(EndpointResult::Search {
+                endpoints: Vec::new(),
             })
         }
 
@@ -823,8 +823,8 @@ mod tests {
                         output_schema: serde_json::json!({"type": "object"}),
                         effect: EffectClass::Mutating,
                         approval: ApprovalPosture::Required,
-                        connections: vec![protocol::operation::ConnectionSummary {
-                            connection_ref: "connection:todo".to_owned(),
+                        endpoints: vec![protocol::operation::EndpointSummary {
+                            endpoint_ref: "connection:todo".to_owned(),
                             label: "Todo".to_owned(),
                             provider: "provider:todo".to_owned(),
                             audiences: Vec::new(),
@@ -889,7 +889,7 @@ mod tests {
         let mut request = envelope("tenant-dev");
         request.request = OperationRequest::Invoke(InvokeRequest {
             operation_ref: operation_ref.to_owned(),
-            connection_ref: "connection:test".to_owned(),
+            endpoint_ref: "connection:test".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: approval.map(str::to_owned),
@@ -940,7 +940,7 @@ mod tests {
             context: envelope("tenant-dev").context,
             request: protocol::approval::IssueRequest {
                 operation_ref: APPROVAL_OPERATION.to_owned(),
-                connection_ref: "connection:todo".to_owned(),
+                endpoint_ref: "connection:todo".to_owned(),
                 description_ref: "description:todo-create-list".to_owned(),
                 input: input.clone(),
                 ttl_seconds: 120,
@@ -970,7 +970,7 @@ mod tests {
             let mut envelope = envelope("tenant-dev");
             envelope.request = OperationRequest::Invoke(InvokeRequest {
                 operation_ref: APPROVAL_OPERATION.to_owned(),
-                connection_ref: "connection:todo".to_owned(),
+                endpoint_ref: "connection:todo".to_owned(),
                 description_ref: "description:todo-create-list".to_owned(),
                 input: input.clone(),
                 approval_evidence_ref: Some(proof.approval_evidence_ref.clone()),
@@ -987,9 +987,9 @@ mod tests {
         );
     }
 
-    fn connection_envelope(tenant_id: &str) -> ConnectionRequestEnvelope {
-        ConnectionRequestEnvelope {
-            protocol: protocol::connection::CONTRACT.to_owned(),
+    fn connection_envelope(tenant_id: &str) -> EndpointRequestEnvelope {
+        EndpointRequestEnvelope {
+            protocol: protocol::endpoint::CONTRACT.to_owned(),
             request_id: "request-connection-1".to_owned(),
             context: OwnerContext {
                 tenant_id: tenant_id.to_owned(),
@@ -998,7 +998,7 @@ mod tests {
                 authority_snapshot_id: "snapshot-test".to_owned(),
                 authority_snapshot_sha256: "a".repeat(64),
             },
-            request: ConnectionRequest::Search(protocol::connection::SearchRequest {
+            request: EndpointRequest::Search(protocol::endpoint::SearchRequest {
                 query: String::new(),
                 limit: 10,
             }),
@@ -1055,21 +1055,21 @@ mod tests {
     fn tenant_members_receive_only_read_only_module_invocation() {
         let read = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "work/task.list".to_owned(),
-            connection_ref: "connection:b10x".to_owned(),
+            endpoint_ref: "connection:b10x".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
         });
         let write = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "work/task.create".to_owned(),
-            connection_ref: "connection:b10x".to_owned(),
+            endpoint_ref: "connection:b10x".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
         });
         let external = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "slack.chat.post-message".to_owned(),
-            connection_ref: "connection:slack".to_owned(),
+            endpoint_ref: "connection:slack".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
@@ -1158,7 +1158,7 @@ mod tests {
             HostedAdmissionPolicy::new(["operator".to_owned()]),
             HostedAuthority::unbound(),
         );
-        let request = Request::post("/connections")
+        let request = Request::post("/endpoints")
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::AUTHORIZATION, "Bearer access")
             .body(Body::from(
@@ -1436,7 +1436,7 @@ mod tests {
             .with_kubernetes_groups(["dev".to_owned(), "sre".to_owned()], ["sre".to_owned()]);
         let request = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "kubernetes.pod.logs".to_owned(),
-            connection_ref: "connection:kubernetes:in-cluster".to_owned(),
+            endpoint_ref: "connection:kubernetes:in-cluster".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
@@ -1465,7 +1465,7 @@ mod tests {
             .with_monitoring_groups(["dev".to_owned(), "sre".to_owned()]);
         let request = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "prometheus-query-range".to_owned(),
-            connection_ref: "connection:prometheus:dev".to_owned(),
+            endpoint_ref: "connection:prometheus:dev".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,

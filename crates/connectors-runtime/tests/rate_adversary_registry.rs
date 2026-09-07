@@ -23,8 +23,8 @@ impl Owner {
             output_schema: json!({"type":"object"}),
             effect: EffectClass::ReadOnly,
             approval: ApprovalPosture::NotRequired,
-            connections: vec![ConnectionSummary {
-                connection_ref: self.connection.into(),
+            endpoints: vec![EndpointSummary {
+                endpoint_ref: self.connection.into(),
                 label: self.connection.into(),
                 provider: "fixture".into(),
                 audiences: vec![],
@@ -51,7 +51,7 @@ impl ConnectorBackend for Owner {
         match request {
             OperationRequest::Describe(value) => value.operation_ref == "fixture.read",
             OperationRequest::Invoke(value) => {
-                value.operation_ref == "fixture.read" && value.connection_ref == self.connection
+                value.operation_ref == "fixture.read" && value.endpoint_ref == self.connection
             }
             _ => false,
         }
@@ -116,7 +116,7 @@ async fn rate_adversary_registry_checks_advice_through_describe_and_invoke() {
     let invoke = |lease: String| {
         OperationRequest::Invoke(InvokeRequest {
             operation_ref: "fixture.read".into(),
-            connection_ref: "connection:a".into(),
+            endpoint_ref: "connection:a".into(),
             description_ref: lease,
             input: json!({}),
             approval_evidence_ref: None,
