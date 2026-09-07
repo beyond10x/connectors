@@ -1712,6 +1712,10 @@ fn kinds_the_tree_derives() -> BTreeMap<String, Unspecified> {
             .get(position + 1)
             .map_or(source.len(), |(next, _, _)| *next);
         let arm = &source[*index..end];
+        // The final arm of a function ends before the following helper declaration. Pattern
+        // matches in a version-conversion helper are not requests this CLI leaf constructs.
+        let arm = arm.split("\nfn ").next().unwrap_or(arm);
+        let arm = arm.split("\nasync fn ").next().unwrap_or(arm);
         let mut reached = requests_built_by(arm, &enums);
         for (module, requests) in &modules {
             if arm.contains(&format!("{module}::")) {
@@ -2030,7 +2034,7 @@ fn an_exception_whose_kind_the_tree_contradicts_is_refused() {
 
     let mut forwards_nothing = UNSPECIFIED_PATHS.to_vec();
     for entry in &mut forwards_nothing {
-        if entry.0 == "connection activate" {
+        if entry.0 == "operation invoke" {
             entry.2 = "forwards `connectors.connection.PruneConnections`, which \
                        `connectors-service` accepts";
         }
@@ -2042,7 +2046,7 @@ fn an_exception_whose_kind_the_tree_contradicts_is_refused() {
 
     let mut forwards_unnamed = UNSPECIFIED_PATHS.to_vec();
     for entry in &mut forwards_unnamed {
-        if entry.0 == "connection materialize" {
+        if entry.0 == "operation invoke" {
             entry.2 = "the service handles it and this frontend passes it along";
         }
     }
