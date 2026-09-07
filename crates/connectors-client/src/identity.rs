@@ -491,6 +491,31 @@ impl AuthenticatedHostedClient {
         }
     }
 
+    /// Explicit endpoint subscription lifecycle; authenticated refusals are renewed only before
+    /// dispatch, and transport failures never retry a stream-opening request.
+    pub async fn event_v2(
+        &self,
+        request: event::v2::EventRequest,
+    ) -> Result<event::v2::ResponseEnvelope, AuthenticatedHostedError> {
+        let scope = request
+            .legacy_read()
+            .as_ref()
+            .map_or(EVENT_READ_SCOPE, event_scope);
+        let token = self.tokens.access_token(scope).await?;
+        match self
+            .hosted
+            .event_v2(&token, &self.context, request.clone())
+            .await
+        {
+            Err(ClientError::HostedAuthentication) => {
+                self.tokens.invalidate(scope)?;
+                let token = self.tokens.access_token(scope).await?;
+                Ok(self.hosted.event_v2(&token, &self.context, request).await?)
+            }
+            result => Ok(result?),
+        }
+    }
+
     pub async fn event(
         &self,
         request: event::EventRequest,
