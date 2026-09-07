@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:connect-session-oauth-custody-in-personal-posture
 kind: story
-status: active
+status: implemented
 title: Decide the connect-session ↔ OAuth-callback custody chain in personal posture
 tags:
 - ready
@@ -343,7 +343,7 @@ scope:
   path: providers/jira.toml
 - confidence: cited
   path: providers/slack.toml
-revision: 36
+revision: 38
 ---
 ## Acceptance
 
@@ -443,3 +443,9 @@ Seven selected stories already reached published main. Personal OAuth passed its
 Current source includes Operation v3 default with explicit operation-only v2, Connection v2 bound remediation, schema4 with matching readers, and development-only GitLab public PKCE/device authorization through a dedicated unsealed store. Hosted remediation remains Unsupported after admission where no acquisition owner exists. Protected instructions stay outside model output; completion ends with fresh validation and an explicit new invocation. Full affected local gates pass: server115, runtime455 per default/no-default configuration with two existing PostgreSQL ignores, console107, CLI140, strict affected checks and the final catalog/Markdown/story/ESS gate. Initial root1301pass/2fail/4oldignores was closed by full affected server115 and catalog-cli14 rechecks. Complete sharded CI and auth review remain pending.
 
 Exact runtime final seal: eba21e5f93152eb0aacd01dadf31a19569401421c8a8397f3b09216d11ed7b04 (179 members). Exact client final seal:334ab4c9adf141862dcb9a701e930f80dcdf909dfb3a1c1142dc75af3c8fcae7 (95 members). All first failures remain in those records. Counts describe executed cases per command, not a unique aggregate. Future review results are recorded in full before any findings are routed.
+
+## Full implementation gate completed — 2026-09-07
+
+Manual release rehearsal 34069722221 completed successfully on exact published candidate 0837f79beb4202405942e669c417057f69aac58a. All twelve workspace gates, shared checks and four native Linux/macOS builds passed. Each native binary passed its version/help smoke checks and produced an unexpired development artifact. The publish job was skipped, as required for workflow_dispatch. Exact run, job and artifact responses are retained in coordinator evidence; the public run is https://github.com/beyond10x/connectors/actions/runs/34069722221 .
+
+Both remaining implementations completed their two ordinary review passes. Authentication's final one-file document correction is verified separately with every test byte preserved. The resulting source includes explicit development-only personal GitLab OAuth, bound authentication recovery, matching schema 4 readers and the stated predecessor protocol support. Implementation and executable verification are complete. The coordinator continues source main publication, normal Website/Atlas documentation delivery and the already authorized local installation; this record does not claim those delivery steps have finished. No version bump or release tag has been made.
