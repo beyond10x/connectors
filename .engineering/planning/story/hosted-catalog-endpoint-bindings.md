@@ -26,7 +26,7 @@ scope:
   path: crates/integration-catalog/src/lib.rs
 - confidence: cited
   path: docs/guides/administer-hosted-integrations.md
-revision: 10
+revision: 11
 ---
 ## Outcome
 
@@ -55,6 +55,10 @@ This is one bounded implementation alongside the consuming application's separat
 
 ## Validation so far
 
-Focused locked suites pass on the final implementation: connectors-config (25 unit and 3 permission tests), integration-catalog (108 tests). All-target clippy passes for connectors-config, integration-catalog and connectors-runtime with warnings denied. Formatting and diff whitespace checks pass. The first broad gate found the configuration module size fence; extracting hosted_catalog.rs restored the bound without a waiver. The full repository gate is rerunning with the repository-pinned ESS toolchain. Actual composed browser acceptance and the real provider credential remain the consuming deployment's next proof.
+All twelve repository Cargo workspace gates pass on implementation commit 7e11cb919bd2746e8d3e04c1e74ede788409f147, including both default and no-default-features hosted-runtime configurations. The final gate passes: 65 providers and 70 artifacts verified, portable Markdown links, story index, ESS 0.18.0 specification validation and byte-identical committed clap projection. Focused final suites pass 136 tests; all-target clippy for connectors-config, integration-catalog and connectors-runtime passes with warnings denied. Formatting and diff whitespace checks pass.
+
+The first broad run found the configuration module size fence; extracting hosted_catalog.rs restored the bound without a waiver. A later concurrent run hit an existing one-second OAuth fixture expiry during setup, which passed unchanged alone and with bounded test concurrency. A long temporary directory also exceeded the native completion transport's Unix socket path bound; the unchanged test passed with a short task-owned temporary root. The completed broad gate used RUST_TEST_THREADS=4, a short private TMPDIR and the repository-pinned ESS toolchain. Failed evidence is retained alongside successful runs.
 
 New endpoint metadata is additive to the existing v1 state and omitted for default fixed-origin records. Backward loading and serialization are tested. A connection created for a newly configurable provider needs this updated runtime; an older runtime has no implementation for spending its endpoint-bound credential. No change to provider declarations, canonical request/response schemas, SQL storage or Secrets protocols is made.
+
+Actual composed browser acceptance and the real provider credential remain the consuming deployment's next proof; this artifact remains active until that evidence arrives.
