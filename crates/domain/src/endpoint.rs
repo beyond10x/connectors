@@ -1,208 +1,264 @@
-//! Credential-free discovered interfaces and operator-owned bindings.
-
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-/// One interface on an immutable discovered resource identity. Inventory is not a Grant.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct Endpoint {
-    /// Opaque source-qualified identity, incorporating the resource UID and interface.
-    pub endpoint_ref: String,
-    /// Connection or configured source that owns resource access.
-    pub source_ref: String,
-    /// Resource namespace; absent for cluster-scoped resources.
-    pub namespace: Option<String>,
-    /// Owner-declared resource kind, such as Service.
-    pub resource_kind: String,
-    /// Display name; never substitutes for the immutable resource UID.
-    pub resource_name: String,
-    /// Immutable upstream identity; replacement creates a different endpoint.
-    pub resource_uid: String,
-    /// Declared port name, if present.
-    pub port_name: Option<String>,
-    /// Advertised port; credentials may supply it later for external resources.
-    pub port: Option<u16>,
-    /// Advertised transport, independently of driver availability.
-    pub transport: EndpointTransport,
-    /// Interface identity such as http, ari, ami, or sql.
-    pub interface: String,
-    /// Recognized catalog provider; absent when recognition is unresolved.
-    pub provider: Option<String>,
-    /// Current readiness explanation; Ready still requires invocation admission.
-    pub state: EndpointState,
-    /// Reviewed operator binding, with references and never credential values.
-    pub binding: Option<EndpointBinding>,
-}
-
-/// A discovered transport does not by itself install a protocol driver.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+/// Closed implementation identity for a route through another Connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum EndpointTransport {
-    /// Stream transport supported by Kubernetes Pod forwarding.
-    Tcp,
-    /// Datagram transport, visible even when execution is unsupported.
-    Udp,
-    /// Stream Control Transmission Protocol.
-    Sctp,
+pub enum RouteAdapter {
+    /// Grafana's reviewed data-source proxy prefix, with the data-source identity resolved from a
+    /// Connector-owned opaque binding rather than caller input.
+    GrafanaDatasourceProxyV1,
+    /// Kubernetes API Service proxy for one Connector-owned namespace, Service, and port
+    /// binding. Invocation callers can supply only catalog parameters; they cannot supply any
+    /// Kubernetes resource identity or proxy path.
+    KubernetesServiceProxyV1,
 }
 
-/// Actionable state of a discovered interface.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EndpointState {
-    /// Recognized and configured; invocation authorization remains independent.
-    Ready,
-    /// No unambiguous catalog provider matches the interface.
-    UnknownProvider,
-    /// No installed driver or route supports the advertised interface.
-    UnsupportedProtocol,
-    /// A required credential reference is not configured or cannot be resolved.
-    MissingCredentials,
-    /// Current source or endpoint policy refuses access.
-    Denied,
-    /// No approved reachable route exists.
-    UnavailableRoute,
-    /// The source resource has disappeared or current evidence is unavailable.
-    Stale,
-}
-
-/// Operator-controlled interpretation of an endpoint, persisted outside the cluster.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct EndpointBinding {
-    /// Stable provider from the installed catalog.
-    pub provider: String,
-    /// Optional HTTP path prefix; no query, fragment, or authority is accepted.
-    pub base_path: Option<String>,
-    /// Exact credential reference authorized by source policy.
-    pub credential: Option<EndpointCredentialReference>,
-    /// Explicit credential-free origin for an approved direct route.
-    pub direct_address: Option<String>,
-    /// SQL database override; Crossplane may instead provide the authoritative external name.
-    #[serde(default)]
-    pub database: Option<String>,
-    /// SQL transport policy; absence requires TLS. HTTP profiles use their declared scheme.
-    #[serde(default)]
-    pub tls: Option<EndpointTls>,
-    /// Explicit HTTP scheme for a forwarded service; does not select a direct route.
-    #[serde(default)]
-    pub scheme: Option<EndpointScheme>,
-}
-
-/// HTTP transport scheme selected independently of route placement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EndpointScheme {
-    /// Unencrypted HTTP between the runtime and the service.
-    Http,
-    /// HTTP with TLS verified against the logical service hostname.
-    Https,
-}
-
-/// Operator-owned TLS policy, separate from Kubernetes authentication and tunnel encryption.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EndpointTls {
-    /// Verify TLS using the logical target hostname and optionally a referenced CA.
-    Required,
-    /// Explicit operator consent to a plaintext backend protocol.
-    Disabled,
-}
-
-/// A named credential source; this type cannot carry Secret values.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum EndpointCredentialReference {
-    /// Kubernetes Secret fields mapped to provider-declared credential requirements.
-    KubernetesSecret {
-        /// Namespace admitted by the source's credential policy.
-        namespace: String,
-        /// Exact Secret name, never a discovery selector.
-        name: String,
-        /// Provider credential field to Secret data key; neither side is a value.
-        keys: BTreeMap<String, String>,
-    },
-}
-
-impl Endpoint {
-    /// Check portable inventory bounds without performing source or credential access.
-    pub fn validate(&self) -> bool {
-        [
-            &self.endpoint_ref,
-            &self.source_ref,
-            &self.resource_kind,
-            &self.resource_name,
-            &self.resource_uid,
-            &self.interface,
-        ]
-        .into_iter()
-        .all(|value| reference(value))
-            && self.namespace.as_deref().is_none_or(reference)
-            && self.port_name.as_deref().is_none_or(reference)
-            && self.port.is_none_or(|port| port > 0)
-            && self.provider.as_deref().is_none_or(provider_id)
-            && self.binding.as_ref().is_none_or(EndpointBinding::validate)
-    }
-}
-
-impl EndpointBinding {
-    /// Validate references and path shape; the runtime additionally enforces route policy.
-    pub fn validate(&self) -> bool {
-        provider_id(&self.provider)
-            && self.database.as_deref().is_none_or(reference)
-            && self.base_path.as_deref().is_none_or(|path| {
-                path.starts_with('/')
-                    && !path.starts_with("//")
-                    && path.len() <= 2048
-                    && !path
-                        .chars()
-                        .any(|c| c.is_control() || matches!(c, '?' | '#' | '\\'))
-            })
-            && self
-                .credential
-                .as_ref()
-                .is_none_or(EndpointCredentialReference::validate)
-            && self.direct_address.as_deref().is_none_or(|address| {
-                !address.is_empty()
-                    && address.len() <= 2048
-                    && !address.chars().any(|c| {
-                        c.is_whitespace() || c.is_control() || matches!(c, '@' | '?' | '#' | '\\')
-                    })
-            })
-    }
-}
-
-impl EndpointCredentialReference {
-    /// Check exact names and bounded field mappings, never fetching a Secret.
-    pub fn validate(&self) -> bool {
+impl RouteAdapter {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::KubernetesSecret {
-                namespace,
-                name,
-                keys,
-            } => {
-                reference(namespace)
-                    && reference(name)
-                    && !keys.is_empty()
-                    && keys.len() <= 32
-                    && keys
-                        .iter()
-                        .all(|(field, key)| reference(field) && reference(key))
-            }
+            Self::GrafanaDatasourceProxyV1 => "grafana_datasource_proxy_v1",
+            Self::KubernetesServiceProxyV1 => "kubernetes_service_proxy_v1",
         }
     }
 }
 
-fn reference(value: &str) -> bool {
-    !value.is_empty() && value.len() <= 512 && value.bytes().all(|byte| byte.is_ascii_graphic())
+/// A Connection's immutable execution route.
+///
+/// A mediated route remains a Connection of the target Provider. The parent supplies transport,
+/// not Provider semantics or Grant authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EndpointRoute {
+    /// Resolve the target Provider's operator-approved origin directly.
+    Direct,
+    /// Execute through another authorized Connection and one opaque discovered-resource binding.
+    ViaEndpoint {
+        parent_endpoint: String,
+        resource_binding: String,
+        adapter: RouteAdapter,
+    },
 }
 
-fn provider_id(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 128
-        && value.bytes().all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_' | b'.')
+/// Which side of a configured Connection may begin an interaction.
+///
+/// The names are relative to the Connectors boundary. They deliberately avoid `inbound` and
+/// `outbound`, whose meaning changes with the observer and which would collide with an Operation's
+/// existing read/write direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndpointInitiator {
+    /// A platform principal may ask Connectors to start a declared Operation at the provider.
+    /// The wire and state id stays `b10x`: it is the published initiator id (D5 keeps
+    /// provider identity irreversible; only the Rust name follows the platform's name).
+    #[serde(rename = "b10x")]
+    Platform,
+    /// The provider may start a declared Channel or session toward the platform.
+    Provider,
+}
+
+/// The non-empty set of sides that may initiate through one Connection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InitiationPolicy {
+    allowed: BTreeSet<EndpointInitiator>,
+}
+
+impl InitiationPolicy {
+    /// Construct a policy. A Connection with no permitted initiator is invalid rather than a
+    /// second spelling of an inactive lifecycle state.
+    pub fn new(
+        allowed: impl IntoIterator<Item = EndpointInitiator>,
+    ) -> Result<Self, EndpointAuthorityError> {
+        let allowed = allowed.into_iter().collect::<BTreeSet<_>>();
+        if allowed.is_empty() {
+            return Err(EndpointAuthorityError::NoAllowedInitiator);
+        }
+        Ok(Self { allowed })
+    }
+
+    #[must_use]
+    pub fn platform_only() -> Self {
+        Self {
+            allowed: BTreeSet::from([EndpointInitiator::Platform]),
+        }
+    }
+
+    #[must_use]
+    pub fn provider_only() -> Self {
+        Self {
+            allowed: BTreeSet::from([EndpointInitiator::Provider]),
+        }
+    }
+
+    #[must_use]
+    pub fn bidirectional() -> Self {
+        Self {
+            allowed: BTreeSet::from([EndpointInitiator::Platform, EndpointInitiator::Provider]),
+        }
+    }
+
+    #[must_use]
+    pub fn allows(&self, initiator: EndpointInitiator) -> bool {
+        self.allowed.contains(&initiator)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = EndpointInitiator> + '_ {
+        self.allowed.iter().copied()
+    }
+}
+
+/// Connection identity plus its independently configured initiation boundary.
+///
+/// Grants remain separate: this value says which side may start, not which principal may execute
+/// which operation or receive which channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EndpointAuthority {
+    id: String,
+    initiation: InitiationPolicy,
+    route: EndpointRoute,
+}
+
+impl EndpointAuthority {
+    pub fn new(
+        id: impl Into<String>,
+        initiation: InitiationPolicy,
+    ) -> Result<Self, EndpointAuthorityError> {
+        let id = id.into();
+        if id.is_empty() {
+            return Err(EndpointAuthorityError::EmptyEndpoint);
+        }
+        Ok(Self {
+            id,
+            initiation,
+            route: EndpointRoute::Direct,
         })
+    }
+
+    /// Construct a mediated Connection. The resource binding is opaque Connector-owned state; it
+    /// is not a provider UID or URL accepted from an invocation caller.
+    pub fn mediated(
+        id: impl Into<String>,
+        initiation: InitiationPolicy,
+        parent_endpoint: impl Into<String>,
+        resource_binding: impl Into<String>,
+        adapter: RouteAdapter,
+    ) -> Result<Self, EndpointAuthorityError> {
+        let id = id.into();
+        let parent_endpoint = parent_endpoint.into();
+        let resource_binding = resource_binding.into();
+        validate_ref(&id)
+            .then_some(())
+            .ok_or(EndpointAuthorityError::EmptyEndpoint)?;
+        if !validate_ref(&parent_endpoint) {
+            return Err(EndpointAuthorityError::InvalidParentEndpoint);
+        }
+        if id == parent_endpoint {
+            return Err(EndpointAuthorityError::RouteCycle);
+        }
+        if !validate_ref(&resource_binding) {
+            return Err(EndpointAuthorityError::InvalidResourceBinding);
+        }
+        Ok(Self {
+            id,
+            initiation,
+            route: EndpointRoute::ViaEndpoint {
+                parent_endpoint,
+                resource_binding,
+                adapter,
+            },
+        })
+    }
+
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    #[must_use]
+    pub fn initiation(&self) -> &InitiationPolicy {
+        &self.initiation
+    }
+
+    #[must_use]
+    pub fn route(&self) -> &EndpointRoute {
+        &self.route
+    }
+}
+
+fn validate_ref(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 512
+        && value
+            .chars()
+            .all(|character| !character.is_whitespace() && !character.is_control())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum EndpointAuthorityError {
+    #[error("Connection identity is empty")]
+    EmptyEndpoint,
+    #[error("Connection initiation policy allows no initiator")]
+    NoAllowedInitiator,
+    #[error("mediated route parent Connection identity is invalid")]
+    InvalidParentEndpoint,
+    #[error("mediated route resource binding is invalid")]
+    InvalidResourceBinding,
+    #[error("a Connection cannot route through itself")]
+    RouteCycle,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_three_policies_are_explicit_sets() {
+        let platform = InitiationPolicy::platform_only();
+        assert!(platform.allows(EndpointInitiator::Platform));
+        assert!(!platform.allows(EndpointInitiator::Provider));
+
+        let provider = InitiationPolicy::provider_only();
+        assert!(!provider.allows(EndpointInitiator::Platform));
+        assert!(provider.allows(EndpointInitiator::Provider));
+
+        let both = InitiationPolicy::bidirectional();
+        assert!(both.allows(EndpointInitiator::Platform));
+        assert!(both.allows(EndpointInitiator::Provider));
+    }
+
+    #[test]
+    fn inactive_is_a_lifecycle_state_not_an_empty_policy() {
+        assert_eq!(
+            InitiationPolicy::new([]),
+            Err(EndpointAuthorityError::NoAllowedInitiator)
+        );
+    }
+
+    #[test]
+    fn mediated_route_is_explicit_and_cannot_self_reference() {
+        let connection = EndpointAuthority::mediated(
+            "prometheus-via-grafana",
+            InitiationPolicy::platform_only(),
+            "grafana-infra",
+            "observation:datasource-1",
+            RouteAdapter::GrafanaDatasourceProxyV1,
+        )
+        .expect("valid mediated route");
+        assert!(matches!(
+            connection.route(),
+            EndpointRoute::ViaEndpoint { parent_endpoint, adapter: RouteAdapter::GrafanaDatasourceProxyV1, .. }
+                if parent_endpoint == "grafana-infra"
+        ));
+
+        assert_eq!(
+            EndpointAuthority::mediated(
+                "same",
+                InitiationPolicy::platform_only(),
+                "same",
+                "observation:1",
+                RouteAdapter::GrafanaDatasourceProxyV1,
+            ),
+            Err(EndpointAuthorityError::RouteCycle)
+        );
+    }
 }

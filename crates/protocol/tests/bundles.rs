@@ -114,9 +114,9 @@ fn connector_connection_vectors_match_the_strict_reader() {
     let vectors: OperationVectors =
         serde_json::from_slice(&fs::read(path).expect("vectors are readable"))
             .expect("vectors parse");
-    assert_eq!(vectors.contract, protocol::connection::CONTRACT);
+    assert_eq!(vectors.contract, protocol::endpoint::CONTRACT);
     for vector in vectors.cases {
-        let result = serde_json::from_value::<protocol::connection::RequestEnvelope>(vector.frame)
+        let result = serde_json::from_value::<protocol::endpoint::RequestEnvelope>(vector.frame)
             .map_err(|error| error.to_string())
             .and_then(|request| request.validate().map_err(|error| error.to_string()));
         assert_eq!(
@@ -150,7 +150,7 @@ fn connector_catalog_vectors_match_the_strict_reader() {
 
 #[test]
 fn kubernetes_service_route_round_trips_through_the_connection_response() {
-    let response: protocol::connection::ResponseEnvelope =
+    let response: protocol::endpoint::ResponseEnvelope =
         serde_json::from_value(serde_json::json!({
             "protocol": "b10x.connector-connection.v0alpha1",
             "request_id": "request-materialize-kubernetes-1",
@@ -158,14 +158,14 @@ fn kubernetes_service_route_round_trips_through_the_connection_response() {
             "response": {
                 "result": "materialize",
                 "value": {
-                    "connection_ref": "connection:prometheus:opaque",
+                    "endpoint_ref": "connection:prometheus:opaque",
                     "integration_ref": "prometheus",
                     "label": "monitoring/prometheus (prometheus)",
                     "state": "callable",
                     "initiation": ["b10x"],
                     "route": {
                         "kind": "via_connection",
-                        "parent_connection_ref": "connection:kubernetes:opaque",
+                        "parent_endpoint_ref": "connection:kubernetes:opaque",
                         "route_adapter": "kubernetes_service_proxy_v1"
                     },
                     "channels": []
@@ -174,14 +174,14 @@ fn kubernetes_service_route_round_trips_through_the_connection_response() {
         }))
         .unwrap();
     response.validate().unwrap();
-    let Some(protocol::connection::ConnectionResult::Materialize(description)) = response.response
+    let Some(protocol::endpoint::EndpointResult::Materialize(description)) = response.response
     else {
         panic!("materialize response required");
     };
     assert!(matches!(
         description.summary.route,
-        protocol::connection::ConnectionRoute::ViaConnection {
-            route_adapter: protocol::connection::RouteAdapter::KubernetesServiceProxyV1,
+        protocol::endpoint::EndpointRoute::ViaEndpoint {
+            route_adapter: protocol::endpoint::RouteAdapter::KubernetesServiceProxyV1,
             ..
         }
     ));
@@ -694,8 +694,8 @@ fn authentication_operation_v3_vectors_have_independent_reader_and_schema_result
 
 #[test]
 fn authentication_connection_v2_vectors_have_independent_reader_and_schema_results() {
-    use protocol::connection_v2 as v2;
-    let schema = protocol::connection_v2_schema::connection_v2_schema();
+    use protocol::endpoint_v2 as v2;
+    let schema = protocol::endpoint_v2_schema::connection_v2_schema();
     let validator = jsonschema::options()
         .with_draft(jsonschema::Draft::Draft202012)
         .should_validate_formats(true)
@@ -849,7 +849,7 @@ fn authentication_version_adapters_preserve_ordinary_and_rate_frames() {
 
 #[test]
 fn authentication_bound_requests_cannot_downgrade_to_unbound_creation() {
-    use protocol::{connection as old, connection_v2 as new};
+    use protocol::{endpoint as old, endpoint_v2 as new};
     for case in authentication_vectors("contracts/connector-connection/v0alpha2")
         .cases
         .into_iter()
@@ -865,7 +865,7 @@ fn authentication_bound_requests_cannot_downgrade_to_unbound_creation() {
             let current: new::RequestEnvelope = serde_json::from_value(case.frame).unwrap();
             if bound {
                 let error = current.clone().into_v1().unwrap_err();
-                assert_eq!(error.code, old::ConnectionErrorCode::Protocol);
+                assert_eq!(error.code, old::EndpointErrorCode::Protocol);
                 assert!(!error.retriable);
                 assert!(new::Version::V0Alpha1.encode_request(current).is_err());
             } else {
@@ -893,7 +893,7 @@ fn authentication_bound_requests_cannot_downgrade_to_unbound_creation() {
 #[test]
 fn authentication_selected_decoders_preserve_original_duplicate_fields() {
     use protocol::operation::{legacy, v3, versions, wire};
-    use protocol::{connection, connection_v2};
+    use protocol::{endpoint as connection, endpoint_v2 as connection_v2};
     let op_request = operation_v2_vectors()
         .cases
         .into_iter()
@@ -975,7 +975,7 @@ fn authentication_selected_decoders_preserve_original_duplicate_fields() {
                 }
                 for wrong in [
                     "unknown",
-                    "b10x.connector-operation.v0alpha4",
+                    "b10x.connector-operation.v0alpha5",
                     "b10x.connector-connection.v0alpha3",
                     "",
                 ] {
@@ -989,7 +989,7 @@ fn authentication_selected_decoders_preserve_original_duplicate_fields() {
 
 #[test]
 fn authentication_connection_frame_and_input_budgets_are_version_specific() {
-    use protocol::{connection, connection_v2 as v2};
+    use protocol::{endpoint as connection, endpoint_v2 as v2};
     let vectors = authentication_vectors("contracts/connector-connection/v0alpha2");
     let frame = vectors
         .cases
@@ -1049,7 +1049,7 @@ fn authentication_vectors_cover_every_request_result_and_error_variant() {
         ),
         (
             "contracts/connector-connection/v0alpha2",
-            protocol::connection_v2_schema::connection_v2_schema(),
+            protocol::endpoint_v2_schema::connection_v2_schema(),
             "Connection",
         ),
     ] {
@@ -1088,7 +1088,7 @@ fn authentication_vectors_cover_every_request_result_and_error_variant() {
 #[test]
 fn authentication_new_payloads_refuse_every_predecessor_identity() {
     use protocol::operation::{legacy, v3, versions, wire};
-    use protocol::{connection, connection_v2};
+    use protocol::{endpoint as connection, endpoint_v2 as connection_v2};
     let mut auth = authentication_vectors("contracts/connector-operation/v0alpha3")
         .cases
         .into_iter()
@@ -1127,7 +1127,7 @@ fn authentication_new_payloads_refuse_every_predecessor_identity() {
 
 #[test]
 fn authentication_new_nested_dtos_refuse_original_duplicate_fields() {
-    use protocol::{connection_v2, operation::versions};
+    use protocol::{endpoint_v2 as connection_v2, operation::versions};
     for (directory, name, key, operation, request) in [
         (
             "contracts/connector-operation/v0alpha3",
@@ -1146,7 +1146,7 @@ fn authentication_new_nested_dtos_refuse_original_duplicate_fields() {
         (
             "contracts/connector-connection/v0alpha2",
             "request-remediation_start",
-            "connection_ref",
+            "endpoint_ref",
             false,
             true,
         ),
@@ -1290,7 +1290,7 @@ fn authentication_predecessor_artifacts_and_readers_stay_frozen() {
 #[test]
 fn auth_adversary_original_vector_bytes_reject_escaped_duplicates_and_padded_overflow() {
     use protocol::{
-        connection_v2,
+        endpoint_v2 as connection_v2,
         operation::{self, versions},
     };
     let mut reached = 0;

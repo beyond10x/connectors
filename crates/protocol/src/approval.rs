@@ -35,7 +35,7 @@ pub struct IssueRequest {
     /// Connector-owned operation identity.
     pub operation_ref: String,
     /// Connector-owned credential-free Connection identity.
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     /// Current description lease observed by the human-facing caller.
     pub description_ref: String,
     /// Exact input whose canonical digest is approved.
@@ -69,7 +69,7 @@ impl RequestEnvelope {
             || !valid_ref(&self.context.authority_snapshot_id, 512)
             || !is_digest(&self.context.authority_snapshot_sha256)
             || !valid_ref(&self.request.operation_ref, 512)
-            || !valid_ref(&self.request.connection_ref, 512)
+            || !valid_ref(&self.request.endpoint_ref, 512)
             || !valid_ref(&self.request.description_ref, 512)
             || !(1..=MAX_TTL_SECONDS).contains(&self.request.ttl_seconds)
             || serde_json::to_vec(&self.request.input)
@@ -123,7 +123,7 @@ mod tests {
             },
             request: IssueRequest {
                 operation_ref: "todo.create_list".to_owned(),
-                connection_ref: "connection:todo".to_owned(),
+                endpoint_ref: "connection:todo".to_owned(),
                 description_ref: "description:todo".to_owned(),
                 input: serde_json::json!({"title": "ship it"}),
                 ttl_seconds: 120,

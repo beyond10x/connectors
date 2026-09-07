@@ -1,6 +1,6 @@
 //! Deterministic schema for credential-free endpoint discovery and binding.
 
-use crate::endpoint;
+use crate::endpoint_inventory as endpoint;
 use serde_json::{json, Value};
 
 /// Project the new endpoint frame graph and its shared context and bounded response invariants.
@@ -43,23 +43,23 @@ pub fn endpoint_schema() -> Value {
         "resource_uid",
         "interface",
     ] {
-        defs["Endpoint"]["properties"][field] = reference(512);
+        defs["EndpointInventoryEntry"]["properties"][field] = reference(512);
     }
     for field in ["namespace", "port_name"] {
-        defs["Endpoint"]["properties"][field] = json!({"anyOf":[reference(512),{"type":"null"}]});
+        defs["EndpointInventoryEntry"]["properties"][field] = json!({"anyOf":[reference(512),{"type":"null"}]});
     }
-    defs["Endpoint"]["properties"]["port"] =
+    defs["EndpointInventoryEntry"]["properties"]["port"] =
         json!({"anyOf":[{"type":"integer","minimum":1,"maximum":65535},{"type":"null"}]});
     let provider =
         json!({"type":"string","minLength":1,"maxLength":128,"pattern":"^[a-z0-9._-]+$"});
-    defs["Endpoint"]["properties"]["provider"] =
+    defs["EndpointInventoryEntry"]["properties"]["provider"] =
         json!({"anyOf":[provider.clone(),{"type":"null"}]});
     defs["EndpointBinding"]["properties"]["provider"] = provider;
-    defs["EndpointError"]["properties"]["message"] =
+    defs["EndpointInventoryError"]["properties"]["message"] =
         json!({"type":"string","minLength":1,"maxLength":4096,"pattern":"^[^\\x00-\\x1f\\x7f]*$"});
     defs["ResponseEnvelope"]["oneOf"] = json!([
-        {"required":["response"],"properties":{"status":{"const":"ok"},"response":{"$ref":"#/$defs/EndpointResult"},"error":{"type":"null"}}},
-        {"required":["error"],"properties":{"status":{"const":"error"},"error":{"$ref":"#/$defs/EndpointError"},"response":{"type":"null"}}}
+        {"required":["response"],"properties":{"status":{"const":"ok"},"response":{"$ref":"#/$defs/EndpointInventoryResult"},"error":{"type":"null"}}},
+        {"required":["error"],"properties":{"status":{"const":"error"},"error":{"$ref":"#/$defs/EndpointInventoryError"},"response":{"type":"null"}}}
     ]);
     result["$id"] = json!("https://github.com/beyond10x/connectors/blob/main/contracts/connector-endpoint/v0alpha1/connector-endpoint.schema.json");
     result["title"] = json!("B10x ConnectorEndpoint v0alpha1 frame");

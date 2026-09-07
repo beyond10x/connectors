@@ -1,5 +1,5 @@
 //! The new schemas are deterministic and enforce target exclusivity like the strict readers.
-use protocol::{endpoint, operation::v4};
+use protocol::{endpoint, operation::v5};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf};
@@ -68,12 +68,12 @@ fn endpoint_contract_projection_and_manifests_match() {
         (
             "contracts/connector-endpoint/v0alpha1",
             "connector-endpoint.schema.json",
-            protocol::endpoint_schema::endpoint_schema(),
+            protocol::endpoint_inventory_schema::endpoint_schema(),
         ),
         (
-            "contracts/connector-operation/v0alpha4",
+            "contracts/connector-operation/v0alpha5",
             "connector-operation.schema.json",
-            protocol::operation::schema_v4::operation_v4_schema(),
+            protocol::operation::schema_v5::operation_v5_schema(),
         ),
     ] {
         let schema: Value =
@@ -97,22 +97,22 @@ fn endpoint_contract_projection_and_manifests_match() {
 #[test]
 fn endpoint_operation_reader_and_schema_agree_on_target_selection() {
     let validator =
-        jsonschema::validator_for(&protocol::operation::schema_v4::operation_v4_schema()).unwrap();
+        jsonschema::validator_for(&protocol::operation::schema_v5::operation_v5_schema()).unwrap();
     for (method, params, expected) in [
-        ("invoke", json!({"connection_ref":"connection:one"}), true),
+        ("invoke", json!({"endpoint_ref":"connection:one"}), true),
         ("invoke", json!({"endpoint_ref":"endpoint:one"}), true),
         ("invoke", json!({}), false),
         ("invoke", json!({"endpoint_ref":null}), false),
         (
             "invoke",
-            json!({"endpoint_ref":"endpoint:one","connection_ref":"connection:one"}),
+            json!({"endpoint_ref":"endpoint:one","endpoint_ref":"connection:one"}),
             false,
         ),
         ("describe", json!({}), true),
         ("describe", json!({"endpoint_ref":"endpoint:one"}), true),
         (
             "describe",
-            json!({"endpoint_ref":"endpoint:one","connection_ref":"connection:one"}),
+            json!({"endpoint_ref":"endpoint:one","endpoint_ref":"connection:one"}),
             false,
         ),
     ] {
@@ -122,8 +122,8 @@ fn endpoint_operation_reader_and_schema_agree_on_target_selection() {
             params["description_ref"] = json!("description:one");
             params["input"] = json!({});
         }
-        let frame = json!({"protocol":v4::CONTRACT,"request_id":"request:one","context":context(),"request":{"method":method,"params":params}});
-        let read = serde_json::from_value::<v4::RequestEnvelope>(frame.clone())
+        let frame = json!({"protocol":v5::CONTRACT,"request_id":"request:one","context":context(),"request":{"method":method,"params":params}});
+        let read = serde_json::from_value::<v5::RequestEnvelope>(frame.clone())
             .is_ok_and(|request| request.validate().is_ok());
         assert_eq!(read, expected, "reader: {frame}");
         assert_eq!(validator.is_valid(&frame), expected, "schema: {frame}");
@@ -133,7 +133,7 @@ fn endpoint_operation_reader_and_schema_agree_on_target_selection() {
 #[test]
 fn endpoint_inventory_reader_and_schema_agree_on_bounds() {
     let validator =
-        jsonschema::validator_for(&protocol::endpoint_schema::endpoint_schema()).unwrap();
+        jsonschema::validator_for(&protocol::endpoint_inventory_schema::endpoint_schema()).unwrap();
     for (limit, expected) in [(0, false), (1, true), (100, true), (101, false)] {
         let frame = json!({"protocol":endpoint::CONTRACT,"request_id":"request:one","context":context(),"request":{"method":"list","params":{"source_ref":null,"query":"","limit":limit,"cursor":null}}});
         let read = serde_json::from_value::<endpoint::RequestEnvelope>(frame.clone())

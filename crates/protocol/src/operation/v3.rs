@@ -74,7 +74,7 @@ pub enum AuthenticationNextAction {
 #[serde(deny_unknown_fields)]
 pub struct AuthenticationRequired {
     pub operation_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub integration_ref: String,
     pub auth_profile: String,
     pub need: AuthenticationNeed,
@@ -86,7 +86,7 @@ impl AuthenticationRequired {
     pub fn validate(&self) -> Result<(), OperationError> {
         if [
             &self.operation_ref,
-            &self.connection_ref,
+            &self.endpoint_ref,
             &self.integration_ref,
         ]
         .iter()

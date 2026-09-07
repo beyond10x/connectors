@@ -38,7 +38,7 @@ pub fn operation_v3_schema() -> Value {
     let auth = defs
         .get_mut("AuthenticationRequired")
         .expect("authentication definition");
-    for field in ["operation_ref", "connection_ref", "integration_ref"] {
+    for field in ["operation_ref", "endpoint_ref", "integration_ref"] {
         auth["properties"][field] =
             json!({"type":"string","minLength":1,"maxLength":512,"pattern":"^[!-~]+$"});
     }

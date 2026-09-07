@@ -2,7 +2,7 @@
 // Field-level documentation is generated into the new bundle; predecessor source stays frozen.
 #![allow(missing_docs)]
 use crate::{
-    connection as old,
+    endpoint as old,
     operation::{v3::AuthenticationNeed, OwnerContext},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -11,8 +11,8 @@ use serde_json::Value;
 pub use old::{
     CandidateActivateRequest, CandidateSearchRequest, ConnectSessionCreateRequest,
     ConnectSessionState, ConnectSessionStatus, ConnectSessionStatusRequest,
-    ConnectionCandidateSummary, ConnectionDescription, ConnectionError, ConnectionErrorCode,
-    ConnectionSummary, DescribeRequest, DiscoveryObservationSummary, MaterializeRequest,
+    EndpointCandidateSummary, EndpointDescription, EndpointError, EndpointErrorCode,
+    EndpointSummary, DescribeRequest, DiscoveryObservationSummary, MaterializeRequest,
     ObservationSearchRequest, ResponseStatus, SearchRequest, MAX_RESPONSE_BYTES,
     MAX_SEARCH_RESULTS,
 };
@@ -26,7 +26,7 @@ pub struct RequestEnvelope {
     pub protocol: String,
     pub request_id: String,
     pub context: OwnerContext,
-    pub request: ConnectionRequest,
+    pub request: EndpointRequest,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -36,7 +36,7 @@ pub struct RequestEnvelope {
     rename_all = "snake_case",
     deny_unknown_fields
 )]
-pub enum ConnectionRequest {
+pub enum EndpointRequest {
     CandidateSearch(CandidateSearchRequest),
     CandidateActivate(CandidateActivateRequest),
     Search(SearchRequest),
@@ -54,7 +54,7 @@ pub enum ConnectionRequest {
 #[serde(deny_unknown_fields)]
 pub struct RemediationStartRequest {
     pub operation_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub input: Value,
 }
 
@@ -69,7 +69,7 @@ pub struct RemediationStatusRequest {
 pub struct RemediationAcknowledgeRequest {
     pub connect_session_ref: String,
     pub operation_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -94,7 +94,7 @@ pub enum RemediationNextAction {
 pub struct BoundRemediationStatus {
     pub connect_session_ref: String,
     pub operation_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub integration_ref: String,
     pub auth_profile: String,
     pub need: AuthenticationNeed,
@@ -109,7 +109,7 @@ pub struct BoundRemediationStatus {
 pub struct RemediationAcknowledgement {
     pub connect_session_ref: String,
     pub operation_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub next_action: RemediationNextAction,
 }
 
@@ -120,19 +120,19 @@ pub struct RemediationAcknowledgement {
     rename_all = "snake_case",
     deny_unknown_fields
 )]
-pub enum ConnectionResult {
+pub enum EndpointResult {
     CandidateSearch {
-        candidates: Vec<ConnectionCandidateSummary>,
+        candidates: Vec<EndpointCandidateSummary>,
     },
-    CandidateActivate(ConnectionDescription),
+    CandidateActivate(EndpointDescription),
     Search {
-        connections: Vec<ConnectionSummary>,
+        endpoints: Vec<EndpointSummary>,
     },
-    Describe(ConnectionDescription),
+    Describe(EndpointDescription),
     ObservationSearch {
         observations: Vec<DiscoveryObservationSummary>,
     },
-    Materialize(ConnectionDescription),
+    Materialize(EndpointDescription),
     ConnectSessionCreate(ConnectSessionStatus),
     ConnectSessionStatus(ConnectSessionStatus),
     RemediationStart(BoundRemediationStatus),
@@ -147,13 +147,13 @@ pub struct ResponseEnvelope {
     pub request_id: String,
     pub status: ResponseStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub response: Option<ConnectionResult>,
+    pub response: Option<EndpointResult>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<ConnectionError>,
+    pub error: Option<EndpointError>,
 }
 
 impl RequestEnvelope {
-    pub fn validate(&self) -> Result<(), ConnectionError> {
+    pub fn validate(&self) -> Result<(), EndpointError> {
         if self.protocol != CONTRACT {
             return Err(protocol_refusal());
         }
@@ -162,27 +162,27 @@ impl RequestEnvelope {
             protocol: old::CONTRACT.into(),
             request_id: self.request_id.clone(),
             context: self.context.clone(),
-            request: old::ConnectionRequest::Search(SearchRequest {
+            request: old::EndpointRequest::Search(SearchRequest {
                 query: String::new(),
                 limit: 1,
             }),
         }
         .validate()?;
         match &self.request {
-            ConnectionRequest::RemediationStart(value) => {
+            EndpointRequest::RemediationStart(value) => {
                 require_operation_ref(&value.operation_ref)?;
-                require_ref(&value.connection_ref)?;
+                require_ref(&value.endpoint_ref)?;
                 if serde_json::to_vec(&value.input)
                     .map_or(true, |bytes| bytes.len() > MAX_INPUT_BYTES)
                 {
                     return Err(protocol_refusal());
                 }
             }
-            ConnectionRequest::RemediationStatus(value) => require_ref(&value.connect_session_ref)?,
-            ConnectionRequest::RemediationAcknowledge(value) => {
+            EndpointRequest::RemediationStatus(value) => require_ref(&value.connect_session_ref)?,
+            EndpointRequest::RemediationAcknowledge(value) => {
                 require_ref(&value.connect_session_ref)?;
                 require_operation_ref(&value.operation_ref)?;
-                require_ref(&value.connection_ref)?;
+                require_ref(&value.endpoint_ref)?;
             }
             _ => self.clone().into_v1()?.validate()?,
         }
@@ -193,7 +193,7 @@ impl RequestEnvelope {
     }
 
     /// Bound commands cannot be expressed by unbound v1 session creation.
-    pub fn into_v1(self) -> Result<old::RequestEnvelope, ConnectionError> {
+    pub fn into_v1(self) -> Result<old::RequestEnvelope, EndpointError> {
         Ok(old::RequestEnvelope {
             protocol: old::CONTRACT.into(),
             request_id: self.request_id,
@@ -203,34 +203,34 @@ impl RequestEnvelope {
     }
 }
 
-impl ConnectionRequest {
-    fn into_v1(self) -> Result<old::ConnectionRequest, ConnectionError> {
+impl EndpointRequest {
+    fn into_v1(self) -> Result<old::EndpointRequest, EndpointError> {
         Ok(match self {
-            Self::CandidateSearch(v) => old::ConnectionRequest::CandidateSearch(v),
-            Self::CandidateActivate(v) => old::ConnectionRequest::CandidateActivate(v),
-            Self::Search(v) => old::ConnectionRequest::Search(v),
-            Self::Describe(v) => old::ConnectionRequest::Describe(v),
-            Self::ObservationSearch(v) => old::ConnectionRequest::ObservationSearch(v),
-            Self::Materialize(v) => old::ConnectionRequest::Materialize(v),
-            Self::ConnectSessionCreate(v) => old::ConnectionRequest::ConnectSessionCreate(v),
-            Self::ConnectSessionStatus(v) => old::ConnectionRequest::ConnectSessionStatus(v),
+            Self::CandidateSearch(v) => old::EndpointRequest::CandidateSearch(v),
+            Self::CandidateActivate(v) => old::EndpointRequest::CandidateActivate(v),
+            Self::Search(v) => old::EndpointRequest::Search(v),
+            Self::Describe(v) => old::EndpointRequest::Describe(v),
+            Self::ObservationSearch(v) => old::EndpointRequest::ObservationSearch(v),
+            Self::Materialize(v) => old::EndpointRequest::Materialize(v),
+            Self::ConnectSessionCreate(v) => old::EndpointRequest::ConnectSessionCreate(v),
+            Self::ConnectSessionStatus(v) => old::EndpointRequest::ConnectSessionStatus(v),
             Self::RemediationStart(_)
             | Self::RemediationStatus(_)
             | Self::RemediationAcknowledge(_) => return Err(downgrade_refusal()),
         })
     }
 }
-impl From<old::ConnectionRequest> for ConnectionRequest {
-    fn from(value: old::ConnectionRequest) -> Self {
+impl From<old::EndpointRequest> for EndpointRequest {
+    fn from(value: old::EndpointRequest) -> Self {
         match value {
-            old::ConnectionRequest::CandidateSearch(v) => Self::CandidateSearch(v),
-            old::ConnectionRequest::CandidateActivate(v) => Self::CandidateActivate(v),
-            old::ConnectionRequest::Search(v) => Self::Search(v),
-            old::ConnectionRequest::Describe(v) => Self::Describe(v),
-            old::ConnectionRequest::ObservationSearch(v) => Self::ObservationSearch(v),
-            old::ConnectionRequest::Materialize(v) => Self::Materialize(v),
-            old::ConnectionRequest::ConnectSessionCreate(v) => Self::ConnectSessionCreate(v),
-            old::ConnectionRequest::ConnectSessionStatus(v) => Self::ConnectSessionStatus(v),
+            old::EndpointRequest::CandidateSearch(v) => Self::CandidateSearch(v),
+            old::EndpointRequest::CandidateActivate(v) => Self::CandidateActivate(v),
+            old::EndpointRequest::Search(v) => Self::Search(v),
+            old::EndpointRequest::Describe(v) => Self::Describe(v),
+            old::EndpointRequest::ObservationSearch(v) => Self::ObservationSearch(v),
+            old::EndpointRequest::Materialize(v) => Self::Materialize(v),
+            old::EndpointRequest::ConnectSessionCreate(v) => Self::ConnectSessionCreate(v),
+            old::EndpointRequest::ConnectSessionStatus(v) => Self::ConnectSessionStatus(v),
         }
     }
 }
@@ -247,10 +247,10 @@ impl From<old::RequestEnvelope> for RequestEnvelope {
 
 impl BoundRemediationStatus {
     /// Validate projection structure and equality only, not current time, admission or readiness.
-    pub fn validate(&self) -> Result<(), ConnectionError> {
+    pub fn validate(&self) -> Result<(), EndpointError> {
         for value in [
             &self.connect_session_ref,
-            &self.connection_ref,
+            &self.endpoint_ref,
             &self.integration_ref,
         ] {
             require_ref(value)?;
@@ -263,15 +263,15 @@ impl BoundRemediationStatus {
             || self.expires_at_unix_ms != self.session.expires_at_unix_ms
             || self
                 .session
-                .connection_ref
+                .endpoint_ref
                 .as_ref()
-                .is_some_and(|value| value != &self.connection_ref)
+                .is_some_and(|value| value != &self.endpoint_ref)
         {
             return Err(protocol_refusal());
         }
         old::ResponseEnvelope::success(
             "bound-status-validation",
-            old::ConnectionResult::ConnectSessionStatus(self.session.clone()),
+            old::EndpointResult::ConnectSessionStatus(self.session.clone()),
         )
         .validate()?;
         let coherent = match self.resume_state {
@@ -293,16 +293,16 @@ impl BoundRemediationStatus {
     }
 }
 impl RemediationAcknowledgement {
-    pub fn validate(&self) -> Result<(), ConnectionError> {
+    pub fn validate(&self) -> Result<(), EndpointError> {
         require_ref(&self.connect_session_ref)?;
         require_operation_ref(&self.operation_ref)?;
-        require_ref(&self.connection_ref)
+        require_ref(&self.endpoint_ref)
     }
 }
 
 impl ResponseEnvelope {
     #[must_use]
-    pub fn success(request_id: impl Into<String>, response: ConnectionResult) -> Self {
+    pub fn success(request_id: impl Into<String>, response: EndpointResult) -> Self {
         Self {
             protocol: CONTRACT.into(),
             request_id: request_id.into(),
@@ -312,7 +312,7 @@ impl ResponseEnvelope {
         }
     }
     #[must_use]
-    pub fn failure(request_id: impl Into<String>, error: ConnectionError) -> Self {
+    pub fn failure(request_id: impl Into<String>, error: EndpointError) -> Self {
         Self {
             protocol: CONTRACT.into(),
             request_id: request_id.into(),
@@ -321,7 +321,7 @@ impl ResponseEnvelope {
             error: Some(error),
         }
     }
-    pub fn validate(&self) -> Result<(), ConnectionError> {
+    pub fn validate(&self) -> Result<(), EndpointError> {
         if self.protocol != CONTRACT {
             return Err(protocol_refusal());
         }
@@ -329,26 +329,26 @@ impl ResponseEnvelope {
             (
                 ResponseStatus::Ok,
                 Some(
-                    ConnectionResult::RemediationStart(value)
-                    | ConnectionResult::RemediationStatus(value),
+                    EndpointResult::RemediationStart(value)
+                    | EndpointResult::RemediationStatus(value),
                 ),
                 None,
             ) => {
                 value.validate()?;
                 old::ResponseEnvelope::success(
                     self.request_id.clone(),
-                    old::ConnectionResult::Search {
-                        connections: Vec::new(),
+                    old::EndpointResult::Search {
+                        endpoints: Vec::new(),
                     },
                 )
                 .validate()?;
             }
-            (ResponseStatus::Ok, Some(ConnectionResult::RemediationAcknowledge(value)), None) => {
+            (ResponseStatus::Ok, Some(EndpointResult::RemediationAcknowledge(value)), None) => {
                 value.validate()?;
                 old::ResponseEnvelope::success(
                     self.request_id.clone(),
-                    old::ConnectionResult::Search {
-                        connections: Vec::new(),
+                    old::EndpointResult::Search {
+                        endpoints: Vec::new(),
                     },
                 )
                 .validate()?;
@@ -360,53 +360,53 @@ impl ResponseEnvelope {
         }
         Ok(())
     }
-    pub fn into_v1(self) -> Result<old::ResponseEnvelope, ConnectionError> {
+    pub fn into_v1(self) -> Result<old::ResponseEnvelope, EndpointError> {
         Ok(old::ResponseEnvelope {
             protocol: old::CONTRACT.into(),
             request_id: self.request_id,
             status: self.status,
-            response: self.response.map(ConnectionResult::into_v1).transpose()?,
+            response: self.response.map(EndpointResult::into_v1).transpose()?,
             error: self.error,
         })
     }
 }
 
-impl ConnectionResult {
-    fn into_v1(self) -> Result<old::ConnectionResult, ConnectionError> {
+impl EndpointResult {
+    fn into_v1(self) -> Result<old::EndpointResult, EndpointError> {
         Ok(match self {
             Self::CandidateSearch { candidates } => {
-                old::ConnectionResult::CandidateSearch { candidates }
+                old::EndpointResult::CandidateSearch { candidates }
             }
-            Self::CandidateActivate(v) => old::ConnectionResult::CandidateActivate(v),
-            Self::Search { connections } => old::ConnectionResult::Search { connections },
-            Self::Describe(v) => old::ConnectionResult::Describe(v),
+            Self::CandidateActivate(v) => old::EndpointResult::CandidateActivate(v),
+            Self::Search { endpoints } => old::EndpointResult::Search { endpoints },
+            Self::Describe(v) => old::EndpointResult::Describe(v),
             Self::ObservationSearch { observations } => {
-                old::ConnectionResult::ObservationSearch { observations }
+                old::EndpointResult::ObservationSearch { observations }
             }
-            Self::Materialize(v) => old::ConnectionResult::Materialize(v),
-            Self::ConnectSessionCreate(v) => old::ConnectionResult::ConnectSessionCreate(v),
-            Self::ConnectSessionStatus(v) => old::ConnectionResult::ConnectSessionStatus(v),
+            Self::Materialize(v) => old::EndpointResult::Materialize(v),
+            Self::ConnectSessionCreate(v) => old::EndpointResult::ConnectSessionCreate(v),
+            Self::ConnectSessionStatus(v) => old::EndpointResult::ConnectSessionStatus(v),
             Self::RemediationStart(_)
             | Self::RemediationStatus(_)
             | Self::RemediationAcknowledge(_) => return Err(downgrade_refusal()),
         })
     }
 }
-impl From<old::ConnectionResult> for ConnectionResult {
-    fn from(value: old::ConnectionResult) -> Self {
+impl From<old::EndpointResult> for EndpointResult {
+    fn from(value: old::EndpointResult) -> Self {
         match value {
-            old::ConnectionResult::CandidateSearch { candidates } => {
+            old::EndpointResult::CandidateSearch { candidates } => {
                 Self::CandidateSearch { candidates }
             }
-            old::ConnectionResult::CandidateActivate(v) => Self::CandidateActivate(v),
-            old::ConnectionResult::Search { connections } => Self::Search { connections },
-            old::ConnectionResult::Describe(v) => Self::Describe(v),
-            old::ConnectionResult::ObservationSearch { observations } => {
+            old::EndpointResult::CandidateActivate(v) => Self::CandidateActivate(v),
+            old::EndpointResult::Search { endpoints } => Self::Search { endpoints },
+            old::EndpointResult::Describe(v) => Self::Describe(v),
+            old::EndpointResult::ObservationSearch { observations } => {
                 Self::ObservationSearch { observations }
             }
-            old::ConnectionResult::Materialize(v) => Self::Materialize(v),
-            old::ConnectionResult::ConnectSessionCreate(v) => Self::ConnectSessionCreate(v),
-            old::ConnectionResult::ConnectSessionStatus(v) => Self::ConnectSessionStatus(v),
+            old::EndpointResult::Materialize(v) => Self::Materialize(v),
+            old::EndpointResult::ConnectSessionCreate(v) => Self::ConnectSessionCreate(v),
+            old::EndpointResult::ConnectSessionStatus(v) => Self::ConnectSessionStatus(v),
         }
     }
 }
@@ -422,7 +422,7 @@ impl From<old::ResponseEnvelope> for ResponseEnvelope {
     }
 }
 
-fn require_ref(value: &str) -> Result<(), ConnectionError> {
+fn require_ref(value: &str) -> Result<(), EndpointError> {
     if value.is_empty()
         || value.len() > 512
         || value.bytes().any(|b| b.is_ascii_control() || b == b' ')
@@ -432,7 +432,7 @@ fn require_ref(value: &str) -> Result<(), ConnectionError> {
         Ok(())
     }
 }
-fn require_operation_ref(value: &str) -> Result<(), ConnectionError> {
+fn require_operation_ref(value: &str) -> Result<(), EndpointError> {
     if value.is_empty() || value.len() > 512 || !value.bytes().all(|b| b.is_ascii_graphic()) {
         Err(protocol_refusal())
     } else {
@@ -446,17 +446,17 @@ fn valid_profile(value: &str) -> bool {
             b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'_' | b'-')
         })
 }
-fn protocol_refusal() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Protocol,
+fn protocol_refusal() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Protocol,
         "connection protocol identity or framing is invalid",
         false,
     )
 }
-fn downgrade_refusal() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Protocol,
-        "bound remediation requires ConnectorConnection v0alpha2",
+fn downgrade_refusal() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Protocol,
+        "bound remediation requires ConnectorEndpoint v0alpha2",
         false,
     )
 }
@@ -470,10 +470,10 @@ pub enum Version {
 struct Identity {
     protocol: String,
 }
-fn read<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ConnectionError> {
+fn read<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, EndpointError> {
     serde_json::from_slice(bytes).map_err(|_| protocol_refusal())
 }
-fn selected(bytes: &[u8], maximum: usize) -> Result<Version, ConnectionError> {
+fn selected(bytes: &[u8], maximum: usize) -> Result<Version, EndpointError> {
     if bytes.len() > maximum {
         return Err(protocol_refusal());
     }
@@ -484,14 +484,14 @@ fn selected(bytes: &[u8], maximum: usize) -> Result<Version, ConnectionError> {
         _ => Err(protocol_refusal()),
     }
 }
-fn write<T: Serialize>(value: &T, maximum: usize) -> Result<Vec<u8>, ConnectionError> {
+fn write<T: Serialize>(value: &T, maximum: usize) -> Result<Vec<u8>, EndpointError> {
     let bytes = serde_json::to_vec(value).map_err(|_| protocol_refusal())?;
     if bytes.len() > maximum {
         return Err(protocol_refusal());
     }
     Ok(bytes)
 }
-pub fn decode_request(bytes: &[u8]) -> Result<(Version, RequestEnvelope), ConnectionError> {
+pub fn decode_request(bytes: &[u8]) -> Result<(Version, RequestEnvelope), EndpointError> {
     let version = selected(bytes, MAX_FRAME_BYTES)?;
     let request = match version {
         Version::V0Alpha1 => {
@@ -510,7 +510,7 @@ pub fn decode_request(bytes: &[u8]) -> Result<(Version, RequestEnvelope), Connec
     };
     Ok((version, request))
 }
-pub fn decode_response(bytes: &[u8]) -> Result<(Version, ResponseEnvelope), ConnectionError> {
+pub fn decode_response(bytes: &[u8]) -> Result<(Version, ResponseEnvelope), EndpointError> {
     let version = selected(bytes, MAX_RESPONSE_BYTES)?;
     let response = match version {
         Version::V0Alpha1 => {
@@ -527,14 +527,14 @@ pub fn decode_response(bytes: &[u8]) -> Result<(Version, ResponseEnvelope), Conn
     Ok((version, response))
 }
 impl Version {
-    pub fn encode_request(self, request: RequestEnvelope) -> Result<Vec<u8>, ConnectionError> {
+    pub fn encode_request(self, request: RequestEnvelope) -> Result<Vec<u8>, EndpointError> {
         request.validate()?;
         match self {
             Self::V0Alpha1 => write(&request.into_v1()?, old::MAX_FRAME_BYTES),
             Self::V0Alpha2 => write(&request, MAX_FRAME_BYTES),
         }
     }
-    pub fn encode_response(self, response: ResponseEnvelope) -> Result<Vec<u8>, ConnectionError> {
+    pub fn encode_response(self, response: ResponseEnvelope) -> Result<Vec<u8>, EndpointError> {
         response.validate()?;
         match self {
             Self::V0Alpha1 => write(&response.into_v1()?, MAX_RESPONSE_BYTES),

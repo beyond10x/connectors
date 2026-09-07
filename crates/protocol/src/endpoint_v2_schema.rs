@@ -1,5 +1,5 @@
 //! Complete typed structural projection of ordinary and bound Connection v2 frames.
-use crate::connection_v2;
+use crate::endpoint_v2 as connection_v2;
 use serde_json::{json, Map, Value};
 
 /// Draft 2020-12 schema. Instance equality, UTF-8 byte budgets and legacy URL parsing
@@ -15,7 +15,7 @@ pub fn connection_v2_schema() -> Value {
     }
     let mut schema = serde_json::to_value(schemars::schema_for!(Frame)).expect("schema serializes");
     schema["$id"]=json!("https://github.com/beyond10x/connectors/blob/main/contracts/connector-connection/v0alpha2/connector-connection.schema.json");
-    schema["title"] = json!("B10x ConnectorConnection v0alpha2 frame");
+    schema["title"] = json!("B10x ConnectorEndpoint v0alpha2 frame");
     schema["$comment"]=json!("The reader additionally enforces serialized UTF-8 input/frame/response byte budgets, string byte budgets, equality of independently supplied target/session/expiry values (including mediated-route self-reference refusal), and the frozen v1 WHATWG browser URL parser's route/capability grammar. Schema length counts code points; Draft 2020-12 has no instance-data equality operator. See the bundle README and independent schema/reader vectors.");
     let defs = schema["$defs"].as_object_mut().expect("typed definitions");
     // All ordinary references use the deployed Connection grammar, including non-ASCII
@@ -46,11 +46,11 @@ pub fn connection_v2_schema() -> Value {
         );
         property(defs, name, "request_id", reference(128));
     }
-    for variant in defs.get_mut("ConnectionRoute").expect("route")["oneOf"]
+    for variant in defs.get_mut("EndpointRoute").expect("route")["oneOf"]
         .as_array_mut()
         .expect("tagged route")
     {
-        if let Some(parent) = variant["properties"].get_mut("parent_connection_ref") {
+        if let Some(parent) = variant["properties"].get_mut("parent_endpoint_ref") {
             *parent = reference(512);
         }
     }
@@ -80,21 +80,21 @@ pub fn connection_v2_schema() -> Value {
     for name in [
         "CandidateActivateRequest",
         "ConnectSessionCreateRequest",
-        "ConnectionSummary",
-        "ConnectionDescription",
+        "EndpointSummary",
+        "EndpointDescription",
     ] {
         property(defs, name, "label", nonblank(256));
     }
     for name in [
         "ConnectSessionCreateRequest",
-        "ConnectionSummary",
-        "ConnectionDescription",
+        "EndpointSummary",
+        "EndpointDescription",
         "BoundRemediationStatus",
     ] {
         let field = &mut defs.get_mut(name).expect("profile type")["properties"]["auth_profile"];
         replace_preserving_null(field, profile());
     }
-    for name in ["ConnectionSummary", "ConnectionDescription"] {
+    for name in ["EndpointSummary", "EndpointDescription"] {
         // The deployed reader bounds cardinality but does not reject repeated initiators.
         defs.get_mut(name).expect("summary")["properties"]["initiation"]["minItems"] = json!(1);
         defs.get_mut(name).expect("summary")["properties"]["initiation"]["maxItems"] = json!(2);
@@ -107,7 +107,7 @@ pub fn connection_v2_schema() -> Value {
              "else":{"properties":{"scope":{"type":"null"}}}}
         ]);
     }
-    defs.get_mut("ConnectionDescription").expect("description")["properties"]["channels"]
+    defs.get_mut("EndpointDescription").expect("description")["properties"]["channels"]
         ["maxItems"] = json!(64);
     property(
         defs,
@@ -115,7 +115,7 @@ pub fn connection_v2_schema() -> Value {
         "events",
         json!({"type":"array","maxItems":64,"items":reference(512)}),
     );
-    for name in ["ConnectionCandidateSummary", "DiscoveryObservationSummary"] {
+    for name in ["EndpointCandidateSummary", "DiscoveryObservationSummary"] {
         property(defs, name, "title", nonblank(256));
         property(defs, name, "evidence_sha256", digest());
     }
@@ -131,29 +131,29 @@ pub fn connection_v2_schema() -> Value {
         "observed_type",
         json!({"type":"string","minLength":1,"maxLength":128,"pattern":"^[^\\u0000-\\u001f\\u007f]+$"}),
     );
-    defs.get_mut("ConnectionCandidateSummary")
+    defs.get_mut("EndpointCandidateSummary")
         .expect("candidate")["oneOf"] = json!([
-        state_fields("detected", &[], &["connection_ref"]),
-        state_fields("activated", &["connection_ref"], &[])
+        state_fields("detected", &[], &["endpoint_ref"]),
+        state_fields("activated", &["endpoint_ref"], &[])
     ]);
     defs.get_mut("DiscoveryObservationSummary")
         .expect("observation")["oneOf"] = json!([
-        state_fields("observed", &["target_provider_ref"], &["connection_ref"]),
+        state_fields("observed", &["target_provider_ref"], &["endpoint_ref"]),
         state_fields(
             "unsupported",
             &[],
-            &["target_provider_ref", "connection_ref"]
+            &["target_provider_ref", "endpoint_ref"]
         ),
         state_fields(
             "materialized",
-            &["target_provider_ref", "connection_ref"],
+            &["target_provider_ref", "endpoint_ref"],
             &[]
         ),
-        state_fields("withdrawn", &[], &["connection_ref"])
+        state_fields("withdrawn", &[], &["endpoint_ref"])
     ]);
     property(
         defs,
-        "ConnectionError",
+        "EndpointError",
         "message",
         json!({"type":"string","minLength":1,"maxLength":4096}),
     );
@@ -162,7 +162,7 @@ pub fn connection_v2_schema() -> Value {
         {"properties":{"status":{"const":"ok"},"response":{"not":{"type":"null"}},"error":{"type":"null"}},"required":["response"]},
         {"properties":{"status":{"const":"error"},"error":{"not":{"type":"null"}},"response":{"type":"null"}},"required":["error"]}
     ]);
-    for variant in defs.get_mut("ConnectionResult").expect("results")["oneOf"]
+    for variant in defs.get_mut("EndpointResult").expect("results")["oneOf"]
         .as_array_mut()
         .expect("tagged results")
     {
@@ -172,7 +172,7 @@ pub fn connection_v2_schema() -> Value {
             .and_then(|value| value.get_mut("properties"))
             .and_then(Value::as_object_mut)
         {
-            for field in ["candidates", "connections", "observations"] {
+            for field in ["candidates", "endpoints", "observations"] {
                 if let Some(array) = properties.get_mut(field) {
                     array["maxItems"] = json!(64);
                 }
@@ -194,7 +194,7 @@ pub fn connection_v2_schema() -> Value {
         &mut session["properties"]["browser_completion_url"],
         json!({"type":"string","minLength":1,"maxLength":4096,"pattern":"^[^\\r\\n]*$","$comment":"Legacy WHATWG parse, route and fragment-capability checks are enforced by the unchanged v1 reader."}),
     );
-    let mut pending = state_fields("pending", &[], &["connection_ref"]);
+    let mut pending = state_fields("pending", &[], &["endpoint_ref"]);
     pending["anyOf"] = json!([
         {"required":["completion_endpoint"],"properties":{"completion_endpoint":{"not":{"type":"null"}}}},
         {"required":["browser_completion_url"],"properties":{"browser_completion_url":{"not":{"type":"null"}}}}
@@ -203,14 +203,14 @@ pub fn connection_v2_schema() -> Value {
         pending,
         state_fields(
             "completed",
-            &["connection_ref"],
+            &["endpoint_ref"],
             &["completion_endpoint", "browser_completion_url"]
         ),
         state_fields(
             "expired",
             &[],
             &[
-                "connection_ref",
+                "endpoint_ref",
                 "completion_endpoint",
                 "browser_completion_url"
             ]
@@ -219,7 +219,7 @@ pub fn connection_v2_schema() -> Value {
             "failed",
             &[],
             &[
-                "connection_ref",
+                "endpoint_ref",
                 "completion_endpoint",
                 "browser_completion_url"
             ]
