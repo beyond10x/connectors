@@ -4,6 +4,8 @@
 
 mod claims;
 mod composition;
+mod endpoint_egress;
+mod local_setup;
 mod one_shot;
 mod registry;
 mod service_bundle;

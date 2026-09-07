@@ -597,6 +597,12 @@ impl HostedServerConfig {
                 .iter()
                 .any(|namespace| !valid_dns_label(namespace, 63))
             || !valid_namespace_access(&self.kubernetes.namespace_access)
+            || (!self.kubernetes.enabled && !self.kubernetes.target_grants.is_empty())
+            || self
+                .kubernetes
+                .target_grants
+                .iter()
+                .any(|(provider, grant)| !valid_dns_label(provider, 63) || !valid_ref(grant, 512))
             || !valid_grafana(&self.grafana)
             || (self.sip.enabled != sip_complete)
             || !sip_credentials_valid

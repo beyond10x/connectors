@@ -187,6 +187,7 @@ pub(crate) struct PersonalComposition {
     pub(crate) registry: Arc<BackendRegistry>,
     pub(crate) ownership: LocalStateOwnership,
     readiness: Value,
+    setup_handler: Option<Arc<dyn server::local_setup::LocalSetupHandler>>,
 }
 
 /// Credential capabilities supplied by an embedding personal runtime.
@@ -230,7 +231,7 @@ impl PersonalRuntime {
         supplied_stores: Option<PersonalCredentialStores>,
     ) -> Result<Self, RuntimeError> {
         let composed = Self::compose(config_path, state_root, supplied_stores, true).await?;
-        let daemon =
+        let mut daemon =
             match LocalOperationDaemon::bind_owned(composed.ownership, composed.registry.clone())
                 .await
             {
@@ -240,6 +241,15 @@ impl PersonalRuntime {
                     return Err(error.into());
                 }
             };
+        daemon = daemon.with_configuration(
+            config_path
+                .map(std::fs::canonicalize)
+                .transpose()
+                .map_err(|_| RuntimeError::MissingConfigPath)?,
+        );
+        if let Some(handler) = composed.setup_handler {
+            daemon = daemon.with_setup_handler(handler);
+        }
         Ok(Self {
             daemon,
             readiness: composed.readiness,
@@ -267,8 +277,8 @@ impl PersonalRuntime {
             SqliteState::open(&state_root.join("event-reply-claims.sqlite"))
                 .map_err(|_| RuntimeError::ReplyClaimJournal)?,
         );
-        let event_reply_claims =
-            EventReplyClaims::open(claim_store).map_err(|_| RuntimeError::ReplyClaimJournal)?;
+        let event_reply_claims = EventReplyClaims::open(claim_store.clone())
+            .map_err(|_| RuntimeError::ReplyClaimJournal)?;
         let mut backends = Vec::<Arc<dyn ConnectorBackend>>::new();
         #[cfg(feature = "sip")]
         let mut verifying_key: Option<String> = None;
@@ -286,6 +296,7 @@ impl PersonalRuntime {
         let mut catalog_connections = None;
         let mut oauth_connections = None;
         let mut credential_backend = None;
+        let mut setup_handler: Option<Arc<dyn server::local_setup::LocalSetupHandler>> = None;
 
         if let Some(config_path) = config_path {
             let config = PersonalConfig::read(config_path)?;
@@ -297,7 +308,8 @@ impl PersonalRuntime {
                 .partition(|entry| entry.oauth.is_some());
             let stores = if let Some(stores) = supplied_stores {
                 Some(stores)
-            } else if config.slack.is_some()
+            } else if persistent
+                || config.slack.is_some()
                 || config.grafana.is_some()
                 || !ordinary_catalog.is_empty()
             {
@@ -324,7 +336,7 @@ impl PersonalRuntime {
                 // anywhere without a Secret Service: a server, a container, and any placement
                 // spawned with a different `HOME` than the session that has the bus.
                 let file: Option<Arc<FileStore>> = if config.slack.is_some()
-                    || (keyring.is_none() && !ordinary_catalog.is_empty())
+                    || (keyring.is_none() && (persistent || !ordinary_catalog.is_empty()))
                 {
                     Some(Arc::new(
                         FileStore::open(state_root.join("credentials.store"))
@@ -344,7 +356,8 @@ impl PersonalRuntime {
                 // Catalogued providers keep their credential across a restart, so the operator can
                 // delete the file it was imported from. Grafana's own store stays in memory because
                 // its credential is re-entered through a Connect Session each time.
-                let monitoring: Arc<dyn SecretStore> = if ordinary_catalog.is_empty() {
+                let monitoring: Arc<dyn SecretStore> = if !persistent && ordinary_catalog.is_empty()
+                {
                     Arc::new(MemoryStore::new())
                 } else if let Some(store) = &keyring {
                     Arc::clone(store) as Arc<dyn SecretStore>
@@ -367,6 +380,16 @@ impl PersonalRuntime {
             } else {
                 None
             };
+            if persistent {
+                if let Some(stores) = &stores {
+                    setup_handler = Some(Arc::new(crate::local_setup::PersonalSetup::new(
+                        config_path.to_path_buf(),
+                        config.owner_context(),
+                        stores.monitoring.clone(),
+                        credential_backend.unwrap_or("injected").to_owned(),
+                    )));
+                }
+            }
 
             #[cfg(not(feature = "sip"))]
             if config.voice()?.is_some() {
@@ -416,13 +439,26 @@ impl PersonalRuntime {
                     .monitoring
                     .clone();
                 let egress = monitoring_egress(&grafana.canonical_origin())?;
-                let backend =
-                    MonitoringBackend::open(owner.clone(), grafana, &state_root, store, egress)?;
+                let backend = MonitoringBackend::open_with_state(
+                    owner.clone(),
+                    grafana,
+                    &state_root,
+                    store,
+                    egress,
+                    claim_store.clone(),
+                )?;
                 monitoring_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
             }
             if let Some(kubernetes) = config.kubernetes {
-                let backend = KubernetesLocalBackend::open(owner.clone(), kubernetes, &state_root)?;
+                let backend = KubernetesLocalBackend::open_with_state(
+                    owner.clone(),
+                    kubernetes,
+                    &state_root,
+                    claim_store.clone(),
+                )?
+                .with_endpoint_egress(Arc::new(crate::endpoint_egress::KubernetesEgress));
+                backend.restore_selected_context().await?;
                 kubernetes_candidates = Some(backend.candidate_count());
                 kubernetes_connections = Some(backend.connection_count());
                 backends.push(Arc::new(backend));
@@ -562,6 +598,7 @@ impl PersonalRuntime {
             registry,
             ownership,
             readiness,
+            setup_handler,
         })
     }
 
@@ -647,9 +684,32 @@ impl HostedRuntime {
             env::var("CONNECTORS_DATABASE_URL").ok(),
             env::var("CONNECTORS_SQLITE").ok(),
         )?;
-        let generated_operation_refs = bundle
+        let mut generated_operation_refs = bundle
             .as_ref()
             .map_or_else(BTreeSet::new, ServiceBundle::operation_refs);
+        if config.kubernetes.enabled {
+            for provider in config.kubernetes.target_grants.keys() {
+                if let Some(provider) = catalog::provider(catalog::ProviderKey::id(provider)) {
+                    generated_operation_refs.extend(
+                        provider
+                            .operations
+                            .iter()
+                            .filter(|operation| {
+                                matches!(operation.direction, catalog::OperationDirection::Read)
+                                    && !matches!(operation.risk, catalog::Risk::Destructive)
+                                    && operation.effects.iter().all(|effect| {
+                                        matches!(
+                                            effect,
+                                            catalog::HostEffect::Read
+                                                | catalog::HostEffect::Network
+                                        )
+                                    })
+                            })
+                            .map(|operation| operation.id.to_owned()),
+                    );
+                }
+            }
+        }
         let generated_service_refs = bundle.as_ref().map_or_else(Vec::new, |bundle| {
             bundle
                 .services()
@@ -750,13 +810,21 @@ impl HostedRuntime {
             .cloned()
             .collect::<BTreeSet<_>>();
         if config.kubernetes.enabled {
-            backends.push(Arc::new(KubernetesStatusBackend::in_cluster(
-                config.tenant_id.clone(),
-                kubernetes_namespace_access,
-                config.authority.operator_groups.clone(),
-                config.kubernetes.token_file.clone(),
-                &config.kubernetes.ca_file,
-            )?));
+            backends.push(Arc::new(
+                KubernetesStatusBackend::in_cluster(
+                    config.tenant_id.clone(),
+                    kubernetes_namespace_access,
+                    config.authority.operator_groups.clone(),
+                    config.kubernetes.token_file.clone(),
+                    &config.kubernetes.ca_file,
+                )?
+                .with_endpoint_discovery(
+                    hosted_state.clone(),
+                    config.kubernetes.target_grants.clone(),
+                    Arc::new(crate::endpoint_egress::KubernetesEgress),
+                )
+                .await?,
+            ));
         }
         #[cfg(not(feature = "sip"))]
         if config.sip.enabled {
