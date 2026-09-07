@@ -68,7 +68,7 @@ pub struct KubernetesStatusBackend {
     /// Its own store: a paging cursor is issued by one datasource and must not resolve in the
     /// other, even for the same namespace and principal.
     database_cursors: CursorStore,
-    endpoint_backend: Option<Arc<crate::endpoints::KubernetesEndpointBackend>>,
+    endpoint_backend: Option<Arc<dyn ConnectorBackend>>,
     endpoint_client_config: Option<kube::Config>,
 }
 
@@ -168,7 +168,7 @@ impl KubernetesStatusBackend {
         mut self,
         state: Arc<dyn connector_state::StateStore>,
         target_grants: BTreeMap<String, String>,
-        egress: Arc<dyn crate::endpoints::EndpointEgressFactory>,
+        factory: Arc<dyn crate::endpoints::EndpointBackendFactory>,
     ) -> Result<Self, KubernetesBackendError> {
         let config = self
             .endpoint_client_config
@@ -197,10 +197,7 @@ impl KubernetesStatusBackend {
                 .collect(),
             operator_groups: self.operator_groups.clone(),
         };
-        self.endpoint_backend = Some(Arc::new(
-            crate::endpoints::KubernetesEndpointBackend::new(source, policy, egress)
-                .refresh_on_start(),
-        ));
+        self.endpoint_backend = Some(factory.build(source, policy));
         Ok(self)
     }
 
