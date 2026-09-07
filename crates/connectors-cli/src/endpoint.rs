@@ -22,6 +22,7 @@ pub(super) enum EndpointCommand {
         source: Option<String>,
         #[arg(long, default_value = "")]
         query: String,
+        /// Maximum endpoints to return (1..=100).
         #[arg(long, default_value_t = endpoint::MAX_RESULTS,
             value_parser = clap::value_parser!(u16).range(1..=i64::from(endpoint::MAX_RESULTS)))]
         limit: u16,

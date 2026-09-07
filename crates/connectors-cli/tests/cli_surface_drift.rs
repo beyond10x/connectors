@@ -162,34 +162,30 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
         Unspecified::Lifecycle,
         "supplies a credential a hosted Integration requires; no entity of this specification moves",
     ),
+    ("daemon start", Unspecified::Lifecycle, "starts the local daemon process"),
+    ("daemon status", Unspecified::Read, "reads local daemon lifecycle status"),
+    ("daemon stop", Unspecified::Lifecycle, "stops the local daemon process"),
+    ("endpoint list", Unspecified::Read, "reads discovered service interfaces"),
+    ("endpoint show", Unspecified::Read, "reads one endpoint and its readiness"),
+    ("endpoint refresh", Unspecified::Flow, "reconciles configured discovery sources"),
+    ("endpoint bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
     // Under `connection`.
-    (
-        "connection candidates",
-        Unspecified::Read,
-        "a read of potential direct Connections; no provider is contacted",
-    ),
-    (
-        "connection activate",
-        Unspecified::Forwarded,
-        "forwards `connectors.connection.ActivateCandidate`, which `connectors-service` accepts",
-    ),
     (
         "connection list",
         Unspecified::Read,
         "a read of non-secret Connection summaries",
     ),
-    (
-        "connection observations",
-        Unspecified::Read,
-        "a read of the latest stored discovery observations",
-    ),
-    (
-        "connection materialize",
-        Unspecified::Forwarded,
-        "forwards `connectors.connection.MaterializeObservation`, which `connectors-service` \
-         accepts",
-    ),
     // Under `event`.
+    (
+        "event subscribe",
+        Unspecified::Flow,
+        "starts a declared endpoint event subscription",
+    ),
+    (
+        "event unsubscribe",
+        Unspecified::Flow,
+        "stops a declared endpoint event subscription",
+    ),
     (
         "event search",
         Unspecified::Read,
@@ -675,7 +671,7 @@ fn a_target_flag_removed_from_a_group_is_refused_by_the_countdown() {
 ///
 /// The assertion is flipped rather than deleted, because the correction is a fact about the
 /// repository and a fact is worth holding: the generated `admin`
-/// (`ess/generated/clap/crates/connectors-cli/src/tree.rs:59-63`) is a group with
+/// (`ess/generated/clap/crates/connectors-cli/src/tree.rs:71-75`) is a group with
 /// `subcommand_required(true)` and nothing under it, which is all the specification can emit while
 /// `connectors-cli` accepts no command. Putting it in the parser deletes `admin integrations` and
 /// `admin credentials`, and the contract refuses that twice — once for a declared group whose word

@@ -179,6 +179,16 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
     ),
     // Under `event`.
     (
+        "event subscribe",
+        Unspecified::Flow,
+        "starts a declared endpoint event subscription",
+    ),
+    (
+        "event unsubscribe",
+        Unspecified::Flow,
+        "stops a declared endpoint event subscription",
+    ),
+    (
         "event search",
         Unspecified::Read,
         "a read of admitted Connector channels",
@@ -340,7 +350,7 @@ fn words_the_specification_can_type() -> BTreeSet<String> {
     }
     assert!(
         words.contains("invoke")
-            && words.contains("materialize")
+            && words.contains("connect_session_create")
             && words.contains("SuperviseChannel"),
         "the typed-word extraction read {words:?} out of ess/system/domains and not the two `naming.wire` values and the one un-cased last segment this file names; the blocks moved, so read them again"
     );
@@ -538,8 +548,8 @@ fn wires_of_accepted_commands() -> BTreeSet<String> {
         }
     }
     assert!(
-        wires.contains("materialize"),
-        "the accepted-command wires were read as {wires:?} and do not carry `materialize`; the \
+        wires.contains("connect_session_create"),
+        "the accepted-command wires were read as {wires:?} and do not carry `connect_session_create`; the \
          `accepts.commands` block or the `naming.wire` lines moved, so read them again"
     );
     wires
@@ -1211,8 +1221,8 @@ fn the_copies_this_probe_carries_are_still_copies() {
 fn the_typeable_words_are_the_words_the_design_document_names() {
     let document = read(&repository_root().join("docs/design/19-the-cli-surface.md"));
     let sentence = document
-        .split("and it produced ")
-        .nth(1)
+        .rsplit("and it produced ")
+        .next()
         .expect("the design document records what a whole-surface `cli:` block produced")
         .split(" as words at a shell")
         .next()
