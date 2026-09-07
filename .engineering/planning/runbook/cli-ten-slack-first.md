@@ -6,7 +6,7 @@ status: draft
 title: 'CLI execution: ten stories, Slack delivery first'
 tags:
 - wave-cli
-revision: 40
+revision: 41
 ---
 ## Authorization and objective
 
@@ -3428,3 +3428,9 @@ Review-result:cli-auth-adversary-2-20260907 contains the complete second and fin
 The remaining served-document mismatch is routed to the original server implementor. It is measured in the real hosted router with synthetic metadata and remains unreachable through current built-in hosted production. No base execution establishes origin. The original A managed tree ~/.local/state/worktree/trees/b10x/connectors/wt-78f189927231 remains detached at 77a5857c with exactly five retained additive test files. Only crates/server/src/hosted/docs/openapi.json may change for this final correction. Every test byte and HTTP status/body behavior stays preserved; the deciding matrix, full server suite and strict/fmt verify the correction. No third attack is opened.
 
 The implementor receives the sole compiler and the same private tmpfs target. New scratch is ~/.cache/connectors-cli-wave-20260906/auth-as-tool-result/stage2-runtime-implementation/review2-correction, with owner-only TMPDIR ~/.cache/cw6/ac2. One job, no incremental/debug or wrapper, target cap 12 GiB, reserves of 12 GiB disk, 8 GiB tmpfs and 16 GiB available memory, and a 128 MiB temporary cap remain in force. The first-review reserve exception is not inherited. Root transferred the five exact reviewed test files into the publication tree after verifying each original preimage and prefix. Final source CI, main publication, documentation delivery and authorized installation remain outstanding.
+
+## Implementation gate complete; delivery continues — 2026-09-07
+
+The final two selected units completed their ordinary reviews and correction verification. Exact published candidate 0837f79beb4202405942e669c417057f69aac58a passed manual rehearsal https://github.com/beyond10x/connectors/actions/runs/34069722221 : all twelve workspace gates, shared checks and four native Linux/macOS builds succeeded; publication was skipped. Nine of the ten selected stories now have completed implementation. The several-credentials story remains held under its existing decision blocker and is excluded from the release candidate.
+
+The next publication commit changes only planning records. Before pushing it, verify all nonplanning source bytes and workflow bytes still match the tested candidate, then run the current planning/link/story/history checks. The source PR may merge after these checks. Normal source-first documentation delivery and the two authorized daemon updates remain coordinator work, tracked by Website story publish-connectors-auth and retained installation evidence. The existing public-history provenance obligation stays open in the private Atlas draft; no public history rewrite is part of this wave. A release cut remains the separate human stop required by the wave skill.
