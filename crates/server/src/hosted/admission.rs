@@ -167,6 +167,27 @@ fn wrong_recheck_result() -> OperationError {
     )
 }
 
+/// Re-describe the exact Connection selected by a v4 request, preserving its owner schema.
+pub(super) async fn redescribe_target(
+    state: &HostedState,
+    owner: &PrincipalContext,
+    request_id: &str,
+    operation_ref: &str,
+    connection_ref: &str,
+) -> Result<OperationDescription, Box<Response>> {
+    state
+        .backend
+        .describe_target(owner, operation_ref, connection_ref)
+        .await
+        .map_err(|error| {
+            Box::new(operation_failure(
+                request_id,
+                error,
+                StatusCode::SERVICE_UNAVAILABLE,
+            ))
+        })
+}
+
 /// One axis-free body for every enforcement 403, and one honest outage body for every 503:
 /// grant, approval, replay and session-signal refusals render byte-identically, and replay is
 /// distinct only in the gate's own journal.

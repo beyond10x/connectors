@@ -284,6 +284,15 @@ async fn operation_decided(
     principal: &HostedPrincipal,
     request: RequestEnvelope,
 ) -> Response {
+    operation_decided_at(state, principal, request, false).await
+}
+
+async fn operation_decided_at(
+    state: &HostedState,
+    principal: &HostedPrincipal,
+    request: RequestEnvelope,
+    target_specific: bool,
+) -> Response {
     let required_scope = match &request.request {
         protocol::operation::OperationRequest::Search(_)
         | protocol::operation::OperationRequest::Describe(_) => "connectors.catalog.read",
@@ -335,17 +344,34 @@ async fn operation_decided(
     let mut admitted = None;
     let mut redeemed = None;
     if let OperationRequest::Invoke(invoke) = &request.request {
-        if let Some(response) =
-            remediation::operation_preflight(state, principal, &owner, &request.request_id, invoke)
-                .await
+        if let Some(response) = remediation::operation_preflight_at(
+            state,
+            principal,
+            &owner,
+            &request.request_id,
+            invoke,
+            target_specific,
+        )
+        .await
         {
             return response;
         }
-        let description =
-            match redescribe(state, &owner, &request.request_id, &invoke.operation_ref).await {
-                Ok(description) => description,
-                Err(response) => return *response,
-            };
+        let recheck = if target_specific {
+            admission::redescribe_target(
+                state,
+                &owner,
+                &request.request_id,
+                &invoke.operation_ref,
+                &invoke.connection_ref,
+            )
+            .await
+        } else {
+            redescribe(state, &owner, &request.request_id, &invoke.operation_ref).await
+        };
+        let description = match recheck {
+            Ok(description) => description,
+            Err(response) => return *response,
+        };
         match state
             .authority
             .admit_invoke(principal, invoke, &description)

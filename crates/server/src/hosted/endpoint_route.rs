@@ -171,7 +171,27 @@ pub(super) async fn operation_v4(
             return Json(v4::ResponseEnvelope::failure(request.request_id, error)).into_response()
         }
     };
-    let response = super::operation_decided(
+    if let (operation::OperationRequest::Describe(describe), Some(connection)) =
+        (&normalized.request, &normalized.description_connection)
+    {
+        let response = match state
+            .backend
+            .describe_target(&owner, &describe.operation_ref, connection)
+            .await
+        {
+            Ok(description) => v4::ResponseEnvelope::success(
+                &request.request_id,
+                operation::OperationResult::Describe(description),
+            ),
+            Err(error) => v4::ResponseEnvelope::failure(&request.request_id, error.into()),
+        };
+        let response = match response.validate() {
+            Ok(()) => response,
+            Err(error) => v4::ResponseEnvelope::failure(&request.request_id, error),
+        };
+        return Json(response).into_response();
+    }
+    let response = super::operation_decided_at(
         state,
         &principal,
         operation::RequestEnvelope {
@@ -180,6 +200,7 @@ pub(super) async fn operation_v4(
             context: request.context,
             request: normalized.request,
         },
+        true,
     )
     .await;
     let (mut parts, body) = response.into_parts();
