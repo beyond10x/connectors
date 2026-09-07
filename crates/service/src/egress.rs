@@ -126,6 +126,21 @@ pub trait EgressTransport: Send + Sync + 'static {
         url: String,
         maximum_message_bytes: usize,
     ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError>;
+
+    /// Open a declared authenticated channel. Transports must explicitly support header custody.
+    async fn connect_websocket_with_headers(
+        &self,
+        authority_ref: &str,
+        url: String,
+        headers: BTreeMap<String, String>,
+        maximum_message_bytes: usize,
+    ) -> Result<Box<dyn EgressWebSocket>, EgressTransportError> {
+        if !headers.is_empty() {
+            return Err(EgressTransportError::Refused);
+        }
+        self.connect_websocket(authority_ref, url, maximum_message_bytes)
+            .await
+    }
 }
 
 /// Redaction-safe refusal at the outbound network boundary.

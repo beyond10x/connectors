@@ -2,6 +2,66 @@ use super::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
+async fn forwarded_websocket_retains_logical_host_and_declared_authentication() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let transport = ConnectionEgress::for_endpoint_route(
+        "connection:ari",
+        "http://asterisk.voice.svc:8088/",
+        Some(listener.local_addr().unwrap()),
+    )
+    .unwrap();
+    let url = "ws://asterisk.voice.svc:8088/ari/events?app=fixture";
+    for header in ["Host", "Connection", "Upgrade", "Sec-WebSocket-Key"] {
+        let refused = transport
+            .connect_websocket_with_headers(
+                "connection:ari",
+                url.into(),
+                BTreeMap::from([(header.into(), "override".into())]),
+                4096,
+            )
+            .await;
+        assert!(matches!(refused, Err(EgressTransportError::Refused)));
+    }
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut socket = tokio_tungstenite::accept_hdr_async(
+            stream,
+            |request: &tokio_tungstenite::tungstenite::handshake::server::Request, response| {
+                assert_eq!(request.headers()["host"], "asterisk.voice.svc:8088");
+                assert_eq!(request.headers()["authorization"], "Basic fixture-only");
+                assert_eq!(request.uri().path(), "/ari/events");
+                Ok(response)
+            },
+        )
+        .await
+        .unwrap();
+        socket
+            .send(tokio_tungstenite::tungstenite::Message::Text(
+                "fixture-event".into(),
+            ))
+            .await
+            .unwrap();
+        socket.close(None).await.unwrap();
+    });
+    let mut socket = transport
+        .connect_websocket_with_headers(
+            "connection:ari",
+            url.into(),
+            BTreeMap::from([("Authorization".into(), "Basic fixture-only".into())]),
+            4096,
+        )
+        .await
+        .unwrap();
+    assert!(
+        matches!(socket.receive().await.unwrap(), EgressWebSocketFrame::Text(value) if value == "fixture-event")
+    );
+    tokio::time::timeout(Duration::from_secs(3), server)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
 async fn endpoint_headers_cannot_replace_the_logical_host() {
     use service::EgressTransport;
     let transport = ConnectionEgress::for_endpoint_route(
