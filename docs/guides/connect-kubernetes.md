@@ -91,6 +91,23 @@ Local routes can use Kubernetes port forwarding owned by the daemon. Externally 
 require their explicit routing policy. A hosted deployment uses its configured cluster access
 and network placement; it does not gain access to your laptop's kubeconfig.
 
+## Receive declared events
+
+For an installed streaming channel, subscribe by its declared binding. For example, an admitted
+Asterisk ARI endpoint can use its installed channel parameters:
+
+```bash
+connectors event subscribe --endpoint-ref "$endpoint_ref" \
+  --channel-binding "$channel_binding" --parameters-json '{"app":"developer"}'
+connectors event receive --channel "$channel_ref"
+connectors event unsubscribe --subscription-ref "$subscription_ref"
+```
+
+Use the channel binding declared by the provider. Subscribe returns `subscription_ref` and a
+channel; use that channel's reference with receive. Parameters must match the declaration and
+cannot override credentials or the provider URL. The daemon owns the stream until unsubscribe or
+shutdown. These commands also accept `--target hosted` for an admitted hosted endpoint.
+
 ## Manage the daemon
 
 ```bash

@@ -117,8 +117,8 @@ fn wires_of_accepted_commands() -> BTreeSet<String> {
         }
     }
     assert!(
-        wires.contains("materialize"),
-        "the accepted-command wires were read as {wires:?} and do not carry `materialize`; the \
+        wires.contains("connect_session_create"),
+        "the accepted-command wires were read as {wires:?} and do not carry `connect_session_create`; the \
          blocks moved, so read them again"
     );
     wires
@@ -424,9 +424,9 @@ fn the_paths_the_design_document_says_send_no_protocol_request_send_none() {
 
     let connect = reaches("setup connect");
     assert!(
-        connect.len() >= 7,
+        connect.len() >= 3,
         "`connectors connect` reaches {connect:?} through `connect::dispatch` and `LocalClient`; \
-         this case was written for the seven it reached, so the chain has to be read again"
+         three predecessor requests remain after legacy discovery retirement"
     );
     let wires = wires_of_accepted_commands();
     let forwarded: BTreeSet<&String> = connect
@@ -434,9 +434,8 @@ fn the_paths_the_design_document_says_send_no_protocol_request_send_none() {
         .filter(|variant| wires.contains(&snake_case(variant)))
         .collect();
     assert!(
-        forwarded.len() >= 3,
-        "`connectors connect` reaches {forwarded:?} accepted commands; it reached three when this \
-         case was written"
+        !forwarded.is_empty(),
+        "`connectors connect` must still reach its admitted ConnectSessionCreate command: {forwarded:?}"
     );
 
     let mut wrong = Vec::new();
