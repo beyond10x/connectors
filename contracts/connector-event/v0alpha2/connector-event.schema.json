@@ -1,0 +1,673 @@
+{
+  "$comment": "UTF-8 byte budgets, exact provider channel parameters, principal ownership and current subscription grants are additional Rust reader/runtime checks.",
+  "$defs": {
+    "ChannelSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "channel_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "events": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel_ref",
+        "connection_ref",
+        "integration_ref",
+        "binding_ref",
+        "events"
+      ],
+      "type": "object"
+    },
+    "DataEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "channel_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "connection_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "event_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "event_type": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "integration_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "payload": true,
+        "provenance": {
+          "$ref": "#/$defs/EventProvenance"
+        },
+        "received_at_unix_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "event_ref",
+        "channel_ref",
+        "connection_ref",
+        "integration_ref",
+        "event_type",
+        "provenance",
+        "received_at_unix_ms",
+        "payload"
+      ],
+      "type": "object"
+    },
+    "EventError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/EventErrorCode"
+        },
+        "message": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retriable"
+      ],
+      "type": "object"
+    },
+    "EventErrorCode": {
+      "enum": [
+        "unavailable",
+        "not_found",
+        "not_granted",
+        "invalid_input",
+        "stale_authority",
+        "protocol"
+      ],
+      "type": "string"
+    },
+    "EventProvenance": {
+      "enum": [
+        "native",
+        "polled"
+      ],
+      "type": "string"
+    },
+    "EventRequest": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "search",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SearchRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "receive",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/ReceiveRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "replay",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/ReplayRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "subscribe",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/SubscribeRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "method": {
+              "const": "unsubscribe",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/UnsubscribeRequest"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EventResult": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "search",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "channels": {
+                  "items": {
+                    "$ref": "#/$defs/ChannelSummary"
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "channels"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "receive",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "events": {
+                  "items": {
+                    "$ref": "#/$defs/DataEvent"
+                  },
+                  "maxItems": 100,
+                  "type": "array"
+                },
+                "next": {
+                  "minLength": 1,
+                  "pattern": "^[0-9]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "events",
+                "next"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "replay",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/DataEvent"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "subscribe",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "channel": {
+                  "$ref": "#/$defs/ChannelSummary"
+                },
+                "subscription_ref": {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "subscription_ref",
+                "channel"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "const": "unsubscribe",
+              "type": "string"
+            },
+            "value": {
+              "additionalProperties": false,
+              "properties": {
+                "subscription_ref": {
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "subscription_ref"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "result",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OwnerContext": {
+      "additionalProperties": false,
+      "description": "Owner facts presented by a client and re-evaluated by Connectors.",
+      "properties": {
+        "agent_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "agent_revision": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "authority_snapshot_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        },
+        "authority_snapshot_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[!-~]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "agent_id",
+        "agent_revision",
+        "authority_snapshot_id",
+        "authority_snapshot_sha256"
+      ],
+      "type": "object"
+    },
+    "ReceiveRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "channel_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "wait_ms": {
+          "maximum": 30000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "channel_ref",
+        "limit",
+        "wait_ms"
+      ],
+      "type": "object"
+    },
+    "ReplayRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "event_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_ref"
+      ],
+      "type": "object"
+    },
+    "RequestEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/OwnerContext"
+        },
+        "protocol": {
+          "const": "b10x.connector-event.v0alpha2"
+        },
+        "request": {
+          "$ref": "#/$defs/EventRequest"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "context",
+        "request"
+      ],
+      "type": "object"
+    },
+    "ResponseEnvelope": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "error": {
+              "type": "null"
+            },
+            "response": {
+              "$ref": "#/$defs/EventResult"
+            },
+            "status": {
+              "const": "ok"
+            }
+          },
+          "required": [
+            "response"
+          ]
+        },
+        {
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/EventError"
+            },
+            "response": {
+              "type": "null"
+            },
+            "status": {
+              "const": "error"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ],
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EventError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protocol": {
+          "const": "b10x.connector-event.v0alpha2"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EventResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/ResponseStatus"
+        }
+      },
+      "required": [
+        "protocol",
+        "request_id",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ResponseStatus": {
+      "enum": [
+        "ok",
+        "error"
+      ],
+      "type": "string"
+    },
+    "SearchRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "maxLength": 512,
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "limit"
+      ],
+      "type": "object"
+    },
+    "SubscribeRequest": {
+      "additionalProperties": false,
+      "description": "Parameters are provider-declared channel configuration, never credentials or route overrides.\nThe runtime validates each name and value against its pinned channel declaration.",
+      "properties": {
+        "channel_binding": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "endpoint_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "maxProperties": 32,
+          "propertyNames": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "endpoint_ref",
+        "channel_binding",
+        "parameters"
+      ],
+      "type": "object"
+    },
+    "UnsubscribeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "subscription_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u0020\\u007f]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subscription_ref"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/beyond10x/connectors/blob/main/contracts/connector-event/v0alpha2/connector-event.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/RequestEnvelope"
+    },
+    {
+      "$ref": "#/$defs/ResponseEnvelope"
+    }
+  ],
+  "title": "B10x ConnectorEvent v0alpha2 frame"
+}
