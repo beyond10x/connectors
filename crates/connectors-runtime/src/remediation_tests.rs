@@ -161,6 +161,7 @@ async fn auth_adversary_registry_never_combines_split_owners_or_falls_through_cl
     let mut observations = Vec::new();
     for case in [
         "ordinary",
+        "operation-only",
         "split",
         "ambiguous-ordinary",
         "claimed-refused",
@@ -168,7 +169,7 @@ async fn auth_adversary_registry_never_combines_split_owners_or_falls_through_cl
     ] {
         let first = Arc::new(AuthAdversaryOptionalRoute {
             operation: true,
-            connection: case != "split",
+            connection: !matches!(case, "split" | "operation-only"),
             route: case.starts_with("claimed"),
             unavailable: case == "claimed-unavailable",
             metadata_calls: 0.into(),
@@ -204,6 +205,7 @@ async fn auth_adversary_registry_never_combines_split_owners_or_falls_through_cl
         observations,
         [
             ("ordinary", "unsupported", 1, 0),
+            ("operation-only", "unsupported", 1, 0),
             ("split", "refused", 0, 0),
             ("ambiguous-ordinary", "unavailable", 0, 0),
             ("claimed-refused", "refused", 1, 0),

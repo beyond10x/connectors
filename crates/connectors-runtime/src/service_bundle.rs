@@ -887,6 +887,18 @@ mod tests {
 
         let first = build(false).await;
         let second = build(true).await;
+        for bundle in [&first, &second] {
+            assert!(matches!(
+                bundle.registry().remediation_metadata(
+                    &context(),
+                    service::RemediationTarget {
+                        operation_ref: SECOND_OPERATION,
+                        connection_ref: "connection:provider:usage",
+                    },
+                ),
+                Err(service::RemediationError::Unsupported)
+            ));
+        }
         let identities = |bundle: &ServiceBundle| {
             bundle
                 .services()
