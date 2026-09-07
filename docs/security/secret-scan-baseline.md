@@ -23,6 +23,19 @@ An initial attempt using an empty `--gitleaks-ignore-path` file still suppressed
 findings. That result is retained as an unsuccessful attempt to disable exclusions; only the scan
 with the repository ignore file absent supports the unignored counts above.
 
+## Final authentication correction report — 2026-09-07
+
+The final correction at `f2f0dd006a5500d030cab0d622af5d006ff8c092` adds one further match of
+the same class: its immutable verification report records the new OpenAPI file's SHA-256 at
+line 72. Recomputing the digest from that commit's source verifies the reported value exactly.
+It is a public content identity. The ordinary scan reports that one new match. With the ignore
+file physically absent, the scan reports 57 findings with 56 unique fingerprints over 454
+reachable commits, 42 public refs plus the candidate, 400 patch-bearing commits and 114,299,689
+bytes. Exactly one fingerprint falls outside the preceding baseline. The ignore file was restored
+exactly, then only the new commit/path/rule/line fingerprint was added. Both authentication
+report fingerprints are individually reviewed; all earlier entries and detector configuration
+are retained.
+
 ## Historical inventory
 
 **Regenerated 2026-08-25 after the history rewrites.** Regenerate from a scan run with
