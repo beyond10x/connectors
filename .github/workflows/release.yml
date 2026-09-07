@@ -249,7 +249,7 @@ jobs:
           cp "crates/connectors-cli/target/${{ matrix.target }}/release/connectors" "dist/$name/"
           # No LICENSE-MIT / LICENSE-APACHE file exists in the tree yet, though the manifests
           # declare `MIT OR Apache-2.0`. When they land, add them here.
-          cp README.md CHANGELOG.md "dist/$name/"
+          cp README.md CHANGELOG.md WHATS-NEW.md "dist/$name/"
           cd dist
           tar -czf "${name}.tar.gz" "$name"
           ls -l
