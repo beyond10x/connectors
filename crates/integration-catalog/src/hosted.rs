@@ -12,7 +12,9 @@ use connector_secrets::{
     TenantLayout,
 };
 use connector_state::StateStore;
-use connectors_config::{CatalogIntegrationConfig, HostedCatalogConfig, InitiationConfig};
+use connectors_config::{
+    CatalogIntegrationConfig, HostedCatalogBinding, HostedCatalogConfig, InitiationConfig,
+};
 use protocol::catalog::{SetupProfileActor, SetupProfileSummary};
 use protocol::connection::{
     ConnectSessionState, ConnectSessionStatus, ConnectionActor, ConnectionDescription,
@@ -29,7 +31,7 @@ use service::{
 use sha2::{Digest as _, Sha256};
 
 use super::{
-    connection_ref, credential_address, origin_of, CatalogBackend, CatalogIntegrationError,
+    connection_ref, credential_address, hosted_endpoints, CatalogBackend, CatalogIntegrationError,
 };
 
 const STATE_KEY: &str = "catalog.connections.v1";
@@ -60,6 +62,7 @@ struct Inner {
     public_origin: url::Url,
     grant_ref: String,
     providers: BTreeSet<String>,
+    bindings: BTreeMap<String, HostedCatalogBinding>,
     excluded_providers: BTreeSet<String>,
     excluded_profiles: BTreeSet<(String, String)>,
     ttl_seconds: u64,
@@ -101,10 +104,16 @@ struct StoredConnection {
     label: String,
     owner_subject: String,
     actor: StoredActor,
+    #[serde(default, skip_serializing_if = "binding_is_default")]
+    binding: HostedCatalogBinding,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     credential_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_verified_at_unix_ms: Option<u64>,
+}
+
+fn binding_is_default(binding: &HostedCatalogBinding) -> bool {
+    binding == &HostedCatalogBinding::default()
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -128,6 +137,7 @@ struct Session {
     label: String,
     owner_subject: String,
     owner: PrincipalContext,
+    binding: HostedCatalogBinding,
     capability_sha256: [u8; 32],
     expires_at_unix_ms: u64,
     state: ConnectSessionState,
@@ -150,6 +160,7 @@ impl HostedCatalogBackend {
         if !policy.enabled {
             return Err(HostedCatalogError::InvalidPolicy);
         }
+        let bindings = hosted_endpoints::bindings(&policy)?;
         let public_origin = policy
             .public_origin
             .as_deref()
@@ -172,6 +183,7 @@ impl HostedCatalogBackend {
                 public_origin,
                 grant_ref,
                 providers: policy.providers.into_iter().collect(),
+                bindings,
                 excluded_providers,
                 excluded_profiles,
                 ttl_seconds: policy.connect_session_ttl_seconds,
@@ -204,10 +216,11 @@ impl Inner {
         }
         let provider = catalog::provider(catalog::ProviderKey::id(provider_ref))?;
         if provider.authority.is_none()
-            || provider
+            || (provider
                 .services
                 .iter()
                 .any(|service| service.base_url.contains('{'))
+                && !self.bindings.contains_key(provider_ref))
         {
             return None;
         }
@@ -271,24 +284,45 @@ impl Inner {
             grant_ref: grant_ref.to_owned(),
             initiation: InitiationConfig::Platform,
             allow_writes: false,
-            endpoints: BTreeMap::new(),
+            endpoints: connection.binding.endpoints.clone(),
             // Hosted self-service stores no user half today, so a `basic` connector is not
             // connectable through it. Stated as an empty map rather than left implicit: the
             // personal placement fills this from `[catalog.usernames]`, and the hosted gap is a
             // missing acquisition surface, not a different resolution rule.
             usernames: BTreeMap::new(),
-            operator_approved: false,
+            operator_approved: !connection.binding.endpoints.is_empty(),
             credential: Some(connection.credential.clone()),
-            network: connectors_config::NetworkScopeConfig::Public,
+            network: connection.binding.network,
             credential_file: None,
             oauth: None,
         }
+    }
+
+    fn connection_current(&self, connection: &StoredConnection) -> bool {
+        self.profile(&connection.provider, &connection.credential)
+            .is_some()
+            && connection.binding
+                == self
+                    .bindings
+                    .get(&connection.provider)
+                    .cloned()
+                    .unwrap_or_default()
+    }
+
+    fn summary(&self, connection: StoredConnection) -> ConnectionSummary {
+        let current = self.connection_current(&connection);
+        let mut summary = connection_summary(connection);
+        if !current {
+            summary.state = ConnectionState::Degraded;
+        }
+        summary
     }
 
     fn delegate(&self, context: &PrincipalContext) -> Result<CatalogBackend, OperationError> {
         let configured = self
             .owned_connections(context)
             .iter()
+            .filter(|connection| self.connection_current(connection))
             .map(|connection| Self::config(connection, &self.grant_ref))
             .collect::<Vec<_>>();
         CatalogBackend::bind_stored(
@@ -343,6 +377,7 @@ impl Inner {
                 label,
                 owner_subject: context.subject().to_owned(),
                 owner: context.clone(),
+                binding: self.bindings.get(provider).cloned().unwrap_or_default(),
                 capability_sha256: Sha256::digest(capability.as_bytes()).into(),
                 expires_at_unix_ms,
                 state: ConnectSessionState::Pending,
@@ -440,15 +475,15 @@ impl Inner {
             grant_ref: self.grant_ref.clone(),
             initiation: InitiationConfig::Platform,
             allow_writes: false,
-            endpoints: BTreeMap::new(),
+            endpoints: session.binding.endpoints.clone(),
             // Hosted self-service stores no user half today, so a `basic` connector is not
             // connectable through it. Stated as an empty map rather than left implicit: the
             // personal placement fills this from `[catalog.usernames]`, and the hosted gap is a
             // missing acquisition surface, not a different resolution rule.
             usernames: BTreeMap::new(),
-            operator_approved: false,
+            operator_approved: !session.binding.endpoints.is_empty(),
             credential: Some(session.credential.clone()),
-            network: connectors_config::NetworkScopeConfig::Public,
+            network: session.binding.network,
             credential_file: None,
             oauth: None,
         };
@@ -460,6 +495,7 @@ impl Inner {
             credential: session.credential.clone(),
             label: session.label.clone(),
             owner_subject: session.owner_subject.clone(),
+            binding: session.binding.clone(),
             actor: match credential.subject {
                 Subject::User => StoredActor::User,
                 Subject::App => StoredActor::App,
@@ -588,6 +624,7 @@ impl Inner {
             credential: session.credential.clone(),
             label: session.label.clone(),
             owner_subject: session.owner_subject.clone(),
+            binding: session.binding.clone(),
             actor: match credential.subject {
                 Subject::User => StoredActor::User,
                 Subject::App => StoredActor::App,
@@ -725,7 +762,11 @@ impl ConnectorBackend for HostedCatalogBackend {
             .get(session_ref)
             .filter(|session| session.state == ConnectSessionState::Pending)
             .ok_or(HostedCompletionError::NotFound)?;
-        Ok(completion_page(&session.provider))
+        let provider = catalog::provider(catalog::ProviderKey::id(&session.provider))
+            .ok_or(HostedCompletionError::Unavailable)?;
+        let origins = hosted_endpoints::origins(provider, &session.binding)
+            .map_err(|_| HostedCompletionError::Unavailable)?;
+        Ok(completion_page(&session.provider, &origins))
     }
 
     async fn complete_hosted_session(
@@ -802,7 +843,7 @@ impl ConnectorBackend for HostedCatalogBackend {
                             || connection.provider.to_ascii_lowercase().contains(&query)
                             || connection.label.to_ascii_lowercase().contains(&query)
                     })
-                    .map(connection_summary)
+                    .map(|connection| self.inner.summary(connection))
                     .collect::<Vec<_>>();
                 connections.truncate(usize::from(request.limit));
                 Ok(ConnectionResult::Search { connections })
@@ -814,7 +855,7 @@ impl ConnectorBackend for HostedCatalogBackend {
                 .find(|connection| connection.connection_ref == request.connection_ref)
                 .map(|connection| {
                     ConnectionResult::Describe(ConnectionDescription {
-                        summary: connection_summary(connection),
+                        summary: self.inner.summary(connection),
                         channels: Vec::new(),
                     })
                 })
@@ -839,46 +880,13 @@ impl ConnectorBackend for HostedCatalogBackend {
     }
 }
 
-/// Exact public origins needed by enabled generic providers.
+/// Exact origins needed by enabled generic providers. Runtime composition must also honor each
+/// origin's network scope through [`super::hosted_admitted_destinations`].
 pub fn hosted_admitted_origins(
     policy: &HostedCatalogConfig,
 ) -> Result<Vec<String>, HostedCatalogError> {
-    let admitted = policy
-        .providers
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    let mut origins = BTreeSet::new();
-    for provider in catalog::providers() {
-        if !admitted.is_empty() && !admitted.contains(provider.id) {
-            continue;
-        }
-        if provider.auth.iter().all(|credential| {
-            !matches!(credential.acquire, Acquisition::ConnectSession)
-                || matches!(credential.subject, Subject::Unstated)
-        }) {
-            continue;
-        }
-        if provider
-            .services
-            .iter()
-            .any(|service| service.base_url.contains('{'))
-        {
-            continue;
-        }
-        for service in provider.services {
-            let origin = origin_of(service.base_url);
-            if !origin.is_empty() {
-                origins.insert(origin);
-            }
-        }
-    }
-    for provider in &policy.providers {
-        if catalog::provider(catalog::ProviderKey::id(provider)).is_none() {
-            return Err(HostedCatalogError::InvalidPolicy);
-        }
-    }
-    Ok(origins.into_iter().collect())
+    hosted_endpoints::hosted_admitted_destinations(policy)
+        .map(|destinations| destinations.into_iter().map(|(origin, _)| origin).collect())
 }
 
 fn connection_summary(connection: StoredConnection) -> ConnectionSummary {
@@ -898,14 +906,22 @@ fn connection_summary(connection: StoredConnection) -> ConnectionSummary {
     }
 }
 
-fn completion_page(provider: &str) -> HostedCompletionPage {
+fn completion_page(provider: &str, origins: &[String]) -> HostedCompletionPage {
     let title = html_escape(provider);
+    let destinations = if origins.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<p>Provider destination: <strong>{}</strong></p>",
+            html_escape(&origins.join(", "))
+        )
+    };
     HostedCompletionPage {
         title: format!("Connect {title}"),
         html: format!(
             r#"<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect {title}</title>
 <style>body{{font:16px system-ui;max-width:38rem;margin:4rem auto;padding:1rem;background:#111;color:#eee}}label,input,button{{display:block;width:100%;box-sizing:border-box}}input,button{{padding:.8rem;margin-top:.5rem}}button{{margin-top:1rem}}</style>
-<h1>Connect {title}</h1><p>Enter the provider credential once. It is sent only to Connectors and stored in the configured credential store.</p>
+<h1>Connect {title}</h1>{destinations}<p>Enter the provider credential once. Connectors verifies it with the provider and stores it in the configured credential store.</p>
 <form><label>Credential<input name="credential" type="password" autocomplete="off" maxlength="8192" required></label><button>Connect</button></form><p id="status"></p>
 <script>const form=document.querySelector('form'),status=document.querySelector('#status'),button=document.querySelector('button');const capability=new URL(location.href).hash.match(/^#token=([A-Za-z0-9_-]{{32,256}})$/)?.[1];history.replaceState(null,'',location.pathname);form.addEventListener('submit',async event=>{{event.preventDefault();const field=form.elements.credential,value=field.value;if(!capability||!value||value.length>8192){{status.textContent='Check the credential value.';return;}}field.value='';button.disabled=true;status.textContent='Saving the credential…';try{{const response=await fetch(location.pathname,{{method:'POST',headers:{{'Content-Type':'application/octet-stream','X-Connect-Session':capability}},body:value}});if(response.ok){{status.textContent='{title} connected. You may close this tab.';return;}}status.textContent=response.status===503?'The credential store is unavailable. Start Connect again later.':'The connection was refused.';}}catch{{status.textContent='Hosted Connectors is unavailable. Start Connect again later.';}}button.disabled=false;}});</script>"#
         ),
@@ -1011,6 +1027,10 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 #[cfg(test)]
+#[path = "hosted_endpoint_tests.rs"]
+mod endpoint_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use connector_secrets::MemoryStore;
@@ -1078,7 +1098,7 @@ mod tests {
         }
     }
 
-    fn principal(subject: &str) -> PrincipalContext {
+    pub(super) fn principal(subject: &str) -> PrincipalContext {
         PrincipalContext::hosted(
             "tenant-test".to_owned(),
             subject.to_owned(),
@@ -1187,6 +1207,7 @@ mod tests {
                 public_origin: Some("https://connectors.example.test/api/connectors/v1".to_owned()),
                 grant_ref: Some("grant:catalog-read".to_owned()),
                 providers: vec!["anthropic".to_owned()],
+                bindings: BTreeMap::new(),
                 connect_session_ttl_seconds: 300,
             },
             BTreeSet::new(),
@@ -1239,7 +1260,7 @@ mod tests {
         );
     }
 
-    async fn search(
+    pub(super) async fn search(
         backend: &HostedCatalogBackend,
         principal: &PrincipalContext,
     ) -> ConnectionResult {
@@ -1267,6 +1288,7 @@ mod tests {
                 public_origin: Some("https://connectors.example.test/api/connectors/v1".to_owned()),
                 grant_ref: Some("grant:catalog-read".to_owned()),
                 providers: vec!["anthropic".to_owned()],
+                bindings: BTreeMap::new(),
                 connect_session_ttl_seconds: 300,
             },
             BTreeSet::new(),
