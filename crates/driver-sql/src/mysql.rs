@@ -31,28 +31,54 @@ use crate::credentials::ResolvedSecret;
 use crate::{scrub, SqlConnectionConfig, SqlDriverError};
 
 fn opts(config: &SqlConnectionConfig, secret: &ResolvedSecret) -> Opts {
-    OptsBuilder::default()
+    let mut options = OptsBuilder::default()
         .ip_or_hostname(config.host.clone())
         .tcp_port(config.port)
+        .prefer_socket(false)
         .db_name(Some(config.database.clone()))
         .user(Some(config.user.clone()))
         .pass(Some(secret.expose().to_owned()))
         .init(vec![format!(
             "SET SESSION max_execution_time = {}",
             config.statement_timeout_ms
-        )])
-        .into()
+        )]);
+    if let Some(address) = config.connect_address {
+        options = options
+            .resolved_ips(Some(vec![address.ip()]))
+            .tcp_port(address.port());
+    }
+    let tls = match &config.tls {
+        crate::SqlTls::Disabled => None,
+        crate::SqlTls::Required => Some(mysql_async::SslOpts::default()),
+        crate::SqlTls::WithCa(bytes) => Some(
+            mysql_async::SslOpts::default()
+                .with_disable_built_in_roots(true)
+                .with_root_certs(vec![bytes.clone().into()]),
+        ),
+    };
+    options.ssl_opts(tls).into()
 }
 
 async fn connect(
     config: &SqlConnectionConfig,
     secret: &ResolvedSecret,
 ) -> Result<Conn, SqlDriverError> {
-    Conn::new(opts(config, secret))
-        .await
-        .map_err(|error| SqlDriverError::Connection {
-            detail: scrub(&error.to_string(), secret),
-        })
+    if !matches!(config.tls, crate::SqlTls::Disabled) {
+        config.tls.client_config()?;
+        // When another runtime already chose a crypto provider, retain its choice.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+    tokio::time::timeout(
+        std::time::Duration::from_millis(u64::from(config.statement_timeout_ms)),
+        Conn::new(opts(config, secret)),
+    )
+    .await
+    .map_err(|_| SqlDriverError::Connection {
+        detail: "database connection timed out".into(),
+    })?
+    .map_err(|error| SqlDriverError::Connection {
+        detail: scrub(&error.to_string(), secret),
+    })
 }
 
 fn query_error(error: &mysql_async::Error, secret: &ResolvedSecret) -> SqlDriverError {

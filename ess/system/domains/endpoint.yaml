@@ -1,0 +1,57 @@
+domain: connectors.endpoint
+
+summary: Credential-free discovered service interfaces resolved under current Connection and Grant authority.
+
+types:
+  - name: connectors.endpoint.EndpointRef
+    kind: newtype
+    of: String
+  - name: connectors.endpoint.Readiness
+    kind: enum
+    variants: [Ready, UnknownProvider, UnsupportedProtocol, MissingCredentials, Denied, UnavailableRoute, Stale, Ambiguous]
+  - name: connectors.endpoint.CredentialKeyReference
+    kind: struct
+    fields:
+      - name: namespace
+        type: String
+      - name: secret_name
+        type: String
+      - name: key
+        type: String
+
+entities:
+  # The approved 2026-09-07 discovery plan defines one source Connection to many interfaces.
+  # Registry entries reference the Connection; inventory grants no execution authority.
+  # This is an immutable inventory snapshot, not an invented operational lifecycle.
+  - name: connectors.endpoint.Endpoint
+    identity:
+      name: endpoint_ref
+      type: connectors.endpoint.EndpointRef
+    fields:
+      - name: source_connection_ref
+        type: connectors.connection.ConnectionRef
+      - name: namespace
+        type: Optional<String>
+      - name: resource_name
+        type: String
+      - name: resource_uid
+        type: String
+      - name: interface
+        type: String
+      - name: provider
+        type: Optional<String>
+      - name: readiness
+        type: connectors.endpoint.Readiness
+    relations:
+      - name: source_connection
+        kind: references
+        target: connectors.connection.Connection
+        cardinality: one
+        via: source_connection_ref
+    lifecycle:
+      initial: Observed
+      states: [Observed]
+      terminal: [Observed]
+
+# Discovery refresh, partial-scan reconciliation, authorization and runtime credential custody
+# remain executable Rust obligations. A Ready value is a diagnosis, never an admission proof.
