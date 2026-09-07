@@ -14,10 +14,10 @@ use connector_oauth::{PendingStates, DEFAULT_PENDING_CAPACITY};
 use connector_secrets::{PreparedSecretStore, Secret};
 use connector_state::StateStore;
 use connectors_config::{HostedJiraConfig, InitiationConfig, JiraSharedAuth};
-use protocol::connection::{
-    ConnectionActor, ConnectionDescription, ConnectionError, ConnectionErrorCode,
-    ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionScope,
-    ConnectionState, ConnectionSummary,
+use protocol::endpoint::{
+    EndpointActor, EndpointDescription, EndpointError, EndpointErrorCode,
+    EndpointInitiator, EndpointRequest, EndpointResult, EndpointRoute, EndpointScope,
+    EndpointState, EndpointSummary,
 };
 use protocol::datasource::{DatasourceError, DatasourceRequest, DatasourceResult};
 use protocol::operation::{OperationError, OperationRequest, OperationResult};
@@ -42,7 +42,7 @@ pub(super) const REFRESH_TOKEN_CREDENTIAL: &str = "refresh_token";
 pub(super) const USER_CLIENT_SECRET_CREDENTIAL: &str = "user_oauth_client_secret";
 pub(super) const SERVICE_CLIENT_SECRET_CREDENTIAL: &str = "service_oauth_client_secret";
 pub(super) const SERVICE_API_TOKEN_CREDENTIAL: &str = "service_api_token";
-pub(super) const STATE_KEY: &str = "jira.connections";
+pub(super) const STATE_KEY: &str = "jira.endpoints";
 pub(super) const AUDIT_KEY: &str = "jira.audit";
 pub(super) const STATE_VERSION: u8 = 1;
 pub(super) const MAX_STATE_BYTES: usize = 4 * 1024 * 1024;
@@ -140,7 +140,7 @@ pub(super) struct CachedServiceToken {
 pub(super) struct StateFile {
     pub(super) version: u8,
     pub(super) next_transaction_generation: u64,
-    pub(super) connections: Vec<StoredConnection>,
+    pub(super) endpoints: Vec<StoredEndpoint>,
     pub(super) pending: Vec<PendingCommit>,
 }
 
@@ -149,7 +149,7 @@ impl Default for StateFile {
         Self {
             version: STATE_VERSION,
             next_transaction_generation: 1,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             pending: Vec::new(),
         }
     }
@@ -157,8 +157,8 @@ impl Default for StateFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct StoredConnection {
-    pub(super) connection_ref: String,
+pub(super) struct StoredEndpoint {
+    pub(super) endpoint_ref: String,
     pub(super) instance_id: String,
     pub(super) label: String,
     pub(super) grant_ref: String,
@@ -176,7 +176,7 @@ pub(super) struct StoredConnection {
 #[serde(deny_unknown_fields)]
 pub(super) struct PendingCommit {
     pub(super) transaction_id: String,
-    pub(super) connection: StoredConnection,
+    pub(super) connection: StoredEndpoint,
 }
 
 pub(super) struct CredentialValues {
@@ -214,7 +214,7 @@ impl JiraBackend {
             )?;
         if metadata.version != STATE_VERSION
             || metadata.next_transaction_generation == 0
-            || metadata.connections.len() > 1_024
+            || metadata.endpoints.len() > 1_024
             || metadata.pending.len() > 32
         {
             return Err(JiraError::new("connection-state"));
@@ -258,7 +258,7 @@ impl JiraBackend {
 
     #[must_use]
     pub fn connection_count(&self) -> usize {
-        lock(&self.inner.metadata).connections.len() + 1
+        lock(&self.inner.metadata).endpoints.len() + 1
     }
 }
 
@@ -275,7 +275,7 @@ impl ConnectorBackend for JiraBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
-            connections: true,
+            endpoints: true,
             events: false,
             datasources: true,
         }
@@ -286,15 +286,15 @@ impl ConnectorBackend for JiraBackend {
             OperationRequest::Describe(request) => is_jira_operation(&request.operation_ref),
             OperationRequest::Invoke(request) => {
                 is_jira_operation(&request.operation_ref)
-                    && ((request.connection_ref == ORG_CONNECTION_REF
+                    && ((request.endpoint_ref == ORG_CONNECTION_REF
                         && matches!(
                             request.operation_ref.as_str(),
                             "jira-issue-search" | "jira-project-list" | "jira-issue-comments-read"
                         ))
                         || lock(&self.inner.metadata)
-                            .connections
+                            .endpoints
                             .iter()
-                            .any(|connection| connection.connection_ref == request.connection_ref))
+                            .any(|connection| connection.endpoint_ref == request.endpoint_ref))
             }
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
@@ -304,32 +304,32 @@ impl ConnectorBackend for JiraBackend {
         }
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
         match request {
-            ConnectionRequest::ConnectSessionCreate(request) => {
+            EndpointRequest::ConnectSessionCreate(request) => {
                 request.integration_ref == INTEGRATION_REF
             }
-            ConnectionRequest::ConnectSessionStatus(request) => {
+            EndpointRequest::ConnectSessionStatus(request) => {
                 lock(&self.inner.sessions).owns(&request.connect_session_ref)
             }
-            ConnectionRequest::Describe(request) => {
-                request.connection_ref == ORG_CONNECTION_REF
+            EndpointRequest::Describe(request) => {
+                request.endpoint_ref == ORG_CONNECTION_REF
                     || lock(&self.inner.metadata)
-                        .connections
+                        .endpoints
                         .iter()
-                        .any(|connection| connection.connection_ref == request.connection_ref)
+                        .any(|connection| connection.endpoint_ref == request.endpoint_ref)
             }
-            ConnectionRequest::Search(_)
-            | ConnectionRequest::CandidateSearch(_)
-            | ConnectionRequest::CandidateActivate(_)
-            | ConnectionRequest::ObservationSearch(_)
-            | ConnectionRequest::Materialize(_) => false,
+            EndpointRequest::Search(_)
+            | EndpointRequest::CandidateSearch(_)
+            | EndpointRequest::CandidateActivate(_)
+            | EndpointRequest::ObservationSearch(_)
+            | EndpointRequest::Materialize(_) => false,
         }
     }
 
     fn connect_session_access(
         &self,
-        request: &protocol::connection::ConnectSessionCreateRequest,
+        request: &protocol::endpoint::ConnectSessionCreateRequest,
     ) -> ConnectSessionAccess {
         if request.integration_ref == INTEGRATION_REF
             && request.auth_profile.as_deref() == Some(PROFILE_USER)
@@ -419,34 +419,34 @@ impl ConnectorBackend for JiraBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         self.inner.check_context(context)?;
         match request {
-            ConnectionRequest::Search(request) => {
+            EndpointRequest::Search(request) => {
                 let query = request.query.to_ascii_lowercase();
-                let mut connections = vec![organization_connection_summary(
+                let mut endpoints = vec![organization_connection_summary(
                     self.inner.policy.initiation,
                     self.inner.service_callable.load(Ordering::Acquire),
                 )];
-                connections.extend(self.inner.owned_user_connections(context).into_iter().map(
+                endpoints.extend(self.inner.owned_user_connections(context).into_iter().map(
                     |connection| user_connection_summary(connection, self.inner.policy.initiation),
                 ));
-                connections.retain(|connection| {
+                endpoints.retain(|connection| {
                     query.is_empty()
                         || connection.label.to_ascii_lowercase().contains(&query)
                         || INTEGRATION_REF.contains(&query)
                 });
-                connections.truncate(usize::from(request.limit));
-                Ok(ConnectionResult::Search { connections })
+                endpoints.truncate(usize::from(request.limit));
+                Ok(EndpointResult::Search { endpoints })
             }
-            ConnectionRequest::Describe(request)
-                if request.connection_ref == ORG_CONNECTION_REF =>
+            EndpointRequest::Describe(request)
+                if request.endpoint_ref == ORG_CONNECTION_REF =>
             {
-                Ok(ConnectionResult::Describe(ConnectionDescription {
+                Ok(EndpointResult::Describe(EndpointDescription {
                     summary: organization_connection_summary(
                         self.inner.policy.initiation,
                         self.inner.service_callable.load(Ordering::Acquire),
@@ -454,48 +454,48 @@ impl ConnectorBackend for JiraBackend {
                     channels: Vec::new(),
                 }))
             }
-            ConnectionRequest::Describe(request) => self
+            EndpointRequest::Describe(request) => self
                 .inner
                 .owned_user_connections(context)
                 .into_iter()
-                .find(|connection| connection.connection_ref == request.connection_ref)
+                .find(|connection| connection.endpoint_ref == request.endpoint_ref)
                 .map(|connection| {
-                    ConnectionResult::Describe(ConnectionDescription {
+                    EndpointResult::Describe(EndpointDescription {
                         summary: user_connection_summary(connection, self.inner.policy.initiation),
                         channels: Vec::new(),
                     })
                 })
-                .ok_or_else(connection_not_found),
-            ConnectionRequest::ConnectSessionCreate(request) => {
+                .ok_or_else(endpoint_not_found),
+            EndpointRequest::ConnectSessionCreate(request) => {
                 if request.auth_profile.as_deref() != Some(PROFILE_USER) {
-                    return Err(ConnectionError::new(
-                        ConnectionErrorCode::InvalidInput,
+                    return Err(EndpointError::new(
+                        EndpointErrorCode::InvalidInput,
                         "Jira self-service setup requires jira.oauth_user",
                         false,
                     ));
                 }
                 self.inner
                     .create_session(context, request.label)
-                    .map(ConnectionResult::ConnectSessionCreate)
+                    .map(EndpointResult::ConnectSessionCreate)
             }
-            ConnectionRequest::ConnectSessionStatus(request) => {
+            EndpointRequest::ConnectSessionStatus(request) => {
                 if lock(&self.inner.session_owners)
                     .get(&request.connect_session_ref)
                     .is_none_or(|owner| owner.subject != context.subject())
                 {
-                    return Err(connection_not_found());
+                    return Err(endpoint_not_found());
                 }
                 lock(&self.inner.sessions)
                     .status(&request.connect_session_ref)
-                    .map(ConnectionResult::ConnectSessionStatus)
-                    .ok_or_else(connection_not_found)
+                    .map(EndpointResult::ConnectSessionStatus)
+                    .ok_or_else(endpoint_not_found)
             }
-            ConnectionRequest::ObservationSearch(_) => Ok(ConnectionResult::ObservationSearch {
+            EndpointRequest::ObservationSearch(_) => Ok(EndpointResult::ObservationSearch {
                 observations: Vec::new(),
             }),
-            ConnectionRequest::CandidateSearch(_)
-            | ConnectionRequest::CandidateActivate(_)
-            | ConnectionRequest::Materialize(_) => Err(connection_not_found()),
+            EndpointRequest::CandidateSearch(_)
+            | EndpointRequest::CandidateActivate(_)
+            | EndpointRequest::Materialize(_) => Err(endpoint_not_found()),
         }
     }
 
@@ -519,12 +519,12 @@ impl JiraInner {
             .map_err(|_| JiraError::new("connection-state"))
     }
 
-    pub(super) fn check_context(&self, context: &PrincipalContext) -> Result<(), ConnectionError> {
+    pub(super) fn check_context(&self, context: &PrincipalContext) -> Result<(), EndpointError> {
         if context.tenant_id() == self.tenant_id {
             Ok(())
         } else {
-            Err(ConnectionError::new(
-                ConnectionErrorCode::StaleAuthority,
+            Err(EndpointError::new(
+                EndpointErrorCode::StaleAuthority,
                 "owner authority snapshot is not current",
                 false,
             ))
@@ -534,12 +534,12 @@ impl JiraInner {
     pub(super) fn owned_user_connections(
         &self,
         context: &PrincipalContext,
-    ) -> Vec<StoredConnection> {
+    ) -> Vec<StoredEndpoint> {
         if context.tenant_id() != self.tenant_id {
             return Vec::new();
         }
         lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .filter(|connection| {
                 user_connection_is_admitted(
@@ -556,7 +556,7 @@ impl JiraInner {
         &self,
         audit_ref: &str,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
         context: &PrincipalContext,
         outcome: &str,
     ) -> Result<(), JiraError> {
@@ -564,7 +564,7 @@ impl JiraInner {
             "at_unix_ms": now_ms().ok_or_else(|| JiraError::new("clock"))?,
             "audit_ref": audit_ref,
             "operation_ref": operation_ref,
-            "connection_ref": connection_ref,
+            "endpoint_ref": endpoint_ref,
             "tenant_id": context.tenant_id(),
             "actor_subject": context.actor_subject(),
             "outcome": outcome,
@@ -581,55 +581,55 @@ impl JiraInner {
 pub(super) fn organization_connection_summary(
     init: InitiationConfig,
     callable: bool,
-) -> ConnectionSummary {
-    ConnectionSummary {
-        connection_ref: ORG_CONNECTION_REF.to_owned(),
+) -> EndpointSummary {
+    EndpointSummary {
+        endpoint_ref: ORG_CONNECTION_REF.to_owned(),
         integration_ref: INTEGRATION_REF.to_owned(),
         label: "Organization Jira read-only".to_owned(),
         state: if callable {
-            ConnectionState::Callable
+            EndpointState::Callable
         } else {
-            ConnectionState::Degraded
+            EndpointState::Degraded
         },
         initiation: initiation(init),
-        route: ConnectionRoute::Direct,
-        scope: Some(ConnectionScope::Tenant),
-        actor: Some(ConnectionActor::App),
+        route: EndpointRoute::Direct,
+        scope: Some(EndpointScope::Tenant),
+        actor: Some(EndpointActor::App),
         auth_profile: Some(PROFILE_ORGANIZATION.to_owned()),
     }
 }
 
 pub(super) fn user_connection_summary(
-    connection: StoredConnection,
+    connection: StoredEndpoint,
     init: InitiationConfig,
-) -> ConnectionSummary {
-    ConnectionSummary {
-        connection_ref: connection.connection_ref,
+) -> EndpointSummary {
+    EndpointSummary {
+        endpoint_ref: connection.endpoint_ref,
         integration_ref: INTEGRATION_REF.to_owned(),
         label: connection.label,
-        state: ConnectionState::Callable,
+        state: EndpointState::Callable,
         initiation: initiation(init),
-        route: ConnectionRoute::Direct,
-        scope: Some(ConnectionScope::Principal),
-        actor: Some(ConnectionActor::User),
+        route: EndpointRoute::Direct,
+        scope: Some(EndpointScope::Principal),
+        actor: Some(EndpointActor::User),
         auth_profile: Some(PROFILE_USER.to_owned()),
     }
 }
 
 fn user_connection_is_admitted(
-    connection: &StoredConnection,
+    connection: &StoredEndpoint,
     owner_subject: &str,
     expected_grant_ref: &str,
 ) -> bool {
     connection.owner_subject == owner_subject && connection.grant_ref == expected_grant_ref
 }
 
-pub(super) fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
+pub(super) fn initiation(config: InitiationConfig) -> Vec<EndpointInitiator> {
     match config {
-        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
-        InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
+        InitiationConfig::Platform => vec![EndpointInitiator::Platform],
+        InitiationConfig::Provider => vec![EndpointInitiator::Provider],
         InitiationConfig::Both => {
-            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+            vec![EndpointInitiator::Platform, EndpointInitiator::Provider]
         }
     }
 }
@@ -712,23 +712,23 @@ fn oauth_completion_page(authorize_url: &str) -> HostedCompletionPage {
     }
 }
 
-pub(super) fn connection_not_found() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::NotFound,
+pub(super) fn endpoint_not_found() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::NotFound,
         "Jira connection was not found",
         false,
     )
 }
 
-pub(super) fn connection_unavailable() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Unavailable,
+pub(super) fn connection_unavailable() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Unavailable,
         "Jira connection setup is unavailable",
         true,
     )
 }
 
-pub(super) fn operation_from_context(error: ConnectionError) -> OperationError {
+pub(super) fn operation_from_context(error: EndpointError) -> OperationError {
     OperationError::new(
         protocol::operation::OperationErrorCode::StaleAuthority,
         error.message,
@@ -744,7 +744,7 @@ pub(super) fn operation_not_found() -> OperationError {
     )
 }
 
-pub(super) fn datasource_from_context(error: ConnectionError) -> DatasourceError {
+pub(super) fn datasource_from_context(error: EndpointError) -> DatasourceError {
     DatasourceError::new(
         protocol::datasource::DatasourceErrorCode::StaleAuthority,
         error.message,
@@ -759,9 +759,9 @@ mod tests {
     #[test]
     fn organization_and_user_profiles_are_distinct() {
         let organization = organization_connection_summary(InitiationConfig::Platform, false);
-        assert_eq!(organization.scope, Some(ConnectionScope::Tenant));
-        assert_eq!(organization.actor, Some(ConnectionActor::App));
-        assert_eq!(organization.state, ConnectionState::Degraded);
+        assert_eq!(organization.scope, Some(EndpointScope::Tenant));
+        assert_eq!(organization.actor, Some(EndpointActor::App));
+        assert_eq!(organization.state, EndpointState::Degraded);
         assert_eq!(
             organization.auth_profile.as_deref(),
             Some(PROFILE_ORGANIZATION)
@@ -772,8 +772,8 @@ mod tests {
 
     #[test]
     fn delegated_connection_is_withdrawn_when_its_grant_changes() {
-        let connection = StoredConnection {
-            connection_ref: "connection:jira:test".to_owned(),
+        let connection = StoredEndpoint {
+            endpoint_ref: "connection:jira:test".to_owned(),
             instance_id: "test".to_owned(),
             label: "My Jira".to_owned(),
             grant_ref: "grant:jira:delegated-user:v1".to_owned(),

@@ -20,7 +20,7 @@ async fn remediation_created_metadata_is_exact_and_does_not_publish_callable_dis
         .clone();
     let target = RemediationTarget {
         operation_ref: "gitlab-project-list",
-        connection_ref: &connection,
+        endpoint_ref: &connection,
     };
     assert!(backend.owns_remediation(RemediationRoute::Target(target)));
     let metadata = backend.remediation_metadata(&owner(), target).unwrap();
@@ -61,11 +61,11 @@ async fn remediation_unknown_and_wrong_owner_refuse_without_credential_or_provid
     for target in [
         RemediationTarget {
             operation_ref: "unknown",
-            connection_ref: &connection,
+            endpoint_ref: &connection,
         },
         RemediationTarget {
             operation_ref: "gitlab-project-list",
-            connection_ref: "connection:absent",
+            endpoint_ref: "connection:absent",
         },
     ] {
         assert!(matches!(
@@ -83,7 +83,7 @@ async fn remediation_unknown_and_wrong_owner_refuse_without_credential_or_provid
     .unwrap();
     let target = RemediationTarget {
         operation_ref: "gitlab-project-list",
-        connection_ref: &connection,
+        endpoint_ref: &connection,
     };
     assert!(matches!(
         backend.remediation_metadata(&other, target),
@@ -116,7 +116,7 @@ async fn remediation_fresh_and_safely_refreshable_credentials_are_ready_without_
         .clone();
     let target = RemediationTarget {
         operation_ref: "gitlab-project-list",
-        connection_ref: &connection,
+        endpoint_ref: &connection,
     };
     assert_eq!(
         backend.credential_readiness(&owner(), target).await,
@@ -147,7 +147,7 @@ fn binding_from_admission(
     assert_eq!(admission.grant_revision, None);
     let binding = service::RemediationBinding {
         operation_ref: target.operation_ref.into(),
-        connection_ref: target.connection_ref.into(),
+        endpoint_ref: target.endpoint_ref.into(),
         integration_ref: metadata.integration_ref,
         auth_profile: metadata.auth_profile,
         need: protocol::operation::v3::AuthenticationNeed::AuthorizeConfigured,
@@ -179,7 +179,7 @@ async fn remediation_personal_factory_binds_actual_policy_and_rechecks_current_a
         .clone();
     let target = RemediationTarget {
         operation_ref: "gitlab-project-list",
-        connection_ref: &connection,
+        endpoint_ref: &connection,
     };
     let (binding, authority) = binding_from_admission(&backend, target);
     let now = backend.inner.now().unwrap();
@@ -194,7 +194,7 @@ async fn remediation_personal_factory_binds_actual_policy_and_rechecks_current_a
             ..binding.clone()
         },
         service::RemediationBinding {
-            connection_ref: "other".into(),
+            endpoint_ref: "other".into(),
             ..binding.clone()
         },
         service::RemediationBinding {
@@ -244,7 +244,7 @@ async fn finish_bound(status: &connection_api::ConnectSessionStatus) {
 
 #[tokio::test]
 async fn remediation_bound_session_publishes_exact_target_and_acknowledges_once_without_dispatch() {
-    use protocol::connection_v2::{
+    use protocol::endpoint_v2::{
         RemediationAcknowledgeRequest, RemediationResumeState, RemediationStatusRequest,
     };
     use service::{RemediationRequest, RemediationResult};
@@ -266,7 +266,7 @@ async fn remediation_bound_session_publishes_exact_target_and_acknowledges_once_
         .clone();
     let target = RemediationTarget {
         operation_ref: "gitlab-project-list",
-        connection_ref: &connection,
+        endpoint_ref: &connection,
     };
     let (binding, authority) = binding_from_admission(&backend, target);
     let RemediationResult::Status(start) = backend
@@ -281,7 +281,7 @@ async fn remediation_bound_session_publishes_exact_target_and_acknowledges_once_
         panic!("bound status")
     };
     assert_eq!(start.resume_state, RemediationResumeState::Pending);
-    assert_eq!(start.connection_ref, connection);
+    assert_eq!(start.endpoint_ref, connection);
     assert_eq!(start.integration_ref, "gitlab");
     assert_eq!(start.auth_profile, "gitlab.oauth_token");
     assert_eq!(egress.count(), 0);
@@ -303,7 +303,7 @@ async fn remediation_bound_session_publishes_exact_target_and_acknowledges_once_
     };
     assert_eq!(ready.resume_state, RemediationResumeState::Ready);
     assert_eq!(
-        ready.session.connection_ref.as_deref(),
+        ready.session.endpoint_ref.as_deref(),
         Some(connection.as_str())
     );
     assert!(ready.session.completion_endpoint.is_none());
@@ -311,7 +311,7 @@ async fn remediation_bound_session_publishes_exact_target_and_acknowledges_once_
     let ack = RemediationAcknowledgeRequest {
         connect_session_ref: start.connect_session_ref.clone(),
         operation_ref: target.operation_ref.into(),
-        connection_ref: connection.clone(),
+        endpoint_ref: connection.clone(),
     };
     let context = owner();
     let (first, second) = tokio::join!(
@@ -386,7 +386,7 @@ async fn remediation_bound_publication_rechecks_its_receiver_authority_before_cu
         &backend,
         RemediationTarget {
             operation_ref: "gitlab-project-list",
-            connection_ref: &connection,
+            endpoint_ref: &connection,
         },
     );
     let active = Arc::new(AtomicBool::new(true));
@@ -457,7 +457,7 @@ async fn remediation_expired_acknowledgement_refuses_without_rolling_back_publis
         &backend,
         RemediationTarget {
             operation_ref: "gitlab-project-list",
-            connection_ref: &connection,
+            endpoint_ref: &connection,
         },
     );
     let deadline = binding.expires_at_unix_ms;
@@ -490,10 +490,10 @@ async fn remediation_expired_acknowledgement_refuses_without_rolling_back_publis
         .handle_remediation(
             &owner(),
             service::RemediationRequest::Acknowledge(
-                protocol::connection_v2::RemediationAcknowledgeRequest {
+                protocol::endpoint_v2::RemediationAcknowledgeRequest {
                     connect_session_ref: start.connect_session_ref.clone(),
                     operation_ref: "gitlab-project-list".into(),
-                    connection_ref: connection,
+                    endpoint_ref: connection,
                 },
             ),
             authority.clone(),
@@ -514,7 +514,7 @@ async fn remediation_expired_acknowledgement_refuses_without_rolling_back_publis
     assert_eq!(egress.count(), 2);
     assert!(matches!(acknowledgement, Err(RemediationError::Conflict)));
     let status =
-        service::RemediationRequest::Status(protocol::connection_v2::RemediationStatusRequest {
+        service::RemediationRequest::Status(protocol::endpoint_v2::RemediationStatusRequest {
             connect_session_ref: start.connect_session_ref.clone(),
         });
     let service::RemediationResult::Status(expired) = backend
@@ -526,7 +526,7 @@ async fn remediation_expired_acknowledgement_refuses_without_rolling_back_publis
     };
     assert_eq!(
         expired.resume_state,
-        protocol::connection_v2::RemediationResumeState::Expired
+        protocol::endpoint_v2::RemediationResumeState::Expired
     );
     assert_eq!(
         expired.session_state,
@@ -539,7 +539,7 @@ async fn remediation_expired_acknowledgement_refuses_without_rolling_back_publis
             .handle_remediation(
                 &owner(),
                 service::RemediationRequest::Status(
-                    protocol::connection_v2::RemediationStatusRequest {
+                    protocol::endpoint_v2::RemediationStatusRequest {
                         connect_session_ref: start.connect_session_ref
                     }
                 ),
@@ -591,7 +591,7 @@ async fn remediation_expired_status_never_swallows_an_opaque_receiver_rejection(
             &backend,
             RemediationTarget {
                 operation_ref: "gitlab-project-list",
-                connection_ref: &connection,
+                endpoint_ref: &connection,
             },
         );
         let deadline = binding.expires_at_unix_ms;
@@ -618,7 +618,7 @@ async fn remediation_expired_status_never_swallows_an_opaque_receiver_rejection(
             .handle_remediation(
                 &owner(),
                 service::RemediationRequest::Status(
-                    protocol::connection_v2::RemediationStatusRequest {
+                    protocol::endpoint_v2::RemediationStatusRequest {
                         connect_session_ref: start.connect_session_ref,
                     },
                 ),
@@ -659,7 +659,7 @@ async fn auth_adversary_owner_readiness_tracks_deleted_credentials_and_revoked_a
             .clone();
         let target = RemediationTarget {
             operation_ref: "gitlab-project-list",
-            connection_ref: &connection,
+            endpoint_ref: &connection,
         };
         assert_eq!(
             backend.credential_readiness(&owner(), target).await,

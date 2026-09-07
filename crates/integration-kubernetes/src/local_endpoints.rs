@@ -87,7 +87,7 @@ impl KubernetesLocalBackend {
         config.proxy_url = None;
         config.connect_timeout = Some(std::time::Duration::from_secs(5));
         let client = Client::try_from(config).map_err(|_| KubernetesLocalError::EndpointSource)?;
-        let connection_ref = opaque_ref(
+        let endpoint_ref = opaque_ref(
             "connection:kubernetes:",
             &format!(
                 "{}\0{}",
@@ -105,7 +105,7 @@ impl KubernetesLocalBackend {
         let source = Arc::new(
             KubernetesEndpointSource::new(
                 client.clone(),
-                connection_ref.clone(),
+                endpoint_ref.clone(),
                 self.policy.namespaces.iter().cloned().collect(),
                 self.policy.all_namespaces,
                 self.policy.target_grants.clone(),
@@ -118,14 +118,14 @@ impl KubernetesLocalBackend {
             source,
             EndpointPrincipalPolicy::Local(Arc::new(self.owner.clone())),
         );
-        let description = ConnectionDescription {
-            summary: ConnectionSummary {
-                connection_ref: connection_ref.clone(),
+        let description = EndpointDescription {
+            summary: EndpointSummary {
+                endpoint_ref: endpoint_ref.clone(),
                 integration_ref: KUBERNETES.to_owned(),
                 label: selected.to_owned(),
-                state: ConnectionState::Authorized,
+                state: EndpointState::Authorized,
                 initiation: initiation(self.policy.initiation),
-                route: ConnectionRoute::Direct,
+                route: EndpointRoute::Direct,
                 scope: None,
                 actor: None,
                 auth_profile: None,
@@ -135,10 +135,10 @@ impl KubernetesLocalBackend {
         let mut state = lock(&self.state);
         state.candidate_connections.insert(
             candidate.summary.candidate_ref.clone(),
-            connection_ref.clone(),
+            endpoint_ref.clone(),
         );
-        state.clients.insert(connection_ref.clone(), client);
-        state.connections.insert(connection_ref, description);
+        state.clients.insert(endpoint_ref.clone(), client);
+        state.endpoints.insert(endpoint_ref, description);
         *lock(&self.endpoint_backend) = Some(backend);
         Ok(())
     }

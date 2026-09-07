@@ -47,16 +47,16 @@ mod inventory_tests {
         let mut state = KubernetesState::default();
         for (reference, client) in clients {
             state.clients.insert(reference.to_owned(), client);
-            state.connections.insert(
+            state.endpoints.insert(
                 reference.to_owned(),
-                ConnectionDescription {
-                    summary: ConnectionSummary {
-                        connection_ref: reference.to_owned(),
+                EndpointDescription {
+                    summary: EndpointSummary {
+                        endpoint_ref: reference.to_owned(),
                         integration_ref: KUBERNETES.to_owned(),
                         label: reference.to_owned(),
-                        state: ConnectionState::Authorized,
-                        initiation: vec![ConnectionInitiator::Platform],
-                        route: ConnectionRoute::Direct,
+                        state: EndpointState::Authorized,
+                        initiation: vec![EndpointInitiator::Platform],
+                        route: EndpointRoute::Direct,
                         scope: None,
                         actor: None,
                         auth_profile: None,
@@ -95,7 +95,7 @@ mod inventory_tests {
     ) -> OperationRequest {
         OperationRequest::Invoke(InvokeRequest {
             operation_ref: operation.into(),
-            connection_ref: connection.into(),
+            endpoint_ref: connection.into(),
             description_ref: backend.operation_description_ref(&backend.owner, operation),
             input,
             approval_evidence_ref: None,
@@ -164,16 +164,16 @@ mod inventory_tests {
             assert_eq!(summary.approval, ApprovalPosture::NotRequired);
             assert_eq!(
                 summary
-                    .connections
+                    .endpoints
                     .iter()
-                    .map(|connection| connection.connection_ref.as_str())
+                    .map(|connection| connection.endpoint_ref.as_str())
                     .collect::<Vec<_>>(),
                 ["connection:alpha", "connection:beta"]
             );
             let description = backend
                 .operation_description(&backend.owner, operation)
                 .unwrap();
-            assert_eq!(description.connections, summary.connections);
+            assert_eq!(description.endpoints, summary.endpoints);
             assert_eq!(description.output_schema["additionalProperties"], false);
             assert!(backend.owns_operation(&request(
                 &backend,
@@ -196,7 +196,7 @@ mod inventory_tests {
                 .await
                 .unwrap(),
             json!({
-                "connection_ref": "connection:alpha", "namespaces": ["apps", "monitoring"]
+                "endpoint_ref": "connection:alpha", "namespaces": ["apps", "monitoring"]
             })
         );
         assert!(requests.lock().unwrap().is_empty());
@@ -245,7 +245,7 @@ mod inventory_tests {
                 .unwrap();
             assert_eq!(
                 output,
-                json!({"connection_ref": reference, "namespace": "apps", "deployments": [
+                json!({"endpoint_ref": reference, "namespace": "apps", "deployments": [
                     {"name": name, "containers": [{"name": "app", "image": image}], "desired_replicas": replicas, "ready_replicas": replicas}
                 ]})
             );
@@ -630,7 +630,7 @@ mod inventory_tests {
         assert_eq!(
             result,
             json!({
-                "connection_ref": "connection:alpha", "namespace": "apps", "deployments": [{
+                "endpoint_ref": "connection:alpha", "namespace": "apps", "deployments": [{
                     "name": "app.v2", "desired_replicas": 1, "ready_replicas": 0,
                     "containers": [
                         {"name": "first", "image": "example/first@sha256:abcdef"},

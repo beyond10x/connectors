@@ -1,6 +1,6 @@
 //! Exact personal admission and bound sessions on the existing OAuth/custody owners.
 use super::*;
-use protocol::connection_v2::{
+use protocol::endpoint_v2::{
     BoundRemediationStatus, RemediationAcknowledgement, RemediationNextAction,
     RemediationResumeState,
 };
@@ -45,7 +45,7 @@ impl OAuthInner {
         let index = self
             .bindings
             .iter()
-            .position(|binding| binding.custody.identity.connection == target.connection_ref)
+            .position(|binding| binding.custody.identity.connection == target.endpoint_ref)
             .ok_or(RemediationError::Refused)?;
         let binding = &self.bindings[index];
         let raw = binding
@@ -56,7 +56,7 @@ impl OAuthInner {
             .ok_or(RemediationError::Unavailable)?;
         if operation.provider != binding.policy.provider.id
             || !raw.admits(operation)
-            || !raw.initiation.allows(domain::ConnectionInitiator::Platform)
+            || !raw.initiation.allows(domain::EndpointInitiator::Platform)
             || !scopes_admit(
                 operation,
                 &binding.policy.registration.auth_profile,
@@ -85,7 +85,7 @@ impl OAuthInner {
             &hex::encode(binding.policy.authority_digest),
             catalog::reader::embedded().digest(),
             operation.record(),
-            target.connection_ref,
+            target.endpoint_ref,
             binding.policy.provider.id,
             &binding.policy.registration.auth_profile,
             &hex::encode(binding.policy.client_digest),
@@ -163,7 +163,7 @@ impl PersonalAuthority {
         let inner = self.inner.upgrade().ok_or(RemediationError::Unavailable)?;
         let target = RemediationTarget {
             operation_ref: &binding.operation_ref,
-            connection_ref: &binding.connection_ref,
+            endpoint_ref: &binding.endpoint_ref,
         };
         let index = inner.admit_remediation_target(context, target)?;
         let policy = &inner.bindings[index].policy;
@@ -216,7 +216,7 @@ impl PersonalOAuthBackend {
     pub(super) fn owns_bound_remediation(&self, route: RemediationRoute<'_>) -> bool {
         match route {
             RemediationRoute::Target(target) => self.inner.bindings.iter().any(|binding| {
-                binding.custody.identity.connection == target.connection_ref
+                binding.custody.identity.connection == target.endpoint_ref
                     && binding.delegate.owns_operation_ref(target.operation_ref)
             }),
             RemediationRoute::Session(reference) => {
@@ -244,7 +244,7 @@ impl PersonalOAuthBackend {
         Ok(RemediationMetadata {
             operation: catalog::reader::operation(target.operation_ref)
                 .ok_or(RemediationError::Refused)?,
-            connection: domain::ConnectionAuthority::new(
+            connection: domain::EndpointAuthority::new(
                 &binding.custody.identity.connection,
                 raw.initiation.clone(),
             )
@@ -313,7 +313,7 @@ impl PersonalOAuthBackend {
                     context,
                     RemediationTarget {
                         operation_ref: &binding.operation_ref,
-                        connection_ref: &binding.connection_ref,
+                        endpoint_ref: &binding.endpoint_ref,
                     },
                 )?;
                 authority.recheck(context, &binding, self.inner.now().map_err(closed)?)?;
@@ -340,7 +340,7 @@ impl PersonalOAuthBackend {
                     context,
                     &request.connect_session_ref,
                     true,
-                    Some((&request.operation_ref, &request.connection_ref)),
+                    Some((&request.operation_ref, &request.endpoint_ref)),
                 )
                 .await
             }
@@ -381,14 +381,14 @@ impl PersonalOAuthBackend {
             )?;
             (
                 state.binding.operation_ref.clone(),
-                state.binding.connection_ref.clone(),
+                state.binding.endpoint_ref.clone(),
             )
         };
         let index = self.inner.admit_remediation_target(
             context,
             RemediationTarget {
                 operation_ref: &operation,
-                connection_ref: &connection,
+                endpoint_ref: &connection,
             },
         )?;
         let binding = &self.inner.bindings[index];
@@ -428,7 +428,7 @@ impl PersonalOAuthBackend {
             }
             connection_api::ConnectSessionState::Completed
                 if readiness == CredentialReadiness::Ready
-                    && session.connection_ref.as_deref() == Some(connection.as_str()) =>
+                    && session.endpoint_ref.as_deref() == Some(connection.as_str()) =>
             {
                 RemediationResumeState::Ready
             }
@@ -449,7 +449,7 @@ impl PersonalOAuthBackend {
                 RemediationAcknowledgement {
                     connect_session_ref: reference.into(),
                     operation_ref: operation,
-                    connection_ref: connection,
+                    endpoint_ref: connection,
                     next_action: RemediationNextAction::FreshDescriptionThenExplicitInvoke,
                 },
             ));
@@ -458,7 +458,7 @@ impl PersonalOAuthBackend {
             BoundRemediationStatus {
                 connect_session_ref: reference.into(),
                 operation_ref: operation,
-                connection_ref: connection,
+                endpoint_ref: connection,
                 integration_ref: state.binding.integration_ref.clone(),
                 auth_profile: state.binding.auth_profile.clone(),
                 need: state.binding.need,

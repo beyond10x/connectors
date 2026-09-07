@@ -22,7 +22,7 @@ use futures_util::stream::{self, BoxStream};
 use futures_util::StreamExt as _;
 use http::{HeaderName, HeaderValue};
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
+    ApprovalPosture, EndpointSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
     OperationResult, OperationSummary, SearchRequest,
 };
@@ -73,7 +73,7 @@ pub struct ReviewedOperation {
 pub struct McpServiceProfile {
     pub contract: String,
     pub service_ref: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub connection_label: String,
     pub provider: ReviewedProvider,
     pub snapshot: ToolSnapshot,
@@ -250,9 +250,9 @@ impl McpBackend {
             .find(|operation| operation.operation_ref == operation_ref)
     }
 
-    fn connection_summary(&self) -> ConnectionSummary {
-        ConnectionSummary {
-            connection_ref: self.profile.connection_ref.clone(),
+    fn endpoint_summary(&self) -> EndpointSummary {
+        EndpointSummary {
+            endpoint_ref: self.profile.endpoint_ref.clone(),
             label: self.profile.connection_label.clone(),
             provider: self.deployment.provider.provider_ref.clone(),
             audiences: Vec::new(),
@@ -268,7 +268,7 @@ impl McpBackend {
         digest.update(b"\0");
         digest.update(operation_ref.as_bytes());
         digest.update(b"\0");
-        digest.update(self.profile.connection_ref.as_bytes());
+        digest.update(self.profile.endpoint_ref.as_bytes());
         format!("description-sha256-{:x}", digest.finalize())
     }
 
@@ -293,7 +293,7 @@ impl McpBackend {
                 title: operation.title.clone(),
                 effect: operation.effect,
                 approval: ApprovalPosture::Required,
-                connections: vec![self.connection_summary()],
+                endpoints: vec![self.endpoint_summary()],
             })
             .collect();
         OperationResult::Search { operations }
@@ -321,7 +321,7 @@ impl McpBackend {
             output_schema: json!({"type": "object"}),
             effect: reviewed.effect,
             approval: ApprovalPosture::Required,
-            connections: vec![self.connection_summary()],
+            endpoints: vec![self.endpoint_summary()],
             description_ref: self.description_ref(context, &reviewed.operation_ref),
         }))
     }
@@ -334,7 +334,7 @@ impl McpBackend {
         let reviewed = self
             .reviewed(&request.operation_ref)
             .ok_or_else(operation_not_found)?;
-        if request.connection_ref != self.profile.connection_ref {
+        if request.endpoint_ref != self.profile.endpoint_ref {
             return Err(operation_not_granted());
         }
         if request.description_ref != self.description_ref(context, &request.operation_ref) {
@@ -412,7 +412,7 @@ impl ConnectorBackend for McpBackend {
             OperationRequest::Search(_) => true,
             OperationRequest::Describe(request) => self.reviewed(&request.operation_ref).is_some(),
             OperationRequest::Invoke(request) => {
-                request.connection_ref == self.profile.connection_ref
+                request.endpoint_ref == self.profile.endpoint_ref
                     && self.reviewed(&request.operation_ref).is_some()
             }
             _ => false,
@@ -488,7 +488,7 @@ fn validate_profile(
         || local.len() != profile.operations.len()
         || remote != snapshot
         || !valid_ref(&profile.service_ref)
-        || !valid_ref(&profile.connection_ref)
+        || !valid_ref(&profile.endpoint_ref)
         || !valid_text(&profile.connection_label, 256)
         || !valid_text(&profile.provider.display_name, 256)
         || !valid_text(&profile.provider.description, 4096)

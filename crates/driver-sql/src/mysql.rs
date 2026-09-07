@@ -28,9 +28,9 @@ use protocol::sql::{
 
 use crate::bounds::{Offer, RowAccumulator};
 use crate::credentials::ResolvedSecret;
-use crate::{scrub, SqlConnectionConfig, SqlDriverError};
+use crate::{scrub, SqlEndpointConfig, SqlDriverError};
 
-fn opts(config: &SqlConnectionConfig, secret: &ResolvedSecret) -> Opts {
+fn opts(config: &SqlEndpointConfig, secret: &ResolvedSecret) -> Opts {
     let mut options = OptsBuilder::default()
         .ip_or_hostname(config.host.clone())
         .tcp_port(config.port)
@@ -60,7 +60,7 @@ fn opts(config: &SqlConnectionConfig, secret: &ResolvedSecret) -> Opts {
 }
 
 async fn connect(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
 ) -> Result<Conn, SqlDriverError> {
     if !matches!(config.tls, crate::SqlTls::Disabled) {
@@ -118,7 +118,7 @@ fn rendered_row(row: &Row) -> Vec<Option<String>> {
 }
 
 pub(crate) async fn run_query(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
     statement: &str,
     max_rows: u32,
@@ -202,7 +202,7 @@ async fn fetch_first_column(
 }
 
 pub(crate) async fn list_schemas(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
 ) -> Result<SchemaList, SqlDriverError> {
     let mut conn = connect(config, secret).await?;
@@ -221,7 +221,7 @@ pub(crate) async fn list_schemas(
 }
 
 pub(crate) async fn list_tables(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
     schema: &str,
 ) -> Result<TableList, SqlDriverError> {
@@ -245,7 +245,7 @@ pub(crate) async fn list_tables(
 }
 
 pub(crate) async fn describe_table(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
     schema: &str,
     table: &str,

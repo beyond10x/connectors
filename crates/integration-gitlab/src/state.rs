@@ -1,6 +1,6 @@
 //! Where this Integration keeps its own bookkeeping.
 //!
-//! Not GitLab data — the list of Connections that exist and the credential transactions that are
+//! Not GitLab data — the list of Endpoints that exist and the credential transactions that are
 //! half-committed. A hosted placement may run several replicas of one Connector, so that list has
 //! to be shared: it lives in whatever durable store the deployment bound, PostgreSQL in the cluster
 //! and SQLite on one machine. A personal placement is one process on one machine, where an

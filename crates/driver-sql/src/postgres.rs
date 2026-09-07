@@ -28,14 +28,14 @@ use protocol::sql::{
 
 use crate::bounds::{Offer, RowAccumulator};
 use crate::credentials::ResolvedSecret;
-use crate::{scrub, SqlConnectionConfig, SqlDriverError};
+use crate::{scrub, SqlEndpointConfig, SqlDriverError};
 
 /// Rows fetched per cursor round trip: small enough that a byte-cap stop wastes little
 /// transfer, large enough that a full page needs few round trips.
 const FETCH_BATCH: u32 = 64;
 
 async fn connect(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
 ) -> Result<ConnectionGuard, SqlDriverError> {
     let timeout = config.statement_timeout_ms;
@@ -135,7 +135,7 @@ mod route_tests {
                 "no plaintext startup after TLS refusal"
             );
         });
-        let config = SqlConnectionConfig {
+        let config = SqlEndpointConfig {
             engine: crate::SqlEngine::Postgres,
             host: "database.internal.invalid".into(),
             port: 5432,
@@ -163,7 +163,7 @@ mod route_tests {
 }
 
 pub(crate) async fn run_query(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
     statement: &str,
     max_rows: u32,
@@ -245,7 +245,7 @@ pub(crate) async fn run_query(
 const INVENTORY_LIMIT: u32 = MAX_RESULT_ROWS + 1;
 
 pub(crate) async fn list_schemas(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
 ) -> Result<SchemaList, SqlDriverError> {
     let client = connect(config, secret).await?;
@@ -270,7 +270,7 @@ pub(crate) async fn list_schemas(
 }
 
 pub(crate) async fn list_tables(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
     schema: &str,
 ) -> Result<TableList, SqlDriverError> {
@@ -300,7 +300,7 @@ pub(crate) async fn list_tables(
 }
 
 pub(crate) async fn describe_table(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     secret: &ResolvedSecret,
     schema: &str,
     table: &str,

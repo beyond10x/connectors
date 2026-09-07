@@ -191,7 +191,7 @@ impl PlatformBackend {
                 context,
                 InvokeRequest {
                     operation_ref: operation_ref.to_owned(),
-                    connection_ref: self.config.connection.connection_ref.clone(),
+                    endpoint_ref: self.config.connection.endpoint_ref.clone(),
                     description_ref: self.description_ref(context, canonical),
                     input,
                     approval_evidence_ref: None,
@@ -245,14 +245,14 @@ impl PlatformBackend {
     fn workspace_datasource_binding(&self) -> DatasourceBinding {
         let digest = Sha256::digest(format!(
             "{WORKSPACES_DATASOURCE}\0{}\0{}\0binding-v1",
-            self.config.connection.connection_ref, self.deployment_sha256,
+            self.config.connection.endpoint_ref, self.deployment_sha256,
         ));
         let mut generation = [0_u8; 8];
         generation.copy_from_slice(&digest[..8]);
         DatasourceBinding {
             datasource_ref: WORKSPACES_DATASOURCE.to_owned(),
             binding_ref: self.workspace_datasource_binding_ref(),
-            connection_ref: self.config.connection.connection_ref.clone(),
+            endpoint_ref: self.config.connection.endpoint_ref.clone(),
             label: "platform logical workspaces".to_owned(),
             purpose: None,
             generation: u64::from_be_bytes(generation).max(1),
@@ -262,7 +262,7 @@ impl PlatformBackend {
     fn workspace_datasource_binding_ref(&self) -> String {
         let digest = Sha256::digest(format!(
             "{WORKSPACES_DATASOURCE}\0{}\0{}\0binding-ref-v1",
-            self.config.connection.connection_ref, self.deployment_sha256,
+            self.config.connection.endpoint_ref, self.deployment_sha256,
         ));
         format!("binding:b10x:workspaces:{}", hex::encode(&digest[..16]))
     }

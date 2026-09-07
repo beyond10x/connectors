@@ -74,7 +74,7 @@ pub enum SqlEngine {
 /// none is secret: the credential is a [`CredentialReference`], so this struct can derive
 /// `Debug` without a redaction hazard.
 #[derive(Debug, Clone)]
-pub struct SqlConnectionConfig {
+pub struct SqlEndpointConfig {
     /// The engine behind this route.
     pub engine: SqlEngine,
     /// Database host, as the deployment names it.
@@ -143,7 +143,7 @@ pub fn scrub(detail: &str, secret: &ResolvedSecret) -> String {
 }
 
 fn resolve(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     source: &dyn CredentialSource,
 ) -> Result<ResolvedSecret, SqlDriverError> {
     Ok(source.resolve(&config.credential)?)
@@ -170,7 +170,7 @@ fn effective_max_rows(requested: Option<u32>) -> Result<u32, SqlDriverError> {
 /// [`SqlDriverError::Credential`] when the reference cannot be resolved;
 /// [`SqlDriverError::Connection`]/[`SqlDriverError::Query`] for wire failures, scrubbed.
 pub async fn run_query(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     source: &dyn CredentialSource,
     input: &SqlQueryInput,
 ) -> Result<QueryResultPage, SqlDriverError> {
@@ -196,7 +196,7 @@ pub async fn run_query(
 /// [`SqlDriverError::Credential`] when the reference cannot be resolved;
 /// [`SqlDriverError::Connection`]/[`SqlDriverError::Query`] for wire failures, scrubbed.
 pub async fn list_schemas(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     source: &dyn CredentialSource,
 ) -> Result<SchemaList, SqlDriverError> {
     let secret = resolve(config, source)?;
@@ -214,7 +214,7 @@ pub async fn list_schemas(
 /// [`SqlDriverError::Credential`] when the reference cannot be resolved;
 /// [`SqlDriverError::Connection`]/[`SqlDriverError::Query`] for wire failures, scrubbed.
 pub async fn list_tables(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     source: &dyn CredentialSource,
     schema: &str,
 ) -> Result<TableList, SqlDriverError> {
@@ -234,7 +234,7 @@ pub async fn list_tables(
 /// visible columns; [`SqlDriverError::Credential`] when the reference cannot be resolved;
 /// [`SqlDriverError::Connection`]/[`SqlDriverError::Query`] for wire failures, scrubbed.
 pub async fn describe_table(
-    config: &SqlConnectionConfig,
+    config: &SqlEndpointConfig,
     source: &dyn CredentialSource,
     schema: &str,
     table: &str,
@@ -272,8 +272,8 @@ mod tests {
     use super::*;
     use crate::credentials::FileEnvCredentialSource;
 
-    fn config(engine: SqlEngine) -> SqlConnectionConfig {
-        SqlConnectionConfig {
+    fn config(engine: SqlEngine) -> SqlEndpointConfig {
+        SqlEndpointConfig {
             engine,
             host: "127.0.0.1".to_owned(),
             port: 1,

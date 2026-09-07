@@ -1,15 +1,15 @@
-pub(crate) fn connection_unavailable() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Unavailable,
+pub(crate) fn connection_unavailable() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Unavailable,
         "connection management is temporarily unavailable",
         true,
     )
 }
 
-pub(crate) fn connect_session_error(error: ConnectSessionLifecycleError) -> ConnectionError {
+pub(crate) fn connect_session_error(error: ConnectSessionLifecycleError) -> EndpointError {
     match error {
-        ConnectSessionLifecycleError::Capacity => ConnectionError::new(
-            ConnectionErrorCode::Conflict,
+        ConnectSessionLifecycleError::Capacity => EndpointError::new(
+            EndpointErrorCode::Conflict,
             "too many Connect Sessions are pending",
             true,
         ),
@@ -17,17 +17,17 @@ pub(crate) fn connect_session_error(error: ConnectSessionLifecycleError) -> Conn
     }
 }
 
-pub(crate) fn connection_not_found() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::NotFound,
+pub(crate) fn endpoint_not_found() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::NotFound,
         "connection, observation, or Connect Session was not found",
         false,
     )
 }
 
-pub(crate) fn connection_protocol() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Protocol,
+pub(crate) fn endpoint_protocol() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Protocol,
         "connection backend returned an incompatible response",
         false,
     )
@@ -174,7 +174,7 @@ pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 use std::sync::{Mutex, MutexGuard};
 
-use protocol::connection::{ConnectionError, ConnectionErrorCode};
+use protocol::endpoint::{EndpointError, EndpointErrorCode};
 use protocol::operation::{OperationError, OperationErrorCode};
 use serde_json::Value;
 use service::{ConnectSessionLifecycleError, EgressTransportFailure};

@@ -223,7 +223,7 @@ pub(crate) fn absent_collection_is_empty(
     Ok(())
 }
 
-/// The published endpoint descriptor: what S-058's connections consume. Every field is present:
+/// The published endpoint descriptor: what S-058's endpoints consume. Every field is present:
 /// a descriptor exists only where the resource associates with the read namespace, and a
 /// resource whose facts cannot be resolved is excluded rather than published with guesses.
 #[derive(Debug, Clone, Serialize)]
@@ -396,7 +396,7 @@ pub(crate) fn databases_description_ref(context: &PrincipalContext) -> String {
 /// digest is domain-separated from the workload binding, so a binding ref names exactly one
 /// (datasource, namespace) pair.
 pub(crate) fn database_namespace_binding(
-    connection_ref: &str,
+    endpoint_ref: &str,
     namespace: &str,
 ) -> DatasourceBinding {
     let digest = Sha256::digest(format!("{DATABASES_DATASOURCE}\0{namespace}\0v1"));
@@ -405,7 +405,7 @@ pub(crate) fn database_namespace_binding(
     DatasourceBinding {
         datasource_ref: DATABASES_DATASOURCE.to_owned(),
         binding_ref: database_namespace_binding_ref(namespace),
-        connection_ref: connection_ref.to_owned(),
+        endpoint_ref: endpoint_ref.to_owned(),
         label: namespace.to_owned(),
         purpose: None,
         generation: u64::from_be_bytes(generation_bytes),

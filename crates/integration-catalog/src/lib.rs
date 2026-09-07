@@ -47,9 +47,9 @@ use connector_address::{CredentialRef, InstanceId};
 use connector_secrets::{Secret, SecretStore};
 use connectors_config::{CatalogIntegrationConfig, InitiationConfig};
 use domain::InitiationPolicy;
-use protocol::connection as connection_api;
+use protocol::endpoint as connection_api;
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary, EffectClass, InvocationResult, OperationDescription,
+    ApprovalPosture, EndpointSummary, EffectClass, InvocationResult, OperationDescription,
     OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
 };
 use service::{
@@ -62,7 +62,7 @@ mod confluence_reads;
 mod incremental_reads;
 pub use config::DeclaredConfig;
 mod custody;
-pub mod endpoint;
+pub mod endpoint_inventory;
 mod oauth;
 pub use oauth::{
     personal_oauth_admitted_connection_ref, personal_oauth_admitted_origins, PersonalOAuthBackend,
@@ -108,7 +108,7 @@ pub enum CatalogIntegrationError {
 /// One configured provider connection, resolved from the catalogue at composition time.
 struct Binding {
     provider: &'static catalog::Provider,
-    connection_ref: String,
+    endpoint_ref: String,
     label: String,
     /// The Grant this Connection's authority derives from.
     ///
@@ -222,7 +222,7 @@ impl CatalogBackend {
 
             bindings.push(Binding {
                 provider,
-                connection_ref: connection_ref(&entry.provider, entry.instance()),
+                endpoint_ref: endpoint_ref(&entry.provider, entry.instance()),
                 label: entry.label(),
                 grant_ref: entry.grant_ref.clone(),
                 initiation: match entry.initiation {
@@ -249,7 +249,7 @@ impl CatalogBackend {
         })
     }
 
-    /// Bind already-stored catalog Connections without importing credential material.
+    /// Bind already-stored catalog Endpoints without importing credential material.
     ///
     /// Hosted self-service uses this constructor after filtering durable connection rows to the
     /// authenticated principal. Credential acquisition remains in [`HostedCatalogBackend`]; this
@@ -273,7 +273,7 @@ impl CatalogBackend {
             credential_leaf(provider, entry.credential.as_deref())?;
             bindings.push(Binding {
                 provider,
-                connection_ref: connection_ref(&entry.provider, entry.instance()),
+                endpoint_ref: endpoint_ref(&entry.provider, entry.instance()),
                 label: entry.label(),
                 grant_ref: entry.grant_ref.clone(),
                 initiation: match entry.initiation {
@@ -300,7 +300,7 @@ impl CatalogBackend {
         })
     }
 
-    /// How many provider connections this adapter published.
+    /// How many provider endpoints this adapter published.
     #[must_use]
     pub fn connection_count(&self) -> usize {
         self.inner.bindings.len()
@@ -314,15 +314,15 @@ impl Inner {
             .find(|binding| binding.provider.id == operation.provider)
     }
 
-    fn binding_by_ref(&self, connection_ref: &str) -> Option<&Binding> {
+    fn binding_by_ref(&self, endpoint_ref: &str) -> Option<&Binding> {
         self.bindings
             .iter()
-            .find(|binding| binding.connection_ref == connection_ref)
+            .find(|binding| binding.endpoint_ref == endpoint_ref)
     }
 
-    fn summary(&self, binding: &Binding) -> ConnectionSummary {
-        ConnectionSummary {
-            connection_ref: binding.connection_ref.clone(),
+    fn summary(&self, binding: &Binding) -> EndpointSummary {
+        EndpointSummary {
+            endpoint_ref: binding.endpoint_ref.clone(),
             label: binding.label.clone(),
             provider: binding.provider.id.to_owned(),
             audiences: binding
@@ -337,24 +337,24 @@ impl Inner {
 
     /// Configured bindings are known, but this passive view has no persisted verification evidence.
     /// Reuse operation discovery's opaque identity without probing custody or the provider.
-    fn connections(&self, query: &str, limit: u16) -> Vec<connection_api::ConnectionSummary> {
+    fn endpoints(&self, query: &str, limit: u16) -> Vec<connection_api::EndpointSummary> {
         self.bindings
             .iter()
             .filter(|binding| matches_query(query, &[binding.provider.id, &binding.label]))
             .take(usize::from(limit))
-            .map(|binding| connection_api::ConnectionSummary {
-                connection_ref: binding.connection_ref.clone(),
+            .map(|binding| connection_api::EndpointSummary {
+                endpoint_ref: binding.endpoint_ref.clone(),
                 integration_ref: binding.provider.id.to_owned(),
                 label: binding.label.clone(),
-                state: connection_api::ConnectionState::Created,
+                state: connection_api::EndpointState::Created,
                 initiation: [
                     (
-                        domain::ConnectionInitiator::Platform,
-                        connection_api::ConnectionInitiator::Platform,
+                        domain::EndpointInitiator::Platform,
+                        connection_api::EndpointInitiator::Platform,
                     ),
                     (
-                        domain::ConnectionInitiator::Provider,
-                        connection_api::ConnectionInitiator::Provider,
+                        domain::EndpointInitiator::Provider,
+                        connection_api::EndpointInitiator::Provider,
                     ),
                 ]
                 .into_iter()
@@ -362,7 +362,7 @@ impl Inner {
                     binding.initiation.allows(declared).then_some(exposed)
                 })
                 .collect(),
-                route: connection_api::ConnectionRoute::Direct,
+                route: connection_api::EndpointRoute::Direct,
                 scope: None,
                 actor: None,
                 auth_profile: None,
@@ -372,17 +372,17 @@ impl Inner {
 
     /// Every operation this deployment can currently call, filtered by the caller's query.
     ///
-    /// **Grouped by operation, then limited.** One operation that several Connections can serve is
+    /// **Grouped by operation, then limited.** One operation that several Endpoints can serve is
     /// one row carrying all of them, not one row per Connection — a person holding two Slack
     /// identities has one `slack-users-info`, answerable as either. Doing it the other way round
-    /// also truncated wrongly: applying the caller's limit while still walking Connections dropped
+    /// also truncated wrongly: applying the caller's limit while still walking Endpoints dropped
     /// the later identities from an operation instead of dropping later operations, so
     /// `--limit 1` reported `slack-users-info` as reachable through exactly one identity when three
     /// could serve it.
     fn search(&self, query: &str, limit: u16) -> Vec<OperationSummary> {
         // Insertion-ordered so the result is stable across runs: a caller diffing two searches
         // should see real changes, not map iteration order.
-        let mut grouped: Vec<(&'static catalog::Operation, Vec<ConnectionSummary>)> = Vec::new();
+        let mut grouped: Vec<(&'static catalog::Operation, Vec<EndpointSummary>)> = Vec::new();
         for binding in &self.bindings {
             for operation in binding.provider.operations {
                 if !binding.admits(operation) {
@@ -398,7 +398,7 @@ impl Inner {
                     .iter_mut()
                     .find(|(existing, _)| existing.id == operation.id)
                 {
-                    Some((_, connections)) => connections.push(self.summary(binding)),
+                    Some((_, endpoints)) => endpoints.push(self.summary(binding)),
                     None => grouped.push((operation, vec![self.summary(binding)])),
                 }
             }
@@ -406,12 +406,12 @@ impl Inner {
         grouped
             .into_iter()
             .take(limit as usize)
-            .map(|(operation, connections)| OperationSummary {
+            .map(|(operation, endpoints)| OperationSummary {
                 operation_ref: operation.id.to_owned(),
                 title: operation.id.to_owned(),
                 effect: effect_class(operation),
                 approval: approval_posture(operation),
-                connections,
+                endpoints,
             })
             .collect()
     }
@@ -466,7 +466,7 @@ impl Inner {
             effect: effect_class(operation),
             approval: approval_posture(operation),
             // Every Connection that could serve it, so a caller reading one description can pick.
-            connections: self
+            endpoints: self
                 .bindings
                 .iter()
                 .filter(|candidate| {
@@ -486,7 +486,7 @@ impl Inner {
     fn admit_invocation(
         &self,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
         description_ref: &str,
         input: &serde_json::Value,
     ) -> Result<(&'static catalog::Operation, &Binding), OperationError> {
@@ -515,7 +515,7 @@ impl Inner {
         let operation = catalog::operation(catalog::OperationKey::id(operation_ref))
             .ok_or_else(|| refusal(OperationErrorCode::NotFound, "no such catalogued operation"))?;
         let binding = self
-            .binding_by_ref(connection_ref)
+            .binding_by_ref(endpoint_ref)
             .ok_or_else(|| refusal(OperationErrorCode::NotFound, "no such Connection"))?;
         if binding.provider.id != operation.provider {
             return Err(refusal(
@@ -533,7 +533,7 @@ impl Inner {
         }
         if !binding
             .initiation
-            .allows(domain::ConnectionInitiator::Platform)
+            .allows(domain::EndpointInitiator::Platform)
         {
             return Err(refusal(
                 OperationErrorCode::NotGranted,
@@ -547,12 +547,12 @@ impl Inner {
     async fn invoke(
         &self,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
         description_ref: &str,
         input: serde_json::Value,
     ) -> Result<InvocationResult, OperationError> {
         let (operation, binding) =
-            self.admit_invocation(operation_ref, connection_ref, description_ref, &input)?;
+            self.admit_invocation(operation_ref, endpoint_ref, description_ref, &input)?;
 
         let document =
             connector_resolve::document::provider(binding.provider.id).ok_or_else(|| {
@@ -625,7 +625,7 @@ impl Inner {
         let response = self
             .egress
             .execute(
-                connection_ref,
+                endpoint_ref,
                 EgressHttpRequest {
                     request: plan.request,
                     maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
@@ -668,7 +668,7 @@ impl Inner {
             return Ok(InvocationResult {
                 operation_ref: operation_ref.to_owned(),
                 output: incremental_reads::project(operation_ref, &input, &request_url, response)?,
-                connector_audit_ref: audit_ref(operation_ref, connection_ref),
+                connector_audit_ref: audit_ref(operation_ref, endpoint_ref),
                 execution_ref: None,
             });
         }
@@ -703,7 +703,7 @@ impl Inner {
         Ok(InvocationResult {
             operation_ref: operation_ref.to_owned(),
             output,
-            connector_audit_ref: audit_ref(operation_ref, connection_ref),
+            connector_audit_ref: audit_ref(operation_ref, endpoint_ref),
             execution_ref: None,
         })
     }
@@ -723,7 +723,7 @@ impl ConnectorBackend for CatalogBackend {
 
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
-            connections: true,
+            endpoints: true,
             ..BackendCapabilities::OPERATIONS
         }
     }
@@ -736,7 +736,7 @@ impl ConnectorBackend for CatalogBackend {
             }
             OperationRequest::Invoke(invoke) => {
                 self.owns_operation_ref(&invoke.operation_ref)
-                    && self.inner.binding_by_ref(&invoke.connection_ref).is_some()
+                    && self.inner.binding_by_ref(&invoke.endpoint_ref).is_some()
             }
             _ => false,
         }
@@ -758,7 +758,7 @@ impl ConnectorBackend for CatalogBackend {
                 self.inner
                     .invoke(
                         &invoke.operation_ref,
-                        &invoke.connection_ref,
+                        &invoke.endpoint_ref,
                         &invoke.description_ref,
                         invoke.input,
                     )
@@ -771,19 +771,19 @@ impl ConnectorBackend for CatalogBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         _context: &PrincipalContext,
-        request: connection_api::ConnectionRequest,
-    ) -> Result<connection_api::ConnectionResult, connection_api::ConnectionError> {
+        request: connection_api::EndpointRequest,
+    ) -> Result<connection_api::EndpointResult, connection_api::EndpointError> {
         match request {
-            connection_api::ConnectionRequest::Search(search) => {
-                Ok(connection_api::ConnectionResult::Search {
-                    connections: self.inner.connections(&search.query, search.limit),
+            connection_api::EndpointRequest::Search(search) => {
+                Ok(connection_api::EndpointResult::Search {
+                    endpoints: self.inner.endpoints(&search.query, search.limit),
                 })
             }
-            _ => Err(connection_api::ConnectionError::new(
-                connection_api::ConnectionErrorCode::Unavailable,
+            _ => Err(connection_api::EndpointError::new(
+                connection_api::EndpointErrorCode::Unavailable,
                 "this Integration serves passive Connection search only",
                 false,
             )),
@@ -880,7 +880,7 @@ fn origin_of(base: &str) -> String {
 
 /// **Both halves of a Connection's declared configuration**, from the one entry that carries them.
 ///
-/// Endpoint values fill the `{variable}` slots a base URL declares. Usernames are the non-secret
+/// EndpointInventoryEntry values fill the `{variable}` slots a base URL declares. Usernames are the non-secret
 /// user half of a `basic` credential — an Atlassian account email against `jira.api_token` — which
 /// [`connector_resolve::assemble_credentials`] asks for through
 /// [`ConfigField::Username`](connector_resolve::ConfigField) and refuses the whole mechanism
@@ -982,7 +982,7 @@ fn ensure_owner_directory(root: &Path) -> Result<(), CatalogIntegrationError> {
     Ok(())
 }
 
-fn connection_ref(provider: &str, name: &str) -> String {
+fn endpoint_ref(provider: &str, name: &str) -> String {
     format!("connection:{provider}:{}", digest(&[provider, name]))
 }
 
@@ -1062,8 +1062,8 @@ fn lease_ref(operation_ref: &str) -> String {
     format!("description:{}", digest(&[operation_ref, &encoded]))
 }
 
-fn audit_ref(operation_ref: &str, connection_ref: &str) -> String {
-    format!("audit:{}", digest(&[operation_ref, connection_ref]))
+fn audit_ref(operation_ref: &str, endpoint_ref: &str) -> String {
+    format!("audit:{}", digest(&[operation_ref, endpoint_ref]))
 }
 
 fn digest(parts: &[&str]) -> String {

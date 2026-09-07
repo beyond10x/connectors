@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
-use domain::endpoint::{Endpoint, EndpointCredentialReference, EndpointState, EndpointTransport};
+use domain::endpoint_inventory::{EndpointInventoryEntry, EndpointCredentialReference, EndpointReadiness, EndpointTransport};
 use k8s_openapi::api::core::v1::{Pod, Secret, Service, ServicePort};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::{api::ListParams, Api};
@@ -65,15 +65,15 @@ impl Drop for EndpointRouteLease {
 
 impl KubernetesEndpointSource {
     /// Revalidate immutable resource identity and current policy. Does not read a credential.
-    pub async fn validate(&self, reference: &str) -> Result<Endpoint, EndpointSourceError> {
+    pub async fn validate(&self, reference: &str) -> Result<EndpointInventoryEntry, EndpointSourceError> {
         let endpoint = self.validation_candidate(reference)?;
         if endpoint.source_ref != self.source_ref {
             return Err(EndpointSourceError::Denied);
         }
         match endpoint.state {
-            EndpointState::Denied => return Err(EndpointSourceError::Denied),
-            EndpointState::Stale => return Err(EndpointSourceError::Stale),
-            EndpointState::UnknownProvider | EndpointState::UnsupportedProtocol => {
+            EndpointReadiness::Denied => return Err(EndpointSourceError::Denied),
+            EndpointReadiness::Stale => return Err(EndpointSourceError::Stale),
+            EndpointReadiness::UnknownProvider | EndpointReadiness::UnsupportedProtocol => {
                 return Err(EndpointSourceError::InvalidBinding)
             }
             _ => {}
@@ -105,7 +105,7 @@ impl KubernetesEndpointSource {
     /// Read only the bound Secret, after the invocation owner has admitted the operation.
     pub async fn resolve_credentials(
         &self,
-        endpoint: &Endpoint,
+        endpoint: &EndpointInventoryEntry,
     ) -> Result<ResolvedEndpointCredentials, EndpointSourceError> {
         if endpoint.source_ref != self.source_ref
             || self.show(&endpoint.endpoint_ref)?.binding != endpoint.binding
@@ -165,7 +165,7 @@ impl KubernetesEndpointSource {
     /// Resolve an approved route. The returned guard must outlive the entire driver call.
     pub async fn open_route(
         &self,
-        endpoint: &Endpoint,
+        endpoint: &EndpointInventoryEntry,
         credentials: &ResolvedEndpointCredentials,
     ) -> Result<EndpointRouteLease, EndpointSourceError> {
         // Recheck even when the caller performed a prior metadata-only resolution: description
@@ -228,8 +228,8 @@ impl KubernetesEndpointSource {
             return Err(EndpointSourceError::UnavailableRoute);
         }
         let scheme = match endpoint.binding.as_ref().and_then(|binding| binding.scheme) {
-            Some(domain::endpoint::EndpointScheme::Http) => "http",
-            Some(domain::endpoint::EndpointScheme::Https) => "https",
+            Some(domain::endpoint_inventory::EndpointScheme::Http) => "http",
+            Some(domain::endpoint_inventory::EndpointScheme::Https) => "https",
             None => match endpoint.interface.as_str() {
                 "https" => "https",
                 "mysql" => "mysql",

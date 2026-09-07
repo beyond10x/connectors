@@ -16,10 +16,10 @@ use connector_secrets::{
     TenantLayout,
 };
 use connectors_config::{HostedGitlabConfig, InitiationConfig};
-use protocol::connection::{
-    ConnectSessionStatus, ConnectionActor, ConnectionDescription, ConnectionError,
-    ConnectionErrorCode, ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionScope,
-    ConnectionState, ConnectionSummary,
+use protocol::endpoint::{
+    ConnectSessionStatus, EndpointActor, EndpointDescription, EndpointError,
+    EndpointErrorCode, EndpointInitiator, EndpointRequest, EndpointResult, EndpointScope,
+    EndpointState, EndpointSummary,
 };
 use protocol::datasource::{
     AccessMode as DatasourceAccessMode, Completeness as DatasourceCompleteness, DatasourceBinding,
@@ -29,7 +29,7 @@ use protocol::datasource::{
     RecordView as DatasourceRecordView,
 };
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, EffectClass,
+    ApprovalPosture, EndpointSummary as OperationEndpointSummary, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
@@ -63,7 +63,7 @@ const ACCESS_TOKEN_CREDENTIAL: &str = "access_token";
 const REFRESH_TOKEN_CREDENTIAL: &str = "refresh_token";
 pub(crate) const OAUTH_CLIENT_SECRET_CREDENTIAL: &str = "oauth_client_secret";
 pub(crate) const REPOSITORY_FILE_GET: &str = "gitlab-repository-file-get";
-pub(crate) const STATE_KEY: &str = "gitlab.connections";
+pub(crate) const STATE_KEY: &str = "gitlab.endpoints";
 const AUDIT_KEY: &str = "gitlab.audit";
 pub(crate) const STATE_VERSION: u8 = 1;
 pub(crate) const MAX_STATE_BYTES: usize = 4 * 1024 * 1024;
@@ -147,7 +147,7 @@ struct OAuthPending {
 pub(crate) struct StateFile {
     version: u8,
     next_transaction_generation: u64,
-    connections: Vec<StoredConnection>,
+    endpoints: Vec<StoredEndpoint>,
     pending: Vec<PendingCommit>,
 }
 
@@ -156,7 +156,7 @@ impl Default for StateFile {
         Self {
             version: STATE_VERSION,
             next_transaction_generation: 1,
-            connections: Vec::new(),
+            endpoints: Vec::new(),
             pending: Vec::new(),
         }
     }
@@ -164,8 +164,8 @@ impl Default for StateFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct StoredConnection {
-    connection_ref: String,
+struct StoredEndpoint {
+    endpoint_ref: String,
     instance_id: String,
     label: String,
     #[serde(default)]
@@ -186,7 +186,7 @@ struct StoredConnection {
 #[serde(deny_unknown_fields)]
 struct PendingCommit {
     transaction_id: String,
-    connection: StoredConnection,
+    connection: StoredEndpoint,
 }
 
 struct VerifiedCredential {
@@ -262,7 +262,7 @@ impl GitlabBackend {
         )?;
         if metadata.version != STATE_VERSION
             || metadata.next_transaction_generation == 0
-            || metadata.connections.len() > 1_024
+            || metadata.endpoints.len() > 1_024
             || metadata.pending.len() > 32
         {
             return Err(GitlabError::new("connection-state"));
@@ -298,7 +298,7 @@ impl GitlabBackend {
     #[must_use]
     pub fn connection_count(&self) -> usize {
         lock(&self.inner.metadata)
-            .connections
+            .endpoints
             .iter()
             .filter(|connection| connection.grant_ref == self.inner.policy.user_grant_ref)
             .count()
@@ -318,7 +318,7 @@ impl ConnectorBackend for GitlabBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
-            connections: true,
+            endpoints: true,
             events: false,
             datasources: true,
         }
@@ -330,9 +330,9 @@ impl ConnectorBackend for GitlabBackend {
             OperationRequest::Invoke(request) => {
                 is_gitlab_operation(&request.operation_ref)
                     && lock(&self.inner.metadata)
-                        .connections
+                        .endpoints
                         .iter()
-                        .any(|connection| connection.connection_ref == request.connection_ref)
+                        .any(|connection| connection.endpoint_ref == request.endpoint_ref)
             }
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
@@ -342,30 +342,30 @@ impl ConnectorBackend for GitlabBackend {
         }
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
         match request {
-            ConnectionRequest::ConnectSessionCreate(request) => {
+            EndpointRequest::ConnectSessionCreate(request) => {
                 request.integration_ref == INTEGRATION_REF
                     && GitlabProfile::parse(request.auth_profile.as_deref()).is_some()
             }
-            ConnectionRequest::ConnectSessionStatus(request) => {
+            EndpointRequest::ConnectSessionStatus(request) => {
                 lock(&self.inner.sessions).owns(&request.connect_session_ref)
             }
-            ConnectionRequest::Describe(request) => lock(&self.inner.metadata)
-                .connections
+            EndpointRequest::Describe(request) => lock(&self.inner.metadata)
+                .endpoints
                 .iter()
-                .any(|connection| connection.connection_ref == request.connection_ref),
-            ConnectionRequest::Search(_)
-            | ConnectionRequest::CandidateSearch(_)
-            | ConnectionRequest::CandidateActivate(_)
-            | ConnectionRequest::ObservationSearch(_)
-            | ConnectionRequest::Materialize(_) => false,
+                .any(|connection| connection.endpoint_ref == request.endpoint_ref),
+            EndpointRequest::Search(_)
+            | EndpointRequest::CandidateSearch(_)
+            | EndpointRequest::CandidateActivate(_)
+            | EndpointRequest::ObservationSearch(_)
+            | EndpointRequest::Materialize(_) => false,
         }
     }
 
     fn connect_session_access(
         &self,
-        request: &protocol::connection::ConnectSessionCreateRequest,
+        request: &protocol::endpoint::ConnectSessionCreateRequest,
     ) -> ConnectSessionAccess {
         if request.integration_ref == INTEGRATION_REF
             && GitlabProfile::parse(request.auth_profile.as_deref()).is_some()
@@ -507,16 +507,16 @@ impl ConnectorBackend for GitlabBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         self.inner.check_context(context)?;
         match request {
-            ConnectionRequest::Search(request) => {
+            EndpointRequest::Search(request) => {
                 let query = request.query.to_ascii_lowercase();
-                let mut connections = self
+                let mut endpoints = self
                     .inner
                     .owned_connections(context)
                     .into_iter()
@@ -525,57 +525,57 @@ impl ConnectorBackend for GitlabBackend {
                             || connection.label.to_ascii_lowercase().contains(&query)
                             || INTEGRATION_REF.contains(&query)
                     })
-                    .map(|connection| connection_summary(connection, self.inner.policy.initiation))
+                    .map(|connection| endpoint_summary(connection, self.inner.policy.initiation))
                     .collect::<Vec<_>>();
-                connections.truncate(usize::from(request.limit));
-                Ok(ConnectionResult::Search { connections })
+                endpoints.truncate(usize::from(request.limit));
+                Ok(EndpointResult::Search { endpoints })
             }
-            ConnectionRequest::Describe(request) => self
+            EndpointRequest::Describe(request) => self
                 .inner
                 .owned_connections(context)
                 .into_iter()
-                .find(|connection| connection.connection_ref == request.connection_ref)
+                .find(|connection| connection.endpoint_ref == request.endpoint_ref)
                 .map(|connection| {
-                    ConnectionResult::Describe(ConnectionDescription {
-                        summary: connection_summary(connection, self.inner.policy.initiation),
+                    EndpointResult::Describe(EndpointDescription {
+                        summary: endpoint_summary(connection, self.inner.policy.initiation),
                         channels: Vec::new(),
                     })
                 })
-                .ok_or_else(connection_not_found),
-            ConnectionRequest::ConnectSessionCreate(request) => {
+                .ok_or_else(endpoint_not_found),
+            EndpointRequest::ConnectSessionCreate(request) => {
                 let profile =
                     GitlabProfile::parse(request.auth_profile.as_deref()).ok_or_else(|| {
-                        ConnectionError::new(
-                            ConnectionErrorCode::InvalidInput,
+                        EndpointError::new(
+                            EndpointErrorCode::InvalidInput,
                             "GitLab setup requires gitlab.oauth_user or gitlab.personal_token",
                             false,
                         )
                     })?;
                 self.inner
                     .create_session(context, request.label, profile)
-                    .map(ConnectionResult::ConnectSessionCreate)
+                    .map(EndpointResult::ConnectSessionCreate)
             }
-            ConnectionRequest::ConnectSessionStatus(request) => {
+            EndpointRequest::ConnectSessionStatus(request) => {
                 if lock(&self.inner.session_owners)
                     .get(&request.connect_session_ref)
                     .is_none_or(|owner| owner.subject != context.subject())
                     && lock(&self.inner.sessions)
                         .status(&request.connect_session_ref)
-                        .is_none_or(|status| status.connection_ref.is_none())
+                        .is_none_or(|status| status.endpoint_ref.is_none())
                 {
-                    return Err(connection_not_found());
+                    return Err(endpoint_not_found());
                 }
                 lock(&self.inner.sessions)
                     .status(&request.connect_session_ref)
-                    .map(ConnectionResult::ConnectSessionStatus)
-                    .ok_or_else(connection_not_found)
+                    .map(EndpointResult::ConnectSessionStatus)
+                    .ok_or_else(endpoint_not_found)
             }
-            ConnectionRequest::ObservationSearch(_) => Ok(ConnectionResult::ObservationSearch {
+            EndpointRequest::ObservationSearch(_) => Ok(EndpointResult::ObservationSearch {
                 observations: Vec::new(),
             }),
-            ConnectionRequest::CandidateSearch(_)
-            | ConnectionRequest::CandidateActivate(_)
-            | ConnectionRequest::Materialize(_) => Err(connection_not_found()),
+            EndpointRequest::CandidateSearch(_)
+            | EndpointRequest::CandidateActivate(_)
+            | EndpointRequest::Materialize(_) => Err(endpoint_not_found()),
         }
     }
 
@@ -620,24 +620,24 @@ impl GitlabInner {
         self.state_store.replace(STATE_KEY, &body, MAX_STATE_BYTES)
     }
 
-    fn check_context(&self, context: &PrincipalContext) -> Result<(), ConnectionError> {
+    fn check_context(&self, context: &PrincipalContext) -> Result<(), EndpointError> {
         if context.tenant_id() == self.tenant_id {
             Ok(())
         } else {
-            Err(ConnectionError::new(
-                ConnectionErrorCode::StaleAuthority,
+            Err(EndpointError::new(
+                EndpointErrorCode::StaleAuthority,
                 "owner authority snapshot is not current",
                 false,
             ))
         }
     }
 
-    fn owned_connections(&self, context: &PrincipalContext) -> Vec<StoredConnection> {
+    fn owned_connections(&self, context: &PrincipalContext) -> Vec<StoredEndpoint> {
         if context.tenant_id() != self.tenant_id {
             return Vec::new();
         }
         lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .filter(|connection| {
                 connection.owner_subject == context.subject()
@@ -652,11 +652,11 @@ impl GitlabInner {
         owner: &PrincipalContext,
         label: String,
         profile: GitlabProfile,
-    ) -> Result<ConnectSessionStatus, ConnectionError> {
+    ) -> Result<ConnectSessionStatus, EndpointError> {
         self.expire_sessions();
         let email = owner.email().ok_or_else(|| {
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "GitLab user connection requires a verified Identity email",
                 false,
             )
@@ -811,10 +811,10 @@ impl GitlabInner {
         outcome: Result<String, GitlabError>,
     ) -> Result<(), HostedCompletionError> {
         match outcome {
-            Ok(connection_ref) => lock(&self.sessions)
+            Ok(endpoint_ref) => lock(&self.sessions)
                 .finish(
                     session_ref,
-                    ConnectSessionTerminal::Completed { connection_ref },
+                    ConnectSessionTerminal::Completed { endpoint_ref },
                 )
                 .map(|_| ())
                 .map_err(|_| HostedCompletionError::Unavailable),
@@ -965,25 +965,25 @@ impl GitlabInner {
             .pending_label(session_ref)
             .map_err(|_| GitlabError::new("connect-session"))?;
         let existing = lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .find(|connection| {
                 connection.owner_subject == owner.subject && connection.profile == owner.profile
             })
             .cloned();
-        let (instance_id, connection_ref) = existing.map_or_else(
+        let (instance_id, endpoint_ref) = existing.map_or_else(
             || {
                 random_uuid().map(|id| {
                     let reference = format!("connection:gitlab:{id}");
                     (id, reference)
                 })
             },
-            |connection| Ok((connection.instance_id, connection.connection_ref)),
+            |connection| Ok((connection.instance_id, connection.endpoint_ref)),
         )?;
         let (transaction, generation) = self.reserve_transaction()?;
         let generation_value = u64::from_be_bytes(generation.protocol_bytes());
-        let connection = StoredConnection {
-            connection_ref: connection_ref.clone(),
+        let connection = StoredEndpoint {
+            endpoint_ref: endpoint_ref.clone(),
             instance_id,
             label,
             grant_ref: self.policy.user_grant_ref.clone(),
@@ -999,14 +999,14 @@ impl GitlabInner {
         };
         self.commit_credentials(transaction, generation, connection, credentials)
             .await?;
-        Ok(connection_ref)
+        Ok(endpoint_ref)
     }
 
     async fn commit_credentials(
         &self,
         transaction: SecretTransactionId,
         generation: SecretTransactionGeneration,
-        connection: StoredConnection,
+        connection: StoredEndpoint,
         credentials: CredentialValues,
     ) -> Result<(), GitlabError> {
         let mut batch = SecretBatch::new(
@@ -1059,7 +1059,7 @@ impl GitlabInner {
             state
                 .pending
                 .retain(|pending| pending.transaction_id != transaction_id);
-            upsert_connection(&mut state.connections, connection);
+            upsert_connection(&mut state.endpoints, connection);
             self.persist(&state)?;
         }
         let _ = self.credential_store.reclaim(generation).await;
@@ -1119,7 +1119,7 @@ impl GitlabInner {
             state
                 .pending
                 .retain(|candidate| candidate.transaction_id != pending.transaction_id);
-            upsert_connection(&mut state.connections, pending.connection);
+            upsert_connection(&mut state.endpoints, pending.connection);
             self.persist(&state)?;
         }
         Ok(())
@@ -1127,7 +1127,7 @@ impl GitlabInner {
 
     fn connection_credential_ref(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         credential: &str,
     ) -> Result<CredentialRef, GitlabError> {
         CredentialRef::for_instance(
@@ -1144,12 +1144,12 @@ impl GitlabInner {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-    ) -> Vec<OperationConnectionSummary> {
+    ) -> Vec<OperationEndpointSummary> {
         self.owned_connections(context)
             .into_iter()
             .filter(|connection| supports_operation(connection, operation_ref))
-            .map(|connection| OperationConnectionSummary {
-                connection_ref: connection.connection_ref,
+            .map(|connection| OperationEndpointSummary {
+                endpoint_ref: connection.endpoint_ref,
                 label: connection.label,
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["delegated-user".to_owned()],
@@ -1167,8 +1167,8 @@ impl GitlabInner {
                 if !operation.expose {
                     return None;
                 }
-                let connections = self.operation_connections(context, operation_ref);
-                if connections.is_empty() {
+                let endpoints = self.operation_connections(context, operation_ref);
+                if endpoints.is_empty() {
                     return None;
                 }
                 let title = operation_ref.replace('-', " ");
@@ -1183,7 +1183,7 @@ impl GitlabInner {
                     title,
                     effect: operation_effect(operation_ref),
                     approval: operation_approval(operation_ref),
-                    connections,
+                    endpoints,
                 })
             })
             .collect()
@@ -1197,7 +1197,7 @@ impl GitlabInner {
         digest.update(operation_ref.as_bytes());
         for connection in self.operation_connections(context, operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.connection_ref.as_bytes());
+            digest.update(connection.endpoint_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }
@@ -1212,8 +1212,8 @@ impl GitlabInner {
         }
         let operation = connector_resolve::document::operation(operation_ref)
             .ok_or_else(operation_not_found)?;
-        let connections = self.operation_connections(context, operation_ref);
-        if connections.is_empty() {
+        let endpoints = self.operation_connections(context, operation_ref);
+        if endpoints.is_empty() {
             return Err(operation_not_found());
         }
         Ok(OperationResult::Describe(OperationDescription {
@@ -1227,7 +1227,7 @@ impl GitlabInner {
                 .unwrap_or_else(|| serde_json::json!({"type":"object"})),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
-            connections,
+            endpoints,
             description_ref: self.operation_description_ref(context, operation_ref),
         }))
     }
@@ -1244,7 +1244,7 @@ impl GitlabInner {
             .owned_connections(context)
             .into_iter()
             .find(|connection| {
-                connection.connection_ref == request.connection_ref
+                connection.endpoint_ref == request.endpoint_ref
                     && supports_operation(connection, &request.operation_ref)
             })
             .ok_or_else(operation_not_granted)?;
@@ -1307,7 +1307,7 @@ impl GitlabInner {
         self.audit(
             &audit_ref,
             &request.operation_ref,
-            &request.connection_ref,
+            &request.endpoint_ref,
             context,
             "attempted",
         )
@@ -1315,7 +1315,7 @@ impl GitlabInner {
         let response = self
             .egress
             .execute(
-                &request.connection_ref,
+                &request.endpoint_ref,
                 EgressHttpRequest {
                     request: plan.request,
                     maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
@@ -1351,7 +1351,7 @@ impl GitlabInner {
                 self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.connection_ref,
+                    &request.endpoint_ref,
                     context,
                     "completed",
                 )
@@ -1367,7 +1367,7 @@ impl GitlabInner {
                 let _ = self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.connection_ref,
+                    &request.endpoint_ref,
                     context,
                     "indeterminate",
                 );
@@ -1376,7 +1376,7 @@ impl GitlabInner {
         }
     }
 
-    async fn connection_token(&self, connection: &StoredConnection) -> Result<Secret, GitlabError> {
+    async fn connection_token(&self, connection: &StoredEndpoint) -> Result<Secret, GitlabError> {
         if connection.grant_ref != self.policy.user_grant_ref {
             return Err(GitlabError::new("connection-grant"));
         }
@@ -1389,12 +1389,12 @@ impl GitlabInner {
                 })
             })
         {
-            self.refresh_oauth(&connection.connection_ref).await?;
+            self.refresh_oauth(&connection.endpoint_ref).await?;
         }
         let current = lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
-            .find(|candidate| candidate.connection_ref == connection.connection_ref)
+            .find(|candidate| candidate.endpoint_ref == connection.endpoint_ref)
             .filter(|candidate| candidate.grant_ref == self.policy.user_grant_ref)
             .cloned()
             .ok_or_else(|| GitlabError::new("connection-state"))?;
@@ -1404,12 +1404,12 @@ impl GitlabInner {
             .map_err(|_| GitlabError::new("credential-resolve"))
     }
 
-    async fn refresh_oauth(&self, connection_ref: &str) -> Result<(), GitlabError> {
+    async fn refresh_oauth(&self, endpoint_ref: &str) -> Result<(), GitlabError> {
         let _refresh = self.refresh_lock.lock().await;
         let connection = lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
-            .find(|candidate| candidate.connection_ref == connection_ref)
+            .find(|candidate| candidate.endpoint_ref == endpoint_ref)
             .filter(|candidate| candidate.grant_ref == self.policy.user_grant_ref)
             .cloned()
             .ok_or_else(|| GitlabError::new("connection-state"))?;
@@ -1452,7 +1452,7 @@ impl GitlabInner {
         ]);
         let response = self
             .execute(
-                connection_ref,
+                endpoint_ref,
                 http_request(
                     "POST",
                     token_url,
@@ -1474,9 +1474,9 @@ impl GitlabInner {
             .map_err(|_| GitlabError::new("oauth-refresh"))?;
         let access = Secret::new(refreshed.access_token.to_string());
         let info: OAuthTokenInfo = self
-            .provider_json(connection_ref, "/oauth/token/info", &access, &[])
+            .provider_json(endpoint_ref, "/oauth/token/info", &access, &[])
             .await?;
-        let user = self.current_user(connection_ref, &access).await?;
+        let user = self.current_user(endpoint_ref, &access).await?;
         if user.state != "active"
             || user.bot
             || info.resource_owner_id != connection.external_user_id
@@ -1517,7 +1517,7 @@ impl GitlabInner {
         &self,
         audit_ref: &str,
         operation_ref: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
         context: &PrincipalContext,
         outcome: &str,
     ) -> Result<(), GitlabError> {
@@ -1525,7 +1525,7 @@ impl GitlabInner {
             "at_unix_ms": now_ms().ok_or_else(|| GitlabError::new("clock"))?,
             "audit_ref": audit_ref,
             "operation_ref": operation_ref,
-            "connection_ref": connection_ref,
+            "endpoint_ref": endpoint_ref,
             "tenant_id": context.tenant_id(),
             "actor_subject": context.actor_subject(),
             "outcome": outcome,
@@ -1623,7 +1623,7 @@ impl GitlabInner {
         digest.update(datasource_projection_sha256(datasource_ref).as_bytes());
         for connection in self.owned_connections(context) {
             digest.update(b"\0");
-            digest.update(connection.connection_ref.as_bytes());
+            digest.update(connection.endpoint_ref.as_bytes());
             digest.update(b"\0");
             digest.update(connection.credential_generation.to_be_bytes());
         }
@@ -1672,7 +1672,7 @@ impl GitlabInner {
                     .await
                     .map_err(|_| datasource_unavailable())?;
                 let reached_limit = self
-                    .scan_membership_projects(&connection.connection_ref, &token, true, |project| {
+                    .scan_membership_projects(&connection.endpoint_ref, &token, true, |project| {
                         let Some(project_id) = project.get("id").and_then(Value::as_u64) else {
                             return false;
                         };
@@ -1688,11 +1688,11 @@ impl GitlabInner {
                             datasource_ref: datasource_ref.to_owned(),
                             binding_ref: datasource_binding_ref(
                                 datasource_ref,
-                                &connection.connection_ref,
+                                &connection.endpoint_ref,
                                 connection.credential_generation,
                                 Some(project_id),
                             ),
-                            connection_ref: connection.connection_ref.clone(),
+                            endpoint_ref: connection.endpoint_ref.clone(),
                             label,
                             generation: connection.credential_generation,
                             purpose: None,
@@ -1710,11 +1710,11 @@ impl GitlabInner {
                     datasource_ref: datasource_ref.to_owned(),
                     binding_ref: datasource_binding_ref(
                         datasource_ref,
-                        &connection.connection_ref,
+                        &connection.endpoint_ref,
                         connection.credential_generation,
                         None,
                     ),
-                    connection_ref: connection.connection_ref.clone(),
+                    endpoint_ref: connection.endpoint_ref.clone(),
                     label: connection.label.clone(),
                     generation: connection.credential_generation,
                     purpose: None,
@@ -1745,7 +1745,7 @@ impl GitlabInner {
             .owned_connections(context)
             .into_iter()
             .find(|connection| {
-                connection.connection_ref == binding_connection(&request.binding_ref)
+                connection.endpoint_ref == binding_connection(&request.binding_ref)
             })
             .ok_or_else(datasource_not_granted)?;
         if connection.credential_generation
@@ -1775,7 +1775,7 @@ impl GitlabInner {
         } else {
             let expected = datasource_binding_ref(
                 &request.datasource_ref,
-                &connection.connection_ref,
+                &connection.endpoint_ref,
                 connection.credential_generation,
                 None,
             );
@@ -1797,7 +1797,7 @@ impl GitlabInner {
         self.audit(
             &audit_ref,
             &request.datasource_ref,
-            &connection.connection_ref,
+            &connection.endpoint_ref,
             context,
             "attempted",
         )
@@ -1808,7 +1808,7 @@ impl GitlabInner {
         target.query_pairs_mut().extend_pairs(&plan.query);
         let response = self
             .execute(
-                &connection.connection_ref,
+                &connection.endpoint_ref,
                 http_request("GET", target, bearer_headers(&token), None),
                 protocol::datasource::MAX_RESULT_BYTES,
                 vec!["x-next-page".to_owned()],
@@ -1822,7 +1822,7 @@ impl GitlabInner {
                     let _ = self.audit(
                         &audit_ref,
                         &request.datasource_ref,
-                        &connection.connection_ref,
+                        &connection.endpoint_ref,
                         context,
                         "indeterminate",
                     );
@@ -1833,7 +1833,7 @@ impl GitlabInner {
                 let _ = self.audit(
                     &audit_ref,
                     &request.datasource_ref,
-                    &connection.connection_ref,
+                    &connection.endpoint_ref,
                     context,
                     "indeterminate",
                 );
@@ -1861,7 +1861,7 @@ impl GitlabInner {
         self.audit(
             &audit_ref,
             &request.datasource_ref,
-            &connection.connection_ref,
+            &connection.endpoint_ref,
             context,
             "completed",
         )
@@ -1869,7 +1869,7 @@ impl GitlabInner {
         let next_cursor = next_page.map(|page| {
             datasource_cursor(
                 &request.datasource_ref,
-                &connection.connection_ref,
+                &connection.endpoint_ref,
                 project_id,
                 page,
             )
@@ -1896,17 +1896,17 @@ impl GitlabInner {
         &self,
         datasource_ref: &str,
         binding_ref: &str,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         token: &Secret,
     ) -> Result<u64, DatasourceError> {
         let mut resolved = None;
-        self.scan_membership_projects(&connection.connection_ref, token, false, |project| {
+        self.scan_membership_projects(&connection.endpoint_ref, token, false, |project| {
             let Some(project_id) = project.get("id").and_then(Value::as_u64) else {
                 return false;
             };
             if datasource_binding_ref(
                 datasource_ref,
-                &connection.connection_ref,
+                &connection.endpoint_ref,
                 connection.credential_generation,
                 Some(project_id),
             ) == binding_ref
@@ -1933,7 +1933,7 @@ fn datasource_request_plan(
     datasource_ref: &str,
     project_id: Option<u64>,
     read: &DatasourceRead,
-    connection: &StoredConnection,
+    connection: &StoredEndpoint,
 ) -> Result<DatasourcePlan, DatasourceError> {
     let (view, key, limit, page) = match read {
         DatasourceRead::List { limit, cursor } => {
@@ -1943,7 +1943,7 @@ fn datasource_request_plan(
                     parse_datasource_cursor(
                         cursor,
                         datasource_ref,
-                        &connection.connection_ref,
+                        &connection.endpoint_ref,
                         project_id,
                     )
                 })
@@ -2344,18 +2344,18 @@ fn project_bound(datasource_ref: &str) -> bool {
 
 fn datasource_binding_ref(
     datasource_ref: &str,
-    connection_ref: &str,
+    endpoint_ref: &str,
     generation: u64,
     project_id: Option<u64>,
 ) -> String {
-    let instance = connection_ref
+    let instance = endpoint_ref
         .strip_prefix("connection:gitlab:")
         .unwrap_or("invalid");
     let mut digest = Sha256::new();
     digest.update(b"b10x/gitlab-datasource-binding/v1\0");
     digest.update(datasource_ref.as_bytes());
     digest.update(b"\0");
-    digest.update(connection_ref.as_bytes());
+    digest.update(endpoint_ref.as_bytes());
     digest.update(b"\0");
     digest.update(generation.to_be_bytes());
     digest.update(project_id.unwrap_or_default().to_be_bytes());
@@ -2382,18 +2382,18 @@ fn binding_generation_hint(_binding_ref: &str) -> Option<u64> {
 
 fn datasource_cursor(
     datasource_ref: &str,
-    connection_ref: &str,
+    endpoint_ref: &str,
     project_id: Option<u64>,
     page: u64,
 ) -> String {
-    let digest = cursor_digest(datasource_ref, connection_ref, project_id, page);
+    let digest = cursor_digest(datasource_ref, endpoint_ref, project_id, page);
     format!("cursor:gitlab:{page}:{digest}")
 }
 
 fn parse_datasource_cursor(
     cursor: &str,
     datasource_ref: &str,
-    connection_ref: &str,
+    endpoint_ref: &str,
     project_id: Option<u64>,
 ) -> Result<u64, DatasourceError> {
     let mut parts = cursor.split(':');
@@ -2409,7 +2409,7 @@ fn parse_datasource_cursor(
     if parts.next().is_some()
         || !constant_time_equal(
             digest.as_bytes(),
-            cursor_digest(datasource_ref, connection_ref, project_id, page).as_bytes(),
+            cursor_digest(datasource_ref, endpoint_ref, project_id, page).as_bytes(),
         )
     {
         return Err(datasource_cursor_expired());
@@ -2419,7 +2419,7 @@ fn parse_datasource_cursor(
 
 fn cursor_digest(
     datasource_ref: &str,
-    connection_ref: &str,
+    endpoint_ref: &str,
     project_id: Option<u64>,
     page: u64,
 ) -> String {
@@ -2427,7 +2427,7 @@ fn cursor_digest(
     digest.update(b"b10x/gitlab-datasource-cursor/v1\0");
     digest.update(datasource_ref.as_bytes());
     digest.update(b"\0");
-    digest.update(connection_ref.as_bytes());
+    digest.update(endpoint_ref.as_bytes());
     digest.update(b"\0");
     digest.update(project_id.unwrap_or_default().to_be_bytes());
     digest.update(page.to_be_bytes());
@@ -2547,37 +2547,37 @@ fn canonical_scopes(scopes: Vec<String>) -> Vec<String> {
     connector_oauth::parse_scopes(&scopes.join(" "), &SCOPE_POLICY)
 }
 
-fn connection_summary(
-    connection: StoredConnection,
+fn endpoint_summary(
+    connection: StoredEndpoint,
     configured_initiation: InitiationConfig,
-) -> ConnectionSummary {
-    ConnectionSummary {
-        connection_ref: connection.connection_ref,
+) -> EndpointSummary {
+    EndpointSummary {
+        endpoint_ref: connection.endpoint_ref,
         integration_ref: INTEGRATION_REF.to_owned(),
         label: connection.label,
-        state: ConnectionState::Callable,
+        state: EndpointState::Callable,
         initiation: initiation(configured_initiation),
-        route: protocol::connection::ConnectionRoute::Direct,
-        scope: Some(ConnectionScope::Principal),
-        actor: Some(ConnectionActor::User),
+        route: protocol::endpoint::EndpointRoute::Direct,
+        scope: Some(EndpointScope::Principal),
+        actor: Some(EndpointActor::User),
         auth_profile: Some(connection.profile.as_str().to_owned()),
     }
 }
 
-fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
+fn initiation(config: InitiationConfig) -> Vec<EndpointInitiator> {
     match config {
-        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
-        InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
+        InitiationConfig::Platform => vec![EndpointInitiator::Platform],
+        InitiationConfig::Provider => vec![EndpointInitiator::Provider],
         InitiationConfig::Both => {
-            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+            vec![EndpointInitiator::Platform, EndpointInitiator::Provider]
         }
     }
 }
 
-fn upsert_connection(connections: &mut Vec<StoredConnection>, connection: StoredConnection) {
-    connections.retain(|candidate| candidate.connection_ref != connection.connection_ref);
-    connections.push(connection);
-    connections.sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+fn upsert_connection(endpoints: &mut Vec<StoredEndpoint>, connection: StoredEndpoint) {
+    endpoints.retain(|candidate| candidate.endpoint_ref != connection.endpoint_ref);
+    endpoints.push(connection);
+    endpoints.sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
 }
 
 fn proposal_digest(batch: &SecretBatch) -> SecretProposalDigest {
@@ -2706,27 +2706,27 @@ fn hosted_error(error: GitlabError) -> HostedCompletionError {
     }
 }
 
-fn connect_session_error(_error: service::ConnectSessionLifecycleError) -> ConnectionError {
+fn connect_session_error(_error: service::ConnectSessionLifecycleError) -> EndpointError {
     connection_unavailable()
 }
 
-fn connection_unavailable() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::Unavailable,
+fn connection_unavailable() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::Unavailable,
         "GitLab connection setup is unavailable",
         true,
     )
 }
 
-fn connection_not_found() -> ConnectionError {
-    ConnectionError::new(
-        ConnectionErrorCode::NotFound,
+fn endpoint_not_found() -> EndpointError {
+    EndpointError::new(
+        EndpointErrorCode::NotFound,
         "GitLab Connection was not found",
         false,
     )
 }
 
-fn operation_from_context(error: ConnectionError) -> OperationError {
+fn operation_from_context(error: EndpointError) -> OperationError {
     OperationError::new(OperationErrorCode::StaleAuthority, error.message, false)
 }
 
@@ -2772,7 +2772,7 @@ fn operation_outcome_unknown(operation_ref: &str) -> OperationError {
     )
 }
 
-fn datasource_from_context(error: ConnectionError) -> DatasourceError {
+fn datasource_from_context(error: EndpointError) -> DatasourceError {
     datasource_error(DatasourceErrorCode::StaleAuthority, error.message, false)
 }
 

@@ -2,8 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use domain::endpoint::{
-    Endpoint, EndpointBinding, EndpointCredentialReference, EndpointState, EndpointTransport,
+use domain::endpoint_inventory::{
+    EndpointInventoryEntry, EndpointBinding, EndpointCredentialReference, EndpointReadiness, EndpointTransport,
 };
 use kube::api::{ApiResource, DynamicObject, ListParams};
 use kube::Api;
@@ -112,8 +112,8 @@ impl KubernetesEndpointSource {
 
     pub(super) async fn validate_crossplane(
         &self,
-        endpoint: Endpoint,
-    ) -> Result<Endpoint, EndpointSourceError> {
+        endpoint: EndpointInventoryEntry,
+    ) -> Result<EndpointInventoryEntry, EndpointSourceError> {
         let engine = match endpoint.resource_kind.as_str() {
             "PostgresqlDatabase" => "postgresql",
             "MysqlDatabase" => "mysql",
@@ -181,7 +181,7 @@ fn project_database(
     database: &DynamicObject,
     configs: &[DynamicObject],
     admits: impl Fn(&str) -> bool,
-) -> Option<Endpoint> {
+) -> Option<EndpointInventoryEntry> {
     let name = database.metadata.name.as_deref()?;
     let uid = database.metadata.uid.as_deref()?;
     if !dns_name(name) || uid.is_empty() {
@@ -210,7 +210,7 @@ fn project_database(
         .filter(|name| !name.is_empty() && name.len() <= 512)
         .cloned();
     let identity = format!("{source}\0{engine}\0{name}\0{uid}");
-    Some(Endpoint {
+    Some(EndpointInventoryEntry {
         endpoint_ref: format!(
             "endpoint:kubernetes:{}",
             hex::encode(Sha256::digest(identity.as_bytes()))
@@ -230,7 +230,7 @@ fn project_database(
         transport: EndpointTransport::Tcp,
         interface: engine.to_owned(),
         provider: Some(engine.to_owned()),
-        state: EndpointState::UnavailableRoute,
+        state: EndpointReadiness::UnavailableRoute,
         binding: Some(EndpointBinding {
             provider: engine.to_owned(),
             base_path: None,

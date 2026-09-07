@@ -21,9 +21,9 @@ async fn endpoint_fixture(
         executor.clone(),
     );
     Arc::get_mut(&mut backend.inner).unwrap().inventory_state = Some(inventory);
-    lock(&backend.inner.state).parent = Some(ParentConnection {
-        connection_ref: "connection:grafana:endpoints".into(),
-        label: "Endpoint fixture".into(),
+    lock(&backend.inner.state).parent = Some(ParentEndpoint {
+        endpoint_ref: "connection:grafana:endpoints".into(),
+        label: "EndpointInventoryEntry fixture".into(),
     });
     credentials
         .put(
@@ -38,13 +38,13 @@ async fn endpoint_fixture(
 
 #[tokio::test]
 async fn endpoints_discover_unknown_datasources_and_lazily_invoke_through_grafana() {
-    use protocol::endpoint::{self, EndpointRequest, EndpointResult, EndpointState};
+    use protocol::endpoint_inventory::{self, EndpointInventoryRequest, EndpointInventoryResult, EndpointReadiness};
     let (_root, backend, _, executor) =
         endpoint_fixture(Arc::new(connector_state::MemoryState::new())).await;
-    let EndpointResult::List { endpoints, .. } = backend
-        .handle_endpoint(
+    let EndpointInventoryResult::List { endpoints, .. } = backend
+        .handle_endpoint_inventory(
             &owner(),
-            EndpointRequest::List(endpoint::ListRequest {
+            EndpointInventoryRequest::List(endpoint::ListRequest {
                 source_ref: None,
                 query: String::new(),
                 limit: 100,
@@ -59,7 +59,7 @@ async fn endpoints_discover_unknown_datasources_and_lazily_invoke_through_grafan
     assert_eq!(endpoints.len(), 3);
     assert!(endpoints
         .iter()
-        .any(|endpoint| endpoint.state == EndpointState::UnknownProvider));
+        .any(|endpoint| endpoint.state == EndpointReadiness::UnknownProvider));
     assert!(!serde_json::to_string(&endpoints)
         .unwrap()
         .contains("SENTINEL"));
@@ -74,7 +74,7 @@ async fn endpoints_discover_unknown_datasources_and_lazily_invoke_through_grafan
     let description = backend.inner.describe_connection(&connection).unwrap();
     assert!(matches!(
         description.summary.route,
-        ConnectionRoute::ViaConnection {
+        EndpointRoute::ViaEndpoint {
             route_adapter: RouteAdapter::GrafanaDatasourceProxyV1,
             ..
         }
@@ -96,7 +96,7 @@ async fn endpoints_discover_unknown_datasources_and_lazily_invoke_through_grafan
         .await
         .unwrap();
     assert_eq!(connection, resolved);
-    backend.handle(&owner(), OperationRequest::Invoke(InvokeRequest { operation_ref: PROMETHEUS_QUERY_RANGE.into(), connection_ref: resolved,
+    backend.handle(&owner(), OperationRequest::Invoke(InvokeRequest { operation_ref: PROMETHEUS_QUERY_RANGE.into(), endpoint_ref: resolved,
         description_ref: description.description_ref, input: serde_json::json!({"query":"up","start":"2026-01-01T00:00:00Z","end":"2026-01-01T00:01:00Z","step":"15s"}), approval_evidence_ref: None,
     })).await.unwrap();
     assert!(lock(&executor.requests)
@@ -108,13 +108,13 @@ async fn endpoints_discover_unknown_datasources_and_lazily_invoke_through_grafan
 
 #[tokio::test]
 async fn endpoint_inventory_restores_identity_but_rechecks_current_target_grants() {
-    use protocol::endpoint::{self, EndpointRequest, EndpointResult};
+    use protocol::endpoint_inventory::{self, EndpointInventoryRequest, EndpointInventoryResult};
     let inventory: Arc<dyn StateStore> = Arc::new(connector_state::MemoryState::new());
     let (root, backend, credentials, executor) = endpoint_fixture(inventory.clone()).await;
-    let EndpointResult::List { endpoints, .. } = backend
-        .handle_endpoint(
+    let EndpointInventoryResult::List { endpoints, .. } = backend
+        .handle_endpoint_inventory(
             &owner(),
-            EndpointRequest::List(endpoint::ListRequest {
+            EndpointInventoryRequest::List(endpoint::ListRequest {
                 source_ref: None,
                 query: String::new(),
                 limit: 100,
@@ -148,22 +148,22 @@ async fn endpoint_inventory_restores_identity_but_rechecks_current_target_grants
     restored.inner.restore_inventory().unwrap();
     assert_eq!(restored.connection_count(), 1);
     let result = restored
-        .handle_endpoint(
+        .handle_endpoint_inventory(
             &owner(),
-            EndpointRequest::Show(endpoint::ShowRequest {
+            EndpointInventoryRequest::Show(endpoint::ShowRequest {
                 endpoint_ref: endpoint.endpoint_ref.clone(),
             }),
         )
         .await
         .unwrap();
-    let EndpointResult::Show {
+    let EndpointInventoryResult::Show {
         endpoint: restored_endpoint,
     } = result
     else {
         panic!()
     };
     assert_eq!(restored_endpoint.endpoint_ref, endpoint.endpoint_ref);
-    assert_eq!(restored_endpoint.state, endpoint::EndpointState::Denied);
+    assert_eq!(restored_endpoint.state, endpoint::EndpointReadiness::Denied);
     assert!(restored
         .resolve_endpoint(&owner(), &endpoint.endpoint_ref, PROMETHEUS_QUERY_RANGE)
         .await

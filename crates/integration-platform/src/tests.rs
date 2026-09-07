@@ -1,6 +1,6 @@
 use super::*;
 use connector_resolve::document::HostEffect;
-use connectors_config::{InitiationConfig, PlatformConnectionConfig};
+use connectors_config::{InitiationConfig, PlatformEndpointConfig};
 use protocol::datasource::{
     BindingSearchRequest, DatasourceRead, DatasourceRequest, DatasourceResult,
     DescribeRequest as DatasourceDescribeRequest, ReadRequest,
@@ -28,8 +28,8 @@ fn config(root: &Path) -> PlatformIntegrationConfig {
         fs::set_permissions(&signing_key, fs::Permissions::from_mode(0o600)).unwrap();
     }
     PlatformIntegrationConfig {
-        connection: PlatformConnectionConfig {
-            connection_ref: "connection-platform".to_owned(),
+        connection: PlatformEndpointConfig {
+            endpoint_ref: "connection-platform".to_owned(),
             label: "platform local".to_owned(),
             grant_ref: "grant-platform".to_owned(),
             initiation: InitiationConfig::Platform,
@@ -182,7 +182,7 @@ async fn invoke_operation(
             &principal(),
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: operation_ref.to_owned(),
-                connection_ref: "connection-platform".to_owned(),
+                endpoint_ref: "connection-platform".to_owned(),
                 description_ref: description.description_ref,
                 input,
                 approval_evidence_ref: approval_evidence_ref.map(ToOwned::to_owned),
@@ -239,12 +239,12 @@ async fn search_projects_only_configured_capabilities() {
         .all(|operation| operation.operation_ref.starts_with("work.")));
     assert!(operations
         .iter()
-        .all(|operation| operation.connections.len() == 1));
+        .all(|operation| operation.endpoints.len() == 1));
 
-    let ConnectionResult::Search { connections } = backend
-        .handle_connection(
+    let EndpointResult::Search { endpoints } = backend
+        .handle_endpoint(
             &principal(),
-            ConnectionRequest::Search(protocol::connection::SearchRequest {
+            EndpointRequest::Search(protocol::endpoint::SearchRequest {
                 query: "b10x".to_owned(),
                 limit: 64,
             }),
@@ -254,10 +254,10 @@ async fn search_projects_only_configured_capabilities() {
     else {
         panic!("Connection search result expected")
     };
-    assert_eq!(connections.len(), 1);
-    assert_eq!(connections[0].integration_ref, PROVIDER);
-    assert_eq!(connections[0].state, ConnectionState::Callable);
-    assert_eq!(connections[0].route, ConnectionRoute::Direct);
+    assert_eq!(endpoints.len(), 1);
+    assert_eq!(endpoints[0].integration_ref, PROVIDER);
+    assert_eq!(endpoints[0].state, EndpointState::Callable);
+    assert_eq!(endpoints[0].route, EndpointRoute::Direct);
 }
 
 /// Configure every module origin so search projects the whole module surface at once.

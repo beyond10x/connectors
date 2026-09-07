@@ -150,7 +150,7 @@ async fn a_full_decision_precedes_secret_commit_and_coherent_publication() {
             .status("session:one")
             .unwrap()
             .state,
-        protocol::connection::ConnectSessionState::Completed
+        protocol::endpoint::ConnectSessionState::Completed
     );
 }
 
@@ -569,7 +569,7 @@ async fn uncertain_secret_operations_are_resolved_from_state_and_never_assumed_r
             .unwrap()
             .state;
         assert_eq!(
-            state == protocol::connection::ConnectSessionState::Completed,
+            state == protocol::endpoint::ConnectSessionState::Completed,
             published
         );
     }
@@ -659,9 +659,9 @@ async fn expiry_or_revocation_before_the_claim_aborts_without_a_decision() {
                 .unwrap()
                 .state,
             if expired {
-                protocol::connection::ConnectSessionState::Expired
+                protocol::endpoint::ConnectSessionState::Expired
             } else {
-                protocol::connection::ConnectSessionState::Failed
+                protocol::endpoint::ConnectSessionState::Failed
             }
         );
     }
@@ -761,7 +761,7 @@ async fn a_held_full_write_blocks_commit_but_not_private_status_or_expiry_checks
             .unwrap()
             .unwrap()
             .state,
-        protocol::connection::ConnectSessionState::Completed
+        protocol::endpoint::ConnectSessionState::Completed
     );
 }
 
@@ -791,11 +791,11 @@ async fn a_reclaimed_publication_retains_its_original_authorization_timing() {
     let value: serde_json::Value =
         serde_json::from_slice(&owner.journal.read().unwrap().unwrap()).unwrap();
     assert_eq!(
-        value["connections"]["connection:one"]["authorization"]["authorized_at"],
+        value["endpoints"]["connection:one"]["authorization"]["authorized_at"],
         99
     );
     assert_eq!(
-        value["connections"]["connection:one"]["authorization"]["deadline"],
+        value["endpoints"]["connection:one"]["authorization"]["deadline"],
         100
     );
 }
@@ -841,7 +841,7 @@ async fn generation_exhaustion_refuses_before_io_and_resolves_its_private_guard(
             .status("session:one")
             .unwrap()
             .state,
-        protocol::connection::ConnectSessionState::Failed
+        protocol::endpoint::ConnectSessionState::Failed
     );
     assert_eq!(owner.state.lock().unwrap().image.next_generation, u64::MAX);
 }
@@ -1342,7 +1342,7 @@ async fn journal_capacity_is_reserved_for_publication_before_secret_prepare() {
                 .unwrap(),
         )
         .unwrap();
-        image.connections.insert(
+        image.endpoints.insert(
             historical.identity.connection.clone(),
             Publication {
                 identity: historical.identity.clone(),
@@ -1392,7 +1392,7 @@ async fn journal_capacity_is_reserved_for_publication_before_secret_prepare() {
             authorized_at: 99,
             deadline: 100,
         });
-        published.connections.insert(
+        published.endpoints.insert(
             fixture.binding.identity.connection.clone(),
             pending.publication.clone(),
         );

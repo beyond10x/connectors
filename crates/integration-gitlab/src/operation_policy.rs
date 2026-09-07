@@ -25,7 +25,7 @@ pub(super) const GITLAB_OPERATIONS: [&str; 21] = [
     REPOSITORY_FILE_GET,
 ];
 
-pub(super) fn supports_operation(connection: &StoredConnection, operation_ref: &str) -> bool {
+pub(super) fn supports_operation(connection: &StoredEndpoint, operation_ref: &str) -> bool {
     is_gitlab_operation(operation_ref)
         && (!is_mutating_operation(operation_ref)
             || connection.scopes.iter().any(|scope| scope == "api"))

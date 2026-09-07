@@ -155,8 +155,8 @@ async fn open(
         .await
         .unwrap()
 }
-fn create() -> connection_api::ConnectionRequest {
-    connection_api::ConnectionRequest::ConnectSessionCreate(
+fn create() -> connection_api::EndpointRequest {
+    connection_api::EndpointRequest::ConnectSessionCreate(
         connection_api::ConnectSessionCreateRequest {
             integration_ref: "gitlab".into(),
             label: "Display only".into(),
@@ -175,8 +175,8 @@ async fn http(authority: &str, target: &str, extra: &str) -> String {
     response
 }
 async fn deliver_code(backend: &PersonalOAuthBackend) -> connection_api::ConnectSessionStatus {
-    let connection_api::ConnectionResult::ConnectSessionCreate(status) =
-        backend.handle_connection(&owner(), create()).await.unwrap()
+    let connection_api::EndpointResult::ConnectSessionCreate(status) =
+        backend.handle_endpoint(&owner(), create()).await.unwrap()
     else {
         panic!("session")
     };
@@ -244,7 +244,7 @@ async fn invocation(backend: &PersonalOAuthBackend) -> operation_api::InvokeRequ
     };
     operation_api::InvokeRequest {
         operation_ref: description.operation_ref,
-        connection_ref: backend.inner.bindings[0]
+        endpoint_ref: backend.inner.bindings[0]
             .custody
             .identity
             .connection
@@ -274,7 +274,7 @@ async fn actual_pkce_uses_observed_evidence_and_same_store_for_dispatch_and_reop
     assert!(completed.browser_completion_url.is_none());
     assert!(completed.completion_endpoint.is_none());
     assert_eq!(
-        completed.connection_ref.as_deref(),
+        completed.endpoint_ref.as_deref(),
         Some(
             backend.inner.bindings[0]
                 .custody
@@ -346,7 +346,7 @@ async fn unique_binding_and_owner_refusals_happen_before_listener_session_or_egr
         Arc::new(Clock::new()),
     )
     .await;
-    assert!(backend.handle_connection(&owner(), create()).await.is_err());
+    assert!(backend.handle_endpoint(&owner(), create()).await.is_err());
     assert!(backend.inner.sessions.lock().unwrap().is_empty());
     assert_eq!(egress.count(), 0);
     let uri = url::Url::parse(
@@ -697,15 +697,15 @@ async fn wrong_owner_unknown_profile_and_nonpersistent_create_have_zero_egress()
         authority_snapshot_sha256: "1".repeat(64),
     })
     .unwrap();
-    assert!(backend.handle_connection(&other, create()).await.is_err());
-    let connection_api::ConnectionRequest::ConnectSessionCreate(mut request) = create() else {
+    assert!(backend.handle_endpoint(&other, create()).await.is_err());
+    let connection_api::EndpointRequest::ConnectSessionCreate(mut request) = create() else {
         unreachable!()
     };
     request.auth_profile = Some("gitlab.token".into());
     assert!(backend
-        .handle_connection(
+        .handle_endpoint(
             &owner(),
-            connection_api::ConnectionRequest::ConnectSessionCreate(request)
+            connection_api::EndpointRequest::ConnectSessionCreate(request)
         )
         .await
         .is_err());
@@ -723,7 +723,7 @@ async fn wrong_owner_unknown_profile_and_nonpersistent_create_have_zero_egress()
     )
     .await
     .unwrap();
-    assert!(backend.handle_connection(&owner(), create()).await.is_err());
+    assert!(backend.handle_endpoint(&owner(), create()).await.is_err());
     assert!(backend.inner.sessions.lock().unwrap().is_empty());
     assert_eq!(egress.count(), 0);
     backend.shutdown().await;
@@ -739,8 +739,8 @@ fn device_configuration() -> CatalogIntegrationConfig {
 }
 
 async fn authorize_device(backend: &PersonalOAuthBackend) -> connection_api::ConnectSessionStatus {
-    let connection_api::ConnectionResult::ConnectSessionCreate(status) =
-        backend.handle_connection(&owner(), create()).await.unwrap()
+    let connection_api::EndpointResult::ConnectSessionCreate(status) =
+        backend.handle_endpoint(&owner(), create()).await.unwrap()
     else {
         panic!("device session")
     };
@@ -811,7 +811,7 @@ async fn device_optional_refresh_omission_deletes_previous_secret_and_refuses_on
     egress.info("fixture-client", 42, &["read_api"]);
     let second = authorize_device(&backend).await;
     assert_eq!(
-        first.connection_ref, second.connection_ref,
+        first.endpoint_ref, second.endpoint_ref,
         "display setup reuses the stable configured binding"
     );
     assert!(
@@ -856,8 +856,8 @@ async fn pending_callback_shutdown_joins_receiver_and_cannot_revive_session_afte
         clock.clone(),
     )
     .await;
-    let connection_api::ConnectionResult::ConnectSessionCreate(status) =
-        backend.handle_connection(&owner(), create()).await.unwrap()
+    let connection_api::EndpointResult::ConnectSessionCreate(status) =
+        backend.handle_endpoint(&owner(), create()).await.unwrap()
     else {
         panic!("session")
     };
@@ -1389,7 +1389,7 @@ async fn requested_scope_ceiling_never_substitutes_for_observed_operation_scopes
     else {
         panic!("description")
     };
-    assert!(description.connections.is_empty());
+    assert!(description.endpoints.is_empty());
     assert!(backend
         .handle(
             &owner(),

@@ -53,7 +53,7 @@ mod tests {
         ] {
             let mut bound = binding(true);
             bound.provider = catalog::provider(catalog::ProviderKey::id("slack")).unwrap();
-            bound.connection_ref = "connection:slack:test".to_owned();
+            bound.endpoint_ref = "connection:slack:test".to_owned();
             let mut inner = test_inner(vec![bound]);
             let egress = Arc::new(RateEgress {
                 retry,
@@ -145,7 +145,7 @@ mod tests {
 
     fn named(name: &str) -> Binding {
         let mut binding = binding(false);
-        binding.connection_ref = format!("connection:gitlab:{name}");
+        binding.endpoint_ref = format!("connection:gitlab:{name}");
         binding.label = name.to_owned();
         binding
     }
@@ -154,7 +154,7 @@ mod tests {
         Binding {
             instance: None,
             provider: gitlab(),
-            connection_ref: "connection:gitlab:test".to_owned(),
+            endpoint_ref: "connection:gitlab:test".to_owned(),
             label: "GitLab".to_owned(),
             grant_ref: "grant:gitlab:test".to_owned(),
             initiation: InitiationPolicy::platform_only(),
@@ -413,8 +413,8 @@ mod tests {
         let description = inner
             .describe(write.id)
             .expect("the second connection admits it");
-        assert_eq!(description.connections.len(), 1);
-        assert_eq!(description.connections[0].label, "writer");
+        assert_eq!(description.endpoints.len(), 1);
+        assert_eq!(description.endpoints[0].label, "writer");
         assert_eq!(description.approval, ApprovalPosture::Required);
         assert_eq!(
             test_inner(vec![named("reader")])
@@ -452,7 +452,7 @@ mod tests {
         let rows = inner.search("gitlab-user-get", 1);
         assert_eq!(rows.len(), 1, "one operation");
         assert_eq!(
-            rows[0].connections.len(),
+            rows[0].endpoints.len(),
             3,
             "and every Connection that can serve it, not the first one the limit happened to reach"
         );
@@ -542,7 +542,7 @@ mod tests {
     async fn rate_adversary_catalog_checks_binding_and_lease_before_rate_disclosure() {
         let mut bound = binding(true);
         bound.provider = catalog::provider(catalog::ProviderKey::id("slack")).unwrap();
-        bound.connection_ref = "connection:slack:test".into();
+        bound.endpoint_ref = "connection:slack:test".into();
         let mut inner = test_inner(vec![bound]);
         let egress = Arc::new(RateEgress {
             retry: Some("0"),

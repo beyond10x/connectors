@@ -137,7 +137,7 @@ impl SlackBackend {
         inner.recover_pending().await?;
         inner.ensure_org_connection().await?;
         inner.ensure_declared_instances().await?;
-        for connection in lock(&inner.metadata).connections.clone() {
+        for connection in lock(&inner.metadata).endpoints.clone() {
             if inner.connection_is_admitted(&connection) {
                 inner.start_supervisor(connection);
             }

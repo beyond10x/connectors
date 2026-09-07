@@ -96,7 +96,7 @@ async fn oauth_pass1_explicit_reauthorization_repairs_only_coherent_subject_afte
             assert_eq!(egress.count(), 6);
         } else {
             assert_eq!(result.state, connection_api::ConnectSessionState::Completed);
-            assert_eq!(result.connection_ref, initial.connection_ref);
+            assert_eq!(result.endpoint_ref, initial.endpoint_ref);
             assert!(!backend
                 .inner
                 .reconcile_marker(&backend.inner.bindings[0])
@@ -160,8 +160,8 @@ async fn oauth_pass1_device_slowdown_and_denial_keep_one_authorization_and_origi
         clock.clone(),
     )
     .await;
-    let connection_api::ConnectionResult::ConnectSessionCreate(status) =
-        backend.handle_connection(&owner(), create()).await.unwrap()
+    let connection_api::EndpointResult::ConnectSessionCreate(status) =
+        backend.handle_endpoint(&owner(), create()).await.unwrap()
     else {
         panic!("device create")
     };
@@ -258,8 +258,8 @@ async fn oauth_pass2_shutdown_after_token_before_evidence_never_publishes_or_res
         )
         .await;
         let status = if device {
-            let connection_api::ConnectionResult::ConnectSessionCreate(status) =
-                backend.handle_connection(&owner(), create()).await.unwrap()
+            let connection_api::EndpointResult::ConnectSessionCreate(status) =
+                backend.handle_endpoint(&owner(), create()).await.unwrap()
             else {
                 panic!("device create");
             };
