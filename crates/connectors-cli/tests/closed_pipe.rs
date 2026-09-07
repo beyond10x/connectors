@@ -86,6 +86,11 @@ impl Fixture {
 
     fn respond(&self, close_transport: bool) -> JoinHandle<()> {
         let listener = UnixListener::bind(self.root.join("connectors.sock")).unwrap();
+        std::fs::set_permissions(
+            listener.local_addr().unwrap().as_pathname().unwrap(),
+            <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+        )
+        .unwrap();
         listener.set_nonblocking(true).unwrap();
         thread::spawn(move || {
             let deadline = Instant::now() + Duration::from_secs(10);
@@ -635,6 +640,11 @@ fn search_output(group: &str, format: &str, refused: bool, sink: Option<OwnedFd>
         _ => unreachable!(),
     };
     let listener = UnixListener::bind(fixture.root.join("connectors.sock")).unwrap();
+    std::fs::set_permissions(
+        listener.local_addr().unwrap().as_pathname().unwrap(),
+        <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+    )
+    .unwrap();
     listener.set_nonblocking(true).unwrap();
     let server = thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(10);
