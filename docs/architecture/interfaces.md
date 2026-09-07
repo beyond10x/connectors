@@ -169,7 +169,7 @@ The [shipped parser](../../crates/connectors-cli/src/lib.rs) defines eight top-l
 | Group | Responsibility | Example |
 |---|---|---|
 | `setup` | Create configuration, connect a provider, install completions | `connectors setup connect slack` |
-| `inspect` | Report configuration, provider, and credential readiness | `connectors inspect doctor` |
+| `inspect` | Report installed versions, configuration, provider, and credential readiness | `connectors inspect doctor` |
 | `session` | Log in to or out of a hosted deployment | `connectors session logout` |
 | `serve` | Run local, hosted, or MCP service entry points | `connectors serve local` |
 | `connection` | List, discover, activate, and materialize Connections | `connectors connection list` |
@@ -183,6 +183,15 @@ output. Shell completions come from the same parser:
 ```bash
 connectors setup completions fish
 ```
+
+Use `connectors inspect upgrade` to see the CLI version, embedded catalog schema and digest,
+supported credential-file formats, and hosted session-metadata version. Add `-o json` for
+machine-readable output. The report describes the installed binary's capabilities and includes
+source-installation guidance. It works without configuration, saved credentials, or a running
+service, and makes no network request.
+
+Credential files support v1 and v2; prepared transactions use v2. The report does not inspect or
+migrate an existing file, check for a newer release, or install an update.
 
 Version 0.6.0 introduced this grouping. Bare `connectors serve` displays the group; running a local
 service requires `connectors serve local`. Use the current paths in scripts. The

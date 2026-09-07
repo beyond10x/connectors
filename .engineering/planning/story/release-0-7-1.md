@@ -1,13 +1,27 @@
 ---
 format: aep.planning-md/1
-id: task:release-0-7-1
-kind: task
+id: story:release-0-7-1
+kind: story
 status: active
-title: Cut and verify Connectors v0.7.1
+title: Release binary inspection and current fixes as Connectors v0.7.1
 relations:
 - derived_from: runbook:small-wave-after-0-7-0
-- decomposes: story:release-0-7-1
-revision: 3
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: cited
+  path: Cargo.toml
+- confidence: cited
+  path: WHATS-NEW.md
+- confidence: cited
+  path: catalog
+- confidence: cited
+  path: connectors.lock
+- confidence: cited
+  path: crates
+- confidence: cited
+  path: docs/architecture/interfaces.md
+revision: 4
 ---
 ## Acceptance
 
