@@ -22,6 +22,9 @@ const MAX_LOCAL_CLIENTS: usize = 64;
 const FRAME_READ_DEADLINE: Duration = Duration::from_secs(5);
 const BACKEND_SHUTDOWN_DEADLINE: Duration = Duration::from_secs(15);
 
+#[path = "local_control.rs"]
+mod control;
+
 #[cfg(test)]
 #[path = "local_lifecycle_tests.rs"]
 mod lifecycle_tests;
@@ -123,23 +126,6 @@ impl<B: ConnectorBackend + ?Sized> LocalOperationDaemon<B> {
     #[must_use]
     pub fn socket_path(&self) -> &Path {
         &self.socket_path
-    }
-
-    /// Name the exact configuration served, so background startup detects another configuration.
-    #[must_use]
-    pub fn with_configuration(mut self, configuration: Option<PathBuf>) -> Self {
-        self.lifecycle = Arc::new(crate::local_lifecycle::Lifecycle::new(configuration));
-        self
-    }
-
-    /// Bind confidential enrollment to the runtime's own configuration and credential store.
-    #[must_use]
-    pub fn with_setup_handler(
-        mut self,
-        handler: Arc<dyn crate::local_setup::LocalSetupHandler>,
-    ) -> Self {
-        self.setup = Some(handler);
-        self
     }
 
     /// Serve until shutdown, then abort and join every incomplete local client before removing the

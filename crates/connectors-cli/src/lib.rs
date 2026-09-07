@@ -925,7 +925,13 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 };
                 if provider.is_some() && bootstrap.is_none() {
                     init::ensure_owner(&config_path)?;
-                    connectors_console::daemon::start(&config_path, &state_root).await?;
+                    match connectors_console::daemon::require(&state_root).await {
+                        Ok(()) => {}
+                        Err(connectors_console::daemon::DaemonError::Required) => {
+                            connectors_console::daemon::start(&config_path, &state_root).await?;
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
                 }
                 let personal = PersonalConfig::read(&config_path)?;
                 if let (Some(operation_ref), Some(connection_ref)) =
@@ -968,6 +974,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                         personal
                             .kubernetes
                             .as_ref()
+                            .filter(|_| provider == "kubernetes")
                             .and_then(|policy| policy.selected_context.clone())
                     }),
                     connect::PersonalOAuthOptions {

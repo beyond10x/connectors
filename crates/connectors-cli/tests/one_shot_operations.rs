@@ -1,4 +1,4 @@
-//! Separate real processes share durable authority without publishing a control socket.
+//! Separate CLI processes share the daemon-owned authority and never execute providers locally.
 
 use std::fs;
 use std::io::{BufRead as _, Write as _};
@@ -84,9 +84,28 @@ impl Fixture {
             .unwrap()
     }
 
+    fn start(&self) {
+        success(&self.run(&["daemon", "start"]));
+    }
+
+    fn stop(&self) {
+        let output = self
+            .command(&["daemon", "stop"])
+            .arg("--state-root")
+            .arg(&self.state)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+    }
+
     fn platform(&self) -> UnixListener {
         let socket = self.root.join("work.sock");
         let listener = UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(
+            listener.local_addr().unwrap().as_pathname().unwrap(),
+            <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+        )
+        .unwrap();
         fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
         self.configure(&format!(
             "[platform.connection]\nconnection_ref = 'connection-fixture'\nlabel = 'fixture'\n\
@@ -100,7 +119,14 @@ impl Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
-        fs::remove_dir_all(&self.root).unwrap();
+        if self.state.join("daemon.log").exists() {
+            let _ = self
+                .command(&["daemon", "stop"])
+                .arg("--state-root")
+                .arg(&self.state)
+                .output();
+        }
+        let _ = fs::remove_dir_all(&self.root);
     }
 }
 
@@ -154,12 +180,13 @@ fn serve_http(listener: UnixListener) -> thread::JoinHandle<String> {
 }
 
 #[test]
-fn separate_describe_and_invoke_processes_reuse_the_same_authority_without_a_daemon() {
+fn separate_describe_and_invoke_processes_share_daemon_authority() {
     let fixture = Fixture::new();
     let listener = fixture.platform();
+    fixture.start();
     let description =
         success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
-    assert!(!fixture.state.join("connectors.sock").exists());
+    assert!(fixture.state.join("connectors.sock").exists());
     let lease = description["description_ref"].as_str().unwrap();
     let serving = serve_http(listener);
     let invoked = success(&fixture.run(&[
@@ -179,7 +206,7 @@ fn separate_describe_and_invoke_processes_reuse_the_same_authority_without_a_dae
         .join()
         .unwrap()
         .starts_with("GET /api/work/v2/requests?"));
-    assert!(!fixture.state.join("connectors.sock").exists());
+    assert!(fixture.state.join("connectors.sock").exists());
 }
 
 #[test]
@@ -189,7 +216,9 @@ fn ordinary_search_and_connection_list_use_default_paths_without_a_daemon() {
     fs::create_dir_all(&config_dir).unwrap();
     fs::copy(&fixture.config, config_dir.join("connectors.toml")).unwrap();
     for arguments in [["operation", "search"], ["connection", "list"]] {
-        success(&fixture.command(&arguments).output().unwrap());
+        let output = fixture.command(&arguments).output().unwrap();
+        assert!(!output.status.success());
+        assert_eq!(value(&output)["error"]["code"], "daemon-required");
     }
     assert!(!fixture
         .root
@@ -218,7 +247,7 @@ fn events_and_session_signals_name_the_persistent_daemon_requirement() {
             value(&output)["error"]["message"]
                 .as_str()
                 .unwrap()
-                .contains("connectors serve local"),
+                .contains("connectors daemon start"),
             "{output:?}"
         );
         assert!(
@@ -229,25 +258,15 @@ fn events_and_session_signals_name_the_persistent_daemon_requirement() {
 }
 
 #[test]
-fn doctor_enumerates_bounded_and_persistent_verbs() {
+fn doctor_explains_the_daemon_boundary() {
     let fixture = Fixture::new();
     let report = success(&fixture.run(&["inspect", "doctor"]));
-    let daemon = report["checks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|row| row["check"] == "daemon")
-        .unwrap();
+    let checks = report["checks"].as_array().unwrap();
+    let daemon = checks.iter().find(|row| row["check"] == "daemon").unwrap();
     let detail = daemon["detail"].as_str().unwrap();
-    for word in [
-        "operation",
-        "connection",
-        "session",
-        "event",
-        "connectors serve local",
-    ] {
-        assert!(detail.contains(word), "missing {word}: {detail}");
-    }
+    assert!(detail.contains("all local provider access"));
+    assert!(detail.contains("connectors daemon start"));
+    assert!(detail.contains("offline"));
 }
 
 #[test]
@@ -256,6 +275,11 @@ fn a_running_daemon_is_used_without_constructing_a_local_runtime() {
     fs::create_dir(&fixture.state).unwrap();
     fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
     let listener = UnixListener::bind(fixture.state.join("connectors.sock")).unwrap();
+    std::fs::set_permissions(
+        listener.local_addr().unwrap().as_pathname().unwrap(),
+        <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+    )
+    .unwrap();
     fs::set_permissions(
         fixture.state.join("connectors.sock"),
         fs::Permissions::from_mode(0o600),
@@ -302,6 +326,11 @@ fn a_transport_that_drops_the_request_is_never_retried_locally() {
     fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
     let socket = fixture.state.join("connectors.sock");
     let listener = UnixListener::bind(&socket).unwrap();
+    std::fs::set_permissions(
+        listener.local_addr().unwrap().as_pathname().unwrap(),
+        <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+    )
+    .unwrap();
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
     let serving = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
@@ -321,6 +350,7 @@ fn a_transport_that_drops_the_request_is_never_retried_locally() {
 fn concurrent_commands_and_daemon_start_cannot_take_the_in_flight_invocation_state() {
     let fixture = Fixture::new();
     let listener = fixture.platform();
+    fixture.start();
     let description =
         success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
     let lease = description["description_ref"].as_str().unwrap();
@@ -363,18 +393,14 @@ fn concurrent_commands_and_daemon_start_cannot_take_the_in_flight_invocation_sta
         .arg(&fixture.state);
     let child = first.spawn().unwrap();
     arrival.recv_timeout(Duration::from_secs(10)).unwrap();
-    for arguments in [["operation", "search"], ["serve", "local"]] {
-        let refused = fixture.run(&arguments);
-        assert!(!refused.status.success(), "{refused:?}");
-        assert!(
-            value(&refused)["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("owns this state root"),
-            "{refused:?}"
-        );
-        assert!(!fixture.state.join("connectors.sock").exists());
-    }
+    success(&fixture.run(&["operation", "search"]));
+    let refused = fixture.run(&["serve", "local"]);
+    assert!(!refused.status.success());
+    assert!(value(&refused)["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("owns this state root"));
+    assert!(fixture.state.join("connectors.sock").exists());
     release.send(()).unwrap();
     success(&child.wait_with_output().unwrap());
     serving.join().unwrap();
@@ -412,30 +438,14 @@ fn invalid_bounds_and_unsafe_state_refuse_before_runtime_state_is_opened() {
 }
 
 #[test]
-fn connection_mutations_require_daemon_before_creating_continuation_state() {
+fn old_discovery_commands_are_retired_without_creating_state() {
     let fixture = Fixture::new();
-    for arguments in [
-        vec![
-            "connection",
-            "activate",
-            "--candidate",
-            "candidate-fixture",
-            "--label",
-            "fixture",
-        ],
-        vec![
-            "connection",
-            "materialize",
-            "--observation",
-            "observation-fixture",
-        ],
-    ] {
-        let refused = fixture.run(&arguments);
-        assert!(!refused.status.success());
-        assert!(value(&refused)["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("connectors serve local"));
+    for command in ["candidates", "activate", "observations", "materialize"] {
+        let output = fixture
+            .command(&["connection", command, "--help"])
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
         assert!(!fixture.state.exists());
     }
 }
@@ -445,6 +455,7 @@ fn a_changed_authority_or_selected_connection_never_reaches_fixture_egress() {
     let fixture = Fixture::new();
     let listener = fixture.platform();
     listener.set_nonblocking(true).unwrap();
+    fixture.start();
     let description =
         success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
     let lease = description["description_ref"].as_str().unwrap();
@@ -472,6 +483,8 @@ fn a_changed_authority_or_selected_connection_never_reaches_fixture_egress() {
         .unwrap()
         .replace("agent_revision = 1", "agent_revision = 2");
     fs::write(&fixture.config, changed).unwrap();
+    fixture.stop();
+    fixture.start();
     let refused = fixture.run(&[
         "operation",
         "invoke",
@@ -512,25 +525,12 @@ fn browser_session_operations_are_refused_under_canonical_and_published_aliases(
         BROWSER_CLOSE_OPERATION,
         BROWSER_CLOSE_TOOL_REF,
     ] {
-        let description =
-            success(&fixture.run(&["operation", "describe", "--operation", operation]));
-        let refused = fixture.run(&[
-            "operation",
-            "invoke",
-            "--operation",
-            operation,
-            "--connection",
-            "connection-fixture",
-            "--description-ref",
-            description["description_ref"].as_str().unwrap(),
-            "--input-json",
-            "{}",
-        ]);
+        let refused = fixture.run(&["operation", "describe", "--operation", operation]);
         assert!(!refused.status.success(), "{operation}: {refused:?}");
         assert!(value(&refused)["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("connectors serve local"));
+            .contains("connectors daemon start"));
         assert!(!fixture.root.join("browser").exists());
         assert!(!fixture.root.join("artifacts").exists());
     }
@@ -542,10 +542,17 @@ fn adversary_uncertain_invoke_never_resends_after_the_control_socket_disappears(
         let fixture = Fixture::new();
         let egress = fixture.platform();
         egress.set_nonblocking(true).unwrap();
+        fixture.start();
         let description =
             success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
+        fixture.stop();
         let socket = fixture.state.join("connectors.sock");
         let listener = UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(
+            listener.local_addr().unwrap().as_pathname().unwrap(),
+            <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+        )
+        .unwrap();
         fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
@@ -677,6 +684,7 @@ fn adversary_caller_input_cannot_rebind_routes_or_revoked_grants() {
     let fixture = Fixture::new();
     let egress = fixture.platform();
     egress.set_nonblocking(true).unwrap();
+    fixture.start();
     let description =
         success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
     for input in [
@@ -712,6 +720,8 @@ fn adversary_caller_input_cannot_rebind_routes_or_revoked_grants() {
         .unwrap()
         .replace("grant-fixture", "replacement-grant");
     fs::write(&fixture.config, changed).unwrap();
+    fixture.stop();
+    fixture.start();
     let refused = fixture.run(&[
         "operation",
         "invoke",
@@ -780,6 +790,7 @@ fn final_http_replies(
 fn final_adversary_invalid_provider_output_is_not_resent_and_releases_the_state_root() {
     let fixture = Fixture::new();
     let listener = fixture.platform();
+    fixture.start();
     let description =
         success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
     let serving = final_http_replies(listener, vec!["{}"]);
@@ -810,13 +821,14 @@ fn final_adversary_invalid_provider_output_is_not_resent_and_releases_the_state_
         .collect::<Vec<_>>();
     assert_eq!(outcomes, ["attempted", "indeterminate"]);
     success(&fixture.run(&["operation", "search"]));
-    assert!(!fixture.state.join("connectors.sock").exists());
+    assert!(fixture.state.join("connectors.sock").exists());
 }
 
 #[test]
-fn final_adversary_provider_cursor_survives_two_distinct_one_shot_processes() {
+fn provider_cursor_survives_two_distinct_cli_processes() {
     let fixture = Fixture::new();
     let listener = fixture.platform();
+    fixture.start();
     let description =
         success(&fixture.run(&["operation", "describe", "--operation", "work.requests.list"]));
     let serving = final_http_replies(
@@ -841,7 +853,7 @@ fn final_adversary_provider_cursor_survives_two_distinct_one_shot_processes() {
         ]))
     };
     let first = invoke(r#"{"cursor":"","limit":1}"#);
-    assert!(!fixture.state.join("connectors.sock").exists());
+    assert!(fixture.state.join("connectors.sock").exists());
     let cursor = first["output"]["next_cursor"].as_str().unwrap();
     assert_eq!(cursor, "provider-page-two");
     let second = invoke(&json!({"cursor":cursor,"limit":1}).to_string());
@@ -854,53 +866,16 @@ fn final_adversary_provider_cursor_survives_two_distinct_one_shot_processes() {
         .next()
         .unwrap()
         .contains("cursor=provider-page-two"));
-    assert!(!fixture.state.join("connectors.sock").exists());
+    assert!(fixture.state.join("connectors.sock").exists());
 }
 
 #[test]
-fn final_adversary_kubernetes_candidates_never_publish_a_dead_connection_or_run_auth_exec() {
+fn endpoint_discovery_without_a_daemon_never_runs_kubeconfig_authentication() {
     let fixture = Fixture::new();
-    fixture.configure("[kubernetes]\ngrant_ref = 'grant:kubernetes'\ninitiation = 'platform'\ntarget_grants = { prometheus = 'grant:prometheus' }\nallow_exec_auth = true\n");
-    let kubeconfig = fixture.root.join("synthetic-kubeconfig");
-    fs::write(&kubeconfig, "apiVersion: v1\nkind: Config\ncurrent-context: fixture\nclusters:\n- name: fixture\n  cluster:\n    server: https://cluster.invalid\ncontexts:\n- name: fixture\n  context:\n    cluster: fixture\n    user: fixture\nusers:\n- name: fixture\n  user:\n    exec:\n      apiVersion: client.authentication.k8s.io/v1\n      command: nonexistent-fixture-auth-helper\n      interactiveMode: Never\n").unwrap();
-    let run = |arguments: &[&str]| {
-        fixture
-            .command(arguments)
-            .arg("--config")
-            .arg(&fixture.config)
-            .arg("--state-root")
-            .arg(&fixture.state)
-            .env("KUBECONFIG", &kubeconfig)
-            .output()
-            .unwrap()
-    };
-    let arguments = ["connection", "candidates", "--integration", "kubernetes"];
-    let first = success(&run(&arguments));
-    let second = success(&run(&arguments));
-    let candidates = first["candidates"].as_array().unwrap();
-    assert_eq!(candidates.len(), 1);
-    assert_eq!(
-        first, second,
-        "passive candidate identity changed between processes"
-    );
-    assert_eq!(candidates[0]["state"], "detected");
-    assert!(candidates[0]["connection_ref"].is_null());
-    let listed = success(&run(&["connection", "list"]));
-    assert_eq!(listed["connections"], json!([]));
-    let refused = run(&[
-        "connection",
-        "activate",
-        "--candidate",
-        candidates[0]["candidate_ref"].as_str().unwrap(),
-        "--label",
-        "fixture",
-    ]);
-    assert!(!refused.status.success());
-    assert!(value(&refused)["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("connectors serve local"));
-    assert!(!fixture.state.join("connectors.sock").exists());
+    let output = fixture.run(&["endpoint", "list"]);
+    assert!(!output.status.success());
+    assert_eq!(value(&output)["error"]["code"], "daemon-required");
+    assert!(!fixture.state.exists());
 }
 
 #[test]
@@ -912,6 +887,11 @@ fn rate_stage2_cli_json_and_yaml_preserve_delay_and_never_resend_an_invoke() {
             fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
             let socket = fixture.state.join("connectors.sock");
             let listener = UnixListener::bind(&socket).unwrap();
+            std::fs::set_permissions(
+                listener.local_addr().unwrap().as_pathname().unwrap(),
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+            )
+            .unwrap();
             fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
             let server = thread::spawn(move || {
                 let (mut stream, _) = listener.accept().unwrap();
@@ -981,7 +961,7 @@ fn rate_stage2_cli_json_and_yaml_preserve_delay_and_never_resend_an_invoke() {
 }
 
 #[test]
-fn rate_stage2_one_shot_refusals_preserve_retriable_without_inventing_delay() {
+fn missing_daemon_does_not_invent_retry_advice() {
     let fixture = Fixture::new();
     let output = fixture.run(&[
         "operation",
@@ -997,7 +977,7 @@ fn rate_stage2_one_shot_refusals_preserve_retriable_without_inventing_delay() {
     ]);
     assert!(!output.status.success());
     let value = value(&output);
-    assert!(value["error"]["retriable"].is_boolean());
+    assert_eq!(value["error"]["code"], "daemon-required");
     assert!(value["error"].get("retry_after_seconds").is_none());
     assert!(!fixture.state.join("connectors.sock").exists());
 }
@@ -1018,6 +998,11 @@ fn rate_adversary_cli_keeps_integer_extremes_and_never_resends_before_exit() {
             fs::create_dir(&fixture.state).unwrap();
             fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
             let listener = UnixListener::bind(fixture.state.join("connectors.sock")).unwrap();
+            std::fs::set_permissions(
+                listener.local_addr().unwrap().as_pathname().unwrap(),
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+            )
+            .unwrap();
             listener.set_nonblocking(true).unwrap();
             let done = Arc::new(AtomicBool::new(false));
             let finished = done.clone();
@@ -1128,6 +1113,11 @@ fn rate_final_cli_describe_spelling_and_invalid_advice_never_resend() {
             fs::set_permissions(&fixture.state, fs::Permissions::from_mode(0o700)).unwrap();
             let socket = fixture.state.join("connectors.sock");
             let listener = UnixListener::bind(&socket).unwrap();
+            std::fs::set_permissions(
+                listener.local_addr().unwrap().as_pathname().unwrap(),
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+            )
+            .unwrap();
             fs::set_permissions(socket, fs::Permissions::from_mode(0o600)).unwrap();
             listener.set_nonblocking(true).unwrap();
             let done = Arc::new(AtomicBool::new(false));
