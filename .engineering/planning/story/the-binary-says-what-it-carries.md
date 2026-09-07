@@ -2,81 +2,98 @@
 format: aep.planning-md/1
 id: story:the-binary-says-what-it-carries
 kind: story
-status: draft
+status: active
 title: The binary says what it carries
 relations:
 - derived_from: epic:cli-surface
 - depends_on: story:cli-first-level-groups
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connector-secrets/src/file.rs
+- confidence: cited
+  path: crates/connector-secrets/src/file/prepared.rs
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/adversary_fence_probe.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface_drift.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/upgrade.rs
+- confidence: cited
+  path: crates/connectors-client/src/identity.rs
+- confidence: inferred
+  path: crates/connectors-client/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-console/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-console/src/upgrade.rs
+- confidence: cited
+  path: docs/design/19-the-cli-surface.md
+- confidence: cited
+  path: ess/system/components.yaml
+revision: 18
 ---
 # Story: the binary says what it carries
 
 ## Defect
 
-A `connectors` binary carries four independently versioned things and reports one of them. `--version`
-prints the workspace version (`crates/connectors-cli/src/lib.rs:36`). The other three are readable
-only by failing:
+The installed CLI reports its package version, but has no single command for the embedded catalog and the supported credential/session formats. `InspectCommand` in `crates/connectors-cli/src/lib.rs:235` has no upgrade leaf. Source review at `4d0cd30872533da40f209274f936eaeae9bf01d7` established these owning facts:
 
-| what | where the version lives | how a person finds out today |
-|---|---|---|
-| the embedded catalog pack | `crates/catalog-reader/catalog.pack`, embedded at `crates/catalog-reader/src/lib.rs:73`; schema version recorded at `connectors.lock:6-9` | not at all |
-| the credential file-store format | `crates/connector-secrets/src/file.rs:88-92` (`VERSION = "1"`, v2 at `:44-47`) | a refusal at `file.rs:822-829` after a write is attempted |
-| hosted session metadata | `crates/connectors-client/src/identity.rs:36` (`METADATA_VERSION: u32 = 1`), checked at `:884` | `IdentityError::State`, which names no version |
+- Embedded catalog schema and digest: `crates/catalog-reader/src/lib.rs:316,321`, available through `crates/catalog/src/lib.rs:49`.
+- Credential v1 grammar: `crates/connector-secrets/src/file.rs:95`; v2 grammar: `crates/connector-secrets/src/file/prepared.rs:19,83,133`.
+- Credential write selection: `crates/connector-secrets/src/file.rs:387`; prepared transactions switch to v2 at `file/prepared.rs:414`.
+- Hosted session metadata: `crates/connectors-client/src/identity.rs:36`.
 
-The credential store migrates v1 to v2 on the first prepared-transaction write, and a 0.19.1 reader
-then refuses v2 (`crates/connector-secrets/src/file.rs:30-35`). That makes downgrade-after-upgrade a
-data hazard a person cannot see coming, because nothing prints which format is on disk.
+The original draft conflated supported formats with the format of an existing local file. This revision chooses compiled capabilities: inspecting an installed binary must work without opening state. It also replaces the stale release-history claims in the original draft with the current source references above.
 
 ## Shape
 
-One leaf: `connectors inspect upgrade`. It reads constants already compiled into the binary and
-prints them beside the install command the repository already has (`Taskfile.yaml:5,54-69`).
+Add `connectors inspect upgrade`, with the existing output conventions. Report the CLI version, embedded catalog schema/digest, supported credential read/write formats (v1 and v2, including the prepared-write transition), session metadata version, and the existing source installation instruction from `Taskfile.yaml:5`.
 
-`inspect` is the group whose declared summary is reading what is configured, what is connected and
-what cannot work (`ess/system/components.yaml:201-202`). The command writes nothing, opens no
-socket, and downloads nothing.
+Values come from the owning implementation rather than a second table of version literals. Preserve the existing credential bytes and session grammar when exposing these facts. This reaches four existing crates through current dependencies: CLI, console, secrets and client. It is a bounded diagnostic feature, not merely one parser arm.
 
-**It is an enumerated exception, not a declared command.** `connectors-cli` owns
-`connectors.target` alone, which declares no command, and `ESS-COMPONENT-004` refuses placing
-another domain's command there (`ess/system/components.yaml:101-106,120-127`). So the path arrives
-as one `unspecified-path: inspect upgrade — read` line in `ess/system/components.yaml` and one
-matching `UNSPECIFIED_PATHS` entry, which `crates/connectors-cli/tests/cli_surface.rs:98,429,459`
-holds equal in both directions, kind included.
-
-No new dependency. Nothing in `CLI_DEPENDENCIES`
-(`crates/catalog-build/tests/main/architecture_fence.rs:304-330`) changes, which is what keeps this
-story one parser arm and one console function rather than a crate.
-
-## Not in this story
-
-**No download and no version comparison.** Resolving the newest published release and replacing this
-binary is `connectors setup upgrade`, and it is blocked rather than deferred: `SHA256SUMS` is
-produced by the same job that uploads the archive (`.github/workflows/release.yml:276-282,300-313`),
-so it establishes integrity and not authenticity, and `crates/catalog-reader/README.md:41-49` — a
-public file of this repository — states that b10x has no supported distribution channel and that the
-first must follow ADR 0019 with a signed bundle manifest. A `--check-remote` flag would also be
-reach into the outside world with no catalogued operation, no bound credential and no grant, which
-is what O1 forbids (`AGENTS.md:15`).
-
-**No configured catalog pack.** `[catalog] pack` and its digest are `epic:deployment-packs`.
-
-**No correction to design 02.** `docs/design/02-architecture.md:390` states "Pre-v1 there are no
-release artifacts; the repo is the product". Sixteen releases are published, the latest `v0.5.11`.
-The sentence is false and amending it is a separate change, named here so it is not lost.
+The command is a read exception in `ess/system/components.yaml:162`, with matching `UNSPECIFIED_PATHS` in all three CLI contract tests and updated totals in `docs/design/19-the-cli-surface.md:83,111,121`. No new domain entity or ESS command owner is introduced. Generated clap output must remain byte-identical.
 
 ## Acceptance
 
-- `connectors inspect upgrade` exits 0 and prints four version facts: the CLI version, the embedded
-  pack's schema version and digest, the credential-store format version, and the session-metadata
-  version.
-- Each printed value is read from the constant that governs it, not restated — a test changing
-  `connector-secrets`' `VERSION` changes the output.
-- The command opens no socket and writes no file. It runs with the state root absent.
-- `ess/system/components.yaml` and `UNSPECIFIED_PATHS` agree, and `ess/generated/clap` regenerates
-  byte-identically.
-- `connectors --help` still lists 8 commands.
-- `bash scripts/gate.sh` exits 0.
+`connectors inspect upgrade` exits successfully with the compiled CLI/catalog/credential/session facts and existing installation guidance in the supported output modes, runs without opening configuration, state, files, sockets or network connections, and passes the command-contract checks and complete repository gate with existing top-level groups and serialized formats preserved.
 
-## Depends on
+## Verification
 
-`story:cli-first-level-groups`, which is what makes `inspect` a group.
+- Exercise the real CLI with an absent state root and assert the report against exported owning facts, including both supported credential versions and the prepared-write behavior.
+- Test supported output formats and meaningful failures through existing output conventions.
+- Check the exact CLI exception enumeration, its mirrored test declarations and design totals; regenerate with ESS and compare the generated bytes.
+- Run affected locked tests, strict Clippy and formatting, then every repository gate lane with its own observed exit status.
+
+## Not in this story
+
+No self-update, release lookup, downloads, remote version comparison, state-format diagnosis, configuration migration, new dependency, release/version bump, or deployment-pack support. Public release notes are updated when a separately authorized release is prepared. The design document's current publication allowlist is `b10x.docs.yaml:78–84`.
+
+## Objectives and readiness
+
+Serves O1 (governed reach) and O5 (generic platform), as declared in `AGENTS.md:10–16` and the current Atlas ROADMAP: consumers can identify their installed catalog and compatibility capabilities without an external call. This objective mapping is the coordinator's proposal. Existing prerequisite `story:cli-first-level-groups` is implemented; no declared blocker targets this story.
+
+## Scope correction, 2026-09-07
+
+The scoper's original section below is retained. Coordinator source review adds `crates/connector-secrets/src/file/prepared.rs` as cited scope: reporting only the v1 `VERSION` would omit the shipped v2 parser and writer. Acceptance now resolves the scoper's ambiguity; overall implementation confidence remains medium until the public reporting exports are verified by the implementor. Catalog access and installation text reuse existing owners without changes to those owners.
+## Scope
+
+Derived 2026-09-07 by `story-scoper` through read-only inspection of base `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+
+- **Primary surface:** `crates/connectors-cli/src/lib.rs:235` — cited; extend `InspectCommand` and its dispatch at line 922.
+- **Console registration:** `crates/connectors-console/src/lib.rs:35` — inferred; register the reusable report module.
+- **Console implementation:** `crates/connectors-console/src/upgrade.rs` — inferred; new module collecting compiled version facts and installation guidance.
+- **Credential authority:** `crates/connector-secrets/src/file.rs:95` — cited; its format constant is private, requiring a public reporting surface.
+- **Session authority:** `crates/connectors-client/src/identity.rs:36` — cited; `METADATA_VERSION` is private.
+- **Session export:** `crates/connectors-client/src/lib.rs:28` — inferred; expose the session-format reporting surface through the existing identity exports.
+- **CLI contract:** `crates/connectors-cli/tests/cli_surface.rs:98` — cited; add the read exception to `UNSPECIFIED_PATHS`.
+- **Contract copies:** `crates/connectors-cli/tests/cli_surface_drift.rs:521` and `crates/connectors-cli/tests/adversary_fence_probe.rs:1164` — cited; tests require their copied exception declarations to remain byte-identical.
+- **Behavior verification:** `crates/connectors-cli/tests/upgrade.rs` — inferred; new integration coverage for reported facts and execution with absent state.
+- **Specification:** `ess/system/components.yaml:162` — cited; add `unspecified-path: inspect upgrade — read`; the existing mechanism uses a checked comment enumeration, not an ESS command declaration.
+- **Documents:** `docs/design/19-the-cli-surface.md:83` — cited; exception totals and residual-path accounting at lines 111 and 121 must include the new leaf.
+- **Symbols:** `InspectCommand`, `UNSPECIFIED_PATHS`, `VERSION`, `METADATA_VERSION` — cited.
+- **Confidence:** medium — inferred; landing sites are established, but acceptance leaves credential-format reporting ambiguous.
+- **Would collide with:** changes to CLI parser/dispatch, its exception declaration and copied contract tests, console module registration, credential-format exports, session metadata exports, and CLI specification/design accounting — inferred.

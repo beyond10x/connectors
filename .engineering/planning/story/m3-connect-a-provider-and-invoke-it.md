@@ -9,7 +9,18 @@ refs:
   reference: S-008
 relations:
 - derived_from: epic:build-order
-revision: 1
+scope:
+- confidence: cited
+  path: crates/domain
+- confidence: cited
+  path: crates/integration-catalog
+- confidence: cited
+  path: crates/protocol
+- confidence: cited
+  path: crates/server
+- confidence: cited
+  path: crates/service
+revision: 7
 ---
 ## Acceptance
 
@@ -75,3 +86,16 @@ Migrated from `docs/stories/S-008-m3-connect-a-provider-and-invoke-it.md`, which
 - First written 2026-08-13 · last touched 2026-08-16 · 6 revision(s)
 - Legacy id `S-008`, recorded as the reference `legacy:S-008`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` at released base 4d0cd308 — cited.
+
+- **Authority model:** `crates/domain` — cited; src/grant.rs:114–182 owns selectors, explicit exceptions and GrantSet; evaluator.rs owns grant decisions.
+- **Client contracts:** `crates/protocol` — cited; src/connection.rs:96 owns session creation, lifecycle states and tenant/principal scopes.
+- **Lifecycle and authority services:** `crates/service` — cited; src/connect_session.rs owns session lifetime; runtime.rs owns admitted principals and backend capabilities.
+- **Hosted admission/routes:** `crates/server` — cited; hosted/connection_route.rs selects exact Identity scopes; hosted/operation_transport.rs and enforcement.rs own hosted admission.
+- **Acquisition and declared execution:** `crates/integration-catalog` — cited; hosted.rs:140 accepts prepared custody; oauth.rs:356 opens personal acquisition; lib.rs executes resolved catalog requests.
+- **Disposition:** reconcile this legacy milestone with shipped implementations and isolate remaining acceptance gaps before scheduling implementation — inferred.
+- **Confidence:** medium; current owners are identifiable, but this milestone spans several independently delivered units — inferred.
+- **Would collide with:** Connection contracts, grant authority, ConnectSession lifecycle, hosted admission or catalog acquisition/execution — cited.

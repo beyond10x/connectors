@@ -9,7 +9,22 @@ refs:
   reference: S-021
 relations:
 - derived_from: epic:post-m1
-revision: 1
+scope:
+- confidence: inferred
+  path: catalog
+- confidence: inferred
+  path: connectors.lock
+- confidence: cited
+  path: crates/catalog-build/tests/main/catalog_invariants.rs
+- confidence: inferred
+  path: crates/catalog-reader/catalog.pack
+- confidence: inferred
+  path: crates/connector-spec
+- confidence: inferred
+  path: ess/system/domains/catalog.yaml
+- confidence: cited
+  path: providers
+revision: 9
 ---
 ## Acceptance
 
@@ -61,3 +76,17 @@ Migrated from `docs/stories/S-021-coverage-regains-its-second-direction.md`, whi
 - First written 2026-08-13 · last touched 2026-08-13 · 1 revision(s)
 - Legacy id `S-021`, recorded as the reference `legacy:S-021`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper`, read-only against `4d0cd30872533da40f209274f936eaeae9bf01d7`. Every line is **cited** or **inferred**.
+
+- **Primary surface:** `crates/catalog-build/tests/main/catalog_invariants.rs:1162` — cited; derive declared-minus-published, require an exact reason for every gap, reject stale reasons, and add the requested mutation cases.
+- **Already implemented:** `spec_backed_coverage_holds_in_both_directions` checks published-source membership, exact selectors and deferrals, and retains `spec_backed >= 7`; it does not check unnamed omissions — cited.
+- **Reason data:** `providers/` — cited; the acceptance requires reviewed reasons alongside connector declarations. Existing prose explains some exclusions but is not checked reason data.
+- **Also likely:** `crates/connector-spec` — inferred; extend the provider declaration and validation beyond the existing bulk-selection-only `defer`, keeping its schema and schema checks synchronized.
+- **Domain modeling:** `ess/system/domains/catalog.yaml` — inferred; a new persisted gap/reason record needs a typed home before implementation. Its identity must distinguish source documents and operations, including operations rejected by ingest.
+- **Regenerated outputs:** `connectors.lock`, `catalog/`, `crates/catalog-reader/catalog.pack` — inferred; provider-byte provenance changes require deterministic regeneration.
+- **Documents:** no standalone public documentation deliverable is required by the acceptance — cited.
+- **Confidence:** medium — inferred; the missing invariant and existing declaration limits are located, but reason storage, source identity and the full provider-data migration remain undecided.
+- **Would collide with:** consolidated catalog invariants, provider declaration/schema work, provider reason data, catalog ESS modeling, and catalog regeneration — inferred.

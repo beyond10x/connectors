@@ -9,7 +9,16 @@ refs:
   reference: S-005
 relations:
 - derived_from: epic:catalog-adoptions
-revision: 1
+scope:
+- confidence: cited
+  path: crates/catalog-build
+- confidence: cited
+  path: crates/connector-spec
+- confidence: cited
+  path: providers/discord.toml
+- confidence: cited
+  path: providers/hubspot.toml
+revision: 6
 ---
 ## Acceptance
 
@@ -54,3 +63,16 @@ Migrated from `docs/stories/S-005-header-name-rate-limit-retry.md`, which is not
 - First written 2026-08-13 · last touched 2026-08-13 · 3 revision(s)
 - Legacy id `S-005`, recorded as the reference `legacy:S-005`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` at released base 4d0cd308 — cited.
+
+- **Declaration surface:** `crates/connector-spec` — cited; src/rate_limit.rs:8 defines the fixed pair, while ConditionalRateLimit permits an absent numeric allowance but carries no header mapping.
+- **Canonical projection and regressions:** `crates/catalog-build` — cited; src/document.rs:340 serializes rate declarations; src/document_schema.rs:503 still requires requests/per_seconds; existing provider assertions belong in tests/main/catalog_invariants.rs.
+- **Provider declaration:** `providers/hubspot.toml:107` — cited; tier-dependent limits remain deliberately undeclared.
+- **Provider declaration:** `providers/discord.toml:112` — cited; per-route response-header discovery remains prose.
+- **Consumer boundary:** invocation egress already normalizes HTTP 429 using literal retry-after; document how declared headers would be consumed, without implementing backoff — cited.
+- **Proposed deciding regression:** header_discovered_rate_reaches_canonical_document, retaining fixed-rate compatibility and explicit unknown-by-tier behavior — inferred.
+- **Confidence:** medium; missing vocabulary and owners are clear, but representation and schema compatibility remain undecided — inferred.
+- **Would collide with:** rate declaration/IR validation, canonical schema generation and the two provider definitions — cited.

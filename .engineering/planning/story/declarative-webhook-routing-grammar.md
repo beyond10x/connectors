@@ -9,7 +9,18 @@ refs:
   reference: S-012
 relations:
 - derived_from: epic:carried-constraints
-revision: 1
+scope:
+- confidence: cited
+  path: crates/catalog-build
+- confidence: cited
+  path: crates/connector-spec
+- confidence: cited
+  path: docs/design
+- confidence: cited
+  path: ess/system/domains/event.yaml
+- confidence: inferred
+  path: providers
+revision: 7
 ---
 ## Acceptance
 
@@ -66,3 +77,16 @@ Migrated from `docs/stories/S-012-declarative-webhook-routing-grammar.md`, which
 - First written 2026-08-13 · last touched 2026-08-13 · 1 revision(s)
 - Legacy id `S-012`, recorded as the reference `legacy:S-012`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper`, read-only against `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+
+- **Primary surface:** `crates/connector-spec` — cited; `src/inbound.rs:198` owns HMAC declarations, `:291` verification states, and `:488` discriminator/delivery/payload selectors. Attribution and a declared unsupported-signature state remain missing.
+- **Validation and fixtures:** existing channel validation, channel-binding tests and verification-conformance tests within the primary surface — cited; body-sourced timestamp refusal already exists at `src/provider/channel_validation.rs:628`, with a test at `tests/main/channel_bindings.rs:603`.
+- **Projection:** `crates/catalog-build` — cited; `src/inbound.rs:83` classifies verification, and `src/document.rs:932` projects HMAC parameters. Grammar changes must survive those projections.
+- **Provider declarations:** `providers/` — inferred; preserve existing bindings while expressing any newly supported or explicitly refused verification cases.
+- **Documents:** `docs/design/` — cited; acceptance requires measured corpus classifications and recorded counts; architecture §6 already assigns this grammar to the webhook terminator.
+- **Domain modeling:** `ess/system/domains/event.yaml:93` — cited; its unresolved Webhook-to-Channel relation explicitly names this story as the owner of attribution semantics.
+- **Confidence:** medium — inferred; declaration, validation and projection owners are located, but the production terminator and complete routing corpus have not been located.
+- **Would collide with:** inbound declaration/schema work, catalog channel projections, provider bindings, event-domain modeling and the numbered design series — inferred.

@@ -9,7 +9,18 @@ refs:
   reference: S-004
 relations:
 - derived_from: epic:catalog-adoptions
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connector-spec
+- confidence: cited
+  path: crates/integration-slack
+- confidence: cited
+  path: crates/protocol
+- confidence: cited
+  path: ess/system/domains/connection.yaml
+- confidence: inferred
+  path: providers/slack.toml
+revision: 7
 ---
 ## Acceptance
 
@@ -56,3 +67,17 @@ Migrated from `docs/stories/S-004-adopt-token-response-metadata.md`, which is no
 - First written 2026-08-13 · last touched 2026-08-13 · 1 revision(s)
 - Legacy id `S-004`, recorded as the reference `legacy:S-004`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper`, read-only against `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+
+- **Primary surface:** `crates/connector-spec` — cited; `OAuth2Spec` in `src/auth.rs:382` owns OAuth declarations; add closed extraction declarations, credential-field refusal, schema coverage and tests.
+- **Acquisition and persistence:** `crates/integration-slack` — cited; `src/backend/api_runtime.rs:127` parses the token response, `src/backend.rs:262` defines stored connections, and `src/backend/connection_runtime.rs:4` constructs their readable description.
+- **Connection contract:** `crates/protocol` — cited; `src/connection.rs:204` defines `ConnectionDescription`, the existing response surface requiring declared metadata.
+- **Provider fixture:** `providers/slack.toml` — inferred; declare the selected response paths and exercise acquisition with a recorded response.
+- **Domain modeling:** `ess/system/domains/connection.yaml:222` — cited; Connection already exists, but its fields omit token-response metadata. Model the added value type and ownership before implementation.
+- **Also likely:** shared acquisition, admission/audit checks, contract projections and generated catalog artifacts — inferred; exact propagation remains unclosed.
+- **Documents:** no standalone documentation deliverable — cited; acceptance requires working declaration, acquisition, custody separation and admitted reads.
+- **Confidence:** medium — inferred; core owners are located, but the metadata contract and propagation boundaries need design.
+- **Would collide with:** OAuth declaration/schema changes, Slack acquisition and connection persistence, Connection protocol evolution, and connection ESS modeling — inferred.
