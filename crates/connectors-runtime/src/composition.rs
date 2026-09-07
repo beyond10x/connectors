@@ -439,7 +439,7 @@ impl PersonalRuntime {
                     &state_root,
                     claim_store.clone(),
                 )?
-                .with_endpoint_egress(Arc::new(crate::endpoint_egress::KubernetesEgress));
+                .with_endpoint_backend_factory(Arc::new(crate::endpoint_egress::KubernetesEgress));
                 backend.restore_selected_context().await?;
                 kubernetes_candidates = Some(backend.candidate_count());
                 kubernetes_connections = Some(backend.connection_count());

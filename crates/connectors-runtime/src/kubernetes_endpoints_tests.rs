@@ -1,5 +1,4 @@
 use super::*;
-use crate::endpoints::tests::{client, service, source};
 use domain::endpoint::{EndpointBinding, EndpointCredentialReference};
 use service::{EgressHttpRequest, EgressHttpResponse, EgressTransportError, EgressWebSocket};
 use std::sync::Mutex;
@@ -116,6 +115,11 @@ async fn ari_execution_resolves_the_current_named_secret_and_keeps_invalid_input
                 };
                 (200, serde_json::to_value(secret).unwrap())
             }
+            _ if path.starts_with("/api/v1/namespaces/apps/services?") => (
+                200,
+                serde_json::json!({"apiVersion":"v1", "kind":"ServiceList", "metadata":{}, "items":[current]}),
+            ),
+            _ if path.starts_with("/apis/") => absent(),
             _ => panic!("unexpected cluster request {path}"),
         }
     });
@@ -123,15 +127,8 @@ async fn ari_execution_resolves_the_current_named_secret_and_keeps_invalid_input
         client,
         Arc::new(connector_state::MemoryState::new()),
     ));
-    let endpoints = crate::endpoints::project_service(source.source_ref(), &fixture);
-    let endpoint_ref = endpoints[0].endpoint_ref.clone();
-    source
-        .reconcile(crate::endpoints::EndpointScan {
-            endpoints,
-            complete: true,
-            warnings: Vec::new(),
-        })
-        .unwrap();
+    source.refresh().await.unwrap();
+    let endpoint_ref = source.list().unwrap()[0].endpoint_ref.clone();
     source
         .bind(
             &endpoint_ref,
@@ -222,4 +219,59 @@ async fn ari_execution_resolves_the_current_named_secret_and_keeps_invalid_input
         before,
         "changed bindings invalidate old descriptions before any source or Secret I/O"
     );
+}
+
+use connector_state::StateStore;
+use integration_kubernetes::endpoints::EndpointPlacement;
+use k8s_openapi::api::core::v1::Service;
+use kube::Client;
+use serde_json::{json, Value};
+
+fn service(name: &str, uid: &str, ports: Value) -> Service {
+    serde_json::from_value(
+        json!({"metadata":{"name":name,"namespace":"apps","uid":uid},
+        "spec":{"selector":{"app":name},"ports":ports}}),
+    )
+    .unwrap()
+}
+
+fn client(respond: impl Fn(&str) -> (u16, Value) + Send + Sync + 'static) -> Client {
+    let respond = Arc::new(respond);
+    let service = tower::service_fn(move |request: http::Request<kube::client::Body>| {
+        assert_eq!(request.method(), http::Method::GET);
+        let (status, body) = respond(&request.uri().to_string());
+        async move {
+            Ok::<_, std::io::Error>(
+                http::Response::builder()
+                    .status(status)
+                    .header("content-type", "application/json")
+                    .body(kube::client::Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+        }
+    });
+    Client::new(service, "apps")
+}
+
+fn absent() -> (u16, Value) {
+    (
+        404,
+        json!({"apiVersion":"v1","kind":"Status","status":"Failure","reason":"NotFound","code":404,"message":"not installed"}),
+    )
+}
+
+fn source(client: Client, store: Arc<dyn StateStore>) -> KubernetesEndpointSource {
+    KubernetesEndpointSource::new(
+        client,
+        "source:cluster".to_owned(),
+        BTreeSet::from(["apps".to_owned()]),
+        false,
+        BTreeMap::from([
+            ("asterisk".to_owned(), "grant:ari-read".to_owned()),
+            ("loki".to_owned(), "grant:loki-read".to_owned()),
+        ]),
+        store,
+        EndpointPlacement::Local,
+    )
+    .unwrap()
 }

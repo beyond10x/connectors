@@ -5,6 +5,7 @@
 mod claims;
 mod composition;
 mod endpoint_egress;
+mod kubernetes_endpoints;
 mod local_setup;
 mod registry;
 mod service_bundle;
