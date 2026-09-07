@@ -45,7 +45,12 @@ pub mod admission;
 pub mod bounds;
 pub mod credentials;
 mod mysql;
+mod operation;
 mod postgres;
+mod tls;
+
+pub use operation::{admit_operation, AdmittedSqlOperation};
+pub use tls::SqlTls;
 
 use protocol::sql::{
     QueryResultPage, SchemaList, SqlQueryInput, TableDescription, TableList, MAX_RESULT_ROWS,
@@ -76,6 +81,10 @@ pub struct SqlConnectionConfig {
     pub host: String,
     /// Database port.
     pub port: u16,
+    /// Optional runtime-admitted physical address. `host` remains the TLS identity.
+    pub connect_address: Option<std::net::SocketAddr>,
+    /// Deployment-owned TLS requirements. There is no opportunistic plaintext downgrade.
+    pub tls: SqlTls,
     /// The database (PostgreSQL) or default schema (MySQL) to connect to.
     pub database: String,
     /// The database account. Deployment-owned; pairs with the referenced credential.
@@ -268,6 +277,8 @@ mod tests {
             engine,
             host: "127.0.0.1".to_owned(),
             port: 1,
+            connect_address: None,
+            tls: SqlTls::Disabled,
             database: "db".to_owned(),
             user: "reader".to_owned(),
             credential: CredentialReference::File {

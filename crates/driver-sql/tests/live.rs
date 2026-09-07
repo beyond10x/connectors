@@ -29,6 +29,8 @@ fn env_or(name: &str, fallback: &str) -> String {
 fn postgres_config() -> SqlConnectionConfig {
     SqlConnectionConfig {
         engine: SqlEngine::Postgres,
+        connect_address: None,
+        tls: driver_sql::SqlTls::Disabled,
         host: env_or("B10X_SQL_TEST_PG_HOST", "127.0.0.1"),
         port: env_or("B10X_SQL_TEST_PG_PORT", "15432")
             .parse()
@@ -45,6 +47,8 @@ fn postgres_config() -> SqlConnectionConfig {
 fn mysql_config() -> SqlConnectionConfig {
     SqlConnectionConfig {
         engine: SqlEngine::MySql,
+        connect_address: None,
+        tls: driver_sql::SqlTls::Disabled,
         host: env_or("B10X_SQL_TEST_MYSQL_HOST", "127.0.0.1"),
         port: env_or("B10X_SQL_TEST_MYSQL_PORT", "13306")
             .parse()
