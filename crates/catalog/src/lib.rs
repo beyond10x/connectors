@@ -347,7 +347,8 @@ pub struct Operation {
     /// [`expose`](Self::expose) this is the complete caller-facing contract, built from document
     /// data alone.
     pub input_schema: &'static str,
-    /// The build-time translated successful response schema, absent when none was declared.
+    /// The declared successful response schema: the build-time translated contract output,
+    /// or the canonical effective response for a legacy operation. Absent when none is declared.
     pub output_schema: Option<&'static str>,
     /// Whether the operation is published to callers. An unexposed operation exists (its document
     /// entry is the audit trail) but is not offered.

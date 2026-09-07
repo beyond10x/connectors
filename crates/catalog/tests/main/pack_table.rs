@@ -12,6 +12,43 @@
 
 use catalog::{Acquisition, CredentialRequirement, OperationKey, Placement, ProviderKey};
 
+#[test]
+fn legacy_response_schemas_reach_the_typed_table_without_losing_declared_constraints() {
+    let mut declared = 0;
+    let mut absent = 0;
+    for record in catalog::reader::embedded().operations() {
+        let document: serde_json::Value = serde_json::from_str(record.record()).unwrap();
+        if document["request_semantics"] != "legacy_v1" {
+            continue;
+        }
+        let operation = catalog::operation(OperationKey::id(record.id())).unwrap();
+        let expected = document["contract"]
+            .get("output_schema")
+            .filter(|value| !value.is_null())
+            .or_else(|| {
+                document
+                    .get("response_schema")
+                    .filter(|value| !value.is_null())
+            });
+        let actual = operation
+            .output_schema
+            .map(|schema| serde_json::from_str::<serde_json::Value>(schema).unwrap());
+        assert_eq!(
+            actual.as_ref(),
+            expected,
+            "{} response fidelity",
+            record.id()
+        );
+        if expected.is_some() {
+            declared += 1;
+        } else {
+            absent += 1;
+        }
+    }
+    assert!(declared > 0, "declared legacy outputs are covered");
+    assert!(absent > 0, "unspecified legacy outputs stay unspecified");
+}
+
 /// Every provider in the pack becomes a provider in the table, in the same order, and the two
 /// agree operation for operation.
 #[test]
