@@ -4,7 +4,7 @@ use connector_secrets::Secret;
 use serde::Deserialize;
 use service::{HostedCompletionError, HostedCompletionPage};
 
-use super::{SlackConnectionProfile, SlackCredentials, SlackError};
+use super::{SlackEndpointProfile, SlackCredentials, SlackError};
 
 const MAX_HOSTED_SUBMISSION_BYTES: usize = 8 * 1024;
 pub(super) const MAX_AUTH_TEST_RESPONSE_BYTES: usize = 64 * 1024;
@@ -30,13 +30,13 @@ pub(super) struct AuthTestIdentity {
 }
 
 pub(super) fn completion_page(
-    profile: SlackConnectionProfile,
+    profile: SlackEndpointProfile,
     oauth_authorize_url: Option<&str>,
 ) -> HostedCompletionPage {
     let html = match profile {
-        SlackConnectionProfile::OrgUser => oauth_page(oauth_authorize_url),
-        SlackConnectionProfile::CompanionBot => HOSTED_COMPANION_SETUP_PAGE.to_owned(),
-        SlackConnectionProfile::Legacy | SlackConnectionProfile::OrgBot => {
+        SlackEndpointProfile::OrgUser => oauth_page(oauth_authorize_url),
+        SlackEndpointProfile::CompanionBot => HOSTED_COMPANION_SETUP_PAGE.to_owned(),
+        SlackEndpointProfile::Legacy | SlackEndpointProfile::OrgBot => {
             "<!doctype html><meta charset=\"utf-8\"><title>Connect Slack</title><p>This Slack setup profile is operator-managed.</p>".to_owned()
         }
     };

@@ -64,7 +64,7 @@ impl DeclaredConfig {
 impl ConfigPort for DeclaredConfig {
     fn resolve(&self, field: ConfigField<'_>) -> Option<ConfigValue> {
         match field {
-            ConfigField::Endpoint(name) => self.endpoints.get(name).map(|raw| self.value(raw)),
+            ConfigField::EndpointInventoryEntry(name) => self.endpoints.get(name).map(|raw| self.value(raw)),
             ConfigField::Username(credential) => {
                 self.usernames.get(credential).map(|raw| self.value(raw))
             }
@@ -86,7 +86,7 @@ mod tests {
             true,
         );
         let value = config
-            .resolve(ConfigField::Endpoint("origin"))
+            .resolve(ConfigField::EndpointInventoryEntry("origin"))
             .expect("the declared origin resolves");
         assert!(value.is_operator_approved());
     }
@@ -101,7 +101,7 @@ mod tests {
             false,
         );
         let value = config
-            .resolve(ConfigField::Endpoint("origin"))
+            .resolve(ConfigField::EndpointInventoryEntry("origin"))
             .expect("the value is present");
         assert!(!value.is_operator_approved());
     }
@@ -109,6 +109,6 @@ mod tests {
     #[test]
     fn an_unsupplied_variable_is_absent_rather_than_empty() {
         let config = DeclaredConfig::default();
-        assert!(config.resolve(ConfigField::Endpoint("subdomain")).is_none());
+        assert!(config.resolve(ConfigField::EndpointInventoryEntry("subdomain")).is_none());
     }
 }

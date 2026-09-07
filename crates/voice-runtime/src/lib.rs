@@ -271,6 +271,14 @@ impl VoiceSessionControl {
         true
     }
 
+    /// Wait for the selected terminal reason without consuming it.
+    ///
+    /// Session owners use this to carry a termination request to their transport. The reason is
+    /// retained, so a request made before the owner starts waiting is observed as well.
+    pub async fn wait_termination(&self) -> TerminationReason {
+        self.wait().await.reason
+    }
+
     async fn wait(&self) -> TerminalSelection {
         loop {
             let notified = self.terminal.ready.notified();

@@ -241,7 +241,7 @@ mod tests {
         DataEvent {
             event_ref: "pending".to_owned(),
             channel_ref: "channel:work".to_owned(),
-            connection_ref: "connection:work".to_owned(),
+            endpoint_ref: "connection:work".to_owned(),
             integration_ref: "b10x".to_owned(),
             event_type: "request.created".to_owned(),
             provenance: EventProvenance::Polled,

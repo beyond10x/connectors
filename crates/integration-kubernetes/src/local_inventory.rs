@@ -4,7 +4,7 @@
 //! template, not Pods, and do not change the existing compact workload datasource projection.
 
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary, EffectClass, InvokeRequest, OperationDescription,
+    ApprovalPosture, EndpointSummary, EffectClass, InvokeRequest, OperationDescription,
     OperationError, OperationErrorCode, MAX_RESULT_BYTES,
 };
 use serde::{Deserialize, Serialize};
@@ -74,13 +74,13 @@ struct DeploymentSummary {
 
 #[derive(Serialize)]
 struct NamespaceInventory<'a> {
-    connection_ref: &'a str,
+    endpoint_ref: &'a str,
     namespaces: Vec<String>,
 }
 
 #[derive(Serialize)]
 struct WorkloadInventory<'a> {
-    connection_ref: &'a str,
+    endpoint_ref: &'a str,
     namespace: &'a str,
     deployments: Vec<DeploymentSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -137,7 +137,7 @@ impl KubernetesLocalBackend {
                 );
             }
             return bounded_value(NamespaceInventory {
-                connection_ref: &request.connection_ref,
+                endpoint_ref: &request.endpoint_ref,
                 namespaces: namespaces.into_iter().collect(),
             });
         }
@@ -163,7 +163,7 @@ impl KubernetesLocalBackend {
         // domain-separated key also prevents replay through the separate datasource protocol.
         let cursor_scope = format!(
             "{WORKLOAD_OPERATION}\0{}\0{}",
-            request.connection_ref, input.namespace
+            request.endpoint_ref, input.namespace
         );
         let cursors = &self.workloads.inventory_cursors;
         let provider_cursor = cursors
@@ -196,7 +196,7 @@ impl KubernetesLocalBackend {
             .store(context, &cursor_scope, provider_cursor)
             .map_err(operation_from_datasource)?;
         bounded_value(WorkloadInventory {
-            connection_ref: &request.connection_ref,
+            endpoint_ref: &request.endpoint_ref,
             namespace: &input.namespace,
             deployments,
             next_cursor,
@@ -205,7 +205,7 @@ impl KubernetesLocalBackend {
 }
 
 pub(super) fn namespace_operation(
-    connections: Vec<ConnectionSummary>,
+    endpoints: Vec<EndpointSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -216,21 +216,21 @@ pub(super) fn namespace_operation(
         input_schema: json!({"type": "object", "additionalProperties": false, "properties": {}}),
         output_schema: json!({
             "type": "object", "additionalProperties": false,
-            "required": ["connection_ref", "namespaces"],
+            "required": ["endpoint_ref", "namespaces"],
             "properties": {
-                "connection_ref": {"type": "string"},
+                "endpoint_ref": {"type": "string"},
                 "namespaces": {"type": "array", "items": {"type": "string"}}
             }
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        connections,
+        endpoints,
         description_ref,
     }
 }
 
 pub(super) fn workload_operation(
-    connections: Vec<ConnectionSummary>,
+    endpoints: Vec<EndpointSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -248,9 +248,9 @@ pub(super) fn workload_operation(
         }),
         output_schema: json!({
             "type": "object", "additionalProperties": false,
-            "required": ["connection_ref", "namespace", "deployments"],
+            "required": ["endpoint_ref", "namespace", "deployments"],
             "properties": {
-                "connection_ref": {"type": "string"}, "namespace": {"type": "string"},
+                "endpoint_ref": {"type": "string"}, "namespace": {"type": "string"},
                 "next_cursor": {"type": "string"},
                 "deployments": {"type": "array", "maxItems": MAX_LIST_LIMIT, "items": {
                     "type": "object", "additionalProperties": false,
@@ -267,7 +267,7 @@ pub(super) fn workload_operation(
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        connections,
+        endpoints,
         description_ref,
     }
 }

@@ -32,7 +32,7 @@ struct AuditJournalState {
 pub(super) struct AuditEvent<'a> {
     pub(super) audit_ref: &'a str,
     pub(super) operation_ref: &'a str,
-    pub(super) connection_ref: &'a str,
+    pub(super) endpoint_ref: &'a str,
     pub(super) tenant_id: &'a str,
     pub(super) subject: &'a str,
     pub(super) actor_subject: &'a str,

@@ -18,17 +18,17 @@ use connector_resolve::{resolve, Request};
 use connector_secrets::{CredentialRef, Secret, SecretStore};
 use connector_state::StateStore;
 use domain::{
-    AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy, ProtocolPlan,
+    AdmittedOperation, Capability, EndpointAuthority, DriverId, InitiationPolicy, ProtocolPlan,
     RouteAdapter as DomainRouteAdapter,
 };
-use protocol::connection::{
-    ConnectSessionStatus, ConnectionDescription, ConnectionError, ConnectionErrorCode,
-    ConnectionInitiator, ConnectionRequest, ConnectionResult, ConnectionRoute, ConnectionState,
-    ConnectionSummary as ControlConnectionSummary, DiscoveryObservationState,
+use protocol::endpoint::{
+    ConnectSessionStatus, EndpointDescription, EndpointError, EndpointErrorCode,
+    EndpointInitiator, EndpointRequest, EndpointResult, EndpointRoute, EndpointState,
+    EndpointSummary as ControlEndpointSummary, DiscoveryObservationState,
     DiscoveryObservationSummary, RouteAdapter,
 };
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest,
+    ApprovalPosture, EndpointSummary, DescribeRequest, InvocationResult, InvokeRequest,
     OperationDescription, OperationError, OperationErrorCode, OperationRequest, OperationResult,
     OperationSummary,
 };
@@ -98,7 +98,7 @@ impl MonitoringError {
 trait HttpExecutor: Send + Sync + 'static {
     async fn execute(
         &self,
-        connection_ref: &str,
+        endpoint_ref: &str,
         request: Request,
     ) -> Result<Value, UpstreamFailure>;
 }
@@ -111,13 +111,13 @@ struct PortExecutor {
 impl HttpExecutor for PortExecutor {
     async fn execute(
         &self,
-        connection_ref: &str,
+        endpoint_ref: &str,
         request: Request,
     ) -> Result<Value, UpstreamFailure> {
         let response = self
             .egress
             .execute(
-                connection_ref,
+                endpoint_ref,
                 EgressHttpRequest {
                     request,
                     maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
@@ -175,16 +175,16 @@ enum MonitoringAccess {
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct MonitoringState {
-    parent: Option<ParentConnection>,
+    parent: Option<ParentEndpoint>,
     observations: BTreeMap<String, StoredObservation>,
-    children: BTreeMap<String, ChildConnection>,
+    children: BTreeMap<String, ChildEndpoint>,
     evidence_generation: u64,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ParentConnection {
-    connection_ref: String,
+struct ParentEndpoint {
+    endpoint_ref: String,
     label: String,
 }
 
@@ -192,7 +192,7 @@ struct ParentConnection {
 #[serde(deny_unknown_fields)]
 struct StoredObservation {
     observation_ref: String,
-    source_connection_ref: String,
+    source_endpoint_ref: String,
     observed_type: String,
     title: String,
     resource_binding: String,
@@ -200,17 +200,17 @@ struct StoredObservation {
     active: bool,
     evidence_generation: u64,
     evidence_sha256: String,
-    connection_ref: Option<String>,
+    endpoint_ref: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ChildConnection {
-    connection_ref: String,
+struct ChildEndpoint {
+    endpoint_ref: String,
     label: String,
     provider: String,
     grant_ref: String,
-    parent_connection_ref: String,
+    parent_endpoint_ref: String,
     observation_ref: String,
     resource_binding: String,
 }
@@ -219,8 +219,8 @@ struct ChildConnection {
 struct AuditEvent<'a> {
     audit_ref: &'a str,
     operation_ref: &'a str,
-    connection_ref: &'a str,
-    parent_connection_ref: Option<&'a str>,
+    endpoint_ref: &'a str,
+    parent_endpoint_ref: Option<&'a str>,
     route_adapter: Option<&'a str>,
     tenant_id: &'a str,
     agent_id: &'a str,
@@ -324,9 +324,9 @@ impl MonitoringBackend {
             .origin
             .clone()
             .ok_or_else(|| MonitoringError::new("hosted-policy"))?;
-        let parent = ParentConnection {
-            connection_ref: hosted
-                .connection_ref
+        let parent = ParentEndpoint {
+            endpoint_ref: hosted
+                .endpoint_ref
                 .clone()
                 .ok_or_else(|| MonitoringError::new("hosted-policy"))?,
             label: hosted
@@ -428,7 +428,7 @@ impl MonitoringBackend {
         }
     }
 
-    /// Number of Grafana and mediated target Connections in this daemon generation.
+    /// Number of Grafana and mediated target Endpoints in this daemon generation.
     #[must_use]
     pub fn connection_count(&self) -> usize {
         let state = lock(&self.inner.state);
@@ -438,16 +438,16 @@ impl MonitoringBackend {
 
 #[async_trait]
 impl ConnectorBackend for MonitoringBackend {
-    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
-        self.inner.owns_endpoint(request)
+    fn owns_endpoint_inventory(&self, request: &protocol::endpoint_inventory::EndpointInventoryRequest) -> bool {
+        self.inner.owns_endpoint_inventory(request)
     }
 
-    async fn handle_endpoint(
+    async fn handle_endpoint_inventory(
         &self,
         context: &PrincipalContext,
-        request: protocol::endpoint::EndpointRequest,
-    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
-        self.inner.handle_endpoint(context, request).await
+        request: protocol::endpoint_inventory::EndpointInventoryRequest,
+    ) -> Result<protocol::endpoint_inventory::EndpointInventoryResult, protocol::endpoint_inventory::EndpointInventoryError> {
+        self.inner.handle_endpoint_inventory(context, request).await
     }
 
     async fn resolve_endpoint(
@@ -472,7 +472,7 @@ impl ConnectorBackend for MonitoringBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
-            connections: true,
+            endpoints: true,
             events: false,
             datasources: false,
         }
@@ -483,31 +483,31 @@ impl ConnectorBackend for MonitoringBackend {
             OperationRequest::Describe(request) => supported_operation(&request.operation_ref),
             OperationRequest::Invoke(request) => {
                 supported_operation(&request.operation_ref)
-                    && self.inner.owns_connection_ref(&request.connection_ref)
+                    && self.inner.owns_connection_ref(&request.endpoint_ref)
             }
             OperationRequest::Search(_) => false,
             _ => false,
         }
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
         match request {
-            ConnectionRequest::Describe(request) => {
-                self.inner.owns_connection_ref(&request.connection_ref)
+            EndpointRequest::Describe(request) => {
+                self.inner.owns_connection_ref(&request.endpoint_ref)
             }
-            ConnectionRequest::ObservationSearch(request) => {
-                self.inner.is_parent(&request.source_connection_ref)
+            EndpointRequest::ObservationSearch(request) => {
+                self.inner.is_parent(&request.source_endpoint_ref)
             }
-            ConnectionRequest::Materialize(request) => {
+            EndpointRequest::Materialize(request) => {
                 self.inner.has_observation(&request.observation_ref)
             }
-            ConnectionRequest::ConnectSessionCreate(request) => {
+            EndpointRequest::ConnectSessionCreate(request) => {
                 self.inner.hosted_targets.is_none() && request.integration_ref == GRAFANA
             }
-            ConnectionRequest::ConnectSessionStatus(request) => {
+            EndpointRequest::ConnectSessionStatus(request) => {
                 self.inner.has_session(&request.connect_session_ref)
             }
-            ConnectionRequest::Search(_) => false,
+            EndpointRequest::Search(_) => false,
             _ => false,
         }
     }
@@ -547,68 +547,68 @@ impl ConnectorBackend for MonitoringBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         self.inner.check_connection_context(context)?;
         match request {
-            ConnectionRequest::Search(request) => {
+            EndpointRequest::Search(request) => {
                 if !self.inner.admits(context) {
-                    return Ok(ConnectionResult::Search {
-                        connections: Vec::new(),
+                    return Ok(EndpointResult::Search {
+                        endpoints: Vec::new(),
                     });
                 }
-                let mut connections = self.inner.search_connections(&request.query);
-                connections.sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
-                connections.truncate(usize::from(request.limit));
-                Ok(ConnectionResult::Search { connections })
+                let mut endpoints = self.inner.search_connections(&request.query);
+                endpoints.sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
+                endpoints.truncate(usize::from(request.limit));
+                Ok(EndpointResult::Search { endpoints })
             }
-            ConnectionRequest::Describe(request) => {
+            EndpointRequest::Describe(request) => {
                 self.inner.require_connection_access(context)?;
                 self.inner
-                    .describe_connection(&request.connection_ref)
-                    .map(ConnectionResult::Describe)
-                    .ok_or_else(connection_not_found)
+                    .describe_connection(&request.endpoint_ref)
+                    .map(EndpointResult::Describe)
+                    .ok_or_else(endpoint_not_found)
             }
-            ConnectionRequest::ObservationSearch(request)
-                if self.inner.is_parent(&request.source_connection_ref) =>
+            EndpointRequest::ObservationSearch(request)
+                if self.inner.is_parent(&request.source_endpoint_ref) =>
             {
                 self.inner.require_connection_access(context)?;
-                Ok(ConnectionResult::ObservationSearch {
+                Ok(EndpointResult::ObservationSearch {
                     observations: self
                         .inner
                         .search_observations(&request.query, request.limit),
                 })
             }
-            ConnectionRequest::Materialize(request)
+            EndpointRequest::Materialize(request)
                 if self.inner.has_observation(&request.observation_ref) =>
             {
                 self.inner.require_connection_access(context)?;
                 self.inner
                     .materialize(&request.observation_ref)
-                    .map(ConnectionResult::Materialize)
+                    .map(EndpointResult::Materialize)
             }
-            ConnectionRequest::ConnectSessionCreate(request)
+            EndpointRequest::ConnectSessionCreate(request)
                 if request.integration_ref == GRAFANA && self.inner.hosted_targets.is_none() =>
             {
                 self.inner.require_connection_access(context)?;
                 self.inner
                     .create_session(request.label)
                     .await
-                    .map(ConnectionResult::ConnectSessionCreate)
+                    .map(EndpointResult::ConnectSessionCreate)
             }
-            ConnectionRequest::ConnectSessionStatus(request)
+            EndpointRequest::ConnectSessionStatus(request)
                 if self.inner.has_session(&request.connect_session_ref) =>
             {
                 self.inner.require_connection_access(context)?;
                 self.inner
                     .session_status(&request.connect_session_ref)
-                    .map(ConnectionResult::ConnectSessionStatus)
-                    .ok_or_else(connection_not_found)
+                    .map(EndpointResult::ConnectSessionStatus)
+                    .ok_or_else(endpoint_not_found)
             }
-            _ => Err(connection_not_found()),
+            _ => Err(endpoint_not_found()),
         }
     }
 
@@ -639,12 +639,12 @@ impl MonitoringInner {
         }
     }
 
-    fn check_connection_context(&self, actual: &PrincipalContext) -> Result<(), ConnectionError> {
+    fn check_connection_context(&self, actual: &PrincipalContext) -> Result<(), EndpointError> {
         if self.same_authority_partition(actual) {
             Ok(())
         } else {
-            Err(ConnectionError::new(
-                ConnectionErrorCode::StaleAuthority,
+            Err(EndpointError::new(
+                EndpointErrorCode::StaleAuthority,
                 "owner authority snapshot is not current",
                 false,
             ))
@@ -668,10 +668,10 @@ impl MonitoringInner {
         })
     }
 
-    fn require_connection_access(&self, actual: &PrincipalContext) -> Result<(), ConnectionError> {
+    fn require_connection_access(&self, actual: &PrincipalContext) -> Result<(), EndpointError> {
         self.admits(actual).then_some(()).ok_or_else(|| {
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "monitoring Connection is not granted to this principal",
                 false,
             )
@@ -698,8 +698,8 @@ impl MonitoringInner {
         operation_ids()
             .into_iter()
             .filter_map(|operation_ref| {
-                let connections = self.connections_for_operation(operation_ref);
-                if connections.is_empty() {
+                let endpoints = self.connections_for_operation(operation_ref);
+                if endpoints.is_empty() {
                     return None;
                 }
                 let operation = operation_document(operation_ref)?;
@@ -714,7 +714,7 @@ impl MonitoringInner {
                     title: title.to_owned(),
                     effect: effect(operation.effects()),
                     approval: ApprovalPosture::NotRequired,
-                    connections,
+                    endpoints,
                 })
             })
             .collect()
@@ -727,8 +727,8 @@ impl MonitoringInner {
     ) -> Result<OperationResult, OperationError> {
         let operation =
             operation_document(&request.operation_ref).ok_or_else(operation_not_found)?;
-        let connections = self.connections_for_operation(&request.operation_ref);
-        if connections.is_empty() {
+        let endpoints = self.connections_for_operation(&request.operation_ref);
+        if endpoints.is_empty() {
             return Err(operation_not_found());
         }
         Ok(OperationResult::Describe(OperationDescription {
@@ -743,7 +743,7 @@ impl MonitoringInner {
             )?,
             effect: effect(operation.effects()),
             approval: ApprovalPosture::NotRequired,
-            connections,
+            endpoints,
             description_ref: self.description_ref(context, &request.operation_ref),
         }))
     }
@@ -774,8 +774,8 @@ impl MonitoringInner {
         self.append_audit(AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            connection_ref: &request.connection_ref,
-            parent_connection_ref: None,
+            endpoint_ref: &request.endpoint_ref,
+            parent_endpoint_ref: None,
             route_adapter: None,
             tenant_id: context.tenant_id(),
             agent_id: context.actor_subject(),
@@ -787,7 +787,7 @@ impl MonitoringInner {
             let parent = lock(&self.state)
                 .parent
                 .clone()
-                .filter(|parent| parent.connection_ref == request.connection_ref)
+                .filter(|parent| parent.endpoint_ref == request.endpoint_ref)
                 .ok_or_else(operation_not_granted)?;
             let token = self
                 .load_credential(&request.operation_ref, ROUTE_DIRECT)
@@ -801,16 +801,16 @@ impl MonitoringInner {
             };
             if request.operation_ref == GRAFANA_DATASOURCES_LIST {
                 if self.hosted_targets.is_some() {
-                    self.reconcile_hosted_output(&parent.connection_ref, &value)?;
+                    self.reconcile_hosted_output(&parent.endpoint_ref, &value)?;
                 } else {
-                    self.reconcile_observations(&parent.connection_ref, &value)?;
+                    self.reconcile_observations(&parent.endpoint_ref, &value)?;
                 }
             }
             (project_output(&request.operation_ref, &value)?, None, None)
         } else {
             let child = lock(&self.state)
                 .children
-                .get(&request.connection_ref)
+                .get(&request.endpoint_ref)
                 .filter(|child| child.provider == provider)
                 .cloned()
                 .ok_or_else(operation_not_granted)?;
@@ -825,15 +825,15 @@ impl MonitoringInner {
                 .await?;
             (
                 project_output(&request.operation_ref, &value)?,
-                Some(child.parent_connection_ref.clone()),
+                Some(child.parent_endpoint_ref.clone()),
                 Some(DomainRouteAdapter::GrafanaDatasourceProxyV1.as_str()),
             )
         };
         self.append_audit(AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            connection_ref: &request.connection_ref,
-            parent_connection_ref: parent_ref.as_deref(),
+            endpoint_ref: &request.endpoint_ref,
+            parent_endpoint_ref: parent_ref.as_deref(),
             route_adapter: adapter,
             tenant_id: context.tenant_id(),
             agent_id: context.actor_subject(),
@@ -867,13 +867,13 @@ impl MonitoringInner {
     async fn execute_direct(
         &self,
         context: &PrincipalContext,
-        parent: &ParentConnection,
+        parent: &ParentEndpoint,
         token: &Secret,
         operation: &'static connector_resolve::document::Operation,
         input: Value,
     ) -> Result<Value, OperationError> {
-        let connection = ConnectionAuthority::new(
-            &parent.connection_ref,
+        let connection = EndpointAuthority::new(
+            &parent.endpoint_ref,
             initiation_policy(self.policy.initiation),
         )
         .map_err(|_| operation_not_granted())?;
@@ -919,7 +919,7 @@ impl MonitoringInner {
             return Err(operation_not_granted());
         }
         self.executor
-            .execute(&parent.connection_ref, request.request)
+            .execute(&parent.endpoint_ref, request.request)
             .await
             .map_err(|failure| refuse_dispatch(&operation.id, ROUTE_DIRECT, failure.into()))
     }
@@ -933,7 +933,7 @@ impl MonitoringInner {
     async fn list_dashboards_direct(
         &self,
         context: &PrincipalContext,
-        parent: &ParentConnection,
+        parent: &ParentEndpoint,
         token: &Secret,
         operation: &'static connector_resolve::document::Operation,
         input: &Value,
@@ -996,15 +996,15 @@ impl MonitoringInner {
     async fn execute_mediated(
         &self,
         context: &PrincipalContext,
-        child: &ChildConnection,
+        child: &ChildEndpoint,
         token: &Secret,
         operation: &'static connector_resolve::document::Operation,
         input: Value,
     ) -> Result<Value, OperationError> {
-        let connection = ConnectionAuthority::mediated(
-            &child.connection_ref,
+        let connection = EndpointAuthority::mediated(
+            &child.endpoint_ref,
             InitiationPolicy::platform_only(),
-            &child.parent_connection_ref,
+            &child.parent_endpoint_ref,
             &child.resource_binding,
             DomainRouteAdapter::GrafanaDatasourceProxyV1,
         )
@@ -1044,7 +1044,7 @@ impl MonitoringInner {
             .strip_prefix(TARGET_BASE)
             .filter(|relative| relative.starts_with(&mediated.target_path_template))
             .ok_or_else(operation_not_granted)?;
-        if mediated.parent_connection != child.parent_connection_ref
+        if mediated.parent_endpoint != child.parent_endpoint_ref
             || mediated.resource_binding != child.resource_binding
             || mediated.adapter != DomainRouteAdapter::GrafanaDatasourceProxyV1
             || !safe_datasource_uid(&child.resource_binding)
@@ -1066,12 +1066,12 @@ impl MonitoringInner {
         connector_resolve::auth::place(&operation.id, &credential, &mut request)
             .map_err(|_| operation_unavailable())?;
         self.executor
-            .execute(&child.parent_connection_ref, request)
+            .execute(&child.parent_endpoint_ref, request)
             .await
             .map_err(|failure| refuse_dispatch(&operation.id, ROUTE_MEDIATED, failure.into()))
     }
 
-    fn connections_for_operation(&self, operation_ref: &str) -> Vec<ConnectionSummary> {
+    fn connections_for_operation(&self, operation_ref: &str) -> Vec<EndpointSummary> {
         let provider = provider_for_operation(operation_ref);
         let state = lock(&self.state);
         if provider == GRAFANA {
@@ -1079,8 +1079,8 @@ impl MonitoringInner {
                 .parent
                 .as_ref()
                 .map(|parent| {
-                    vec![ConnectionSummary {
-                        connection_ref: parent.connection_ref.clone(),
+                    vec![EndpointSummary {
+                        endpoint_ref: parent.endpoint_ref.clone(),
                         label: parent.label.clone(),
                         provider: provider.to_owned(),
                         audiences: audiences_for_operation(operation_ref),
@@ -1093,8 +1093,8 @@ impl MonitoringInner {
             .children
             .values()
             .filter(|child| child.provider == provider && child_is_current(&state, child))
-            .map(|child| ConnectionSummary {
-                connection_ref: child.connection_ref.clone(),
+            .map(|child| EndpointSummary {
+                endpoint_ref: child.endpoint_ref.clone(),
                 label: child.label.clone(),
                 provider: provider.to_owned(),
                 audiences: audiences_for_operation(operation_ref),
@@ -1112,12 +1112,12 @@ impl MonitoringInner {
         digest.update(operation_ref.as_bytes());
         for connection in self.connections_for_operation(operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.connection_ref.as_bytes());
+            digest.update(connection.endpoint_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }
 
-    fn search_connections(&self, query: &str) -> Vec<ControlConnectionSummary> {
+    fn search_connections(&self, query: &str) -> Vec<ControlEndpointSummary> {
         let query = query.to_ascii_lowercase();
         let state = lock(&self.state);
         let mut result = Vec::new();
@@ -1140,35 +1140,35 @@ impl MonitoringInner {
         result
     }
 
-    fn describe_connection(&self, connection_ref: &str) -> Option<ConnectionDescription> {
+    fn describe_connection(&self, endpoint_ref: &str) -> Option<EndpointDescription> {
         let state = lock(&self.state);
         if let Some(parent) = state
             .parent
             .as_ref()
-            .filter(|parent| parent.connection_ref == connection_ref)
+            .filter(|parent| parent.endpoint_ref == endpoint_ref)
         {
-            return Some(ConnectionDescription {
+            return Some(EndpointDescription {
                 summary: self.parent_summary(parent),
                 channels: Vec::new(),
             });
         }
         state
             .children
-            .get(connection_ref)
-            .map(|child| ConnectionDescription {
+            .get(endpoint_ref)
+            .map(|child| EndpointDescription {
                 summary: self.child_summary(&state, child),
                 channels: Vec::new(),
             })
     }
 
-    fn parent_summary(&self, parent: &ParentConnection) -> ControlConnectionSummary {
-        ControlConnectionSummary {
-            connection_ref: parent.connection_ref.clone(),
+    fn parent_summary(&self, parent: &ParentEndpoint) -> ControlEndpointSummary {
+        ControlEndpointSummary {
+            endpoint_ref: parent.endpoint_ref.clone(),
             integration_ref: GRAFANA.to_owned(),
             label: parent.label.clone(),
-            state: ConnectionState::Callable,
+            state: EndpointState::Callable,
             initiation: initiation(self.policy.initiation),
-            route: ConnectionRoute::Direct,
+            route: EndpointRoute::Direct,
             scope: None,
             actor: None,
             auth_profile: None,
@@ -1178,20 +1178,20 @@ impl MonitoringInner {
     fn child_summary(
         &self,
         state: &MonitoringState,
-        child: &ChildConnection,
-    ) -> ControlConnectionSummary {
-        ControlConnectionSummary {
-            connection_ref: child.connection_ref.clone(),
+        child: &ChildEndpoint,
+    ) -> ControlEndpointSummary {
+        ControlEndpointSummary {
+            endpoint_ref: child.endpoint_ref.clone(),
             integration_ref: child.provider.clone(),
             label: child.label.clone(),
             state: if child_is_current(state, child) {
-                ConnectionState::Callable
+                EndpointState::Callable
             } else {
-                ConnectionState::Degraded
+                EndpointState::Degraded
             },
-            initiation: vec![ConnectionInitiator::Platform],
-            route: ConnectionRoute::ViaConnection {
-                parent_connection_ref: child.parent_connection_ref.clone(),
+            initiation: vec![EndpointInitiator::Platform],
+            route: EndpointRoute::ViaEndpoint {
+                parent_endpoint_ref: child.parent_endpoint_ref.clone(),
                 route_adapter: RouteAdapter::GrafanaDatasourceProxyV1,
             },
             scope: None,
@@ -1200,20 +1200,20 @@ impl MonitoringInner {
         }
     }
 
-    fn is_parent(&self, connection_ref: &str) -> bool {
+    fn is_parent(&self, endpoint_ref: &str) -> bool {
         lock(&self.state)
             .parent
             .as_ref()
-            .is_some_and(|parent| parent.connection_ref == connection_ref)
+            .is_some_and(|parent| parent.endpoint_ref == endpoint_ref)
     }
 
-    fn owns_connection_ref(&self, connection_ref: &str) -> bool {
+    fn owns_connection_ref(&self, endpoint_ref: &str) -> bool {
         let state = lock(&self.state);
         state
             .parent
             .as_ref()
-            .is_some_and(|parent| parent.connection_ref == connection_ref)
-            || state.children.contains_key(connection_ref)
+            .is_some_and(|parent| parent.endpoint_ref == endpoint_ref)
+            || state.children.contains_key(endpoint_ref)
     }
 
     fn has_observation(&self, observation_ref: &str) -> bool {
@@ -1242,40 +1242,40 @@ impl MonitoringInner {
             .collect()
     }
 
-    fn materialize(&self, observation_ref: &str) -> Result<ConnectionDescription, ConnectionError> {
+    fn materialize(&self, observation_ref: &str) -> Result<EndpointDescription, EndpointError> {
         let mut state = lock(&self.state);
         let observation = state
             .observations
             .get(observation_ref)
             .cloned()
-            .ok_or_else(connection_not_found)?;
+            .ok_or_else(endpoint_not_found)?;
         if !observation.active {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::Conflict,
+            return Err(EndpointError::new(
+                EndpointErrorCode::Conflict,
                 "discovery observation is no longer current",
                 false,
             ));
         }
-        if let Some(connection_ref) = &observation.connection_ref {
+        if let Some(endpoint_ref) = &observation.endpoint_ref {
             let child = state
                 .children
-                .get(connection_ref)
-                .ok_or_else(connection_protocol)?;
+                .get(endpoint_ref)
+                .ok_or_else(endpoint_protocol)?;
             if !child_is_current(&state, child) {
-                return Err(ConnectionError::new(
-                    ConnectionErrorCode::Conflict,
+                return Err(EndpointError::new(
+                    EndpointErrorCode::Conflict,
                     "materialized Connection no longer matches current discovery evidence",
                     false,
                 ));
             }
-            return Ok(ConnectionDescription {
+            return Ok(EndpointDescription {
                 summary: self.child_summary(&state, child),
                 channels: Vec::new(),
             });
         }
         let provider = observation.target_provider.clone().ok_or_else(|| {
-            ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "observed datasource type has no target Provider contract",
                 false,
             )
@@ -1284,38 +1284,38 @@ impl MonitoringInner {
             .policy
             .target_grant(&provider)
             .ok_or_else(|| {
-                ConnectionError::new(
-                    ConnectionErrorCode::NotGranted,
+                EndpointError::new(
+                    EndpointErrorCode::NotGranted,
                     "target Provider has no independent Connector Grant",
                     false,
                 )
             })?
             .to_owned();
-        let connection_ref = format!(
+        let endpoint_ref = format!(
             "connection:{provider}:{}",
             digest_prefix(observation_ref.as_bytes())
         );
-        let child = ChildConnection {
-            connection_ref: connection_ref.clone(),
+        let child = ChildEndpoint {
+            endpoint_ref: endpoint_ref.clone(),
             label: observation.title.clone(),
             provider,
             grant_ref,
-            parent_connection_ref: observation.source_connection_ref,
+            parent_endpoint_ref: observation.source_endpoint_ref,
             observation_ref: observation_ref.to_owned(),
             resource_binding: observation.resource_binding,
         };
         let previous = state.clone();
-        state.children.insert(connection_ref.clone(), child.clone());
+        state.children.insert(endpoint_ref.clone(), child.clone());
         state
             .observations
             .get_mut(observation_ref)
             .expect("observation was read from this map")
-            .connection_ref = Some(connection_ref);
+            .endpoint_ref = Some(endpoint_ref);
         if self.persist_inventory(&state).is_err() {
             *state = previous;
             return Err(connection_unavailable());
         }
-        Ok(ConnectionDescription {
+        Ok(EndpointDescription {
             summary: self.child_summary(&state, &child),
             channels: Vec::new(),
         })
@@ -1340,12 +1340,12 @@ impl MonitoringInner {
                 serde_json::json!({}),
             )
             .await?;
-        self.reconcile_hosted_output(&parent.connection_ref, &output)
+        self.reconcile_hosted_output(&parent.endpoint_ref, &output)
     }
 
     fn reconcile_hosted_output(
         &self,
-        source_connection_ref: &str,
+        source_endpoint_ref: &str,
         output: &Value,
     ) -> Result<(), OperationError> {
         let targets = self.hosted_targets.as_ref().ok_or_else(operation_invalid)?;
@@ -1394,7 +1394,7 @@ impl MonitoringInner {
             let observation_ref = format!(
                 "observation:grafana:{}",
                 digest_prefix(
-                    format!("{source_connection_ref}\0{}", target.connection_ref).as_bytes()
+                    format!("{source_endpoint_ref}\0{}", target.endpoint_ref).as_bytes()
                 )
             );
             let found = discovered.get(&(target.provider.clone(), target.uid_sha256.clone()));
@@ -1403,7 +1403,7 @@ impl MonitoringInner {
                 observation_ref.clone(),
                 StoredObservation {
                     observation_ref: observation_ref.clone(),
-                    source_connection_ref: source_connection_ref.to_owned(),
+                    source_endpoint_ref: source_endpoint_ref.to_owned(),
                     observed_type: target.provider.clone(),
                     title: target.label.clone(),
                     resource_binding: resource_binding.clone(),
@@ -1411,17 +1411,17 @@ impl MonitoringInner {
                     active: found.is_some(),
                     evidence_generation: generation,
                     evidence_sha256: evidence_sha256.clone(),
-                    connection_ref: Some(target.connection_ref.clone()),
+                    endpoint_ref: Some(target.endpoint_ref.clone()),
                 },
             );
             state.children.insert(
-                target.connection_ref.clone(),
-                ChildConnection {
-                    connection_ref: target.connection_ref.clone(),
+                target.endpoint_ref.clone(),
+                ChildEndpoint {
+                    endpoint_ref: target.endpoint_ref.clone(),
                     label: target.label.clone(),
                     provider: target.provider.clone(),
                     grant_ref: target.grant_ref.clone(),
-                    parent_connection_ref: source_connection_ref.to_owned(),
+                    parent_endpoint_ref: source_endpoint_ref.to_owned(),
                     observation_ref,
                     resource_binding,
                 },
@@ -1437,13 +1437,13 @@ impl MonitoringInner {
             }
             let observation_ref = format!(
                 "observation:grafana:{}",
-                digest_prefix(format!("{source_connection_ref}\0{uid}").as_bytes())
+                digest_prefix(format!("{source_endpoint_ref}\0{uid}").as_bytes())
             );
             state.observations.insert(
                 observation_ref.clone(),
                 StoredObservation {
                     observation_ref,
-                    source_connection_ref: source_connection_ref.into(),
+                    source_endpoint_ref: source_endpoint_ref.into(),
                     observed_type: observed_type.clone(),
                     title: title.clone(),
                     resource_binding: uid.clone(),
@@ -1451,7 +1451,7 @@ impl MonitoringInner {
                     active: true,
                     evidence_generation: generation,
                     evidence_sha256: evidence_sha256.clone(),
-                    connection_ref: None,
+                    endpoint_ref: None,
                 },
             );
         }
@@ -1472,10 +1472,10 @@ impl MonitoringInner {
     async fn create_session(
         self: &Arc<Self>,
         label: String,
-    ) -> Result<ConnectSessionStatus, ConnectionError> {
+    ) -> Result<ConnectSessionStatus, EndpointError> {
         if lock(&self.state).parent.is_some() {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::Conflict,
+            return Err(EndpointError::new(
+                EndpointErrorCode::Conflict,
                 "the configured Grafana Integration already has a Connection",
                 false,
             ));
@@ -1542,10 +1542,10 @@ impl MonitoringInner {
             .complete_connection(&session_ref, submission.secret())
             .await;
         let accepted = match result {
-            Ok(connection_ref) => {
+            Ok(endpoint_ref) => {
                 let _ = lock(&self.sessions).finish(
                     &session_ref,
-                    ConnectSessionTerminal::Completed { connection_ref },
+                    ConnectSessionTerminal::Completed { endpoint_ref },
                 );
                 true
             }
@@ -1570,8 +1570,8 @@ impl MonitoringInner {
             .pending_label(session_ref)
             .map_err(|_| MonitoringError::new("connect-session"))?;
         let instance_id = random_uuid()?;
-        let parent = ParentConnection {
-            connection_ref: format!("connection:grafana:{instance_id}"),
+        let parent = ParentEndpoint {
+            endpoint_ref: format!("connection:grafana:{instance_id}"),
             label,
         };
         let operation = operation_document(GRAFANA_DATASOURCES_LIST)
@@ -1588,7 +1588,7 @@ impl MonitoringInner {
             .map_err(|_| MonitoringError::new("verification"))?;
         let prior = lock(&self.state).clone();
         if self
-            .reconcile_observations(&parent.connection_ref, &output)
+            .reconcile_observations(&parent.endpoint_ref, &output)
             .is_err()
         {
             *lock(&self.state) = prior;
@@ -1603,19 +1603,19 @@ impl MonitoringInner {
             *lock(&self.state) = prior;
             return Err(MonitoringError::new("credential-store"));
         }
-        let connection_ref = parent.connection_ref.clone();
+        let endpoint_ref = parent.endpoint_ref.clone();
         lock(&self.state).parent = Some(parent);
         let persisted = self.persist_inventory(&lock(&self.state));
         if persisted.is_err() {
             *lock(&self.state) = prior;
             return Err(MonitoringError::new("inventory-state"));
         }
-        Ok(connection_ref)
+        Ok(endpoint_ref)
     }
 
     fn reconcile_observations(
         &self,
-        source_connection_ref: &str,
+        source_endpoint_ref: &str,
         output: &Value,
     ) -> Result<(), OperationError> {
         let items = output.as_array().ok_or_else(operation_invalid)?;
@@ -1654,7 +1654,7 @@ impl MonitoringInner {
         state.evidence_generation = state.evidence_generation.saturating_add(1).max(1);
         let generation = state.evidence_generation;
         for observation in state.observations.values_mut() {
-            if observation.source_connection_ref == source_connection_ref {
+            if observation.source_endpoint_ref == source_endpoint_ref {
                 observation.active = false;
                 observation.evidence_generation = generation;
                 observation.evidence_sha256.clone_from(&evidence_sha256);
@@ -1663,7 +1663,7 @@ impl MonitoringInner {
         for (uid, observed_type, title) in normalized {
             let observation_ref = format!(
                 "observation:grafana:{}",
-                digest_prefix(format!("{source_connection_ref}\0{uid}").as_bytes())
+                digest_prefix(format!("{source_endpoint_ref}\0{uid}").as_bytes())
             );
             let target_provider = target_provider(&observed_type).map(str::to_owned);
             match state.observations.get_mut(&observation_ref) {
@@ -1680,7 +1680,7 @@ impl MonitoringInner {
                         observation_ref.clone(),
                         StoredObservation {
                             observation_ref,
-                            source_connection_ref: source_connection_ref.to_owned(),
+                            source_endpoint_ref: source_endpoint_ref.to_owned(),
                             observed_type,
                             title,
                             resource_binding: uid,
@@ -1688,7 +1688,7 @@ impl MonitoringInner {
                             active: true,
                             evidence_generation: generation,
                             evidence_sha256: evidence_sha256.clone(),
-                            connection_ref: None,
+                            endpoint_ref: None,
                         },
                     );
                 }
@@ -1772,7 +1772,7 @@ fn grafana_credential_ref(owner: &PrincipalContext) -> Result<CredentialRef, Mon
 fn observation_summary(observation: &StoredObservation) -> DiscoveryObservationSummary {
     let state = if !observation.active {
         DiscoveryObservationState::Withdrawn
-    } else if observation.connection_ref.is_some() {
+    } else if observation.endpoint_ref.is_some() {
         DiscoveryObservationState::Materialized
     } else if observation.target_provider.is_some() {
         DiscoveryObservationState::Observed
@@ -1782,39 +1782,39 @@ fn observation_summary(observation: &StoredObservation) -> DiscoveryObservationS
     DiscoveryObservationSummary {
         observation_ref: observation.observation_ref.clone(),
         discovery_ref: DISCOVERY_REF.to_owned(),
-        source_connection_ref: observation.source_connection_ref.clone(),
+        source_endpoint_ref: observation.source_endpoint_ref.clone(),
         observed_type: observation.observed_type.clone(),
         title: observation.title.clone(),
         state,
         evidence_generation: observation.evidence_generation,
         evidence_sha256: observation.evidence_sha256.clone(),
         target_provider_ref: observation.target_provider.clone(),
-        connection_ref: if state == DiscoveryObservationState::Materialized {
-            observation.connection_ref.clone()
+        endpoint_ref: if state == DiscoveryObservationState::Materialized {
+            observation.endpoint_ref.clone()
         } else {
             None
         },
     }
 }
 
-fn child_is_current(state: &MonitoringState, child: &ChildConnection) -> bool {
+fn child_is_current(state: &MonitoringState, child: &ChildEndpoint) -> bool {
     state
         .observations
         .get(&child.observation_ref)
         .is_some_and(|observation| {
             observation.active
                 && observation.target_provider.as_deref() == Some(child.provider.as_str())
-                && observation.source_connection_ref == child.parent_connection_ref
+                && observation.source_endpoint_ref == child.parent_endpoint_ref
                 && observation.resource_binding == child.resource_binding
         })
 }
 
-fn initiation(config: InitiationConfig) -> Vec<ConnectionInitiator> {
+fn initiation(config: InitiationConfig) -> Vec<EndpointInitiator> {
     match config {
-        InitiationConfig::Platform => vec![ConnectionInitiator::Platform],
-        InitiationConfig::Provider => vec![ConnectionInitiator::Provider],
+        InitiationConfig::Platform => vec![EndpointInitiator::Platform],
+        InitiationConfig::Provider => vec![EndpointInitiator::Provider],
         InitiationConfig::Both => {
-            vec![ConnectionInitiator::Platform, ConnectionInitiator::Provider]
+            vec![EndpointInitiator::Platform, EndpointInitiator::Provider]
         }
     }
 }

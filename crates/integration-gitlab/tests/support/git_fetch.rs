@@ -235,7 +235,7 @@ async fn project_and_branch_authority_reads_overlap_on_creation_and_each_exchang
 pub(super) fn request() -> protocol::git_fetch::CreateRequest {
     protocol::git_fetch::CreateRequest {
         idempotency_key: "coding-session-one".to_owned(),
-        connection_ref: "connection:gitlab:11111111-1111-4111-8111-111111111111".to_owned(),
+        endpoint_ref: "connection:gitlab:11111111-1111-4111-8111-111111111111".to_owned(),
         project_id: 42,
         reference: "trunk".to_owned(),
         expected_commit: "a".repeat(40),
@@ -278,8 +278,8 @@ pub(super) async fn backend_with_egress(egress: Arc<dyn EgressTransport>) -> Git
         )
         .await
         .unwrap();
-    let connection = StoredConnection {
-        connection_ref: "connection:gitlab:11111111-1111-4111-8111-111111111111".to_owned(),
+    let connection = StoredEndpoint {
+        endpoint_ref: "connection:gitlab:11111111-1111-4111-8111-111111111111".to_owned(),
         instance_id: "11111111-1111-4111-8111-111111111111".to_owned(),
         label: "GitLab".to_owned(),
         grant_ref: "grant:gitlab:user".to_owned(),
@@ -302,7 +302,7 @@ pub(super) async fn backend_with_egress(egress: Arc<dyn EgressTransport>) -> Git
         .await
         .unwrap();
     super::super::lock(&backend.inner.metadata)
-        .connections
+        .endpoints
         .push(connection);
     backend
 }
@@ -447,7 +447,7 @@ async fn v2_drop_budget_revocation_and_foreign_authority_fail_closed() {
     );
     let grant = backend.create(&context(), request()).await.unwrap();
     backend.exchange(v2_exchange(&grant, None)).await.unwrap();
-    lock(&backend.inner.metadata).connections.clear();
+    lock(&backend.inner.metadata).endpoints.clear();
     assert!(matches!(
         backend
             .exchange(v2_exchange(&grant, Some(v2_command("ls-refs", &[]))))
@@ -712,7 +712,7 @@ async fn global_capacity_refuses_without_evicting_an_inflight_other_principal() 
                 GitFetchSessionRecord {
                     idempotency_key: format!("other-{index}"),
                     owner_subject: format!("person:other-{index}"),
-                    connection_ref: format!("connection:other-{index}"),
+                    endpoint_ref: format!("connection:other-{index}"),
                     project_id: index as u64,
                     reference: "trunk".to_owned(),
                     expected_commit: "a".repeat(40),
@@ -751,7 +751,7 @@ async fn removed_principal_connection_revokes_a_live_session() {
     let grant = backend.create(&context(), request()).await.unwrap();
     let authority = grant.expose_at_control_boundary().to_owned();
     super::super::lock(&backend.inner.metadata)
-        .connections
+        .endpoints
         .clear();
     assert!(matches!(
         backend
@@ -787,7 +787,7 @@ async fn current_grant_and_provider_default_tip_are_revalidated() {
 
     let grant = backend.create(&context(), request()).await.unwrap();
     let authority = grant.expose_at_control_boundary().to_owned();
-    super::super::lock(&backend.inner.metadata).connections[0].grant_ref =
+    super::super::lock(&backend.inner.metadata).endpoints[0].grant_ref =
         "grant:gitlab:revoked".to_owned();
     assert!(matches!(
         backend

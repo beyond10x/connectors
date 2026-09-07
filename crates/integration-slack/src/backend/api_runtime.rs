@@ -57,7 +57,7 @@ impl SlackInner {
             .ok_or_else(|| SlackError::new("oauth-state"))?;
         let session_ref = pending.session_ref.clone();
         let outcome: Result<String, SlackError> = async {
-            if pending.owner.profile != SlackConnectionProfile::OrgUser
+            if pending.owner.profile != SlackEndpointProfile::OrgUser
                 || error.is_some()
                 || code.is_none()
                 || now_ms().is_none_or(|now| now >= expires_at_unix_ms)
@@ -175,10 +175,10 @@ impl SlackInner {
         .await;
         lock(&self.hosted_sessions).remove(&session_ref);
         match outcome {
-            Ok(connection_ref) => lock(&self.sessions)
+            Ok(endpoint_ref) => lock(&self.sessions)
                 .finish(
                     &session_ref,
-                    ConnectSessionTerminal::Completed { connection_ref },
+                    ConnectSessionTerminal::Completed { endpoint_ref },
                 )
                 .map_err(|_| SlackError::new("connect-session")),
             Err(error) => {
@@ -260,8 +260,8 @@ impl SlackInner {
         if !evidence.is_bot || evidence.team_id != expected_team_id {
             return Err(SlackError::new("credential-workspace"));
         }
-        let connection = StoredConnection {
-            connection_ref: ORG_BOT_CONNECTION.to_owned(),
+        let connection = StoredEndpoint {
+            endpoint_ref: ORG_BOT_CONNECTION.to_owned(),
             instance_id: "org-bot".to_owned(),
             label: "Organization Slack bot".to_owned(),
             grant_ref: self.policy.grant_for_profile(PROFILE_ORG_BOT).to_owned(),
@@ -269,7 +269,7 @@ impl SlackInner {
             allowed_events: Vec::new(),
             owner_subject: String::new(),
             team_id: expected_team_id,
-            profile: SlackConnectionProfile::OrgBot,
+            profile: SlackEndpointProfile::OrgBot,
             external_subject_id: evidence.subject_id,
             scopes: evidence.scopes,
             purpose: String::new(),
@@ -277,16 +277,16 @@ impl SlackInner {
         };
         let mut state = lock(&self.metadata);
         state
-            .connections
-            .retain(|stored| stored.profile != SlackConnectionProfile::OrgBot);
-        state.connections.push(connection);
+            .endpoints
+            .retain(|stored| stored.profile != SlackEndpointProfile::OrgBot);
+        state.endpoints.push(connection);
         state
-            .connections
-            .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
+            .endpoints
+            .sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
         self.persist_metadata(&state)
     }
 
-    pub(super) fn connection_is_admitted(&self, connection: &StoredConnection) -> bool {
+    pub(super) fn connection_is_admitted(&self, connection: &StoredEndpoint) -> bool {
         connection.grant_ref == self.policy.grant_for_profile(connection.profile.as_str())
             && connection.initiation == self.policy.initiation
             // A stored connection may admit no event its profile cannot receive and no event this
@@ -303,9 +303,9 @@ impl SlackInner {
             && match self.admission {
                 PrincipalAdmission::Exact(_) => true,
                 PrincipalAdmission::Tenant(_) => {
-                    connection.profile != SlackConnectionProfile::Legacy
+                    connection.profile != SlackEndpointProfile::Legacy
                         && !connection.team_id.is_empty()
-                        && (connection.profile == SlackConnectionProfile::OrgBot
+                        && (connection.profile == SlackEndpointProfile::OrgBot
                             || !connection.owner_subject.is_empty())
                 }
             }
@@ -313,7 +313,7 @@ impl SlackInner {
 
     pub(super) fn connection_owned_by(
         &self,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         context: &PrincipalContext,
     ) -> bool {
         self.context_admitted(context)
@@ -323,7 +323,7 @@ impl SlackInner {
                         || connection.owner_subject == owner.subject()
                 }
                 PrincipalAdmission::Tenant(_) => {
-                    connection.profile == SlackConnectionProfile::OrgBot
+                    connection.profile == SlackEndpointProfile::OrgBot
                         || connection.owner_subject == context.subject()
                 }
             }
@@ -339,12 +339,12 @@ impl SlackInner {
     pub(super) fn check_connection_context(
         &self,
         actual: &PrincipalContext,
-    ) -> Result<(), ConnectionError> {
+    ) -> Result<(), EndpointError> {
         if self.context_admitted(actual) {
             Ok(())
         } else {
-            Err(ConnectionError::new(
-                ConnectionErrorCode::StaleAuthority,
+            Err(EndpointError::new(
+                EndpointErrorCode::StaleAuthority,
                 "owner authority snapshot is not current",
                 false,
             ))
@@ -420,12 +420,12 @@ impl SlackInner {
         &self,
         context: &PrincipalContext,
         datasource_ref: &str,
-    ) -> Vec<StoredConnection> {
+    ) -> Vec<StoredEndpoint> {
         if !SLACK_DATASOURCES.contains(&datasource_ref) {
             return Vec::new();
         }
         lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .filter(|connection| self.connection_is_admitted(connection))
             .filter(|connection| self.connection_owned_by(connection, context))
@@ -447,7 +447,7 @@ impl SlackInner {
         digest.update(datasource_projection_sha256(datasource_ref).as_bytes());
         for connection in self.datasource_connections(context, datasource_ref) {
             digest.update(b"\0");
-            digest.update(connection.connection_ref.as_bytes());
+            digest.update(connection.endpoint_ref.as_bytes());
             digest.update(b"\0");
             digest.update(connection.grant_ref.as_bytes());
             digest.update(b"\0");
@@ -528,7 +528,7 @@ impl SlackInner {
                 // Which of several Slack identities to read through is the question a caller
                 // actually has here, and a scope label alone does not answer it.
                 purpose: (!connection.purpose.is_empty()).then(|| connection.purpose.clone()),
-                connection_ref: connection.connection_ref,
+                endpoint_ref: connection.endpoint_ref,
                 generation: u64::from(STATE_VERSION),
             })
             .collect::<Vec<_>>();
@@ -577,10 +577,10 @@ impl SlackInner {
                 )
             })?;
         let credential_name = match connection.profile {
-            SlackConnectionProfile::OrgUser | SlackConnectionProfile::Legacy => {
+            SlackEndpointProfile::OrgUser | SlackEndpointProfile::Legacy => {
                 USER_TOKEN_CREDENTIAL
             }
-            SlackConnectionProfile::OrgBot | SlackConnectionProfile::CompanionBot => {
+            SlackEndpointProfile::OrgBot | SlackEndpointProfile::CompanionBot => {
                 BOT_TOKEN_CREDENTIAL
             }
         };
@@ -642,7 +642,7 @@ impl SlackInner {
         &self,
         context: &PrincipalContext,
         datasource_ref: &str,
-        connection: &StoredConnection,
+        connection: &StoredEndpoint,
         endpoint: &'static str,
         params: &[(String, String)],
         credential: &Secret,
@@ -654,7 +654,7 @@ impl SlackInner {
         let audit = AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: datasource_ref,
-            connection_ref: &connection.connection_ref,
+            endpoint_ref: &connection.endpoint_ref,
             tenant_id: context.tenant_id(),
             actor_subject: context.actor_subject(),
             outcome: "attempted",
@@ -672,7 +672,7 @@ impl SlackInner {
             let response = self
                 .egress
                 .execute(
-                    &connection.connection_ref,
+                    &connection.endpoint_ref,
                     EgressHttpRequest {
                         request: bearer_request("GET", target.into(), credential),
                         maximum_response_bytes: protocol::datasource::MAX_RESULT_BYTES,
@@ -722,23 +722,23 @@ impl SlackInner {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-    ) -> Vec<OperationConnectionSummary> {
+    ) -> Vec<OperationEndpointSummary> {
         lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .filter(|connection| self.connection_is_admitted(connection))
             .filter(|connection| self.connection_owned_by(connection, context))
             .filter(|connection| connection.carries_operations)
             .filter(|connection| connection_supports_operation(connection, operation_ref))
-            .map(|connection| OperationConnectionSummary {
-                connection_ref: connection.connection_ref.clone(),
+            .map(|connection| OperationEndpointSummary {
+                endpoint_ref: connection.endpoint_ref.clone(),
                 label: connection.label.clone(),
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec![match connection.profile {
-                    SlackConnectionProfile::OrgBot => "organization-read",
-                    SlackConnectionProfile::OrgUser => "delegated-user",
-                    SlackConnectionProfile::CompanionBot => "companion-bot",
-                    SlackConnectionProfile::Legacy => "legacy-reconnect-required",
+                    SlackEndpointProfile::OrgBot => "organization-read",
+                    SlackEndpointProfile::OrgUser => "delegated-user",
+                    SlackEndpointProfile::CompanionBot => "companion-bot",
+                    SlackEndpointProfile::Legacy => "legacy-reconnect-required",
                 }
                 .to_owned()],
                 purpose: (!connection.purpose.is_empty()).then(|| connection.purpose.clone()),
@@ -755,8 +755,8 @@ impl SlackInner {
         SLACK_OPERATIONS
             .iter()
             .filter_map(|operation_ref| {
-                let connections = self.operation_connections(context, operation_ref);
-                if connections.is_empty() {
+                let endpoints = self.operation_connections(context, operation_ref);
+                if endpoints.is_empty() {
                     return None;
                 }
                 let operation = connector_resolve::document::operation(operation_ref)?;
@@ -773,7 +773,7 @@ impl SlackInner {
                     title: title.to_owned(),
                     effect: operation_effect(operation_ref),
                     approval: operation_approval(operation_ref),
-                    connections: connections.clone(),
+                    endpoints: endpoints.clone(),
                 })
             })
             .collect()
@@ -796,7 +796,7 @@ impl SlackInner {
         digest.update(self.policy.grant_ref.as_bytes());
         for connection in self.operation_connections(context, operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.connection_ref.as_bytes());
+            digest.update(connection.endpoint_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }
@@ -811,8 +811,8 @@ impl SlackInner {
         }
         let operation = connector_resolve::document::operation(operation_ref)
             .ok_or_else(operation_not_found)?;
-        let connections = self.operation_connections(context, operation_ref);
-        if connections.is_empty() {
+        let endpoints = self.operation_connections(context, operation_ref);
+        if endpoints.is_empty() {
             return Err(operation_not_found());
         }
         Ok(OperationResult::Describe(OperationDescription {
@@ -825,7 +825,7 @@ impl SlackInner {
             output_schema: serde_json::json!({"type":"object"}),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
-            connections,
+            endpoints,
             description_ref: self.description_ref(context, operation_ref),
         }))
     }
@@ -839,10 +839,10 @@ impl SlackInner {
             return Err(operation_not_found());
         }
         let connection = lock(&self.metadata)
-            .connections
+            .endpoints
             .iter()
             .find(|connection| {
-                connection.connection_ref == request.connection_ref
+                connection.endpoint_ref == request.endpoint_ref
                     && self.connection_is_admitted(connection)
                     && self.connection_owned_by(connection, context)
                     && connection_supports_operation(connection, &request.operation_ref)
@@ -871,11 +871,11 @@ impl SlackInner {
             return Err(operation_invalid());
         }
         let credential_name = match connection.profile {
-            SlackConnectionProfile::OrgUser => USER_TOKEN_CREDENTIAL,
-            SlackConnectionProfile::OrgBot | SlackConnectionProfile::CompanionBot => {
+            SlackEndpointProfile::OrgUser => USER_TOKEN_CREDENTIAL,
+            SlackEndpointProfile::OrgBot | SlackEndpointProfile::CompanionBot => {
                 BOT_TOKEN_CREDENTIAL
             }
-            SlackConnectionProfile::Legacy => {
+            SlackEndpointProfile::Legacy => {
                 if operation_effect(&request.operation_ref) == EffectClass::ReadOnly {
                     USER_TOKEN_CREDENTIAL
                 } else {
@@ -931,7 +931,7 @@ impl SlackInner {
         let audit = AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            connection_ref: &request.connection_ref,
+            endpoint_ref: &request.endpoint_ref,
             tenant_id: context.tenant_id(),
             actor_subject: context.actor_subject(),
             outcome: "attempted",
@@ -945,7 +945,7 @@ impl SlackInner {
             let response = self
                 .egress
                 .execute(
-                    &request.connection_ref,
+                    &request.endpoint_ref,
                     EgressHttpRequest {
                         request: outbound,
                         maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,

@@ -10,9 +10,9 @@ struct InventorySnapshot {
     version: u8,
     state: MonitoringState,
 }
-use protocol::endpoint::{
-    Endpoint, EndpointBinding, EndpointError, EndpointErrorCode, EndpointRequest, EndpointResult,
-    EndpointState, EndpointTransport,
+use protocol::endpoint_inventory::{
+    EndpointInventoryEntry, EndpointBinding, EndpointInventoryError, EndpointInventoryErrorCode, EndpointInventoryRequest, EndpointInventoryResult,
+    EndpointReadiness, EndpointTransport,
 };
 
 impl MonitoringInner {
@@ -65,7 +65,7 @@ impl MonitoringInner {
         }
         let parent = snapshot.state.parent.as_ref();
         if parent.is_some_and(|parent| {
-            !safe_reference(&parent.connection_ref) || !valid_title(&parent.label)
+            !safe_reference(&parent.endpoint_ref) || !valid_title(&parent.label)
         }) || snapshot
             .state
             .observations
@@ -73,7 +73,7 @@ impl MonitoringInner {
             .any(|(key, observation)| {
                 key != &observation.observation_ref
                     || parent.is_none_or(|parent| {
-                        observation.source_connection_ref != parent.connection_ref
+                        observation.source_endpoint_ref != parent.endpoint_ref
                     })
                     || !safe_datasource_uid(&observation.resource_binding)
                     || !valid_title(&observation.title)
@@ -87,42 +87,42 @@ impl MonitoringInner {
         // than restoring an obsolete grant reference from a previous policy generation.
         snapshot.state.children.clear();
         for observation in snapshot.state.observations.values_mut() {
-            observation.connection_ref = None;
+            observation.endpoint_ref = None;
             observation.target_provider =
                 target_provider(&observation.observed_type).map(str::to_owned);
         }
         *lock(&self.state) = snapshot.state;
         Ok(())
     }
-    pub(super) fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
+    pub(super) fn owns_endpoint_inventory(&self, request: &EndpointInventoryRequest) -> bool {
         match request {
-            EndpointRequest::List(request) => request
+            EndpointInventoryRequest::List(request) => request
                 .source_ref
                 .as_deref()
                 .is_none_or(|source| self.is_parent(source)),
-            EndpointRequest::Refresh(request) => request
+            EndpointInventoryRequest::Refresh(request) => request
                 .source_ref
                 .as_deref()
                 .is_none_or(|source| self.is_parent(source)),
-            EndpointRequest::Show(request) => {
+            EndpointInventoryRequest::Show(request) => {
                 self.endpoint_observation(&request.endpoint_ref).is_some()
             }
-            EndpointRequest::Bind(request) => {
+            EndpointInventoryRequest::Bind(request) => {
                 self.endpoint_observation(&request.endpoint_ref).is_some()
             }
         }
     }
 
-    pub(super) async fn handle_endpoint(
+    pub(super) async fn handle_endpoint_inventory(
         &self,
         context: &PrincipalContext,
-        request: EndpointRequest,
-    ) -> Result<EndpointResult, EndpointError> {
+        request: EndpointInventoryRequest,
+    ) -> Result<EndpointInventoryResult, EndpointInventoryError> {
         if !self.same_authority_partition(context) || !self.admits(context) {
             return Err(endpoint_refusal());
         }
         match request {
-            EndpointRequest::List(request) => {
+            EndpointInventoryRequest::List(request) => {
                 let query = request.query.to_ascii_lowercase();
                 let mut endpoints: Vec<_> = lock(&self.state)
                     .observations
@@ -131,7 +131,7 @@ impl MonitoringInner {
                         request
                             .source_ref
                             .as_ref()
-                            .is_none_or(|source| source == &observation.source_connection_ref)
+                            .is_none_or(|source| source == &observation.source_endpoint_ref)
                     })
                     .filter(|observation| {
                         query.is_empty()
@@ -162,21 +162,21 @@ impl MonitoringInner {
                 } else {
                     None
                 };
-                Ok(EndpointResult::List {
+                Ok(EndpointInventoryResult::List {
                     endpoints,
                     next_cursor,
                     warnings: Vec::new(),
                 })
             }
-            EndpointRequest::Show(request) => {
+            EndpointInventoryRequest::Show(request) => {
                 let observation = self
                     .endpoint_observation(&request.endpoint_ref)
                     .ok_or_else(endpoint_not_found)?;
-                Ok(EndpointResult::Show {
+                Ok(EndpointInventoryResult::Show {
                     endpoint: self.endpoint(&observation),
                 })
             }
-            EndpointRequest::Refresh(request) => {
+            EndpointInventoryRequest::Refresh(request) => {
                 self.require_endpoint_management(context)?;
                 if request
                     .source_ref
@@ -188,12 +188,12 @@ impl MonitoringInner {
                 self.refresh_endpoint_inventory()
                     .await
                     .map_err(endpoint_operation_error)?;
-                Ok(EndpointResult::Refresh {
+                Ok(EndpointInventoryResult::Refresh {
                     endpoints: lock(&self.state).observations.len(),
                     warnings: Vec::new(),
                 })
             }
-            EndpointRequest::Bind(request) => {
+            EndpointInventoryRequest::Bind(request) => {
                 self.require_endpoint_management(context)?;
                 let observation = self
                     .endpoint_observation(&request.endpoint_ref)
@@ -208,10 +208,10 @@ impl MonitoringInner {
                     || request.binding.tls.is_some()
                     || request.binding.scheme.is_some()
                 {
-                    return Err(EndpointError::new(EndpointErrorCode::InvalidInput,
+                    return Err(EndpointInventoryError::new(EndpointInventoryErrorCode::InvalidInput,
                         "Grafana datasource bindings retain their recognized provider and Grafana-owned route", false));
                 }
-                Ok(EndpointResult::Bind {
+                Ok(EndpointInventoryResult::Bind {
                     endpoint: self.endpoint(&observation),
                 })
             }
@@ -254,7 +254,7 @@ impl MonitoringInner {
         }
         // Existing materialization verifies the independent target grant and mediated child.
         self.materialize(&fresh.observation_ref)
-            .map(|connection| connection.summary.connection_ref)
+            .map(|connection| connection.summary.endpoint_ref)
             .map_err(|_| operation_not_granted())
     }
 
@@ -266,13 +266,13 @@ impl MonitoringInner {
             .cloned()
     }
 
-    fn endpoint(&self, observation: &StoredObservation) -> Endpoint {
+    fn endpoint(&self, observation: &StoredObservation) -> EndpointInventoryEntry {
         let uid_sha256 = if observation.resource_binding.is_empty() {
             self.hosted_targets
                 .as_ref()
                 .and_then(|targets| {
                     targets.iter().find(|target| {
-                        observation.connection_ref.as_ref() == Some(&target.connection_ref)
+                        observation.endpoint_ref.as_ref() == Some(&target.endpoint_ref)
                     })
                 })
                 .map(|target| target.uid_sha256.clone())
@@ -291,26 +291,26 @@ impl MonitoringInner {
         let endpoint_ref = format!(
             "endpoint:grafana:{}",
             digest_prefix(
-                format!("{}\0{uid_sha256}", observation.source_connection_ref).as_bytes()
+                format!("{}\0{uid_sha256}", observation.source_endpoint_ref).as_bytes()
             )
         );
         let state = if !observation.active {
-            EndpointState::Stale
+            EndpointReadiness::Stale
         } else if observation.target_provider.is_none() {
-            EndpointState::UnknownProvider
-        } else if observation.connection_ref.is_some()
+            EndpointReadiness::UnknownProvider
+        } else if observation.endpoint_ref.is_some()
             || observation
                 .target_provider
                 .as_deref()
                 .is_some_and(|provider| self.policy.target_grant(provider).is_some())
         {
-            EndpointState::Ready
+            EndpointReadiness::Ready
         } else {
-            EndpointState::Denied
+            EndpointReadiness::Denied
         };
-        Endpoint {
+        EndpointInventoryEntry {
             endpoint_ref,
-            source_ref: observation.source_connection_ref.clone(),
+            source_ref: observation.source_endpoint_ref.clone(),
             namespace: None,
             resource_kind: "GrafanaDatasource".into(),
             resource_name: if observation.resource_binding.is_empty() {
@@ -340,7 +340,7 @@ impl MonitoringInner {
         }
     }
 
-    fn require_endpoint_management(&self, context: &PrincipalContext) -> Result<(), EndpointError> {
+    fn require_endpoint_management(&self, context: &PrincipalContext) -> Result<(), EndpointInventoryError> {
         let admitted = match &self.access {
             MonitoringAccess::ExactOwner => context == &self.owner,
             MonitoringAccess::HostedGroups {
@@ -377,7 +377,7 @@ impl MonitoringInner {
                 serde_json::json!({}),
             )
             .await?;
-        self.reconcile_observations(&parent.connection_ref, &output)
+        self.reconcile_observations(&parent.endpoint_ref, &output)
     }
 }
 
@@ -385,23 +385,23 @@ fn safe_reference(value: &str) -> bool {
     !value.is_empty() && value.len() <= 512 && value.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
-fn endpoint_not_found() -> EndpointError {
-    EndpointError::new(
-        EndpointErrorCode::NotFound,
+fn endpoint_not_found() -> EndpointInventoryError {
+    EndpointInventoryError::new(
+        EndpointInventoryErrorCode::NotFound,
         "the Grafana endpoint is unavailable",
         false,
     )
 }
-fn endpoint_refusal() -> EndpointError {
-    EndpointError::new(
-        EndpointErrorCode::NotGranted,
+fn endpoint_refusal() -> EndpointInventoryError {
+    EndpointInventoryError::new(
+        EndpointInventoryErrorCode::NotGranted,
         "Grafana endpoint access is not admitted",
         false,
     )
 }
-fn endpoint_operation_error(_: OperationError) -> EndpointError {
-    EndpointError::new(
-        EndpointErrorCode::Unavailable,
+fn endpoint_operation_error(_: OperationError) -> EndpointInventoryError {
+    EndpointInventoryError::new(
+        EndpointInventoryErrorCode::Unavailable,
         "Grafana inventory refresh is unavailable",
         true,
     )

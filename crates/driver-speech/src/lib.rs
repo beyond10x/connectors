@@ -238,7 +238,7 @@ mod tests {
 
     use domain::audio::AudioSink;
     use domain::{
-        AdmittedOperation, AudioPlan, Capability, ConnectionAuthority, Implementation,
+        AdmittedOperation, AudioPlan, Capability, EndpointAuthority, Implementation,
         InitiationPolicy, Interaction, OperationFacts, Placement, ProtocolPlan, ZeroIoPlan,
     };
     use service::{admit_audio_plan, AudioDeploymentRoute};
@@ -344,7 +344,7 @@ mod tests {
                 "org",
                 "principal-1",
                 "grant-1",
-                ConnectionAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
+                EndpointAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
             ),
             ProtocolPlan::AudioV1(AudioPlan {
                 connection: connection.to_owned(),

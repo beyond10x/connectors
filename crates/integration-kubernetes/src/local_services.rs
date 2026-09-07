@@ -17,8 +17,8 @@ use k8s_openapi::api::authorization::v1::{
 use k8s_openapi::api::core::v1::{Service, ServicePort};
 use kube::api::{ListParams, PostParams};
 use kube::{Api, Client};
-use protocol::connection::{
-    ConnectionError, ConnectionErrorCode, DiscoveryObservationState, DiscoveryObservationSummary,
+use protocol::endpoint::{
+    EndpointError, EndpointErrorCode, DiscoveryObservationState, DiscoveryObservationSummary,
 };
 use protocol::operation::{OperationError, OperationErrorCode};
 use serde_json::Value;
@@ -82,7 +82,7 @@ pub(crate) fn recognize_service(service: &Service) -> Option<&'static str> {
     }
 }
 
-pub(crate) async fn verify_identity(client: Client) -> Result<(), ConnectionError> {
+pub(crate) async fn verify_identity(client: Client) -> Result<(), EndpointError> {
     let reviews: Api<SelfSubjectReview> = Api::all(client);
     let reviewed = reviews
         .create(&PostParams::default(), &SelfSubjectReview::default())
@@ -101,12 +101,12 @@ pub(crate) async fn verify_identity(client: Client) -> Result<(), ConnectionErro
 pub(crate) async fn discover_services(
     client: Client,
     policy: &KubernetesIntegrationConfig,
-) -> Result<Vec<Service>, ConnectionError> {
+) -> Result<Vec<Service>, EndpointError> {
     let limit = u32::from(policy.resource_limit);
     if policy.namespaces.is_empty() {
         if !can_list_services(client.clone(), None).await? {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            return Err(EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "the selected Kubernetes identity cannot list Services cluster-wide",
                 false,
             ));
@@ -146,7 +146,7 @@ pub(crate) async fn discover_services(
 pub(crate) async fn can_list_services(
     client: Client,
     namespace: Option<&str>,
-) -> Result<bool, ConnectionError> {
+) -> Result<bool, EndpointError> {
     let reviews: Api<SelfSubjectAccessReview> = Api::all(client);
     let review = SelfSubjectAccessReview {
         spec: SelfSubjectAccessReviewSpec {
@@ -228,7 +228,7 @@ pub(crate) async fn can_get_service(
 
 pub(crate) async fn service_is_current(
     client: Client,
-    child: &KubernetesServiceConnection,
+    child: &KubernetesServiceEndpoint,
 ) -> Result<bool, OperationError> {
     let services: Api<Service> = Api::namespaced(client, &child.namespace);
     let current = services
@@ -251,7 +251,7 @@ pub(crate) async fn service_is_current(
     };
     let binding = format!(
         "{}\0{}\0{}\0{}\0{}\0{}",
-        child.parent_connection_ref, child.namespace, child.service, port, uid, provider
+        child.parent_endpoint_ref, child.namespace, child.service, port, uid, provider
     );
     Ok(provider == child.provider
         && uid == child.resource_uid
@@ -261,7 +261,7 @@ pub(crate) async fn service_is_current(
 
 pub(crate) async fn proxy_json(
     client: Client,
-    child: &KubernetesServiceConnection,
+    child: &KubernetesServiceEndpoint,
     relative: &str,
 ) -> Result<Value, OperationError> {
     let route = format!(
@@ -295,7 +295,7 @@ pub(crate) async fn proxy_json(
 }
 
 pub(crate) fn normalize_services(
-    source_connection_ref: &str,
+    source_endpoint_ref: &str,
     services: Vec<Service>,
 ) -> Vec<StoredServiceObservation> {
     let mut seen = BTreeSet::new();
@@ -308,7 +308,7 @@ pub(crate) fn normalize_services(
             let uid = service.metadata.uid.as_deref()?;
             let port = select_service_port(provider, service.spec.as_ref()?.ports.as_deref()?)?;
             let binding =
-                format!("{source_connection_ref}\0{namespace}\0{name}\0{port}\0{uid}\0{provider}");
+                format!("{source_endpoint_ref}\0{namespace}\0{name}\0{port}\0{uid}\0{provider}");
             if !seen.insert(binding.clone()) {
                 return None;
             }
@@ -317,14 +317,14 @@ pub(crate) fn normalize_services(
                 summary: DiscoveryObservationSummary {
                     observation_ref: opaque_ref("observation:kubernetes:", &binding),
                     discovery_ref: DISCOVERY_REF.to_owned(),
-                    source_connection_ref: source_connection_ref.to_owned(),
+                    source_endpoint_ref: source_endpoint_ref.to_owned(),
                     observed_type: "kubernetes_service".to_owned(),
                     title,
                     state: DiscoveryObservationState::Observed,
                     evidence_generation: 1,
                     evidence_sha256: digest(&binding),
                     target_provider_ref: Some(provider.to_owned()),
-                    connection_ref: None,
+                    endpoint_ref: None,
                 },
                 namespace: namespace.to_owned(),
                 service: name.to_owned(),

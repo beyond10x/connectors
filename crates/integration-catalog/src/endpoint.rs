@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use catalog::{HostEffect, OperationDirection, Risk};
 use connector_secrets::SecretStore;
 use protocol::operation::{
-    ConnectionSummary, InvocationResult, OperationDescription, OperationError, OperationErrorCode,
+    EndpointSummary, InvocationResult, OperationDescription, OperationError, OperationErrorCode,
     OperationSummary,
 };
 use service::{EgressHttpRequest, EgressTransport};
@@ -32,7 +32,7 @@ pub fn read_admitted(operation: &catalog::Operation) -> bool {
 pub fn describe(
     provider: &str,
     operation_ref: &str,
-    connections: Vec<ConnectionSummary>,
+    endpoints: Vec<EndpointSummary>,
     description_ref: String,
 ) -> Result<OperationDescription, OperationError> {
     let operation = admitted_operation(provider, operation_ref)?;
@@ -50,21 +50,21 @@ pub fn describe(
             .unwrap_or(serde_json::Value::Null),
         effect: effect_class(operation),
         approval: approval_posture(operation),
-        connections,
+        endpoints,
         description_ref,
     })
 }
 
 pub fn summary(
     operation: &catalog::Operation,
-    connections: Vec<ConnectionSummary>,
+    endpoints: Vec<EndpointSummary>,
 ) -> OperationSummary {
     OperationSummary {
         operation_ref: operation.id.to_owned(),
         title: operation.id.to_owned(),
         effect: effect_class(operation),
         approval: approval_posture(operation),
-        connections,
+        endpoints,
     }
 }
 
@@ -140,12 +140,12 @@ pub fn admit_http(
 
 impl AdmittedHttpOperation {
     /// Use the same declared credential assembler, request resolver, pagination and bounds as
-    /// configured catalog Connections; only the admitted origin comes from discovery.
+    /// configured catalog Endpoints; only the admitted origin comes from discovery.
     #[allow(clippy::too_many_arguments)]
     pub async fn execute(
         self,
         tenant: &str,
-        connection_ref: &str,
+        endpoint_ref: &str,
         base_url: &str,
         config: &DeclaredConfig,
         secrets: &dyn SecretStore,
@@ -198,7 +198,7 @@ impl AdmittedHttpOperation {
         let request_url = plan.request.url.clone();
         let response = egress
             .execute(
-                connection_ref,
+                endpoint_ref,
                 EgressHttpRequest {
                     request: plan.request,
                     maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
@@ -254,7 +254,7 @@ impl AdmittedHttpOperation {
         Ok(InvocationResult {
             operation_ref: operation.id.to_owned(),
             output,
-            connector_audit_ref: audit_ref(operation.id, connection_ref),
+            connector_audit_ref: audit_ref(operation.id, endpoint_ref),
             execution_ref: None,
         })
     }

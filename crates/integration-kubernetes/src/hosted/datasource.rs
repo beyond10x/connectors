@@ -164,25 +164,25 @@ fn kubernetes_datasource_ref(reference: &str) -> bool {
 
 #[async_trait]
 impl ConnectorBackend for KubernetesStatusBackend {
-    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+    fn owns_endpoint_inventory(&self, request: &protocol::endpoint_inventory::EndpointInventoryRequest) -> bool {
         self.endpoint_backend
             .as_ref()
-            .is_some_and(|backend| backend.owns_endpoint(request))
+            .is_some_and(|backend| backend.owns_endpoint_inventory(request))
     }
 
-    async fn handle_endpoint(
+    async fn handle_endpoint_inventory(
         &self,
         context: &PrincipalContext,
-        request: protocol::endpoint::EndpointRequest,
-    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        request: protocol::endpoint_inventory::EndpointInventoryRequest,
+    ) -> Result<protocol::endpoint_inventory::EndpointInventoryResult, protocol::endpoint_inventory::EndpointInventoryError> {
         let backend = self.endpoint_backend.as_ref().ok_or_else(|| {
-            protocol::endpoint::EndpointError::new(
-                protocol::endpoint::EndpointErrorCode::Unavailable,
+            protocol::endpoint_inventory::EndpointInventoryError::new(
+                protocol::endpoint_inventory::EndpointInventoryErrorCode::Unavailable,
                 "Kubernetes endpoint discovery is not configured",
                 false,
             )
         })?;
-        backend.handle_endpoint(context, request).await
+        backend.handle_endpoint_inventory(context, request).await
     }
 
     async fn resolve_endpoint(
@@ -261,7 +261,7 @@ impl ConnectorBackend for KubernetesStatusBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
-            connections: true,
+            endpoints: true,
             events: self.endpoint_backend.is_some(),
             datasources: true,
         }
@@ -286,7 +286,7 @@ impl ConnectorBackend for KubernetesStatusBackend {
                 matches!(
                     request.operation_ref.as_str(),
                     STATUS_OPERATION | RESTART_OPERATION | LOGS_OPERATION
-                ) && request.connection_ref == CONNECTION
+                ) && request.endpoint_ref == CONNECTION
             }
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
@@ -296,15 +296,15 @@ impl ConnectorBackend for KubernetesStatusBackend {
         }
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
         if self
             .endpoint_backend
             .as_ref()
-            .is_some_and(|backend| backend.owns_connection(request))
+            .is_some_and(|backend| backend.owns_endpoint(request))
         {
             return true;
         }
-        matches!(request, ConnectionRequest::Describe(request) if request.connection_ref == CONNECTION)
+        matches!(request, EndpointRequest::Describe(request) if request.endpoint_ref == CONNECTION)
     }
 
     fn owns_datasource(&self, request: &DatasourceRequest) -> bool {
@@ -385,32 +385,32 @@ impl ConnectorBackend for KubernetesStatusBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         self.require_connection_owner(context)?;
-        if !matches!(request, ConnectionRequest::Search(_)) {
+        if !matches!(request, EndpointRequest::Search(_)) {
             if let Some(backend) = self
                 .endpoint_backend
                 .as_ref()
-                .filter(|backend| backend.owns_connection(&request))
+                .filter(|backend| backend.owns_endpoint(&request))
             {
-                return backend.handle_connection(context, request).await;
+                return backend.handle_endpoint(context, request).await;
             }
         }
         if !self.has_read_access(context) {
-            return Err(ConnectionError::new(
-                ConnectionErrorCode::NotGranted,
+            return Err(EndpointError::new(
+                EndpointErrorCode::NotGranted,
                 "Kubernetes Connection is not granted to this principal",
                 false,
             ));
         }
         match request {
-            ConnectionRequest::Search(search) => {
+            EndpointRequest::Search(search) => {
                 let query = search.query.to_ascii_lowercase();
-                let mut connections = (query.is_empty()
+                let mut endpoints = (query.is_empty()
                     || ["kubernetes", "development", "cluster", "read-only"]
                         .iter()
                         .any(|term| query.contains(term)))
@@ -419,28 +419,28 @@ impl ConnectorBackend for KubernetesStatusBackend {
                 .take(usize::from(search.limit))
                 .collect::<Vec<_>>();
                 if let Some(backend) = &self.endpoint_backend {
-                    if let ConnectionResult::Search {
-                        connections: discovered,
+                    if let EndpointResult::Search {
+                        endpoints: discovered,
                     } = backend
-                        .handle_connection(context, ConnectionRequest::Search(search.clone()))
+                        .handle_endpoint(context, EndpointRequest::Search(search.clone()))
                         .await?
                     {
-                        connections.extend(discovered);
+                        endpoints.extend(discovered);
                     }
                 }
-                connections.truncate(usize::from(search.limit));
-                Ok(ConnectionResult::Search { connections })
+                endpoints.truncate(usize::from(search.limit));
+                Ok(EndpointResult::Search { endpoints })
             }
-            ConnectionRequest::Describe(ConnectionDescribeRequest { connection_ref })
-                if connection_ref == CONNECTION =>
+            EndpointRequest::Describe(EndpointDescribeRequest { endpoint_ref })
+                if endpoint_ref == CONNECTION =>
             {
-                Ok(ConnectionResult::Describe(ControlConnectionDescription {
+                Ok(EndpointResult::Describe(ControlEndpointDescription {
                     summary: control_connection(),
                     channels: Vec::new(),
                 }))
             }
-            _ => Err(ConnectionError::new(
-                ConnectionErrorCode::NotFound,
+            _ => Err(EndpointError::new(
+                EndpointErrorCode::NotFound,
                 "Kubernetes Integration Connection was not found",
                 false,
             )),

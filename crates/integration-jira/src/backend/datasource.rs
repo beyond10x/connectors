@@ -23,7 +23,7 @@ const DETAIL_FIELDS: &str = "summary,status,issuetype,priority,assignee,labels,u
 struct BindingTarget {
     binding: DatasourceBinding,
     project_key: String,
-    user_connection: Option<StoredConnection>,
+    user_connection: Option<StoredEndpoint>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -123,7 +123,7 @@ impl JiraInner {
                 binding: DatasourceBinding {
                     datasource_ref: JIRA_DATASOURCE.to_owned(),
                     binding_ref: datasource_binding_ref(ORG_CONNECTION_REF, project, 1),
-                    connection_ref: ORG_CONNECTION_REF.to_owned(),
+                    endpoint_ref: ORG_CONNECTION_REF.to_owned(),
                     label: format!("{project} · organization read-only"),
                     generation: 1,
                     purpose: None,
@@ -138,11 +138,11 @@ impl JiraInner {
                     binding: DatasourceBinding {
                         datasource_ref: JIRA_DATASOURCE.to_owned(),
                         binding_ref: datasource_binding_ref(
-                            &connection.connection_ref,
+                            &connection.endpoint_ref,
                             project,
                             connection.credential_generation,
                         ),
-                        connection_ref: connection.connection_ref.clone(),
+                        endpoint_ref: connection.endpoint_ref.clone(),
                         label: format!("{project} · {}", connection.label),
                         generation: connection.credential_generation,
                         purpose: None,
@@ -230,7 +230,7 @@ impl JiraInner {
                 DatasourceRead::List { .. } => "jira.issues.list",
                 DatasourceRead::Get { .. } => "jira.issues.get",
             },
-            &target.binding.connection_ref,
+            &target.binding.endpoint_ref,
             context,
             "attempted",
         )
@@ -327,7 +327,7 @@ impl JiraInner {
             } else {
                 "jira.issues.get"
             },
-            &target.binding.connection_ref,
+            &target.binding.endpoint_ref,
             context,
             "completed",
         )
@@ -613,10 +613,10 @@ fn insert_optional_string(
     Ok(())
 }
 
-fn datasource_binding_ref(connection_ref: &str, project: &str, generation: u64) -> String {
+fn datasource_binding_ref(endpoint_ref: &str, project: &str, generation: u64) -> String {
     let mut digest = Sha256::new();
     digest.update(b"b10x/jira-datasource-binding/v1\0");
-    digest.update(connection_ref.as_bytes());
+    digest.update(endpoint_ref.as_bytes());
     digest.update(b"\0");
     digest.update(project.as_bytes());
     digest.update(generation.to_be_bytes());

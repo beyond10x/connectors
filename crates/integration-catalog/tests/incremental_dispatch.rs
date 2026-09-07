@@ -151,7 +151,7 @@ async fn invoke(
             &principal,
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: operation.into(),
-                connection_ref: description.connections[0].connection_ref.clone(),
+                endpoint_ref: description.endpoints[0].endpoint_ref.clone(),
                 description_ref: description.description_ref,
                 input,
                 approval_evidence_ref: None,

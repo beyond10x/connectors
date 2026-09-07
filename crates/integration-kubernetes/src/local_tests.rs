@@ -236,7 +236,7 @@ contexts:
         assert!(candidates(&kubeconfig).is_empty());
     }
 
-    /// **Two activated clusters are two callable Connections**, not one.
+    /// **Two activated clusters are two callable Endpoints**, not one.
     ///
     /// The regression: `cluster_connection` answered `state.clients.keys().next()`, so an operator
     /// who had activated five kubeconfig contexts — all `authorized`, all with a live client — got
@@ -289,20 +289,20 @@ contexts:
     }
 
     /// Activation's own output shape, for the two references a test names.
-    fn descriptions(references: &[&str]) -> BTreeMap<String, ConnectionDescription> {
+    fn descriptions(references: &[&str]) -> BTreeMap<String, EndpointDescription> {
         references
             .iter()
             .map(|reference| {
                 (
                     (*reference).to_owned(),
-                    ConnectionDescription {
-                        summary: ConnectionSummary {
-                            connection_ref: (*reference).to_owned(),
+                    EndpointDescription {
+                        summary: EndpointSummary {
+                            endpoint_ref: (*reference).to_owned(),
                             integration_ref: KUBERNETES.to_owned(),
                             label: (*reference).to_owned(),
-                            state: ConnectionState::Authorized,
-                            initiation: vec![ConnectionInitiator::Platform],
-                            route: ConnectionRoute::Direct,
+                            state: EndpointState::Authorized,
+                            initiation: vec![EndpointInitiator::Platform],
+                            route: EndpointRoute::Direct,
                             scope: None,
                             actor: None,
                             auth_profile: None,

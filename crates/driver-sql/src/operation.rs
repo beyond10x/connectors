@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::{credentials::CredentialSource, SqlConnectionConfig, SqlDriverError, SqlEngine};
+use crate::{credentials::CredentialSource, SqlEndpointConfig, SqlDriverError, SqlEngine};
 
 /// A parsed, bounded read operation. Obtain it before resolving credentials or opening a route.
 #[derive(Debug)]
@@ -102,7 +102,7 @@ impl AdmittedSqlOperation {
     /// Refuses an engine mismatch and propagates bounded driver failures without secret values.
     pub async fn execute(
         self,
-        config: &SqlConnectionConfig,
+        config: &SqlEndpointConfig,
         credentials: &dyn CredentialSource,
     ) -> Result<Value, SqlDriverError> {
         if self.engine != config.engine {

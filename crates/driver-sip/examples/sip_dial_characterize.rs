@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use connector_resolve::document::Document;
 use domain::voice::{AudioFrame, TerminationReason};
-use domain::{AdmittedOperation, Capability, ConnectionAuthority, DriverId, InitiationPolicy};
+use domain::{AdmittedOperation, Capability, EndpointAuthority, DriverId, InitiationPolicy};
 use protocol::sip::{SipDialInput, SIP_DIAL_OPERATION, SIP_DIAL_PROVIDER, SIP_DIAL_TOOL_REF};
 use service::{
     admit_sip_dial, CredentialSet, NoHostResolution, SipDeploymentRoute, SipDialRouteTable,
@@ -56,7 +56,7 @@ async fn main() {
             "development",
             "operator",
             "characterization-grant",
-            ConnectionAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
+            EndpointAuthority::new(connection, InitiationPolicy::platform_only()).unwrap(),
         ),
         &PlanningEnvironment {
             available_drivers: BTreeSet::from([DriverId::SipV1]),

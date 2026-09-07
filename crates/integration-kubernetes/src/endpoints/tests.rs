@@ -63,8 +63,8 @@ fn every_interface_remains_visible_with_exact_recognition_and_uid_identity() {
         Some("/ari")
     );
     assert_eq!(endpoints[1].interface, "ami");
-    assert_eq!(endpoints[1].state, EndpointState::UnsupportedProtocol);
-    assert_eq!(endpoints[2].state, EndpointState::UnknownProvider);
+    assert_eq!(endpoints[1].state, EndpointReadiness::UnsupportedProtocol);
+    assert_eq!(endpoints[2].state, EndpointReadiness::UnknownProvider);
     assert_eq!(endpoints[3].transport, EndpointTransport::Udp);
     let replacement = project_service("source", &service("asterisk", "uid-two", ports));
     assert_ne!(endpoints[0].endpoint_ref, replacement[0].endpoint_ref);
@@ -149,12 +149,12 @@ async fn partial_refresh_preserves_unseen_resources_and_restart_preserves_bindin
             warnings: vec!["namespace unavailable".to_owned()],
         })
         .unwrap();
-    assert_ne!(source.show(&reference).unwrap().state, EndpointState::Stale);
+    assert_ne!(source.show(&reference).unwrap().state, EndpointReadiness::Stale);
     let reopened = super::tests::source(client(|_| absent()), store);
     assert_eq!(reopened.show(&reference).unwrap().binding, Some(binding));
     assert_eq!(
         reopened.show(&reference).unwrap().state,
-        EndpointState::Stale
+        EndpointReadiness::Stale
     );
     assert!(!reopened.warnings().unwrap().is_empty());
     reopened
@@ -166,7 +166,7 @@ async fn partial_refresh_preserves_unseen_resources_and_restart_preserves_bindin
         .unwrap();
     assert_eq!(
         reopened.show(&reference).unwrap().state,
-        EndpointState::Stale
+        EndpointReadiness::Stale
     );
 }
 
@@ -201,15 +201,15 @@ async fn restored_inventory_needs_current_uid_validation_and_never_reads_credent
     );
     assert_eq!(
         restored.show(&reference).unwrap().state,
-        EndpointState::Stale
+        EndpointReadiness::Stale
     );
     assert_eq!(
         restored.validate(&reference).await.unwrap().state,
-        EndpointState::Ready
+        EndpointReadiness::Ready
     );
     assert_eq!(
         restored.show(&reference).unwrap().state,
-        EndpointState::Ready
+        EndpointReadiness::Ready
     );
     current.lock().unwrap().metadata.uid = Some("replacement-uid".to_owned());
     assert_eq!(

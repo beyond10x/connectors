@@ -344,7 +344,7 @@ pub fn personal_oauth_admitted_connection_ref(
     entry: &CatalogIntegrationConfig,
 ) -> Result<String> {
     let policy = Policy::admit(owner, entry)?;
-    Ok(super::connection_ref(
+    Ok(super::endpoint_ref(
         &policy.configured.provider,
         policy.configured.instance(),
     ))
@@ -426,7 +426,7 @@ impl PersonalOAuthBackend {
                         ]))
                     ),
                     integration: policy.provider.id.into(),
-                    connection: super::connection_ref(&entry.provider, entry.instance()),
+                    connection: super::endpoint_ref(&entry.provider, entry.instance()),
                     purpose: policy.registration.auth_profile.clone(),
                     store: "personal-oauth-development-file-v1".into(),
                     address_digest: [0; 32],
@@ -541,7 +541,7 @@ impl OAuthInner {
             let marker: RefreshAttempt =
                 serde_json::from_slice(&bytes).map_err(|_| PersonalOAuthError::Unavailable)?;
             if marker.version != 1
-                || marker.connection_ref != identity.connection
+                || marker.endpoint_ref != identity.connection
                 || marker.binding_sha256 != binding_digest(identity)?
                 || marker.previous_generation == 0
             {
@@ -589,7 +589,7 @@ impl OAuthInner {
         }
         let marker = RefreshAttempt {
             version: 1,
-            connection_ref: identity.connection.clone(),
+            endpoint_ref: identity.connection.clone(),
             binding_sha256: binding_digest(identity)?,
             previous_generation: generation,
         };
@@ -608,7 +608,7 @@ impl OAuthInner {
 #[serde(deny_unknown_fields)]
 struct RefreshAttempt {
     version: u8,
-    connection_ref: String,
+    endpoint_ref: String,
     binding_sha256: [u8; 32],
     previous_generation: u64,
 }
@@ -666,14 +666,14 @@ fn field_digest(fields: &[&str]) -> [u8; 32] {
     hash.finalize().into()
 }
 
-fn connection_error(error: PersonalOAuthError) -> connection_api::ConnectionError {
+fn endpoint_error(error: PersonalOAuthError) -> connection_api::EndpointError {
     let code = match error {
-        PersonalOAuthError::Invalid => connection_api::ConnectionErrorCode::InvalidInput,
-        PersonalOAuthError::Refused => connection_api::ConnectionErrorCode::NotGranted,
-        PersonalOAuthError::PortInUse => connection_api::ConnectionErrorCode::Conflict,
-        _ => connection_api::ConnectionErrorCode::Unavailable,
+        PersonalOAuthError::Invalid => connection_api::EndpointErrorCode::InvalidInput,
+        PersonalOAuthError::Refused => connection_api::EndpointErrorCode::NotGranted,
+        PersonalOAuthError::PortInUse => connection_api::EndpointErrorCode::Conflict,
+        _ => connection_api::EndpointErrorCode::Unavailable,
     };
-    connection_api::ConnectionError::new(code, error.to_string(), false)
+    connection_api::EndpointError::new(code, error.to_string(), false)
 }
 
 fn operation_error(error: PersonalOAuthError) -> operation_api::OperationError {
@@ -967,11 +967,11 @@ impl OAuthInner {
                 if !lock(&binding.authority)?.operation(operation, &publication.evidence) {
                     continue;
                 }
-                for connection in &mut summary.connections {
+                for connection in &mut summary.endpoints {
                     connection.purpose = Some(binding.policy.registration.auth_profile.clone());
                 }
                 if let Some(existing) = merged.get_mut(&summary.operation_ref) {
-                    existing.connections.extend(summary.connections);
+                    existing.endpoints.extend(summary.endpoints);
                 } else {
                     merged.insert(summary.operation_ref.clone(), summary);
                 }
@@ -1010,13 +1010,13 @@ impl OAuthInner {
                         })
                     });
             if !admitted {
-                description.connections.clear();
+                description.endpoints.clear();
             }
-            for connection in &mut description.connections {
+            for connection in &mut description.endpoints {
                 connection.purpose = Some(binding.policy.registration.auth_profile.clone());
             }
             if let Some(existing) = &mut result {
-                existing.connections.extend(description.connections);
+                existing.endpoints.extend(description.endpoints);
             } else {
                 result = Some(description);
             }
@@ -1036,7 +1036,7 @@ impl OAuthInner {
     ) -> std::result::Result<&'static catalog::Operation, operation_api::OperationError> {
         let (operation, raw) = binding.delegate.inner.admit_invocation(
             &request.operation_ref,
-            &request.connection_ref,
+            &request.endpoint_ref,
             &request.description_ref,
             &request.input,
         )?;
@@ -1080,7 +1080,7 @@ impl OAuthInner {
         let binding = self
             .bindings
             .iter()
-            .find(|binding| binding.custody.identity.connection == request.connection_ref)
+            .find(|binding| binding.custody.identity.connection == request.endpoint_ref)
             .ok_or_else(|| operation_error(PersonalOAuthError::Refused))?;
         let guard = binding.gate.lock().await;
         let operation = self.admit_invocation(binding, &request)?;
@@ -1120,34 +1120,34 @@ impl OAuthInner {
             .inner
             .invoke(
                 &request.operation_ref,
-                &request.connection_ref,
+                &request.endpoint_ref,
                 &request.description_ref,
                 request.input,
             )
             .await
     }
 
-    fn connection_summary(
+    fn endpoint_summary(
         &self,
         binding: &OAuthBinding,
-    ) -> Result<connection_api::ConnectionSummary> {
+    ) -> Result<connection_api::EndpointSummary> {
         let mut summary = binding
             .delegate
             .inner
-            .connections("", 1)
+            .endpoints("", 1)
             .into_iter()
             .next()
             .ok_or(PersonalOAuthError::Unavailable)?;
-        summary.scope = Some(connection_api::ConnectionScope::Principal);
-        summary.actor = Some(connection_api::ConnectionActor::User);
+        summary.scope = Some(connection_api::EndpointScope::Principal);
+        summary.actor = Some(connection_api::EndpointActor::User);
         summary.auth_profile = Some(binding.policy.registration.auth_profile.clone());
         summary.state = match self.coherent(binding) {
             Ok(Some(publication)) if self.now()? < publication.evidence.expires_at => {
-                connection_api::ConnectionState::Callable
+                connection_api::EndpointState::Callable
             }
-            Ok(Some(_)) => connection_api::ConnectionState::Authorized,
-            Ok(None) => connection_api::ConnectionState::Created,
-            Err(_) => connection_api::ConnectionState::Degraded,
+            Ok(Some(_)) => connection_api::EndpointState::Authorized,
+            Ok(None) => connection_api::EndpointState::Created,
+            Err(_) => connection_api::EndpointState::Degraded,
         };
         Ok(summary)
     }
@@ -1239,7 +1239,7 @@ impl ConnectorBackend for PersonalOAuthBackend {
 
     fn capabilities(&self) -> service::BackendCapabilities {
         service::BackendCapabilities {
-            connections: true,
+            endpoints: true,
             ..service::BackendCapabilities::OPERATIONS
         }
     }
@@ -1254,7 +1254,7 @@ impl ConnectorBackend for PersonalOAuthBackend {
                 .any(|binding| binding.delegate.owns_operation_ref(&request.operation_ref)),
             operation_api::OperationRequest::Invoke(request) => {
                 self.inner.bindings.iter().any(|binding| {
-                    binding.custody.identity.connection == request.connection_ref
+                    binding.custody.identity.connection == request.endpoint_ref
                         && binding.delegate.owns_operation_ref(&request.operation_ref)
                 })
             }
@@ -1262,20 +1262,20 @@ impl ConnectorBackend for PersonalOAuthBackend {
         }
     }
 
-    fn owns_connection(&self, request: &connection_api::ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &connection_api::EndpointRequest) -> bool {
         match request {
-            connection_api::ConnectionRequest::Search(_) => true,
-            connection_api::ConnectionRequest::Describe(request) => self
+            connection_api::EndpointRequest::Search(_) => true,
+            connection_api::EndpointRequest::Describe(request) => self
                 .inner
                 .bindings
                 .iter()
-                .any(|binding| binding.custody.identity.connection == request.connection_ref),
-            connection_api::ConnectionRequest::ConnectSessionCreate(request) => self
+                .any(|binding| binding.custody.identity.connection == request.endpoint_ref),
+            connection_api::EndpointRequest::ConnectSessionCreate(request) => self
                 .inner
                 .bindings
                 .iter()
                 .any(|binding| binding.policy.provider.id == request.integration_ref),
-            connection_api::ConnectionRequest::ConnectSessionStatus(request) => self
+            connection_api::EndpointRequest::ConnectSessionStatus(request) => self
                 .inner
                 .sessions
                 .lock()
@@ -1315,7 +1315,7 @@ impl ConnectorBackend for PersonalOAuthBackend {
 
     fn supports_ephemeral_invocation(&self, request: &operation_api::InvokeRequest) -> bool {
         self.inner.bindings.iter().any(|binding| {
-            binding.custody.identity.connection == request.connection_ref
+            binding.custody.identity.connection == request.endpoint_ref
                 && binding.delegate.supports_ephemeral_invocation(request)
         })
     }
@@ -1357,38 +1357,38 @@ impl ConnectorBackend for PersonalOAuthBackend {
         }
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: connection_api::ConnectionRequest,
-    ) -> std::result::Result<connection_api::ConnectionResult, connection_api::ConnectionError>
+        request: connection_api::EndpointRequest,
+    ) -> std::result::Result<connection_api::EndpointResult, connection_api::EndpointError>
     {
         if !same_owner(&self.inner.owner, context) || *self.inner.stopping.borrow() {
-            return Err(connection_error(PersonalOAuthError::Refused));
+            return Err(endpoint_error(PersonalOAuthError::Refused));
         }
         // Status must not wait behind a human-held device gate or an in-progress transaction.
-        if let connection_api::ConnectionRequest::ConnectSessionStatus(request) = request {
+        if let connection_api::EndpointRequest::ConnectSessionStatus(request) = request {
             return self
                 .inner
                 .session_status(&request.connect_session_ref)
                 .await
-                .map(connection_api::ConnectionResult::ConnectSessionStatus)
-                .map_err(connection_error);
+                .map(connection_api::EndpointResult::ConnectSessionStatus)
+                .map_err(endpoint_error);
         }
         self.inner
             .custody
             .recover()
             .await
-            .map_err(|_| connection_error(PersonalOAuthError::Unavailable))?;
+            .map_err(|_| endpoint_error(PersonalOAuthError::Unavailable))?;
         match request {
-            connection_api::ConnectionRequest::ConnectSessionCreate(request) => self
+            connection_api::EndpointRequest::ConnectSessionCreate(request) => self
                 .inner
                 .create(request)
                 .await
-                .map(connection_api::ConnectionResult::ConnectSessionCreate)
-                .map_err(connection_error),
-            connection_api::ConnectionRequest::Search(request) => {
-                let mut connections = Vec::new();
+                .map(connection_api::EndpointResult::ConnectSessionCreate)
+                .map_err(endpoint_error),
+            connection_api::EndpointRequest::Search(request) => {
+                let mut endpoints = Vec::new();
                 for binding in &self.inner.bindings {
                     if !super::matches_query(
                         &request.query,
@@ -1400,36 +1400,36 @@ impl ConnectorBackend for PersonalOAuthBackend {
                         continue;
                     }
                     let _guard = binding.gate.lock().await;
-                    connections.push(
+                    endpoints.push(
                         self.inner
-                            .connection_summary(binding)
-                            .map_err(connection_error)?,
+                            .endpoint_summary(binding)
+                            .map_err(endpoint_error)?,
                     );
-                    if connections.len() >= usize::from(request.limit) {
+                    if endpoints.len() >= usize::from(request.limit) {
                         break;
                     }
                 }
-                Ok(connection_api::ConnectionResult::Search { connections })
+                Ok(connection_api::EndpointResult::Search { endpoints })
             }
-            connection_api::ConnectionRequest::Describe(request) => {
+            connection_api::EndpointRequest::Describe(request) => {
                 let binding = self
                     .inner
                     .bindings
                     .iter()
-                    .find(|binding| binding.custody.identity.connection == request.connection_ref)
-                    .ok_or_else(|| connection_error(PersonalOAuthError::Refused))?;
+                    .find(|binding| binding.custody.identity.connection == request.endpoint_ref)
+                    .ok_or_else(|| endpoint_error(PersonalOAuthError::Refused))?;
                 let _guard = binding.gate.lock().await;
-                Ok(connection_api::ConnectionResult::Describe(
-                    connection_api::ConnectionDescription {
+                Ok(connection_api::EndpointResult::Describe(
+                    connection_api::EndpointDescription {
                         summary: self
                             .inner
-                            .connection_summary(binding)
-                            .map_err(connection_error)?,
+                            .endpoint_summary(binding)
+                            .map_err(endpoint_error)?,
                         channels: Vec::new(),
                     },
                 ))
             }
-            _ => Err(connection_error(PersonalOAuthError::Refused)),
+            _ => Err(endpoint_error(PersonalOAuthError::Refused)),
         }
     }
 

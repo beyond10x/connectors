@@ -4,24 +4,24 @@ use super::*;
 
 #[async_trait]
 impl ConnectorBackend for KubernetesLocalBackend {
-    fn owns_endpoint(&self, request: &protocol::endpoint::EndpointRequest) -> bool {
+    fn owns_endpoint_inventory(&self, request: &protocol::endpoint_inventory::EndpointInventoryRequest) -> bool {
         self.endpoint_backend()
-            .is_some_and(|backend| backend.owns_endpoint(request))
+            .is_some_and(|backend| backend.owns_endpoint_inventory(request))
     }
 
-    async fn handle_endpoint(
+    async fn handle_endpoint_inventory(
         &self,
         context: &PrincipalContext,
-        request: protocol::endpoint::EndpointRequest,
-    ) -> Result<protocol::endpoint::EndpointResult, protocol::endpoint::EndpointError> {
+        request: protocol::endpoint_inventory::EndpointInventoryRequest,
+    ) -> Result<protocol::endpoint_inventory::EndpointInventoryResult, protocol::endpoint_inventory::EndpointInventoryError> {
         let backend = self.endpoint_backend().ok_or_else(|| {
-            protocol::endpoint::EndpointError::new(
-                protocol::endpoint::EndpointErrorCode::Unavailable,
+            protocol::endpoint_inventory::EndpointInventoryError::new(
+                protocol::endpoint_inventory::EndpointInventoryErrorCode::Unavailable,
                 "select a Kubernetes context with setup connect kubernetes",
                 false,
             )
         })?;
-        backend.handle_endpoint(context, request).await
+        backend.handle_endpoint_inventory(context, request).await
     }
 
     async fn resolve_endpoint(
@@ -89,7 +89,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
     fn capabilities(&self) -> BackendCapabilities {
         BackendCapabilities {
             operations: true,
-            connections: true,
+            endpoints: true,
             events: self.endpoint_backend().is_some(),
             // `kubernetes.workloads`, read through whichever kubeconfig context the operator
             // activated. Declared unconditionally: a placement that advertised datasources only
@@ -113,14 +113,14 @@ impl ConnectorBackend for KubernetesLocalBackend {
             OperationRequest::Invoke(request) => {
                 lock(&self.state)
                     .children
-                    .contains_key(&request.connection_ref)
+                    .contains_key(&request.endpoint_ref)
                     || (matches!(
                         request.operation_ref.as_str(),
                         STATUS_OPERATION
                             | RESTART_OPERATION
                             | NAMESPACE_OPERATION
                             | WORKLOAD_OPERATION
-                    ) && self.is_cluster_connection(&request.connection_ref))
+                    ) && self.is_cluster_connection(&request.endpoint_ref))
             }
             OperationRequest::Search(_) => false,
             _ => false,
@@ -138,26 +138,26 @@ impl ConnectorBackend for KubernetesLocalBackend {
             && local_operations().contains(&request.operation_ref.as_str())
     }
 
-    fn owns_connection(&self, request: &ConnectionRequest) -> bool {
+    fn owns_endpoint(&self, request: &EndpointRequest) -> bool {
         if self
             .endpoint_backend()
-            .is_some_and(|backend| backend.owns_connection(request))
+            .is_some_and(|backend| backend.owns_endpoint(request))
         {
             return true;
         }
         match request {
-            ConnectionRequest::CandidateSearch(request) => request.integration_ref == KUBERNETES,
-            ConnectionRequest::CandidateActivate(request) => {
+            EndpointRequest::CandidateSearch(request) => request.integration_ref == KUBERNETES,
+            EndpointRequest::CandidateActivate(request) => {
                 self.candidates.contains_key(&request.candidate_ref)
             }
-            ConnectionRequest::Describe(request) => lock(&self.state)
-                .connections
-                .contains_key(&request.connection_ref),
-            ConnectionRequest::ObservationSearch(request) => self.observations(request).is_some(),
-            ConnectionRequest::Materialize(request) => {
+            EndpointRequest::Describe(request) => lock(&self.state)
+                .endpoints
+                .contains_key(&request.endpoint_ref),
+            EndpointRequest::ObservationSearch(request) => self.observations(request).is_some(),
+            EndpointRequest::Materialize(request) => {
                 self.observation(&request.observation_ref).is_some()
             }
-            ConnectionRequest::Search(_) => false,
+            EndpointRequest::Search(_) => false,
             _ => false,
         }
     }
@@ -219,7 +219,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
             OperationRequest::Invoke(request)
                 if lock(&self.state)
                     .children
-                    .contains_key(&request.connection_ref) =>
+                    .contains_key(&request.endpoint_ref) =>
             {
                 self.invoke_service(context, request).await
             }
@@ -243,72 +243,72 @@ impl ConnectorBackend for KubernetesLocalBackend {
             .await
     }
 
-    async fn handle_connection(
+    async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: ConnectionRequest,
-    ) -> Result<ConnectionResult, ConnectionError> {
+        request: EndpointRequest,
+    ) -> Result<EndpointResult, EndpointError> {
         self.check_context(context)?;
-        if !matches!(request, ConnectionRequest::Search(_)) {
+        if !matches!(request, EndpointRequest::Search(_)) {
             if let Some(backend) = self
                 .endpoint_backend()
-                .filter(|backend| backend.owns_connection(&request))
+                .filter(|backend| backend.owns_endpoint(&request))
             {
-                return backend.handle_connection(context, request).await;
+                return backend.handle_endpoint(context, request).await;
             }
         }
         match request {
-            ConnectionRequest::CandidateSearch(request)
+            EndpointRequest::CandidateSearch(request)
                 if request.integration_ref == KUBERNETES =>
             {
-                Ok(ConnectionResult::CandidateSearch {
+                Ok(EndpointResult::CandidateSearch {
                     candidates: self.search_candidates(&request),
                 })
             }
-            ConnectionRequest::CandidateActivate(request)
+            EndpointRequest::CandidateActivate(request)
                 if self.candidates.contains_key(&request.candidate_ref) =>
             {
                 self.activate(request)
                     .await
-                    .map(ConnectionResult::CandidateActivate)
+                    .map(EndpointResult::CandidateActivate)
             }
-            ConnectionRequest::Search(request) => {
-                let mut connections = self.search_connections(&request.query);
+            EndpointRequest::Search(request) => {
+                let mut endpoints = self.search_connections(&request.query);
                 if let Some(backend) = self.endpoint_backend() {
-                    if let ConnectionResult::Search {
-                        connections: discovered,
+                    if let EndpointResult::Search {
+                        endpoints: discovered,
                     } = backend
-                        .handle_connection(context, ConnectionRequest::Search(request.clone()))
+                        .handle_endpoint(context, EndpointRequest::Search(request.clone()))
                         .await?
                     {
-                        connections.extend(discovered);
+                        endpoints.extend(discovered);
                     }
                 }
-                connections.truncate(usize::from(request.limit));
-                Ok(ConnectionResult::Search { connections })
+                endpoints.truncate(usize::from(request.limit));
+                Ok(EndpointResult::Search { endpoints })
             }
-            ConnectionRequest::Describe(request) => {
+            EndpointRequest::Describe(request) => {
                 let description = {
                     lock(&self.state)
-                        .connections
-                        .get(&request.connection_ref)
+                        .endpoints
+                        .get(&request.endpoint_ref)
                         .cloned()
                 };
                 description
-                    .map(ConnectionResult::Describe)
-                    .ok_or_else(connection_not_found)
+                    .map(EndpointResult::Describe)
+                    .ok_or_else(endpoint_not_found)
             }
-            ConnectionRequest::ObservationSearch(request) => self
+            EndpointRequest::ObservationSearch(request) => self
                 .observations(&request)
-                .map(|observations| ConnectionResult::ObservationSearch { observations })
-                .ok_or_else(connection_not_found),
-            ConnectionRequest::Materialize(request)
+                .map(|observations| EndpointResult::ObservationSearch { observations })
+                .ok_or_else(endpoint_not_found),
+            EndpointRequest::Materialize(request)
                 if self.observation(&request.observation_ref).is_some() =>
             {
                 self.materialize(&request)
-                    .map(ConnectionResult::Materialize)
+                    .map(EndpointResult::Materialize)
             }
-            _ => Err(connection_not_found()),
+            _ => Err(endpoint_not_found()),
         }
     }
 }

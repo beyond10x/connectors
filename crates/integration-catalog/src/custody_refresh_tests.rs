@@ -279,7 +279,7 @@ impl Fixture {
                     next_generation: 2,
                     retired_through: 1,
                     retired_transaction: Some(id.protocol_bytes()),
-                    connections: BTreeMap::from([(
+                    endpoints: BTreeMap::from([(
                         binding.identity.connection.clone(),
                         publication,
                     )]),

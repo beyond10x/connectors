@@ -32,7 +32,7 @@ use protocol::datasource::{
     DatasourceResult, DatasourceSummary, ReadRequest, ReadVerb, RecordView,
 };
 use protocol::operation::{
-    ApprovalPosture, ConnectionSummary, EffectClass, OperationDescription, OperationError,
+    ApprovalPosture, EndpointSummary, EffectClass, OperationDescription, OperationError,
     OperationErrorCode, MAX_RESULT_BYTES,
 };
 use serde::{Deserialize, Serialize};
@@ -838,14 +838,14 @@ pub(crate) fn datasource_description_ref(context: &PrincipalContext) -> String {
 /// mode: in-cluster the binding hangs off the deployment's own Connection, on a workstation off
 /// the Connection the operator activated from a kubeconfig context. The binding ref itself does
 /// not carry it — a namespace names the same records whichever way the cluster was reached.
-pub(crate) fn namespace_binding(connection_ref: &str, namespace: &str) -> DatasourceBinding {
+pub(crate) fn namespace_binding(endpoint_ref: &str, namespace: &str) -> DatasourceBinding {
     let digest = Sha256::digest(format!("{DATASOURCE}\0{namespace}\0v1"));
     let mut generation_bytes = [0_u8; 8];
     generation_bytes.copy_from_slice(&digest[..8]);
     DatasourceBinding {
         datasource_ref: DATASOURCE.to_owned(),
         binding_ref: namespace_binding_ref(namespace),
-        connection_ref: connection_ref.to_owned(),
+        endpoint_ref: endpoint_ref.to_owned(),
         label: namespace.to_owned(),
         purpose: None,
         generation: u64::from_be_bytes(generation_bytes),
@@ -1088,9 +1088,9 @@ pub(crate) async fn read_workloads(
 /// Shared for the same reason the datasource projection is: a Deployment read through a
 /// workstation kubeconfig and one read through an in-cluster ServiceAccount are the same object,
 /// so the contract a caller is handed must not depend on which placement answered. Only the
-/// Connections and the description lease belong to the placement.
+/// Endpoints and the description lease belong to the placement.
 pub(crate) fn status_operation(
-    connections: Vec<ConnectionSummary>,
+    endpoints: Vec<EndpointSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -1121,13 +1121,13 @@ pub(crate) fn status_operation(
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        connections,
+        endpoints,
         description_ref,
     }
 }
 
 pub(crate) fn logs_operation(
-    connections: Vec<ConnectionSummary>,
+    endpoints: Vec<EndpointSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -1161,7 +1161,7 @@ pub(crate) fn logs_operation(
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        connections,
+        endpoints,
         description_ref,
     }
 }
@@ -1205,7 +1205,7 @@ pub(crate) fn fit_pod_logs(mut logs: PodLogs) -> Result<serde_json::Value, Opera
 }
 
 pub(crate) fn restart_operation(
-    connections: Vec<ConnectionSummary>,
+    endpoints: Vec<EndpointSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -1236,7 +1236,7 @@ pub(crate) fn restart_operation(
         }),
         effect: EffectClass::Mutating,
         approval: ApprovalPosture::Required,
-        connections,
+        endpoints,
         description_ref,
     }
 }

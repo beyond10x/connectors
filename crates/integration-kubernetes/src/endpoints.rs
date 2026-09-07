@@ -7,8 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 use connector_state::StateStore;
-use domain::endpoint::{
-    Endpoint, EndpointBinding, EndpointCredentialReference, EndpointState, EndpointTransport,
+use domain::endpoint_inventory::{
+    EndpointInventoryEntry, EndpointBinding, EndpointCredentialReference, EndpointReadiness, EndpointTransport,
 };
 use k8s_openapi::api::core::v1::{Service, ServicePort};
 use kube::{api::ListParams, Api, Client};
@@ -65,7 +65,7 @@ pub enum EndpointSourceError {
 /// A scan carries its completeness so denied or failed namespaces never erase old evidence.
 #[derive(Debug, Clone)]
 pub struct EndpointScan {
-    pub endpoints: Vec<Endpoint>,
+    pub endpoints: Vec<EndpointInventoryEntry>,
     pub complete: bool,
     pub warnings: Vec<String>,
 }
@@ -73,7 +73,7 @@ pub struct EndpointScan {
 #[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Image {
-    endpoints: BTreeMap<String, Endpoint>,
+    endpoints: BTreeMap<String, EndpointInventoryEntry>,
     bindings: BTreeMap<String, EndpointBinding>,
     #[serde(default)]
     warnings: Vec<String>,
@@ -167,7 +167,7 @@ impl KubernetesEndpointSource {
     }
 
     /// Current durable inventory, without contacting the cluster or resolving a Secret.
-    pub fn list(&self) -> Result<Vec<Endpoint>, EndpointSourceError> {
+    pub fn list(&self) -> Result<Vec<EndpointInventoryEntry>, EndpointSourceError> {
         let image = self
             .image
             .lock()
@@ -183,7 +183,7 @@ impl KubernetesEndpointSource {
             .map(|mut endpoint| {
                 self.apply_policy(&mut endpoint);
                 if unverified.contains(&endpoint.endpoint_ref) {
-                    endpoint.state = EndpointState::Stale;
+                    endpoint.state = EndpointReadiness::Stale;
                 }
                 endpoint
             })
@@ -236,7 +236,7 @@ impl KubernetesEndpointSource {
     pub(super) fn validation_candidate(
         &self,
         reference: &str,
-    ) -> Result<Endpoint, EndpointSourceError> {
+    ) -> Result<EndpointInventoryEntry, EndpointSourceError> {
         let mut endpoint = self
             .image
             .lock()
@@ -245,14 +245,14 @@ impl KubernetesEndpointSource {
             .get(reference)
             .cloned()
             .ok_or(EndpointSourceError::Stale)?;
-        if endpoint.state == EndpointState::Stale {
-            endpoint.state = EndpointState::Ready;
+        if endpoint.state == EndpointReadiness::Stale {
+            endpoint.state = EndpointReadiness::Ready;
         }
         self.apply_policy(&mut endpoint);
         Ok(endpoint)
     }
 
-    pub(super) fn mark_validated(&self, endpoint: &Endpoint) -> Result<(), EndpointSourceError> {
+    pub(super) fn mark_validated(&self, endpoint: &EndpointInventoryEntry) -> Result<(), EndpointSourceError> {
         let mut image = self
             .image
             .lock()
@@ -272,7 +272,7 @@ impl KubernetesEndpointSource {
         Ok(())
     }
 
-    pub fn show(&self, reference: &str) -> Result<Endpoint, EndpointSourceError> {
+    pub fn show(&self, reference: &str) -> Result<EndpointInventoryEntry, EndpointSourceError> {
         self.list()?
             .into_iter()
             .find(|endpoint| endpoint.endpoint_ref == reference)
@@ -284,7 +284,7 @@ impl KubernetesEndpointSource {
         &self,
         reference: &str,
         binding: EndpointBinding,
-    ) -> Result<Endpoint, EndpointSourceError> {
+    ) -> Result<EndpointInventoryEntry, EndpointSourceError> {
         self.validate_binding(&binding)?;
         let mut image = self
             .image
@@ -297,7 +297,7 @@ impl KubernetesEndpointSource {
             .ok_or(EndpointSourceError::Stale)?;
         endpoint.provider = Some(binding.provider.clone());
         endpoint.binding = Some(binding.clone());
-        endpoint.state = EndpointState::Ready;
+        endpoint.state = EndpointReadiness::Ready;
         self.apply_policy(endpoint);
         let endpoint = endpoint.clone();
         next.bindings.insert(reference.to_owned(), binding);
@@ -406,7 +406,7 @@ impl KubernetesEndpointSource {
         if scan.complete {
             for (reference, endpoint) in &mut next.endpoints {
                 if !observed.contains(reference) {
-                    endpoint.state = EndpointState::Stale;
+                    endpoint.state = EndpointReadiness::Stale;
                 }
             }
         }
@@ -461,8 +461,8 @@ impl KubernetesEndpointSource {
         Ok(())
     }
 
-    fn apply_policy(&self, endpoint: &mut Endpoint) {
-        if endpoint.state == EndpointState::Stale {
+    fn apply_policy(&self, endpoint: &mut EndpointInventoryEntry) {
+        if endpoint.state == EndpointReadiness::Stale {
             return;
         }
         if endpoint
@@ -470,11 +470,11 @@ impl KubernetesEndpointSource {
             .as_deref()
             .is_some_and(|namespace| !self.admits_namespace(namespace))
         {
-            endpoint.state = EndpointState::Denied;
+            endpoint.state = EndpointReadiness::Denied;
             return;
         }
         if endpoint.transport != EndpointTransport::Tcp || endpoint.interface == "ami" {
-            endpoint.state = EndpointState::UnsupportedProtocol;
+            endpoint.state = EndpointReadiness::UnsupportedProtocol;
             return;
         }
         let Some(provider) = endpoint
@@ -482,11 +482,11 @@ impl KubernetesEndpointSource {
             .as_deref()
             .and_then(|id| catalog::provider(catalog::ProviderKey::id(id)))
         else {
-            endpoint.state = EndpointState::UnknownProvider;
+            endpoint.state = EndpointReadiness::UnknownProvider;
             return;
         };
         if self.grant_for(provider.id).is_none() {
-            endpoint.state = EndpointState::Denied;
+            endpoint.state = EndpointReadiness::Denied;
             return;
         }
         if endpoint
@@ -494,7 +494,7 @@ impl KubernetesEndpointSource {
             .as_ref()
             .is_some_and(|binding| self.validate_binding(binding).is_err())
         {
-            endpoint.state = EndpointState::Denied;
+            endpoint.state = EndpointReadiness::Denied;
             return;
         }
         if (!provider.auth.is_empty() || matches!(provider.id, "mysql" | "postgresql"))
@@ -504,11 +504,11 @@ impl KubernetesEndpointSource {
                 .and_then(|binding| binding.credential.as_ref())
                 .is_none()
         {
-            endpoint.state = EndpointState::MissingCredentials;
+            endpoint.state = EndpointReadiness::MissingCredentials;
             return;
         }
-        if endpoint.state != EndpointState::UnavailableRoute {
-            endpoint.state = EndpointState::Ready;
+        if endpoint.state != EndpointReadiness::UnavailableRoute {
+            endpoint.state = EndpointReadiness::Ready;
         }
     }
 }
@@ -538,7 +538,7 @@ fn profiles() -> &'static [Profile] {
 }
 
 /// Pure all-port inventory projection. Unknown and unsupported interfaces remain visible.
-pub fn project_service(source_ref: &str, service: &Service) -> Vec<Endpoint> {
+pub fn project_service(source_ref: &str, service: &Service) -> Vec<EndpointInventoryEntry> {
     let (Some(namespace), Some(name), Some(uid), Some(spec)) = (
         service.metadata.namespace.as_deref(),
         service.metadata.name.as_deref(),
@@ -564,11 +564,11 @@ pub fn project_service(source_ref: &str, service: &Service) -> Vec<Endpoint> {
             provider: provider.clone(), base_path: profile.base_path.clone(), credential: None, direct_address: None, database: None, tls: None, scheme: None,
         }));
         let identity = format!("{source_ref}\0{namespace}\0{name}\0{uid}\0{}\0{number}\0{transport:?}\0{interface}", port.name.as_deref().unwrap_or(""));
-        let state = if transport != EndpointTransport::Tcp || interface == "ami" { EndpointState::UnsupportedProtocol }
-            else if profile.is_none() { EndpointState::UnknownProvider }
-            else if spec.selector.as_ref().is_none_or(BTreeMap::is_empty) { EndpointState::UnavailableRoute }
-            else { EndpointState::Ready };
-        Some(Endpoint { endpoint_ref: format!("endpoint:kubernetes:{}", hex::encode(Sha256::digest(identity.as_bytes()))),
+        let state = if transport != EndpointTransport::Tcp || interface == "ami" { EndpointReadiness::UnsupportedProtocol }
+            else if profile.is_none() { EndpointReadiness::UnknownProvider }
+            else if spec.selector.as_ref().is_none_or(BTreeMap::is_empty) { EndpointReadiness::UnavailableRoute }
+            else { EndpointReadiness::Ready };
+        Some(EndpointInventoryEntry { endpoint_ref: format!("endpoint:kubernetes:{}", hex::encode(Sha256::digest(identity.as_bytes()))),
             source_ref: source_ref.to_owned(), namespace: Some(namespace.to_owned()), resource_kind: "Service".to_owned(),
             resource_name: name.to_owned(), resource_uid: uid.to_owned(), port_name: port.name.clone(), port: Some(number),
             transport, interface, provider: profile.and_then(|profile| profile.provider.clone()), state, binding })
