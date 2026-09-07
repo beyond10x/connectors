@@ -152,6 +152,11 @@ async fn partial_refresh_preserves_unseen_resources_and_restart_preserves_bindin
     assert_ne!(source.show(&reference).unwrap().state, EndpointState::Stale);
     let reopened = super::tests::source(client(|_| absent()), store);
     assert_eq!(reopened.show(&reference).unwrap().binding, Some(binding));
+    assert_eq!(
+        reopened.show(&reference).unwrap().state,
+        EndpointState::Stale
+    );
+    assert!(!reopened.warnings().unwrap().is_empty());
     reopened
         .reconcile(EndpointScan {
             endpoints: Vec::new(),
@@ -162,6 +167,54 @@ async fn partial_refresh_preserves_unseen_resources_and_restart_preserves_bindin
     assert_eq!(
         reopened.show(&reference).unwrap().state,
         EndpointState::Stale
+    );
+}
+
+#[tokio::test]
+async fn restored_inventory_needs_current_uid_validation_and_never_reads_credentials() {
+    let store = Arc::new(MemoryState::new());
+    let original = service("loki", "original-uid", json!([{"port":3100}]));
+    let registry = source(
+        client(|_| panic!("restoration must be passive")),
+        store.clone(),
+    );
+    let endpoints = project_service(registry.source_ref(), &original);
+    let reference = endpoints[0].endpoint_ref.clone();
+    registry
+        .reconcile(EndpointScan {
+            endpoints,
+            complete: true,
+            warnings: Vec::new(),
+        })
+        .unwrap();
+    let current = Arc::new(Mutex::new(original));
+    let fixture = current.clone();
+    let restored = source(
+        client(move |path| {
+            assert_eq!(path, "/api/v1/namespaces/apps/services/loki");
+            (
+                200,
+                serde_json::to_value(fixture.lock().unwrap().clone()).unwrap(),
+            )
+        }),
+        store,
+    );
+    assert_eq!(
+        restored.show(&reference).unwrap().state,
+        EndpointState::Stale
+    );
+    assert_eq!(
+        restored.validate(&reference).await.unwrap().state,
+        EndpointState::Ready
+    );
+    assert_eq!(
+        restored.show(&reference).unwrap().state,
+        EndpointState::Ready
+    );
+    current.lock().unwrap().metadata.uid = Some("replacement-uid".to_owned());
+    assert_eq!(
+        restored.validate(&reference).await.unwrap_err(),
+        EndpointSourceError::Stale
     );
 }
 
