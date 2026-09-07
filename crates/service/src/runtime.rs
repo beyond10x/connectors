@@ -694,6 +694,13 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         false
     }
 
+    /// Exact subscription ownership; never opens a stream during routing.
+    fn owns_event_v2(&self, request: &protocol::event::v2::EventRequest) -> bool {
+        request
+            .legacy_read()
+            .is_some_and(|request| self.owns_event(&request))
+    }
+
     fn owns_datasource(&self, _request: &DatasourceRequest) -> bool {
         false
     }
@@ -758,6 +765,23 @@ pub trait ConnectorBackend: Send + Sync + 'static {
         Err(EventError::new(
             EventErrorCode::Unavailable,
             "event delivery is not configured",
+            false,
+        ))
+    }
+
+    /// Explicit stream lifecycle. Implementations must bind subscriptions to admitted principal,
+    /// endpoint identity and current channel grant, and release routes on shutdown or revocation.
+    async fn handle_event_v2(
+        &self,
+        context: &PrincipalContext,
+        request: protocol::event::v2::EventRequest,
+    ) -> Result<protocol::event::v2::EventResult, EventError> {
+        if let Some(request) = request.legacy_read() {
+            return self.handle_event(context, request).await.map(Into::into);
+        }
+        Err(EventError::new(
+            EventErrorCode::NotFound,
+            "no Integration owns this subscription",
             false,
         ))
     }

@@ -12,8 +12,59 @@ fn context() -> Value {
 }
 
 #[test]
+fn event_subscription_reader_and_schema_preserve_closed_lifecycle_frames() {
+    use protocol::event::v2;
+    let schema = protocol::event::schema_v2::event_v2_schema();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    for (params, valid) in [
+        (
+            json!({"endpoint_ref":"k8s/default/service/voice/http", "channel_binding":"ari-events", "parameters":{"app":"demo","subscribe_all":true}}),
+            true,
+        ),
+        (
+            json!({"endpoint_ref":"k8s/default/service/voice/http", "channel_binding":"ari-events", "parameters":{}, "credential":"secret"}),
+            false,
+        ),
+        (
+            json!({"endpoint_ref":"k8s/default/service/voice/http", "channel_binding":"ari-events"}),
+            false,
+        ),
+        (
+            json!({"endpoint_ref":null, "channel_binding":"ari-events", "parameters":{}}),
+            false,
+        ),
+        (
+            json!({"endpoint_ref":"endpoint:one", "channel_binding":"ari-events", "parameters":{"invalid key":"value"}}),
+            false,
+        ),
+    ] {
+        let frame = json!({"protocol":v2::CONTRACT,"request_id":"request:one","context":context(),"request":{"method":"subscribe","params":params}});
+        assert_eq!(
+            serde_json::from_value::<v2::RequestEnvelope>(frame.clone())
+                .is_ok_and(|request| request.validate().is_ok()),
+            valid,
+            "reader {frame}"
+        );
+        assert_eq!(validator.is_valid(&frame), valid, "schema {frame}");
+        let mut legacy = frame;
+        legacy["protocol"] = json!(protocol::event::CONTRACT);
+        assert!(serde_json::from_value::<protocol::event::RequestEnvelope>(legacy).is_err());
+    }
+    let frame = json!({"protocol":v2::CONTRACT,"request_id":"request:one","context":context(),"request":{"method":"subscribe","params":{"endpoint_ref":"endpoint:one","channel_binding":"ari-events","parameters":{"app":"a".repeat(v2::MAX_PARAMETER_BYTES)}}}});
+    assert!(serde_json::from_value::<v2::RequestEnvelope>(frame)
+        .unwrap()
+        .validate()
+        .is_err());
+}
+
+#[test]
 fn endpoint_contract_projection_and_manifests_match() {
     for (directory, file, expected) in [
+        (
+            "contracts/connector-event/v0alpha2",
+            "connector-event.schema.json",
+            protocol::event::schema_v2::event_v2_schema(),
+        ),
         (
             "contracts/connector-endpoint/v0alpha1",
             "connector-endpoint.schema.json",
