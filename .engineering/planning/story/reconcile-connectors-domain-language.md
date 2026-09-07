@@ -97,7 +97,7 @@ scope:
   path: ess/system
 - confidence: inferred
   path: providers
-revision: 8
+revision: 9
 ---
 ## Acceptance
 
@@ -232,3 +232,13 @@ The standalone review deliverable is [Connectors domain language: proposal for r
 The prior evidence entry for "good, do the first one now" was incorrectly interpreted as implementation approval. The operator explicitly clarified that it authorized analysis only. Preserve that historical entry, but do not use it as implementation authorization. Earlier automated planning reviews assessed story drafts; they did not approve unresolved naming decisions on the operator's behalf.
 
 Implementation is stopped. Existing uncommitted code remains preserved and is excluded as evidence that the proposed design is correct. Story 2 remains unstarted. This story's active lifecycle state covers the current analysis/review work; it is not evidence of an approved implementation. Do not mark it implemented upon completion of this document or upon a planning validation pass.
+
+## Independent naming review
+
+An independent reviewer agent, given the document, requirements and source baseline without the author's conversation history, reviewed docs/design/23-domain-language-review.md at SHA256 5132420037a9f6e5b9d0533f07e075ab2cf0432b17178ac509e0c5d80fa1b82e against source commit 62b1014551cd2b75f89df946b63e62b41a084199.
+
+Verdict: revise before acceptance. The verbatim immutable report is [review-result:domain-language-independent-review-round-one](../review-result/domain-language-independent-review-round-one.md).
+
+Three findings remain open: NIR-001 (high), logical consumer stream membership after cross-receiver event deduplication; NIR-002 (medium), controlling principal for incoming offered Sessions; NIR-003 (medium), the omitted operational-event family. The reviewer supports the main target, datasource, receiver/session and legacy-boundary distinctions, but the completeness claims need correction along with these findings.
+
+This turn records review evidence only. The reviewed proposal has not been edited or treated as approved, and no implementation has resumed. Operator review and any requested document revisions remain the next actions; this result is not permission for code changes.
