@@ -281,3 +281,26 @@ checkout. It opens no configuration or installation state and makes no network r
 The new leaf is a `read` exception under the existing `inspect` group. The totals above now count
 28 exceptions: 13 kinds derived from protocol calls, two grouping paths and 13 residual claims.
 The eight top-level groups and generated clap tree remain unchanged.
+
+## Endpoint discovery and daemon lifecycle — 2026-09-07
+
+The parser now adds `endpoint` and `daemon`, for ten first-level groups. Public candidate,
+activation, observation and materialization leaves are retired. Endpoint list/show/refresh/bind
+and daemon start/status/stop replace that setup surface. The generated clap outline is regenerated
+from the same ten groups.
+
+The current exception list has **31 entries, 0 of them one word and 31 of them two or three**.
+**9 of the 31** kinds are derived from the tree, and **2 more** are `Grouping`.
+**The remaining 20** — `inspect upgrade`, `inspect doctor`, `inspect providers`, `inspect auth`,
+`admin integrations status`, `setup completions`, `daemon start`, `daemon status`, `daemon stop`,
+`endpoint list`, `endpoint show`, `endpoint refresh`, `endpoint bind`, and the seven `Lifecycle`
+steps — reach no protocol request in the current source walker. Their classifications remain
+reviewed claims; the new leaf handlers live in separate CLI modules that the walker does not yet
+follow. Process lifecycle helpers are excluded from its provider-frame inference, so a
+`daemon::require` readiness check does not classify every provider read as a lifecycle flow.
+
+Local operation, connection, event and endpoint commands now use the daemon exclusively.
+`setup connect kubernetes` records the selected kubeconfig context and explicit namespace policy,
+starts the daemon if needed, then refreshes inventory through the Endpoint protocol. Enrollment
+and credential inspection use the confidential local setup protocol; provider credentials and
+acquisition calls stay in the daemon. Static help and installed-provider inspection remain offline.
