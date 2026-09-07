@@ -634,7 +634,7 @@ fn admin_authentication_failures_remain_unsuccessful_with_a_closed_reader() {
 fn search_output(group: &str, format: &str, refused: bool, sink: Option<OwnedFd>) -> Output {
     let fixture = Fixture::new();
     let (verb, field) = match group {
-        "connection" => ("list", "connections"),
+        "connection" => ("list", "endpoints"),
         "event" => ("search", "channels"),
         "operation" => ("search", "operations"),
         _ => unreachable!(),

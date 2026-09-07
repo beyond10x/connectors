@@ -18,13 +18,13 @@ mod tests {
 
     #[test]
     fn compact_unwraps_the_one_array_a_list_response_carries() {
-        let response = json!({"connections": [
-            {"connection_ref": "connection:slack:a", "label": "Slack"},
-            {"connection_ref": "connection:slack:b", "label": "Other"},
+        let response = json!({"endpoints": [
+            {"endpoint_ref": "connection:slack:a", "label": "Slack"},
+            {"endpoint_ref": "connection:slack:b", "label": "Other"},
         ]});
         let rendered = render(Format::Compact, &response).unwrap();
         assert_eq!(rendered.lines().count(), 2);
-        assert!(rendered.starts_with("connection_ref=connection:slack:a\tlabel=Slack"));
+        assert!(rendered.starts_with("endpoint_ref=connection:slack:a\tlabel=Slack"));
     }
 
     #[test]
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn an_object_with_two_arrays_is_not_unwrapped() {
         // Guessing which array is "the records" would be wrong as often as right.
-        let response = json!({"connections": [{"a": 1}], "observations": [{"b": 2}]});
+        let response = json!({"endpoints": [{"a": 1}], "observations": [{"b": 2}]});
         assert!(unwrap_single_array(&response).is_none());
     }
 
@@ -280,7 +280,7 @@ mod tests {
         // no `key=value` reader can address, and the acceptance says no format drops a field.
         let rendered = render(
             Format::Compact,
-            &json!({"connection_ref": "connection:slack:T1", "events": ["message", "reaction"]}),
+            &json!({"endpoint_ref": "connection:slack:T1", "events": ["message", "reaction"]}),
         )
         .unwrap();
         assert_eq!(
@@ -699,7 +699,7 @@ mod tests {
 
     #[test]
     fn every_protocol_state_this_renderer_can_be_handed_has_a_rank() {
-        use protocol::connection::{ChannelState, ConnectSessionState, ConnectionState};
+        use protocol::endpoint::{ChannelState, ConnectSessionState, EndpointState};
 
         // The other half of the vocabulary, and the half this package does not own: these three
         // enums are what a result off the wire puts under a `state` key. The source scan below
@@ -707,13 +707,13 @@ mod tests {
         // enums themselves. **Every match here is exhaustive on purpose**: a variant added upstream
         // will not compile until somebody has decided what a reader should see for it, which is the
         // only form of this check that does not rot. `revoked` arriving as `?` is what this is for.
-        let connection = |state: ConnectionState| match state {
-            ConnectionState::Callable => Severity::Ok,
+        let connection = |state: EndpointState| match state {
+            EndpointState::Callable => Severity::Ok,
             // On the way to callable, and reached by doing the next thing in the flow.
-            ConnectionState::Created | ConnectionState::Authorized => Severity::Warn,
-            ConnectionState::Degraded => Severity::Warn,
+            EndpointState::Created | EndpointState::Authorized => Severity::Warn,
+            EndpointState::Degraded => Severity::Warn,
             // The authority is gone. Nothing this Connection is asked to do can work.
-            ConnectionState::Revoked => Severity::Fail,
+            EndpointState::Revoked => Severity::Fail,
         };
         let channel = |state: ChannelState| match state {
             ChannelState::Connected => Severity::Ok,
@@ -728,11 +728,11 @@ mod tests {
 
         let mut ranked = 0_usize;
         for (word, expected) in [
-            ConnectionState::Created,
-            ConnectionState::Authorized,
-            ConnectionState::Callable,
-            ConnectionState::Degraded,
-            ConnectionState::Revoked,
+            EndpointState::Created,
+            EndpointState::Authorized,
+            EndpointState::Callable,
+            EndpointState::Degraded,
+            EndpointState::Revoked,
         ]
         .into_iter()
         .map(|state| {

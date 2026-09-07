@@ -33,7 +33,7 @@ use zeroize::Zeroizing;
 /// declared an endpoint would be an endpoint.
 enum Slot<'a> {
     /// A `{variable}` in the provider's declared base URL.
-    Endpoint(&'a str),
+    EndpointInventoryEntry(&'a str),
     /// The non-secret user half of the named credential's Basic join.
     Username(&'a str),
 }
@@ -152,7 +152,7 @@ pub async fn run(
             field.binds.strip_prefix("endpoint."),
             field.binds.strip_prefix("username."),
         ) {
-            (Some(variable), _) => Slot::Endpoint(variable),
+            (Some(variable), _) => Slot::EndpointInventoryEntry(variable),
             // **Only the credential being supplied.** A provider may declare a Basic token and a
             // bearer service-account token; the Basic one needs an account name and the bearer one
             // has no user half at all. Asking for every declared user half would make connecting
@@ -179,7 +179,7 @@ pub async fn run(
             approval_needed.push(field.name.to_owned());
         }
         match target {
-            Slot::Endpoint(variable) => endpoints.insert(variable.to_owned(), value),
+            Slot::EndpointInventoryEntry(variable) => endpoints.insert(variable.to_owned(), value),
             Slot::Username(credential) => usernames.insert(credential.to_owned(), value),
         };
     }

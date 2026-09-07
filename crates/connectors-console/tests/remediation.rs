@@ -13,7 +13,7 @@ const HOSTILE: &str = r#"{
     "retriable": false,
     "authentication": {
       "operation_ref": "slack-conversations-history",
-      "connection_ref": "connection:test",
+      "endpoint_ref": "connection:test",
       "integration_ref": "https://private.example.test/SYNTHETIC_PRIVATE_INSTRUCTION",
       "auth_profile": "slack.bot",
       "need": "authorize_configured",
@@ -47,7 +47,7 @@ fn auth_stage2_hostile_output_child() {
     assert!(!error.retriable);
     let auth = error.authentication.as_ref().unwrap();
     assert_eq!(auth.operation_ref, "slack-conversations-history");
-    assert_eq!(auth.connection_ref, "connection:test");
+    assert_eq!(auth.endpoint_ref, "connection:test");
     assert_eq!(auth.attempt, v3::AuthenticationAttemptState::NotAttempted);
     assert!(auth.integration_ref.contains(PRIVATE));
     let projected =
@@ -91,11 +91,11 @@ fn bound_config() -> connectors_config::PersonalConfig {
             "redirect_uri":"http://127.0.0.1:47193/oauth/callback","browser_placement":"same_machine","registration_use":"development_only","custody":"development_file","allowed_scopes":["read_api"]}}]
     })).unwrap()
 }
-fn bound_request() -> protocol::connection_v2::RemediationStartRequest {
+fn bound_request() -> protocol::endpoint_v2::RemediationStartRequest {
     let config = bound_config();
-    protocol::connection_v2::RemediationStartRequest {
+    protocol::endpoint_v2::RemediationStartRequest {
         operation_ref: "gitlab-fixture-read".into(),
-        connection_ref: integration_catalog::personal_oauth_admitted_connection_ref(
+        endpoint_ref: integration_catalog::personal_oauth_admitted_connection_ref(
             &config.principal_context().unwrap(),
             &config.catalog[0],
         )
@@ -138,7 +138,7 @@ async fn auth_stage2_bound_presenter_refuses_before_session_or_output() {
         }
         let mut request = bound_request();
         if case == "wrong-binding" {
-            request.connection_ref = "connection:other".into();
+            request.endpoint_ref = "connection:other".into();
         }
         let result = connectors_console::remediation::run(
             &bound_config(),
@@ -192,7 +192,7 @@ fn auth_stage2_bound_input_is_bounded_and_errors_do_not_echo_values() {
 
 #[tokio::test]
 async fn auth_stage2_bound_presenter_clears_written_inode_on_success_expiry_and_drop() {
-    use protocol::connection_v2 as v2;
+    use protocol::endpoint_v2 as v2;
     use std::os::unix::fs::PermissionsExt as _;
     use std::sync::Arc;
     use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
@@ -226,7 +226,7 @@ async fn auth_stage2_bound_presenter_clears_written_inode_on_success_expiry_and_
         let entered = Arc::new(tokio::sync::Notify::new());
         let observed = entered.clone();
         let private_path = path.clone();
-        let expected = bound_request().connection_ref;
+        let expected = bound_request().endpoint_ref;
         let daemon = tokio::spawn(async move {
             let deadline = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -271,19 +271,19 @@ async fn auth_stage2_bound_presenter_clears_written_inode_on_success_expiry_and_
                                 released.take().unwrap().await.unwrap();
                             }
                         }
-                        serde_json::json!({"result":method,"value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","connection_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":if turn==0{"pending"}else{"completed"},"resume_state":if turn==0{"pending"}else{"ready"},"expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":if turn==0{"pending"}else{"completed"},"expires_at_unix_ms":deadline,"browser_completion_url":if turn==0{serde_json::json!(format!("http://{address}/#token={}","p".repeat(43)))}else{serde_json::Value::Null},"connection_ref":if turn==0{serde_json::Value::Null}else{serde_json::json!(expected)}}}})
+                        serde_json::json!({"result":method,"value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","endpoint_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":if turn==0{"pending"}else{"completed"},"resume_state":if turn==0{"pending"}else{"ready"},"expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":if turn==0{"pending"}else{"completed"},"expires_at_unix_ms":deadline,"browser_completion_url":if turn==0{serde_json::json!(format!("http://{address}/#token={}","p".repeat(43)))}else{serde_json::Value::Null},"endpoint_ref":if turn==0{serde_json::Value::Null}else{serde_json::json!(expected)}}}})
                     }
                     2 => {
                         assert_eq!(method, "remediation_acknowledge");
-                        serde_json::json!({"result":method,"value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","connection_ref":expected,"next_action":"fresh_description_then_explicit_invoke"}})
+                        serde_json::json!({"result":method,"value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","endpoint_ref":expected,"next_action":"fresh_description_then_explicit_invoke"}})
                     }
                     3 => {
                         assert_eq!(method, "describe");
-                        serde_json::json!({"result":method,"value":{"connection_ref":expected,"integration_ref":"gitlab","label":PRIVATE,"state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"gitlab.oauth_token","channels":[]}})
+                        serde_json::json!({"result":method,"value":{"endpoint_ref":expected,"integration_ref":"gitlab","label":PRIVATE,"state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"gitlab.oauth_token","channels":[]}})
                     }
                     4 => {
                         assert_eq!(method, "describe");
-                        serde_json::json!({"result":method,"value":{"operation_ref":"gitlab-fixture-read","title":PRIVATE,"description":PRIVATE,"input_schema":{"type":"object","required":["synthetic"]},"output_schema":{},"effect":"read_only","approval":"not_required","connections":[{"connection_ref":expected,"label":PRIVATE,"provider":"gitlab","audiences":[]}],"description_ref":PRIVATE}})
+                        serde_json::json!({"result":method,"value":{"operation_ref":"gitlab-fixture-read","title":PRIVATE,"description":PRIVATE,"input_schema":{"type":"object","required":["synthetic"]},"output_schema":{},"effect":"read_only","approval":"not_required","endpoints":[{"endpoint_ref":expected,"label":PRIVATE,"provider":"gitlab","audiences":[]}],"description_ref":PRIVATE}})
                     }
                     _ => unreachable!(),
                 };
@@ -346,7 +346,7 @@ async fn auth_stage2_bound_presenter_clears_written_inode_on_success_expiry_and_
 
 #[tokio::test]
 async fn auth_adversary_presenter_error_clears_original_inode_after_path_replacement() {
-    use protocol::connection_v2 as v2;
+    use protocol::endpoint_v2 as v2;
     use std::os::unix::fs::PermissionsExt as _;
     use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
     for replacement in [false, true] {
@@ -374,7 +374,7 @@ async fn auth_adversary_presenter_error_clears_original_inode_after_path_replace
         });
         let private_path = path.clone();
         let old_path = retained.clone();
-        let expected = bound_request().connection_ref;
+        let expected = bound_request().endpoint_ref;
         let daemon = tokio::spawn(async move {
             let deadline = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -396,7 +396,7 @@ async fn auth_adversary_presenter_error_clears_original_inode_after_path_replace
                         std::fs::read(&private_path).unwrap().is_empty(),
                         "destination reserved before Start"
                     );
-                    serde_json::json!({"protocol":v2::CONTRACT,"request_id":request["request_id"],"status":"ok","response":{"result":"remediation_start","value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","connection_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":"pending","resume_state":"pending","expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":"pending","expires_at_unix_ms":deadline,"browser_completion_url":format!("http://{address}/#token={}","p".repeat(43))}}}})
+                    serde_json::json!({"protocol":v2::CONTRACT,"request_id":request["request_id"],"status":"ok","response":{"result":"remediation_start","value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","endpoint_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":"pending","resume_state":"pending","expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":"pending","expires_at_unix_ms":deadline,"browser_completion_url":format!("http://{address}/#token={}","p".repeat(43))}}}})
                 } else {
                     assert!(std::fs::read_to_string(&private_path)
                         .unwrap()
@@ -472,7 +472,7 @@ async fn auth_adversary2_instruction_fetch_cancellation_clears_reserved_destinat
             released.await.unwrap();
         });
         let private_path = path.clone();
-        let expected = bound_request().connection_ref;
+        let expected = bound_request().endpoint_ref;
         let daemon = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
             let mut line = String::new();
@@ -492,9 +492,9 @@ async fn auth_adversary2_instruction_fetch_cancellation_clears_reserved_destinat
                 .unwrap()
                 .as_millis() as u64
                 + 60_000;
-            let response = serde_json::json!({"protocol":protocol::connection_v2::CONTRACT,"request_id":request["request_id"],"status":"ok","response":{"result":"remediation_start","value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","connection_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":"pending","resume_state":"pending","expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":"pending","expires_at_unix_ms":deadline,"browser_completion_url":format!("http://{address}/#token={}","p".repeat(43))}}}});
+            let response = serde_json::json!({"protocol":protocol::endpoint_v2::CONTRACT,"request_id":request["request_id"],"status":"ok","response":{"result":"remediation_start","value":{"connect_session_ref":"session:bound","operation_ref":"gitlab-fixture-read","endpoint_ref":expected,"integration_ref":"gitlab","auth_profile":"gitlab.oauth_token","need":"reauthorize_existing","session_state":"pending","resume_state":"pending","expires_at_unix_ms":deadline,"session":{"connect_session_ref":"session:bound","integration_ref":"gitlab","state":"pending","expires_at_unix_ms":deadline,"browser_completion_url":format!("http://{address}/#token={}","p".repeat(43))}}}});
             let bytes = serde_json::to_vec(&response).unwrap();
-            protocol::connection_v2::decode_response(&bytes).unwrap();
+            protocol::endpoint_v2::decode_response(&bytes).unwrap();
             stream.write_all(&bytes).await.unwrap();
             stream.write_all(b"\n").await.unwrap();
             listener

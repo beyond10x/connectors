@@ -232,7 +232,7 @@ fn auth_stage2_real_cli_auth_refusals_keep_every_format_private_without_resend()
                 .unwrap();
             let (version, request) = versions::decode_request(line.as_bytes()).unwrap();
             assert_eq!(version, versions::Version::V0Alpha3);
-            let response = serde_json::json!({"protocol":v3::CONTRACT,"request_id":request.request_id,"status":"error","error":{"code":"authentication_required","message":"https://private.example/SYNTHETIC_PRIVATE_INSTRUCTION","retriable":false,"authentication":{"operation_ref":"fixture.write","connection_ref":"connection:fixture","integration_ref":"https://private.example/SYNTHETIC_PRIVATE_INSTRUCTION","auth_profile":"fixture.user","need":"reauthorize_existing","attempt":"not_attempted","next_action":"start_trusted_remediation"}}});
+            let response = serde_json::json!({"protocol":v3::CONTRACT,"request_id":request.request_id,"status":"error","error":{"code":"authentication_required","message":"https://private.example/SYNTHETIC_PRIVATE_INSTRUCTION","retriable":false,"authentication":{"operation_ref":"fixture.write","endpoint_ref":"connection:fixture","integration_ref":"https://private.example/SYNTHETIC_PRIVATE_INSTRUCTION","auth_profile":"fixture.user","need":"reauthorize_existing","attempt":"not_attempted","next_action":"start_trusted_remediation"}}});
             versions::decode_response(response.to_string().as_bytes()).unwrap();
             writeln!(stream, "{response}").unwrap();
             drop(stream);

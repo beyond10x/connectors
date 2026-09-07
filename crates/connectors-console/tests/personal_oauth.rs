@@ -139,7 +139,7 @@ fn headless_oauth_requires_private_file_before_session_creation() {
 
 #[tokio::test]
 async fn explicit_private_file_is_reserved_before_create_and_erased_before_public_success() {
-    use protocol::connection::*;
+    use protocol::endpoint::*;
     use std::io::{BufRead as _, Read as _, Write as _};
     let root = private_tempdir();
     let expected_reference = configured_reference();
@@ -188,7 +188,7 @@ async fn explicit_private_file_is_reserved_before_create_and_erased_before_publi
             let request: RequestEnvelope = serde_json::from_str(&line).unwrap();
             request.validate().unwrap();
             let result = match (turn, request.request) {
-                (0, ConnectionRequest::ConnectSessionCreate(create)) => {
+                (0, EndpointRequest::ConnectSessionCreate(create)) => {
                     assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
                     assert!(
                         private_path.is_file(),
@@ -199,7 +199,7 @@ async fn explicit_private_file_is_reserved_before_create_and_erased_before_publi
                         0o600
                     );
                     assert!(std::fs::read(&private_path).unwrap().is_empty());
-                    ConnectionResult::ConnectSessionCreate(ConnectSessionStatus {
+                    EndpointResult::ConnectSessionCreate(ConnectSessionStatus {
                         connect_session_ref: "session:fixture".into(),
                         integration_ref: "gitlab".into(),
                         state: ConnectSessionState::Pending,
@@ -209,33 +209,33 @@ async fn explicit_private_file_is_reserved_before_create_and_erased_before_publi
                             "http://{authority}/#token={}",
                             "p".repeat(43)
                         )),
-                        connection_ref: None,
+                        endpoint_ref: None,
                     })
                 }
-                (1, ConnectionRequest::ConnectSessionStatus(_)) => {
+                (1, EndpointRequest::ConnectSessionStatus(_)) => {
                     assert!(std::fs::read_to_string(&private_path)
                         .unwrap()
                         .contains("PRIVATE-AUTHORIZATION"));
-                    ConnectionResult::ConnectSessionStatus(ConnectSessionStatus {
+                    EndpointResult::ConnectSessionStatus(ConnectSessionStatus {
                         connect_session_ref: "session:fixture".into(),
                         integration_ref: "gitlab".into(),
                         state: ConnectSessionState::Completed,
                         expires_at_unix_ms: deadline,
                         completion_endpoint: None,
                         browser_completion_url: None,
-                        connection_ref: Some(daemon_reference.clone()),
+                        endpoint_ref: Some(daemon_reference.clone()),
                     })
                 }
-                (2, ConnectionRequest::Describe(describe)) => {
-                    assert_eq!(describe.connection_ref, daemon_reference);
-                    ConnectionResult::Describe(ConnectionDescription {
-                        summary: ConnectionSummary {
-                            connection_ref: describe.connection_ref,
+                (2, EndpointRequest::Describe(describe)) => {
+                    assert_eq!(describe.endpoint_ref, daemon_reference);
+                    EndpointResult::Describe(EndpointDescription {
+                        summary: EndpointSummary {
+                            endpoint_ref: describe.endpoint_ref,
                             integration_ref: "gitlab".into(),
                             label: "Display only".into(),
-                            state: ConnectionState::Callable,
-                            initiation: vec![ConnectionInitiator::Platform],
-                            route: ConnectionRoute::Direct,
+                            state: EndpointState::Callable,
+                            initiation: vec![EndpointInitiator::Platform],
+                            route: EndpointRoute::Direct,
                             scope: None,
                             actor: None,
                             auth_profile: Some("gitlab.oauth_token".into()),
@@ -274,7 +274,7 @@ async fn explicit_private_file_is_reserved_before_create_and_erased_before_publi
     assert!(!public.contains(&"p".repeat(43)));
     assert!(!public.contains("oauth/authorize"));
     assert!(!public.contains("instruction"));
-    assert_eq!(outcome["connection_ref"], expected_reference);
+    assert_eq!(outcome["endpoint_ref"], expected_reference);
     assert_eq!(outcome["connection"], config().catalog[0].label());
 }
 
@@ -308,7 +308,7 @@ fn private_daemon_refusal_is_closed_on_stdout_and_stderr_in_all_formats() {
         }
         return;
     };
-    use protocol::connection::*;
+    use protocol::endpoint::*;
     use std::io::{BufRead as _, Write as _};
     let root = private_tempdir();
     let destination = root.path().join("instructions");
@@ -327,12 +327,12 @@ fn private_daemon_refusal_is_closed_on_stdout_and_stderr_in_all_formats() {
         let request: RequestEnvelope = serde_json::from_str(&line).unwrap();
         assert!(matches!(
             request.request,
-            ConnectionRequest::ConnectSessionCreate(_)
+            EndpointRequest::ConnectSessionCreate(_)
         ));
         let response = ResponseEnvelope::failure(
             request.request_id,
-            ConnectionError::new(
-                ConnectionErrorCode::InvalidInput,
+            EndpointError::new(
+                EndpointErrorCode::InvalidInput,
                 "PRIVATE-AUTHORIZATION-DAEMON-FIXTURE",
                 false,
             ),
@@ -418,7 +418,7 @@ fn private_tempdir() -> tempfile::TempDir {
 
 #[tokio::test]
 async fn successful_private_daemon_label_cannot_reach_the_public_summary() {
-    use protocol::connection::*;
+    use protocol::endpoint::*;
     use std::io::{BufRead as _, Read as _, Write as _};
     let root = private_tempdir();
     let expected_reference = configured_reference();
@@ -467,7 +467,7 @@ async fn successful_private_daemon_label_cannot_reach_the_public_summary() {
             let request: RequestEnvelope = serde_json::from_str(&line).unwrap();
             request.validate().unwrap();
             let result = match (turn, request.request) {
-                (0, ConnectionRequest::ConnectSessionCreate(create)) => {
+                (0, EndpointRequest::ConnectSessionCreate(create)) => {
                     assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
                     assert!(
                         private_path.is_file(),
@@ -478,7 +478,7 @@ async fn successful_private_daemon_label_cannot_reach_the_public_summary() {
                         0o600
                     );
                     assert!(std::fs::read(&private_path).unwrap().is_empty());
-                    ConnectionResult::ConnectSessionCreate(ConnectSessionStatus {
+                    EndpointResult::ConnectSessionCreate(ConnectSessionStatus {
                         connect_session_ref: "session:fixture".into(),
                         integration_ref: "gitlab".into(),
                         state: ConnectSessionState::Pending,
@@ -488,33 +488,33 @@ async fn successful_private_daemon_label_cannot_reach_the_public_summary() {
                             "http://{authority}/#token={}",
                             "p".repeat(43)
                         )),
-                        connection_ref: None,
+                        endpoint_ref: None,
                     })
                 }
-                (1, ConnectionRequest::ConnectSessionStatus(_)) => {
+                (1, EndpointRequest::ConnectSessionStatus(_)) => {
                     assert!(std::fs::read_to_string(&private_path)
                         .unwrap()
                         .contains("PRIVATE-AUTHORIZATION"));
-                    ConnectionResult::ConnectSessionStatus(ConnectSessionStatus {
+                    EndpointResult::ConnectSessionStatus(ConnectSessionStatus {
                         connect_session_ref: "session:fixture".into(),
                         integration_ref: "gitlab".into(),
                         state: ConnectSessionState::Completed,
                         expires_at_unix_ms: deadline,
                         completion_endpoint: None,
                         browser_completion_url: None,
-                        connection_ref: Some(daemon_reference.clone()),
+                        endpoint_ref: Some(daemon_reference.clone()),
                     })
                 }
-                (2, ConnectionRequest::Describe(describe)) => {
-                    assert_eq!(describe.connection_ref, daemon_reference);
-                    ConnectionResult::Describe(ConnectionDescription {
-                        summary: ConnectionSummary {
-                            connection_ref: describe.connection_ref,
+                (2, EndpointRequest::Describe(describe)) => {
+                    assert_eq!(describe.endpoint_ref, daemon_reference);
+                    EndpointResult::Describe(EndpointDescription {
+                        summary: EndpointSummary {
+                            endpoint_ref: describe.endpoint_ref,
                             integration_ref: "gitlab".into(),
                             label: "PRIVATE-AUTHORIZATION-DAEMON-LABEL".into(),
-                            state: ConnectionState::Callable,
-                            initiation: vec![ConnectionInitiator::Platform],
-                            route: ConnectionRoute::Direct,
+                            state: EndpointState::Callable,
+                            initiation: vec![EndpointInitiator::Platform],
+                            route: EndpointRoute::Direct,
                             scope: None,
                             actor: None,
                             auth_profile: Some("gitlab.oauth_token".into()),
@@ -553,7 +553,7 @@ async fn successful_private_daemon_label_cannot_reach_the_public_summary() {
     assert!(!public.contains(&"p".repeat(43)));
     assert!(!public.contains("oauth/authorize"));
     assert!(!public.contains("instruction"));
-    assert_eq!(outcome["connection_ref"], expected_reference);
+    assert_eq!(outcome["endpoint_ref"], expected_reference);
     assert_eq!(outcome["connection"], config().catalog[0].label());
 }
 
@@ -575,7 +575,7 @@ async fn oauth_pass1_servers(
     tokio::task::JoinHandle<()>,
     std::sync::Arc<tokio::sync::Notify>,
 ) {
-    use protocol::connection::*;
+    use protocol::endpoint::*;
     use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _};
     let unix = tokio::net::UnixListener::bind(root.join("connectors.sock")).unwrap();
     let http = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -618,9 +618,9 @@ async fn oauth_pass1_servers(
             let request: RequestEnvelope = serde_json::from_str(&line).unwrap();
             request.validate().unwrap();
             let result = match (turn, request.request) {
-                (0, ConnectionRequest::ConnectSessionCreate(create)) => {
+                (0, EndpointRequest::ConnectSessionCreate(create)) => {
                     assert_eq!(create.auth_profile.as_deref(), Some("gitlab.oauth_token"));
-                    ConnectionResult::ConnectSessionCreate(ConnectSessionStatus {
+                    EndpointResult::ConnectSessionCreate(ConnectSessionStatus {
                         connect_session_ref: "session:adversary".into(),
                         integration_ref: "gitlab".into(),
                         state: ConnectSessionState::Pending,
@@ -630,35 +630,35 @@ async fn oauth_pass1_servers(
                             "http://{authority}/#token={}",
                             "q".repeat(43)
                         )),
-                        connection_ref: None,
+                        endpoint_ref: None,
                     })
                 }
-                (1, ConnectionRequest::ConnectSessionStatus(status)) => {
+                (1, EndpointRequest::ConnectSessionStatus(status)) => {
                     assert_eq!(status.connect_session_ref, "session:adversary");
                     observed.notify_one();
                     if cancel {
                         std::future::pending::<()>().await;
                     }
-                    ConnectionResult::ConnectSessionStatus(ConnectSessionStatus {
+                    EndpointResult::ConnectSessionStatus(ConnectSessionStatus {
                         connect_session_ref: "session:adversary".into(),
                         integration_ref: "gitlab".into(),
                         state: ConnectSessionState::Completed,
                         expires_at_unix_ms: deadline,
                         completion_endpoint: None,
                         browser_completion_url: None,
-                        connection_ref: Some(reference.clone()),
+                        endpoint_ref: Some(reference.clone()),
                     })
                 }
-                (2, ConnectionRequest::Describe(describe)) => {
-                    assert_eq!(describe.connection_ref, reference);
-                    ConnectionResult::Describe(ConnectionDescription {
-                        summary: ConnectionSummary {
-                            connection_ref: reference.clone(),
+                (2, EndpointRequest::Describe(describe)) => {
+                    assert_eq!(describe.endpoint_ref, reference);
+                    EndpointResult::Describe(EndpointDescription {
+                        summary: EndpointSummary {
+                            endpoint_ref: reference.clone(),
                             integration_ref: "gitlab".into(),
                             label: "OAUTH-PASS1-PRIVATE-DAEMON".into(),
-                            state: ConnectionState::Callable,
-                            initiation: vec![ConnectionInitiator::Platform],
-                            route: ConnectionRoute::Direct,
+                            state: EndpointState::Callable,
+                            initiation: vec![EndpointInitiator::Platform],
+                            route: EndpointRoute::Direct,
                             scope: None,
                             actor: None,
                             auth_profile: Some("gitlab.oauth_token".into()),
@@ -751,7 +751,7 @@ fn oauth_pass1_real_controlling_pty_handoff_keeps_redirected_outputs_private() {
             daemon.await.unwrap();
             instructions.await.unwrap();
             assert_eq!(value["connection"], "Trusted display");
-            assert_eq!(value["connection_ref"], configured_reference());
+            assert_eq!(value["endpoint_ref"], configured_reference());
             value
         });
     let format = match format.to_str().unwrap() {
@@ -828,7 +828,7 @@ async fn oauth_pass1_cancellation_erases_already_written_private_inode_before_re
 
 #[tokio::test]
 async fn oauth_pass2_private_file_expires_while_completion_grace_stays_bounded() {
-    use protocol::connection::*;
+    use protocol::endpoint::*;
     use std::io::Read as _;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -869,27 +869,27 @@ async fn oauth_pass2_private_file_expires_while_completion_grace_stays_bounded()
                     request.validate().unwrap();
                     seen.fetch_add(1, Ordering::SeqCst);
                     let result = match (turn, request.request) {
-                        (0, ConnectionRequest::ConnectSessionCreate(_)) => ConnectionResult::ConnectSessionCreate(ConnectSessionStatus {
+                        (0, EndpointRequest::ConnectSessionCreate(_)) => EndpointResult::ConnectSessionCreate(ConnectSessionStatus {
                             connect_session_ref:"session:grace".into(), integration_ref:"gitlab".into(), state:ConnectSessionState::Pending,
                             expires_at_unix_ms:expires, completion_endpoint:None,
-                            browser_completion_url:Some(format!("http://{address}/#token={}", "q".repeat(43))), connection_ref:None,
+                            browser_completion_url:Some(format!("http://{address}/#token={}", "q".repeat(43))), endpoint_ref:None,
                         }),
-                        (1, ConnectionRequest::ConnectSessionStatus(status)) => {
+                        (1, EndpointRequest::ConnectSessionStatus(status)) => {
                             assert_eq!(status.connect_session_ref, "session:grace");
                             observed.notify_one();
                             released.take().unwrap().await.unwrap();
                             assert!(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64 >= expires);
-                            ConnectionResult::ConnectSessionStatus(ConnectSessionStatus {
+                            EndpointResult::ConnectSessionStatus(ConnectSessionStatus {
                                 connect_session_ref:"session:grace".into(), integration_ref:"gitlab".into(), state:ConnectSessionState::Completed,
-                                expires_at_unix_ms:expires, completion_endpoint:None, browser_completion_url:None, connection_ref:Some(reference.clone()),
+                                expires_at_unix_ms:expires, completion_endpoint:None, browser_completion_url:None, endpoint_ref:Some(reference.clone()),
                             })
                         },
-                        (2, ConnectionRequest::Describe(describe)) => {
-                            assert_eq!(describe.connection_ref, reference);
-                            ConnectionResult::Describe(ConnectionDescription {
-                                summary:ConnectionSummary { connection_ref:reference.clone(), integration_ref:"gitlab".into(),
-                                    label:"OAUTH-PASS2-PRIVATE-DAEMON".into(), state:ConnectionState::Callable,
-                                    initiation:vec![ConnectionInitiator::Platform], route:ConnectionRoute::Direct,
+                        (2, EndpointRequest::Describe(describe)) => {
+                            assert_eq!(describe.endpoint_ref, reference);
+                            EndpointResult::Describe(EndpointDescription {
+                                summary:EndpointSummary { endpoint_ref:reference.clone(), integration_ref:"gitlab".into(),
+                                    label:"OAUTH-PASS2-PRIVATE-DAEMON".into(), state:EndpointState::Callable,
+                                    initiation:vec![EndpointInitiator::Platform], route:EndpointRoute::Direct,
                                     scope:None, actor:None, auth_profile:Some("gitlab.oauth_token".into()) },
                                 channels:Vec::new(),
                             })

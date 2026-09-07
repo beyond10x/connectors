@@ -1,7 +1,7 @@
 //! Explicit versioned transport and trusted, bounded authentication remediation.
 
 use super::*;
-use protocol::{connection_v2, operation::versions::Version};
+use protocol::{endpoint_v2 as connection_v2, operation::versions::Version};
 
 impl LocalClient {
     /// Select one exact operation identity. This never negotiates or resends a request.
@@ -33,7 +33,7 @@ impl LocalClient {
     pub async fn connection_v2(
         &self,
         context: &operation::OwnerContext,
-        request: connection_v2::ConnectionRequest,
+        request: connection_v2::EndpointRequest,
     ) -> Result<connection_v2::ResponseEnvelope, ClientError> {
         let request_id = request_id();
         let bytes = connection_request(context, &request_id, request)?;
@@ -121,14 +121,14 @@ impl HostedClient {
         &self,
         bearer: &str,
         context: &operation::OwnerContext,
-        request: connection_v2::ConnectionRequest,
+        request: connection_v2::EndpointRequest,
     ) -> Result<connection_v2::ResponseEnvelope, ClientError> {
         require_bearer(bearer)?;
         let request_id = request_id();
         let bytes = connection_request(context, &request_id, request)?;
         let (_, bytes) = self
             .versioned_exchange(
-                &self.connections,
+                &self.endpoints,
                 bearer,
                 bytes,
                 connection_v2::MAX_RESPONSE_BYTES,
@@ -206,7 +206,7 @@ fn operation_request(
 fn connection_request(
     context: &operation::OwnerContext,
     request_id: &str,
-    request: connection_v2::ConnectionRequest,
+    request: connection_v2::EndpointRequest,
 ) -> Result<Vec<u8>, ClientError> {
     let envelope = connection_v2::RequestEnvelope {
         protocol: connection_v2::CONTRACT.into(),
@@ -232,22 +232,22 @@ impl LocalClient {
         auth_profile: &str,
     ) -> Result<PendingRemediation, ClientError> {
         let operation_ref = request.operation_ref.clone();
-        let connection_ref = request.connection_ref.clone();
+        let endpoint_ref = request.endpoint_ref.clone();
         let input = request.input.clone();
         let response = self
             .connection_v2(
                 context,
-                connection_v2::ConnectionRequest::RemediationStart(request),
+                connection_v2::EndpointRequest::RemediationStart(request),
             )
             .await
             .map_err(|_| ClientError::RemediationRefused)?;
-        let Some(connection_v2::ConnectionResult::RemediationStart(status)) = response.response
+        let Some(connection_v2::EndpointResult::RemediationStart(status)) = response.response
         else {
             return Err(ClientError::RemediationRefused);
         };
         let now = personal_oauth::oauth_now().map_err(|_| ClientError::RemediationRefused)?;
         if status.operation_ref != operation_ref
-            || status.connection_ref != connection_ref
+            || status.endpoint_ref != endpoint_ref
             || status.integration_ref != integration_ref
             || status.auth_profile != auth_profile
             || status.expires_at_unix_ms <= now
@@ -277,7 +277,7 @@ impl LocalClient {
             receiver: self.socket.clone(),
             owner: context.clone(),
             operation_ref,
-            connection_ref,
+            endpoint_ref,
             integration_ref: integration_ref.into(),
             auth_profile: auth_profile.into(),
             input,
@@ -349,7 +349,7 @@ impl LocalClient {
             let response = self
                 .connection_v2(
                     context,
-                    connection_v2::ConnectionRequest::RemediationStatus(
+                    connection_v2::EndpointRequest::RemediationStatus(
                         connection_v2::RemediationStatusRequest {
                             connect_session_ref: pending.session_ref.clone(),
                         },
@@ -357,7 +357,7 @@ impl LocalClient {
                 )
                 .await?;
             pending.live()?;
-            let Some(connection_v2::ConnectionResult::RemediationStatus(status)) =
+            let Some(connection_v2::EndpointResult::RemediationStatus(status)) =
                 response.response
             else {
                 return Err(ClientError::RemediationRefused);
@@ -377,22 +377,22 @@ impl LocalClient {
         let response = self
             .connection_v2(
                 context,
-                connection_v2::ConnectionRequest::RemediationAcknowledge(
+                connection_v2::EndpointRequest::RemediationAcknowledge(
                     connection_v2::RemediationAcknowledgeRequest {
                         connect_session_ref: pending.session_ref.clone(),
                         operation_ref: pending.operation_ref.clone(),
-                        connection_ref: pending.connection_ref.clone(),
+                        endpoint_ref: pending.endpoint_ref.clone(),
                     },
                 ),
             )
             .await?;
-        let Some(connection_v2::ConnectionResult::RemediationAcknowledge(ack)) = response.response
+        let Some(connection_v2::EndpointResult::RemediationAcknowledge(ack)) = response.response
         else {
             return Err(ClientError::RemediationRefused);
         };
         if ack.connect_session_ref != pending.session_ref
             || ack.operation_ref != pending.operation_ref
-            || ack.connection_ref != pending.connection_ref
+            || ack.endpoint_ref != pending.endpoint_ref
         {
             return Err(ClientError::RemediationRefused);
         }
@@ -400,18 +400,18 @@ impl LocalClient {
         let response = self
             .connection_v2(
                 context,
-                connection_v2::ConnectionRequest::Describe(connection_v2::DescribeRequest {
-                    connection_ref: pending.connection_ref.clone(),
+                connection_v2::EndpointRequest::Describe(connection_v2::DescribeRequest {
+                    endpoint_ref: pending.endpoint_ref.clone(),
                 }),
             )
             .await?;
-        let Some(connection_v2::ConnectionResult::Describe(description)) = response.response else {
+        let Some(connection_v2::EndpointResult::Describe(description)) = response.response else {
             return Err(ClientError::RemediationRefused);
         };
-        if description.summary.connection_ref != pending.connection_ref
+        if description.summary.endpoint_ref != pending.endpoint_ref
             || description.summary.integration_ref != pending.integration_ref
             || description.summary.auth_profile.as_deref() != Some(pending.auth_profile.as_str())
-            || description.summary.state != connection::ConnectionState::Callable
+            || description.summary.state != connection::EndpointState::Callable
         {
             return Err(ClientError::RemediationRefused);
         }
@@ -428,8 +428,8 @@ impl LocalClient {
             return Err(ClientError::RemediationRefused);
         };
         if description.operation_ref != pending.operation_ref
-            || !description.connections.iter().any(|binding| {
-                binding.connection_ref == pending.connection_ref
+            || !description.endpoints.iter().any(|binding| {
+                binding.endpoint_ref == pending.endpoint_ref
                     && binding.provider == pending.integration_ref
                     && binding
                         .purpose
@@ -474,13 +474,13 @@ impl PendingRemediation {
     fn matches(&self, status: &connection_v2::BoundRemediationStatus) -> bool {
         status.connect_session_ref == self.session_ref
             && status.operation_ref == self.operation_ref
-            && status.connection_ref == self.connection_ref
+            && status.endpoint_ref == self.endpoint_ref
             && status.integration_ref == self.integration_ref
             && status.auth_profile == self.auth_profile
             && status.need == self.need
             && status.expires_at_unix_ms == self.expires_at_unix_ms
             && status.session.completion_endpoint.is_none()
             && (status.resume_state != connection_v2::RemediationResumeState::Ready
-                || status.session.connection_ref.as_deref() == Some(self.connection_ref.as_str()))
+                || status.session.endpoint_ref.as_deref() == Some(self.endpoint_ref.as_str()))
     }
 }

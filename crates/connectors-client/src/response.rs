@@ -1,6 +1,6 @@
 //! Correlation and closed-envelope validation for Connector client responses.
 
-use protocol::{catalog, connection, datasource, event, operation};
+use protocol::{catalog, endpoint as connection, datasource, event, operation};
 
 use crate::ClientError;
 
@@ -24,7 +24,7 @@ pub(crate) fn validate_versioned_operation_response(
             return Err(ClientError::InvalidResponse);
         };
         if auth.operation_ref != invoke.operation_ref
-            || auth.connection_ref != invoke.connection_ref
+            || auth.endpoint_ref != invoke.endpoint_ref
         {
             return Err(ClientError::InvalidResponse);
         }
@@ -35,10 +35,10 @@ pub(crate) fn validate_versioned_operation_response(
 pub(crate) fn validate_connection_v2_response(
     bytes: &[u8],
     request_id: &str,
-) -> Result<protocol::connection_v2::ResponseEnvelope, ClientError> {
-    let (version, response) = protocol::connection_v2::decode_response(bytes)
+) -> Result<protocol::endpoint_v2::ResponseEnvelope, ClientError> {
+    let (version, response) = protocol::endpoint_v2::decode_response(bytes)
         .map_err(|_| ClientError::InvalidResponse)?;
-    if version != protocol::connection_v2::Version::V0Alpha2 || response.request_id != request_id {
+    if version != protocol::endpoint_v2::Version::V0Alpha2 || response.request_id != request_id {
         return Err(ClientError::InvalidResponse);
     }
     Ok(response)
@@ -118,7 +118,7 @@ mod tests {
     fn invoke() -> operation::OperationRequest {
         operation::OperationRequest::Invoke(operation::InvokeRequest {
             operation_ref: "fixture.write".to_owned(),
-            connection_ref: "connection:fixture".to_owned(),
+            endpoint_ref: "connection:fixture".to_owned(),
             description_ref: "description:fixture".to_owned(),
             input: json!({}),
             approval_evidence_ref: None,

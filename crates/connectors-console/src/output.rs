@@ -34,7 +34,7 @@
 //!
 //! **It does not make a row fit.** The last column is never cut — a cut last column would be a
 //! value silently truncated at the one place a reader is looking — so a row is exactly as wide as
-//! its final cell needs, and on the real catalogue 66 of the 71 lines `connectors providers`
+//! its final cell needs, and on the real catalogue 67 of the 72 lines `connectors providers`
 //! prints are wider than `TABLE_BUDGET`, the longest at 237 terminal columns. That is the design
 //! and not a defect: what the budget buys is that the last column is *reachable* without
 //! horizontal scrolling and that everything before it stays aligned.
@@ -61,8 +61,8 @@ pub enum Format {
     /// A field the report carries *beside* its records rides on every record line rather than
     /// taking a line of its own. A summary line spelled in the same `key=value` vocabulary is
     /// indistinguishable from a record to `wc -l` and to an `awk -F\t` loop, and a line a script
-    /// has to learn to skip is worse than one it can read: `providers` answered 65 to `wc -l`
-    /// before this format carried its summary and must go on answering 65.
+    /// has to learn to skip is worse than one it can read: `providers` must answer `wc -l` with
+    /// exactly the number of providers listed, including native integrations.
     Compact,
     /// Pretty-printed JSON.
     Json,

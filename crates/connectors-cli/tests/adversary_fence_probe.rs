@@ -1209,7 +1209,7 @@ fn the_copies_this_probe_carries_are_still_copies() {
 /// `docs/design/19-the-cli-surface.md` states the rule twice and measures it once: "a command's
 /// typed word is its `naming.wire`, or the qualified name's last segment, verbatim and un-cased",
 /// and a `cli:` block over the whole accepted surface "produced `SuperviseChannel`,
-/// `ReconnectChannel`, `ConnectChannel`, `StopChannel`, `AuthorizeConnection`, ... as words at a
+/// `ReconnectChannel`, `ConnectChannel`, `StopChannel`, `AuthorizeEndpoint`, ... as words at a
 /// shell". `ess/system/components.yaml` names three of the same words — "Placing them would emit
 /// `SuperviseChannel`, `FinishConnectSession` and `SettleSession` as words at a shell — measured,
 /// not supposed".

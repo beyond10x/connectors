@@ -68,7 +68,7 @@ pub struct HostedClaudeCodeConfig {
     pub enabled: bool,
 }
 
-/// Generic, catalog-driven self-service connections.
+/// Generic, catalog-driven self-service endpoints.
 ///
 /// The provider list is deployment policy, not a second catalog: every credential name, address,
 /// request template and destination still comes from the compiled Connector catalog. An empty
@@ -255,7 +255,7 @@ pub struct HostedGrafanaConfig {
     #[serde(default)]
     pub origin: Option<String>,
     #[serde(default)]
-    pub connection_ref: Option<String>,
+    pub endpoint_ref: Option<String>,
     #[serde(default)]
     pub label: Option<String>,
     #[serde(default)]
@@ -273,7 +273,7 @@ impl Default for HostedGrafanaConfig {
         Self {
             enabled: false,
             origin: None,
-            connection_ref: None,
+            endpoint_ref: None,
             label: None,
             grant_ref: None,
             read_groups: Vec::new(),
@@ -289,7 +289,7 @@ impl Default for HostedGrafanaConfig {
 pub struct HostedGrafanaTargetConfig {
     pub provider: String,
     pub uid_sha256: String,
-    pub connection_ref: String,
+    pub endpoint_ref: String,
     pub label: String,
     pub grant_ref: String,
 }
@@ -696,7 +696,7 @@ fn valid_namespace_access(access: &[KubernetesNamespaceAccessConfig]) -> bool {
 
 fn valid_grafana(config: &HostedGrafanaConfig) -> bool {
     let empty = config.origin.is_none()
-        && config.connection_ref.is_none()
+        && config.endpoint_ref.is_none()
         && config.label.is_none()
         && config.grant_ref.is_none()
         && config.read_groups.is_empty()
@@ -725,7 +725,7 @@ fn valid_grafana(config: &HostedGrafanaConfig) -> bool {
         .map(|target| {
             (
                 target.provider.as_str(),
-                target.connection_ref.as_str(),
+                target.endpoint_ref.as_str(),
                 target.uid_sha256.as_str(),
             )
         })
@@ -735,7 +735,7 @@ fn valid_grafana(config: &HostedGrafanaConfig) -> bool {
     canonical.dedup();
     origin_valid
         && config
-            .connection_ref
+            .endpoint_ref
             .as_deref()
             .is_some_and(|value| valid_ref(value, 512))
         && config
@@ -760,7 +760,7 @@ fn valid_grafana(config: &HostedGrafanaConfig) -> bool {
                     .uid_sha256
                     .bytes()
                     .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
-                && valid_ref(&target.connection_ref, 512)
+                && valid_ref(&target.endpoint_ref, 512)
                 && valid_display(&target.label, 256)
                 && valid_ref(&target.grant_ref, 512)
         })
@@ -903,7 +903,7 @@ listen = "0.0.0.0:5060"
 [b10x]
 work_origin = "http://b10x-work:8080"
 [b10x.connection]
-connection_ref = "connection:b10x:b10x"
+endpoint_ref = "connection:b10x:b10x"
 label = "platform private services"
 grant_ref = "grant:deployment:b10x:b10x"
 initiation = "b10x"
@@ -972,7 +972,7 @@ work_origin = "http://b10x-work:8080"
 ontology_origin = "http://b10x-ontology:8080"
 planner_origin = "http://b10x-planner:8080"
 [platform.connection]
-connection_ref = "connection:b10x:b10x"
+endpoint_ref = "connection:b10x:b10x"
 label = "platform private services"
 grant_ref = "grant:deployment:b10x:b10x"
 initiation = "platform"
@@ -1246,7 +1246,7 @@ namespaces = []
 [grafana]
 enabled = true
 origin = "https://grafana.example.test"
-connection_ref = "connection:grafana:global"
+endpoint_ref = "connection:grafana:global"
 label = "Global infrastructure Grafana"
 grant_ref = "grant:grafana:global-read"
 read_groups = ["dev", "sre"]
@@ -1254,7 +1254,7 @@ reconcile_interval_seconds = 300
 [[grafana.targets]]
 provider = "prometheus"
 uid_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-connection_ref = "connection:prometheus:dev"
+endpoint_ref = "connection:prometheus:dev"
 label = "Prometheus · dev"
 grant_ref = "grant:prometheus:dev-read"
 [vault]

@@ -9,7 +9,7 @@ use crate::file::{read_trusted_config, TrustedConfigReadError, TrustedOwner};
 use crate::hosted::{HostedServerConfig, HostedServerConfigError, MAX_CONFIG_BYTES};
 use crate::personal::InitiationConfig;
 
-/// Value-free policy for delegated GitLab user Connections.
+/// Value-free policy for delegated GitLab user Endpoints.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HostedGitlabConfig {
