@@ -5,7 +5,7 @@
 # fetched 2026-09-06: https://kubernetes.io/docs/reference/kubernetes-api/apps/deployment-v1/
 domain: connectors.inventory
 
-summary: Bounded workload observations from one explicitly selected, activated Connection.
+summary: Bounded workload observations from one explicitly selected, activated Endpoint.
 
 types:
   - name: connectors.inventory.ContainerImage
@@ -31,16 +31,16 @@ types:
   - name: connectors.inventory.NamespaceInventory
     kind: struct
     fields:
-      - name: connection_ref
-        type: connectors.runtime.ConnectionRef
+      - name: endpoint_ref
+        type: connectors.runtime.EndpointRef
       - name: namespaces
         type: List<String>
 
   - name: connectors.inventory.WorkloadInventory
     kind: struct
     fields:
-      - name: connection_ref
-        type: connectors.runtime.ConnectionRef
+      - name: endpoint_ref
+        type: connectors.runtime.EndpointRef
       - name: namespace
         type: String
       - name: deployments

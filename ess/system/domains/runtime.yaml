@@ -36,12 +36,12 @@ types:
     fields:
       - name: operation_ref
         type: connectors.runtime.OperationRef
-      - name: connection_ref
-        type: connectors.connection.ConnectionRef
+      - name: endpoint_ref
+        type: connectors.endpoint.EndpointRef
       - name: integration_ref
-        type: connectors.connection.IntegrationRef
+        type: connectors.endpoint.IntegrationRef
       - name: auth_profile
-        type: connectors.connection.AuthProfile
+        type: connectors.endpoint.AuthProfile
       - name: need
         type: connectors.runtime.AuthenticationNeed
       - name: attempt
@@ -94,7 +94,7 @@ types:
     kind: newtype
     of: String
 
-  - name: connectors.runtime.ConnectionRef
+  - name: connectors.runtime.EndpointRef
     kind: newtype
     of: String
 
@@ -140,7 +140,7 @@ entities:
   # dispatch" (docs/design/01-domain-model.md:297). Settled by a state enum, or by the CAS
   # revision at docs/design/01-domain-model.md:301 becoming an observable ladder rather than a
   # version counter.
-  # UNMAPPED: the Grant-to-Connection relation. docs/design/01-domain-model.md:294-295 says
+  # UNMAPPED: the Grant-to-Endpoint relation. docs/design/01-domain-model.md:294-295 says
   # "Grants bind to connections (which one a principal may exercise), never to credentials",
   # which fixes the direction; nothing states how many connections one grant binds. Settled by
   # the grant store's own selector shape (docs/design/01-domain-model.md:291-293).
@@ -230,8 +230,8 @@ entities:
     fields:
       - name: operation_ref
         type: connectors.runtime.OperationRef
-      - name: connection_ref
-        type: connectors.runtime.ConnectionRef
+      - name: endpoint_ref
+        type: connectors.runtime.EndpointRef
       - name: connector_audit_ref
         type: connectors.runtime.AuditRef
       - name: termination
@@ -368,7 +368,7 @@ commands:
   # UNMAPPED: this is not a caller-facing command and no `OperationRequest` variant names it —
   # the session settles because the call ended, not because anything asked. The name is this
   # document's, taken from the field that carries it. Settled by the same surface work as the
-  # channel supervisor steps in `connectors.connection`, if a settlement is ever something a
+  # channel supervisor steps in `connectors.endpoint`, if a settlement is ever something a
   # caller can ask for.
   # UNMAPPED: `OperationRequest::SessionReconcile` (crates/protocol/src/operation/legacy.rs:55) is
   # deliberately not modelled as the cause, and not modelled at all. Its handler
