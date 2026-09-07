@@ -7,7 +7,18 @@ title: Kubernetes joins the catalog
 refs:
 - provider: legacy
   reference: S-057
-revision: 2
+scope:
+- confidence: inferred
+  path: crates/connector-spec
+- confidence: cited
+  path: crates/connectors-runtime/src/composition.rs
+- confidence: cited
+  path: crates/integration-catalog
+- confidence: cited
+  path: crates/integration-kubernetes
+- confidence: cited
+  path: providers/kubernetes.toml
+revision: 8
 ---
 ## Acceptance
 
@@ -49,3 +60,16 @@ Migrated from `docs/stories/S-057-kubernetes-joins-the-catalog.md`, which is not
 - First written 2026-08-24 · last touched 2026-08-24 · 1 revision(s)
 - Legacy id `S-057`, recorded as the reference `legacy:S-057`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` at released base 4d0cd308 — cited.
+
+- **Provider:** `providers/kubernetes.toml` — cited; explicitly required by acceptance, currently absent.
+- **Declaration primitives:** `crates/connector-spec` — inferred; needs generic vocabulary for rotating file credentials, namespace-group admission and bounded text responses.
+- **Generic execution:** `crates/integration-catalog` — cited; target adapter named by the story; existing credential-file import differs from per-call rereading.
+- **Migration and retained regressions:** `crates/integration-kubernetes` — cited; src/hosted.rs owns namespace policy, token reads and logs; src/hosted_tests.rs covers namespace admission, token rotation, bounds and restart authority.
+- **Runtime registration:** `crates/connectors-runtime/src/composition.rs:753` — cited; currently constructs the handwritten hosted backend.
+- **Preservation:** existing local workload inventory and datasource projections are shipped behavior, not evidence that this catalog migration is complete — cited.
+- **Confidence:** medium; execution owners are clear, while declaration and source-ingestion choices remain unresolved — inferred.
+- **Would collide with:** catalog execution/declarations, Kubernetes hosted policy and regressions, or runtime backend composition — cited.

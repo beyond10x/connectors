@@ -9,7 +9,16 @@ refs:
   reference: S-017
 relations:
 - derived_from: epic:sources
-revision: 1
+scope:
+- confidence: cited
+  path: SOURCES.toml
+- confidence: cited
+  path: crates/catalog-build
+- confidence: cited
+  path: crates/catalog-cli
+- confidence: cited
+  path: docs/research/vendor
+revision: 3
 ---
 ## Acceptance
 
@@ -55,3 +64,16 @@ Migrated from `docs/stories/S-017-mint-source-entries-from-the-mined-catalogs.md
 - First written 2026-08-13 · last touched 2026-08-13 · 2 revision(s)
 - Legacy id `S-017`, recorded as the reference `legacy:S-017`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper`, read-only against `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+
+- **Primary surface:** `crates/catalog-build` — cited; `src/lib.rs:128` provides the existing stdout-only scaffold boundary. Add local corpus lookup, per-field citations, disagreement reporting, TODO fields and honest empty proposals here.
+- **CLI:** `crates/catalog-cli` — cited; `src/main.rs:49` declares only build/diff/check/scaffold. The `sources mint` command does not exist.
+- **Source index:** `SOURCES.toml:243` — cited; existing Nango, Airbyte and Apideck entries identify the mining inputs. Register the additional spec directory and its refresh/provenance ownership.
+- **Reference corpus:** `docs/research/vendor/` — cited; existing artifacts include Nango’s catalog, one Airbyte example and Apideck’s API specification. Acceptance explicitly requires adding a vendored spec directory.
+- **Symbols:** `Verb`, `Invocation`, scaffold rendering and the future source-entry model — inferred; reuse the source model owned by S-016 rather than introducing a separate representation.
+- **Documents:** provenance and source registration accompany the new reference artifact — cited.
+- **Confidence:** high — cited; command absence, library extension point, existing inputs and the missing spec-directory requirement are directly located.
+- **Would collide with:** catalog source-command development, catalog-build dispatch/scaffolding, source-index validation/refresh and reference-corpus registration — inferred.

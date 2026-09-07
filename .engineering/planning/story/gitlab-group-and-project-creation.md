@@ -7,7 +7,30 @@ title: Create GitLab groups and projects through admitted operations
 summary: Close the provisioning gap that forces callers out of Connectors when creating a repository namespace and project.
 relations:
 - derived_from: epic:catalog-adoptions
-revision: 1
+scope:
+- confidence: cited
+  path: catalog
+- confidence: cited
+  path: connectors.lock
+- confidence: cited
+  path: crates/catalog-build
+- confidence: cited
+  path: crates/catalog-cli/examples/vendor_gitlab.rs
+- confidence: cited
+  path: crates/catalog-reader/catalog.pack
+- confidence: cited
+  path: crates/connector-resolve
+- confidence: cited
+  path: crates/connector-spec
+- confidence: inferred
+  path: crates/connectors-runtime/tests
+- confidence: cited
+  path: providers/gitlab.toml
+- confidence: cited
+  path: specs/gitlab.provenance.toml
+- confidence: cited
+  path: specs/gitlab/coverage-19.4.toml
+revision: 13
 ---
 ## Context
 
@@ -64,3 +87,18 @@ Official references inspected on 2026-09-05:
 They document the group and project creation endpoints. Their request fields, authority
 requirements, and returned identities must be captured through the repository's provenance
 workflow during implementation, rather than inferred from the reproduction above.
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` through read-only inspection — cited.
+
+- **Primary surface:** `providers/gitlab.toml:1207` — cited; extend the established official-source operation projection.
+- **Source accounting:** `specs/gitlab/coverage-19.4.toml:1823`, `specs/gitlab.provenance.toml:32`, `crates/catalog-cli/examples/vendor_gitlab.rs:21` — cited; coverage, provenance and the generator's selected-operation inventory must agree.
+- **Prerequisite importer:** `crates/connector-spec` — cited; both requested operations are refused because `BodyEncoding` supports only JSON/form.
+- **Encoding propagation:** `crates/catalog-build`, `crates/connector-resolve` — cited; generated request templates/schema and the resolver currently represent only JSON/form bodies.
+- **Generated artifacts:** `catalog`, `connectors.lock`, `crates/catalog-reader/catalog.pack` — cited; catalog-schema/request changes and a complete catalog build affect these shared outputs.
+- **Runtime verification:** `crates/connectors-runtime/tests` — inferred; local provisioning/admission/error cases belong beside the existing GitLab runtime integration coverage.
+- **Documents:** source-provenance annotations within the listed files — inferred.
+- **Symbols:** `BodyEncoding`, `READABLE_BODIES`, `BodyTemplate`, `SCHEDULES` — cited.
+- **Confidence:** medium — inferred; the importer prerequisite is established, but multipart semantics and resulting compatibility changes remain unscoped.
+- **Would collide with:** OpenAPI import, request-body encoding, catalog generation/schema/conformance, GitLab selection/provenance, and shared catalog outputs — inferred.
