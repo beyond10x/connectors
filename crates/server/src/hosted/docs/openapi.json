@@ -723,11 +723,21 @@
             }
           },
           "409": {
-            "description": "The admitted operation was not attempted and needs explicit trusted authentication remediation. This does not renew Identity, spend approval, or resend the operation.",
+            "description": "The operation description is stale, or the admitted v0alpha3 operation was not attempted and needs explicit trusted authentication remediation. This does not renew Identity, spend approval, or resend the operation.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/operation.v3.responseEnvelope"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/operation.v1.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.responseEnvelope"
+                    },
+                    {
+                      "$ref": "#/components/schemas/operation.v3.responseEnvelope"
+                    }
+                  ]
                 },
                 "examples": {
                   "authentication_required": {

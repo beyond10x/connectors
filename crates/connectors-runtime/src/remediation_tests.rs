@@ -211,3 +211,112 @@ async fn auth_adversary_registry_never_combines_split_owners_or_falls_through_cl
         ]
     );
 }
+
+struct AuthAdversary2SessionOwner {
+    session: &'static str,
+    result: service::RemediationError,
+    calls: AtomicU64,
+}
+#[async_trait]
+impl ConnectorBackend for AuthAdversary2SessionOwner {
+    async fn ready(&self) -> Result<(), BackendReadinessError> {
+        Ok(())
+    }
+    fn owns_remediation(&self, route: service::RemediationRoute<'_>) -> bool {
+        matches!(route, service::RemediationRoute::Session(reference) if reference == self.session)
+    }
+    async fn handle_remediation(
+        &self,
+        _: &PrincipalContext,
+        request: service::RemediationRequest,
+        _: Arc<dyn service::RemediationAuthority>,
+    ) -> Result<service::RemediationResult, service::RemediationError> {
+        assert!(matches!(
+            request,
+            service::RemediationRequest::Status(_) | service::RemediationRequest::Acknowledge(_)
+        ));
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Err(self.result)
+    }
+    async fn handle(
+        &self,
+        _: &PrincipalContext,
+        _: OperationRequest,
+    ) -> Result<OperationResult, OperationError> {
+        panic!("session routing must not dispatch an operation")
+    }
+}
+struct AuthAdversary2NoAdmission;
+impl service::RemediationAuthority for AuthAdversary2NoAdmission {
+    fn recheck(
+        &self,
+        _: &PrincipalContext,
+        _: &service::RemediationBinding,
+        _: u64,
+    ) -> Result<(), service::RemediationError> {
+        panic!("the registry must preserve its selected owner's refusal")
+    }
+}
+#[tokio::test]
+async fn auth_adversary2_session_routing_refuses_ambiguity_and_never_falls_back_after_claim() {
+    use protocol::connection_v2::{RemediationAcknowledgeRequest, RemediationStatusRequest};
+    for scenario in [
+        "single-refused",
+        "single-unavailable",
+        "single-unsupported",
+        "ambiguous",
+        "unknown",
+    ] {
+        for acknowledge in [false, true] {
+            let expected = match scenario {
+                "single-unavailable" | "ambiguous" => RemediationError::Unavailable,
+                "single-unsupported" => RemediationError::Unsupported,
+                _ => RemediationError::Refused,
+            };
+            let first = Arc::new(AuthAdversary2SessionOwner {
+                session: "session:owned",
+                result: expected,
+                calls: 0.into(),
+            });
+            let second = Arc::new(AuthAdversary2SessionOwner {
+                session: if scenario == "ambiguous" {
+                    "session:owned"
+                } else {
+                    "session:decoy"
+                },
+                result: RemediationError::Unavailable,
+                calls: 0.into(),
+            });
+            let registry = BackendRegistry::new(vec![first.clone(), second.clone()]);
+            let reference = if scenario == "unknown" {
+                "session:unknown"
+            } else {
+                "session:owned"
+            };
+            let request = if acknowledge {
+                service::RemediationRequest::Acknowledge(RemediationAcknowledgeRequest {
+                    connect_session_ref: reference.into(),
+                    operation_ref: target().operation_ref.into(),
+                    connection_ref: target().connection_ref.into(),
+                })
+            } else {
+                service::RemediationRequest::Status(RemediationStatusRequest {
+                    connect_session_ref: reference.into(),
+                })
+            };
+            let result = registry
+                .handle_remediation(&principal(), request, Arc::new(AuthAdversary2NoAdmission))
+                .await;
+            let Err(actual) = result else {
+                panic!("refusal was promoted to readiness")
+            };
+            assert_eq!(actual, expected);
+            let calls = first.calls.load(Ordering::SeqCst);
+            assert_eq!(calls, u64::from(scenario.starts_with("single-")));
+            assert_eq!(second.calls.load(Ordering::SeqCst), 0);
+            eprintln!(
+                "session route {scenario}, acknowledge={acknowledge}: {actual:?}, calls={calls}"
+            );
+        }
+    }
+}

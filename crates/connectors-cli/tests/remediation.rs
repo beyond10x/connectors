@@ -592,3 +592,64 @@ fn auth_adversary_cli_unsafe_daemon_objects_refuse_before_open_stdin_or_private_
         "an existing non-socket or symlink must be refused before blocking on caller stdin"
     );
 }
+
+#[test]
+fn auth_adversary2_cli_socket_permissions_refuse_before_open_stdin_in_every_format() {
+    for format in ["json", "yaml", "text", "compact"] {
+        for (root_mode, socket_mode) in [(0o700, 0o640), (0o700, 0o606), (0o750, 0o600)] {
+            let fixture = Fixture::new();
+            let socket = fixture.root.join("connectors.sock");
+            let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            fs::set_permissions(&socket, fs::Permissions::from_mode(socket_mode)).unwrap();
+            fs::set_permissions(&fixture.root, fs::Permissions::from_mode(root_mode)).unwrap();
+            let destination = fixture.root.join("SYNTHETIC_PRIVATE_INSTRUCTION");
+            let mut command = fixture.command(
+                format,
+                &[
+                    "setup",
+                    "connect",
+                    "--operation",
+                    "fixture.write",
+                    "--connection",
+                    "connection:fixture",
+                    "--input",
+                    "-",
+                ],
+            );
+            command
+                .arg("--instruction-file")
+                .arg(&destination)
+                .stdin(Stdio::piped());
+            let mut child = command.spawn().unwrap();
+            let input = child.stdin.take().unwrap();
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while child.try_wait().unwrap().is_none() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let blocked = child.try_wait().unwrap().is_none();
+            if blocked {
+                child.kill().unwrap();
+            }
+            drop(input);
+            let output = child.wait_with_output().unwrap();
+            eprintln!("CLI permissions {format}/{root_mode:o}/{socket_mode:o}: blocked={blocked}, exit={:?}", output.status.code());
+            assert!(!blocked, "permission refusal waited for caller stdin");
+            assert!(!output.status.success());
+            let text = String::from_utf8_lossy(&output.stdout).to_string()
+                + &String::from_utf8_lossy(&output.stderr);
+            let expected_code = if root_mode == 0o700 {
+                "configuration"
+            } else {
+                "runtime"
+            };
+            assert!(text.contains(expected_code), "actual refusal: {text}");
+            assert!(!text.contains("SYNTHETIC_PRIVATE_INSTRUCTION"));
+            assert!(!destination.exists());
+            assert_eq!(
+                listener.accept().unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+        }
+    }
+}

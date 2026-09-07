@@ -34,7 +34,7 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 - Add explicitly configured GitLab public PKCE and device authorization, token-info verification,
   refresh and durable recovery through one dedicated OAuth store. This initial personal custody
   is unsealed and development-only; private instructions use a terminal or owner-only file.
-- **Auth review pending:** default operations to v0alpha3 with typed `authentication_required`
+- Default operations to v0alpha3 with typed `authentication_required`
   refusals. Trusted local setup binds remediation to the intended operation and Connection, then
   stops ready for a separate explicit invocation. `operation --protocol-version v2` retains
   explicit interoperability; no negotiation, automatic session creation or invocation replay.
