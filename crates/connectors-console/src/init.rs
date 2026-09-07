@@ -168,6 +168,45 @@ pub fn run(
     })
 }
 
+/// Bootstrap a local owner before the first provider is enrolled. Existing files are validated.
+pub fn ensure_owner(config_path: &Path) -> Result<(), InitError> {
+    match std::fs::symlink_metadata(config_path) {
+        Ok(_) => {
+            PersonalConfig::read(config_path)?;
+            return Ok(());
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let digest = derive_snapshot(&[]);
+    let config = PersonalConfig {
+        owner: OwnerConfig {
+            tenant_id: "local".into(),
+            agent_id: local_agent_id(),
+            agent_revision: 1,
+            authority_snapshot_id: format!("snapshot:local:{}", &digest[..16]),
+            authority_snapshot_sha256: digest,
+        },
+        connection: None,
+        authority: None,
+        application: None,
+        sip: None,
+        slack: None,
+        grafana: None,
+        kubernetes: None,
+        platform: None,
+        catalog: Vec::new(),
+    };
+    write_validated(
+        config_path,
+        toml::to_string_pretty(&config)?.as_bytes(),
+        false,
+    )
+}
+
 /// Write, prove the bytes on disk are readable, then move into place.
 ///
 /// **The validation is a read-back, not a pre-check**, and that is the stronger claim: the daemon
@@ -182,7 +221,7 @@ pub fn run(
 /// `0600` at creation rather than a later `chmod`: a mode fixed after the fact leaves a window in
 /// which the file exists at the process umask. Nothing secret goes in here, but the daemon refuses
 /// a configuration that is not owner-only, so writing one that it would refuse is pointless.
-fn write_validated(path: &Path, bytes: &[u8], force: bool) -> Result<(), InitError> {
+pub(crate) fn write_validated(path: &Path, bytes: &[u8], force: bool) -> Result<(), InitError> {
     use std::os::unix::fs::OpenOptionsExt as _;
 
     if !force && path.exists() {
@@ -210,7 +249,7 @@ fn write_validated(path: &Path, bytes: &[u8], force: bool) -> Result<(), InitErr
 }
 
 /// The digest over the admitted set. See this module's documentation for why it excludes `[owner]`.
-fn derive_snapshot(integrations: &[&'static str]) -> String {
+pub(crate) fn derive_snapshot(integrations: &[&'static str]) -> String {
     let mut digest = Sha256::new();
     digest.update(SNAPSHOT_DOMAIN);
     for integration in integrations {
@@ -224,7 +263,7 @@ fn derive_snapshot(integrations: &[&'static str]) -> String {
 ///
 /// Host and uid, not a random id: the same machine must derive the same agent across runs, or every
 /// `init` would orphan the previous run's audit trail.
-fn local_agent_id() -> String {
+pub(crate) fn local_agent_id() -> String {
     let host = rustix::system::uname()
         .nodename()
         .to_str()
@@ -251,13 +290,22 @@ fn kubeconfig_readable() -> bool {
 ///
 /// `target_grants` cannot be empty: a monitoring Service discovered behind the cluster is a
 /// Connection the placement must be able to attribute, and one it cannot attribute is one it must
-/// not open. Namespaces stay empty, which means cluster-wide discovery bounded by whatever the
-/// operator's own RBAC already permits — on a personal machine the kubeconfig is the aperture.
+/// not open. Namespace scope defaults to the selected context's namespace; cluster-wide access
+/// requires the explicit setup option.
 fn kubernetes_config(allow_exec_auth: bool) -> KubernetesIntegrationConfig {
+    let contexts = integration_kubernetes::local_contexts().unwrap_or_default();
+    let context = contexts
+        .iter()
+        .find(|context| context.current)
+        .or_else(|| (contexts.len() == 1).then(|| &contexts[0]));
     KubernetesIntegrationConfig {
         grant_ref: "grant:kubernetes:local".to_owned(),
         initiation: InitiationConfig::Platform,
-        namespaces: Vec::new(),
+        namespaces: vec![context
+            .and_then(|context| context.namespace.clone())
+            .unwrap_or_else(|| "default".into())],
+        all_namespaces: false,
+        selected_context: context.map(|context| context.name.clone()),
         target_grants: BTreeMap::from([
             ("prometheus".to_owned(), "grant:prometheus:local".to_owned()),
             ("loki".to_owned(), "grant:loki:local".to_owned()),

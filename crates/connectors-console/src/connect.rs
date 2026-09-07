@@ -93,6 +93,8 @@ pub enum ConnectError {
     Prompt(#[from] std::io::Error),
     #[error("the Connector returned an invalid connection response")]
     InvalidResponse,
+    #[error(transparent)]
+    Refused(#[from] crate::envelope::ReducedError),
 }
 
 /// Run one guided flow and return what happened, without printing it.
@@ -155,25 +157,13 @@ pub async fn run(
         }));
     }
 
-    let observations = client
-        .observations(&owner, description.summary.connection_ref.clone())
-        .await?;
-    let materialized = client.materialize_admitted(&owner, observations).await?;
-    Ok(json!({
-        "provider": "grafana",
-        "connected": true,
-        "connection": description.summary.label,
-        "connection_ref": description.summary.connection_ref,
-        "targets": materialized.connections.iter().map(|target| json!({
-            "label": target.label,
-            "integration_ref": target.integration_ref,
-            "connection_ref": target.connection_ref,
-        })).collect::<Vec<_>>(),
-        // Reported rather than dropped: a data source that was seen and not connected is the
-        // question an operator asks next, and silence about it reads as "there were none".
-        "unsupported": materialized.unsupported,
-        "not_granted": materialized.not_granted,
-    }))
+    discovered(
+        &client,
+        &owner,
+        "grafana",
+        description.summary.connection_ref,
+    )
+    .await
 }
 
 /// Kubernetes needs no credential — it reads the operator's own kubeconfig — so its flow either
@@ -189,7 +179,7 @@ async fn kubernetes(
         .await?;
     let CandidateActivationOutcome::Connected {
         connection,
-        observations,
+        observations: _,
     } = outcome
     else {
         let CandidateActivationOutcome::SelectionRequired(candidates) = outcome else {
@@ -204,14 +194,48 @@ async fn kubernetes(
             "contexts": candidates.iter().map(|candidate| candidate.title.clone()).collect::<Vec<_>>(),
         }));
     };
+    discovered(
+        client,
+        owner,
+        "kubernetes",
+        connection.summary.connection_ref,
+    )
+    .await
+}
+
+async fn discovered(
+    client: &LocalClient,
+    owner: &protocol::operation::OwnerContext,
+    provider: &str,
+    source_ref: String,
+) -> Result<Value, ConnectError> {
+    use protocol::endpoint::{EndpointRequest, ListRequest, RefreshRequest};
+    let refreshed = client
+        .endpoint(
+            owner,
+            EndpointRequest::Refresh(RefreshRequest {
+                source_ref: Some(source_ref.clone()),
+            }),
+        )
+        .await?;
+    let refreshed = crate::reduce_envelope!(refreshed)?;
+    let endpoints = client
+        .endpoint(
+            owner,
+            EndpointRequest::List(ListRequest {
+                source_ref: Some(source_ref.clone()),
+                query: String::new(),
+                limit: protocol::endpoint::MAX_RESULTS,
+                cursor: None,
+            }),
+        )
+        .await?;
+    let endpoints = crate::reduce_envelope!(endpoints)?;
     Ok(json!({
-        "provider": "kubernetes",
-        "connected": true,
-        "connection_ref": connection.summary.connection_ref,
-        "observations": observations.iter().map(|observation| json!({
-            "title": observation.title,
-            "observation_ref": observation.observation_ref,
-        })).collect::<Vec<_>>(),
+        "provider": provider, "connected": true, "source_ref": source_ref,
+        "endpoints": endpoints["endpoints"], "next_cursor": endpoints["next_cursor"],
+        "warnings": refreshed["warnings"],
+        "next": "connectors endpoint list",
     }))
 }
 
@@ -325,7 +349,6 @@ pub async fn dispatch_with_personal_oauth(
         || options.force
         || options.credential_file.is_some()
         || options.instance.is_some()
-        || options.acquire.is_some()
     {
         return Err(ConnectError::PersonalOAuthConfiguration);
     }

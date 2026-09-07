@@ -183,32 +183,18 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
         Unspecified::Lifecycle,
         "supplies a credential a hosted Integration requires; no entity of this specification moves",
     ),
+    ("daemon start", Unspecified::Lifecycle, "starts the local daemon process"),
+    ("daemon status", Unspecified::Read, "reads local daemon lifecycle status"),
+    ("daemon stop", Unspecified::Lifecycle, "stops the local daemon process"),
+    ("endpoint list", Unspecified::Read, "reads discovered service interfaces"),
+    ("endpoint show", Unspecified::Read, "reads one endpoint and its readiness"),
+    ("endpoint refresh", Unspecified::Flow, "reconciles configured discovery sources"),
+    ("endpoint bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
     // Under `connection`.
-    (
-        "connection candidates",
-        Unspecified::Read,
-        "a read of potential direct Connections; no provider is contacted",
-    ),
-    (
-        "connection activate",
-        Unspecified::Forwarded,
-        "forwards `connectors.connection.ActivateCandidate`, which `connectors-service` accepts",
-    ),
     (
         "connection list",
         Unspecified::Read,
         "a read of non-secret Connection summaries",
-    ),
-    (
-        "connection observations",
-        Unspecified::Read,
-        "a read of the latest stored discovery observations",
-    ),
-    (
-        "connection materialize",
-        Unspecified::Forwarded,
-        "forwards `connectors.connection.MaterializeObservation`, which `connectors-service` \
-         accepts",
     ),
     // Under `event`.
     (
@@ -2262,7 +2248,7 @@ fn the_kinds_the_tree_derives_are_the_kinds_the_list_carries() {
     // not cover by the phrase "the seven `Lifecycle` steps", and it may not name one the tree
     // derives — which is exactly how `connect` came to be described as measured by nothing.
     let sentence = one_line
-        .split("**The remaining ")
+        .rsplit("**The remaining ")
         .nth(1)
         .map(|rest| {
             rest.split(" reach no protocol request")

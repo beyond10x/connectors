@@ -36,11 +36,13 @@
 pub mod admin;
 pub mod auth;
 pub mod connect;
+pub mod daemon;
 pub mod doctor;
 pub mod enrol;
 pub mod envelope;
 pub mod init;
 pub mod input;
+pub mod kubernetes_setup;
 pub mod output;
 pub mod providers;
 pub mod remediation;
