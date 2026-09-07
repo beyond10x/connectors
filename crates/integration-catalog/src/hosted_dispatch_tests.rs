@@ -42,6 +42,55 @@ async fn invoke_hosted(
 }
 
 #[tokio::test]
+async fn public_grafana_descriptions_preserve_declared_output_schemas_for_capability_consumers() {
+    let egress = Arc::new(RecordingEgress::default());
+    let backend = open(
+        policy(Some(ORIGIN)),
+        Arc::new(MemoryStore::new()),
+        Arc::new(MemoryState::new()),
+        egress.clone(),
+    )
+    .await;
+    let owner = principal("first");
+    connect(&backend, &owner).await;
+    for operation in [
+        "grafana-dashboards-list",
+        "grafana-dashboard-get",
+        "grafana-datasources-list",
+        "grafana-datasource-query",
+    ] {
+        let result = backend
+            .handle(
+                &owner,
+                OperationRequest::Describe(protocol::operation::DescribeRequest {
+                    operation_ref: operation.to_owned(),
+                }),
+            )
+            .await
+            .unwrap();
+        let OperationResult::Describe(description) = result else {
+            panic!("description response")
+        };
+        let declared: serde_json::Value = serde_json::from_str(
+            catalog::reader::operation(operation).unwrap().record(),
+        )
+        .unwrap();
+        assert!(description.input_schema.is_object());
+        assert!(description.output_schema.is_object());
+        assert_eq!(description.output_schema, declared["response_schema"]);
+        if operation == "grafana-datasources-list" {
+            assert_eq!(description.output_schema["type"], "array");
+            assert_eq!(description.output_schema["items"]["type"], "object");
+            assert_eq!(
+                description.output_schema["items"]["required"],
+                serde_json::json!(["id", "uid", "name", "type"])
+            );
+        }
+    }
+    assert_eq!(lock(&egress.urls).len(), 1, "describing does not contact the provider");
+}
+
+#[tokio::test]
 async fn public_describe_then_invoke_survives_scope_token_and_request_rotation() {
     let egress = Arc::new(RecordingEgress::default());
     let backend = open(

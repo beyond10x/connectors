@@ -25,6 +25,12 @@ scope:
 - confidence: cited
   path: crates/catalog-reader/catalog.pack
 - confidence: cited
+  path: crates/catalog/src/lib.rs
+- confidence: cited
+  path: crates/catalog/src/table.rs
+- confidence: cited
+  path: crates/catalog/tests/main/pack_table.rs
+- confidence: cited
   path: crates/connector-secrets/README.md
 - confidence: cited
   path: crates/connector-secrets/src/file.rs
@@ -127,10 +133,12 @@ scope:
 - confidence: cited
   path: crates/service/src/runtime.rs
 - confidence: cited
+  path: docs/design/04-the-callers-contract.md
+- confidence: cited
   path: docs/guides/administer-hosted-integrations.md
 - confidence: cited
   path: providers/grafana.toml
-revision: 47
+revision: 51
 ---
 ## Outcome
 
@@ -270,3 +278,23 @@ The full catalog suite passes 120 tests. Separate public HostedCatalogBackend de
 These use controlled value/state adapters and provider transport, not the operator's real provider account. The consuming deployment has reported durable credential acquisition, but the new pinned runtime and BFF still require local composition and a real governed provider read before acceptance is complete. No credential was read, replayed or requested by this upstream subtask, and no deployment or release was performed. The story remains active for that acceptance.
 
 After verification, 102 exact completed test executables were reclaimed from the retained task target, excluding all top-level executable inodes and all libraries, source and evidence. This restored about 7.38 GiB for the consuming composition. The successful gate logs, earlier refusal evidence and exact cleanup inventory are retained privately with the task handoff.
+
+## Declared legacy response schemas reach capability consumers
+
+The consuming deployment now succeeds at a real governed provider read, but capability creation refuses the resulting description because output_schema is null. Source diagnosis confirms that the canonical legacy operation retains its effective response_schema while contract.output_schema is intentionally absent for legacy request semantics. The typed catalog reader reads only the latter. The generic description therefore drops an existing declared schema before the consuming platform sees it.
+
+Read the existing canonical effective response_schema for legacy operations when no translated contract output is present. OpenAPI 3 operations continue to use only the compiler-translated contract output; absence remains absence where no supported output was declared. Preserve every declared constraint, including an array-valued response represented by a JSON object schema. Do not substitute an empty schema or JSON object response type, invent provider fields, change raw provider schemas, or reinterpret credential-producing wire payloads: canonical response_schema already represents the safe effective output.
+
+Add catalog-wide byte/value-fidelity coverage between canonical legacy response declarations and typed operations, explicit precedence/absence coverage, and an actual public hosted Grafana description regression for the declared operations. The protocol DTO shape and catalog artifact bytes stay unchanged; legacy public description content changes from null to its existing schema. No provider request, credential, grant or invocation authority changes. Full source gates and parent-owned real profile/agent/provider acceptance remain required. No real provider credentials are accessed or replayed by the upstream implementation.
+
+## Declared response projection verification
+
+The typed reader now preserves the existing canonical effective response schema for legacy operations while giving translated contract output precedence. Catalog-wide fidelity coverage compares every legacy typed output with its canonical declaration. This restores 853 already-declared legacy response schemas; 154 legacy operations with no output declaration remain unspecified. The four OpenAPI 3 operations retain their existing three translated outputs and one unspecified output. Explicit fixture coverage preserves boolean schemas and absence, and prevents a literal OpenAPI source response from substituting for a missing translated contract. Canonical catalog documents, pack bytes, generated schemas and wire contract fields are unchanged.
+
+A public hosted regression connects a sentinel through controlled adapters and describes all four declared Grafana operations. Their input and output schemas are JSON objects with exact canonical output equality. The datasource-list output keeps type array and its declared item properties and required fields; it is not coerced into an object response or an unconstrained schema. Description requests perform no additional provider exchange. The catalog package passes 27 tests/doctests, and the complete integration-catalog suite passes 121 tests.
+
+All twelve authoritative workspace gate lanes pass, including both hosted runtime feature configurations, final catalog verification for 65 providers and 70 artifacts, documentation links, story checks, ESS 0.18.0 validation and exact clap generation. All-workspace formatting and root/runtime all-target clippy pass with warnings denied. The root gate ran before a clippy-only equivalent Option fallback correction; the affected catalog tests and root clippy were repeated afterward, and all subsequent lanes ran on the final implementation.
+
+Failed evidence remains retained: clippy first requested an eager Option fallback, which was corrected without changing behavior. The first parallel runtime lane also hit four existing one-second OAuth fixture authorization/expiry failures. Those four tests passed unchanged in isolation, then both complete runtime configurations passed with serial test execution. Production deadlines and test assertions were not changed. Future constrained local runs should keep this timing evidence visible and use the bounded serial gate setting rather than treating a retry as unexplained success.
+
+This is source-boundary evidence. The consuming deployment separately reported a real governed provider read before this change, but the corrected description still requires actual capability-profile compilation and an agent tool invocation after composition. No real credential was read, replayed or requested here. The generic catalog connector_audit_ref is a deterministic operation/connection digest, not a durable per-execution audit receipt, and is not used as proof of a provider call. The story remains active for parent-owned real acceptance.
