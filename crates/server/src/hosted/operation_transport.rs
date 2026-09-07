@@ -28,6 +28,9 @@ pub(super) async fn operation(
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
     let version = match probe.get("protocol").and_then(serde_json::Value::as_str) {
+        Some(protocol::operation::v4::CONTRACT) => {
+            return super::endpoint_route::operation_v4(&state, &headers, &body).await;
+        }
         Some(legacy::CONTRACT) => Version::V0Alpha1,
         Some(protocol::operation::wire::CONTRACT) => Version::V0Alpha2,
         Some(v3::CONTRACT) => Version::V0Alpha3,
