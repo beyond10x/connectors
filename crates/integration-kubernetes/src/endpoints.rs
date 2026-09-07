@@ -17,10 +17,8 @@ use sha2::{Digest, Sha256};
 
 mod routes;
 pub use routes::{EndpointRouteLease, ResolvedEndpointCredentials};
-mod backend;
 mod composition;
 mod crossplane;
-pub use backend::{EndpointEgressFactory, KubernetesEndpointBackend};
 pub use composition::{EndpointBackendFactory, EndpointPrincipalPolicy};
 
 const MAX_STATE_BYTES: usize = 16 * 1024 * 1024;

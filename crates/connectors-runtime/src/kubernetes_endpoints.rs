@@ -15,7 +15,7 @@ use protocol::operation::{
 use service::{ConnectorBackend, EgressTransport, PrincipalContext};
 use sha2::{Digest, Sha256};
 
-use super::{
+use integration_kubernetes::endpoints::{
     EndpointPrincipalPolicy, EndpointRouteLease, EndpointSourceError, KubernetesEndpointSource,
     ResolvedEndpointCredentials,
 };
@@ -766,4 +766,5 @@ fn operation_refused() -> OperationError {
 }
 
 #[cfg(test)]
+#[path = "kubernetes_endpoints_tests.rs"]
 mod tests;

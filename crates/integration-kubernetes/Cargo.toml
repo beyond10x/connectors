@@ -15,8 +15,6 @@ async-trait = "0.1"
 connector-resolve = { version = "0.7.2", path = "../connector-resolve" }
 connector-state = { version = "0.7.2", path = "../connector-state" }
 connector-secrets = { version = "0.7.2", path = "../connector-secrets" }
-integration-catalog = { version = "0.7.2", path = "../integration-catalog" }
-driver-sql = { version = "0.7.2", path = "../driver-sql" }
 catalog = { version = "0.7.2", path = "../catalog" }
 connectors-config = { version = "0.7.2", path = "../connectors-config" }
 domain = { version = "0.7.2", path = "../domain" }
