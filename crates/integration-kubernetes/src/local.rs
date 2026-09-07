@@ -5,8 +5,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::endpoints::{
-    EndpointEgressFactory, EndpointPlacement, EndpointPrincipalPolicy, KubernetesEndpointBackend,
-    KubernetesEndpointSource,
+    EndpointBackendFactory, EndpointPlacement, EndpointPrincipalPolicy, KubernetesEndpointSource,
 };
 
 use crate::local_services::{
@@ -151,8 +150,8 @@ pub struct KubernetesLocalBackend {
     /// `crate::local_workloads`.
     workloads: WorkloadSurface,
     endpoint_state: Option<Arc<dyn connector_state::StateStore>>,
-    endpoint_egress: Option<Arc<dyn EndpointEgressFactory>>,
-    endpoint_backend: Mutex<Option<Arc<KubernetesEndpointBackend>>>,
+    endpoint_factory: Option<Arc<dyn EndpointBackendFactory>>,
+    endpoint_backend: Mutex<Option<Arc<dyn ConnectorBackend>>>,
 }
 
 impl KubernetesLocalBackend {
@@ -173,7 +172,7 @@ impl KubernetesLocalBackend {
             activation: tokio::sync::Mutex::new(()),
             workloads: WorkloadSurface::default(),
             endpoint_state: None,
-            endpoint_egress: None,
+            endpoint_factory: None,
             endpoint_backend: Mutex::new(None),
         })
     }
@@ -390,7 +389,7 @@ impl KubernetesLocalBackend {
             channels: Vec::new(),
         };
         let observations = normalize_services(&connection_ref, services);
-        if let (Some(store), Some(egress)) = (&self.endpoint_state, &self.endpoint_egress) {
+        if let (Some(store), Some(factory)) = (&self.endpoint_state, &self.endpoint_factory) {
             let source = Arc::new(
                 KubernetesEndpointSource::new(
                     client.clone(),
@@ -407,11 +406,10 @@ impl KubernetesLocalBackend {
                 .refresh()
                 .await
                 .map_err(|_| connection_unavailable())?;
-            *lock(&self.endpoint_backend) = Some(Arc::new(KubernetesEndpointBackend::new(
+            *lock(&self.endpoint_backend) = Some(factory.build(
                 source,
                 EndpointPrincipalPolicy::Local(Arc::new(self.owner.clone())),
-                egress.clone(),
-            )));
+            ));
         }
         let mut state = lock(&self.state);
         state
