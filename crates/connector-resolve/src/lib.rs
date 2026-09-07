@@ -78,7 +78,7 @@ mod resolve;
 mod slot;
 mod template;
 
-pub use channel::{channel_plan, PreparedChannelPlan};
+pub use channel::{channel_plan, channel_plan_for_endpoint, PreparedChannelPlan};
 pub use config::{ConfigField, ConfigPort, ConfigValue};
 pub use credentials::{assemble_credentials, Assembly, Redaction};
 pub use endpoints::{resolve_endpoint, resolve_endpoints};
