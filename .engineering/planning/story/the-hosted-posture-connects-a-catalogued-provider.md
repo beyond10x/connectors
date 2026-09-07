@@ -9,7 +9,18 @@ refs:
   reference: S-073
 relations:
 - derived_from: epic:subscription-custody
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connectors-config/src/hosted.rs
+- confidence: cited
+  path: crates/connectors-runtime/src/composition.rs
+- confidence: cited
+  path: crates/hosted-vault/src/prepared.rs
+- confidence: cited
+  path: crates/integration-catalog/src/hosted.rs
+- confidence: cited
+  path: crates/integration-catalog/src/lib.rs
+revision: 3
 ---
 ## Acceptance
 
@@ -62,3 +73,15 @@ Migrated from `docs/stories/S-073-the-hosted-posture-connects-a-catalogued-provi
 - First written 2026-08-25 · last touched 2026-08-25 · 2 revision(s)
 - Legacy id `S-073`, recorded as the reference `legacy:S-073`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+- **Primary surface:** `crates/integration-catalog/src/hosted.rs:54` — cited; `HostedCatalogBackend` owns hosted acquisition, subject isolation, setup profiles and prepared publication/recovery.
+- **Composition:** `crates/connectors-runtime/src/composition.rs:971` — cited; HostedRuntime registers the generic adapter; lines 689–705 supply Vault/prepared custody and line 1269 selects PostgreSQL.
+- **Policy:** `crates/connectors-config/src/hosted.rs:78` — cited; `HostedCatalogConfig` controls enablement, admitted providers and session lifetime.
+- **Addressing:** `crates/integration-catalog/src/lib.rs:1020` — cited; shared `credential_address` constructs instance-qualified references.
+- **Custody dependency:** `crates/hosted-vault/src/prepared.rs:254` — cited; existing prepared-store implementation, with shared-journal restart coverage at line 765.
+- **Already implemented:** core behavior exists at released base `4d0cd308` — cited; acquisition uses fresh instances and shared addressing (hosted.rs:435–455), prepared publication/recovery (471–562), SelfService/profile discovery (695–712), and a two-person isolation/address/sentinel test (1259–1324). The story’s “personal only” context is stale.
+- **Confidence:** high for ownership and shipped core behavior — cited; production composition and concrete test assertions are present.
+- **Would collide with:** hosted catalog acquisition/recovery, runtime composition, hosted policy, shared credential addressing and prepared custody changes — inferred from these owners.
+- **Small-wave suitability:** suitable for acceptance/evidence reconciliation first; no missing implementation slice established by this inspection — inferred.

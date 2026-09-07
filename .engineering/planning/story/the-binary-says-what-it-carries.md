@@ -2,81 +2,161 @@
 format: aep.planning-md/1
 id: story:the-binary-says-what-it-carries
 kind: story
-status: draft
+status: implemented
 title: The binary says what it carries
 relations:
 - derived_from: epic:cli-surface
 - depends_on: story:cli-first-level-groups
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connector-secrets/src/file.rs
+- confidence: cited
+  path: crates/connector-secrets/src/file/format.rs
+- confidence: cited
+  path: crates/connector-secrets/src/file/prepared.rs
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+- confidence: cited
+  path: crates/connectors-cli/src/main.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/adversary_fence_probe.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/cli_surface_drift.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/upgrade.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/upgrade_adversary.rs
+- confidence: cited
+  path: crates/connectors-client/src/identity.rs
+- confidence: cited
+  path: crates/connectors-client/src/lib.rs
+- confidence: cited
+  path: crates/connectors-console/src/lib.rs
+- confidence: cited
+  path: crates/connectors-console/src/upgrade.rs
+- confidence: cited
+  path: crates/connectors-console/tests/upgrade_adversary.rs
+- confidence: cited
+  path: docs/design/19-the-cli-surface.md
+- confidence: cited
+  path: ess/system/components.yaml
+revision: 29
 ---
 # Story: the binary says what it carries
 
 ## Defect
 
-A `connectors` binary carries four independently versioned things and reports one of them. `--version`
-prints the workspace version (`crates/connectors-cli/src/lib.rs:36`). The other three are readable
-only by failing:
+The installed CLI reports its package version, but has no single command for the embedded catalog and the supported credential/session formats. `InspectCommand` in `crates/connectors-cli/src/lib.rs:235` has no upgrade leaf. Source review at `4d0cd30872533da40f209274f936eaeae9bf01d7` established these owning facts:
 
-| what | where the version lives | how a person finds out today |
-|---|---|---|
-| the embedded catalog pack | `crates/catalog-reader/catalog.pack`, embedded at `crates/catalog-reader/src/lib.rs:73`; schema version recorded at `connectors.lock:6-9` | not at all |
-| the credential file-store format | `crates/connector-secrets/src/file.rs:88-92` (`VERSION = "1"`, v2 at `:44-47`) | a refusal at `file.rs:822-829` after a write is attempted |
-| hosted session metadata | `crates/connectors-client/src/identity.rs:36` (`METADATA_VERSION: u32 = 1`), checked at `:884` | `IdentityError::State`, which names no version |
+- Embedded catalog schema and digest: `crates/catalog-reader/src/lib.rs:316,321`, available through `crates/catalog/src/lib.rs:49`.
+- Credential v1 grammar: `crates/connector-secrets/src/file.rs:95`; v2 grammar: `crates/connector-secrets/src/file/prepared.rs:19,83,133`.
+- Credential write selection: `crates/connector-secrets/src/file.rs:387`; prepared transactions switch to v2 at `file/prepared.rs:414`.
+- Hosted session metadata: `crates/connectors-client/src/identity.rs:36`.
 
-The credential store migrates v1 to v2 on the first prepared-transaction write, and a 0.19.1 reader
-then refuses v2 (`crates/connector-secrets/src/file.rs:30-35`). That makes downgrade-after-upgrade a
-data hazard a person cannot see coming, because nothing prints which format is on disk.
+The original draft conflated supported formats with the format of an existing local file. This revision chooses compiled capabilities: inspecting an installed binary must work without opening state. It also replaces the stale release-history claims in the original draft with the current source references above.
 
 ## Shape
 
-One leaf: `connectors inspect upgrade`. It reads constants already compiled into the binary and
-prints them beside the install command the repository already has (`Taskfile.yaml:5,54-69`).
+Add `connectors inspect upgrade`, with the existing output conventions. Report the CLI version, embedded catalog schema/digest, supported credential read/write formats (v1 and v2, including the prepared-write transition), session metadata version, and the existing source installation instruction from `Taskfile.yaml:5`.
 
-`inspect` is the group whose declared summary is reading what is configured, what is connected and
-what cannot work (`ess/system/components.yaml:201-202`). The command writes nothing, opens no
-socket, and downloads nothing.
+Values come from the owning implementation rather than a second table of version literals. Preserve the existing credential bytes and session grammar when exposing these facts. This reaches four existing crates through current dependencies: CLI, console, secrets and client. It is a bounded diagnostic feature, not merely one parser arm.
 
-**It is an enumerated exception, not a declared command.** `connectors-cli` owns
-`connectors.target` alone, which declares no command, and `ESS-COMPONENT-004` refuses placing
-another domain's command there (`ess/system/components.yaml:101-106,120-127`). So the path arrives
-as one `unspecified-path: inspect upgrade — read` line in `ess/system/components.yaml` and one
-matching `UNSPECIFIED_PATHS` entry, which `crates/connectors-cli/tests/cli_surface.rs:98,429,459`
-holds equal in both directions, kind included.
-
-No new dependency. Nothing in `CLI_DEPENDENCIES`
-(`crates/catalog-build/tests/main/architecture_fence.rs:304-330`) changes, which is what keeps this
-story one parser arm and one console function rather than a crate.
-
-## Not in this story
-
-**No download and no version comparison.** Resolving the newest published release and replacing this
-binary is `connectors setup upgrade`, and it is blocked rather than deferred: `SHA256SUMS` is
-produced by the same job that uploads the archive (`.github/workflows/release.yml:276-282,300-313`),
-so it establishes integrity and not authenticity, and `crates/catalog-reader/README.md:41-49` — a
-public file of this repository — states that b10x has no supported distribution channel and that the
-first must follow ADR 0019 with a signed bundle manifest. A `--check-remote` flag would also be
-reach into the outside world with no catalogued operation, no bound credential and no grant, which
-is what O1 forbids (`AGENTS.md:15`).
-
-**No configured catalog pack.** `[catalog] pack` and its digest are `epic:deployment-packs`.
-
-**No correction to design 02.** `docs/design/02-architecture.md:390` states "Pre-v1 there are no
-release artifacts; the repo is the product". Sixteen releases are published, the latest `v0.5.11`.
-The sentence is false and amending it is a separate change, named here so it is not lost.
+The command is a read exception in `ess/system/components.yaml:162`, with matching `UNSPECIFIED_PATHS` in all three CLI contract tests and updated totals in `docs/design/19-the-cli-surface.md:83,111,121`. No new domain entity or ESS command owner is introduced. Generated clap output must remain byte-identical.
 
 ## Acceptance
 
-- `connectors inspect upgrade` exits 0 and prints four version facts: the CLI version, the embedded
-  pack's schema version and digest, the credential-store format version, and the session-metadata
-  version.
-- Each printed value is read from the constant that governs it, not restated — a test changing
-  `connector-secrets`' `VERSION` changes the output.
-- The command opens no socket and writes no file. It runs with the state root absent.
-- `ess/system/components.yaml` and `UNSPECIFIED_PATHS` agree, and `ess/generated/clap` regenerates
-  byte-identically.
-- `connectors --help` still lists 8 commands.
-- `bash scripts/gate.sh` exits 0.
+`connectors inspect upgrade` exits successfully with the compiled CLI/catalog/credential/session facts and existing installation guidance in the supported output modes, runs without opening configuration, state, files, sockets or network connections, and passes the command-contract checks and complete repository gate with existing top-level groups and serialized formats preserved.
 
-## Depends on
+## Verification
 
-`story:cli-first-level-groups`, which is what makes `inspect` a group.
+- Exercise the real CLI with an absent state root and assert the report against exported owning facts, including both supported credential versions and the prepared-write behavior.
+- Test supported output formats and meaningful failures through existing output conventions.
+- Check the exact CLI exception enumeration, its mirrored test declarations and design totals; regenerate with ESS and compare the generated bytes.
+- Run affected locked tests, strict Clippy and formatting, then every repository gate lane with its own observed exit status.
+
+## Not in this story
+
+No self-update, release lookup, downloads, remote version comparison, state-format diagnosis, configuration migration, new dependency, release/version bump, or deployment-pack support. Public release notes are updated when a separately authorized release is prepared. The design document's current publication allowlist is `b10x.docs.yaml:78–84`.
+
+## Objectives and readiness
+
+Serves O1 (governed reach) and O5 (generic platform), as declared in `AGENTS.md:10–16` and the current Atlas ROADMAP: consumers can identify their installed catalog and compatibility capabilities without an external call. This objective mapping is the coordinator's proposal. Existing prerequisite `story:cli-first-level-groups` is implemented; no declared blocker targets this story.
+
+## Scope correction, 2026-09-07
+
+The scoper's original section below is retained. Coordinator source review adds `crates/connector-secrets/src/file/prepared.rs` as cited scope: reporting only the v1 `VERSION` would omit the shipped v2 parser and writer. Acceptance now resolves the scoper's ambiguity; overall implementation confidence remains medium until the public reporting exports are verified by the implementor. Catalog access and installation text reuse existing owners without changes to those owners.
+## Scope
+
+## Scope
+
+Confirmed by the implementor against unit commit `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. This replaces the original mixed cited/inferred scope: all four inferred locations were confirmed, credential ambiguity was resolved in the approved brief, and main.rs was added after a measured startup socketpair. These corrections supersede the earlier medium-confidence scoping language.
+
+| Scope hypothesis | Source confirmation |
+| --- | --- |
+| Inferred console registration | Confirmed existing registry; new registration `crates/connectors-console/src/lib.rs:47`. |
+| Inferred console report owner | Confirmed reporting pattern in `crates/connectors-console/src/providers.rs`; new report `crates/connectors-console/src/upgrade.rs:11`. |
+| Inferred session export | Existing identity exports `crates/connectors-client/src/lib.rs:28`; alias at line 31 uses owning constant `identity.rs:37`. |
+| Inferred real CLI test location | Confirmed existing integration suite; new tests `crates/connectors-cli/tests/upgrade.rs:67,106,122,142,159,179`. |
+| Cited parser and output owner | `crates/connectors-cli/src/lib.rs:235,769,817,853,962`; shared output handling preserves closed-pipe success and other write failures. |
+| Cited credential owners | `crates/connector-secrets/src/file.rs:102` exports both formats; `file/prepared.rs:19,21` derives v2 from the unchanged parser/writer header. |
+| Cited catalog owner, unchanged | `crates/catalog-reader/src/lib.rs:316,321,561`; metadata comes from embedded bytes. |
+| Cited contract/accounting | Three assigned exception copies updated; `ess/system/components.yaml:172` and `docs/design/19-the-cli-surface.md:83,111,121,273` account for 28 exceptions. |
+| Measured scope correction | Unconditional Tokio in `crates/connectors-cli/src/main.rs` created a socketpair. Coordinator applied the exact `main-runtime.patch`; main now uses the same clap tree before constructing Tokio. |
+
+Every inferred location was confirmed; none was wrong. The approved brief had already resolved credential-format ambiguity. Public async `run_from`, moved-path notices, help/errors and the normal fallback remain; no broad startup refactoring was made.
+
+The independent adversary added `crates/connectors-cli/tests/upgrade_adversary.rs` (embedding, parser ownership, output-option placement) and `crates/connectors-console/tests/upgrade_adversary.rs` (actual credential transition and reopening), committed at `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`. These two cited verification paths bring the final typed scope to 16 paths. The native syscall probe remains a recorded external verifier rather than adding an undeclared strace prerequisite to Cargo tests.
+
+Full-gate correction at `0f2f5c64a63bd05ec016207288e694e8dd2c21d8` adds the confirmed owner `crates/connector-secrets/src/file/format.rs:4,12,13,20`. The earlier file.rs:102 helper location is superseded by `file.rs:74,83,84`: module registration, public reexport and imports. Existing v1 constants and helper move into the new 22-line module; v2 remains in the unchanged prepared.rs. The parent is 2617 lines against its unchanged 2625 ceiling. Final typed scope is 17 paths; no test or waiver changed in this correction.
+
+## Scope
+
+Confirmed by the implementor against unit commit `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. This replaces the original mixed cited/inferred scope: all four inferred locations were confirmed, credential ambiguity was resolved in the approved brief, and main.rs was added after a measured startup socketpair. These corrections supersede the earlier medium-confidence scoping language.
+
+| Scope hypothesis | Source confirmation |
+| --- | --- |
+| Inferred console registration | Confirmed existing registry; new registration `crates/connectors-console/src/lib.rs:47`. |
+| Inferred console report owner | Confirmed reporting pattern in `crates/connectors-console/src/providers.rs`; new report `crates/connectors-console/src/upgrade.rs:11`. |
+| Inferred session export | Existing identity exports `crates/connectors-client/src/lib.rs:28`; alias at line 31 uses owning constant `identity.rs:37`. |
+| Inferred real CLI test location | Confirmed existing integration suite; new tests `crates/connectors-cli/tests/upgrade.rs:67,106,122,142,159,179`. |
+| Cited parser and output owner | `crates/connectors-cli/src/lib.rs:235,769,817,853,962`; shared output handling preserves closed-pipe success and other write failures. |
+| Cited credential owners | `crates/connector-secrets/src/file.rs:102` exports both formats; `file/prepared.rs:19,21` derives v2 from the unchanged parser/writer header. |
+| Cited catalog owner, unchanged | `crates/catalog-reader/src/lib.rs:316,321,561`; metadata comes from embedded bytes. |
+| Cited contract/accounting | Three assigned exception copies updated; `ess/system/components.yaml:172` and `docs/design/19-the-cli-surface.md:83,111,121,273` account for 28 exceptions. |
+| Measured scope correction | Unconditional Tokio in `crates/connectors-cli/src/main.rs` created a socketpair. Coordinator applied the exact `main-runtime.patch`; main now uses the same clap tree before constructing Tokio. |
+
+Every inferred location was confirmed; none was wrong. The approved brief had already resolved credential-format ambiguity. Public async `run_from`, moved-path notices, help/errors and the normal fallback remain; no broad startup refactoring was made.
+
+The independent adversary added `crates/connectors-cli/tests/upgrade_adversary.rs` (embedding, parser ownership, output-option placement) and `crates/connectors-console/tests/upgrade_adversary.rs` (actual credential transition and reopening), committed at `157ef0cc3ad8102b4c20d13c24dfb52d996e3aa8`. These two cited verification paths bring the final typed scope to 16 paths. The native syscall probe remains a recorded external verifier rather than adding an undeclared strace prerequisite to Cargo tests.
+
+## Scope
+
+Confirmed by the implementor against unit commit `1b1cf58c27d34f5cda4a376f8815ebcb6db3e0e8`. This replaces the original mixed cited/inferred scope: all four inferred locations were confirmed, credential ambiguity was resolved in the approved brief, and main.rs was added after a measured startup socketpair. These corrections supersede the earlier medium-confidence scoping language.
+
+| Scope hypothesis | Source confirmation |
+| --- | --- |
+| Inferred console registration | Confirmed existing registry; new registration `crates/connectors-console/src/lib.rs:47`. |
+| Inferred console report owner | Confirmed reporting pattern in `crates/connectors-console/src/providers.rs`; new report `crates/connectors-console/src/upgrade.rs:11`. |
+| Inferred session export | Existing identity exports `crates/connectors-client/src/lib.rs:28`; alias at line 31 uses owning constant `identity.rs:37`. |
+| Inferred real CLI test location | Confirmed existing integration suite; new tests `crates/connectors-cli/tests/upgrade.rs:67,106,122,142,159,179`. |
+| Cited parser and output owner | `crates/connectors-cli/src/lib.rs:235,769,817,853,962`; shared output handling preserves closed-pipe success and other write failures. |
+| Cited credential owners | `crates/connector-secrets/src/file.rs:102` exports both formats; `file/prepared.rs:19,21` derives v2 from the unchanged parser/writer header. |
+| Cited catalog owner, unchanged | `crates/catalog-reader/src/lib.rs:316,321,561`; metadata comes from embedded bytes. |
+| Cited contract/accounting | Three assigned exception copies updated; `ess/system/components.yaml:172` and `docs/design/19-the-cli-surface.md:83,111,121,273` account for 28 exceptions. |
+| Measured scope correction | Unconditional Tokio in `crates/connectors-cli/src/main.rs` created a socketpair. Coordinator applied the exact `main-runtime.patch`; main now uses the same clap tree before constructing Tokio. |
+
+Every inferred location was confirmed; none was wrong. The approved brief had already resolved credential-format ambiguity. Public async `run_from`, moved-path notices, help/errors and the normal fallback remain; no broad startup refactoring was made.
+
+## Runtime-startup scope correction, 2026-09-07
+
+The implementor measured an AF_UNIX socket pair created by unconditional Tokio startup in `crates/connectors-cli/src/main.rs:5`, before command dispatch. Its pre-change executable also fails with exit 101 when `TOKIO_WORKER_THREADS=0`; the raw evidence is retained in the unit scratch `red-runtime-startup.log`. This violates the accepted socket-free diagnostic behavior even though the report itself is pure. Add `crates/connectors-cli/src/main.rs` as cited scope: use the same clap tree to dispatch this synchronous report before starting Tokio, while preserving the public async embedding entry point and normal fallback behavior. The coordinator applies the implementor's reviewed main-entry patch; this is a bounded implementation correction within the approved story.
+
+## Full-gate correction: credential format ownership
+
+Rehearsal 34118426365 tested integration `49ec5f3b56a3a0a78de71b14a9aac88d41448d98`. Eleven workspace jobs and shared checks succeeded; root job 101730626671 failed `architecture_fence::production_modules_obey_the_named_size_fence` at `crates/catalog-build/tests/main/architecture_fence.rs:427`. Its exact diagnostic reports `crates/connector-secrets/src/file.rs` at 2634 lines against the existing 2625-line ceiling. The unit added nine lines there. Root test-main ran 85 passing cases and one failure, then Cargo exited 101; subsequent root test targets were not proved by this failed run. Raw native job log is retained as `rehearsal-root.log` in coordinator scratch.
+
+This is an introduced structural regression found by the whole gate after the first adversary pass. The existing size waiver explicitly admits no growth. The correction extracts the v1 format constants and compiled-format helper into a focused `crates/connector-secrets/src/file/format.rs`, retaining the existing public `file::supported_format_versions` entry point and exact parser/writer bytes. The original module imports/reexports that owner. No size threshold or assertion is raised or removed. The new module path is inferred until implementation confirmation.
+
+The same implementor receives this correction; focused architecture-fence and affected regression/lint checks must pass. A second adversary pass reviews the corrected unit, within the two-attack budget. The failed rehearsal is superseded and cancelled; no base merge, version bump or release cut has occurred.

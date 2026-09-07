@@ -9,7 +9,18 @@ refs:
   reference: S-030
 relations:
 - derived_from: epic:carried-constraints
-revision: 1
+scope:
+- confidence: inferred
+  path: crates/domain
+- confidence: inferred
+  path: crates/protocol
+- confidence: cited
+  path: crates/server
+- confidence: cited
+  path: crates/service/src/dispatch.rs
+- confidence: inferred
+  path: ess/system/domains/runtime.yaml
+revision: 4
 ---
 ## Acceptance
 
@@ -47,3 +58,17 @@ Migrated from `docs/stories/S-030-raw-proxy-is-break-glass-not-a-model-capabilit
 - First written 2026-08-13 · last touched 2026-08-14 · 3 revision(s)
 - Legacy id `S-030`, recorded as the reference `legacy:S-030`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` through read-only inspection — cited.
+
+- **Primary surface:** `crates/server` — cited; hosted admission/MCP refusal boundaries and connection-bound destination enforcement already live here.
+- **Dispatch and audit:** `crates/service/src/dispatch.rs:47` — cited; `DispatchPolicy` and `AuditSink` own pre-dispatch enforcement and audit.
+- **Authority facts:** `crates/domain` — inferred; any implemented break-glass aperture requires authority distinct from ordinary grants and destructive/max-effect classification.
+- **Protocol fences:** `crates/protocol` — inferred; negative fixtures should prove arbitrary credential-bearing requests cannot enter the ordinary operation protocol.
+- **Specification:** `ess/system/domains/runtime.yaml:191` — inferred; an operational break-glass feature would need to resolve the existing deferred Proxy model.
+- **Documents:** none required for omission-only regression fences — inferred.
+- **Symbols:** `OperationRequest`, `DispatchPolicy`, `AuditSink`, `DestinationRule` — cited.
+- **Confidence:** low — inferred; the draft mixes protecting an omitted capability with acceptance requiring that capability to execute.
+- **Would collide with:** hosted admission/MCP boundaries, destination policy, dispatch audit, grant evaluation, operation protocol fences and runtime-domain specification — inferred.
