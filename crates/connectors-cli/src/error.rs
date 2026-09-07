@@ -45,6 +45,8 @@ pub(super) enum MainError {
     McpOutput,
     #[error("--target hosted cannot be combined with local-only --config or --state-root")]
     TargetConflict,
+    #[error("hosted token setup requires --auth-profile and --credential-file, and accepts only provider, --label and --target hosted; provider settings and OAuth instructions belong to their existing flows")]
+    HostedSetupOptions,
     #[error("events require a persistent daemon; run `connectors serve local` with the same --config and --state-root")]
     DaemonRequired,
 }
@@ -63,6 +65,9 @@ impl MainError {
             Self::Client(_) => "connector-unreachable",
             Self::Identity(IdentityError::NoActiveLogin) => "hosted-login-required",
             Self::Identity(_) => "identity",
+            Self::Hosted(connectors_client::AuthenticatedHostedError::Client(
+                connectors_client::ClientError::CompletionUnconfirmed,
+            )) => "completion-unconfirmed",
             Self::Hosted(_) => "hosted-connector",
             Self::Io(_) => "io",
             Self::Json(_) => "malformed-response",
@@ -75,6 +80,7 @@ impl MainError {
             Self::Unhealthy => "unhealthy",
             Self::McpOutput => "invalid-argument",
             Self::TargetConflict => "target-conflict",
+            Self::HostedSetupOptions => "invalid-argument",
             Self::DaemonRequired => "daemon-required",
             Self::Input(_) => "invalid-argument",
             Self::Auth(_) => "credential-store",

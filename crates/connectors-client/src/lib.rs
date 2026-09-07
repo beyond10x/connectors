@@ -18,6 +18,7 @@ use zeroize::Zeroizing;
 mod admin;
 mod git_fetch_client;
 mod hosted_catalog;
+mod hosted_connect;
 mod identity;
 mod model;
 mod personal_oauth;
@@ -458,6 +459,8 @@ impl HostedClient {
         let builder = reqwest::Client::builder()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
+            // Connection acquisition and other state changes must never be silently replayed.
+            .retry(reqwest::retry::never())
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(35));
         let builder = if base.scheme() == "https" {

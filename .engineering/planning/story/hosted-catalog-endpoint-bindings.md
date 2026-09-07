@@ -9,17 +9,43 @@ relations:
 - informed_by: story:deployment-declared-destination-aperture
 scope:
 - confidence: cited
+  path: Cargo.lock
+- confidence: cited
   path: catalog/grafana.catalog.json
 - confidence: cited
   path: connectors.lock
 - confidence: cited
   path: crates/catalog-reader/catalog.pack
 - confidence: cited
+  path: crates/connectors-cli/Cargo.lock
+- confidence: cited
+  path: crates/connectors-cli/src/error.rs
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+- confidence: cited
+  path: crates/connectors-cli/tests/hosted_connect.rs
+- confidence: cited
+  path: crates/connectors-client/Cargo.toml
+- confidence: cited
+  path: crates/connectors-client/src/hosted_connect.rs
+- confidence: cited
+  path: crates/connectors-client/src/hosted_connect_tests.rs
+- confidence: cited
+  path: crates/connectors-client/src/identity.rs
+- confidence: cited
+  path: crates/connectors-client/src/lib.rs
+- confidence: cited
+  path: crates/connectors-client/src/model.rs
+- confidence: cited
   path: crates/connectors-config/src/hosted.rs
 - confidence: cited
   path: crates/connectors-config/src/hosted_catalog.rs
 - confidence: cited
   path: crates/connectors-config/src/lib.rs
+- confidence: cited
+  path: crates/connectors-console/Cargo.lock
+- confidence: cited
+  path: crates/connectors-console/src/connect.rs
 - confidence: cited
   path: crates/connectors-runtime/src/composition.rs
 - confidence: cited
@@ -34,7 +60,7 @@ scope:
   path: docs/guides/administer-hosted-integrations.md
 - confidence: cited
   path: providers/grafana.toml
-revision: 15
+revision: 25
 ---
 ## Outcome
 
@@ -86,3 +112,31 @@ The form now renders the exact selected credential's catalog label, help, canoni
 Validation passed on 2026-09-07: 110 integration-catalog tests, all-target clippy for integration-catalog and connectors-runtime, formatting, the complete scripts/gate.sh run across all twelve workspaces and both runtime configurations, and its final catalog/docs/ESS lane. Both catalog build/diff rounds reached the same fixed point; catalog check verified 65 providers and 70 artifacts. Comparing the Grafana canonical document with config removed proves all operations, auth, services and schemas unchanged. Only declared credential help/docs and the resulting pack/lock hashes changed.
 
 The consuming deployment must still render the published form and complete its own real credential/read proof. This source change adds no admin credential requirement or programmatic provisioning endpoint to the generic catalog adapter.
+
+## Owner-scoped programmatic acquisition
+
+The owner-authorized hosted token flow can reuse Connection v1 CreateConnectSession and Status plus the existing one-use HTTP completion route. The CLI adds `connectors setup connect <provider> --target hosted --auth-profile <declared-profile> --credential-file <owner-only-file> --label <label>`, retaining local as the default. It uses the existing saved Identity session, requests only the ordinary self-connection and catalog scopes, and never requests administrative or cross-owner authority. Deployment automation with its own existing principal can use the reusable HostedClient completion method and unchanged APIs; this work does not invent workload login, create provider service accounts, or register shared administrative credentials.
+
+Acceptance: owner-only regular non-symlink bounded credential input is read without output; returned session capabilities remain private and can be submitted only once to the selected Connector origin and exact session route with redirects refused; completion is reported only after owner-scoped Status and Describe agree on provider, profile and callable Connection. Refused/expired sessions, hostile destinations, redirects, provider verification failure, foreign Connection or profile, and unsafe files fail without secret/capability diagnostics. Multiple token providers exercise the same path. Existing personal setup, OAuth and operation routing retain their behavior. The selected provider's runtime Connect Session contract remains the authority for profile admission and custody.
+
+Cited existing typed authority: ess/system/domains/connection.yaml ConnectSession and CreateConnectSession/FinishConnectSession; crates/protocol/src/connection.rs ConnectSessionStatus/Create request; crates/server/src/hosted/connect.rs one-use POST; crates/connectors-client/src/identity.rs scope selection; crates/connectors-cli/tests/cli_surface.rs treats setup connect as an existing multi-step Flow. No new wire entity, API schema or generated command path is introduced.
+
+Scope adds the reusable client completion/workflow and tests, a thin CLI target branch and parsing tests, and generic setup documentation. This is one bounded story, so no parallel decomposition/critic panel is needed. The sub-agent run is non-interactive; no missing authority is treated as approval.
+
+## Local TLS prerequisite
+
+The consuming local deployment's public discovery route returns the valid contract with its retained CA, but the installed CLI fails Discovery because its reqwest build contains only bundled WebPKI roots. Enable native certificate roots on the client-owned reqwest dependency so the normal platform trust store and SSL_CERT_FILE can admit a private development CA while retaining full certificate and hostname verification. This is required to exercise the same hosted Identity/Connect Session path against the local TLS deployment. Preserve the user's saved login and use isolated state for verification; never add an insecure TLS flag.
+
+## Programmatic acquisition boundary
+
+The reusable protocol client remains independent of embedded provider declarations and accepts an already-authorized Identity bearer plus the ordinary OwnerContext. Its caller selects a declared single-secret token profile. Incompatible native flows retain their server refusal: Jira raw completion is Invalid; Slack OAuth raw completion is Refused; Slack companion input must parse exactly two tokens before any verification or custody commit. The CLI performs a conservative preflight in connectors-console, which already links the pinned catalogue: exact credential, ConnectSession acquisition, stated subject and exactly one matching secret config field. It refuses unknown, OAuth, Basic and native-only profiles before reading the credential file or acquiring Identity authority. Runtime deployment admission remains authoritative, and newer profiles require matching CLI declarations while protocol clients remain catalogue-version-independent.
+
+## Programmatic acquisition verification
+
+The complete scripts/gate.sh run passed on 2026-09-07: all twelve Cargo workspaces, both hosted runtime feature configurations, catalog verification (65 providers, 70 artifacts), documentation/story checks, ESS 0.18.0 validation and exact committed clap projection. The client boundary suite uses real TLS with a temporary CA and verifies native SSL_CERT_FILE trust in isolated child processes, rejection without that CA, exact origin/API-prefix/session route, ownership/permissions/type/size file refusal, redirect refusal, dropped-response no replay, malformed acknowledgement refusal and matching completed principal Connection status. Three CLI process tests pass, including unknown/OAuth/native-multifield profile refusal before Identity and file access. Formatting, whitespace checks and client/CLI all-target clippy pass.
+
+The consuming deployment independently reports a successful fresh normal Identity CLI login through a headless browser, upstream fixture, Identity callback and CLI loopback, followed by normal scope renewal and a hosted Connection list. It used task-isolated local selection and normal keyring custody without changing the operator's existing hosted session. Private evidence is retained as hosted-cli-login-672379418819327/result.json and hosted-cli-read-1788792695405657932/connections.json. The first browser helper attempt failed for missing TMPDIR and the corrected environment passed; failed evidence remains available.
+
+The first focused source fixture used an HTTP hosted completion URL, which the unchanged Connection protocol correctly refused. Fixtures were corrected to use TLS and required Connection initiation/actor fields rather than weakening validation. Real provider token acquisition and an actual Grafana read remain pending owner setup; no service-account token was accessed or minted, and source/boundary tests are not claimed as real-provider success. This artifact remains active for that consuming-deployment evidence.
+
+The final all-target clippy run for connectors-console also passes with warnings denied. Its existing catalogue dependency owns CLI preflight; connectors-client gains only native-root TLS support plus test-only TLS fixture dependencies and retains no catalogue/runtime dependency.
