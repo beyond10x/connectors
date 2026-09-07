@@ -50,6 +50,7 @@ axum = { version = "0.8", features = ["json", "tokio"] }
 connector-secrets = { version = "0.7.2", path = "../connector-secrets" }
 connector-state = { version = "0.7.2", path = "../connector-state" }
 connectors-config = { version = "0.7.2", path = "../connectors-config" }
+driver-sql = { version = "0.7.2", path = "../driver-sql" }
 domain = { version = "0.7.2", path = "../domain" }
 futures-util = "0.3"
 hosted-vault = { version = "0.7.2", path = "../hosted-vault" }
@@ -83,6 +84,10 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc
 url = "2"
 
 [dev-dependencies]
+http = "1"
+k8s-openapi = { version = "0.28", features = ["v1_32"] }
+kube = { version = "4.0", default-features = false, features = ["client", "rustls-tls", "ring", "ws"] }
+tower = { version = "0.5", features = ["util"] }
 rcgen = "0.13"
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["io-util", "macros", "rt"] }
