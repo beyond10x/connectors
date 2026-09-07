@@ -9,7 +9,22 @@ refs:
   reference: S-074
 relations:
 - derived_from: epic:subscription-custody
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connectors-cli/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-cli/tests/hosted_connect.rs
+- confidence: inferred
+  path: crates/connectors-client/src/identity.rs
+- confidence: cited
+  path: crates/connectors-client/src/lib.rs
+- confidence: cited
+  path: crates/connectors-console/src/auth.rs
+- confidence: cited
+  path: crates/connectors-console/src/connect.rs
+- confidence: cited
+  path: crates/connectors-console/src/enrol.rs
+revision: 4
 ---
 ## Acceptance
 
@@ -52,3 +67,19 @@ Migrated from `docs/stories/S-074-the-cli-drives-a-hosted-connection.md`, which 
 - First written 2026-08-25 · last touched 2026-08-25 · 1 revision(s)
 - Legacy id `S-074`, recorded as the reference `legacy:S-074`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` through read-only inspection — cited.
+
+- **Primary surface:** `crates/connectors-console/src/connect.rs:63` — cited; shared provider-flow dispatch currently requires personal configuration and local state.
+- **Credential input:** `crates/connectors-console/src/enrol.rs:125` — cited; reuse declared credential selection and hidden-prompt/file handling while separating local storage from hosted submission.
+- **Presence reporting:** `crates/connectors-console/src/auth.rs:42` — cited; current status reads local declared credentials through `SecretStore::exists`.
+- **CLI:** `crates/connectors-cli/src/lib.rs:854` — cited; `setup connect` unconditionally opens personal configuration/state; `inspect auth` likewise needs hosted-target wiring.
+- **Hosted client:** `crates/connectors-client/src/lib.rs:640` — cited; existing hosted subscription status/submission methods are reusable building blocks.
+- **Authenticated client:** `crates/connectors-client/src/identity.rs:420` — inferred; extend authenticated hosted helpers for connection acquisition and value-free credential presence.
+- **Behavior verification:** `crates/connectors-cli/tests/hosted_connect.rs` — inferred; proposed end-to-end CLI coverage using local hosted fixtures.
+- **Documents:** none established as required — inferred.
+- **Symbols:** `dispatch`, `enrol::run`, `auth::status`, `HostedClient`, `AuthenticatedHostedClient` — cited.
+- **Confidence:** medium — inferred; frontend owners are clear, but generic hosted acquisition and presence prerequisites remain unverified.
+- **Would collide with:** CLI setup/inspect dispatch, console enrollment/auth flows, hosted client methods and authenticated-session wrappers — inferred.

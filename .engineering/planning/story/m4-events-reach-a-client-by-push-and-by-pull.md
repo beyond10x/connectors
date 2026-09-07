@@ -9,7 +9,22 @@ refs:
   reference: S-009
 relations:
 - derived_from: epic:build-order
-revision: 1
+scope:
+- confidence: inferred
+  path: contracts/connector-event
+- confidence: inferred
+  path: crates/connectors-client
+- confidence: inferred
+  path: crates/connectors-runtime
+- confidence: cited
+  path: crates/protocol/src/event.rs
+- confidence: cited
+  path: crates/server
+- confidence: cited
+  path: crates/service
+- confidence: cited
+  path: ess/system/domains/event.yaml
+revision: 9
 ---
 ## Acceptance
 
@@ -62,3 +77,19 @@ Migrated from `docs/stories/S-009-m4-events-reach-a-client-by-push-and-by-pull.m
 - First written 2026-08-13 · last touched 2026-08-16 · 4 revision(s)
 - Legacy id `S-009`, recorded as the reference `legacy:S-009`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper` through read-only inspection — cited.
+
+- **Primary surface:** `crates/server` — cited; architecture assigns channel supervision and inbound transport here; existing hosted event routing is at `src/hosted/routing.rs:175`.
+- **Service owner:** `crates/service` — cited; owns the event domain and backend event dispatch at `src/runtime.rs:688`.
+- **Protocol:** `crates/protocol/src/event.rs:36` — cited; existing search/receive/replay requests, event identity and native/polled provenance.
+- **Client:** `crates/connectors-client` — inferred; extend existing event clients for subscription and delivery-replay behavior.
+- **Runtime composition:** `crates/connectors-runtime` — inferred; wire supervision, delivery workers and event dispatch into both placements.
+- **Specification:** `ess/system/domains/event.yaml:54` — cited; existing Event, Webhook, Delivery and Subscription entities contain unresolved lifecycle and relation semantics.
+- **Published contract:** `contracts/connector-event` — inferred; new wire behavior needs compatible schemas, vectors and versioned bundle treatment.
+- **Documents:** eventing design amendments may follow resolved lifecycle/transport decisions — inferred.
+- **Symbols:** `EventRequest`, `ReplayRequest`, `DataEvent`, `EventProvenance`, `ConnectorBackend::handle_event` — cited.
+- **Confidence:** medium — inferred; ownership is established, but remaining work depends on reconciling broad historical acceptance with existing provider-specific implementations.
+- **Would collide with:** server event routing/supervision, service event dispatch, event protocol/contracts, client event APIs, runtime composition and event-domain specification — inferred.

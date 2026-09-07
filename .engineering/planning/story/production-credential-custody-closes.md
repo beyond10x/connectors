@@ -9,7 +9,18 @@ refs:
   reference: S-034
 relations:
 - derived_from: epic:credential-production
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connector-secrets
+- confidence: cited
+  path: crates/connectors-runtime
+- confidence: cited
+  path: crates/hosted-secrets
+- confidence: cited
+  path: crates/service
+- confidence: cited
+  path: ess/system/domains/deployment.yaml
+revision: 3
 ---
 ## Acceptance
 
@@ -54,3 +65,16 @@ Migrated from `docs/stories/S-034-production-credential-custody-closes.md`, whic
 - First written 2026-08-15 · last touched 2026-08-15 · 1 revision(s)
 - Legacy id `S-034`, recorded as the reference `legacy:S-034`
 - Migrated 2026-09-04 by the `aep-planning:story-migration` skill
+
+## Scope
+
+Derived 2026-09-07 by `story-scoper`, read-only against `4d0cd30872533da40f209274f936eaeae9bf01d7` — cited.
+
+- **Primary surface:** `crates/connector-secrets` — cited; `src/keyring.rs:1` implements Linux keyring custody, `src/transaction.rs:170` owns prepared transactions, and `src/vault.rs:31` explicitly excludes session renewal. Production custody extends these existing owners.
+- **Release composition:** `crates/connectors-runtime` — cited; `src/composition.rs:316` attempts the keyring, `:326` opens a file fallback, and `:336` records that Slack’s prepared store still requires files. The story’s no-fallback release requirement is not satisfied.
+- **Managed-store adapter:** `crates/hosted-secrets` — cited; `src/lib.rs:21` owns the shared Secrets HTTP adapter and projected-token binding.
+- **Management:** `crates/service` — cited; `src/admin.rs:119` provides value-free credential status and `:156` owns the administrative registry. Full lifecycle and atomic Connection-metadata changes need assessment here.
+- **Domain modeling:** `ess/system/domains/deployment.yaml:187` — cited; Credential exists, but its lifecycle currently contains only Acquired. New management transitions, external bindings and sealed-envelope types require owner-grounded modeling.
+- **Documents and external owners:** production acceptance, signed bundles, clean-room conformance and operational evidence extend beyond this checkout — cited.
+- **Confidence:** medium — inferred; concrete local gaps are located, but satellite contracts and production infrastructure ownership remain unverified.
+- **Would collide with:** secret-store transactions, runtime custody selection, hosted secret transport, administrative lifecycle and deployment-domain modeling — inferred.
