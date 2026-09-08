@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-anonymous-auth
 kind: story
-status: draft
+status: implemented
 title: Represent deliberate anonymous and parent-authenticated access
 tags:
 - P2
@@ -14,13 +14,29 @@ relations:
 scope:
 - confidence: cited
   path: contracts/auth/capability/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/auth/connection/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/auth/evidence/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/auth/management.md
 - confidence: cited
   path: contracts/auth/profile/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/discovery/mediated_route/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/discovery/resources/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/service/compatibility.md
 - confidence: cited
   path: docs/adapters/grafana.md
-revision: 2
+- confidence: inferred
+  path: docs/evidence/auth-profile-budget-20260908
+- confidence: inferred
+  path: ess/domains/auth_access.yaml
+- confidence: inferred
+  path: ess/system.yaml
+revision: 10
 ---
 ## Context
 
@@ -48,12 +64,20 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 ## Scope
 
-- cited: `contracts/auth/profile/v1alpha1/semantics.md`
 - cited: `contracts/auth/capability/v1alpha1/semantics.md`
+- inferred: `contracts/auth/connection/v1alpha1/semantics.md`
+- inferred: `contracts/auth/evidence/v1alpha1/semantics.md`
+- inferred: `contracts/auth/management.md`
+- cited: `contracts/auth/profile/v1alpha1/semantics.md`
 - cited: `contracts/discovery/mediated_route/v1alpha1/semantics.md`
+- inferred: `contracts/discovery/resources/v1alpha1/semantics.md`
+- inferred: `contracts/service/compatibility.md`
 - cited: `docs/adapters/grafana.md`
+- inferred: `docs/evidence/auth-profile-budget-20260908`
+- inferred: `ess/domains/auth_access.yaml`
+- inferred: `ess/system.yaml`
 
-Source locations: `contracts/auth/profile/v1alpha1/semantics.md:62`; `contracts/auth/profile/v1alpha1/semantics.md:64`; `contracts/auth/capability/v1alpha1/semantics.md:67`; `docs/adapters/grafana.md:74`; `contracts/discovery/mediated_route/v1alpha1/semantics.md:52`.
+Root serializes tracked edits for the approved auth-access/acquisition/budget cluster; two independent reviewers write only ignored snapshots. Shared paths are coordinated here, not a concurrent implementation wave.
 
 ## Dependencies and edit coordination
 
@@ -63,4 +87,8 @@ Shared edit surfaces with `story:contracts-credential-evidence`, `story:contract
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+This approved local specification-hardening story revises contracts and adapter design, models settled values through ESS 0.20.0, and records explicit UNMAPPED semantic/ownership constraints and independent review evidence. Runtime code and adapter-kind schema changes remain out of scope. Generic schema checks do not execute admission or sequential scenarios. Local commits and the local recovery backup are authorized; no external publication. Root is the sole tracked-file editor in primary main under the repository override; two independent read-only reviewers retain ignored snapshots. These three existing stories are serialized through one editor, not a parallel implementation wave.
+
+## Completion evidence
+
+F09/E10 are fixed for this approved semantic specification scope. Normative corrections, 44 declared textual traces, 50 schema expectations and exact ESS projection/gate limits are recorded in [verification](../../../docs/evidence/auth-profile-budget-20260908/verification.md) and [dispositions](../../../docs/evidence/auth-profile-budget-20260908/dispositions.md). Both immutable final independent review records auth-access-a-final-20260908 and auth-access-b-final-20260908 approve with zero remaining findings. ESS 0.20.0 validates 12 files/183 declarations; two 191-artifact projections match; 50 existing Rust tests/MSRV1.88 gate pass. This is not runtime execution of the new semantics. No implementation/adapter-kind schema change or external publication.

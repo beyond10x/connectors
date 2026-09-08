@@ -1,0 +1,13 @@
+# Local specification checkpoint — auth access and permission budgets
+
+Baseline: `1d63519d3a98845e31311749ab40cbc4532193f6`. This checkpoint closes F08/F09/E09/E10/E29 and the three owning stories for their semantic scope. No runtime code or current adapter-kind schema changed; no external publication occurred.
+
+Both independent final reviews approve with zero residual findings: [A](reviews/reviewer-a/final/report.md) and [B](reviews/reviewer-b/final/report.md). A's authoritative [reviewed-input manifest](reviews/reviewer-a/final/source-hashes-reviewed.json) covers 55 files; B's [manifest](reviews/reviewer-b/final/source-hashes.json) covers 49. Every input still matched its reviewed hash at closure. Mutable planning lifecycle/accounting was excluded. A's [scope note](reviews/reviewer-a/final/scope-note.md) distinguishes ten mechanically copied archived records from files actually read; those records informed neither its findings nor verdict.
+
+Initial reviews are anchored to the retained baseline Git objects (B also pins one historical Kubernetes implementation). Intermediate snapshots remain in ignored .local/auth-profile-budget-20260908 alongside their immutable copied reports/manifests. Final normative inputs are in this commit; separately checked session compilation artifacts are retained as gzip-compressed exact bytes with B's auxiliary evidence ([storage hashes](session-evidence-storage.json)); decompression matches the original reviewer hashes. Neither reviewer ran a runtime suite or saw the other's review text. Root alone edited tracked source and used AEP for every planning mutation.
+
+The [verification](verification.md) records the passing existing gate/MSRV, ESS declaration/schema checks and explicit limits. The gate ran against the final ESS values and unchanged runtime code; subsequent prose corrections were independently reviewed. Final AEP validation is recorded in planning-final.log. No generic schema or compiled scenario is claimed as executing permission budget, acquisition, cache or transport behavior.
+
+The [closure audit](closure-audit.json) verifies **21 of 48 original findings fixed, 27 open; 13 owner stories implemented, 14 draft**. Twenty-one new reviewer findings have fixed outcomes across the three stories. Broader specification stabilization, including remaining source findings, discovery/persistence and catalog/stack/open-decision work, remains active.
+
+Final report SHA-256: A `e02d256bfb8bea3797c72253d566792dbc2e94b04dc274358b1e6aaeeb00197c`; B `e197025e1893986c71a159fd90cae4c0837d6a97b8ec577f484ac8705b8db19c`. The commit carrying this record is the local checkpoint; publication is only to the configured local recovery bare repository under the separately verified bot identity.

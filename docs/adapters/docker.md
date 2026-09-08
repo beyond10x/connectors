@@ -55,6 +55,8 @@ Container selection is by id or name and must match a configured allowlist (ids,
 | `docker.socket` | `socket_peer` | `static_config` (socket path) | `socket-peer` (owner-checked path, no TCP) | `verify_operation` |
 | `docker.mtls` | `mtls` | `static_config` (CA, cert, key refs) | `mtls-client-identity` | `verify_operation` |
 
+Both rows are deployment-supplied static_config activation under [acquisition §4.0](../../contracts/auth/acquisition/v1alpha1/semantics.md#40-acquisition-paths-and-required-declarations), not auth.begin/interactive entry. The socket profile validates the configured peer/transport aperture without manufacturing an OAuth token; mTLS captures a coherent certificate/key generation and uses its reviewed identity validation. Listing performs neither activation nor verification. These proposed transport profiles still require their concrete reader, validation and capability bindings before advertisement.
+
 A daemon socket grants root-equivalent control of the host; the adapter narrows it by allowlists and by advertising only enabled operations. This is containment by configuration, not a sandbox (`docs/design.md:967`).
 
 ## 6. Configuration outline

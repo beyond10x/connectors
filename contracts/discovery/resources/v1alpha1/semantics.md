@@ -65,13 +65,14 @@ Operation `resources.observe` (paged like `datasource.records`):
 | `reachability` | `via_source_only`, `direct_possible`, `unknown` |
 | `generation` | monotonic per source connection; the whole set shares one generation |
 
-Withdrawal is implicit: an observation absent from the newest generation is withdrawn; `resources.observe` at an older generation returns `StaleCursor`.
+Withdrawal requires a complete authoritative observation over the represented scope: the [authorization-budget rule](../../../auth/evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08) forbids publishing a denied/unavailable/incomplete scan as a complete replacing generation or withdrawing unseen resources from it. Finer coverage/generation semantics remain with the discovery-coverage story. For a complete replacing generation, an absent observation is withdrawn; `resources.observe` at an older generation returns `StaleCursor`.
 
 Errors: base codes; `Forbidden` when the profile is not enabled in configuration.
 
 ## 4. Rules
 
 - No effect: observing never dials the observed resource, never resolves a credential for it, never downloads or executes anything (`docs/design.md:483`).
+- Source authentication is a candidate credential-placement fact, never inherited host authority. inherited_from_source may select only the explicit via_parent profile after materialization validates the supported fixed parent route and child/parent admissions; it grants no arbitrary target authentication or direct fallback. Separate/unknown requirements do not become anonymous because no credential was found.
 - Candidates are not connections: a candidate says "an adapter of kind X could be bound through this source". Materialization is an explicit, host-owned configuration step (`docs/design.md:472-481`) that creates an `auth.connection` with `route.kind = via` and a `route.mediated_http` binding.
 - Recognition is closed: the mapping table is part of the adapter specification; an unknown type is observable with `candidate: null`; nothing falls through to a generic proxy.
 - Identity stability: `id` is stable across generations while the private binding (Grafana UID, Kubernetes Service UID) is unchanged; a changed type or a new provider identity yields a new `id`, and every child bound to the old one is degraded (`auth.connection` state `parent_degraded`).

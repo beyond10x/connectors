@@ -8,11 +8,11 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 11
+revision: 12
 ---
 ## Intake
 
-The operator asked to ingest the external review before creating stories for all priorities. This record reconciles 15 consolidated findings with all 33 external findings: **48 source items, each assigned exactly once to one of 27 draft stories**. Grouping preserves each source ID; it does not claim 48 independent defects.
+The operator asked to ingest the external review before creating stories for all priorities. This record reconciles 15 consolidated findings with all 33 external findings: **48 source items, each assigned exactly once to one of 27 originally drafted stories**. Grouping preserves each source ID; it does not claim 48 independent defects.
 
 Baseline for all file:line citations is local commit `db1c329` unless an old-repository path is named. Source findings F01–F15 are preserved in `review-result:contract-semantics-20260908`; E01–E33 are preserved in `review-result:contract-docs-external-20260908`.
 
@@ -33,8 +33,8 @@ P0 means an established critical current failure requiring immediate containment
 | F05 | P1 | P1 | `story:contracts-credential-evidence` | Fixed at semantic-contract/ESS level in the auth hardening wave; see `contracts/auth/evidence/v1alpha1/verification.md`, immutable adversarial review and the full gate at `2a440495`. Runtime binding remains future work. |
 | F06 | P1 | P1 | `story:contracts-session-revocation` | Fixed at semantic-contract/ESS level by `story:contracts-session-revocation`; sessions §4.1 and verification.md record bounded cutoff/teardown, independent approvals and explicit runtime obligations. |
 | F07 | P2 | P2 | `story:contracts-connection-readiness` | Fixed at semantic-contract/ESS-value level: one global viability reduction plus exact-operation eligibility; optional write scope and target-specific failures no longer poison eligible reads. Two final independent approvals and bounded verification evidence. |
-| F08 | P2 | P2 | `story:contracts-permission-budgets` | Accepted for remediation; assigned, not fixed. |
-| F09 | P2 | P2 | `story:contracts-anonymous-auth` | Accepted for remediation; assigned, not fixed. |
+| F08 | P2 | P2 | `story:contracts-permission-budgets` | Fixed at semantic-contract/ESS-value level: exact target/cache binding, bounded 64-target/64-call/4-concurrent authorization, preflight refusal and explicit denied-target coverage. Both final independent reviewers approve; see docs/evidence/auth-profile-budget-20260908/verification.md. Runtime remains unimplemented. |
+| F09 | P2 | P2 | `story:contracts-anonymous-auth` | Fixed at semantic-contract/ESS-value level: explicit anonymous and parent-authenticated profile/placement rules without fabricated child credentials or fallback. Both final independent reviewers approve; see docs/evidence/auth-profile-budget-20260908/verification.md. Runtime remains unimplemented. |
 | F10 | P2 | P2 | `story:contracts-mutation-classification` | Accepted for remediation; assigned, not fixed. |
 | F11 | P2 | P2 | `story:contracts-restart-idempotency` | Accepted for remediation; assigned, not fixed. |
 | F12 | P2 | P2 | `story:contracts-log-continuation` | Accepted for remediation; assigned, not fixed. |
@@ -49,8 +49,8 @@ P0 means an established critical current failure requiring immediate containment
 | E06 | should-fix | P2 | `story:contracts-mutation-classification` | Accepted for remediation; assigned, not fixed. |
 | E07 | should-fix | P2 | `story:contracts-discovery-profiles` | Accepted for remediation; assigned, not fixed. |
 | E08 | should-fix | P2 | `story:contracts-restart-idempotency` | Qualified duplicate: old UID/resourceVersion preconditions prevent asserting that every repeated dispatch causes another rollout. |
-| E09 | should-fix | P2 | `story:contracts-acquisition-profiles` | Accepted for remediation; assigned, not fixed. |
-| E10 | should-fix | P2 | `story:contracts-anonymous-auth` | Accepted for remediation; assigned, not fixed. |
+| E09 | should-fix | P2 | `story:contracts-acquisition-profiles` | Fixed at semantic-contract/ESS-value level: separate static_config activation and managed acquisition with flow-specific endpoint/field requirements. Both final independent reviewers approve; see docs/evidence/auth-profile-budget-20260908/verification.md. Runtime remains unimplemented. |
+| E10 | should-fix | P2 | `story:contracts-anonymous-auth` | Fixed at semantic-contract/ESS-value level: distinct anonymous/via_parent monitoring rows and admitted no-child-credential capability/configuration semantics. Both final independent reviewers approve; see docs/evidence/auth-profile-budget-20260908/verification.md. Runtime remains unimplemented. |
 | E11 | should-fix | P2 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | E12 | should-fix | P2 | `story:contracts-mutation-visibility` | Not established as stated: implemented-only advertisement does not imply disabled operations are hidden; story resolves the actual visibility ambiguity. |
 | E13 | should-fix | P3 | `story:contracts-documentation-index` | Fixed during `story:independent-review-remediation`: configuration is in the deferred-family list and index/design counts agree. The owner remains draft for E22 and prerequisite-dependent coverage. |
@@ -69,7 +69,7 @@ P0 means an established critical current failure requiring immediate containment
 | E26 | nit | P3 | `story:contracts-evidence-precision` | Accepted example/normative distinction; preserve intentionally selected contract defaults rather than blindly relabel every number. |
 | E27 | nit | P3 | `story:contracts-supported-vocabulary` | Qualified: inventory reserved support and rationale; blanket removal is not established by the cited design rule. |
 | E28 | nit | P2 | `story:contracts-persistence-ownership` | Accepted for remediation; assigned, not fixed. |
-| E29 | nit | P2 | `story:contracts-acquisition-profiles` | Accepted for remediation; assigned, not fixed. |
+| E29 | nit | P2 | `story:contracts-acquisition-profiles` | Fixed at semantic-contract/ESS-value level: client-credentials token-only endpoint requirement and explicit specified/reserved/implemented support matrix. Both final independent reviewers approve; see docs/evidence/auth-profile-budget-20260908/verification.md. Runtime remains unimplemented. |
 | E30 | nit | P3 | `story:contracts-tenant-header` | Fixed by `story:contracts-tenant-header`: logs §4.1 and the Grafana child example use receiver-owned http.extra_headers; the earlier tenant_header label is not an alias or implemented key. Textual audit and independent review pass. |
 | E31 | nit | P3 | `story:contracts-evidence-precision` | Accepted evidence limitation: an untyped item schema does not guarantee the claimed status projection. |
 | E32 | nit | P2 | `story:contracts-discovery-profiles` | Accepted for remediation; assigned, not fixed. |
@@ -89,9 +89,11 @@ The first completed hardening story is `story:contracts-mutation-outcomes`, owni
 
 ## Completion accounting
 
-**16 of 48 source findings are fixed; 32 remain assigned, not fixed.** F01/F02/F03/F04/F05/F06/F07/E01/E02/E04/E11/E19/E20/E21 are fixed at the semantic-contract/model level; E13/E30 are fixed in documentation. Ten of the 27 owner stories are implemented for their specification scope: mutation outcomes, idempotency scope, refresh coordination, credential evidence, session revocation, tenant-header naming, wire compatibility, federated approval, connection readiness and management boundary. The documentation-index story remains draft because E22 and its prerequisites remain open.
+**21 of 48 source findings are fixed; 27 remain assigned, not fixed.** Thirteen of the 27 owner stories are implemented for their specification scope; fourteen remain draft. The documentation-index story remains draft for E22 and its dependencies even though E13 is fixed. Each source ID retains exactly one owner in the table above.
 
-The preceding specification checkpoint closed F06/E20 using the session contract/model, 13 authored scenarios, a separate trace/deadline audit and two independent final approvals, plus E30 through a shared receiver-owned monitoring configuration rule. The previous checkpoint closed E02 through the complete family/wire disposition, public ESS values, 68 decoder vectors, 27 textual response vectors and two final independent approvals ([verification](../../../docs/evidence/wire-compatibility-20260908/verification.md)). The preceding checkpoint closed F03 with the selected one-hop canonical subject/preparation/proof/nonce/redemption rules, explicit ESS values and receipts, bounded crypto/type/time/textual evidence and two final independent approvals ([verification](../../../docs/evidence/federated-approval-20260908/verification.md), [review provenance](../../../docs/evidence/federated-approval-20260908/checkpoint.md)). The latest checkpoint closes F07/E19/E21/E04 through connection viability/eligibility and host management ownership, synchronized auth/service contracts and typed ESS values, with two independent final approvals ([verification](../../../docs/evidence/connection-semantics-20260908/verification.md), [review provenance](../../../docs/evidence/connection-semantics-20260908/checkpoint.md)). Seventeen owner stories remain draft; persistence consolidation still depends on discovery-coverage work. Runtime enforcement remains future work. Drafting or reviewing a plan is not evidence that its contract defect is fixed. Future closure records the normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without adopting the external reviewer's proposed architecture.
+The latest checkpoint closes F08/F09/E09/E10/E29 through explicit anonymous/parent-authenticated access, bounded exact-target permission checks and flow-specific acquisition paths. Both independent final reviewers approve; 21 individual review findings have fixed outcomes. Evidence: [verification](../../../docs/evidence/auth-profile-budget-20260908/verification.md), [dispositions](../../../docs/evidence/auth-profile-budget-20260908/dispositions.md), [review provenance](../../../docs/evidence/auth-profile-budget-20260908/checkpoint.md). ESS values and schema checks do not execute runtime authority, transport, acquisition, cache or budget behavior.
+
+Earlier reviewed checkpoints remain recorded in the owning stories and epic: mutation outcomes/idempotency, refresh/credential evidence, session revocation/tenant headers, complete wire compatibility, federated approval, and connection viability/host management. Persistence consolidation still depends on discovery coverage. Remaining original findings and the broader catalog/stack/open-decision scope keep the overall goal active. A plan/review alone is not a fixed defect; future closure requires the corresponding normative revision and honest verification evidence.
 
 ## Acceptance
 
