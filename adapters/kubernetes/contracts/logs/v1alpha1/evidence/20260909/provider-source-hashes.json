@@ -1,0 +1,9 @@
+[
+  {
+    "file": "kubernetes-v1.35.0-core-types.go",
+    "url": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/api/core/v1/types.go",
+    "sha256": "3ce00ec375ddbab52daf76d30421b1065fa9bcf34fe5e0ef94dc14b8475d1506",
+    "bytes": 445653,
+    "archive": "vendor/kubernetes-v1.35.0-core-types.go.gz"
+  }
+]
