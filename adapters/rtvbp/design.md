@@ -12,6 +12,17 @@
 | `auth.capability` | `session-authority` (present with DPoP on upgrade), `inbound-verifier` (when serving) | proof-bound establishment |
 | `auth.profile` | `rtvbp.session_authority` (`session_authority`, subject `none`) | no vendor credential; host-issued per session |
 
+RTVBP selects no `auth.evidence` check. Atomic one-use redemption is an
+`inbound-verifier` capability decision backed by the session-redemption owner; a
+durable ledger does not turn it into an eighth readiness-evidence name.
+
+## Session and media protocol messages
+
+Offer, accept, reject, cancel and close are session control messages. Media
+`signal` and `interrupt` are negotiated media control messages. They use the
+versioned RTVBP duplex binding and are not ordinary operation ids; an independently
+admitted operation would need a separate declaration.
+
 Bridge (composition, not an adapter): consumes `media` twice and `sessions` for joint termination; no auth contracts of its own.
 
 Local audio (composition binding): consumes `media` with the same profile; device selection is deployment configuration, never caller input (`crates/driver-audio/README.md`, enumeration reserved).

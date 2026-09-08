@@ -13,8 +13,15 @@ requires bounding the upstream runtime's unbounded queues before advertisement.
 A host-issued 60-second proof-bound single-redemption authority carries DPoP on
 the WebSocket upgrade. Redeem (iss,jti) at the serving endpoint before data bytes.
 The rtvbp.session_authority profile selects session_authority, host_issued,
-session-authority presentation and inbound-verifier redemption with a ledger.
-No vendor credential or parent grant is invented.
+session-authority presentation and inbound-verifier redemption backed by the
+session-redemption ledger. This is a capability decision, not an `auth.evidence`
+check; the binding selects no additional evidence name. No vendor credential or
+parent grant is invented.
+
+Offer, accept, reject, cancel and close are session control messages; `signal` and
+`interrupt` are media control messages. None is an ordinary operation id merely
+because the RTVBP transport carries it. Advertising an operation wrapper would
+require a separate declaration and admission contract.
 
 Establishment authority is separate from the live data lease, at most 2 s from
 host issuance. Direct paths expire without a reachable control plane. Enforce

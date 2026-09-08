@@ -13,16 +13,16 @@
 | `datasource.records/v1alpha1` `document` profile | [datasources/records/v1alpha1](datasources/records/v1alpha1/semantics.md) | proposed | single-item content bodies with representation, version, byte truncation |
 | `datasource.relational/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | bounded relational result binding; native semantics belong to the SQL adapter |
 | `datasource.logs/v1alpha1` | [datasources/logs/v1alpha1](datasources/logs/v1alpha1/semantics.md) | proposed | log lines with stream identity, native query, window and byte bounds |
-| `datasource.series/v1alpha1` | [datasources/series/v1alpha1](datasources/series/v1alpha1/semantics.md) | proposed | labeled time series with step, PromQL, partial results |
+| `datasource.series/v1alpha1` | [datasources/series/v1alpha1](datasources/series/v1alpha1/semantics.md) | proposed | labeled time series with native query, step and explicit partial results; native profiles live with their adapters |
 | `endpoint_discovery/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | address/port observations and candidates, no dial |
 | `host_discovery/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | node/host observations |
 | `resource_discovery/v1alpha1` | [discovery/resources/v1alpha1](discovery/resources/v1alpha1/semantics.md) | proposed | opaque-locator observations with target-adapter candidates, generations, withdrawal |
 | `route.mediated_http/v1alpha1` | [discovery/mediated_route/v1alpha1](discovery/mediated_route/v1alpha1/semantics.md) | proposed | one-hop forwarding of a child adapter's HTTP through a parent connection's admitted binding |
 | `auth.connection/v1alpha1` | [auth/connection/v1alpha1](auth/connection/v1alpha1/semantics.md) | proposed | stable connection refs, identities, scope/actor, route, safe status |
 | `auth.profile/v1alpha1` | [auth/profile/v1alpha1](auth/profile/v1alpha1/semantics.md) | proposed | provider-declared credential purposes, schemes, flows, scopes |
-| `auth.acquisition/v1alpha1` | [auth/acquisition/v1alpha1](auth/acquisition/v1alpha1/semantics.md) | proposed | begin/complete/refresh/revoke/repair flows: OAuth2 code, client credentials, static entry |
+| `auth.acquisition/v1alpha1` | [auth/acquisition/v1alpha1](auth/acquisition/v1alpha1/semantics.md) | proposed | managed begin/complete/refresh/revoke/repair flows and separate deployment activation; OAuth2 code, client credentials, static entry and static_config |
 | `auth.custody/v1alpha1` | [auth/custody/v1alpha1](auth/custody/v1alpha1/semantics.md) | proposed (extends `SecretStore`) | immutable secret versions, credential sets, CAS active reference |
-| `auth.capability/v1alpha1` | [auth/capability/v1alpha1](auth/capability/v1alpha1/semantics.md) | proposed (extends `AuthenticatedHttp`) | connection-bound runtime capabilities: HTTP bearer/basic/signing, mTLS, socket peer, exec plugin, SIP lease, session authority, inbound verifier, mediated HTTP |
+| `auth.capability/v1alpha1` | [auth/capability/v1alpha1](auth/capability/v1alpha1/semantics.md) | proposed (extends `AuthenticatedHttp`) | connection-bound runtime capabilities: HTTP bearer/basic, mTLS, socket peer, exec plugin, SIP lease, session authority, inbound verifier, mediated HTTP; signing remains reserved/refused; [read refresh retry](auth/capability/v1alpha1/read-refresh-once.md) requires its separately selected native profile |
 | `auth.evidence/v1alpha1` | [auth/evidence/v1alpha1](auth/evidence/v1alpha1/semantics.md) | proposed | value-free readiness and provider-side authorization checks |
 | `sessions/v1alpha1` | [sessions/v1alpha1](sessions/v1alpha1/semantics.md) | proposed | bidirectional sessions: offer, establishment, correlation, lease, revocation, terminal races, duplex transport |
 | `media/v1alpha1` | [media/v1alpha1](media/v1alpha1/semantics.md) | proposed | negotiated tracks, duplex frames, readiness, loss, overload, DTMF, interrupt |
@@ -43,10 +43,10 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 | Adapter document | Contracts |
 |---|---|
 | [Atlassian](../adapters/atlassian/design.md) | operations + mutation, records + document, auth.connection, auth.profile, auth.acquisition, auth.custody, auth.capability, auth.evidence |
-| [Kubernetes](../adapters/kubernetes/design.md) | records, endpoint_discovery, host_discovery (implemented) + logs, mutation, resource_discovery, route.mediated_http, auth.profile, auth.capability, auth.evidence |
-| [Docker](../adapters/docker/design.md) | operations + mutation, records, logs, endpoint_discovery, auth.profile, auth.capability, auth.evidence |
-| [Grafana, Loki, Prometheus, Alertmanager](../docs/compositions/monitoring.md) | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.evidence |
-| [Media session: SIP, RTVBP, bridge, local audio](../docs/compositions/media-session.md) | operations + mutation, sessions, media, auth.profile, auth.capability, auth.custody, auth.evidence, auth.connection |
+| [Kubernetes](../adapters/kubernetes/design.md) | records, endpoint_discovery, host_discovery (implemented) + logs, mutation, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
+| [Docker](../adapters/docker/design.md) | operations + mutation, records, logs, endpoint_discovery, auth.connection, auth.profile, auth.acquisition (static_config), auth.capability, auth.custody, auth.evidence |
+| [Grafana, Loki, Prometheus, Alertmanager](../docs/compositions/monitoring.md) | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.custody, auth.evidence |
+| [Media session: SIP, RTVBP, bridge, local audio](../docs/compositions/media-session.md) | operations + mutation, records, sessions, media, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.custody, auth.evidence |
 | [Catalog and pre-compiled third-party specs](../adapters/catalog/design.md) | catalog, operations `generic-http` + mutation, records `generic-http-page`, auth.profile, auth.acquisition, auth.capability (+ `http-header`, `http-query`), auth.evidence, auth.connection, auth.custody |
 
 ## Provider authentication at a glance
@@ -60,7 +60,7 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 | Grafana | service-account bearer via connect session (`providers/grafana.toml`); explicit configured first phase | 2 proposed paths | static_config/read_only first; static_entry/versioned managed later | http-bearer | credential/identity checks and declared verification |
 | Loki / Prometheus / Alertmanager | explicit anonymous, bearer, basic or parent-mediated binding + admitted tenant header (`docs/design/08:150-160` old) | 4 proposed profiles per child adapter | static_config activation/materialization, no auth.begin | http-anonymous / http-bearer / http-basic / mediated-http | applicable binding/credential checks; declared verification |
 | SIP | trunk username+password to sipx (`crates/driver-sip/src/lib.rs:104-114`) | 1 | static entry | sip-credential-lease | custody reachable |
-| RTVBP | host-issued proof-bound authority + DPoP (`docs/design/05:297-305` old) | 1 (no vendor credential) | host issued | session-authority, inbound-verifier | redemption ledger |
+| RTVBP | host-issued proof-bound authority + DPoP (`docs/design/05:297-305` old) | 1 (no vendor credential) | host issued | session-authority, inbound-verifier | none; redemption is inbound-verifier capability state |
 
 ## Document template
 
