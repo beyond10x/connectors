@@ -85,6 +85,8 @@ Not needed: discovery (no observations), sessions/media, mediated routes.
 
 Jira stays on REST v2 for plain-string comment bodies; ADF (v3) is a later `jira.adf` representation (`jira.toml:18-60`).
 
+For every keyed write, the receiver owns reservation and replay under [mutation §5.1](../../contracts/operations/v1alpha1/semantics.md#51-key-namespace-fingerprint-and-replay-admission). Jira and Confluence do not supply a substitute key namespace. The same key/body used by different admitted callers or trusted origins is isolated; within one namespace, changing issue/comment/page operation, connection, input or fingerprint revision conflicts while the reservation remains live. The fingerprint includes the connection metadata revision, so an authorized change of external identity or `cloud_id` cannot replay or reuse a previous binding's result silently. Same-identity token refresh alone does not create a new namespace. Every replay requires current project/space/resource/result access, but never redeems approval again. Pending and unknown outcomes remain reserved across restart and past the known-result replay window; a known result expires 86,400 s after durable settlement, after which a new attempt needs fresh admission/approval.
+
 ## 5. Auth
 
 | Profile | Scheme | Acquisition | Capability | Evidence |
@@ -125,5 +127,6 @@ None.
 ## 10. Evidence required
 
 - Fixture: auth header placement for basic and bearer; paging for `startAt`, `nextPageToken`, CQL cursor; document truncation; every mutation with approval, replay, and lost-response scenarios; scope refusal.
+- Keyed-write fixtures: reuse key/body across caller, origin, Jira/Confluence operation and connection boundaries; revoke project/space access before replay; rotate same-identity credentials; change connection/configuration revision; expire known-result retention; keep in-flight/unknown reservations and generation-bound waiters safe. These are host/adapter binding obligations, not implemented provider behavior.
 - Live: Atlassian authentication chain (`docs/design.md:1000`): connect, bounded read, expire, refresh or repair, identity preserved; repeated with a second custody binding.
 - Decoupling: adapter builds without siblings; business tests run with fake authenticated transport and no OAuth server (`docs/design.md:1012`).
