@@ -1,0 +1,178 @@
+{
+  "source": "confluence-v2.openapi.json",
+  "source_sha256": "451377c5a598ee8155acc11b611404f309bed4a4292ea87f88ed3bfed38fa0a8",
+  "facts": [
+    {
+      "pointer": "/paths/~1pages/get/parameters",
+      "value": [
+        {
+          "name": "id",
+          "in": "query",
+          "required": false,
+          "description": "Filter the results based on page ids. Multiple page ids can be specified as a comma-separated list.",
+          "schema": {
+            "type": "array",
+            "maxItems": 250,
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        },
+        {
+          "name": "space-id",
+          "in": "query",
+          "required": false,
+          "description": "Filter the results based on space ids. Multiple space ids can be specified as a comma-separated list.",
+          "schema": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "description": "Filter the results to pages based on their status. By default, `current` and `archived` are used.",
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "current",
+                "archived",
+                "deleted",
+                "trashed"
+              ]
+            }
+          }
+        },
+        {
+          "name": "body-format",
+          "in": "query",
+          "description": "The content format types to be returned in the `body` field of the response. If available, the representation will be available under a response field of the same name under the `body` field.",
+          "schema": {
+            "$ref": "#/components/schemas/PrimaryBodyRepresentation"
+          }
+        },
+        {
+          "name": "subtype",
+          "in": "query",
+          "required": false,
+          "description": "Filter the results to pages based on their subtype.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "live",
+              "page"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "pointer": "/components/schemas/PageBulk",
+      "value": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID of the page."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ContentStatus"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the page."
+          },
+          "spaceId": {
+            "type": "string",
+            "description": "ID of the space the page is in."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "ID of the parent page, or null if there is no parent page."
+          },
+          "parentType": {
+            "$ref": "#/components/schemas/ParentContentType"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer",
+            "nullable": true,
+            "description": "Position of child page within the given parent page tree."
+          },
+          "authorId": {
+            "type": "string",
+            "description": "The account ID of the user who created this page originally."
+          },
+          "ownerId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The account ID of the user who owns this page."
+          },
+          "lastOwnerId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The account ID of the user who owned this page previously, or null if there is no previous owner."
+          },
+          "subtype": {
+            "type": "string",
+            "nullable": true,
+            "description": "The subtype of the page."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time when the page was created. In format \"YYYY-MM-DDTHH:mm:ss.sssZ\"."
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "body": {
+            "$ref": "#/components/schemas/BodyBulk"
+          },
+          "_links": {
+            "$ref": "#/components/schemas/AbstractPageLinks"
+          }
+        }
+      }
+    },
+    {
+      "pointer": "/components/schemas/BodyBulk",
+      "value": {
+        "type": "object",
+        "description": "Contains fields for each representation type requested.",
+        "properties": {
+          "storage": {
+            "$ref": "#/components/schemas/BodyType"
+          },
+          "atlas_doc_format": {
+            "$ref": "#/components/schemas/BodyType"
+          }
+        }
+      }
+    },
+    {
+      "pointer": "/components/schemas/BodyType",
+      "value": {
+        "type": "object",
+        "properties": {
+          "representation": {
+            "type": "string",
+            "description": "Type of content representation used for the value field."
+          },
+          "value": {
+            "type": "string",
+            "description": "Body of the content, in the format found in the representation field."
+          }
+        }
+      }
+    }
+  ]
+}
