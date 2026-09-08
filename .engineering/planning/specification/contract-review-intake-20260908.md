@@ -8,7 +8,7 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 10
+revision: 11
 ---
 ## Intake
 
@@ -32,7 +32,7 @@ P0 means an established critical current failure requiring immediate containment
 | F04 | P1 | P1 | `story:contracts-refresh-coordination` | Fixed at semantic-contract/ESS level in the auth hardening wave; see `contracts/auth/acquisition/v1alpha1/verification.md`, immutable adversarial review and the full gate at `2a440495`. Runtime binding remains future work. |
 | F05 | P1 | P1 | `story:contracts-credential-evidence` | Fixed at semantic-contract/ESS level in the auth hardening wave; see `contracts/auth/evidence/v1alpha1/verification.md`, immutable adversarial review and the full gate at `2a440495`. Runtime binding remains future work. |
 | F06 | P1 | P1 | `story:contracts-session-revocation` | Fixed at semantic-contract/ESS level by `story:contracts-session-revocation`; sessions §4.1 and verification.md record bounded cutoff/teardown, independent approvals and explicit runtime obligations. |
-| F07 | P2 | P2 | `story:contracts-connection-readiness` | Accepted for remediation; assigned, not fixed. |
+| F07 | P2 | P2 | `story:contracts-connection-readiness` | Fixed at semantic-contract/ESS-value level: one global viability reduction plus exact-operation eligibility; optional write scope and target-specific failures no longer poison eligible reads. Two final independent approvals and bounded verification evidence. |
 | F08 | P2 | P2 | `story:contracts-permission-budgets` | Accepted for remediation; assigned, not fixed. |
 | F09 | P2 | P2 | `story:contracts-anonymous-auth` | Accepted for remediation; assigned, not fixed. |
 | F10 | P2 | P2 | `story:contracts-mutation-classification` | Accepted for remediation; assigned, not fixed. |
@@ -44,7 +44,7 @@ P0 means an established critical current failure requiring immediate containment
 | E01 | blocking | P1 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | E02 | blocking | P1 | `story:contracts-wire-compatibility` | Fixed by `story:contracts-wire-compatibility`: one version/field/profile matrix, explicit v1alpha2 routes, unchanged-read legacy projection with invoke enforcement, exact mutation/audit encoding and ESS values; 68 current decoder vectors, 27 textual response vectors, full gate and two final independent approvals. |
 | E03 | blocking | P2 | `story:contracts-host-composition` | Qualified: colocation is allowed; concrete wiring ownership must preserve the generic-host dependency invariant. |
-| E04 | should-fix | P2 | `story:contracts-management-boundary` | Qualified: the design prohibits exposing private callback authority, not every use of an operations envelope. |
+| E04 | should-fix | P2 | `story:contracts-management-boundary` | Fixed by host-owned separately admitted management, explicit instance/connection/acquisition targets, one coordinator through federation, protected UI/completion boundaries and separate local/provider revocation observations. Operation-envelope reuse does not assign coordination to adapters; concrete bindings remain advertisement gates. |
 | E05 | should-fix | P2 | `story:contracts-read-refresh-retry` | Accepted for remediation; assigned, not fixed. |
 | E06 | should-fix | P2 | `story:contracts-mutation-classification` | Accepted for remediation; assigned, not fixed. |
 | E07 | should-fix | P2 | `story:contracts-discovery-profiles` | Accepted for remediation; assigned, not fixed. |
@@ -59,9 +59,9 @@ P0 means an established critical current failure requiring immediate containment
 | E16 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
 | E17 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
 | E18 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
-| E19 | nit | P2 | `story:contracts-connection-readiness` | Accepted for remediation; assigned, not fixed. |
+| E19 | nit | P2 | `story:contracts-connection-readiness` | Fixed: acquisition payloads/scenarios consistently use insufficient_scope, distinct from generic evidence result insufficient and the global readiness state. |
 | E20 | nit | P2 | `story:contracts-session-revocation` | Fixed by `story:contracts-session-revocation`: media_incompatible and media_overload share the sessions terminal vocabulary; both authored cases compile and both independent rechecks approve. |
-| E21 | nit | P2 | `story:contracts-connection-readiness` | Accepted for remediation; assigned, not fixed. |
+| E21 | nit | P2 | `story:contracts-connection-readiness` | Fixed: one seven-state viability vocabulary includes pending/disabled/revoked with deterministic precedence; status is a reduction, not a fictitious ESS Connection lifecycle. |
 | E22 | nit | P3 | `story:contracts-documentation-index` | Accepted for remediation; assigned, not fixed. |
 | E23 | nit | P2 | `story:contracts-media-controls` | Accepted for remediation; assigned, not fixed. |
 | E24 | nit | P2 | `story:contracts-media-controls` | Accepted for remediation; assigned, not fixed. |
@@ -89,9 +89,9 @@ The first completed hardening story is `story:contracts-mutation-outcomes`, owni
 
 ## Completion accounting
 
-**12 of 48 source findings are fixed; 36 remain assigned, not fixed.** F01/F02/F03/F04/F05/F06/E01/E02/E11/E20 are fixed at the semantic-contract/model level; E13/E30 are fixed in documentation. Eight of the 27 owner stories are implemented for their specification scope: mutation outcomes, idempotency scope, refresh coordination, credential evidence, session revocation, tenant-header naming, wire compatibility and federated approval. The documentation-index story remains draft because E22 and its prerequisites remain open.
+**16 of 48 source findings are fixed; 32 remain assigned, not fixed.** F01/F02/F03/F04/F05/F06/F07/E01/E02/E04/E11/E19/E20/E21 are fixed at the semantic-contract/model level; E13/E30 are fixed in documentation. Ten of the 27 owner stories are implemented for their specification scope: mutation outcomes, idempotency scope, refresh coordination, credential evidence, session revocation, tenant-header naming, wire compatibility, federated approval, connection readiness and management boundary. The documentation-index story remains draft because E22 and its prerequisites remain open.
 
-The preceding specification checkpoint closed F06/E20 using the session contract/model, 13 authored scenarios, a separate trace/deadline audit and two independent final approvals, plus E30 through a shared receiver-owned monitoring configuration rule. The previous checkpoint closed E02 through the complete family/wire disposition, public ESS values, 68 decoder vectors, 27 textual response vectors and two final independent approvals ([verification](../../../docs/evidence/wire-compatibility-20260908/verification.md)). The latest checkpoint closes F03 with the selected one-hop canonical subject/preparation/proof/nonce/redemption rules, explicit ESS values and receipts, bounded crypto/type/time/textual evidence and two final independent approvals ([verification](../../../docs/evidence/federated-approval-20260908/verification.md), [review provenance](../../../docs/evidence/federated-approval-20260908/checkpoint.md)). Nineteen owner stories remain draft; persistence consolidation still depends on management-boundary and discovery-coverage work. Runtime enforcement remains future work. Drafting or reviewing a plan is not evidence that its contract defect is fixed. Future closure records the normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without adopting the external reviewer's proposed architecture.
+The preceding specification checkpoint closed F06/E20 using the session contract/model, 13 authored scenarios, a separate trace/deadline audit and two independent final approvals, plus E30 through a shared receiver-owned monitoring configuration rule. The previous checkpoint closed E02 through the complete family/wire disposition, public ESS values, 68 decoder vectors, 27 textual response vectors and two final independent approvals ([verification](../../../docs/evidence/wire-compatibility-20260908/verification.md)). The preceding checkpoint closed F03 with the selected one-hop canonical subject/preparation/proof/nonce/redemption rules, explicit ESS values and receipts, bounded crypto/type/time/textual evidence and two final independent approvals ([verification](../../../docs/evidence/federated-approval-20260908/verification.md), [review provenance](../../../docs/evidence/federated-approval-20260908/checkpoint.md)). The latest checkpoint closes F07/E19/E21/E04 through connection viability/eligibility and host management ownership, synchronized auth/service contracts and typed ESS values, with two independent final approvals ([verification](../../../docs/evidence/connection-semantics-20260908/verification.md), [review provenance](../../../docs/evidence/connection-semantics-20260908/checkpoint.md)). Seventeen owner stories remain draft; persistence consolidation still depends on discovery-coverage work. Runtime enforcement remains future work. Drafting or reviewing a plan is not evidence that its contract defect is fixed. Future closure records the normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without adopting the external reviewer's proposed architecture.
 
 ## Acceptance
 

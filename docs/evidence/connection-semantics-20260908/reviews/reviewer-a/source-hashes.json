@@ -1,0 +1,151 @@
+{
+  "review": "F07/E04 initial independent reviewer A",
+  "baseline": "12c11f4b43cd6cf5ff67d3243017887b28788344",
+  "created_utc": "2026-09-08T16:00:01.697916+00:00",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278,
+      "matches_baseline": true
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d",
+      "bytes": 121490,
+      "matches_baseline": true
+    },
+    {
+      "path": ".engineering/planning/story/contracts-connection-readiness.md",
+      "sha256": "e3fde0d5134beeb8ed5cd2bd5d91c1264037051ff3701dfd7db633f386453225",
+      "bytes": 4864,
+      "matches_baseline": false
+    },
+    {
+      "path": ".engineering/planning/story/contracts-management-boundary.md",
+      "sha256": "9257b3da264545aa50e7bd8bc81d02508bd4efe275dab2ae6642b076eabe18b3",
+      "bytes": 4808,
+      "matches_baseline": false
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "fb72c94c48b12ab984cb0bea4818e5ff5c72c85943c79e5e2a341710afe6d944",
+      "bytes": 34786,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "812ce5ff030c8a0e36c55d909abf0ee0dac9702424c57e714f19f86f8e240aeb",
+      "bytes": 34517,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "c67f0689fc5fbf4fde14872e10332896d1eb27775e1666d8459bf2a1b15bbf4f",
+      "bytes": 22450,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "bytes": 38950,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "b295d6041fa49f9cee44e2f89d923afaaf7a09f474cf65fbf61fff1f8a5ea114",
+      "bytes": 20277,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "af19e498dca5a6616303d745932b1bc8b813d8bed4cafbec47b1951390e3f131",
+      "bytes": 13081,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "71e3a3887689f612b85eda506f4f543a49b9681c7214c233cc13c64ebd04f39e",
+      "bytes": 12838,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "bytes": 10098,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "0f4a750ecca4089ab133a42b13b954af9d5d9c4b11c3969eb8800fbed452652b",
+      "bytes": 19143,
+      "matches_baseline": true
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "bed3bb55c43553e2a9a1f70a250067e82afdcc2afc3d07069eb19f2743befcca",
+      "bytes": 9287,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+      "bytes": 8245,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208,
+      "matches_baseline": true
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "932273ff7786139fe07520c9bb13b4c874ae83a19a1f5c2821f558b717dadf6e",
+      "bytes": 392,
+      "matches_baseline": true
+    }
+  ]
+}
