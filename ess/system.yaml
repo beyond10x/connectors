@@ -5,3 +5,4 @@ version: v1
 domains:
   - connectors.declarations
   - connectors.mutations
+  - connectors.idempotency

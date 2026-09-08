@@ -37,6 +37,10 @@ entities:
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
       - {name: approval_ref, type: "Optional<String>"}
       - {name: idempotency_key, type: "Optional<String>"}
+      # Host fixes this with the first durable terminal outcome. Keyed retention
+      # uses that instant even if reservation settlement is recovered later.
+      # UNMAPPED: clock provenance and assignment by terminal commands.
+      - {name: settled_at, type: "Optional<Timestamp>"}
     relations:
       - name: instance
         kind: references
@@ -45,10 +49,10 @@ entities:
         via: instance_id
     # UNMAPPED: the operation reference needs instance/adapter qualification;
     # OperationDeclaration.operation_id alone is not a runtime operation identity.
-    # UNMAPPED: Connection, ApprovalRedemption, admission principal/tenant, and
-    # idempotency ownership/retention are not modeled yet. The opaque fields above
-    # assert neither their relationship cardinality nor ownership. F02/F03/E28 own
-    # those decisions; no synthetic entities or relations stand in for them.
+    # KeyReservation in connectors.idempotency explicitly references this attempt;
+    # its lifecycle covers replay retention, separately from audit retention.
+    # UNMAPPED: Connection, ApprovalRedemption and admission principal/tenant
+    # entity relations remain unmodeled. Opaque fields assert no cardinalities.
     lifecycle:
       initial: Prepared
       states: [Prepared, Dispatching, Aborted, Completed, Failed, Indeterminate]
