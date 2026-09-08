@@ -92,7 +92,7 @@ Managed-flow sequence (specializes `docs/design.md:543-549`; static_config follo
 
 ### 4.1 Refresh exclusion, authorization and recovery
 
-Refresh is triggered by `auth.evidence` (expiry near) or by a provider `401` at the execution boundary; it is never caller-invocable. The **host coordinator and its metadata binding** own cross-replica exclusion and the durable refresh ledger. Custody owns only immutable sensitive versions. A custody CAS or an expiring lease alone cannot authorize an exchange (`docs/design.md:596-600`).
+Refresh is triggered only through the selected auth profile's separately admitted maintenance policy (`auth.evidence`, expiry near) or an explicitly supported execution binding permitting a provider `401`; it is never caller-invocable. Neither trigger grants business redispatch by itself. The **host coordinator and its metadata binding** own cross-replica exclusion and the durable refresh ledger. Custody owns only immutable sensitive versions. A custody CAS or an expiring lease alone cannot authorize an exchange (`docs/design.md:596-600`).
 
 The serialization key is one host-private `CredentialGeneration` from [the shared ESS model](../../../../ess/domains/credentials.yaml): an immutable material capture bound to an instance, connection, profile and provider authority, with an expected external identity. It is neither a secret-derived identifier, a file path, nor a custody version. Capturing bytes does not validate identity. A refresh result receives a new generation even if the account is unchanged; validation and dispatch obey [evidence](../../evidence/v1alpha1/semantics.md). The host must prevent the same rotating refresh material from entering two independently refreshable generations or connection bindings. Repeated observations/restarts reuse the existing private capture association where the material is unchanged; aliases that cannot be established safely are refused. UUID uniqueness alone cannot prevent duplicate use of the same token.
 
@@ -117,7 +117,7 @@ If revocation commits first, publication refuses. If publication commits first, 
 
 Required durability includes surviving host restart with reservation/consumption, ownership and publication decisions intact. A binding that cannot provide the stated atomicity, fencing and durable recovery must refuse rotating refresh; falling back to per-process locking or a second exchange is forbidden. In-memory test bindings may simulate the protocol but claim no restart durability. Safe outcome names remain `refreshed`, `reauthorization_required`, `insufficient_scope`, `invalid_or_revoked`, `custody_unavailable` and `uncertain`; detailed ledger refusals below are private, not new public error envelopes. `uncertain` records the exchange observation and requires reauthorization, never “not configured.”
 
-Scope and identity checks apply to refresh results; rotation never widens permission. Refresh success never retries a business write (`docs/design.md:600`; `operations` mutation profile). The separate read-retry contract decision is not settled here.
+Scope and identity checks apply to refresh results; rotation never widens permission. Refresh success never retries a business write (`docs/design.md:600`; `operations` mutation profile). The proposed [read-refresh-once/v1alpha1 binding](../../capability/v1alpha1/read-refresh-once.md) selects the bounded direct-read exception only for its explicitly advertised v1alpha2 combined profile. It participates in one source attempt, observes its published current successor and requires a fresh dispatch admission within the original invocation's time, byte and permission-call ledger. A waiter sends no token request; observing or recovering publication never replays an exchange. Existing/legacy profiles do not silently acquire this behavior, and no current adapter implements the binding.
 
 ### 4.2 Failure matrix
 
@@ -160,6 +160,7 @@ Client credentials (`oauth2_client_credentials`): no browser; `begin` performs t
 - Committed response recovery → current publication owner succeeds; stale owner is refused; revocation/identity replacement wins without resurrection.
 - Publication cutoff → old-generation admissions cannot newly dispatch; already-opened transport is not rolled back.
 - Fake provider rotates then drops the response → `uncertain`; connection `reauthorization_required`; no second refresh call.
+- Two retry-bound read invocations receive 401 for the same generation → one committed token-exchange authorization globally; each live invocation may observe the same published successor and independently establish its fresh admission within its own original remaining budgets. An expired/cancelled invocation never resumes when publication completes. This is the [read binding's textual composition](../../capability/v1alpha1/read-refresh-once.md), not an implemented business retry.
 - Swap the custody binding (in-memory ↔ file) → provider auth implementation unchanged (`docs/design.md:1014`).
 
 ## 7. Compatibility
