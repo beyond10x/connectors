@@ -2,14 +2,14 @@
 format: aep.planning-md/1
 id: epic:contract-semantics-remediation
 kind: epic
-status: draft
+status: active
 title: Resolve the contract and adapter design review findings
 tags:
 - contract-review
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 3
+revision: 7
 ---
 ## Context
 
@@ -17,7 +17,7 @@ The operator paused further implementation to settle textual contracts, then req
 
 ## Outcome
 
-Resolve or explicitly dispose of all **48 source findings** (F01–F15 and E01–E33) through the **27 draft stories** below, preserving one owner per finding and recording the revised contract rules and textual conformance evidence.
+Resolve or explicitly dispose of all **48 source findings** (F01–F15 and E01–E33) through the **27 stories** below, preserving one owner per finding and recording the revised contract rules and textual conformance evidence.
 
 ## Acceptance
 
@@ -55,7 +55,7 @@ After the child stories complete, the intake ledger maps every source finding to
 | P3 | `story:contracts-tenant-header` — Use one configuration name for the monitoring tenant header | E30 |
 | P2 | `story:contracts-mutation-visibility` — Distinguish implemented, enabled and discoverable mutations | E12 |
 
-No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. All children remain draft.
+No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. Mutation outcomes is implemented as semantic hardening with an ESS model; the other 26 children remain draft. The planning verification below records the earlier draft baseline.
 
 ## Sequencing and shared files
 
@@ -63,7 +63,9 @@ Follow the explicit depends_on edges for semantic inputs, not a single global se
 
 ## Scope and exclusions
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+The operator subsequently authorized hardening semantic contracts together with their ESS models, after local checkpoint `57be07c` on 2026-09-08. The original text-only planning boundary is superseded for activated hardening stories. Model settled identities, fields and lifecycle rules with the pinned ESS workflow; compile corresponding scenarios and keep unsupported semantics and unresolved relations explicitly UNMAPPED. Runtime mutation implementation, wire expansion, extra adapters, publication and Atlas changes remain outside this epic. Refine each owning story's machine-readable scope before activation; ESS files add shared edit surfaces and do not authorize a concurrent implementation wave.
+
+The first completed hardening story is `story:contracts-mutation-outcomes`, owning F01/E01/E11. Its typed home is `ess/domains/mutations.yaml`; its gate checks are specification validation and scenario compilation, not a claim of a runtime conformance binding.
 
 The work covers contracts, their adapter plans, the contract index and design cross-references. The current implemented adapters remain Kubernetes, GitLab and SQL; documenting additional adapter plans is not implementation authorization. No remote, Atlas, rollout or old-repository changes are included. First-review open decisions outside F01–F15 remain in the intake record; this epic promises the 48 enumerated findings rather than silently deciding those product questions.
 
@@ -80,3 +82,7 @@ Coverage checks establish 48 source findings with one owner each, 27 draft stori
 Tool limitations: installed AEP reports protocol 0.54.0; validation succeeds but warns for the two original prose reviews and for approval records whose findings blocks contain an empty list. The CLI also printed revision 4 for the added persistence dependency while show/file metadata report revision 3; the actual body, edge and history were verified, without manual metadata repair. These diagnostics do not substitute for contract conformance and do not change the draft status.
 
 Concurrent authoring was observed during the final check: `contracts/catalog/v1alpha1/semantics.md`, `docs/adapters/catalog.md`, and the catalog additions to `contracts/README.md` appeared outside this planning work. The 48-item intake remains anchored to `db1c329`; these later catalog additions have not been reviewed by this panel and are preserved unchanged by the planning agent. Reconcile the index against the then-current reviewed documents when its story is taken up.
+
+## Hardening progress — 2026-09-08
+
+`story:contracts-mutation-outcomes` is complete: F01/E01/E11 corrected in the contract and proposed ESS model, nine authored and 36 generated scenarios compiled, full gate passed, two independent readers approved. Runtime mutation behavior remains unimplemented. The intake records 3 semantic fixes and 45 outstanding source findings; the other 26 stories remain draft. The first story now has exact scenario-file scopes; future stories must refine shared ESS scope before activation. This does not authorize a parallel implementation wave.
