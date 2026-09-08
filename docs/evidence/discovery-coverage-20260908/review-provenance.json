@@ -1,0 +1,58 @@
+[
+  {
+    "review": "review-result:discovery-a-initial-20260908",
+    "report": "reviews/a-initial-report.md",
+    "source_manifest": "reviews/a-initial-source-hashes.json",
+    "snapshot_archive": "reviews/a-initial-sources.tar.gz",
+    "review_sha256": "a4ff99dac9c0a13def3b66b70ccd60dd79eafc2ae5abd11dba4f763d0ce33848",
+    "archive_sha256": "fd545df284abbf928a69029adbc0c9ef7797f9dfab60e417ac0e64b88c7a592e",
+    "source_count": 38
+  },
+  {
+    "review": "review-result:discovery-a-recheck1-20260908",
+    "report": "reviews/a-recheck1-report.md",
+    "source_manifest": "reviews/a-recheck1-source-hashes.json",
+    "snapshot_archive": "reviews/a-recheck1-sources.tar.gz",
+    "review_sha256": "8cf81b6ef2cf4195ee5ea24ce57afbd114200e285fba9a39387daa760895ec92",
+    "archive_sha256": "be3b3bc860689eff71ae7f48878c6e8381855edd1cf612c2a21f0ddd5e4af1d0",
+    "source_count": 40
+  },
+  {
+    "review": "review-result:discovery-b-initial-20260908",
+    "report": "reviews/b-initial-report.md",
+    "source_manifest": "reviews/b-initial-source-hashes.json",
+    "snapshot_archive": "reviews/b-initial-sources.tar.gz",
+    "review_sha256": "617511ac6a39130f0a12d2b2f212f8ecb070007f4578b32ce37c9c652216afce",
+    "archive_sha256": "b4cb451ca79888d1d554733883a62c7d98d28309898c8c4fef9bf9a47aa6f586",
+    "source_count": 33
+  },
+  {
+    "review": "review-result:discovery-b-recheck1-20260908",
+    "report": "reviews/b-recheck1-report.md",
+    "source_manifest": "reviews/b-recheck1-source-hashes.json",
+    "snapshot_archive": "reviews/b-recheck1-sources.tar.gz",
+    "review_sha256": "22654ee016a8af805de2d1f9b8c999b2b7156adbb9662c8fcffb60aeac924e83",
+    "archive_sha256": "a1fb847b49862198c6555df461c5985211cf9531b968f1dc3b870197898885e3",
+    "source_count": 32
+  },
+  {
+    "review": "review-result:discovery-a-final-20260908",
+    "report": "reviews/a-final-report.md",
+    "source_manifest": "reviews/a-final-source-hashes.json",
+    "snapshot_archive": "reviews/a-final-sources.tar.gz",
+    "review_sha256": "e4f5ae4f14f19103998b5079998130b5f0db01c9c817e4c4298ea580f0c898fd",
+    "archive_sha256": "cf56364b4700fab0d70901afe5d1c5867517d9ea60e9c324806d16710ca79c5c",
+    "source_count": 59,
+    "supplemental_archive_prefix": "__supplemental/"
+  },
+  {
+    "review": "review-result:discovery-b-final-20260908",
+    "report": "reviews/b-final-report.md",
+    "source_manifest": "reviews/b-final-source-hashes.json",
+    "snapshot_archive": "reviews/b-final-sources.tar.gz",
+    "review_sha256": "e49ebd5ec87c91bb68d9e79630e7c51fa374b2945d1a080ac2bb99f37801c305",
+    "archive_sha256": "72b473a06290195c9d38768a157c359a5c461f18cb68082fcd1adfa267806c30",
+    "source_count": 52,
+    "supplemental_archive_prefix": "__supplemental/"
+  }
+]

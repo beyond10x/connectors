@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.RouteRevalidationFacts",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:35044af156e9579416925c8497661a614cdee6d484f87b1ea8ffe11719ddcf54",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.RouteRevalidationFacts": {
+      "title": "RouteRevalidationFacts",
+      "x-ess-name": "connectors.discovery.RouteRevalidationFacts",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "expected_route_revision": {
+          "type": "string"
+        },
+        "old_observation_generation": {
+          "type": "integer"
+        },
+        "new_observation_generation": {
+          "type": "integer"
+        },
+        "observation_current": {
+          "type": "boolean"
+        },
+        "fixed_binding_equal": {
+          "type": "boolean"
+        },
+        "parent_generation_current": {
+          "type": "boolean"
+        },
+        "independently_admitted": {
+          "type": "boolean"
+        },
+        "exact_permission_current": {
+          "type": "boolean"
+        },
+        "child_enabled_and_not_revoked": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "expected_route_revision",
+        "old_observation_generation",
+        "new_observation_generation",
+        "observation_current",
+        "fixed_binding_equal",
+        "parent_generation_current",
+        "independently_admitted",
+        "exact_permission_current",
+        "child_enabled_and_not_revoked"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

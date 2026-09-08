@@ -250,7 +250,7 @@ adapter executable -> its own adapter library + host wiring
 spec compiler     -> adapter-kind definition + ESS libraries/tools
 ```
 
-There is no dependency from runtime crates to `connectors-spec`. There is no host-to-concrete-adapter dependency. Thin adapter entrypoints can use shared host wiring without making their libraries depend on customer state or peer providers.
+There is no dependency from runtime crates to `connectors-spec`. There is no host-to-concrete-adapter dependency. Thin adapter entrypoints can use shared host wiring without making their libraries depend on customer state or peer providers. A separately authored composition executable may link selected parent/child libraries and inject their narrow ports into the generic host; [mediated composition ownership](../contracts/discovery/composition.md) defines this one-process case without a concrete loader in the host.
 
 ### 4.2 Adapter layout
 
