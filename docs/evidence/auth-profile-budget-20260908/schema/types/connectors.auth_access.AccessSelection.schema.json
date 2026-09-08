@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.AccessSelection",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:894965f9066e2a023bce6357ac348faf7c54598393e1d9bb1553eec923534b9c",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.AccessMode": {
+      "title": "AccessMode",
+      "x-ess-name": "connectors.auth_access.AccessMode",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "credential",
+        "direct_anonymous",
+        "parent_authenticated"
+      ]
+    },
+    "connectors.auth_access.AccessSelection": {
+      "title": "AccessSelection",
+      "x-ess-name": "connectors.auth_access.AccessSelection",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/connectors.auth_access.AccessMode"
+        },
+        "purpose": {
+          "$ref": "#/$defs/connectors.auth_access.Purpose"
+        },
+        "subject": {
+          "$ref": "#/$defs/connectors.auth_access.Subject"
+        },
+        "scheme": {
+          "$ref": "#/$defs/connectors.auth_access.Scheme"
+        },
+        "flow": {
+          "$ref": "#/$defs/connectors.auth_access.AcquisitionFlow"
+        },
+        "capability": {
+          "$ref": "#/$defs/connectors.auth_access.CapabilityName"
+        }
+      },
+      "required": [
+        "profile",
+        "mode",
+        "purpose",
+        "subject",
+        "scheme",
+        "flow",
+        "capability"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.auth_access.AcquisitionFlow": {
+      "title": "AcquisitionFlow",
+      "x-ess-name": "connectors.auth_access.AcquisitionFlow",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "static_config",
+        "static_entry",
+        "oauth2_authorization_code",
+        "oauth2_client_credentials",
+        "oauth2_password",
+        "workload_identity",
+        "exec_plugin",
+        "host_issued"
+      ]
+    },
+    "connectors.auth_access.CapabilityName": {
+      "title": "CapabilityName",
+      "x-ess-name": "connectors.auth_access.CapabilityName",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "http-bearer",
+        "http-basic",
+        "http-signing",
+        "http-anonymous",
+        "mtls-client-identity",
+        "socket-peer",
+        "exec-credential-plugin",
+        "sip-credential-lease",
+        "session-authority",
+        "inbound-verifier",
+        "mediated-http"
+      ]
+    },
+    "connectors.auth_access.Purpose": {
+      "title": "Purpose",
+      "x-ess-name": "connectors.auth_access.Purpose",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "service_account",
+        "delegated_user",
+        "app_level",
+        "inbound_verification",
+        "transport_identity",
+        "trunk_registration",
+        "anonymous",
+        "mediated_access"
+      ]
+    },
+    "connectors.auth_access.Scheme": {
+      "title": "Scheme",
+      "x-ess-name": "connectors.auth_access.Scheme",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "http_bearer",
+        "http_basic",
+        "http_signing",
+        "mtls",
+        "socket_peer",
+        "exec_plugin",
+        "sip_digest",
+        "session_authority",
+        "none",
+        "parent"
+      ]
+    },
+    "connectors.auth_access.Subject": {
+      "title": "Subject",
+      "x-ess-name": "connectors.auth_access.Subject",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "app",
+        "user",
+        "none"
+      ]
+    }
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.AuthorizationCoverage",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:66b47438e61e8dfe95f8df1914b46f8438e12b197046ce77e79f09fb70885160",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.AuthorizationCoverage": {
+      "title": "AuthorizationCoverage",
+      "x-ess-name": "connectors.auth_access.AuthorizationCoverage",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/connectors.auth_access.AuthorizationTarget"
+          }
+        }
+      },
+      "required": [
+        "complete",
+        "targets"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.auth_access.AuthorizationResult": {
+      "title": "AuthorizationResult",
+      "x-ess-name": "connectors.auth_access.AuthorizationResult",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "allowed",
+        "denied"
+      ]
+    },
+    "connectors.auth_access.AuthorizationTarget": {
+      "title": "AuthorizationTarget",
+      "x-ess-name": "connectors.auth_access.AuthorizationTarget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/connectors.auth_access.PermissionTarget"
+        },
+        "result": {
+          "$ref": "#/$defs/connectors.auth_access.AuthorizationResult"
+        }
+      },
+      "required": [
+        "target",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.auth_access.PermissionTarget": {
+      "title": "PermissionTarget",
+      "x-ess-name": "connectors.auth_access.PermissionTarget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "verb": {
+          "type": "string"
+        },
+        "api_group": {
+          "type": "string"
+        },
+        "api_version": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "subresource": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "verb",
+        "api_group",
+        "api_version",
+        "resource",
+        "namespace",
+        "name",
+        "subresource"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

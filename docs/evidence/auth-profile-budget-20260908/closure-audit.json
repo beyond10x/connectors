@@ -1,0 +1,40 @@
+{
+  "final_review_inputs_matched": {
+    "a": 55,
+    "b": 49
+  },
+  "final_report_sha256": {
+    "a": "e02d256bfb8bea3797c72253d566792dbc2e94b04dc274358b1e6aaeeb00197c",
+    "b": "e197025e1893986c71a159fd90cae4c0837d6a97b8ec577f484ac8705b8db19c"
+  },
+  "original_findings": 48,
+  "fixed": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "F06",
+    "F07",
+    "F08",
+    "F09",
+    "E01",
+    "E02",
+    "E04",
+    "E09",
+    "E10",
+    "E11",
+    "E13",
+    "E19",
+    "E20",
+    "E21",
+    "E29",
+    "E30"
+  ],
+  "open": 27,
+  "owner_story_statuses": {
+    "draft": 14,
+    "implemented": 13
+  },
+  "review_outcomes_fixed": 21
+}

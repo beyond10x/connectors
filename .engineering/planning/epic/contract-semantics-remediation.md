@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 12
+revision: 14
 ---
 ## Context
 
@@ -55,7 +55,7 @@ After the child stories complete, the intake ledger maps every source finding to
 | P3 | `story:contracts-tenant-header` — Use one configuration name for the monitoring tenant header | E30 |
 | P2 | `story:contracts-mutation-visibility` — Distinguish implemented, enabled and discoverable mutations | E12 |
 
-No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. Mutation outcomes and idempotency scope are implemented as semantic hardening with ESS models; the other 25 children remain draft. The planning verification below records the earlier draft baseline.
+No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. The latest checkpoint below records current closure: thirteen owner stories are implemented for semantic specification scope and fourteen remain draft. Earlier planning and checkpoint sections preserve their historical counts and evidence.
 
 ## Sequencing and shared files
 
@@ -114,3 +114,11 @@ The latest checkpoint implements story:contracts-connection-readiness (F07/E19/E
 The full gate/MSRV1.88 passes with 50 existing Rust tests; ESS0.20.0 validates 11 files/167 declarations and two generations of 176 schema artifacts match byte-for-byte. Eighty schema expectations and the declared decision/textual cases have precisely bounded evidence in docs/evidence/connection-semantics-20260908/verification.md. No runtime or adapter implementation changed.
 
 Current ledger: **16/48 source findings fixed, 32 assigned and open; ten owner stories implemented, 17 draft.** This supersedes prior counts without rewriting their historical evidence. The broad specification goal remains active, including remaining auth/discovery/datasource/media semantics, persistence consolidation, catalog and later stack review. All work remains local.
+
+## Current specification checkpoint — auth access and permission budgets
+
+The checkpoint completes contracts-anonymous-auth (F09/E10), contracts-permission-budgets (F08) and contracts-acquisition-profiles (E09/E29) at the semantic-contract/ESS-value level. Explicit anonymous/direct and parent-authenticated bindings avoid fake credentials/identity and fallback. static_config activation is separate from managed acquisition; flow-specific endpoint/registration/client-auth requirements and reserved support are explicit. Exact permission targets use bounded 64/64/4 admission, safe cache reuse and truthful denial/refusal/coverage without widening the current Page.
+
+Both final independent reviewers approve with zero remaining findings; 21 individual review findings have fixed outcomes. ESS 0.20.0 validates 12 files / 183 declarations, two 191-artifact projections match, 50 schema expectations and 44 textual traces document the actual verification boundary. Full gate/MSRV 1.88 passed 50 existing Rust tests; no new runtime or adapter-kind schema implementation. See docs/evidence/auth-profile-budget-20260908/verification.md and checkpoint.md.
+
+Current ledger: **21/48 original findings fixed, 27 open; 13 owner stories implemented, 14 draft.** This supersedes earlier checkpoint counts without rewriting their evidence. The broader specification goal remains active, including discovery/datasource/media semantics, persistence, catalog/stack and remaining open decisions. All work remains local.
