@@ -1,0 +1,22 @@
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/auth/acquisition/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/adversary-authored.json
+13 authored scenario(s) from 13 file(s), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/adversary-authored.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --scenarios contracts/auth/acquisition/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/adversary-synthesized.json
+133 scenario(s) (13 authored), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/adversary-synthesized.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess specify validate --path ess
+connectors v1 — 7 file(s), valid
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out .local/waves/auth-hardening-20260908/refresh/adversary-ir.json
+connectors v1 — 7 file(s), 76 declaration(s), compiled to .local/waves/auth-hardening-20260908/refresh/adversary-ir.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/operations/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/adversary-operations.json
+15 authored scenario(s) from 15 file(s), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/adversary-operations.json
+exit: 0
+
+$ git diff --check
+exit: 0

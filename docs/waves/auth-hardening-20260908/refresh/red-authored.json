@@ -1,0 +1,10 @@
+{
+  "provenance": {
+    "suite_version": "ess-conformance/4",
+    "system": "connectors",
+    "specification_version": "v1",
+    "spec_digest": "14a6bd4c477d88175a7632c5e9d7235a8d2ad0d75ba9612ed9965c44835499f7",
+    "contract_digest": "0de5d49feedf0bc2f65f9cae838f0b7015aa63867c0faec81c7cc1473d3cff0a"
+  },
+  "scenarios": {}
+}
