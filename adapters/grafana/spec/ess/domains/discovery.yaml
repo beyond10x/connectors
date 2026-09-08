@@ -1,0 +1,19 @@
+domain: connectors_grafana.discovery
+summary: Grafana-owned discovery profile and collection partition identifier.
+
+# Normative owner: adapters/grafana/contracts/discovery/v1alpha1/semantics.md.
+types:
+  - name: connectors_grafana.discovery.ObservationProfile
+    kind: enum
+    variants: [grafana-datasources]
+  - name: connectors_grafana.discovery.PartitionKind
+    kind: enum
+    variants: [collection]
+  - name: connectors_grafana.discovery.RecognitionProvider
+    kind: enum
+    variants: [prometheus, loki, alertmanager]
+
+# UNMAPPED: configured source/profile compatibility, complete collection evidence
+# and public codecs. Map only these reviewed datasource type values to declared
+# recognition; unknown plugins stay observable with recognition/candidate null.
+# These values neither collect nor publish an observation or execute a recognizer.

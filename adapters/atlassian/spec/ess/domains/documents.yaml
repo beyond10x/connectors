@@ -1,0 +1,27 @@
+domain: connectors_atlassian.documents
+summary: Atlassian-owned native document representation and membership vocabulary.
+
+# Normative owner: adapters/atlassian/contracts/documents/v1alpha1/semantics.md §§2–7
+# and adapters/atlassian/design.md §6.1. These are private selection values.
+types:
+  - name: connectors_atlassian.documents.DocumentRepresentation
+    kind: enum
+    variants: [confluence_storage, jira_fields_v2]
+  - name: connectors_atlassian.documents.DocumentScopeKind
+    kind: enum
+    variants: [confluence_space, jira_project]
+  - name: connectors_atlassian.documents.CqlSearchSelection
+    kind: struct
+    fields:
+      - {name: cql, type: String}
+      - {name: limit, type: Integer}
+      - {name: max_body_bytes, type: Integer}
+
+# UNMAPPED: profile compatibility and public spelling (confluence.storage versus
+# jira.fields.v2), full native payload schemas, scoped collection predicates,
+# current canonical identity/membership, query grammar and byte accounting.
+# Shared DocumentReadSelection carries an opaque representation identifier;
+# this vocabulary does not advertise implemented codecs or new declaration fields.
+# UNMAPPED: the structural CQL grammar and original-span/scope rewriting in
+# adapters/atlassian/contracts/documents/v1alpha1/cql.md, provider field/function interpretation,
+# continuation lineage, bounded state and aggregate source/page-result accounting.
