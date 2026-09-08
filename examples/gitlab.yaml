@@ -1,0 +1,11 @@
+service:
+  instance: gitlab-local
+  listen: 127.0.0.1:7101
+  service_credential: {kind: file, path: service.secret}
+http:
+  base_url: https://gitlab.com/api/v4/
+  credential: {kind: file, path: gitlab.secret}
+  credential_header: private-token
+  bearer: false
+adapter:
+  allowed_projects: [gitlab-org/gitlab]

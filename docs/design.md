@@ -1207,3 +1207,30 @@ The custom Connectors adapter kind described here is a proposal to implement in 
 Slack was used to make authentication separation concrete. Its official [token documentation](https://docs.slack.dev/authentication/tokens/) distinguishes token roles; [OAuth installation documentation](https://docs.slack.dev/authentication/installing-with-oauth/) describes application installation; [token rotation documentation](https://docs.slack.dev/authentication/using-token-rotation) describes refresh behavior. The [FAQ](https://docs.slack.dev/faq/) supplies supplementary platform context. These are source references for the example, not a substitute for pinning exact provider facts during adapter authoring.
 
 Recheck current official specifications/documentation before implementing any provider endpoint, parameter, authorization exchange, webhook verification rule, or rate behavior. Store the fetched provenance with the adapter. No vendor API path or protocol implementation should be invented from an architectural sketch.
+
+## 27. First executable slice, 2026-09-08
+
+After this design handoff, the operator authorized the goal **three adapters implemented
+end to end**, selecting **Kubernetes including discovery, GitLab, and SQL**. The
+earlier design-only boundary describes the original handoff; the wider architecture
+above remains the direction, with only the explicitly selected profile implemented.
+
+The normative first-slice behavior is [configured adapter services v1alpha1](../contracts/service/v1alpha1/semantics.md).
+It provides eight read/discovery operations through independent Rust services,
+a generic HTTP client, and one-hop federation. Kubernetes endpoint observations
+feed an explicit host-owned SQL configuration step. The SDK defines abstract
+credential and HTTP capabilities; concrete stores, admission, network transport,
+logging and serving belong to the host. Provider libraries can exclude host wiring
+by disabling their `service` feature. There is no provider registry in core.
+
+Connectors owns [the adapter spec kind](../spec-kinds/adapter/v1/semantics.md),
+its JSON Schema, deterministic descriptor compiler, and handwritten implementation
+obligations. [ESS declarations](../ess/system.yaml) give authored entities a typed
+home. Automatic OpenAPI-to-ESS executable realization, OCI synthesis, OAuth
+acquisition, tenant provisioning, durable events, media sessions, and other
+providers remain future work; the current descriptors do not advertise them.
+
+Start with [the README](../README.md), then [the live acceptance recipe](live-e2e.md)
+and [verification evidence](verification.md). The governing implementation record
+is [story:three-adapters-e2e](../.engineering/planning/story/three-adapters-e2e.md).
+This extension keeps the work local and does not register or integrate it into Atlas.

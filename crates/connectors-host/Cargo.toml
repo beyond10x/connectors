@@ -1,0 +1,25 @@
+[package]
+name = "connectors-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+connectors-core.workspace = true
+connectors-sdk.workspace = true
+connectors-client.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+subtle.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true

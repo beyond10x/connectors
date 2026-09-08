@@ -8,9 +8,9 @@ The proposed design serves the existing Connectors objectives O1 (governed integ
 
 ## Worktree and planning
 
-Use the `workspace-hygiene:worktree` skill and managed `worktree` CLI for repository changes. Reuse an existing managed task tree, acquire and maintain your own session lease, and keep the primary checkout clean. Keep local-only work in an explicit handoff; publish wanted commits before `worktree finish`. Review exact IDs with `worktree gc --dry-run` before any cleanup. Never manually remove a managed tree.
+The operator clarified that single-agent work should happen directly in the checkout. Use managed worktrees when multiple agents need isolated changes. For an existing managed tree, preserve its lifecycle and lease rules; do not manually remove it. Keep all work local until publication is explicitly requested.
 
-Use the `aep-plan:planning` skill and `aep plan artifact` commands for all planning-store mutations. The design handoff is `specification:contract-driven-connectors-design`; implementation stages remain proposals. Model new entities and unresolved relations through the applicable ESS workflow before decomposing implementation work. The adapter specification kind belongs to Connectors.
+Use the `aep-plan:planning` skill and `aep plan artifact` commands for all planning-store mutations. The design handoff is `specification:contract-driven-connectors-design`. The current goal authorizes three adapters end to end: Kubernetes including discovery, GitLab, and SQL. Model new entities and unresolved relations through the applicable ESS workflow before decomposing implementation work. The adapter specification kind belongs to Connectors.
 
 ## Workspace operations
 

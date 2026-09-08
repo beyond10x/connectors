@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: engineering
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: connector-reader
+  namespace: engineering
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: connector-reader
+  namespace: engineering
+rules:
+  - apiGroups: [""]
+    resources: [pods, services]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: connector-reader
+  namespace: engineering
+subjects:
+  - kind: ServiceAccount
+    name: connector-reader
+    namespace: engineering
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: connector-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: connector-node-reader
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: connector-node-reader
+subjects:
+  - kind: ServiceAccount
+    name: connector-reader
+    namespace: engineering
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: connector-node-reader
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: engineering
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      protocol: TCP

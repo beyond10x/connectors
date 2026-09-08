@@ -1,0 +1,103 @@
+# Connectors v2
+
+Independent Rust adapter services for **Kubernetes discovery, GitLab, and SQL**,
+consumed directly or through a provider-independent federation host.
+
+This is a local implementation of the first data/discovery profile. It is not registered in Atlas.
+The current end-to-end goal and evidence are tracked in
+[the implementation story](.engineering/planning/story/three-adapters-e2e.md).
+See [the full design](docs/design.md) and
+[the executable first-slice contract](contracts/service/v1alpha1/semantics.md).
+Run [the live acceptance recipe](docs/live-e2e.md) and read
+[the recorded verification and limits](docs/verification.md).
+
+## Build and test
+
+```sh
+cargo build --workspace --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+ess validate --path ess
+aep plan artifact validate
+```
+
+Normal builds consume the committed descriptors and need neither ESS nor networked
+vendor-source refresh. When editing an adapter specification, regenerate its
+descriptor explicitly, for example:
+
+```sh
+cargo run --locked -p connectors-spec -- \
+  --specification adapters/gitlab/spec/adapter.json \
+  --output adapters/gitlab/generated/descriptor.json
+```
+
+Repeat with `--check` to verify that the committed descriptor matches its source.
+
+Each adapter's default `service` feature adds its standalone executable and host
+wiring. To embed only its contract implementation, disable default features:
+
+```sh
+cargo build --locked -p connectors-kubernetes --lib --no-default-features
+```
+
+The same command works for `connectors-gitlab` and `connectors-sql`. These libraries
+depend on shared contracts/SDK and their protocol dependencies, with no host,
+client, or sibling adapter dependency. The generic client and federation host have
+no adapter dependencies. A new provider supplies an `Adapter` implementation and
+configuration; it requires no provider switch in the shared client or host.
+
+## Run services
+
+Copy the matching file from `examples/`, choose a unique instance/listener, configure
+the permitted resources, and bind private credential files or environment references.
+Credential files must be regular files owned by the running user with mode `0600`.
+Credentials never belong in operation input. Config changes require a restart.
+Credential file replacement is resolved on subsequent requests, including gateway
+downstream credentials. Environment references reflect the process environment;
+changing a parent shell's environment cannot update an already running service.
+
+```sh
+target/debug/connectors-gitlab --config gitlab.yaml
+target/debug/connectors-kubernetes --config kubernetes.yaml
+target/debug/connectors-sql --config sql.yaml
+target/debug/connectors serve --config federation.yaml
+```
+
+The shared CLI discovers the current contract before invoking it:
+
+```sh
+target/debug/connectors describe \
+  --endpoint http://127.0.0.1:7101/ --allow-plaintext --token-file service.secret
+target/debug/connectors invoke \
+  --endpoint http://127.0.0.1:7101/ --allow-plaintext --token-file service.secret \
+  --operation project.get --input examples/requests/gitlab-project.json
+```
+
+Through the example federation host, the same operation is `gitlab__project.get`.
+Source prefixes distinguish instances; the gateway does not interpret provider data.
+The first profile supports one federation hop. It never retries a provider request.
+
+## Supported surfaces
+
+| Adapter | Operations | External binding |
+|---|---|---|
+| GitLab | `project.get`, `issues.list`, `file.get` | GitLab API v4; configured project allowlist; token or public reads |
+| Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover` | Kubernetes API; namespace/kind restrictions; bearer token and CA |
+| SQL | `schema.list`, `query.read` | PostgreSQL; explicit role/database; read-only transactions and deadlines |
+
+SQL uses the `postgresql-native-text` profile: column names and native type names
+accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSON
+representations are preserved without numeric coercion. Parameters are text or null
+and PostgreSQL resolves their types. Use explicit SQL casts where inference needs
+help. The database role's grants govern accessible schemas and functions.
+
+Endpoint discovery reports observations with provenance, readiness and reachability.
+It does not create a connection or dial the discovered address. Explicitly configure
+an SQL binding and its credential after selecting an authorized reachable endpoint.
+
+Service listeners speak HTTP; use loopback locally or a trusted TLS-terminating ingress
+for remote deployments. Upstream TLS certificate validation is enabled by default.
+`allow_plaintext` is an explicit local-test configuration, not a TLS verification bypass.
+
+No adapter in this slice advertises OAuth acquisition, writes, durable events, process
+execution, or media sessions. Those remain separate contracts in the full design.
