@@ -3,9 +3,7 @@ use serde_json::{Value, json};
 use std::path::Path;
 
 fn ess() -> std::path::PathBuf {
-    std::env::var_os("CONNECTORS_ESS")
-        .map(Into::into)
-        .unwrap_or_else(|| "ess".into())
+    connectors_spec::toolchain::resolve(None).unwrap()
 }
 
 fn root() -> &'static Path {

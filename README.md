@@ -16,7 +16,8 @@ Run [the live acceptance recipe](docs/live-e2e.md) and read
 
 ## Build and test
 
-Rust 1.88.0 is the checked minimum. The full test/generation gate uses ESS 0.9.2
+Rust 1.88.0 is the checked minimum. The full test/generation gate uses the ESS pin in
+[`crates/connectors-spec/toolchain.json`](crates/connectors-spec/toolchain.json)
 and the rustfmt recorded in the GitLab generated manifest (currently Rust 1.98.1).
 `--msrv` additionally checks all targets on installed Rust 1.88.0. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
@@ -39,7 +40,12 @@ cargo run --locked -p connectors-spec -- \
 ```
 
 Repeat with `--check` to verify the complete bundle. Generation and its tests need
-ESS 0.9.2 and the recorded rustfmt version. Kubernetes and SQL retain v1 descriptor
+the pinned ESS release and the recorded rustfmt version. The shared resolver checks
+`--ess`, then `CONNECTORS_ESS`, then `.local/toolchains/ess/<version>/bin/ess`, then
+each `ess` on PATH for the exact pinned version. Explicit paths must match; default
+lookup skips other versions. It never installs a tool or changes PATH. See the
+[toolchain setup](docs/gitlab-generation.md#generate-and-check).
+Kubernetes and SQL retain v1 descriptor
 generation: omit `--generate` and select their `generated/descriptor.json` output.
 
 Each adapter's default `service` feature adds its standalone executable and host

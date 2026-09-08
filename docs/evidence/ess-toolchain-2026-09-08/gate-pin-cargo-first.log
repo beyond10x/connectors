@@ -1,0 +1,593 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.78s
+     Running `target/debug/connectors-build gate --msrv`
+gate: ["fmt", "--all", "--", "--check"]
+gate: gitlab descriptor matches
+gate: kubernetes descriptor matches
+gate: sql descriptor matches
+gate: ["build", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.93s
+gate: ["test", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling rcgen v0.14.10
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Finished `test` profile [unoptimized] target(s) in 8.81s
+     Running unittests src/main.rs (target/debug/deps/connectors-e353054912b5d7b7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/input.rs (target/debug/deps/input-9a4f2003ded84093)
+
+running 1 test
+test duplicate_input_keys_are_refused_before_service_contact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_build-a87142f8288e6e2c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_client-b6c77ade1c095e5d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_conformance-afab23f51da3f4f6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_contracts-3f7d74457960be3c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_core-1124beec67631947)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire.rs (target/debug/deps/wire-98d8c392a2070060)
+
+running 4 tests
+test canonicalization_is_recursive_and_order_independent ... ok
+test contradictory_response_payloads_are_refused ... ok
+test duplicate_keys_are_refused_at_every_depth ... ok
+test response_roundtrips_success_and_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_gitlab-1f018179d5f67ab1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_gitlab-46c99abf9e3bdc6c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/obligations.rs (target/debug/deps/obligations-3c9fe3e130f692fc)
+
+running 4 tests
+test generated_file_mapping_passes_unencoded_segments_to_the_scoped_transport ... ok
+test generated_dispatch_rejects_invalid_inputs_before_transport ... ok
+test empty_pages_with_continuation_and_full_pages_without_headers_are_partial ... ok
+test response_failures_and_nonadvancing_pagination_remain_explicit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/provider.rs (target/debug/deps/provider-73908231c6756c99)
+
+running 1 test
+test project_issue_pagination_and_file_reads_use_scoped_auth_over_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_host-e394843e8811505a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/http.rs (target/debug/deps/http-60ed5b0674485c3b)
+
+running 3 tests
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+test custom_ca_accepts_its_endpoint_and_refuses_other_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/service.rs (target/debug/deps/service-1c8f8a1351fe43b6)
+
+running 6 tests
+test credential_stores_are_substitutable_and_file_permissions_are_enforced ... ok
+test configuration_yaml_and_json_remain_strict ... ok
+test invalid_identifiers_cannot_inject_log_lines_or_terminal_controls ... ok
+test wire_admission_and_freshness_refuse_before_dispatch ... ok
+test federation_preserves_result_and_reports_downstream_failure ... ok
+test federation_refreshes_atomically_without_replaying_and_rotates_credentials ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_kubernetes-4aa3ea5378117aec)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_kubernetes-3cde772f3cc7548a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/provider.rs (target/debug/deps/provider-5cd2f5a6536edc70)
+
+running 1 test
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sdk-79c1a0b8d3ba734d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cursor.rs (target/debug/deps/cursor-8334e62a8dc883b3)
+
+running 1 test
+test cursors_cannot_be_rebound_forged_or_reused_after_restart ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_spec-947424d9e406b0c3)
+
+running 4 tests
+test toolchain::tests::committed_manifest_uses_the_repository_pin ... ok
+test toolchain::tests::missing_pin_reports_record_and_search_locations_and_cache_is_supported ... ok
+test toolchain::tests::default_search_is_independent_of_path_version_order ... ok
+test toolchain::tests::explicit_overrides_win_and_wrong_paths_do_not_fall_back ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_spec-a27cb07f1d606a5b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compiler.rs (target/debug/deps/compiler-8f744a8f5d28a3eb)
+
+running 4 tests
+test configuration_examples_are_data_not_imports ... ok
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+test shared_configuration_imports_keep_constraints_and_reject_unknown_versions ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/generation.rs (target/debug/deps/generation-4c3661c2dc5663ed)
+
+running 5 tests
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test checked_in_bundle_matches_its_pinned_sources_and_toolchain ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.97s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sql-a48b6b33f0c790ca)
+
+running 1 test
+test tls_tests::configured_ca_replaces_public_roots_and_requires_certificates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_sql-fcaa409137b1bc0b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-1417fa4bb675d4fb)
+
+running 3 tests
+test parsing_and_limits_refuse_before_credentials_or_connection ... ok
+test rows_nulls_native_types_and_truncation_are_preserved ... ok
+test authentication_database_errors_and_row_capacity_are_sanitized ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.95s
+
+   Doc-tests connectors_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_gitlab
+
+running 1 test
+test adapters/gitlab/src/lib.rs - (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+   Doc-tests connectors_host
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+gate: ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+    Checking ring v0.17.14
+    Checking rustls-webpki v0.103.15
+    Checking rcgen v0.14.10
+    Checking rustls v0.23.44
+    Checking tokio-rustls v0.26.5
+    Checking hyper-rustls v0.27.9
+    Checking tokio-postgres-rustls v0.14.0
+    Checking reqwest v0.12.28
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.60s
+gate: ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+gate: connectors-gitlab library boundary holds
+gate: ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+gate: connectors-kubernetes library boundary holds
+gate: ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+   Compiling rustls v0.23.44
+   Compiling tokio-rustls v0.26.5
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.81s
+gate: connectors-sql library boundary holds
+gate: generic CLI boundary holds
+gate: ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling libc v0.2.189
+   Compiling syn v3.0.5
+   Compiling syn v2.0.119
+    Checking cfg-if v1.0.4
+   Compiling serde_core v1.0.229
+    Checking itoa v1.0.18
+    Checking memchr v2.8.3
+    Checking typenum v1.20.1
+   Compiling synstructure v0.13.2
+   Compiling serde v1.0.229
+   Compiling serde_derive v1.0.229
+    Checking once_cell v1.21.4
+   Compiling zerofrom-derive v0.1.7
+    Checking smallvec v1.16.0
+    Checking zerofrom v0.1.8
+   Compiling yoke-derive v0.8.2
+    Checking stable_deref_trait v1.2.1
+   Compiling version_check v0.9.5
+   Compiling zmij v1.0.23
+    Checking yoke v0.8.3
+    Checking bytes v1.12.1
+   Compiling serde_json v1.0.151
+   Compiling zerovec-derive v0.11.6
+    Checking pin-project-lite v0.2.17
+    Checking zerovec v0.11.8
+   Compiling displaydoc v0.2.7
+    Checking percent-encoding v2.3.2
+    Checking futures-core v0.3.34
+   Compiling getrandom v0.4.3
+    Checking rand_core v0.10.1
+    Checking subtle v2.6.1
+    Checking tinystr v0.8.4
+   Compiling generic-array v0.14.7
+    Checking errno v0.3.14
+    Checking writeable v0.6.4
+    Checking litemap v0.8.3
+    Checking signal-hook-registry v1.4.8
+    Checking icu_locale_core v2.3.0
+    Checking zerotrie v0.2.5
+    Checking potential_utf v0.1.6
+   Compiling tokio-macros v2.7.2
+    Checking socket2 v0.6.5
+    Checking mio v1.2.3
+   Compiling autocfg v1.5.1
+    Checking base64 v0.22.1
+    Checking futures-sink v0.3.34
+   Compiling shlex v2.0.1
+    Checking log v0.4.34
+   Compiling icu_properties_data v2.3.0
+    Checking utf8_iter v1.0.4
+   Compiling icu_normalizer_data v2.3.0
+   Compiling find-msvc-tools v0.1.12
+    Checking icu_collections v2.3.0
+   Compiling cc v1.4.5
+    Checking tokio v1.53.1
+   Compiling num-traits v0.2.19
+    Checking icu_provider v2.3.1
+   Compiling ring v0.17.14
+    Checking tracing-core v0.1.36
+    Checking icu_normalizer v2.3.0
+    Checking icu_properties v2.3.0
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking http v1.5.0
+   Compiling tracing-attributes v0.1.31
+   Compiling futures-macro v0.3.34
+    Checking slab v0.4.12
+    Checking futures-task v0.3.34
+    Checking zeroize v1.9.0
+    Checking futures-util v0.3.34
+    Checking rustls-pki-types v1.15.1
+    Checking http-body v1.1.0
+    Checking tracing v0.1.44
+    Checking digest v0.10.7
+    Checking idna_adapter v1.2.2
+    Checking getrandom v0.2.17
+   Compiling parking_lot_core v0.9.12
+   Compiling thiserror v2.0.20
+    Checking untrusted v0.9.0
+    Checking idna v1.1.0
+    Checking num-integer v0.1.47
+    Checking futures-channel v0.3.34
+    Checking aho-corasick v1.1.5
+   Compiling thiserror-impl v2.0.20
+    Checking scopeguard v1.2.0
+    Checking cpufeatures v0.2.17
+   Compiling ref-cast v1.0.27
+    Checking regex-syntax v0.8.11
+   Compiling httparse v1.10.1
+    Checking tower-service v0.3.3
+    Checking sha2 v0.10.9
+    Checking lock_api v0.4.14
+   Compiling ref-cast-impl v1.0.27
+    Checking hex v0.4.3
+    Checking regex-automata v0.4.18
+   Compiling rustls v0.23.44
+   Compiling getrandom v0.3.4
+   Compiling zerocopy v0.8.56
+    Checking try-lock v0.2.5
+    Checking want v0.3.1
+    Checking parking_lot v0.12.5
+    Checking num-bigint v0.4.8
+    Checking rustls-webpki v0.103.15
+    Checking uuid v1.26.0
+    Checking sync_wrapper v1.0.2
+    Checking form_urlencoded v1.2.2
+   Compiling ahash v0.8.12
+    Checking lazy_static v1.5.0
+    Checking atomic-waker v1.1.2
+    Checking tower-layer v0.3.3
+    Checking httpdate v1.0.3
+    Checking hyper v1.11.1
+    Checking num-rational v0.4.2
+    Checking connectors-core v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-core)
+    Checking num-iter v0.1.46
+    Checking num-complex v0.4.6
+    Checking ipnet v2.12.2
+    Checking bitflags v2.13.1
+    Checking borrow-or-share v0.2.4
+    Checking ryu v1.0.23
+    Checking bit-vec v0.8.0
+    Checking bit-set v0.8.0
+    Checking fluent-uri v0.3.2
+    Checking hyper-util v0.1.20
+    Checking num v0.4.3
+    Checking tokio-rustls v0.26.5
+    Checking tower v0.5.3
+    Checking http-body-util v0.1.5
+    Checking tokio-util v0.7.19
+   Compiling async-trait v0.1.92
+    Checking outref v0.5.2
+    Checking vsimd v0.8.0
+    Checking fraction v0.15.4
+    Checking uuid-simd v0.8.0
+    Checking referencing v0.33.0
+    Checking fancy-regex v0.16.2
+    Checking serde_urlencoded v0.7.1
+    Checking url v2.5.8
+    Checking regex v1.13.1
+    Checking webpki-roots v1.0.9
+    Checking email_address v0.2.9
+    Checking bytecount v0.6.9
+    Checking num-cmp v0.1.0
+    Checking hyper-rustls v0.27.9
+    Checking tower-http v0.6.11
+    Checking jsonschema v0.33.0
+    Checking hmac v0.12.1
+    Checking connectors-contracts v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-contracts)
+    Checking reqwest v0.12.28
+   Compiling serde_derive_internals v0.30.0
+    Checking equivalent v1.0.2
+    Checking hashbrown v0.17.1
+    Checking mime v0.3.17
+    Checking axum-core v0.5.6
+    Checking indexmap v2.14.2
+    Checking connectors-sdk v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-sdk)
+   Compiling schemars_derive v1.2.2
+    Checking sharded-slab v0.1.7
+    Checking matchers v0.2.0
+    Checking tracing-log v0.2.0
+    Checking serde_path_to_error v0.1.20
+    Checking thread_local v1.1.10
+    Checking matchit v0.8.4
+    Checking dyn-clone v1.0.20
+    Checking nu-ansi-term v0.50.3
+    Checking unsafe-libyaml v0.2.11
+    Checking tracing-subscriber v0.3.23
+    Checking serde_yaml_ng v0.10.0
+    Checking axum v0.8.9
+    Checking schemars v1.2.2
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking utf8parse v0.2.2
+    Checking anstyle-parse v1.0.0
+    Checking anstyle-query v1.1.5
+    Checking colorchoice v1.0.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle v1.0.14
+    Checking anstream v1.0.0
+    Checking strsim v0.11.1
+    Checking clap_lex v1.1.0
+   Compiling heck v0.5.0
+   Compiling clap_derive v4.6.4
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking clap_builder v4.6.6
+   Compiling rustix v1.1.4
+    Checking linux-raw-sys v0.12.1
+    Checking clap v4.6.6
+    Checking fastrand v2.5.0
+    Checking hybrid-array v0.4.14
+    Checking cmov v0.5.4
+    Checking tempfile v3.27.0
+    Checking ctutils v0.4.2
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+    Checking const-oid v0.10.2
+    Checking tinyvec_macros v0.1.1
+    Checking cpufeatures v0.3.1
+    Checking tinyvec v1.13.2
+    Checking digest v0.11.3
+    Checking chacha20 v0.10.2
+    Checking unicode-normalization v0.1.25
+    Checking unicode-bidi v0.3.18
+    Checking unicode-properties v0.1.4
+    Checking rand v0.10.2
+    Checking stringprep v0.1.5
+    Checking hmac v0.13.0
+    Checking md-5 v0.11.0
+    Checking sha2 v0.11.0
+   Compiling der_derive v0.7.3
+    Checking fallible-iterator v0.2.0
+    Checking siphasher v1.0.3
+    Checking time-core v0.1.9
+    Checking flagset v0.4.7
+    Checking byteorder v1.5.0
+    Checking num-conv v0.2.2
+    Checking powerfmt v0.2.0
+    Checking deranged v0.5.8
+    Checking const-oid v0.9.6
+    Checking der v0.7.10
+    Checking time v0.3.55
+    Checking postgres-protocol v0.6.12
+    Checking phf_shared v0.13.1
+    Checking base64 v0.23.1
+    Checking postgres-types v0.2.14
+    Checking pem v4.0.0
+    Checking phf v0.13.1
+    Checking yasna v0.6.0
+    Checking spki v0.7.3
+    Checking whoami v2.1.3
+    Checking rcgen v0.14.10
+    Checking tokio-postgres v0.7.18
+    Checking x509-cert v0.2.5
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking gitlab-types v1.0.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab/generated/rust/crates/gitlab-types)
+    Checking tokio-postgres-rustls v0.14.0
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 42.84s
+gate: ["validate", "--path", "ess"]
+connectors v1 — 2 file(s), valid
+gate: ["plan", "artifact", "validate"]
+7 file(s) in /home/timo/beyond10x/connectors_v2/.engineering/planning: 7 artifact(s)
+valid
+gate: all checks passed

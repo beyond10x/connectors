@@ -256,3 +256,29 @@ schema checks, offline builds, dependency boundaries and Rust 1.88 checks for al
 targets. The [audit](evidence/review-2026-09-08/audit.json) has no vulnerabilities
 or warnings. It adds local PostgreSQL protocol and TLS fixtures without claiming
 a repeat of the earlier live services or image build.
+
+## ESS executable resolution — 2026-09-08
+
+The repository now owns its pin in `crates/connectors-spec/toolchain.json`.
+The resolver was first verified with the unchanged 0.9.2 pin. Both commands below
+exited 0 and printed `gate: all checks passed`, including the Rust 1.88 check:
+
+```sh
+env -u CONNECTORS_ESS PATH="/home/timo/.cargo/bin:/home/timo/.local/bin:$PATH" TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked -p connectors-build -- gate --msrv
+env -u CONNECTORS_ESS PATH="/home/timo/.local/bin:/home/timo/.cargo/bin:$PATH" TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked -p connectors-build -- gate --msrv
+```
+
+The corresponding [cargo-first](evidence/ess-toolchain-2026-09-08/gate-pin-cargo-first.log)
+and [local-first](evidence/ess-toolchain-2026-09-08/gate-pin-local-first.log) logs
+contain 39 passing tests each. With the same cargo-first environment,
+`cargo test --locked -p connectors-spec --test generation` passed
+[5/5](evidence/ess-toolchain-2026-09-08/generation-pin-cargo-first.log).
+
+With `CONNECTORS_ESS` unset and `PATH=/home/timo/.cargo/bin:/usr/bin:/bin`,
+`target/debug/connectors-build gate --msrv` and the standalone generation tests
+both refused the absent 0.9.2 binary, naming the pin and searched locations:
+[gate refusal](evidence/ess-toolchain-2026-09-08/missing-pin.log),
+[generation refusal](evidence/ess-toolchain-2026-09-08/generation-missing-pin.log).
+No installed executable was renamed. Isolated resolver tests also cover matching
+and mismatching explicit flags/environment paths, cache selection, both PATH
+orders, and agreement between the committed manifest and the repository pin.

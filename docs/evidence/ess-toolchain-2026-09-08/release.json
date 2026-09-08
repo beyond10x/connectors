@@ -1,0 +1,25 @@
+{
+  "release": "0.20.0",
+  "published_at": "2026-09-06T16:07:45Z",
+  "tag_commit": "c90ca1b2a3a5db02d7580dab63be6cbc56679e0b",
+  "archive_url": "https://github.com/beyond10x/ess/releases/download/0.20.0/ess-0.20.0-x86_64-unknown-linux-gnu.tar.gz",
+  "archive_sha256": "569a34b0c2263e663140579b8511c321514fd6428634d6e62ddf2e2b15c66232",
+  "checksum_verified_against": "GitHub release asset digest and SHA256SUMS",
+  "executables": [
+    {
+      "path": "/home/timo/.local/bin/ess",
+      "version": "ess 0.9.2",
+      "sha256": "d80b370d62f50c1146b05fd3ff712fd512e7f2803fda4a31b9d503fc8b79b435"
+    },
+    {
+      "path": "/home/timo/.cargo/bin/ess",
+      "version": "ess 0.18.0",
+      "sha256": "11fef16deb8352eb917c635e6a9029f2f6d555f8ce6702571f61e0c4fcb707a9"
+    },
+    {
+      "path": "/home/timo/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess",
+      "version": "ess 0.20.0",
+      "sha256": "eff3b1c8fe8834b2700681267906c768444a6e38e703ebe5349dd7e472da4980"
+    }
+  ]
+}

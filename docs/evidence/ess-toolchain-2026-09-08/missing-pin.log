@@ -1,0 +1,4 @@
+PATH=/home/timo/.cargo/bin:/usr/bin:/bin; CONNECTORS_ESS unset
+['target/debug/connectors-build', 'gate', '--msrv']
+exit=1
+Error: Error { code: InvalidInput, message: "/home/timo/beyond10x/connectors_v2/crates/connectors-spec/toolchain.json requires ess 0.9.2; no matching ESS executable. Searched: /home/timo/beyond10x/connectors_v2/crates/connectors-spec/../../.local/toolchains/ess/0.9.2/bin/ess: No such file or directory (os error 2); /home/timo/.cargo/bin/ess: found ess 0.18.0; /usr/bin/ess: No such file or directory (os error 2); /bin/ess: No such file or directory (os error 2). Install the pinned release in /home/timo/beyond10x/connectors_v2/crates/connectors-spec/../../.local/toolchains/ess/0.9.2/bin/ess or on PATH; --ess and CONNECTORS_ESS select an explicit executable.", retry_after_seconds: None }

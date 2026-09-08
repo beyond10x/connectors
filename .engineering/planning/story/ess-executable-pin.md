@@ -2,14 +2,23 @@
 format: aep.planning-md/1
 id: story:ess-executable-pin
 kind: story
-status: draft
+status: implemented
 title: Resolve the pinned ESS executable from a repository record
 summary: Gate and generation tests pick the ESS binary matching a repository pin file instead of whatever ess is first on PATH.
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: story:full-review-remediation
 - informed_by: story:gitlab-spec-service
-revision: 1
+scope:
+- confidence: cited
+  path: README.md
+- confidence: cited
+  path: crates/connectors-build
+- confidence: cited
+  path: crates/connectors-spec
+- confidence: cited
+  path: docs
+revision: 6
 ---
 ## Context
 
@@ -42,4 +51,4 @@ Run the README gate command twice, once with `~/.cargo/bin` first on PATH and on
 
 ## Progress
 
-Drafted 2026-09-08 from the full-review re-check. Not started.
+Implemented 2026-09-08. One repository record drives the shared resolver, generator, build tool, tests, generated manifest and build evidence. Exact checked overrides take precedence; default selection checks a versioned checkout cache and every PATH entry, returning an absolute executable. Both full README gates pass with the original 0.9.2 pin under reversed PATH orders (39 tests each), standalone generation passes 5/5 with CONNECTORS_ESS unset and 0.18.0 first, and isolated-PATH gate/generation refusals name the record and searched candidates. Installed binaries were never renamed. Commands and logs: docs/verification.md, ESS executable resolution section, and docs/evidence/ess-toolchain-2026-09-08/. The dependent upgrade is verified separately.
