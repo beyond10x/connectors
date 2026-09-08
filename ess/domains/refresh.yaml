@@ -1,2 +1,280 @@
 domain: connectors.refresh
-# Reserved private authoring surface for story:contracts-refresh-coordination.
+
+summary: Proposed host-owned durable authorization of one rotating refresh per credential generation.
+
+# Normative owner: contracts/auth/acquisition/v1alpha1/semantics.md §4.1.
+# These commands are trusted coordinator ledger operations, not public APIs.
+types:
+  - name: connectors.refresh.RefreshAttemptId
+    kind: newtype
+    of: Uuid
+  - name: connectors.refresh.OwnershipToken
+    kind: newtype
+    of: Uuid
+  - name: connectors.refresh.OwnershipRefusalReason
+    kind: enum
+    variants: [stale_owner]
+  - name: connectors.refresh.SourceRefusalReason
+    kind: enum
+    variants: [reserved, exchange_already_authorized, binding_changed, revoked]
+  - name: connectors.refresh.PublicationRefusalReason
+    kind: enum
+    variants: [binding_changed, revoked, evidence_invalid, candidate_unavailable]
+
+  # Trusted transaction decisions are typed values, never persisted approval
+  # tickets or caller assertions. The coordinator derives them while holding the
+  # same atomic metadata operation that applies the selected outcome. ESS does
+  # not derive them from another entity, a clock or the network.
+  - name: connectors.refresh.ReservationDecision
+    kind: enum
+    variants: [allow, source_unavailable]
+  - name: connectors.refresh.AuthorizationDecision
+    kind: enum
+    variants: [allow, ownership_conflict, source_unavailable]
+  - name: connectors.refresh.ResponseDecision
+    kind: enum
+    variants: [allow, ownership_conflict]
+  - name: connectors.refresh.PublicationDecision
+    kind: enum
+    variants: [allow, ownership_conflict, publication_refused]
+
+entities:
+  - name: connectors.refresh.RefreshAttempt
+    identity:
+      name: attempt_id
+      type: connectors.refresh.RefreshAttemptId
+    fields:
+      - {name: source_generation_id, type: connectors.credentials.CredentialGenerationId}
+      - {name: initial_owner, type: String}
+      - {name: initial_ownership_token, type: connectors.refresh.OwnershipToken}
+      - {name: expected_binding_revision, type: String}
+      - {name: candidate_generation_id, type: "Optional<connectors.credentials.CredentialGenerationId>"}
+    relations:
+      - name: source_generation
+        kind: references
+        target: connectors.credentials.CredentialGeneration
+        cardinality: one
+        via: source_generation_id
+      - name: candidate_generation
+        kind: references
+        target: connectors.credentials.CredentialGeneration
+        cardinality: one
+        via: candidate_generation_id
+    # The optional carrier makes this relation zero-or-one until response storage.
+    # An attempt outlives its source being superseded; this is not ownership.
+    # UNMAPPED: current owner/fence metadata after recovery and state-dependent
+    # candidate assignment. Their atomic joins are obligations below, not a claim
+    # made by the initial-owner fields or the typed optional reference.
+    lifecycle:
+      initial: Reserved
+      states: [Reserved, Authorized, ResponseStored, Recovering, Published, Fenced, Uncertain, Discarded]
+      terminal: [Published, Fenced, Uncertain, Discarded]
+      transitions:
+        - {name: authorize, from: [Reserved], to: Authorized}
+        - {name: fence, from: [Reserved], to: Fenced}
+        - {name: store_response, from: [Authorized], to: ResponseStored}
+        - {name: quarantine, from: [Authorized], to: Uncertain}
+        - {name: recover_response, from: [ResponseStored], to: Recovering}
+        - {name: publish, from: [ResponseStored, Recovering], to: Published}
+        - {name: discard, from: [ResponseStored, Recovering], to: Discarded}
+
+errors:
+  - name: connectors.refresh.RefreshStateConflict
+    fields:
+      - {name: state, type: connectors.refresh.RefreshAttempt.State}
+  - name: connectors.refresh.SourceUnavailable
+    fields:
+      - {name: reason, type: connectors.refresh.SourceRefusalReason}
+  - name: connectors.refresh.OwnershipConflict
+    fields:
+      - {name: reason, type: connectors.refresh.OwnershipRefusalReason}
+  - name: connectors.refresh.PublicationRefused
+    fields:
+      - {name: reason, type: connectors.refresh.PublicationRefusalReason}
+
+commands:
+  - name: connectors.refresh.ReserveRefresh
+    # Atomic per-source index acquisition, conditional on the current binding,
+    # non-revocation and no previously authorized exchange for this source. A
+    # Fenced pre-authorization attempt alone permits a new reservation.
+    input:
+      - {name: decision, type: connectors.refresh.ReservationDecision}
+      - {name: source_generation_id, type: connectors.credentials.CredentialGenerationId}
+      - {name: owner, type: String}
+      - {name: ownership_token, type: connectors.refresh.OwnershipToken}
+      - {name: expected_binding_revision, type: String}
+    outcomes:
+      - name: reserved
+        when: decision == allow
+        creates: connectors.refresh.RefreshAttempt
+        instance: attempt_id
+        emits: [connectors.refresh.RefreshReserved]
+      - name: source-unavailable
+        error: connectors.refresh.SourceUnavailable
+  - name: connectors.refresh.AuthorizeExchange
+    # Persist authorization and consume the source's one-send authority BEFORE
+    # any possible provider call, invalidating source-generation admissions in
+    # that same transaction. Success grants the original live invocation a
+    # single non-replayable send, not a reusable command result or durable ticket.
+    input:
+      - {name: decision, type: connectors.refresh.AuthorizationDecision}
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: owner, type: String}
+      - {name: ownership_token, type: connectors.refresh.OwnershipToken}
+    outcomes:
+      - name: authorized
+        when: decision == allow
+        moves: connectors.refresh.RefreshAttempt.authorize
+        instance: attempt_id
+        emits: [connectors.refresh.ExchangeAuthorized]
+      - name: ownership-conflict
+        when: decision == ownership_conflict
+        error: connectors.refresh.OwnershipConflict
+      - name: source-unavailable
+        error: connectors.refresh.SourceUnavailable
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.FenceReserved
+    # CAS with AuthorizeExchange. Only Reserved can be reclaimed; atomically
+    # close the old attempt and invalidate its fence before releasing the index.
+    input:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+    outcomes:
+      - name: fenced
+        moves: connectors.refresh.RefreshAttempt.fence
+        instance: attempt_id
+        emits: [connectors.refresh.ReservedOwnerFenced]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.StoreResponse
+    # Requires durable candidate material and generation-bound F05 validation.
+    # Atomically attach the candidate to this attempt under current ownership.
+    input:
+      - {name: decision, type: connectors.refresh.ResponseDecision}
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: owner, type: String}
+      - {name: ownership_token, type: connectors.refresh.OwnershipToken}
+      - {name: candidate_generation_id, type: connectors.credentials.CredentialGenerationId}
+    outcomes:
+      - name: stored
+        when: decision == allow
+        moves: connectors.refresh.RefreshAttempt.store_response
+        instance: attempt_id
+        emits: [connectors.refresh.RefreshResponseStored]
+      - name: ownership-conflict
+        error: connectors.refresh.OwnershipConflict
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.QuarantineRefresh
+    # CAS with StoreResponse. An Authorized attempt with no committed candidate
+    # becomes terminal even if no bytes were actually sent. Late responses are
+    # discarded; repair creates fresh material, never another source exchange.
+    input:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+    outcomes:
+      - name: uncertain
+        moves: connectors.refresh.RefreshAttempt.quarantine
+        instance: attempt_id
+        emits: [connectors.refresh.RefreshUncertain]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.RecoverStoredResponse
+    # Fence the old publication owner and grant a new publication-only owner.
+    # This cannot call the provider, authorize exchange or replace the candidate.
+    input:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: new_owner, type: String}
+      - {name: new_ownership_token, type: connectors.refresh.OwnershipToken}
+    outcomes:
+      - name: recovered
+        moves: connectors.refresh.RefreshAttempt.recover_response
+        instance: attempt_id
+        emits: [connectors.refresh.StoredResponseRecovered]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.PublishRefresh
+    # One atomic coordinator transaction: match attempt state, current owner/fence,
+    # source generation, expected binding revision, candidate and current evidence;
+    # require non-revocation, then replace active generation and mark Published.
+    input:
+      - {name: decision, type: connectors.refresh.PublicationDecision}
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: owner, type: String}
+      - {name: ownership_token, type: connectors.refresh.OwnershipToken}
+      - {name: candidate_generation_id, type: connectors.credentials.CredentialGenerationId}
+    outcomes:
+      - name: published
+        when: decision == allow
+        moves: connectors.refresh.RefreshAttempt.publish
+        instance: attempt_id
+        emits: [connectors.refresh.RefreshPublished]
+      - name: ownership-conflict
+        when: decision == ownership_conflict
+        error: connectors.refresh.OwnershipConflict
+      - name: publication-refused
+        error: connectors.refresh.PublicationRefused
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+  - name: connectors.refresh.DiscardCandidate
+    # Definitive unusable candidate / lost binding / revocation, or a lost
+    # publication-only recovery owner. Source authorization remains consumed.
+    input:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+    outcomes:
+      - name: discarded
+        moves: connectors.refresh.RefreshAttempt.discard
+        instance: attempt_id
+        emits: [connectors.refresh.RefreshCandidateDiscarded]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.refresh.RefreshStateConflict
+
+events:
+  - name: connectors.refresh.RefreshReserved
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+  - name: connectors.refresh.ExchangeAuthorized
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+  - name: connectors.refresh.ReservedOwnerFenced
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+  - name: connectors.refresh.RefreshResponseStored
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: candidate_generation_id, type: connectors.credentials.CredentialGenerationId}
+  - name: connectors.refresh.RefreshUncertain
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+  - name: connectors.refresh.StoredResponseRecovered
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+  - name: connectors.refresh.RefreshPublished
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: candidate_generation_id, type: connectors.credentials.CredentialGenerationId}
+  - name: connectors.refresh.RefreshCandidateDiscarded
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+
+views:
+  - name: connectors.refresh.RefreshStates
+    source: connectors.refresh.RefreshAttempt
+    consistency: read_your_writes
+    fields:
+      - {name: attempt_id, type: connectors.refresh.RefreshAttemptId}
+      - {name: source_generation_id, type: connectors.credentials.CredentialGenerationId}
+      - {name: state, type: connectors.refresh.RefreshAttempt.State}
+
+# UNMAPPED executable obligations: per-source reservation/consumption uniqueness,
+# non-replayable send authorization, real lease expiry and fencing, crash-safe
+# durability, immutable byte capture and candidate binding, current F05 evidence,
+# identity/scope comparisons, linearizable active-reference/revocation update,
+# field assignment, transport invocation and prevention of provider-client retries.
+# ESS checks declaration shape and lifecycle causation, not those algorithms.
