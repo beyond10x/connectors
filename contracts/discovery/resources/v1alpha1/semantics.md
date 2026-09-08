@@ -12,7 +12,7 @@
 | Profiles | `grafana-datasources`, `kubernetes-service-targets` |
 | Relation to `endpoint_discovery` | same observation discipline (no dial, no credential, candidates not grants); differs in that the observed resource has an opaque locator rather than an address and port, and in that a recognized observation names a target adapter that could be reached *through* the source |
 
-Three discoveries are distinct: service, contract, resource (`docs/design.md:319-323`). This contract is resource discovery for provider objects whose address is either hidden by the provider (a Grafana data source's backend origin is never exposed) or not routable from the observer (a Kubernetes Service). An observation carries a stable source identity, an observed resource reference, a type/profile, owner scope, an address *or opaque locator*, reachability context, observation time/revision, and known authentication requirements without values (`docs/design.md:468`).
+Three discoveries are distinct: service, contract, resource (`docs/design.md:319-323`). This contract is resource discovery for provider objects whose address is hidden by the provider (a Grafana data source's backend origin is never exposed) or whose native identity is not a caller-routable address (a Kubernetes Service). An observation carries a stable source identity, an observed resource reference, a type/profile, owner scope, an opaque locator, reachability context, observation time/revision, and known authentication requirements without values (`docs/design.md:468`). Address/port observations use `endpoint_discovery`; `address` is removed from this contract's selectable locator values rather than retained as unused shared vocabulary.
 
 ## 2. Old evidence and disposition
 
@@ -65,7 +65,7 @@ An admitted observation operation returns pages of one published discovery view.
 
 | Field | Rule |
 |---|---|
-| `locator.kind` | `opaque` (digest of the provider identity; the identity itself stays private), `address` (reserved; `endpoint_discovery` covers it today) |
+| `locator.kind` | `opaque` only (digest of the provider identity; the identity itself stays private). `address` is removed/refused here because `endpoint_discovery` owns address/port observations. |
 | `recognition` | required-null when unrecognized, otherwise the adapter-declared provider marker and shared declared/inferred confidence; an inferred marker is not proof of an API or an available adapter |
 | `candidate` | required-null unless the selected mapping supplies a potential adapter/route/auth placement; confidence agrees with recognition. Recognition can exist without a candidate, without an installed target adapter |
 | `auth_requirement.kind` | `inherited_from_source` (mediated route uses the source connection's credential), `separate` (a direct connection needs its own), `unknown` |
@@ -192,6 +192,7 @@ Observation ids, scope refs and selection/partition refs are bounded safe string
 - Title-only rename → same id/fixed target; same UID with changed hidden target or port → new id, old child refuses.
 - A repeated partial scan cannot grow retained history beyond the bound or refresh its original expiry; eviction is unknown, not deletion.
 - No materialization occurs from observation alone: the fake host's connection store is unchanged after observe.
+- A resource observation or declaration naming `locator.kind: address` → refused before publication; represent an address/port observation through `endpoint_discovery` instead.
 
 ## 7. Compatibility
 - [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Discovery observations and page generation/coverage use a selected new payload schema. Existing endpoint discovery and the closed Page reader do not gain fields automatically.
