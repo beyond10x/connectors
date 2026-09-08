@@ -6,3 +6,6 @@ domains:
   - connectors.declarations
   - connectors.mutations
   - connectors.idempotency
+  - connectors.credentials
+  - connectors.refresh
+  - connectors.credential_evidence
