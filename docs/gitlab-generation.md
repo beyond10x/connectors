@@ -9,13 +9,21 @@ input and its separate license.
 
 ## Generate and check
 
-Use ESS **0.9.2** and the rustfmt version recorded in the generated manifest.
-This is a reproducibility pin, not a claim about the newest installed ESS. The
-review shell reported 0.18.0; the implementation/remediation shell reports 0.9.2.
-If `ess --version` differs, pass `--ess /path/to/pinned/ess` to the generator or
-build tool. The gate propagates this selection as `CONNECTORS_ESS` to tests;
-standalone generation tests accept that environment variable too. An upgrade
-requires regenerating and reviewing the bundle, import refusal and build evidence.
+The single editable ESS version is
+[`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json).
+Use that release and the rustfmt version recorded in the generated manifest.
+The generator, build tool and standalone generation tests share one resolver:
+`--ess` overrides `CONNECTORS_ESS`; otherwise it checks the checkout-local
+`.local/toolchains/ess/<version>/bin/ess` and then every `ess` on PATH in order.
+Explicit paths must match the pin and never fall back; a bare executable name
+searches PATH for the matching version. Resolution returns an absolute path,
+skips other versions during default lookup, and reports the pin file and searched
+locations if none matches. The gate passes its resolved path to tests.
+
+Install a checksum-verified official release at the checkout-local path above or
+in a directory on PATH. Resolution does not download anything or change global
+tools. A pin change requires regenerating and reviewing the complete bundle,
+import refusal and build evidence; a test checks the manifest against the pin.
 On a machine with a small system temporary filesystem, set `TMPDIR` to an owned
 writable directory first:
 

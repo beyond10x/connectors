@@ -9,7 +9,6 @@ use std::{
     process::Command,
 };
 
-pub const ESS_VERSION: &str = "ess 0.9.2";
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
@@ -559,21 +558,14 @@ pub fn ess(executable: &Path, args: &[&str]) -> Result<Vec<u8>> {
     Ok(output.stdout)
 }
 pub fn check_ess(executable: &Path) -> Result<()> {
-    let actual = String::from_utf8_lossy(&ess(executable, &["--version"])?)
-        .trim()
-        .to_owned();
-    if actual != ESS_VERSION {
-        return Err(refuse(format!(
-            "generation requires {ESS_VERSION}; found {actual}. Select the pinned executable with --ess (CONNECTORS_ESS for tests)"
-        )));
-    }
-    Ok(())
+    crate::toolchain::check(executable)
 }
 
 pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) -> Result<()> {
     let spec =
         Spec::parse(&std::fs::read(spec_path).map_err(|_| refuse("cannot read specification"))?)?;
-    check_ess(executable)?;
+    let resolved = crate::toolchain::resolve(Some(executable))?;
+    let executable = resolved.as_path();
     let temp = tempfile::tempdir().map_err(|_| Error::internal())?;
     let root = temp.path();
     let (selected, coverage) =
@@ -658,7 +650,7 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
         return Err(refuse("cannot identify rustfmt"));
     }
     let files = tree(root).map_err(|e| refuse(format!("output tree: {e}")))?;
-    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(&std::fs::read(spec_path).map_err(|_|Error::internal())?),"upstream_sha256":spec.upstream.sha256,"ess":ESS_VERSION,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
+    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(&std::fs::read(spec_path).map_err(|_|Error::internal())?),"upstream_sha256":spec.upstream.sha256,"ess":crate::toolchain::version()?,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
     install(out, &files, &manifest, &spec, check)?;
     Ok(())
 }
