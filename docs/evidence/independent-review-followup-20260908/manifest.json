@@ -1,0 +1,65 @@
+{
+  "source_commit": "4b44916488a47c6a5d699552ee1d9c2ed3904938",
+  "evidence": [
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/toolchain-stress.json",
+      "bytes": 1652,
+      "sha256": "80c984a2b26eb464c2ccf29ce17b6507f224d6d26b92bbd87cbbb2f2b5b0db5d"
+    },
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/toolchain-stress.log",
+      "bytes": 12832,
+      "sha256": "35fb967258462e03bfe33209165d43d385db2cb7665aec4dd426e9ef1a7cbd71"
+    },
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/toolchain-stress-direct.json",
+      "bytes": 354,
+      "sha256": "3e2c65426fc76dfad7b12c621999229fa94121995b4cbf58f22919cf900393f9"
+    },
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/toolchain-stress-direct.log",
+      "bytes": 49286,
+      "sha256": "8170c916cd8b88fc8616075263a531552291cf9e7a07ef4334b361c1dabdc242"
+    },
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/sql-live.jsonl",
+      "bytes": 1032,
+      "sha256": "8fc3e54f3a521a9d48158f451e9aa4d02c9f0dc3b0dcc1212ee9d2322b182630"
+    },
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/error-decoding.json",
+      "bytes": 1334,
+      "sha256": "575be2d7419ec4a3c8646cb31753b12c2b33afc8ceb2f7d5c4e79f6752e86475"
+    },
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/public-import.log",
+      "bytes": 227,
+      "sha256": "70d81b74e1b51f5ed2a568098932189232fc4fdb9c30fa33e587480c85a77905"
+    },
+    {
+      "path": "docs/evidence/independent-review-followup-20260908/planning-validation.log",
+      "bytes": 3432,
+      "sha256": "12eb3c43355f223f85593cbb9a568ca62db17a117f7bcd478cb9dcd05b7284c0"
+    }
+  ],
+  "reviews": [
+    {
+      "source": ".local/independent-review/reviewer-a/review.md",
+      "artifact": ".engineering/planning/review-result/independent-repository-a-20260908.md",
+      "source_sha256": "4d68f85486f3938d9edd37f5453018bfa57b48553ee3fa8e9679233148b9d27f",
+      "body_matches_ignoring_outer_whitespace": true
+    },
+    {
+      "source": ".local/independent-review/reviewer-b/review.md",
+      "artifact": ".engineering/planning/review-result/independent-repository-b-20260908.md",
+      "source_sha256": "c4762dfd6551e1d0f7f14d2474cdc58b7e120cbecca3abbc58bc315570306ba5",
+      "body_matches_ignoring_outer_whitespace": true
+    },
+    {
+      "source": ".local/review/2026-09-08-concept-and-stack-integration-review.md",
+      "artifact": ".engineering/planning/review-result/concept-stack-integration-20260908.md",
+      "source_sha256": "6e34f5b9c8934849170b9385214e8eaf99500b30619e5a4bc931ecabccdc0557",
+      "body_matches_ignoring_outer_whitespace": true
+    }
+  ]
+}

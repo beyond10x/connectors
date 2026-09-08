@@ -1,0 +1,19 @@
+{
+  "executable": "/home/timo/beyond10x/connectors_v2/target/debug/deps/connectors_spec-07ca01f7d42b2ff0",
+  "threads": "default",
+  "runs": 100,
+  "failed": 2,
+  "etxtbsy": 2,
+  "failures": [
+    {
+      "run": 24,
+      "exit": 101,
+      "text_file_busy": true
+    },
+    {
+      "run": 59,
+      "exit": 101,
+      "text_file_busy": true
+    }
+  ]
+}
