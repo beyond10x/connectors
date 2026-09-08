@@ -1,0 +1,11 @@
+{
+  "commit": "d1dc83f5d600816c699db07dd843f079ded0e72b",
+  "documents": 91,
+  "localLinks": 702,
+  "externalCheckoutLinks": 27,
+  "externalCheckoutValidation": "27 historical sibling-checkout targets verified in the primary workspace layout; no missing target",
+  "missing": [],
+  "markdownAnchorsChecked": 121,
+  "badAnchors": [],
+  "anchorsOutsideLoadedDocuments": []
+}
