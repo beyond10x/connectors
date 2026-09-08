@@ -18,9 +18,18 @@ use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ServiceConfig {
+    #[cfg_attr(
+        feature = "schema",
+        schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))
+    )]
     pub instance: String,
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "String", length(min = 1, max = 512))
+    )]
     pub listen: SocketAddr,
     pub service_credential: CredentialRef,
 }
@@ -91,7 +100,7 @@ async fn invoke(
     };
     let started = Instant::now();
     let result = execute(&service, &invocation).await;
-    tracing::info!(request_id = %invocation.request_id, operation = %invocation.operation, elapsed_ms = started.elapsed().as_millis(), success = result.is_ok(), "operation completed");
+    tracing::info!(request_id = ?invocation.request_id, operation = ?invocation.operation, elapsed_ms = started.elapsed().as_millis(), success = result.is_ok(), "operation completed");
     let status = result.as_ref().err().map(status).unwrap_or(StatusCode::OK);
     let response = Response {
         version: WIRE_VERSION.into(),
@@ -133,7 +142,7 @@ async fn execute(service: &Service, request: &Invocation) -> Result<serde_json::
         std::time::Duration::from_secs(20),
         service
             .adapter
-            .invoke(&request.operation, request.input.clone()),
+            .invoke_at(&request.revision, &request.operation, request.input.clone()),
     )
     .await
     .map_err(|_| Error::new(ErrorCode::Timeout, "operation deadline exceeded"))??;

@@ -129,3 +129,98 @@ async fn error_bodies_are_not_exposed_and_large_responses_are_bounded() {
     );
     server.abort();
 }
+
+#[tokio::test]
+async fn custom_ca_accepts_its_endpoint_and_refuses_other_roots() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio_rustls::{
+        TlsAcceptor,
+        rustls::{self, pki_types::PrivatePkcs8KeyDer},
+    };
+    let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    let unrelated = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    let server = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .with_no_client_auth()
+    .with_single_cert(
+        vec![cert.cert.der().clone()],
+        PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der()).into(),
+    )
+    .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let task = tokio::spawn(async move {
+        let acceptor = TlsAcceptor::from(Arc::new(server));
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            if let Ok(mut stream) = acceptor.accept(stream).await {
+                let mut header = Vec::new();
+                while !header.ends_with(b"\r\n\r\n") {
+                    assert!(header.len() < 4096);
+                    header.push(stream.read_u8().await.unwrap());
+                }
+                stream
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
+    });
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("ca");
+    let mut config = HttpConfig {
+        base_url: format!("https://localhost:{}/", addr.port()),
+        credential: None,
+        credential_header: "authorization".into(),
+        bearer: false,
+        allow_plaintext: false,
+        ca_file: Some(path.clone()),
+    };
+    // A bundle may hold several explicitly configured roots.
+    std::fs::write(
+        &path,
+        format!("{}{}", unrelated.cert.pem(), cert.cert.pem()),
+    )
+    .unwrap();
+    assert_eq!(
+        ScopedHttp::from_config(&config)
+            .unwrap()
+            .get(&["resource"], &[])
+            .await
+            .unwrap()
+            .status,
+        200
+    );
+    std::fs::write(&path, unrelated.cert.pem()).unwrap();
+    assert_eq!(
+        ScopedHttp::from_config(&config)
+            .unwrap()
+            .get(&["resource"], &[])
+            .await
+            .err()
+            .unwrap()
+            .code,
+        ErrorCode::Unavailable
+    );
+    std::fs::write(&path, "").unwrap();
+    assert!(ScopedHttp::from_config(&config).is_err());
+    std::fs::write(&path, "not a certificate").unwrap();
+    assert!(ScopedHttp::from_config(&config).is_err());
+    config.ca_file = None;
+    assert_eq!(
+        ScopedHttp::from_config(&config)
+            .unwrap()
+            .get(&["resource"], &[])
+            .await
+            .err()
+            .unwrap()
+            .code,
+        ErrorCode::Unavailable
+    );
+    task.abort();
+}

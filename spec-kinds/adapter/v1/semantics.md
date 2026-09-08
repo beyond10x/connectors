@@ -25,3 +25,21 @@ version. It does not claim to synthesize provider behavior. Automatic OpenAPI
 import/lowering into executable ESS realizations remains a future authoring feature
 from the full design, separate from this implemented three-adapter service slice.
 No generic ESS extension API or generated production server is assumed.
+
+## Shared configuration schemas
+
+Both adapter versions accept these closed offline `$ref` imports inside
+`configuration_schema`: `urn:connectors:config:v1:service`,
+`urn:connectors:config:v1:http`, and `urn:connectors:config:v1:credential`.
+Their single editable owner is the existing Rust `ServiceConfig`, `HttpConfig`
+and `CredentialRef` types and schema annotations in `connectors-host`.
+The compiler enables the host's optional `schema` feature to derive and inline
+those schemas. Runtime adapter libraries do not gain a host dependency.
+
+Imports never fetch a URL or file. Unknown library versions are refused, sibling
+constraints remain intersections, and instance data in defaults/examples/consts
+is not interpreted as a schema. Generated descriptors are self-contained JSON
+Schemas. The v1 revision covers the expanded specification; v2 covers its authored
+specification and expanded configuration schema. A shared type/schema change
+therefore changes descriptor revisions and is caught by descriptor/bundle checks.
+Existing inline schemas and the closed v1 document syntax remain supported.

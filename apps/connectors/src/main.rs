@@ -85,15 +85,15 @@ async fn run(args: Args) -> connectors_core::Result<()> {
             operation,
             input,
         } => {
-            let client = client(endpoint, token_file, allow_plaintext).await?;
-            let descriptor = client.describe().await?;
             let bytes = std::fs::read(input)
                 .map_err(|_| connectors_core::Error::invalid("input file is not readable"))?;
             if bytes.len() > connectors_core::REQUEST_LIMIT {
                 return Err(connectors_core::Error::invalid("input exceeds byte limit"));
             }
-            let input = serde_json::from_slice(&bytes)
+            let input = connectors_core::read_json(&bytes)
                 .map_err(|_| connectors_core::Error::invalid("invalid JSON input"))?;
+            let client = client(endpoint, token_file, allow_plaintext).await?;
+            let descriptor = client.describe().await?;
             let result = client.invoke(&descriptor, &operation, input).await?;
             println!(
                 "{}",

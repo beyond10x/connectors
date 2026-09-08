@@ -1,7 +1,8 @@
 # Connectors adapter specification v2
 
 Connectors owns `connectors.adapter/v2`, its [closed schema](schema.json), and the
-Rust frontend in `crates/connectors-spec`. v1 remains strict and unchanged.
+Rust frontend in `crates/connectors-spec`. v1 retains its closed syntax and existing inline-schema support.
+Both versions support the [shared offline configuration imports](../v1/semantics.md#shared-configuration-schemas).
 The authored declaration values have a typed home in
 [ess/domains/declarations.yaml](../../../ess/domains/declarations.yaml).
 `UpstreamSource` and `RequestMapping` are embedded declaration values, not provider

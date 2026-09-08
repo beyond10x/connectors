@@ -16,12 +16,16 @@ Run [the live acceptance recipe](docs/live-e2e.md) and read
 
 ## Build and test
 
+Rust 1.88.0 is the checked minimum. The full test/generation gate uses ESS 0.9.2
+and the rustfmt recorded in the GitLab generated manifest (currently Rust 1.98.1).
+`--msrv` additionally checks all targets on installed Rust 1.88.0. The Rust gate runs
+formatting, descriptor drift, offline builds/tests/Clippy, library dependency
+boundaries and ESS/AEP validation. It uses a task-owned temporary directory under
+`.local/tmp`. This local repository has no configured CI or publication target.
+
 ```sh
-cargo build --workspace --locked
-cargo test --workspace --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-ess validate --path ess
-aep plan artifact validate
+mkdir -p .local/tmp
+TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked -p connectors-build -- gate --msrv
 ```
 
 Normal builds consume checked-in generated files and need neither ESS nor networked
@@ -94,14 +98,19 @@ SQL uses the `postgresql-native-text` profile: column names and native type name
 accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSON
 representations are preserved without numeric coercion. Parameters are text or null
 and PostgreSQL resolves their types. Use explicit SQL casts where inference needs
-help. The database role's grants govern accessible schemas and functions.
+help. The database role's grants govern accessible schemas and functions. Each request
+opens a fresh connection and read-only transaction, with `search_path = public, pg_catalog`;
+qualify tables in other schemas (for example `reporting.sales`). There is no pool in
+this bounded local profile. Fresh connections resolve the current credential each
+time and discard session state; connection setup therefore contributes to latency.
 
 Endpoint discovery reports observations with provenance, readiness and reachability.
 It does not create a connection or dial the discovered address. Explicitly configure
 an SQL binding and its credential after selecting an authorized reachable endpoint.
 
 Service listeners speak HTTP; use loopback locally or a trusted TLS-terminating ingress
-for remote deployments. Upstream TLS certificate validation is enabled by default.
+for remote deployments. Upstream TLS certificate validation is enabled by default. When `ca_file` is set,
+only that PEM bundle is trusted; public roots are used only when it is absent.
 `allow_plaintext` is an explicit local-test configuration, not a TLS verification bypass.
 
 No adapter in this slice advertises OAuth acquisition, writes, durable events, process

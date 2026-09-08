@@ -7,15 +7,19 @@ use reqwest::{Client as HttpClient, Url};
 use serde_json::Value;
 use std::time::Duration;
 
+/// A reusable transport and endpoint; contains no credential material.
 #[derive(Clone)]
-pub struct Client {
+pub struct Endpoint {
     http: HttpClient,
     endpoint: Url,
+}
+#[derive(Clone)]
+pub struct Client {
+    transport: Endpoint,
     token: String,
 }
-
-impl Client {
-    pub fn new(endpoint: &str, token: String, allow_plaintext: bool) -> Result<Self> {
+impl Endpoint {
+    pub fn new(endpoint: &str, allow_plaintext: bool) -> Result<Self> {
         let mut endpoint =
             Url::parse(endpoint).map_err(|_| Error::invalid("invalid service endpoint"))?;
         if !matches!(endpoint.scheme(), "http" | "https")
@@ -24,11 +28,9 @@ impl Client {
             || endpoint.password().is_some()
             || endpoint.query().is_some()
             || endpoint.fragment().is_some()
-            || token.is_empty()
-            || token.len() > 8192
         {
             return Err(Error::invalid(
-                "endpoint or service credential configuration is not permitted",
+                "service endpoint configuration is not permitted",
             ));
         }
         if !endpoint.path().ends_with('/') {
@@ -41,29 +43,34 @@ impl Client {
             .no_proxy()
             .build()
             .map_err(|_| Error::internal())?;
-        Ok(Self {
-            http,
-            endpoint,
-            token,
-        })
+        Ok(Self { http, endpoint })
     }
-    pub fn with_token(&self, token: String) -> Result<Self> {
+    pub fn with_token(&self, token: String) -> Result<Client> {
         if token.is_empty() || token.len() > 8192 {
             return Err(Error::invalid("invalid service credential"));
         }
-        Ok(Self {
-            http: self.http.clone(),
-            endpoint: self.endpoint.clone(),
+        Ok(Client {
+            transport: self.clone(),
             token,
         })
     }
+}
+impl Client {
+    pub fn new(endpoint: &str, token: String, allow_plaintext: bool) -> Result<Self> {
+        Endpoint::new(endpoint, allow_plaintext)?.with_token(token)
+    }
+    pub fn with_token(&self, token: String) -> Result<Self> {
+        self.transport.with_token(token)
+    }
     fn url(&self, path: &str) -> Result<Url> {
-        self.endpoint
+        self.transport
+            .endpoint
             .join(path)
             .map_err(|_| Error::invalid("invalid service route"))
     }
     pub async fn describe(&self) -> Result<Descriptor> {
         let response = self
+            .transport
             .http
             .get(self.url("v1/describe")?)
             .bearer_auth(&self.token)
@@ -103,6 +110,7 @@ impl Client {
     }
     pub async fn send(&self, request: &Invocation) -> Result<Value> {
         let response = self
+            .transport
             .http
             .post(self.url("v1/invoke")?)
             .bearer_auth(&self.token)

@@ -155,8 +155,9 @@ local artifacts, not a claim of cross-machine binary reproducibility.
 
 The first profile has static configured instances, restart-based configuration
 activation, expiring in-memory cursors, and one federation hop. Downstream
-descriptions are captured at gateway startup; a source revision change requires
-refreshing that configured snapshot by restarting the gateway. Credential-file
+descriptions were captured only at gateway startup in this original evidence.
+The subsequent [review remediation](review-response-2026-09-08.md) adds atomic
+refresh on a leaf stale-description refusal and deliberate caller resubmission. Credential-file
 rotation is separate and works on subsequent calls without restarting. No cache
 or dynamic plugin download/build installation path is advertised.
 
@@ -245,3 +246,13 @@ Limits and encountered refusals:
 No Atlas, original Connectors checkout, remote repository, registry or consumer
 state was changed. The final image is retained locally. Owned probe images and
 reproducible rootfs copies were removed; reports and the source workspace remain.
+
+## Full review remediation — 2026-09-08
+
+The subsequent [review response](review-response-2026-09-08.md) records all 17
+findings. Its [gate log](evidence/review-2026-09-08/gate.log) shows 35 passing tests,
+zero failures/ignored tests, formatting, warning-denying Clippy, regenerated
+schema checks, offline builds, dependency boundaries and Rust 1.88 checks for all
+targets. The [audit](evidence/review-2026-09-08/audit.json) has no vulnerabilities
+or warnings. It adds local PostgreSQL protocol and TLS fixtures without claiming
+a repeat of the earlier live services or image build.

@@ -198,3 +198,171 @@ async fn credential_stores_are_substitutable_and_file_permissions_are_enforced()
     std::os::unix::fs::symlink(path, &link).unwrap();
     assert!(CredentialRef::File { path: link }.resolve().await.is_err());
 }
+
+struct ChangingLeaf {
+    calls: Arc<AtomicUsize>,
+    revision: Arc<AtomicUsize>,
+}
+#[async_trait]
+impl Adapter for ChangingLeaf {
+    fn descriptor(&self) -> Descriptor {
+        let mut d = Echo(self.calls.clone()).descriptor();
+        let rev = self.revision.load(Ordering::SeqCst);
+        d.revision = format!("rev-{rev}");
+        d.operations[0].id = format!("echo{rev}");
+        d
+    }
+    async fn invoke(&self, _: &str, input: Value) -> Result<Value> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(input)
+    }
+}
+#[tokio::test]
+async fn federation_refreshes_atomically_without_replaying_and_rotates_credentials() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let revision = Arc::new(AtomicUsize::new(1));
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("token");
+    std::fs::write(&path, "service-token").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let credential = CredentialRef::File { path: path.clone() };
+    let (endpoint, leaf) = start_with_credential(
+        Arc::new(ChangingLeaf {
+            calls: calls.clone(),
+            revision: revision.clone(),
+        }),
+        Arc::new(credential.clone()),
+    )
+    .await;
+    let federation = Arc::new(
+        Federation::connect(&FederationConfig {
+            service: ServiceConfig {
+                instance: "gateway".into(),
+                listen: "127.0.0.1:0".parse().unwrap(),
+                service_credential: credential.clone(),
+            },
+            downstreams: vec![DownstreamConfig {
+                name: "source".into(),
+                endpoint,
+                credential,
+                allow_plaintext: true,
+            }],
+        })
+        .await
+        .unwrap(),
+    );
+    let (endpoint, gateway) = start(federation.clone()).await;
+    let client = connectors_client::Client::new(&endpoint, "service-token".into(), true).unwrap();
+    let old = client.describe().await.unwrap();
+    revision.store(2, Ordering::SeqCst);
+    std::fs::write(&path, "rotated-token").unwrap();
+    assert_eq!(
+        client
+            .invoke(&old, "source__echo1", json!({"value":42}))
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::StaleDescription
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let fresh = client.describe().await.unwrap();
+    assert_ne!(old.revision, fresh.revision);
+    assert!(fresh.operation("source__echo1").is_err());
+    assert!(fresh.operation("source__echo2").is_ok());
+    assert_eq!(
+        federation
+            .invoke_at(&old.revision, "source__echo2", json!({"value":1}))
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::StaleDescription
+    );
+    assert_eq!(
+        client
+            .invoke(&fresh, "source__echo2", json!({"value":42}))
+            .await
+            .unwrap(),
+        json!({"value":42})
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    leaf.abort();
+    gateway.abort();
+}
+
+#[tokio::test]
+async fn invalid_identifiers_cannot_inject_log_lines_or_terminal_controls() {
+    use std::{io::Write, sync::Mutex};
+    #[derive(Clone)]
+    struct Capture(Arc<Mutex<Vec<u8>>>);
+    impl Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let buffer = Arc::new(Mutex::new(Vec::new()));
+    let writer = Capture(buffer.clone());
+    let subscriber = tracing_subscriber::fmt()
+        .without_time()
+        .with_ansi(false)
+        .with_writer(move || writer.clone())
+        .finish();
+    let _subscriber = tracing::subscriber::set_default(subscriber);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let app = router(Arc::new(Echo(calls.clone())), Arc::new(FixedSecret));
+    let task = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    let client =
+        connectors_client::Client::new(&format!("http://{address}/"), "service-token".into(), true)
+            .unwrap();
+    let invocation = Invocation {
+        version: WIRE_VERSION.into(),
+        request_id: "injected\n\u{1b}[31m".into(),
+        operation: "echo\r\nFORGED".into(),
+        revision: "rev-1".into(),
+        input: json!({"value":1}),
+    };
+    assert_eq!(
+        client.send(&invocation).await.unwrap_err().code,
+        ErrorCode::InvalidInput
+    );
+    let log = String::from_utf8(buffer.lock().unwrap().clone()).unwrap();
+    assert!(log.contains("operation completed"));
+    assert_eq!(log.lines().count(), 1);
+    assert!(!log.contains('\u{1b}'));
+    assert!(!log.contains('\r'));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    task.abort();
+}
+
+#[test]
+fn configuration_yaml_and_json_remain_strict() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("config");
+    for text in [
+        "instance: test\nlisten: '127.0.0.1:0'\nservice_credential:\n  kind: file\n  path: token\n",
+        r#"{"instance":"test","listen":"127.0.0.1:0","service_credential":{"kind":"file","path":"token"}}"#,
+    ] {
+        std::fs::write(&path, text).unwrap();
+        assert_eq!(
+            connectors_host::read_config::<ServiceConfig>(&path)
+                .unwrap()
+                .instance,
+            "test"
+        );
+    }
+    for text in [
+        "instance: first\ninstance: second\n",
+        r#"{"instance":"first","instance":"second"}"#,
+        r#"{"instance":"test","listen":"127.0.0.1:0","service_credential":{"kind":"file","path":"token"},"unknown":1}"#,
+    ] {
+        std::fs::write(&path, text).unwrap();
+        assert!(connectors_host::read_config::<ServiceConfig>(&path).is_err());
+    }
+}
