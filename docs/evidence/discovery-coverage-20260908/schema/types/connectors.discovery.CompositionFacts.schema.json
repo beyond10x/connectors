@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.CompositionFacts",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:102bddf3d2456c78979631c566726b55fb851283c647d2625155f414a52dbf3c",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.CompositionFacts": {
+      "title": "CompositionFacts",
+      "x-ess-name": "connectors.discovery.CompositionFacts",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "same_process": {
+          "type": "boolean"
+        },
+        "parent_port_registered": {
+          "type": "boolean"
+        },
+        "child_implementation_registered": {
+          "type": "boolean"
+        },
+        "profiles_compatible": {
+          "type": "boolean"
+        },
+        "parent_is_direct": {
+          "type": "boolean"
+        },
+        "independently_admitted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "same_process",
+        "parent_port_registered",
+        "child_implementation_registered",
+        "profiles_compatible",
+        "parent_is_direct",
+        "independently_admitted"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

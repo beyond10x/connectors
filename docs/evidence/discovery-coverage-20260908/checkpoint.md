@@ -1,0 +1,13 @@
+# Local discovery and composition checkpoint — 2026-09-08
+
+Baseline: `0e4a8c11885e7008b2825cdcd0d2855cd241d9b4`. This checkpoint closes F13 and E03 through their two existing owner stories. Root serialized tracked edits in primary main under the repository override. Two independent reviewers wrote only ignored snapshots; no worktree or runtime implementation was created.
+
+Both final reviewers approve with zero residual findings. A froze 59 source/evidence inputs and B froze 52; every final input still matches the reviewed bytes. Initial, intermediate and final reports remain immutable in six AEP review-result artifacts and in [review provenance](review-provenance.json). Each report's source manifest and compressed exact snapshot are retained; final supplemental evidence is under __supplemental/ inside its archive. The [closure audit](closure-audit.json) verifies source/archive/report equality, including exact AEP report bodies. Both reviewers excluded each other's output, dispositions and mutable planning/bookkeeping.
+
+Twenty-three individual reviewer findings have fixed outcomes, each assigned once: 19 to discovery coverage and 4 to composition. The [dispositions](dispositions.md) connect those findings to normative corrections and declared trace expectations. The [verification](verification.md) records 63 schema expectations, 46 textual traces, deterministic 204-artifact projection, pinned ESS 0.20.0 and the existing full gate/MSRV1.88 with 50 Rust tests. None executes the newly selected discovery, metadata, route or process behavior. Separate session compilation is retained as exact compressed bytes with [storage hashes](session-evidence-storage.json).
+
+[Final AEP validation](planning-final.log): 95 artifacts valid. It retains 53 warnings that immutable review records state their findings as prose; this is a planning enumeration limitation, not a test failure. Reports were not rewritten to silence those warnings. Source findings and the 23 new outcomes have separate explicit accounting.
+
+Current ledger: **23/48 original findings fixed, 25 open; 15 owner stories implemented, 12 draft.** Discovery-profiles E07/E14/E32 and persistence ownership remain separate work and can follow the completed coverage prerequisite. Broader catalog/stack/open-decision review keeps the unbounded specification goal active. No runtime/adapter-kind schema changes or external publication are included.
+
+Final report SHA-256: A `e4f5ae4f14f19103998b5079998130b5f0db01c9c817e4c4298ea580f0c898fd`; B `e49ebd5ec87c91bb68d9e79630e7c51fa374b2945d1a080ac2bb99f37801c305`. The commit carrying this record is the local checkpoint; its backup is the configured local recovery bare repository under the separately verified bot identity.

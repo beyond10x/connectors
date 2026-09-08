@@ -14,3 +14,4 @@ domains:
   - connectors.delegation
   - connectors.connection_admission
   - connectors.auth_access
+  - connectors.discovery

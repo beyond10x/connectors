@@ -1,0 +1,33 @@
+[
+  {
+    "source": ".local/discovery-coverage-20260908/sessions-authored.json",
+    "snapshot": "auxiliary/sessions-authored.json",
+    "sha256": "0d9e6d89c2153bca39a2b4e438cf71a12baa92a9d9de140e52518cf6ea120048",
+    "bytes": 161145
+  },
+  {
+    "source": ".local/discovery-coverage-20260908/sessions-suite.json",
+    "snapshot": "auxiliary/sessions-suite.json",
+    "sha256": "b6b837e5bbe6da22c20eea357ad9e98e038a390b10fdef3ae7de5cb144321653",
+    "bytes": 2423518
+  },
+  {
+    "source": ".local/discovery-coverage-20260908/compiled.json",
+    "snapshot": "auxiliary/compiled.json",
+    "sha256": "c2be566be32bb28db36af3b27cad9963d0013cfdfab3e8ad29ab6aca9bdecbd5",
+    "bytes": 219245
+  },
+  {
+    "source": ".local/discovery-coverage-20260908/compiled-final.json",
+    "snapshot": "auxiliary/compiled-final.json",
+    "sha256": "c2be566be32bb28db36af3b27cad9963d0013cfdfab3e8ad29ab6aca9bdecbd5",
+    "bytes": 219245
+  },
+  {
+    "source": "/home/timo/beyond10x/connectors/docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "snapshot": "auxiliary/old-design10.md",
+    "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54",
+    "bytes": 13800
+  }
+]

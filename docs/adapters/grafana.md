@@ -8,7 +8,7 @@
 
 "Federated Grafana" in the old system meant: one Grafana connection, discovery of its data sources, and child connections for Prometheus, Loki and Alertmanager whose traffic is proxied through Grafana (`grafana_datasource_proxy_v1`). In the new system this is three things: the Grafana adapter (reads plus `resource_discovery` plus a `route.mediated_http` capability), independent Loki/Prometheus/Alertmanager adapters that know nothing about Grafana, and the host materializing child connections with a mediated route. Host federation (`crates/connectors-host/src/federation.rs`) is separate and unchanged: it forwards operations between services; the mediated route carries provider traffic inside one host.
 
-Placement: the Grafana adapter needs egress to the Grafana origin (`private_network` in the old declarations); a child adapter using the route runs in the same host process as the Grafana adapter; a direct child adapter runs wherever its origin is reachable.
+Placement: the Grafana adapter needs egress to the Grafana origin (`private_network` in the old declarations); a child adapter using the route runs in the same statically composed process with live injected private ports as the Grafana adapter; a direct child adapter runs wherever its origin is reachable.
 
 ## 2. Old surface and disposition
 
@@ -112,9 +112,9 @@ The admitted parent route/datasource owns downstream tenant headers; the child h
 ## 7. Discovery and routes
 
 1. Grafana `datasources.observe` lists data sources under the Grafana connection; recognized types become candidates; UIDs are sealed as opaque locators.
-2. An operator selects a candidate; the host materializes a child connection (`route.kind = via`) and starts or binds the child adapter in the same host with a `mediated-http` capability.
+2. An operator selects a fresh admitted candidate; the host materializes a child connection (route.kind = via) only when an explicitly installed [composition executable](../../contracts/discovery/composition.md) has constructed the parent and child in one process and injected their private ports. Concrete startup/linking belongs to that executable under deployment admission, never generic server.rs or discovery-triggered loading.
 3. Child invocations run their own admission and evidence; the parent forwards GET requests under its data-source proxy route for the sealed UID; suffix, method, and target discipline per `contracts/discovery/mediated_route/v1alpha1/semantics.md`.
-4. Parent revocation, allowlist change, or a renamed/type-changed source degrades the child; no direct fallback.
+4. Parent revocation, allowlist withdrawal, stale/incomplete target evidence or a changed semantic target/type refuses/degrades the child; no direct fallback. A title-only rename preserves observation identity. New observation/parent generations require explicitly admitted same-target revalidation; a changed UID/fixed target/type requires a new observation and new child.
 5. Kubernetes-discovered Grafana stays fail-closed (needs its own token); Kubernetes → Grafana → Prometheus is two hops and refused.
 
 ## 8. Specification profile
@@ -130,3 +130,5 @@ The admitted parent route/datasource owns downstream tenant headers; the child h
 - Fixture: each child suite run direct and mediated against the same fixture with byte-identical results; route refusal cases; observation withdrawal degrading a child; value-freedom greps for UID and backend URL.
 - Live: a Grafana with one Prometheus and one Loki data source; observe, materialize, query through the host directly and via one-hop federation.
 - Decoupling: Loki/Prometheus/Alertmanager crates build without the Grafana crate; the Grafana crate builds without them; the host's mediated capability is tested with fake parent and child.
+
+Discovery collection and route continuity follow [resource coverage §§4.1–4.4](../../contracts/discovery/resources/v1alpha1/semantics.md#41-exact-coverage-scope). Grafana's one admitted collection must prove provider exhaustion before absence becomes withdrawal; cap/failure may preserve trustworthy current positives while unobserved nonterminal rows remain explicitly stale history; previously withdrawn rows keep their terminal fact. Changed visibility/selection does not prove absence from the old scope. Public paging uses a published immutable view rather than provider continuations. A stable UID/type alone cannot prove an unchanged hidden destination/tenant/auth-placement; the exact parent verifier remains a profile-authoring/implementation gate. This does not broaden source-specific mappings or advertise a mediated implementation.

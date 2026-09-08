@@ -37,7 +37,7 @@ Parent-side capability declaration (in the parent adapter specification):
 Host-side route binding (configuration created by materialization, `resource_discovery`):
 
 ```json
-{ "child_connection": "conn_prom_7", "parent_connection": "conn_grafana_1", "observation": "obs_…", "profile": "grafana-datasource-proxy", "generation": 41, "target_adapter": "prometheus" }
+{ "child_connection": "conn_prom_7", "parent_connection": "conn_grafana_1", "observation": "obs_…", "profile": "grafana-datasource-proxy", "observation_generation": 41, "route_revision": "route_rev_7", "target_adapter": "prometheus" }
 ```
 
 Parent port (Rust, private within one admitted composition; no public forwarding operation):
@@ -57,16 +57,26 @@ Errors returned to the child: base codes plus `route_unavailable` (parent not re
 ## 4. Rules
 
 - Transport only: the route changes how bytes reach the target. The child's business contracts, datasource profiles, operations and result semantics remain identical; its explicitly selected auth profile and safe route metadata differ from direct access. Conformance runs the same business suite direct and mediated (`docs/design.md:1035`, section 21.3).
-- Fixed binding: the target is fixed at materialization (observation id + generation). Request input cannot choose the parent, the resource, a path prefix, or a port.
+- Fixed binding: materialization fixes the observation incarnation, source parent, semantic target/resource/port, route profile, access mode and host owner. An observation generation is the last successfully revalidated evidence revision, not permission to change that fixed identity. Request input cannot choose the parent, resource, prefix or port. See §4.1 for same-target revalidation.
 - Path discipline: the parent prefixes its proxy route (Grafana data-source proxy for the sealed UID; Kubernetes API-server `services/proxy` for the fixed namespace, Service, port) to individually encoded target-relative segments supplied by the child's capability. Absolute URLs, `..`, empty segments, and query keys outside the child's declared set are refused before dispatch.
 - Methods: the profile declares allowed methods; first profiles allow `GET` only (both old adapters were read-only).
 - Authority: the child's selected profile is `purpose: mediated_access`, `subject: none`, `scheme: parent`, `acquisition.flow: static_config`, capability mediated-http. It owns no provider credential, custody reference or external account. The parent capability authenticates the hop using its own current pinned generation; downstream credentials, if any, belong to the reviewed parent route/datasource binding. Child policy and route admission are required independently and never inherited from the parent. The route does not license arbitrary parent operations, copy parent grants into child scopes or expose parent secrets. Child evidence binds parent generation and the fixed route/observation revision, so parent publication/revocation or mapping changes invalidate it.
 - Kubernetes profile: before each forward, require current exact permission evidence for `get`, core/v1, resource services, subresource proxy, in the fixed namespace and Service name. Collect an uncached result under [evidence §4.4](../../../auth/evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08), sharing the original child's target/call/deadline budget; fresh exact evidence may be reused only under that rule. A denial is route_refused; required evidence unavailable or budget-exhausted is unavailable, with no proxy forward. No generic parent grant or list-services result satisfies this check.
-- Grafana profile: the parent re-resolves the sealed UID for the current generation; a changed type or missing source is `route_unavailable` and degrades the child.
+- Grafana profile: the parent compares the sealed semantic target against current admitted evidence. Provider re-resolution is an explicit bounded validation step, not a hidden unlimited read on every forward. Missing/changed/unknown target equality is route_unavailable and degrades the child; a public UID/digest or unchanged type alone does not prove equality.
 - Depth: exactly one hop. A parent connection that is itself `via` cannot provide a route (`route_refused` at materialization).
-- Placement: parent and child run in the same host process or composition; a route is never exposed as a remote capability to another host (that would be federation of provider traffic; out of model).
+- Placement: parent and child run in one process with live private ports injected by the [authored composition executable](../../composition.md). A deployment of independent processes is not this private composition. The route is never exposed as a remote capability to another host; provider-traffic federation remains out of model.
 - Redirects from the parent's provider are not followed; responses are passed through with the parent's response-size bound.
-- Audit per forward: child connection, parent connection and generation, observation id, target operation, profile, final destination subject (safe label); never the UID, URL, or credential.
+- Safe audit per forward: child/parent connection, public observation generation/id, target operation, profile and admitted destination label. Private credential-generation pins and equality/route-state coordinates remain internal correlation, never serialized with the UID, URL or credential.
+
+### 4.1 Observation continuity and route revalidation
+
+Three coordinates are distinct: public observation publication generation under [resource coverage](../../resources/v1alpha1/semantics.md#44-publication-retention-and-public-paging); the private parent credential generation governed by F05; and a host-private route binding revision advanced only by admitted same-target revalidation. The latter example above is host-side data, not a newly public connection field. All must agree with the currently published source/route binding at final dispatch. A normal new observation view or parent material publication invalidates old route admission/child verification; neither silently advances an old capability or permanently requires changing an otherwise identical child ref.
+
+Same-target revalidation is an explicit host configuration/validation action under the selected static_config materialization binding. It is not a public generic `forward`, auth.begin, implicit business retry or authority carried by a discovery cursor. The host separately admits exact child, parent and fixed observation/target; requires a positively observed, unexpired row in the latest acknowledged comparable scope; asks the parent profile to prove exact fixed target/type/tenant/auth-placement equality; and establishes current parent generation and exact route permission. A stale/withdrawn/evicted row supplies no authority. If fresh observations or provider validation are needed, they run only under that separately declared admitted validation plan and finite effect/call/byte/deadline budget. Ordinary invocation requiring an unavailable revalidation step refuses route_unavailable; it cannot invent probes or broaden its budget. Route permission collected for an ordinary already-valid forward shares the child's remaining F08 budget as §4 states.
+
+At one host metadata publication point, compare the expected route revision, current observation generation/incarnation, same fixed semantic binding, parent generation, current independent authority and non-revocation/enablement. An acknowledged success advances only the route evidence revision and invalidates all pending old route admissions and child verification. It creates no credential or new target. Unknown acknowledgement permits no forward; observe that owner or refuse. A stale revalidator cannot resurrect a locally revoked/disabled child or replace newer binding evidence. The final forward repeats the applicable current authority/permission/generation/deadline fence and uses the parent's pinned material. Revalidation success alone is not permanent permission.
+
+Retained history after denied/capped/failed discovery is not deletion and cannot authorize a route. A list-services denial is not proof that get-services/proxy is denied; the separate exact proxy check decides that permission. A current definite proxy denial is route_refused even when history contains an old successful list. Missing fresh observation/equality or a degraded parent remains route_unavailable, and unavailable required proxy evidence uses unavailable; no direct fallback. Local child revoked/disabled precedence remains the auth.connection reduction. A changed type, provider object incarnation, hidden fixed target, port, parent, route mode or owner cannot use this revalidation path: a new independently admitted connection is required. Title-only rename may revalidate the same fixed target. Confirmed withdrawal terminates the old observation incarnation; reappearance gets a new id and never revives its old child.
 
 ## 5. Limits
 
@@ -81,7 +91,9 @@ Errors returned to the child: base codes plus `route_unavailable` (parent not re
 - Same Prometheus fixture reached direct and via a fake Grafana parent → byte-identical child results and errors.
 - Child capability asked for `../api/admin` or an absolute URL → `route_refused`, parent fixture sees zero requests.
 - Parent connection revoked → child `parent_degraded`; child invocation `route_unavailable`; no direct dial attempted (fake DNS/transport records none).
-- Observation withdrawn in generation 42 → route stale; refusal until re-materialized.
+- Fresh unchanged observation at generation 42 → old admission refuses until explicitly admitted same-target revalidation; the fixed child ref may remain. Confirmed withdrawal at 42 → old observation incarnation terminal; any reappearance needs a new observation and newly admitted child.
+- Retained stale observation plus current proxy denial → route_refused when exact permission is checked, never an old-history grant. List-only denial is not substituted for proxy denial.
+- Same UID/type but changed sealed target or port → refuse old route; no automatic re-resolution to a new destination.
 - Kubernetes fake denies `get services/proxy` → `route_refused` before dispatch.
 - Materialization with a parent whose route is `via` → refused (one hop).
 - Audit rows contain no UID or URL (grep against fixture values).
@@ -98,15 +110,16 @@ Errors returned to the child: base codes plus `route_unavailable` (parent not re
 |---|---|
 | `MediatedRoute` port (parent side) and `HttpCapability` implementation (child side) | `crates/connectors-sdk` (trait), `crates/connectors-host/src/http.rs` (binding) |
 | Route binding store with generation check | host metadata store (`auth.connection`) |
-| Composition rule: child adapter placed in the same host as the parent | `crates/connectors-host/src/server.rs` composition loading |
+| Concrete parent/child construction, linking and port injection | authored composition executable above generic host and both adapter libraries, per [composition ownership](../../composition.md); no concrete loading in server.rs |
 | Conformance harness runs each datasource suite direct and mediated | `crates/connectors-conformance` |
 
 ## 9. ESS entities
 
 | Entity | Notes |
 |---|---|
-| `RouteBinding` (identity: child connection ref), lifecycle `bound → degraded → retired` | relations: `parent → Connection` (one), `observation → ResourceObservation` (one), `profile` value |
+| Persistent mediated route binding | Proposed, not declared in ESS. Fixed child/parent/observation and logical host ownership are requirements; persistent relations/lifecycle/cardinality remain UNMAPPED under persistence-ownership. This is not the unrelated gateway RouteBinding value in idempotency.yaml |
 | `Connection.route` | value `direct` or `via` (connection document) |
+| Revalidation and placement facts | [discovery.yaml](../../../../ess/domains/discovery.yaml) types selected values, not a running validator, installed port or persistent composition owner |
 
 ## 10. Open decisions
 

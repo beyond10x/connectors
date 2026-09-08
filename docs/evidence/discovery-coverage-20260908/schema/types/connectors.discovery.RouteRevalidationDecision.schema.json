@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.RouteRevalidationDecision",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:30073b6fc9ce8d3d7e669c350ada89c48560581c1bcbd026dc551c34241fa662",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.RouteRevalidationDecision": {
+      "title": "RouteRevalidationDecision",
+      "x-ess-name": "connectors.discovery.RouteRevalidationDecision",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "same_binding_published",
+        "changed_binding",
+        "refused",
+        "unavailable",
+        "unknown"
+      ]
+    }
+  }
+}
