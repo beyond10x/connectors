@@ -7,6 +7,7 @@
 | Contract id | Document | Status | Defines |
 |---|---|---|---|
 | `operations/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | describe/invoke wire boundary, error envelope, limits |
+| proposed governed service binding | [service/v1alpha2](service/v1alpha2/semantics.md) | proposed | verified caller context, admission, policy, audit and delegated federation; wire version remains subject to compatibility review |
 | `operations/v1alpha1` `mutation` profile | [operations/v1alpha1](operations/v1alpha1/semantics.md) | proposed | effects, idempotency, approval binding, durable attempt record, outcome-unknown |
 | `datasource.records/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | bounded pages, cursors, provenance, completeness |
 | `datasource.records/v1alpha1` `document` profile | [datasources/records/v1alpha1](datasources/records/v1alpha1/semantics.md) | proposed | single-item content bodies with representation, version, byte truncation |
@@ -28,7 +29,13 @@
 | `catalog/v1alpha1` | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) | proposed | list/describe/locate pre-compiled adapter bundles with provenance and coverage; optional; grants nothing |
 | `operations/v1alpha1` `generic-http` profile (and `datasource.records` `generic-http-page`) | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) §3.2 | proposed | an operation realized from a bundle's request mapping by one generic engine: status, JSON passthrough, provenance, status-to-code table |
 
-Deferred families with no document yet: `execution`, `events`, `resources` (`docs/design.md:174-186`).
+Inventory on 2026-09-08: 17 semantic documents (1 implemented service document and
+16 proposed documents). The table has 5 implemented rows and 17 proposed rows;
+multiple rows can share one document. An index entry records a proposal's presence,
+not approval of its wire version or runtime behavior.
+
+Deferred families with no document yet: `execution`, `events`, `resources`,
+`configuration` (`docs/design.md:174-186`).
 
 ## Which adapter needs which contract
 

@@ -1,0 +1,19 @@
+{
+  "command": "TMPDIR=\"$PWD/.local/tmp\" CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=\"$PWD/.local/review-fixes-20260908/target\" cargo run --locked --offline -p connectors-build -- --ess \"$PWD/.local/toolchains/ess/0.20.0/bin/ess\" gate --msrv",
+  "exit": 0,
+  "tests_passed": 50,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "ess_pin": "0.20.0",
+  "msrv": "1.88.0",
+  "ess_output": [
+    "connectors v1 \u2014 7 file(s), valid",
+    "connectors v1 \u2014 7 file(s), 92 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-83Ls76/connectors-ir.json",
+    "169 scenario(s) (34 authored), 0 refusal(s), written to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-83Ls76/contract-conformance.json"
+  ],
+  "target_isolation": {
+    "default_msrv_files_unchanged": 1991,
+    "private_msrv_path": "/home/timo/beyond10x/connectors_v2/.local/review-fixes-20260908/target/msrv",
+    "private_msrv_files": 1997
+  }
+}

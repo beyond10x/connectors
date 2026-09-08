@@ -9,7 +9,7 @@ relations:
 - informed_by: review-result:independent-repository-a-20260908
 - informed_by: review-result:independent-repository-b-20260908
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 1
+revision: 2
 ---
 ## Result and baseline
 
@@ -130,3 +130,7 @@ The three completed auth-wave worktrees were finished and removed through exact-
 Installed Connectors 0.7.0 reported a healthy local placement but no admitted operation for `docker container`. This capability gap was reported before using Docker locally. The test used one new container, no existing database, no external provider calls and no package download. All created test services, the container and temporary fixture credential files were cleaned up. No publication or Atlas registration occurred.
 
 This pass ran targeted reproduction and source checks. It did not rerun the entire gate or claim a clean release gate; the reproduced intermittent failure remains open. Source byte preservation, evidence paths, disposition ID coverage and AEP validity are checked when recording this intake. The imported reviews retain their original prose format; any AEP warnings about missing machine-readable findings blocks are disclosed rather than repaired by rewriting the reviews.
+
+## Subsequent remediation — 2026-09-08
+
+The operator subsequently requested “good, solve them”. Corrections and passing regression evidence are recorded by [story:independent-review-remediation](../story/independent-review-remediation.md) and [the final response](../../../docs/independent-review-response-2026-09-08.md). The observations and open dispositions above describe the investigated 492c20c baseline; this follow-up supplies their later outcome without rewriting that evidence.

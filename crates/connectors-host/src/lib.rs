@@ -27,5 +27,4 @@ pub fn logging() {
         .try_init();
 }
 
-#[cfg(feature = "schema")]
 pub mod schema;

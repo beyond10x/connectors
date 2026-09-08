@@ -13,16 +13,15 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CredentialRef {
     Environment {
-        #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 512)))]
+        #[schemars(length(min = 1, max = 512))]
         name: String,
     },
     File {
-        #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 4096)))]
+        #[schemars(length(min = 1, max = 4096))]
         path: PathBuf,
     },
 }

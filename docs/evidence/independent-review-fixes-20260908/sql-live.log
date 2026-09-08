@@ -1,0 +1,14 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.65s
+     Running `target/debug/examples/live_deadlines`
+{"container":"connectors-sql-live-usbzX4","database":"PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit","image":"sha256:1bea307dfb3ee30541a7acf7de14b58bcd6948da98e5d31a04c627c4d35ec64b"}
+{"case":"schema-list","rows":1}
+{"active_backends":0,"case":"plain-control","elapsed_ms":10030,"error":"timeout"}
+{"active_backends":0,"case":"plain-timeout-bypass","elapsed_ms":10005,"error":"timeout"}
+{"active_backends":0,"case":"dropped-invocation"}
+{"case":"sql-tls","encrypted":true,"untrusted_ca_refused":true}
+{"active_backends":0,"case":"tls-timeout-bypass-after-ca-file-replacement","elapsed_ms":10007}
+{"cleanup_container":"connectors-sql-live-usbzX4","stopped_and_auto_removed":true}

@@ -7,10 +7,17 @@ use rustls::pki_types::{CertificateDer, pem::PemObject};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc, time::Duration};
+use tokio::{sync::oneshot, time::Instant};
 use tokio_postgres::{
-    Client, NoTls,
+    CancelToken, Client, NoTls,
     types::{Format, IsNull, ToSql, Type},
 };
+use tokio_postgres_rustls::MakeRustlsConnect;
+
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const QUERY_TIMEOUT: Duration = Duration::from_secs(10);
+const CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -65,16 +72,21 @@ impl Sql {
             .dbname(&self.config.database)
             .user(&self.config.user)
             .password(&password.0)
-            .connect_timeout(Duration::from_secs(5))
+            .connect_timeout(CONNECT_TIMEOUT)
             .application_name("connectors-sql");
         if self.config.allow_plaintext {
             config.ssl_mode(tokio_postgres::config::SslMode::Disable);
             let (client, connection) = config.connect(NoTls).await.map_err(database_error)?;
+            let cancel = client.cancel_token();
             Ok((
                 client,
-                ConnectionTask(tokio::spawn(async move {
-                    let _ = connection.await;
-                })),
+                ConnectionTask {
+                    task: tokio::spawn(async move {
+                        let _ = connection.await;
+                    }),
+                    cancel,
+                    tls: None,
+                },
             ))
         } else {
             config.ssl_mode(tokio_postgres::config::SslMode::Require);
@@ -86,15 +98,18 @@ impl Sql {
             .map_err(|_| Error::internal())?
             .with_root_certificates(roots)
             .with_no_client_auth();
-            let (client, connection) = config
-                .connect(tokio_postgres_rustls::MakeRustlsConnect::new(tls))
-                .await
-                .map_err(database_error)?;
+            let tls = MakeRustlsConnect::new(tls);
+            let (client, connection) = config.connect(tls.clone()).await.map_err(database_error)?;
+            let cancel = client.cancel_token();
             Ok((
                 client,
-                ConnectionTask(tokio::spawn(async move {
-                    let _ = connection.await;
-                })),
+                ConnectionTask {
+                    task: tokio::spawn(async move {
+                        let _ = connection.await;
+                    }),
+                    cancel,
+                    tls: Some(tls),
+                },
             ))
         }
     }
@@ -109,7 +124,41 @@ impl Sql {
                 "query, parameters or row limit exceed bounds",
             ));
         }
-        let (mut client, _connection) = self.connect().await?;
+        let deadline = Instant::now() + REQUEST_TIMEOUT;
+        let (mut client, connection) = tokio::time::timeout(CONNECT_TIMEOUT, self.connect())
+            .await
+            .map_err(|_| query_timeout())??;
+        // Reserve cleanup time inside the 15 s request bound, even after a slow
+        // connection. A caller cannot extend this deadline with set_config().
+        let work_deadline = (Instant::now() + QUERY_TIMEOUT).min(deadline - CLEANUP_TIMEOUT);
+        let instance = self.descriptor.instance.clone();
+        let database = self.config.database.clone();
+        let (mut send, receive) = oneshot::channel();
+        // The supervisor outlives a dropped invocation long enough to cancel.
+        // Merely aborting the connection driver can leave PostgreSQL executing.
+        tokio::spawn(async move {
+            let result = tokio::select! {
+                biased;
+                _ = send.closed() => None,
+                result = tokio::time::timeout_at(work_deadline, Self::read(&mut client, args, &instance, &database)) => {
+                    Some(result.unwrap_or_else(|_| Err(query_timeout())))
+                }
+            };
+            let cancel = result.as_ref().is_none_or(|result| result.is_err());
+            connection.close(client, cancel).await;
+            if let Some(result) = result {
+                let _ = send.send(result);
+            }
+        });
+        receive.await.map_err(|_| Error::internal())?
+    }
+
+    async fn read(
+        client: &mut Client,
+        args: Query,
+        instance: &str,
+        database: &str,
+    ) -> Result<Value> {
         let transaction = client
             .build_transaction()
             .read_only(true)
@@ -214,15 +263,43 @@ impl Sql {
             columns,
             rows,
             truncated,
-            provenance: provenance(&self.descriptor.instance, &self.config.database, None),
+            provenance: provenance(instance, database, None),
         })
     }
 }
 
-struct ConnectionTask(tokio::task::JoinHandle<()>);
+fn query_timeout() -> Error {
+    Error::new(ErrorCode::Timeout, "database request timed out")
+}
+
+struct ConnectionTask {
+    task: tokio::task::JoinHandle<()>,
+    cancel: CancelToken,
+    tls: Option<MakeRustlsConnect>,
+}
+impl ConnectionTask {
+    async fn close(mut self, client: Client, cancel: bool) {
+        let cleanup = async {
+            if cancel {
+                // The token retains the actual connected address and backend
+                // key; reuse the captured TLS roots, never a mutable CA path.
+                if let Some(tls) = self.tls.take() {
+                    let _ = self.cancel.cancel_query(tls).await;
+                } else {
+                    let _ = self.cancel.cancel_query(NoTls).await;
+                }
+            }
+            drop(client);
+            let _ = (&mut self.task).await;
+        };
+        // CancelRequest has no acknowledgement. Drain the original driver when
+        // possible, but cap cleanup even if cancellation or the server stalls.
+        let _ = tokio::time::timeout(CLEANUP_TIMEOUT, cleanup).await;
+    }
+}
 impl Drop for ConnectionTask {
     fn drop(&mut self) {
-        self.0.abort();
+        self.task.abort();
     }
 }
 
@@ -286,9 +363,7 @@ impl Adapter for Sql {
                 ));
             }
         };
-        tokio::time::timeout(Duration::from_secs(15), self.query(query))
-            .await
-            .map_err(|_| Error::new(ErrorCode::Timeout, "database request timed out"))?
+        self.query(query).await
     }
 }
 

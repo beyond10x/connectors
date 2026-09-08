@@ -376,8 +376,11 @@ pub fn import(spec: &Spec, spec_path: &Path) -> Result<(Value, Value)> {
                             .operations
                             .iter()
                             .find(|o| o.id == mapping.operation)
-                            .unwrap();
-                        let f = fields(op)?.into_iter().find(|f| f.name == *name).unwrap();
+                            .ok_or_else(|| refuse("mapping names undeclared operation"))?;
+                        let f = fields(op)?
+                            .into_iter()
+                            .find(|f| f.name == *name)
+                            .ok_or_else(|| refuse("parameter references missing input"))?;
                         let ty = if f.ty == "Integer" {
                             "integer"
                         } else {

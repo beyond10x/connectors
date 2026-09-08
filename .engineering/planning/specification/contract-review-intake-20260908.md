@@ -8,7 +8,7 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 6
+revision: 7
 ---
 ## Intake
 
@@ -53,7 +53,7 @@ P0 means an established critical current failure requiring immediate containment
 | E10 | should-fix | P2 | `story:contracts-anonymous-auth` | Accepted for remediation; assigned, not fixed. |
 | E11 | should-fix | P2 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | E12 | should-fix | P2 | `story:contracts-mutation-visibility` | Not established as stated: implemented-only advertisement does not imply disabled operations are hidden; story resolves the actual visibility ambiguity. |
-| E13 | should-fix | P3 | `story:contracts-documentation-index` | Accepted for remediation; assigned, not fixed. |
+| E13 | should-fix | P3 | `story:contracts-documentation-index` | Fixed during `story:independent-review-remediation`: configuration is in the deferred-family list and index/design counts agree. The owner remains draft for E22 and prerequisite-dependent coverage. |
 | E14 | should-fix | P2 | `story:contracts-discovery-profiles` | Accepted with correction: the old rule uses exact name OR exact stable name label, not a mandatory name-and-label conjunction. |
 | E15 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
 | E16 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
@@ -89,7 +89,7 @@ The first completed hardening story is `story:contracts-mutation-outcomes`, owni
 
 ## Completion accounting
 
-F01/F02/F04/F05/E01/E11 are **fixed at the semantic-contract/model level**; the remaining **42 source findings are assigned, not fixed**. Drafting or reviewing the plan is not evidence that a contract defect is fixed. Future closure records the revised normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without implementing the external reviewer's suggested architecture.
+F01/F02/F04/F05/E01/E11 are **fixed at the semantic-contract/model level**. E13 is **fixed in the documentation inventory** by `story:independent-review-remediation`; the remaining **41 source findings are assigned, not fixed**. Drafting or reviewing the plan is not evidence that a contract defect is fixed. Future closure records the revised normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without implementing the external reviewer's suggested architecture.
 
 ## Acceptance
 

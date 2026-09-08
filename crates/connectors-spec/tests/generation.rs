@@ -31,6 +31,32 @@ fn checked_in_bundle_matches_its_pinned_sources_and_toolchain() {
 }
 
 #[test]
+fn public_import_refuses_specs_changed_after_validation() {
+    let path = root().join("adapters/gitlab/spec/adapter.json");
+    let mut spec = parse(&source()).unwrap();
+    spec.operations.clear();
+    assert!(
+        import(&spec, &path)
+            .unwrap_err()
+            .message
+            .contains("undeclared operation")
+    );
+    let mut spec = parse(&source()).unwrap();
+    spec.mappings[0].path_parameters.insert(
+        "id".into(),
+        connectors_spec::v2::Parameter::Input {
+            name: "absent".into(),
+        },
+    );
+    assert!(
+        import(&spec, &path)
+            .unwrap_err()
+            .message
+            .contains("missing input")
+    );
+}
+
+#[test]
 fn strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings() {
     let v1 = include_bytes!("../../../adapters/kubernetes/spec/adapter.json");
     let mut old: Value = serde_json::from_slice(v1).unwrap();

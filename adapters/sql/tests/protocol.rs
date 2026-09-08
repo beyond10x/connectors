@@ -46,6 +46,9 @@ struct Scenario {
     parameters: usize,
     auth_error: Option<&'static str>,
     query_error: Option<&'static str>,
+    bound_values: Vec<Option<String>>,
+    hang_on_execute: Option<Arc<tokio::sync::Notify>>,
+    ignore_cancel: bool,
 }
 impl Default for Scenario {
     fn default() -> Self {
@@ -54,6 +57,9 @@ impl Default for Scenario {
             parameters: 0,
             auth_error: None,
             query_error: None,
+            bound_values: vec![],
+            hang_on_execute: None,
+            ignore_cancel: false,
         }
     }
 }
@@ -115,7 +121,37 @@ fn data(row: &Option<Vec<Option<String>>>) -> Vec<u8> {
     }
     body
 }
-async fn fixture(scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
+fn cstring<'a>(body: &mut &'a [u8]) -> &'a str {
+    let end = body.iter().position(|b| *b == 0).unwrap();
+    let value = std::str::from_utf8(&body[..end]).unwrap();
+    *body = &body[end + 1..];
+    value
+}
+fn i16_field(body: &mut &[u8]) -> i16 {
+    let (value, tail) = body.split_at(2);
+    *body = tail;
+    i16::from_be_bytes(value.try_into().unwrap())
+}
+fn check_bind(mut body: &[u8], expected: &[Option<String>]) {
+    cstring(&mut body); // Portal name.
+    cstring(&mut body); // Prepared statement name.
+    for _ in 0..i16_field(&mut body) {
+        assert_eq!(i16_field(&mut body), 0, "parameters use text format");
+    }
+    assert_eq!(i16_field(&mut body) as usize, expected.len());
+    for value in expected {
+        let len = i32::from_be_bytes(body[..4].try_into().unwrap());
+        body = &body[4..];
+        if let Some(value) = value {
+            assert_eq!(len as usize, value.len());
+            assert_eq!(&body[..len as usize], value.as_bytes());
+            body = &body[len as usize..];
+        } else {
+            assert_eq!(len, -1);
+        }
+    }
+}
+async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let sql = adapter(
         listener.local_addr().unwrap().port(),
@@ -136,8 +172,13 @@ async fn fixture(scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
             return;
         }
         send(&mut stream, b'R', &0_i32.to_be_bytes()).await;
+        let mut key = 42_i32.to_be_bytes().to_vec();
+        key.extend(1234_i32.to_be_bytes());
+        send(&mut stream, b'K', &key).await;
         send(&mut stream, b'Z', b"I").await;
         let mut prepares = 0;
+        let mut original = String::new();
+        let mut setup = false;
         let mut row = 0;
         let mut failed = false;
         while let Some((tag, body)) = receive(&mut stream).await {
@@ -146,12 +187,38 @@ async fn fixture(scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                     let query = String::from_utf8(body).unwrap();
                     if query.starts_with("START") || query.starts_with("BEGIN") {
                         assert!(query.contains("READ ONLY"));
+                    } else if query.starts_with("SET") {
+                        assert_eq!(
+                            query.trim_end_matches('\0'),
+                            "SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog"
+                        );
+                        setup = true;
                     }
                     send(&mut stream, b'C', b"OK\0").await;
                     send(&mut stream, b'Z', b"T").await;
                 }
                 b'P' => {
+                    assert!(
+                        setup,
+                        "query preparation preceded trusted transaction setup"
+                    );
+                    let mut body = body.as_slice();
+                    cstring(&mut body);
+                    let query = cstring(&mut body);
                     prepares += 1;
+                    if prepares == 1 {
+                        original = query.into();
+                    } else {
+                        assert!(query.starts_with(
+                            "SELECT CASE WHEN (COALESCE(octet_length(result.c0::text),0)::bigint"
+                        ));
+                        assert!(query.contains(&format!(
+                            ") > {} THEN NULL::text[] ELSE ARRAY[",
+                            connectors_core::RESPONSE_LIMIT
+                        )));
+                        assert!(query.contains("ARRAY[result.c0::text,result.c1::text]"));
+                        assert!(query.ends_with(&format!("FROM ({original}) AS result(c0,c1)")));
+                    }
                     if let Some(code) = scenario.query_error {
                         send(&mut stream, b'E', &error(code)).await;
                         failed = true;
@@ -167,9 +234,31 @@ async fn fixture(scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                     send(&mut stream, b't', &params).await;
                     send(&mut stream, b'T', &description(prepares > 1)).await;
                 }
-                b'B' => send(&mut stream, b'2', b"").await,
+                b'B' => {
+                    check_bind(&body, &scenario.bound_values);
+                    send(&mut stream, b'2', b"").await;
+                }
                 b'E' => {
                     assert_eq!(&body[body.len() - 4..], &1_i32.to_be_bytes());
+                    if let Some(started) = scenario.hang_on_execute.take() {
+                        started.notify_one();
+                        let (mut cancel, _) = listener.accept().await.unwrap();
+                        let mut message = [0; 16];
+                        cancel.read_exact(&mut message).await.unwrap();
+                        assert_eq!(&message[..4], &16_i32.to_be_bytes());
+                        assert_eq!(&message[4..8], &80877102_i32.to_be_bytes());
+                        assert_eq!(&message[8..12], &42_i32.to_be_bytes());
+                        assert_eq!(&message[12..], &1234_i32.to_be_bytes());
+                        if scenario.ignore_cancel {
+                            // Never finish Execute. The cleanup budget must still
+                            // close the original connection, rather than leak it.
+                            let _ = stream.read_to_end(&mut Vec::new()).await;
+                            return;
+                        }
+                        send(&mut stream, b'E', &error("57014")).await;
+                        failed = true;
+                        continue;
+                    }
                     if let Some(value) = scenario.rows.get(row) {
                         send(&mut stream, b'D', &data(value)).await;
                         send(&mut stream, b's', b"").await;
@@ -315,4 +404,74 @@ async fn authentication_database_errors_and_row_capacity_are_sanitized() {
     .await
     .unwrap_err();
     assert_eq!(error.code, ErrorCode::InvalidInput);
+}
+
+#[tokio::test]
+async fn text_null_and_empty_parameters_reach_bind_without_interpolation() {
+    let values = vec![Some("a'雪\\value".into()), Some(String::new()), None];
+    let result = invoke(
+        Scenario { parameters: 3, bound_values: values.clone(), ..Scenario::default() },
+        json!({"query":"SELECT $1::text, $2::text WHERE $3::text IS NULL", "parameters":values, "limit":1}),
+    ).await.unwrap();
+    assert_eq!(result["rows"], json!([["42", null]]));
+}
+
+async fn stalled(
+    ignore_cancel: bool,
+) -> (
+    tokio::task::JoinHandle<Result<Value>>,
+    tokio::task::JoinHandle<()>,
+) {
+    let started = Arc::new(tokio::sync::Notify::new());
+    let (sql, server) = fixture(Scenario {
+        hang_on_execute: Some(started.clone()),
+        ignore_cancel,
+        ..Scenario::default()
+    })
+    .await;
+    let call = tokio::spawn(async move {
+        sql.invoke("query.read", json!({"query":"SELECT 1", "limit":1}))
+            .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(3), started.notified())
+        .await
+        .unwrap();
+    (call, server)
+}
+
+#[tokio::test]
+async fn deadline_sends_the_backend_cancel_key_and_drains_the_connection() {
+    let (call, server) = stalled(false).await;
+    let error = tokio::time::timeout(std::time::Duration::from_secs(13), call)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Timeout);
+    tokio::time::timeout(std::time::Duration::from_secs(1), server)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn dropping_the_invocation_still_cancels_the_database() {
+    let (call, server) = stalled(false).await;
+    call.abort();
+    assert!(call.await.unwrap_err().is_cancelled());
+    tokio::time::timeout(std::time::Duration::from_secs(3), server)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn unresponsive_database_cannot_extend_the_cleanup_budget() {
+    let (call, server) = stalled(true).await;
+    call.abort();
+    assert!(call.await.unwrap_err().is_cancelled());
+    tokio::time::timeout(std::time::Duration::from_secs(3), server)
+        .await
+        .unwrap()
+        .unwrap();
 }

@@ -1,0 +1,12 @@
+{
+  "removed_build_output": "/home/timo/beyond10x/connectors_v2/.local/review-fixes-20260908/target",
+  "observed_allocated_bytes": 3037208576,
+  "path_absent": true,
+  "owned_containers_confirmed_absent": [
+    "connectors-sql-live-usbzX4",
+    "connectors-sql-live-XEo79V"
+  ],
+  "primary_build_refreshed": true,
+  "primary_source_digests_match_verified_gate": true,
+  "unrelated_worktrees": "untouched"
+}

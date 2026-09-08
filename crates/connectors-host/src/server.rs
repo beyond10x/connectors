@@ -17,19 +17,12 @@ use std::{net::SocketAddr, sync::Arc, time::Instant};
 use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ServiceConfig {
-    #[cfg_attr(
-        feature = "schema",
-        schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))
-    )]
+    #[schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
     pub instance: String,
-    #[cfg_attr(
-        feature = "schema",
-        schemars(with = "String", length(min = 1, max = 512))
-    )]
+    #[schemars(with = "String", length(min = 1, max = 512))]
     pub listen: SocketAddr,
     pub service_credential: CredentialRef,
 }
@@ -203,4 +196,117 @@ pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<(
     })
     .await
     .map_err(|_| Error::internal())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{Value, json};
+
+    struct BoundedAdapter {
+        entered: Arc<Semaphore>,
+        result: Option<String>,
+    }
+    #[async_trait::async_trait]
+    impl Adapter for BoundedAdapter {
+        fn descriptor(&self) -> Descriptor {
+            Descriptor {
+                version: WIRE_VERSION.into(),
+                instance: "bounds".into(),
+                adapter: "fixture".into(),
+                revision: "one".into(),
+                configuration_schema: json!({"type":"object"}),
+                operations: vec![connectors_core::Operation {
+                    id: "read".into(),
+                    description: "bounded read".into(),
+                    contract: "operations/v1alpha1".into(),
+                    profile: "read".into(),
+                    input_schema: json!({"type":"object"}),
+                    output_schema: json!({"type":"string"}),
+                }],
+            }
+        }
+        async fn invoke(&self, _: &str, _: Value) -> Result<Value> {
+            self.entered.add_permits(1);
+            match &self.result {
+                Some(value) => Ok(json!(value)),
+                None => std::future::pending().await,
+            }
+        }
+    }
+    fn fixture(result: Option<String>) -> (Service, Arc<Semaphore>) {
+        let entered = Arc::new(Semaphore::new(0));
+        (
+            Service {
+                adapter: Arc::new(BoundedAdapter {
+                    entered: entered.clone(),
+                    result,
+                }),
+                credential: Arc::new(CredentialRef::Environment {
+                    name: "UNUSED".into(),
+                }),
+                slots: Arc::new(Semaphore::new(32)),
+            },
+            entered,
+        )
+    }
+    fn invocation() -> Invocation {
+        Invocation {
+            version: WIRE_VERSION.into(),
+            request_id: "bounds".into(),
+            operation: "read".into(),
+            revision: "one".into(),
+            input: json!({}),
+        }
+    }
+    #[tokio::test(start_paused = true)]
+    async fn service_deadline_cancels_the_adapter_and_releases_capacity() {
+        let (service, entered) = fixture(None);
+        let start = tokio::time::Instant::now();
+        assert_eq!(
+            execute(&service, &invocation()).await.unwrap_err().code,
+            ErrorCode::Timeout
+        );
+        assert_eq!(start.elapsed(), std::time::Duration::from_secs(20));
+        assert_eq!(entered.available_permits(), 1);
+        assert_eq!(service.slots.available_permits(), 32);
+    }
+    #[tokio::test]
+    async fn thirty_two_inflight_calls_refuse_the_next_until_one_is_dropped() {
+        let (service, entered) = fixture(None);
+        let spawn = || {
+            let service = service.clone();
+            tokio::spawn(async move { execute(&service, &invocation()).await })
+        };
+        let mut calls = (0..32).map(|_| spawn()).collect::<Vec<_>>();
+        entered.acquire_many(32).await.unwrap().forget();
+        assert_eq!(
+            execute(&service, &invocation()).await.unwrap_err().code,
+            ErrorCode::Capacity
+        );
+        assert_eq!(entered.available_permits(), 0);
+        let first = calls.remove(0);
+        first.abort();
+        assert!(first.await.unwrap_err().is_cancelled());
+        calls.push(spawn());
+        entered.acquire().await.unwrap().forget();
+        for call in calls {
+            call.abort();
+            let _ = call.await;
+        }
+        assert_eq!(service.slots.available_permits(), 32);
+    }
+    #[tokio::test]
+    async fn oversized_adapter_result_is_refused_after_schema_validation() {
+        let (service, _) = fixture(Some("x".repeat(RESPONSE_LIMIT)));
+        assert_eq!(
+            execute(&service, &invocation()).await.unwrap_err().code,
+            ErrorCode::Capacity
+        );
+        let (service, _) = fixture(Some("small".into()));
+        assert_eq!(
+            execute(&service, &invocation()).await.unwrap(),
+            json!("small")
+        );
+    }
 }
