@@ -186,3 +186,5 @@ The ESS lifecycle describes one supervising owner's decisions. It does not deriv
 | Reattach/resume | not in v1alpha1 |
 | Offer deadline | 10 s |
 | Inbound destination model | one configured endpoint per ingress; assignment resolver deferred |
+
+Persistence ownership is consolidated in [design §31](../../../docs/design.md#31-host-persistence-ownership-and-atomicity). SessionRedemptionPort and SessionSupervisorPort distinguish one-use establishment from live lease/terminal/accounting state. Restart cannot restore a live session. This inventory does not supply a backend or execute its atomicity predicates.

@@ -1,0 +1,429 @@
+[
+  {
+    "id": "source-a",
+    "type": "connectors.discovery.ConfiguredSourceIdentity",
+    "value": {
+      "instance_id": "kube-a",
+      "connection_ref": "conn-a",
+      "api_origin": "https://cluster.example:443",
+      "transport_policy_revision": "trust-7"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "source-other-instance",
+    "type": "connectors.discovery.ConfiguredSourceIdentity",
+    "value": {
+      "instance_id": "kube-b",
+      "connection_ref": "conn-a",
+      "api_origin": "https://cluster.example:443",
+      "transport_policy_revision": "trust-7"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "source-other-connection",
+    "type": "connectors.discovery.ConfiguredSourceIdentity",
+    "value": {
+      "instance_id": "kube-a",
+      "connection_ref": "conn-b",
+      "api_origin": "https://cluster.example:443",
+      "transport_policy_revision": "trust-7"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "kubernetes-binding",
+    "type": "connectors.discovery.DeclaredObservationBinding",
+    "value": {
+      "operation_id": "services.observe",
+      "profile": "kubernetes-service-targets",
+      "source": {
+        "instance_id": "kube-a",
+        "connection_ref": "conn-a",
+        "api_origin": "https://cluster.example:443",
+        "transport_policy_revision": "trust-7"
+      },
+      "projection_revision": "meaning-2"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "grafana-binding",
+    "type": "connectors.discovery.DeclaredObservationBinding",
+    "value": {
+      "operation_id": "datasources.observe",
+      "profile": "grafana-datasources",
+      "source": {
+        "instance_id": "grafana-a",
+        "connection_ref": "conn-grafana",
+        "api_origin": "https://grafana.example:443",
+        "transport_policy_revision": "trust-7"
+      },
+      "projection_revision": "meaning-2"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "profile-grafana-datasources",
+    "type": "connectors.discovery.ObservationProfile",
+    "value": "grafana-datasources",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "profile-kubernetes-service-targets",
+    "type": "connectors.discovery.ObservationProfile",
+    "value": "kubernetes-service-targets",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "provider-grafana",
+    "type": "connectors.discovery.RecognitionProvider",
+    "value": "grafana",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "inferred-grafana",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "grafana",
+      "confidence": "inferred"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "provider-alertmanager",
+    "type": "connectors.discovery.RecognitionProvider",
+    "value": "alertmanager",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "inferred-alertmanager",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "alertmanager",
+      "confidence": "inferred"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "provider-loki",
+    "type": "connectors.discovery.RecognitionProvider",
+    "value": "loki",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "inferred-loki",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "loki",
+      "confidence": "inferred"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "provider-prometheus",
+    "type": "connectors.discovery.RecognitionProvider",
+    "value": "prometheus",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "inferred-prometheus",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "prometheus",
+      "confidence": "inferred"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "provider-argocd",
+    "type": "connectors.discovery.RecognitionProvider",
+    "value": "argocd",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "inferred-argocd",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "argocd",
+      "confidence": "inferred"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "confidence-declared",
+    "type": "connectors.discovery.RecognitionConfidence",
+    "value": "declared",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "confidence-inferred",
+    "type": "connectors.discovery.RecognitionConfidence",
+    "value": "inferred",
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "declared-alertmanager",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "alertmanager",
+      "confidence": "declared"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "declared-loki",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "loki",
+      "confidence": "declared"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "declared-prometheus",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "prometheus",
+      "confidence": "declared"
+    },
+    "schema_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "api-name",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "argocd-server"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "api-label",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "platform-argocd-server",
+      "app_name": "argocd-server"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "metrics",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "argocd-server-metrics",
+      "app_name": "argocd-server-metrics"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "repo",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "argocd-repo-server"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "redis",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "argocd-redis"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "alias-not-argo",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "custom",
+      "legacy_app": "argocd-server"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "folded",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "custom",
+      "app_name": "ARGOCD-SERVER"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "no-trimming",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "custom",
+      "app_name": " argocd-server "
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "monitoring",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "prod-prometheus"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "monitoring-priority",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "grafana-prometheus"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "argo-precedes-monitoring",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "grafana",
+      "app_name": "argocd-server"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "unrecognized",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "custom-api"
+    },
+    "schema_accepts": true,
+    "note": "Declared recognizer input; expected classification is in textual traces, not computed by this audit."
+  },
+  {
+    "id": "unknown-profile",
+    "type": "connectors.discovery.ObservationProfile",
+    "value": "caller-selected",
+    "schema_accepts": false,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "unknown-provider",
+    "type": "connectors.discovery.RecognitionProvider",
+    "value": "arbitrary-proxy",
+    "schema_accepts": false,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "unknown-confidence",
+    "type": "connectors.discovery.RecognitionConfidence",
+    "value": "verified",
+    "schema_accepts": false,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "unknown-input-member",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "x",
+      "target_adapter": "argocd"
+    },
+    "schema_accepts": false,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "missing-source-connection",
+    "type": "connectors.discovery.ConfiguredSourceIdentity",
+    "value": {
+      "instance_id": "kube-a",
+      "api_origin": "https://cluster.example:443",
+      "transport_policy_revision": "trust-7"
+    },
+    "schema_accepts": false,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "missing-service-name",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "app_name": "argocd-server"
+    },
+    "schema_accepts": false,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "public-null-not-optional",
+    "type": "connectors.discovery.KubernetesRecognitionInput",
+    "value": {
+      "service_name": "x",
+      "app_name": null
+    },
+    "schema_accepts": false,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "wrong-operation-profile-pair",
+    "type": "connectors.discovery.DeclaredObservationBinding",
+    "value": {
+      "operation_id": "services.observe",
+      "profile": "grafana-datasources",
+      "source": {
+        "instance_id": "kube-a",
+        "connection_ref": "conn-a",
+        "api_origin": "https://cluster.example:443",
+        "transport_policy_revision": "trust-7"
+      },
+      "projection_revision": "meaning-2"
+    },
+    "schema_accepts": true,
+    "note": "Intentionally shape-valid; receiver declaration/source compatibility must reject this pairing."
+  },
+  {
+    "id": "non-https-origin",
+    "type": "connectors.discovery.ConfiguredSourceIdentity",
+    "value": {
+      "instance_id": "kube-a",
+      "connection_ref": "conn-a",
+      "api_origin": "http://cluster.example",
+      "transport_policy_revision": "trust-7"
+    },
+    "schema_accepts": true,
+    "note": "Intentionally shape-valid; selected canonical HTTPS origin predicate refuses."
+  },
+  {
+    "id": "argo-declared-in-kubernetes",
+    "type": "connectors.discovery.ResourceRecognition",
+    "value": {
+      "provider": "argocd",
+      "confidence": "declared"
+    },
+    "schema_accepts": true,
+    "note": "Intentionally shape-valid; Kubernetes profile requires inferred, not declared, recognition."
+  }
+]

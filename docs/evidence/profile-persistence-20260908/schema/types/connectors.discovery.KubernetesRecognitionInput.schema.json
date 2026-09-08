@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.KubernetesRecognitionInput",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "906f53651110c796906843c9338e67b527761c3c5b354af86ca7e949785e1f6e",
+    "contract_digest": "slice-sha256/2:68e4fc365ffe7845f230a1daedfe34908b5a915e5a40af172e19cc166a0dadaa",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.KubernetesRecognitionInput": {
+      "title": "KubernetesRecognitionInput",
+      "x-ess-name": "connectors.discovery.KubernetesRecognitionInput",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string"
+        },
+        "app_name": {
+          "type": "string"
+        },
+        "legacy_app": {
+          "type": "string"
+        },
+        "legacy_k8s_app": {
+          "type": "string"
+        },
+        "legacy_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_name"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-discovery-profiles
 kind: story
-status: draft
+status: implemented
 title: Make discovery profile binding and Kubernetes recognition explicit
 tags:
 - P2
@@ -12,13 +12,21 @@ relations:
 - informed_by: specification:contract-review-intake-20260908
 - depends_on: story:contracts-discovery-coverage
 scope:
+- confidence: inferred
+  path: contracts/discovery/mediated_route/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/discovery/resources/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/service/compatibility.md
 - confidence: cited
   path: docs/adapters/grafana.md
 - confidence: cited
   path: docs/adapters/kubernetes.md
-revision: 2
+- confidence: inferred
+  path: docs/evidence/profile-persistence-20260908
+- confidence: inferred
+  path: ess/domains/discovery.yaml
+revision: 12
 ---
 ## Context
 
@@ -46,11 +54,13 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 ## Scope
 
+- inferred: `contracts/discovery/mediated_route/v1alpha1/semantics.md`
 - cited: `contracts/discovery/resources/v1alpha1/semantics.md`
-- cited: `docs/adapters/kubernetes.md`
+- inferred: `contracts/service/compatibility.md`
 - cited: `docs/adapters/grafana.md`
-
-Source locations: `contracts/discovery/resources/v1alpha1/semantics.md:31`; `contracts/discovery/resources/v1alpha1/semantics.md:34`; `contracts/discovery/resources/v1alpha1/semantics.md:125`; `docs/adapters/kubernetes.md:56`; `docs/adapters/kubernetes.md:78`; `docs/adapters/grafana.md:61`; `docs/design.md:939`; `../connectors/docs/design/10-local-kubernetes-context-and-resource-discovery.md:175`.
+- cited: `docs/adapters/kubernetes.md`
+- inferred: `docs/evidence/profile-persistence-20260908`
+- inferred: `ess/domains/discovery.yaml`
 
 ## Dependencies and edit coordination
 
@@ -60,4 +70,8 @@ Shared edit surfaces with `story:contracts-credential-evidence`, `story:contract
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+This approved local specification-hardening story revises normative contracts/design and settled ESS values using pinned ESS 0.20.0, retaining explicit UNMAPPED implementation and persistent relation requirements. It introduces no runtime code or current adapter-kind schema change. The existing source findings and stories authorize this work; their earlier text-only/no-commit boundary is superseded by the operator’s hardening instructions. Root is the sole tracked editor in primary main; two independent reviewers write ignored snapshots only. No concurrent implementation wave or external publication. Existing persistent ESS entities are reused; this inventory does not invent lifecycles, delete semantics or a universal storage abstraction. Local checkpoint commits and local recovery backup remain authorized.
+
+## Completion evidence
+
+E07/E14/E32 is fixed for the approved semantic specification scope. Normative revisions, 43 declared textual traces, 44 schema expectations, actual ESS entity inventory and validation limits are recorded in [verification](../../../docs/evidence/profile-persistence-20260908/verification.md) and [dispositions](../../../docs/evidence/profile-persistence-20260908/dispositions.md). Both immutable final independent reviews profile-persistence-a-recheck1-20260908 and profile-persistence-b-recheck1-20260908 approve with zero residual findings. ESS 0.20.0 validates 13 files/204 declarations; two 211-artifact projections match; the existing full gate/MSRV1.88 passes 50 Rust tests. E32 explicitly selects configured authority identity and defers physical-cluster attestation. E28 selects eighteen logical port owners/atomic groups/handoffs without claiming missing persistent entity models or a backend. No runtime/adapter-kind schema change or external publication; no recognizer, storage, authority or sequential conformance execution is claimed.
