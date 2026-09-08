@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-document-admission
 kind: story
-status: active
+status: implemented
 title: Define trusted document membership before content access
 tags:
 - P1
@@ -27,7 +27,7 @@ scope:
   path: ess/domains/datasource_reads.yaml
 - confidence: cited
   path: ess/system.yaml
-revision: 12
+revision: 15
 ---
 ## Context
 
@@ -81,3 +81,11 @@ Current priority is P1 because the deeper review found scope/correctness failure
 ## Adapter ownership correction — 2026-09-09
 
 story:extractable-adapter-contract-ownership relocates native authority under adapters/<owner>/contracts and authored spec/ess. Shared root contracts retain envelopes and common obligations. Initial review snapshots retain original paths and bytes. This relocation does not close any datasource finding or claim final semantic approval; this story remains active pending its own scenario/disposition evidence and independent review.
+
+## Completion evidence — 2026-09-09
+
+F14 and LD-A-04–08/LD-B-05–08 are fixed. Native scoped retrieval, current metadata/cache authority, faithful Jira fields, Confluence storage and bounded immutable CQL lineage rules are supported by 42 manual document/CQL cases in adapters/atlassian/contracts/documents/v1alpha1/evidence/20260909/scenarios.md.
+
+Both independent final reviews spec-completion-a-final-20260909 and spec-completion-b-final-20260909 approve the selected specification scope at d1dc83f5d600816c699db07dd843f079ded0e72b. The complete checkpoint, unchanged reports and exact source archive are retained in [checkpoint](../../../docs/evidence/spec-completion-20260909/checkpoint.md). The full repository gate including MSRV 1.88 passed with 58 Rust tests; ESS synthesis/compilation and textual scenarios do not execute runtime conformance. No runtime implementation or public codec change was added in this wave.
+
+The approved parallel plan supersedes earlier single-primary-writer dispatch wording: isolated workers changed only their assigned sources, coordinator alone wrote planning/shared joins. This story is complete for its enumerated specification findings; the overall goal remains active for the separately scoped persistent ESS model closure. Original immutable review bodies and historical source references remain unchanged.
