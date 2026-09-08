@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.IdempotencyKind",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "72ba9ea092904fdc68ed0063ae596853db6e5f5cb70bac7e93e610ff3f4e66cd",
+    "contract_digest": "slice-sha256/2:7fce1c6962e6e50a71e377efbb34d04a13b40c95f4152cba24d8647bcbc04824",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.IdempotencyKind": {
+      "title": "IdempotencyKind",
+      "x-ess-name": "connectors.mutations.IdempotencyKind",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "none",
+        "natural",
+        "keyed"
+      ]
+    }
+  }
+}

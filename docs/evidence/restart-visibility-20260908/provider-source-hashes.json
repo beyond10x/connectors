@@ -1,0 +1,58 @@
+[
+  {
+    "source": "https://docs.docker.com/reference/api/engine/version/v1.56.yaml",
+    "kind": "official Docker v1.56 Swagger 2.0",
+    "archive": "vendor/docker-v1.56.yaml.gz",
+    "sha256": "f09a22ad220d551dca5d6c402052204d3e9fd1f16943cd78ba6677ea1266616f",
+    "bytes": 473773
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/website/8817d358864b70a9710c5ad34f78df6a239be33d/content/en/docs/reference/using-api/api-concepts.md",
+    "kind": "official pinned Kubernetes documentation/source",
+    "archive": "vendor/kubernetes-api-concepts-1.35.md.gz",
+    "sha256": "c7c9fe6ba9582c4aa70a6e0f04549ee89fc19ff99c41bf0fd61d31ffacc17204",
+    "bytes": 73055
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apimachinery/pkg/api/validation/objectmeta.go",
+    "kind": "official pinned Kubernetes documentation/source",
+    "archive": "vendor/kubernetes-objectmeta-1.35.go.gz",
+    "sha256": "8c45a41329acf6b4e7c1390c705946901d496812f64fb6fc01d9346263797ef4",
+    "bytes": 16149
+  },
+  {
+    "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/local_workloads.rs",
+    "kind": "pinned predecessor evidence",
+    "archive": "vendor/old-kubernetes-local_workloads.rs.gz",
+    "sha256": "08d85a2bcdad8b663c16640c18842dea021783d77bf7eb50d17472566a889caf",
+    "bytes": 20038
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go",
+    "kind": "official pinned Kubernetes conditional-update source",
+    "archive": "vendor/kubernetes-v1.35.0-store.go.gz",
+    "sha256": "d7d0341f475e4de43a985419d15800ced365dafeafdee59269d8b687579d3ee3",
+    "bytes": 64050
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/pkg/registry/apps/deployment/strategy.go",
+    "kind": "official pinned Kubernetes conditional-update source",
+    "archive": "vendor/kubernetes-v1.35.0-strategy.go.gz",
+    "sha256": "fb159281b8a2342e5df2ba988d722446e1665d3cd42d5fe2d2c781d3d0303fdb",
+    "bytes": 7701
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apiserver/pkg/storage/api_object_versioner.go",
+    "kind": "official pinned Kubernetes conditional-update source",
+    "archive": "vendor/kubernetes-v1.35.0-api_object_versioner.go.gz",
+    "sha256": "e69bb647fbff622302800b7452fe0a2e620aa9b16519faea5e77f71767e9bfe0",
+    "bytes": 4003
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/patch.go",
+    "kind": "official pinned Kubernetes conditional-update source",
+    "archive": "vendor/kubernetes-v1.35.0-patch.go.gz",
+    "sha256": "430804c7244ce5ffedea3a5502554eef8d908e02c34cd50ec3da0402e7f291c5",
+    "bytes": 31792
+  }
+]
