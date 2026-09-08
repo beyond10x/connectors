@@ -1,0 +1,261 @@
+# These host-resolved values assume separately admitted fixture callers/origins.
+# No claim that supplying these fields establishes their authority.
+type: ess-scenario/1
+domain: connectors.idempotency
+scenario: idempotency-namespace-values
+summary: 'F02: typed namespace values preserve distinct caller, realm absence and trusted origin; this
+  is not an admission/isolation runtime test.'
+arrange:
+- instance: first-attempt
+  entity: connectors.mutations.AttemptRecord
+- instance: first-reservation
+  entity: connectors.idempotency.KeyReservation
+- instance: second-attempt
+  entity: connectors.mutations.AttemptRecord
+- instance: second-reservation
+  entity: connectors.idempotency.KeyReservation
+- instance: realm-attempt
+  entity: connectors.mutations.AttemptRecord
+- instance: realm-reservation
+  entity: connectors.idempotency.KeyReservation
+- instance: origin-attempt
+  entity: connectors.mutations.AttemptRecord
+- instance: origin-reservation
+  entity: connectors.idempotency.KeyReservation
+timeline:
+- at: '2026-09-08T09:00:00Z'
+  command: connectors.mutations.PrepareAttempt
+  input:
+    instance_id: test-instance
+    request_id: idempotency-namespace-values-first
+    operation_id: jira.issue.create
+    connection_ref: test-connection
+    input_digest: test-digest
+    approval_mode: not_required
+    approval_ref: null
+    idempotency_key: create-1
+  outcome: prepared
+  events:
+  - event: connectors.mutations.AttemptPrepared
+  capture:
+    instance: first-attempt
+    event: connectors.mutations.AttemptPrepared
+    field: attempt_id
+- at: '2026-09-08T09:00:01Z'
+  command: connectors.idempotency.ReserveKey
+  input:
+    namespace:
+      receiver_instance: test-instance
+      authority:
+        tenant: tenant-a
+        realm: null
+        caller: alice
+        executor: alice
+      origin:
+        kind: direct
+        authority_ref: test-instance
+    caller_key: create-1
+    fingerprint: &id001
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
+    attempt_id:
+      $instance: first-attempt
+  outcome: reserved
+  events:
+  - event: connectors.idempotency.KeyReserved
+  capture:
+    instance: first-reservation
+    event: connectors.idempotency.KeyReserved
+    field: reservation_id
+- at: '2026-09-08T09:00:02Z'
+  command: connectors.idempotency.ExpireResult
+  input:
+    reservation_id:
+      $instance: first-reservation
+  outcome: wrong-state
+  error:
+    name: connectors.idempotency.ReservationStateConflict
+    fields:
+      state: Pending
+  no_events:
+  - connectors.idempotency.ResultExpired
+- at: '2026-09-08T09:00:03Z'
+  command: connectors.mutations.PrepareAttempt
+  input:
+    instance_id: test-instance
+    request_id: idempotency-namespace-values-second
+    operation_id: jira.issue.create
+    connection_ref: test-connection
+    input_digest: test-digest
+    approval_mode: not_required
+    approval_ref: null
+    idempotency_key: create-1
+  outcome: prepared
+  events:
+  - event: connectors.mutations.AttemptPrepared
+  capture:
+    instance: second-attempt
+    event: connectors.mutations.AttemptPrepared
+    field: attempt_id
+- at: '2026-09-08T09:00:04Z'
+  command: connectors.idempotency.ReserveKey
+  input:
+    namespace: &id002
+      receiver_instance: test-instance
+      authority:
+        tenant: tenant-a
+        realm: null
+        caller: bob
+        executor: bob
+      origin:
+        kind: direct
+        authority_ref: test-instance
+    caller_key: create-1
+    fingerprint: *id001
+    attempt_id:
+      $instance: second-attempt
+  outcome: reserved
+  events:
+  - event: connectors.idempotency.KeyReserved
+  capture:
+    instance: second-reservation
+    event: connectors.idempotency.KeyReserved
+    field: reservation_id
+- at: '2026-09-08T09:00:05Z'
+  command: connectors.mutations.PrepareAttempt
+  input:
+    instance_id: test-instance
+    request_id: idempotency-namespace-values-realm
+    operation_id: jira.issue.create
+    connection_ref: test-connection
+    input_digest: test-digest
+    approval_mode: not_required
+    approval_ref: null
+    idempotency_key: create-1
+  outcome: prepared
+  events:
+  - event: connectors.mutations.AttemptPrepared
+  capture:
+    instance: realm-attempt
+    event: connectors.mutations.AttemptPrepared
+    field: attempt_id
+- at: '2026-09-08T09:00:06Z'
+  command: connectors.idempotency.ReserveKey
+  input:
+    namespace: &id003
+      receiver_instance: test-instance
+      authority:
+        tenant: tenant-a
+        realm: default
+        caller: alice
+        executor: alice
+      origin:
+        kind: direct
+        authority_ref: test-instance
+    caller_key: create-1
+    fingerprint: *id001
+    attempt_id:
+      $instance: realm-attempt
+  outcome: reserved
+  events:
+  - event: connectors.idempotency.KeyReserved
+  capture:
+    instance: realm-reservation
+    event: connectors.idempotency.KeyReserved
+    field: reservation_id
+- at: '2026-09-08T09:00:07Z'
+  command: connectors.mutations.PrepareAttempt
+  input:
+    instance_id: test-instance
+    request_id: idempotency-namespace-values-origin
+    operation_id: jira.issue.create
+    connection_ref: test-connection
+    input_digest: test-digest
+    approval_mode: not_required
+    approval_ref: null
+    idempotency_key: create-1
+  outcome: prepared
+  events:
+  - event: connectors.mutations.AttemptPrepared
+  capture:
+    instance: origin-attempt
+    event: connectors.mutations.AttemptPrepared
+    field: attempt_id
+- at: '2026-09-08T09:00:08Z'
+  command: connectors.idempotency.ReserveKey
+  input:
+    namespace: &id004
+      receiver_instance: test-instance
+      authority:
+        tenant: tenant-a
+        realm: null
+        caller: alice
+        executor: alice
+      origin:
+        kind: federated
+        authority_ref: trusted-gateway
+    caller_key: create-1
+    fingerprint: *id001
+    attempt_id:
+      $instance: origin-attempt
+  outcome: reserved
+  events:
+  - event: connectors.idempotency.KeyReserved
+  capture:
+    instance: origin-reservation
+    event: connectors.idempotency.KeyReserved
+    field: reservation_id
+assert:
+- view: connectors.idempotency.ReservationStates
+  contains:
+    reservation_id:
+      $instance: first-reservation
+    namespace:
+      receiver_instance: test-instance
+      authority:
+        tenant: tenant-a
+        realm: null
+        caller: alice
+        executor: alice
+      origin:
+        kind: direct
+        authority_ref: test-instance
+    caller_key: create-1
+    state: Pending
+- view: connectors.mutations.AttemptStates
+  contains:
+    attempt_id:
+      $instance: first-attempt
+    state: Prepared
+- view: connectors.idempotency.ReservationStates
+  contains:
+    reservation_id:
+      $instance: second-reservation
+    namespace: *id002
+    caller_key: create-1
+    state: Pending
+- view: connectors.idempotency.ReservationStates
+  contains:
+    reservation_id:
+      $instance: realm-reservation
+    namespace: *id003
+    caller_key: create-1
+    state: Pending
+- view: connectors.idempotency.ReservationStates
+  contains:
+    reservation_id:
+      $instance: origin-reservation
+    namespace: *id004
+    caller_key: create-1
+    state: Pending
+- view: connectors.idempotency.ReservationStates
+  counts:
+    at_least: 4
+    at_most: 4
