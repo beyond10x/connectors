@@ -1,0 +1,400 @@
+{
+  "scope": "Offline independent schema/byte/count audit of final packet; no semantic reducer, runtime provider, clock, storage, route or composition execution.",
+  "reviewed_live_files_equal_snapshot": 52,
+  "typed_expectations": 63,
+  "negative_shapes": 7,
+  "type_results": [
+    {
+      "id": "scope-ab",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "scope-a-only",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-complete",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-capped",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-unavailable",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-not_scanned",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "grafana-collection",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "explicit-cluster-scope",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-complete",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-complete",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-capped",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-capped",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-failed",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-failed",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-unvisited",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-unvisited",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "evidence-observed",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "evidence-stale",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "evidence-withdrawn",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-current",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-attempt_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-predecessor_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-scope_unchanged-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-source_binding_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-parent_generation_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-authority_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-deadline_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-private_bindings_available-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-decision-published",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-decision-refused",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-decision-unknown",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "same-target-revalidation",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-observation_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-fixed_binding_equal-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-parent_generation_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-exact_permission_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-child_enabled_and_not_revoked-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-same_binding_published",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-changed_binding",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-refused",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-unavailable",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-unknown",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "wired-composition",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-same_process-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-parent_port_registered-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-child_implementation_registered-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-profiles_compatible-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-parent_is_direct-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-independently_admitted-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "retired-observation-state",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-partition-state",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "public-null-not-generic-optional",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-publication-member",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "wrong-generation-type",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "missing-current-permission",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "string-process-flag",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "contradictory-complete-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "missing-namespace-coordinate",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "negative-publication-generation",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "false-publisher-published-shape",
+      "accepted": true,
+      "expected_matched": true
+    }
+  ],
+  "shape_valid_semantic_counterexamples": [
+    "contradictory-complete-denied",
+    "missing-namespace-coordinate",
+    "negative-publication-generation",
+    "false-publisher-published-shape"
+  ],
+  "projection_artifacts": 204,
+  "selected_exact_copies": 13,
+  "two_projections_and_manifest_equal": true,
+  "textual_trace_count": 46,
+  "traces": [
+    "DC-T01",
+    "DC-T02",
+    "DC-T03",
+    "DC-T04",
+    "DC-T05",
+    "DC-T06",
+    "DC-T07",
+    "DC-T08",
+    "DC-T09",
+    "DC-T10",
+    "DC-T11",
+    "DC-T12",
+    "DC-T13",
+    "DC-T14",
+    "DC-T15",
+    "DC-T16",
+    "DC-T17",
+    "DC-T18",
+    "DC-T19",
+    "DC-T20",
+    "DC-T21",
+    "DC-T22",
+    "DC-T23",
+    "DC-T24",
+    "DC-T25",
+    "DC-T26",
+    "DC-T27",
+    "DC-T28",
+    "DC-T29",
+    "DC-T30",
+    "DC-T31",
+    "DC-T32",
+    "DC-T33",
+    "DC-T34",
+    "DC-T35",
+    "DC-T36",
+    "DC-T37",
+    "DC-T38",
+    "DC-T39",
+    "DC-T40",
+    "DC-T41",
+    "DC-T42",
+    "DC-T43",
+    "DC-T44",
+    "DC-T45",
+    "DC-T46"
+  ],
+  "recorded_gate_tests": 50,
+  "recorded_gate_pass": true,
+  "recorded_gate_ess": {
+    "files": 13,
+    "declarations": 197
+  },
+  "recorded_gate_synthesis": {
+    "total": 222,
+    "authored": 34,
+    "refusals": 0
+  },
+  "separate_session_artifacts": {
+    "authored": 13,
+    "synthesized": 201,
+    "same_provenance": true,
+    "authored_values_included_unchanged": true
+  },
+  "compiled_before_after_deadline_comment_byte_identical": true,
+  "historical_design_revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8"
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.ObservationEvidence",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:a43f6c672e44262b5a87b1fd34d0c88cd98001fdca526e599d15a99ac4dd0249",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.ObservationEvidence": {
+      "title": "ObservationEvidence",
+      "x-ess-name": "connectors.discovery.ObservationEvidence",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/connectors.discovery.ObservationState"
+        },
+        "last_seen_generation": {
+          "type": "integer"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "state",
+        "last_seen_generation",
+        "observed_at",
+        "valid_until"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.discovery.ObservationState": {
+      "title": "ObservationState",
+      "x-ess-name": "connectors.discovery.ObservationState",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "observed",
+        "stale",
+        "withdrawn"
+      ]
+    }
+  }
+}

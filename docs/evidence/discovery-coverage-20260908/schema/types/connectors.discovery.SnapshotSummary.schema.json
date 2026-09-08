@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.SnapshotSummary",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:73583c4db4133d681b40213eaa49a595b254045a464f8f488a864e783984e76c",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.CollectionCoverage": {
+      "title": "CollectionCoverage",
+      "x-ess-name": "connectors.discovery.CollectionCoverage",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "partitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/connectors.discovery.PartitionCoverage"
+          }
+        }
+      },
+      "required": [
+        "complete",
+        "partitions"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.discovery.CollectionScope": {
+      "title": "CollectionScope",
+      "x-ess-name": "connectors.discovery.CollectionScope",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "string"
+        },
+        "source_connection": {
+          "type": "string"
+        },
+        "declaration": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "scope_ref": {
+          "type": "string"
+        },
+        "selection_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance",
+        "source_connection",
+        "declaration",
+        "profile",
+        "scope_ref",
+        "selection_revision"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.discovery.PartitionCoverage": {
+      "title": "PartitionCoverage",
+      "x-ess-name": "connectors.discovery.PartitionCoverage",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/connectors.discovery.PartitionKind"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/connectors.discovery.PartitionState"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.discovery.PartitionKind": {
+      "title": "PartitionKind",
+      "x-ess-name": "connectors.discovery.PartitionKind",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "collection",
+        "namespace",
+        "cluster"
+      ]
+    },
+    "connectors.discovery.PartitionState": {
+      "title": "PartitionState",
+      "x-ess-name": "connectors.discovery.PartitionState",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "complete",
+        "capped",
+        "denied",
+        "unavailable",
+        "not_scanned"
+      ]
+    },
+    "connectors.discovery.SnapshotSummary": {
+      "title": "SnapshotSummary",
+      "x-ess-name": "connectors.discovery.SnapshotSummary",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/connectors.discovery.CollectionScope"
+        },
+        "generation": {
+          "type": "integer"
+        },
+        "coverage": {
+          "$ref": "#/$defs/connectors.discovery.CollectionCoverage"
+        },
+        "retention_truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scope",
+        "generation",
+        "coverage",
+        "retention_truncated"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
