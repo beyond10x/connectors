@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-tenant-header
 kind: story
-status: draft
+status: implemented
 title: Use one configuration name for the monitoring tenant header
 tags:
 - P3
@@ -15,7 +15,9 @@ scope:
   path: contracts/datasources/logs/v1alpha1/semantics.md
 - confidence: cited
   path: docs/adapters/grafana.md
-revision: 2
+- confidence: cited
+  path: docs/evidence/spec-stabilization-20260908/tenant-header.md
+revision: 7
 ---
 ## Context
 
@@ -55,4 +57,8 @@ Shared edit surfaces with `story:contracts-wire-compatibility`, `story:contracts
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, publish externally, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+
+## Completion evidence — 2026-09-08
+
+E30 is fixed at the semantic/documentation level. `contracts/datasources/logs/v1alpha1/semantics.md` §4.1 owns the proposed receiver-configured `http.extra_headers` spelling; `docs/adapters/grafana.md` §6 uses it and links to the same rule. The previous `tenant_header` label is explicitly not an accepted alias. Direct/mediated authority and refusal cases, current-host implementation limits and review checks are recorded in `docs/evidence/spec-stabilization-20260908/tenant-header.md`. No runtime code or ESS entity changed.

@@ -1,0 +1,490 @@
+{
+  "kind": "ephemeral independent declaration/trace audit",
+  "runtime_execution": false,
+  "checks": [
+    "guarded outcome against declared transitions",
+    "wrong-state expected state",
+    "final view state",
+    "supplied lease <= 2 seconds",
+    "accepted cutoff <= existing lease expiry and terminal + 2 seconds",
+    "teardown <= first accepted terminal + 5 seconds"
+  ],
+  "scenarios": [
+    {
+      "scenario": "continuity-loss-stays-lost",
+      "steps": 6,
+      "final_state": "Lost",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "LoseContinuity",
+          "outcome": "lost",
+          "state_after": "Lost"
+        },
+        {
+          "command": "RenewDataLease",
+          "outcome": "wrong-state",
+          "state_after": "Lost"
+        },
+        {
+          "command": "PermitData",
+          "outcome": "wrong-state",
+          "state_after": "Lost"
+        }
+      ]
+    },
+    {
+      "scenario": "continuity-lost-during-closing",
+      "steps": 6,
+      "final_state": "Lost",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "LoseContinuity",
+          "outcome": "lost",
+          "state_after": "Lost"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "wrong-state",
+          "state_after": "Lost"
+        }
+      ]
+    },
+    {
+      "scenario": "direct-partition-expiry-no-grace",
+      "steps": 6,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "PermitData",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "drain-expiry-has-no-extra-grace",
+      "steps": 6,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "PermitData",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "expired-data-denial-cannot-renew",
+      "steps": 6,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "PermitData",
+          "outcome": "authority-terminated",
+          "state_after": "Closing"
+        },
+        {
+          "command": "RenewDataLease",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "first-terminal-not-replaced",
+      "steps": 6,
+      "final_state": "Lost",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "lost",
+          "state_after": "Lost"
+        }
+      ]
+    },
+    {
+      "scenario": "late-renewal-does-not-revive",
+      "steps": 7,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "RenewDataLease",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "wrong-state",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "media-incompatible-shared-reason",
+      "steps": 4,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "media-overload-shared-reason",
+      "steps": 5,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "revocation-beats-renewal",
+      "steps": 6,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "RenewDataLease",
+          "outcome": "authority-terminated",
+          "state_after": "Closing"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "revocation-refuses-data-and-renewal",
+      "steps": 8,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "ready",
+          "state_after": "Ready"
+        },
+        {
+          "command": "PermitData",
+          "outcome": "permitted",
+          "state_after": "Ready"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "PermitData",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "RenewDataLease",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "revoked-during-establishment",
+      "steps": 5,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "closing",
+          "state_after": "Closing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    },
+    {
+      "scenario": "unverified-lease-never-opens-data",
+      "steps": 6,
+      "final_state": "Closed",
+      "trace": [
+        {
+          "command": "OfferSession",
+          "outcome": "offered",
+          "state_after": "Offered"
+        },
+        {
+          "command": "AcceptOffer",
+          "outcome": "accepted",
+          "state_after": "Establishing"
+        },
+        {
+          "command": "EstablishReady",
+          "outcome": "authority-terminated",
+          "state_after": "Closing"
+        },
+        {
+          "command": "PermitData",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "BeginClose",
+          "outcome": "wrong-state",
+          "state_after": "Closing"
+        },
+        {
+          "command": "FinishTeardown",
+          "outcome": "closed",
+          "state_after": "Closed"
+        }
+      ]
+    }
+  ]
+}

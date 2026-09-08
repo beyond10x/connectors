@@ -1,0 +1,414 @@
+domain: connectors.sessions
+summary: Proposed supervising session lifecycle; timed enforcement remains a binding obligation.
+types:
+- name: connectors.sessions.SessionId
+  kind: newtype
+  of: String
+- name: connectors.sessions.Profile
+  kind: enum
+  variants:
+  - outbound
+  - inbound_offer
+- name: connectors.sessions.Placement
+  kind: enum
+  variants:
+  - local
+  - direct
+  - relay
+- name: connectors.sessions.TerminalReason
+  kind: enum
+  variants:
+  - remote_hangup
+  - local_close
+  - cancelled
+  - rejected
+  - expired
+  - revoked
+  - lease_expired
+  - media_overload
+  - media_incompatible
+  - transport_lost
+  - error
+- name: connectors.sessions.TerminalActor
+  kind: enum
+  variants:
+  - adapter
+  - application
+  - host
+- name: connectors.sessions.GateDecision
+  kind: enum
+  variants:
+  - allow
+  - expired
+  - revoked
+  - unverified
+- name: connectors.sessions.CleanupDecision
+  kind: enum
+  variants:
+  - released
+  - unaccounted
+- name: connectors.sessions.PeerShutdown
+  kind: enum
+  variants:
+  - confirmed
+  - unconfirmed
+- name: connectors.sessions.Binding
+  kind: struct
+  fields:
+  - name: instance_ref
+    type: String
+  - name: connection_ref
+    type: String
+  - name: admitted_revision
+    type: String
+  - name: authority_ref
+    type: String
+- name: connectors.sessions.TerminalFact
+  kind: struct
+  fields:
+  - name: reason
+    type: connectors.sessions.TerminalReason
+  - name: by
+    type: connectors.sessions.TerminalActor
+  - name: accepted_at
+    type: Timestamp
+- name: connectors.sessions.DataLease
+  kind: struct
+  fields:
+  - name: issued_at
+    type: Timestamp
+  - name: effective_expiry
+    type: Timestamp
+  - name: sequence
+    type: Integer
+# Normative owner: contracts/sessions/v1alpha1/semantics.md §4.1.
+# One supervising owner, not a distributed endpoint state replicated by ESS.
+# Binding/lease/terminal are values; SessionId is opaque, not a wire-format mandate.
+# UNMAPPED relations: Connection and SessionAuthority are not yet declared.
+# The known one-connection/one-establishment-authority references retain opaque
+# coordinates until their owning models exist. No guessed stub entity or edge.
+# Stream and endpoint enforcement records are transient binding data; this model
+# does not invent persistence ownership or a guessed endpoint cardinality.
+entities:
+- name: connectors.sessions.Session
+  identity:
+    name: session_id
+    type: connectors.sessions.SessionId
+  fields:
+  - name: binding
+    type: connectors.sessions.Binding
+  - name: profile
+    type: connectors.sessions.Profile
+  - name: placement
+    type: connectors.sessions.Placement
+  - name: streams
+    type: List<String>
+  - name: data_lease
+    type: Optional<connectors.sessions.DataLease>
+  - name: terminal
+    type: Optional<connectors.sessions.TerminalFact>
+  lifecycle:
+    initial: Offered
+    states:
+    - Offered
+    - Establishing
+    - Ready
+    - Closing
+    - Closed
+    - Lost
+    terminal:
+    - Closed
+    - Lost
+    transitions:
+    - name: accept
+      from:
+      - Offered
+      to: Establishing
+    - name: ready
+      from:
+      - Establishing
+      to: Ready
+    - name: permit_data
+      from:
+      - Ready
+      to: Ready
+    - name: renew
+      from:
+      - Ready
+      to: Ready
+    - {name: deny_ready, from: [Establishing], to: Closing}
+    - {name: deny_data, from: [Ready], to: Closing}
+    - {name: deny_renewal, from: [Ready], to: Closing}
+    - name: begin_close
+      from:
+      - Offered
+      - Establishing
+      - Ready
+      to: Closing
+    - name: close
+      from:
+      - Closing
+      to: Closed
+    - name: cleanup_lost
+      from:
+      - Closing
+      to: Lost
+    - name: continuity_lost
+      from:
+      - Offered
+      - Establishing
+      - Ready
+      - Closing
+      to: Lost
+errors:
+- name: connectors.sessions.StateConflict
+  fields:
+  - name: state
+    type: connectors.sessions.Session.State
+# GateDecision is derived by the trusted supervisor, never caller input. allow
+# for EstablishReady requires completed stream/application negotiation, redeemed
+# establishment authority, current host admission, exact binding and a fresh
+# authenticated lease. PermitData and RenewDataLease additionally require the
+# Session already be Ready. A denial never leaves a session renewable.
+# Its derivation, lease lifetime <= 2000 ms including uncertainty, delay/replay
+# rejection, and atomic renewal/revocation are UNMAPPED executable obligations.
+# Any non-allow decision in readiness/data/renewal atomically begins Closing;
+# no separately queued BeginClose is required before renewal becomes impossible.
+# GateDecision.expired means live DATA-LEASE expiry and fixes lease_expired.
+# An unredeemed establishment-token expiry instead uses BeginClose(reason=expired)
+# before readiness; it is not GateDecision.expired. revoked fixes revoked, and unverified fixes error
+# (rejected before readiness). The first authoritative observation fixes t0 and
+# deadlines; later bookkeeping cannot restart them. A public refusal encoding is
+# future wire binding work; this private outcome records the terminal decision.
+# BeginClose atomically records the FIRST terminal and denies further local data;
+# later calls observe that record (StateConflict is internal, not a new terminal).
+# Its deadlines are bounded by §4.1; earlier expiry/drain deadlines dominate.
+# FinishTeardown can claim released only on actual local task/resource evidence;
+# peer_shutdown unconfirmed does not imply local release failed or peer success.
+# LoseContinuity preserves any prior terminal, otherwise records transport_lost.
+commands:
+- name: connectors.sessions.OfferSession
+  input:
+  - name: binding
+    type: connectors.sessions.Binding
+  - name: profile
+    type: connectors.sessions.Profile
+  - name: placement
+    type: connectors.sessions.Placement
+  - name: streams
+    type: List<String>
+  outcomes:
+  - name: offered
+    creates: connectors.sessions.Session
+    instance: session_id
+    emits:
+    - connectors.sessions.SessionOffered
+- name: connectors.sessions.AcceptOffer
+  input:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  outcomes:
+  - name: accepted
+    moves: connectors.sessions.Session.accept
+    instance: session_id
+    emits:
+    - connectors.sessions.OfferAccepted
+  - name: wrong-state
+    wrong_state: true
+    error: connectors.sessions.StateConflict
+- name: connectors.sessions.EstablishReady
+  input:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - name: decision
+    type: connectors.sessions.GateDecision
+  - &id001
+    name: lease
+    type: connectors.sessions.DataLease
+  outcomes:
+  - name: ready
+    moves: connectors.sessions.Session.ready
+    instance: session_id
+    emits:
+    - connectors.sessions.SessionReady
+    when: decision == allow
+  - name: authority-terminated
+    moves: connectors.sessions.Session.deny_ready
+    instance: session_id
+    emits: [connectors.sessions.DataAuthorityTerminated]
+  - name: wrong-state
+    wrong_state: true
+    error: connectors.sessions.StateConflict
+- name: connectors.sessions.PermitData
+  input:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - name: decision
+    type: connectors.sessions.GateDecision
+  - &id002
+    name: direction
+    type: String
+  outcomes:
+  - name: permitted
+    moves: connectors.sessions.Session.permit_data
+    instance: session_id
+    emits:
+    - connectors.sessions.DataPermitted
+    when: decision == allow
+  - name: authority-terminated
+    moves: connectors.sessions.Session.deny_data
+    instance: session_id
+    emits: [connectors.sessions.DataAuthorityTerminated]
+  - name: wrong-state
+    wrong_state: true
+    error: connectors.sessions.StateConflict
+- name: connectors.sessions.RenewDataLease
+  input:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - name: decision
+    type: connectors.sessions.GateDecision
+  - &id003
+    name: lease
+    type: connectors.sessions.DataLease
+  outcomes:
+  - name: renewed
+    moves: connectors.sessions.Session.renew
+    instance: session_id
+    emits:
+    - connectors.sessions.DataLeaseRenewed
+    when: decision == allow
+  - name: authority-terminated
+    moves: connectors.sessions.Session.deny_renewal
+    instance: session_id
+    emits: [connectors.sessions.DataAuthorityTerminated]
+  - name: wrong-state
+    wrong_state: true
+    error: connectors.sessions.StateConflict
+- name: connectors.sessions.BeginClose
+  input:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - &id004
+    name: terminal
+    type: connectors.sessions.TerminalFact
+  - &id005
+    name: cutoff_due_at
+    type: Timestamp
+  - &id006
+    name: teardown_due_at
+    type: Timestamp
+  outcomes:
+  - name: closing
+    moves: connectors.sessions.Session.begin_close
+    instance: session_id
+    emits:
+    - connectors.sessions.ClosingBegun
+  - name: wrong-state
+    wrong_state: true
+    error: connectors.sessions.StateConflict
+- name: connectors.sessions.FinishTeardown
+  input:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - name: decision
+    type: connectors.sessions.CleanupDecision
+  - &id007
+    name: peer_shutdown
+    type: connectors.sessions.PeerShutdown
+  outcomes:
+  - name: closed
+    moves: connectors.sessions.Session.close
+    instance: session_id
+    emits:
+    - connectors.sessions.LocalResourcesReleased
+    when: decision == released
+  - name: lost
+    moves: connectors.sessions.Session.cleanup_lost
+    instance: session_id
+    emits:
+    - connectors.sessions.LocalCleanupUnaccounted
+  - name: wrong-state
+    wrong_state: true
+    error: connectors.sessions.StateConflict
+- name: connectors.sessions.LoseContinuity
+  input:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  outcomes:
+  - name: lost
+    moves: connectors.sessions.Session.continuity_lost
+    instance: session_id
+    emits:
+    - connectors.sessions.ContinuityLost
+  - name: wrong-state
+    wrong_state: true
+    error: connectors.sessions.StateConflict
+events:
+- name: connectors.sessions.DataAuthorityTerminated
+  fields:
+  - {name: session_id, type: connectors.sessions.SessionId}
+  - {name: decision, type: connectors.sessions.GateDecision}
+- name: connectors.sessions.SessionOffered
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+- name: connectors.sessions.OfferAccepted
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+- name: connectors.sessions.SessionReady
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - *id001
+- name: connectors.sessions.DataPermitted
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - *id002
+- name: connectors.sessions.DataLeaseRenewed
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - *id003
+- name: connectors.sessions.ClosingBegun
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - *id004
+  - *id005
+  - *id006
+- name: connectors.sessions.LocalResourcesReleased
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - *id007
+- name: connectors.sessions.LocalCleanupUnaccounted
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+- name: connectors.sessions.ContinuityLost
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+views:
+- name: connectors.sessions.SessionStates
+  source: connectors.sessions.Session
+  consistency: read_your_writes
+  fields:
+  - name: session_id
+    type: connectors.sessions.SessionId
+  - name: state
+    type: connectors.sessions.Session.State
+  - name: terminal
+    type: Optional<connectors.sessions.TerminalFact>
+
+# UNMAPPED: field assignment and immutable first-terminal retention; correlated
+# request cancellation/outcome accounting; actual gate cutoff on all direct/relay
+# or device paths; expiring authority issuance/translation/anti-replay; timer and
+# scheduler execution; zero data drain and bounded lower-layer buffers; teardown,
+# restart resource accounting and confirmation of remote protocol shutdown.
+# ESS verifies declaration types/references and declared lifecycle causation;
+# author/synthesize compiles obligations but does NOT execute a sequential trace.
+# Manual model/scenario audit is separate from real clocks and algorithms.

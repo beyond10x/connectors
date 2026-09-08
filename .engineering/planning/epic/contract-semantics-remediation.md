@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 8
+revision: 9
 ---
 ## Context
 
@@ -88,3 +88,9 @@ Concurrent authoring was observed during the final check: `contracts/catalog/v1a
 `story:contracts-mutation-outcomes` is complete: F01/E01/E11 corrected in the contract and proposed ESS model, nine authored and 36 generated scenarios compiled, full gate passed, two independent readers approved. Runtime mutation behavior remains unimplemented. The intake now records 4 semantic fixes and 44 outstanding source findings; the other 25 stories remain draft. The first story now has exact scenario-file scopes; future stories must refine shared ESS scope before activation. This does not authorize a parallel implementation wave.
 
 `story:contracts-idempotency-scope` is also complete: F02 corrected in the namespace/fingerprint/replay/retention rules and proposed ESS reservation model; full gate passed with 39 tests and 67 compiled ESS scenarios, and both final independent reviewers approved. A first-round cache-miss/claim-spend race was corrected through an authoritative winner recheck. Runtime authorization, atomicity and clock tests remain explicit obligations. The user is handling concurrent versioning documents separately; this story made no wire-version decision.
+
+## Current specification checkpoint — session revocation and tenant-header naming
+
+The auth wave completed `story:contracts-refresh-coordination` and `story:contracts-credential-evidence` (F04/F05), with verification and adversarial evidence under `docs/waves/auth-hardening-20260908/`. The latest single-agent checkpoint completes `story:contracts-session-revocation` (F06/E20) and `story:contracts-tenant-header` (E30). Session hardening passed two independent final rechecks, 13 authored ESS scenarios plus a separate 77-act model/trace/deadline audit, and the full gate with 50 existing Rust tests. No runtime implementation changed in this specification checkpoint; session timing, queues/devices, real authority and teardown remain executable obligations for future bindings.
+
+Current ledger: 10/48 source findings fixed, 38 assigned and open; six contract stories implemented, 21 draft. E13 was fixed separately in the documentation inventory during independent-review remediation, but its documentation-index owner remains draft for E22 and prerequisite-dependent coverage. This supersedes the historical progress counts above. The active broad specification goal is not complete. Remaining work includes wire compatibility, federation approval, other auth/discovery/datasource semantics and the remaining adapter/index evidence. No wire-version decision or implementation wave was inferred from this checkpoint.

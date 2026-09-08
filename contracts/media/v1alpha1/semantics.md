@@ -70,8 +70,8 @@ Terminal reasons added to `sessions`: `media_overload`, `media_incompatible`.
 - Data/control isolation: frames travel on a bounded data path scheduled separately from control; a saturated stream must not delay `close`, `revoke`, or `ping` beyond the session's control bound (`docs/design.md:637`).
 - Capabilities are explicit: an endpoint without `dtmf` refuses a `signal` with `Unsupported`; it never accepts and discards (`docs/design.md:635`). `hold`/`transfer` are not promised by this version.
 - Interrupt: clears the endpoint's bounded output queue and reports the number of frames cleared; it does not cancel anything at the application (`docs/design.md:315` in old design 05, steering is separate).
-- Termination: first accepted terminal wins (sessions rule); `stream_end` in one direction leaves the other usable.
-- Bridge: a bridge holds two MediaSessions, checks profile and capability compatibility before forwarding, forwards frames and signals, and applies a declared joint termination policy (first profile: either side's terminal closes both with the originating reason). It imports no protocol crate.
+- Termination: first accepted terminal wins (sessions rule); `stream_end` in one direction leaves the other usable only while the session's live data authority remains valid. Revocation and any session terminal stop both directions under [sessions §4.1](../../sessions/v1alpha1/semantics.md#41-traffic-cutoff-and-teardown-f06): at most 2 s from host revocation, no grace after lease expiry, no queued-data drain, and at most 5 s to local teardown/accounting. Queued input, output, DTMF, playback and bridge forwarding are discarded at cutoff with local accounting. This declared termination discard does not change the live-session overflow rule. A remote close acknowledgement is not required, and bytes already beyond the last controlled boundary cannot be recalled.
+- Bridge: a bridge holds two MediaSessions, checks profile and capability compatibility before forwarding, forwards frames and signals, and applies a declared joint termination policy (first profile: either side's terminal closes both, propagating the originating reason unless the other side already accepted an earlier terminal). It imports no protocol crate. Both legs enforce their own live leases; terminal propagation cannot extend either lease or add a per-hop cutoff allowance. An unresponsive leg cannot retain queued audio after its cutoff.
 - Participant context (caller number, display name) is untrusted data on the session; it never selects a tenant or destination (`docs/design.md:671`).
 
 ## 5. Limits (first-profile defaults, from the old profile where stated)
@@ -83,6 +83,7 @@ Terminal reasons added to `sessions`: `media_overload`, `media_incompatible`.
 | Output queue | 50 frames | new, to be measured |
 | Control latency under load | within the session's ping bound | sessions |
 | Signal rate | bounded (default 20 per second) | new |
+| Revocation cutoff / terminal teardown | 2 s / 5 s maximum; zero queued frames after cutoff | normative sessions §4.1; applies to direct, relay and local device paths |
 
 ## 6. Conformance scenarios (`docs/design.md:984`, `1002`)
 
@@ -92,8 +93,8 @@ Terminal reasons added to `sessions`: `media_overload`, `media_incompatible`.
 - Output flood → `overload`, then `media_overload` terminal within the bound; no frame silently dropped (fixture counts).
 - `signal dtmf` to an endpoint without `dtmf` → `Unsupported`; with `dtmf` → delivered once.
 - `interrupt` during playback → output queue cleared; count reported; input unaffected.
-- Data flood → `close` acknowledged within the control bound.
-- Bridge between a fake SIP-like endpoint and a fake RTVBP-like endpoint → frames pass unchanged; terminal on one side closes the other with the same reason; substituting either endpoint leaves the bridge and application unchanged (`docs/design.md:1015`).
+- Data flood with a peer ignoring `close` → controlled traffic stops within the session cutoff bound; local teardown/accounting completes within 5 s without waiting for an acknowledgement.
+- Bridge between a fake SIP-like endpoint and a fake RTVBP-like endpoint → frames pass unchanged; terminal on one side closes the other with the same reason unless that side already recorded its own terminal; substituting either endpoint leaves the bridge and application unchanged (`docs/design.md:1015`).
 - Profile mismatch (one side offers 16 kHz) → `media_incompatible`, no `ready`.
 
 ## 7. Compatibility

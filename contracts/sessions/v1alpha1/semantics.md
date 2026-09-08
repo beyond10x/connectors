@@ -47,7 +47,7 @@ Session record (control plane):
 States: `offered → establishing → ready → closing → closed`, plus `lost` (continuity lost; outcome unknown). Terminal record:
 
 ```json
-{ "state": "closed", "reason": "remote_hangup | local_close | cancelled | rejected | expired | revoked | lease_expired | media_overload | transport_lost | error", "by": "adapter | application | host", "at_unix_ms": 0 }
+{ "state": "closed", "reason": "remote_hangup | local_close | cancelled | rejected | expired | revoked | lease_expired | media_overload | media_incompatible | transport_lost | error", "by": "adapter | application | host", "at_unix_ms": 0 }
 ```
 
 Control messages over the `duplex_transport` binding (each with `session` and a direction-qualified `id`):
@@ -59,7 +59,7 @@ Control messages over the `duplex_transport` binding (each with `session` and a 
 | `offer { deadline, streams, participant_context }` | adapter → host | `inbound_offer` only |
 | `accept { admitted }` / `reject { reason }` / `cancel { reason }` | host → adapter, adapter → host | one serialized decision |
 | `close { reason }` | either | begins `closing` |
-| `lease { expires_unix_ms }` / `revoke { reason }` | host → adapter | must be honored within the declared bound |
+| `lease { expires_unix_ms }` / `revoke { reason }` | host → adapter | authenticated, session/revision-bound authority; §4.1 fixes cutoff and late-renewal rules |
 | `ping`/`pong` | either | control responsiveness under data load |
 
 Outbound establishment operation result (`operations` mutation profile, `effects` includes `session_establishment`):
@@ -81,8 +81,8 @@ Errors: base codes plus `session_not_ready`, `session_lost`, `offer_expired`, `o
 | Terminal race | the first terminal fact accepted by the session's serialized loop wins; later terminals are recorded as observations, never replace the reason |
 | Backpressure | control queue bounded and prioritized over data; data policy per stream is declared by the stream contract (media: drop oldest with loss report) |
 | Restart | no reattach in v1alpha1; a restart on either side yields `lost` with `transport_lost`; the outcome of in-flight requests is unknown |
-| Lease/revocation | host may set a lease and revoke; adapter must reach `closing` within the declared bound (first-profile default 2 s) |
-| Shutdown | host drain: no new offers, existing sessions finish or are revoked at the drain deadline; tasks are joined and accounted (`docs/design.md:418`) |
+| Lease/revocation | a live data lease is mandatory for every admitted data path; authoritative revocation stops all controlled data within 2 s, including partitions (§4.1) |
+| Shutdown | host drain: no new offers; leases cannot extend past the drain deadline; data stops by that deadline, with bounded teardown and explicit task accounting (§4.1) |
 
 Establishment (`outbound`): the operation returns `ready` only after every declared stream and the application binding are ready; a terminal before readiness returns `offer_rejected`/`error` with no session ref (old `SipDialEstablished` rule). The session ref is bound to the descriptor revision and connection it was admitted under; a later configuration change follows explicit continuation or revocation (`docs/design.md:485`).
 
@@ -90,7 +90,36 @@ Inbound (`inbound_offer`): the adapter presents `offer` with a verified ingress 
 
 Authority: each session has one `session-authority` issued at accept (host-issued, proof-bound, single redemption, short-lived); the transport binding presents it once; the verifier redeems before accepting bytes. Expiry of an unredeemed authority closes the session as `expired`.
 
-## 5. Ordering, limits (first-profile defaults, to be measured)
+### 4.1 Traffic cutoff and teardown (F06)
+
+This profile selects **2,000 ms maximum from authoritative revocation to data cutoff** and **5,000 ms maximum from an accepted terminal fact to completion of local teardown/accounting**. These are new normative ceilings, not measurements of the old runtime, configurable suggestions, or consequences of a maximum call duration. An implementation may promise tighter bounds. It must refuse session admission if the selected binding cannot enforce these ceilings for every data path.
+
+The session host serializes terminal decisions, establishment, and lease issuance. Let `t0` be its acceptance of the first terminal fact. It immediately refuses new session requests, data admission and renewals under its control, preserves the first reason/actor/time, and enters `closing`. A revoke notification is an acceleration mechanism; delivery or acknowledgement is not the source of cutoff authority. `closing` by itself is not evidence that remote gates have stopped. The host records cutoff and teardown separately and cannot report successful cutoff on the strength of a close message sent.
+
+| Trigger | Data policy and deadline | Terminal / completion |
+|---|---|---|
+| Host revocation, cancellation, local close, remote hangup, rejection, media failure | stop local admission immediately; all controlled directions stop no later than `t0 + 2,000 ms`; no new lease after `t0` | first reason wins, including `media_incompatible` and `media_overload` |
+| Data lease expires | gate stops by the effective expiry, with **no additional 2 s grace**; expiry is a local terminal fact even if the control plane is unreachable | `lease_expired`; terminal session cannot be revived by a late renewal |
+| Establishment authority expires before redemption | refuse redemption and all bytes, regardless of an open socket | `expired`; no ready handle |
+| Negotiation incompatible before readiness | never open a data gate or publish a ready handle; tear down admitted partial resources | `media_incompatible` |
+| Host drain | no new offers; current data leases and renewals capped at the announced drain deadline; all data stops by that deadline | `revoked` if still active at the deadline; teardown/accounting within 5 s of that terminal fact |
+| Control continuity lost / owner restart | local gate stops on detected loss and every remaining gate stops by its existing lease expiry; no reattach or lease re-creation | `lost`, reason `transport_lost` if no earlier terminal fact; in-flight request outcomes unknown |
+
+**Data leases.** The 60 s establishment token is not the live-session lease. Each serving, receiving, relaying or device endpoint must gate data using authenticated host authority bound to the exact session, admitted revision, endpoints and permitted streams/directions. The effective deadline of a data lease is at most **2,000 ms after authoritative issuance**, including delivery delay, clock uncertainty, scheduling delay and already-buffered output. A partition immediately after the last renewal therefore cannot extend access beyond 2 s after host revocation. Renew only while the host still admits the session, under the same serialized authority check as revocation, and never beyond a drain or other earlier deadline.
+
+A binding must document and prove its deadline translation and maximum uncertainty; it must fail closed when that bound cannot be established. Starting a fresh 2 s timer on receipt, replaying a renewal, or adding grace for network latency is forbidden. Sequence/expiry checks reject reordered or replayed authority. A renewal arriving after local expiry or any terminal decision cannot reopen the same session. Suspend/resume and clock changes cannot reset authority: before any further send/delivery, recheck the effective deadline. Lease and clock algorithms are binding obligations, not assurances supplied by ESS timestamps.
+
+A trusted live-data-lease expiry, revocation or inability to verify current authority observed during readiness, data admission or renewal atomically enters `closing` and starts local cutoff/accounting. It cannot leave a renewable `ready` state awaiting a separately queued close command. Live-data-lease expiry (`GateDecision.expired` in the private model) records `lease_expired`, revocation records `revoked`, and unverifiable authority records `error` (`rejected` before readiness), unless an earlier terminal already won. Expiry of an **unredeemed establishment token** instead enters closing through `BeginClose(reason=expired)` before readiness; it is not the private live-lease expiry decision. The authoritative observation fixes the terminal time; later bookkeeping cannot restart cutoff or teardown deadlines. Actual owner/continuity loss during `closing` becomes `lost` while preserving the first terminal. Merely lacking a peer close acknowledgement does not establish owner/continuity loss.
+
+Announce a planned drain at least 2 s before its deadline, unless the host has already confirmed an earlier cutoff for every gate. A shorter requested drain that cannot meet this condition is refused as an unsupported deadline; an emergency revoke still uses the 2 s ceiling. A terminal first observed at a disconnected peer cuts off that peer immediately; the global revocation clock starts when the authoritative host accepts the fact. This does not claim instantaneous knowledge across a partition. The disconnected path still cannot continue after its existing lease expires.
+
+**Queues and enforcement boundary.** At a gate's cutoff, reject new input, output, DTMF and other effectful controls, discard queued input and output in both directions, clear pending playback and bridge forwarding, and cancel queued effectful requests. There is **zero data-drain allowance** after cutoff; the closing period is for bounded control cleanup only. Buffers below the application queue (transport, kernel, codec or audio device) must be purgeable or included in a proven last-emission deadline within the same 2 s ceiling. An unbounded device/transport queue is not an admitted implementation. Explicit discard on termination is recorded in local bounded accounting; it is distinct from silent overflow loss during a live session. A closed peer need not receive a loss notification for cutoff to succeed.
+
+The guarantee covers further emission and delivery across the last boundary controlled by each admitted endpoint, including local audio output. It cannot recall packets already beyond that boundary or stop an untrusted remote device playing bytes already delivered. Peer protocol shutdown is recorded as confirmed or unconfirmed independently of local cutoff. Direct media uses the same serving/receiving enforcement and expiring authority even when a gateway carries no bytes. A bridge gates both legs under their own authority and propagates terminal facts without minting extra lifetime; a multi-hop path must satisfy the **end-to-end 2 s ceiling**, not 2 s per hop. Closing a control socket alone is insufficient.
+
+**Teardown.** By `t0 + 5,000 ms`, stop/join local tasks, release owned transport/device resources, and finish accounting. An unresponsive peer cannot extend this deadline: attempt bounded protocol close, then close local resources. `closed` records confirmed local release; it does not assert remote cooperation or a successful outcome for an unanswered request. If continuity or resource release cannot be established, report `lost` and the unresolved resources/outcomes by the same deadline; do not fabricate `closed` or hide a bound violation. Preserve an already-recorded terminal reason, even when later cleanup fails. A host crash is not proof of teardown: surviving endpoints enforce existing leases, and the restarted owner records loss/accounting without resurrecting authority.
+
+## 5. Ordering and limits
 
 | Bound | Value |
 |---|---|
@@ -98,18 +127,29 @@ Authority: each session has one `session-authority` issued at accept (host-issue
 | Authority lifetime | 60 s (old profile) |
 | In-flight requests per direction | 16 |
 | Control message size | 64 KiB |
-| Revocation bound | 2 s to `closing` |
+| Revocation to controlled data cutoff | 2 s maximum, normative (§4.1) |
+| Live data-lease lifetime | at most 2 s from authoritative issuance, all uncertainty included |
+| Data drain after cutoff | 0 frames / 0 ms; queued data discarded |
+| Terminal fact to local teardown/accounting | 5 s maximum, normative; forced local close independent of peer |
 | Sessions per instance | configuration |
+
+Other table values are first-profile defaults; the authority lifetime is inherited from the old profile. They do not relax the normative cutoff/teardown ceilings.
 
 ## 6. Conformance scenarios (`docs/design.md:983`)
 
 - Both participants issue requests with the same id concurrently → both answered to the correct sender.
 - Offer cancelled 1 ms before accept → accept refused; adapter fixture observes teardown; no data accepted.
 - Two terminals (remote hangup, then local close) → reason `remote_hangup`; second recorded as observation.
-- Data flood on a stream → `ping`/`pong` latency stays within bound; `revoke` reaches `closing` within 2 s.
+- Data flood on a stream → control stays responsive; revocation cuts off all controlled directions within 2 s, clears queued frames/signals, and completes local teardown/accounting within 5 s even if the peer ignores close.
 - Transport dropped → state `lost`, in-flight requests reported unknown; no fabricated `closed` success.
 - Authority presented twice → second refused; bytes before redemption refused.
 - Same suite in-process, over the WebSocket binding, and through a one-hop fake relay (`docs/design.md:1035`).
+- Direct path partitioned immediately after a renewal → data stops by that lease's original effective expiry, no receipt-time reset or grace; delayed renewal cannot revive it.
+- Drain deadline precedes normal lease expiry → last emission/delivery no later than drain deadline.
+- Negotiation incompatible → `media_incompatible`, never ready; overload → `media_overload`; both reasons are in this shared vocabulary.
+- A prior `remote_hangup` followed by revocation or a cleanup failure → the original terminal reason remains; unconfirmed cleanup becomes `lost`, not a fabricated successful close.
+
+The [verification record](verification.md) separates compiled lifecycle scenarios from the future timed transport/device tests required by §4.1.
 
 ## 7. Compatibility
 
@@ -122,7 +162,7 @@ Authority: each session has one `session-authority` issued at accept (host-issue
 |---|---|
 | Session control types and state machine | `crates/connectors-core` (kernel) |
 | `duplex_transport` binding (WebSocket candidate, `docs/design.md:1131`) with size limits and decoder independent of the network library | new host module |
-| Session host: offer admission, lease, revoke, drain, accounting | new host module |
+| Session host: offer admission, authenticated live leases, serialized revoke/renew, cutoff receipt and bounded teardown/accounting | new host module; all direct/relay/device bindings must implement §4.1 |
 | Federation: relay only supported profiles, or advertise direct-session arrangement with scoped endpoint authority (`docs/design.md:789`) | `crates/connectors-host/src/federation.rs` |
 | Operation result type for `session_establishment` | `operations` document |
 
@@ -130,9 +170,11 @@ Authority: each session has one `session-authority` issued at accept (host-issue
 
 | Entity | Notes |
 |---|---|
-| `Session` (identity: session ref), lifecycle `offered → establishing → ready → closing → closed`, plus `lost` | relations: `connection → Connection` (one), `authority → SessionAuthority` (one), `streams` values |
+| `Session` (identity: session ref), lifecycle `Offered → Establishing → Ready → Closing → Closed`, plus `Lost` | modeled in [sessions.yaml](../../../ess/domains/sessions.yaml); opaque connection/authority coordinates, their typed relations are UNMAPPED pending those owner models; stream/path metadata are values |
 | `Offer` | value on `Session` while `offered` |
 | Tenant/application assignment of an inbound destination | UNMAPPED (`resources` deferred) |
+
+The ESS lifecycle describes one supervising owner's decisions. It does not derive the trustworthiness of lease observations, compare deadlines, stop remote gates, enforce queue/device limits, assign immutable terminal fields, or account for real tasks. Author/synthesize checks declarations, names and types and constructs obligations; it does **not execute the sequential scenario trace** against the model. The [verification record](verification.md) includes a separate manual lifecycle/deadline audit. These executable obligations remain explicit; a compiled scenario is not a runtime cutoff measurement or proof that every authored state sequence is possible.
 
 ## 10. Open decisions
 
