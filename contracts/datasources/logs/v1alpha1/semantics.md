@@ -112,6 +112,8 @@ Textual verification: (1) direct Loki configuration and the monitoring example u
 ## 7. Compatibility
 
 - New contract; no old wire contract for logs existed beyond operation results. The old `kubernetes.pod.logs` `text` blob is not preserved; a facade may join lines.
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Log schemas can inhabit the ordinary result slot, but require explicit profile support; framing compatibility does not confer log or cursor semantics on existing typed consumers. Tenant headers remain receiver configuration.
+
 
 ## 8. SDK and host obligations
 

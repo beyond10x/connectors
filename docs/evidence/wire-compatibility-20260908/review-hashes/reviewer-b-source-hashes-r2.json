@@ -1,0 +1,102 @@
+{
+  "head": "3ba2d29870d577aac70c8a68ee901b3b7c6c99ac",
+  "state": "Uncommitted E02 semantic draft; read-only independent recheck. Root verification record is still being assembled and excluded from verdict.",
+  "sources": [
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "d9b9fa2bf89a27dbdd503dcaf4803c2442887ecf0056ade5bf8b2261a501c1b4"
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "af19e498dca5a6616303d745932b1bc8b813d8bed4cafbec47b1951390e3f131"
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "71e3a3887689f612b85eda506f4f543a49b9681c7214c233cc13c64ebd04f39e"
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c"
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "0f4a750ecca4089ab133a42b13b954af9d5d9c4b11c3969eb8800fbed452652b"
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "3460236b62ea45fe39ff01994f2ef1d15f38bfb5d83bc4e7f8267d8954087c88"
+    },
+    {
+      "path": "contracts/catalog/v1alpha1/semantics.md",
+      "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484"
+    },
+    {
+      "path": "contracts/datasources/logs/v1alpha1/semantics.md",
+      "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa"
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba"
+    },
+    {
+      "path": "contracts/datasources/series/v1alpha1/semantics.md",
+      "sha256": "f20d21ff9f7eecd6680c2d6352b452cda1c49536c4c1d7ac9b3589149471b90d"
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "a730e0d9f7298be6338f87ec43e41117e30509f973e5b5bc93c52868f1df70cb"
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "1db065ea6c840b621fa484a6d7654709647cd345fff5afecc9a53b52848f8292"
+    },
+    {
+      "path": "contracts/media/v1alpha1/semantics.md",
+      "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9"
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "2d55303b5e3639731a07129575e394e9653172bb679efa8aa16953c3abd5f949"
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358"
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "d8d07c9e9e9c48fa6f019495af4d58acb7c6d8288b7437cda250f168e3611a5f"
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "cc97dca14eadfdec912bc851bb87f9ff98704daa34e6319b769d6e7d68b8f722"
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "32bd107cb9fe58acc27e329ceab648c1089eb13e80387417450bac4de33f82d2"
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "487b0983f1b38c485e414e9821d93e796e755f4757c453cd69f0678b4e89ea96"
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b"
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ff211fe967cf7ccda01e13c419f6672694f8203a4b4af4867a2519bf519bde72"
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "44121a4d4acbd641dab4a1395063b93b62ebf9c3fccbc2bcfcfb66ef7c46a383"
+    },
+    {
+      "path": "docs/stack-integration-proposal.md",
+      "sha256": "f9b06c2928d8fb0e1597ca5ba0283d09300e01d735b12c186a28c879c4ec507e"
+    },
+    {
+      "path": "docs/cli-migration-v1-to-v2.md",
+      "sha256": "280f825fd1ebfdc237cdf665dd83836aea322078654f7ff421b029202b8ae6af"
+    }
+  ]
+}

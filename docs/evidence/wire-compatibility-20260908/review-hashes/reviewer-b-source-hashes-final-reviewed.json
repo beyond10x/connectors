@@ -1,0 +1,164 @@
+{
+  "purpose": "Consolidated final reviewed source set, preserving all initial and amended immutable snapshots.",
+  "sources": [
+    {
+      "path": "contracts/README.md",
+      "sha256": "487b0983f1b38c485e414e9821d93e796e755f4757c453cd69f0678b4e89ea96",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/README.md"
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "b295d6041fa49f9cee44e2f89d923afaaf7a09f474cf65fbf61fff1f8a5ea114",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/auth/acquisition/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "af19e498dca5a6616303d745932b1bc8b813d8bed4cafbec47b1951390e3f131",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/auth/capability/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "71e3a3887689f612b85eda506f4f543a49b9681c7214c233cc13c64ebd04f39e",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/auth/connection/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/auth/custody/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "0f4a750ecca4089ab133a42b13b954af9d5d9c4b11c3969eb8800fbed452652b",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/auth/evidence/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "bed3bb55c43553e2a9a1f70a250067e82afdcc2afc3d07069eb19f2743befcca",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/auth/profile/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/catalog/v1alpha1/semantics.md",
+      "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/catalog/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/datasources/logs/v1alpha1/semantics.md",
+      "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/datasources/logs/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/datasources/records/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/datasources/series/v1alpha1/semantics.md",
+      "previous_sha256": "c44873d76314177873dba6525aa7952e83a2e98fd5337c1275895feb0b78cc68",
+      "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot-amendment/contracts/datasources/series/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "a730e0d9f7298be6338f87ec43e41117e30509f973e5b5bc93c52868f1df70cb",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/discovery/mediated_route/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "1db065ea6c840b621fa484a6d7654709647cd345fff5afecc9a53b52848f8292",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/discovery/resources/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/media/v1alpha1/semantics.md",
+      "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/media/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "d5b26fa43a5e963d7e7d54cdf823f64b9224876050c0ee0c74dcbd572bcd0e05",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/operations/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "previous_sha256": "503d9c1e4b16135b6d460fdfd9ecfd0465edceb96d092932d4b8b1be8717fc3e",
+      "sha256": "b93d704226f86694c712e11031043316545a1917b07d1c80578d3fb4b3290758",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot-amendment/contracts/service/compatibility.md"
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/service/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "eeaf77a97a3205638c146cd63bb5c5c786407a75862aa9b4493d8d0784c88381",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/service/v1alpha2/semantics.md"
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "cc97dca14eadfdec912bc851bb87f9ff98704daa34e6319b769d6e7d68b8f722",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/contracts/sessions/v1alpha1/semantics.md"
+    },
+    {
+      "path": "docs/cli-migration-v1-to-v2.md",
+      "sha256": "bc3d74a3581a63f09aaa76fc44d6bdceecd34d23ce623f94a337a31d36012901",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/docs/cli-migration-v1-to-v2.md"
+    },
+    {
+      "path": "docs/evidence/wire-compatibility-20260908/gate.log",
+      "sha256": "82ee7681b331589e0f9155bc7de14bf2d449e80996fcb163d4b9e871d1925d4b",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/docs/evidence/wire-compatibility-20260908/gate.log"
+    },
+    {
+      "path": "docs/evidence/wire-compatibility-20260908/legacy-decoder-results.json",
+      "sha256": "cdad66666019c650e725375d9696ac54890d4e0c0ed1198adc9ce1501a41041c",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/docs/evidence/wire-compatibility-20260908/legacy-decoder-results.json"
+    },
+    {
+      "path": "docs/evidence/wire-compatibility-20260908/legacy-decoder-vectors.json",
+      "sha256": "b5f5a1fde50395d8c1dd2decb529bc212faed3871366ddd11485d84443e54080",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/docs/evidence/wire-compatibility-20260908/legacy-decoder-vectors.json"
+    },
+    {
+      "path": "docs/evidence/wire-compatibility-20260908/legacy-probe.md",
+      "sha256": "5299ae33cf6326116e1fe1c602951a9b8cfb7d41cf97913cc18c513281ba7bb0",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/docs/evidence/wire-compatibility-20260908/legacy-probe.md"
+    },
+    {
+      "path": "docs/evidence/wire-compatibility-20260908/proposed-observation-vectors.json",
+      "sha256": "874b5213f9b4f89c93060b19ba8168e2cc17b4c5a1aae0c59148b2d36197d3f4",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/docs/evidence/wire-compatibility-20260908/proposed-observation-vectors.json"
+    },
+    {
+      "path": "docs/evidence/wire-compatibility-20260908/summary.json",
+      "sha256": "4bbca20eef29739c2e31b7abe570e48c2b4bf530d4082a52c23b0c7cd9dc33d1",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/docs/evidence/wire-compatibility-20260908/summary.json"
+    },
+    {
+      "path": "docs/evidence/wire-compatibility-20260908/verification.md",
+      "previous_sha256": "71e94c8c4dcc129c308ed422768ed00233538d18103c0dc834b617333e927515",
+      "sha256": "3af694dd71f841de0f178a79eac8f568013c3f5bf278f8750a7f580fef8c15e4",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot-evidence-amendment/docs/evidence/wire-compatibility-20260908/verification.md"
+    },
+    {
+      "path": "docs/stack-integration-proposal.md",
+      "previous_sha256": "d258dbafd737cbba29baf4d588d297532da7058d8cb596743f9b33bd08906c20",
+      "sha256": "bd55f6fe1dcd0e15ff4f7f2181b7ea5a6391cad1c8ca91381d617e0a438ef8b8",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot-amendment/docs/stack-integration-proposal.md"
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ff211fe967cf7ccda01e13c419f6672694f8203a4b4af4867a2519bf519bde72",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/ess/domains/mutations.yaml"
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/ess/domains/service_wire.yaml"
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "44121a4d4acbd641dab4a1395063b93b62ebf9c3fccbc2bcfcfb66ef7c46a383",
+      "snapshot": ".local/wire-compatibility-20260908/reviewer-b/final-snapshot/ess/system.yaml"
+    }
+  ]
+}

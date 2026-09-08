@@ -90,6 +90,8 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 
 - The `read_only` profile keeps today's env/file `CredentialRef` behavior; adapters using it change nothing.
 - Migration of old credential sets is a scoped custody migration or reauthorization, never a copy through a document or command line (`docs/design.md:1116`).
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Private custody values and CAS ports are not public service messages. An unchanged read-only port can retain legacy behavior; versioned custody requires its own selected infrastructure binding.
+
 
 ## 8. SDK and host obligations
 

@@ -85,8 +85,8 @@ Errors: base codes; `NotFound` for a missing id; `Forbidden` when the id is outs
 - Confluence storage body containing `<script>` → returned verbatim; the contract does not sanitize (consumers do).
 
 ## 7. Compatibility
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Document operations have their own selected payload schemas. Existing list operations remain unchanged only when their complete semantics remain valid; an arbitrary JSON result slot does not extend the current closed Page type.
 
-- Additive: new operations on the Atlassian adapter; no change to existing `list` operations or the wire.
 
 ## 8. SDK and host obligations
 

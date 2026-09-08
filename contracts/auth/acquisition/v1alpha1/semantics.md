@@ -27,11 +27,11 @@ Design responsibility two of four: establish, refresh, revoke, or repair authori
 
 ## 3. Types
 
-Coordinator operations (host-admitted management operations on the adapter service, forwardable through federation as a management contract, `docs/design.md:785`):
+Coordinator interfaces have distinct bindings. Safe `auth.begin` and `auth.status` are admitted management operations; forwarding additionally needs the complete selected federation binding. `auth.complete` is a trusted callback/protected-entry port, not ordinary invoke input or a generic forwardable operation. Refresh and revoke retain their private/admitted entry points below (`docs/design.md:785`):
 
 ```text
 auth.begin(profile, requested_scopes?, repair_of?: connection) -> AuthorizationAction
-auth.complete(acquisition_ref, evidence)                        -> AcquisitionStatus
+auth.complete(acquisition_ref, evidence)                        -> AcquisitionStatus  (trusted completion port; separately bound)
 auth.status(acquisition_ref)                                    -> AcquisitionStatus
 auth.refresh(connection)                                        -> RefreshOutcome     (host-internal, not caller-invocable)
 auth.revoke(connection)                                         -> RevocationOutcome  (via connections.revoke)
@@ -148,6 +148,8 @@ Client credentials (`oauth2_client_credentials`): no browser; `begin` performs t
 
 - Old `connect_session_*` methods map onto `auth.begin`/`auth.status`; a facade can preserve names.
 - Old per-integration OAuth copies are not carried.
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Safe begin/status payloads require the selected management schema; protected entry and completion evidence need their dedicated trusted binding. A unary version does not supply callback protection.
+
 
 ## 8. SDK and host obligations
 

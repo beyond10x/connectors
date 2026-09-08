@@ -19,14 +19,12 @@ not register anything in Atlas. Atlas integration remains deferred by the operat
 
 ## 2. Principles the proposal keeps
 
-- Tenant, principal, realm, authority and executor come from verified authentication before
-  payload decoding; never from a route, query, body or caller-set header (ADR 0026;
-  `docs/design.md` § 7).
+- Authentication establishes trusted tenant/principal, optional realm/authority and any credential-bound executor before payload decoding. Policy then verifies a decoded executor assertion before constructing admitted context; the assertion never supplies authority itself ([service compatibility](../contracts/service/compatibility.md), ADR 0026, `docs/design.md` § 7).
 - The host is the only place admission lives; adapters see a resolved context, not headers
   (`docs/design.md` § 3.2; `crates/connectors-host/src/server.rs:57-70` today).
 - Metadata informs admission and UX; it authorizes nothing (`docs/design.md` § 7;
   `contracts/operations/v1alpha1/semantics.md`, "Authority boundary").
-- One wire version per client build; refusal, not fallback (`docs/design.md` § 5).
+- One explicitly selected codec per interaction; a binary may support several. Selection precedes describe and refuses incompatibility without fallback or resend ([service compatibility](../contracts/service/compatibility.md)); the current binary supports only v1alpha1.
 - A discovered observation never dials, authenticates or materializes
   (`contracts/service/v1alpha1/semantics.md`, Kubernetes paragraph).
 - Connectors owns its audience and scope bytes; Identity stays relying-party agnostic (ADR 0021).
@@ -44,7 +42,7 @@ so inserting lines shifts those citations. Those edits wait for the story that o
 |---|---|---|---|---|
 | `docs/design.md` | § 7, paragraph "For the Beyond10x service binding…" | add: "Specified by `contracts/service/v1alpha2/semantics.md`. Organization rules: ADR 0026 (realm), ADR 0031 (trusted access exchange), ADR 0021 (audience ownership)." | G1/G2; design currently cites 0 ADRs (`grep -c ADR docs/design.md` = 0) | cited by line from `story:contracts-host-composition` (`docs/design.md:158, 253, 798`) and others; apply when that story serializes, or append at end of § 7 only |
 | `docs/design.md` | § 12.3 secret-store contract | add: "The hosted binding is the released Secrets client under ADR 0023; Vault is the temporary rollback source, not a v2 binding." | G4 | same |
-| `docs/design.md` | § 16 federation, item 3 | add: "The `delegated` profile of `service/v1alpha2` carries the caller's verified context under a per-route signature; ADR 0026 names this signed service dispatch." | G1 | same |
+| `docs/design.md` | § 16 federation, item 3 | add: "The `delegated` profile of `service/v1alpha2` remains unbound and unadvertisable until F03 specifies complete origin/receiver/request binding and replay/redemption ownership; a per-route signature sketch is insufficient." | G1 | same |
 | `docs/design.md` | § 18.3 or § 4.1 | add a row: generated adapters from service-sdk lower a `ConnectorServiceFactoryDescriptor` into an adapter/v2 instance and a generated `Adapter`; Connectors takes no dependency on service-sdk (ADR 0027, 0029). | G5 | same |
 | `docs/design.md` | § 19, last paragraph on MCP | replace "MCP can be a client-facing binding and/or an adapter" with the ADR 0028 split: inbound `/mcp` is a host transport binding onto already-governed operations; outbound MCP is an adapter over `EgressTransport` with a strict frozen tool snapshot. | G8 | same |
 | `docs/design.md` | § 2.4 consumer table | add rows: service-sdk `service-connectors` at `235558c…` (`protocol`, `service`); org-brain intended, no pin. Add a note that Atlas `docs/catalog.md:595` records devcenter-http at `v0.5.3` while `../devcenter/Cargo.toml:37` pins `e80b7ae…` `=0.7.0`. | accuracy | same |
@@ -69,11 +67,11 @@ entity, so S2 precedes S3–S7.
 |---|---|---|---|---|---|
 | S1 `contracts-governed-binding` | Review and settle the governed service binding v1alpha2 | P1 | `contracts-wire-compatibility`, `contracts-mutation-outcomes`, `contracts-management-boundary` | `contracts/service/v1alpha2/semantics.md`, `contracts/README.md` | every proposed field, code and profile has a wire disposition in the compatibility matrix; § 6 scenarios have expected observations |
 | S2 `ess-governed-values` | Model `AuditRecord`, the `VerifiedContext` value and the `GrantRecord` decision in ESS | P1 | S1 | `ess/domains/`, `ess/system.yaml` | `ess validate` passes; unresolved relations carry UNMAPPED, none guessed |
-| S3 `host-admission-profiles` | Implement the `Admission` port with `static-bearer`, `identity-audience` (feature `identity`, pinned `identity-client`) and `delegated` | P1 | S1, S2 | `crates/connectors-host/src/server.rs`, new `admission.rs`, `crates/connectors-core/src/lib.rs` | scenarios 1–3, 10 of `service/v1alpha2` § 6 pass as fixtures; adapters build unchanged with `--no-default-features` |
-| S4 `host-policy-audit-ports` | `Policy` and `Audit` ports, fail-closed, local bindings | P1 | S2, S3 | `crates/connectors-host/`, `crates/connectors-sdk/src/lib.rs` (`InvocationContext`) | scenarios 4–8, 12 pass; audit sink grep for credential bytes finds nothing |
+| S3 `host-admission-profiles` | Implement the `Admission` port with `static-bearer`, `identity-audience` (feature `identity`, pinned `identity-client`) and `delegated` | P1 | S1, S2 | `crates/connectors-host/src/server.rs`, new `admission.rs`, `crates/connectors-core/src/lib.rs` | the selected authentication, executor and refusal requirements in `service/v1alpha2` § 6 pass as fixtures (earlier numbered scenarios were proposal references); adapters build unchanged with `--no-default-features` |
+| S4 `host-policy-audit-ports` | `Policy` and `Audit` ports, fail-closed, local bindings | P1 | S2, S3 | `crates/connectors-host/`, `crates/connectors-sdk/src/lib.rs` (`InvocationContext`) | named policy-outage, executor/realm admission, pre-dispatch audit failure, final-audit failure and safe-correlation requirements in `service/v1alpha2` § 6 pass (old scenario numbers are historical); audit output contains no credential bytes |
 | S5 `descriptor-curation-fields` | `effects`, `semantic_effects`, `risk`, `idempotency`, `approval` on every operation; compiler refusals; agent-platform projection vectors | P1 | S1, `contracts-mutation-visibility` | `crates/connectors-core`, `crates/connectors-spec`, `spec-kinds/adapter/v2/schema.json`, `adapters/*/spec`, `adapters/*/generated` | three descriptors regenerate with the fields; a fixture compiles them into the old `OperationDescription` shape without loss |
 | S6 `host-secrets-custody` | `SecretStore` over the released `secrets-client` behind feature `secrets`; non-revealable connector values | P2 | S2, `contracts-persistence-ownership` | `crates/connectors-host/src/credentials.rs`, new `secrets.rs` | file, memory and Secrets bindings pass the same port tests; no plaintext in any log |
-| S7 `federation-delegated-context` | Sign, forward and verify the delegated context; return both audit references | P2 | S3, S4, `contracts-federated-approval` | `crates/connectors-host/src/federation.rs` | scenarios 9–10 pass; replay, expiry and unconfigured route refused |
+| S7 `federation-delegated-context` | Sign, forward and verify the delegated context; return both audit references | P2 | S3, S4, `contracts-federated-approval` | `crates/connectors-host/src/federation.rs` | F03’s complete delegated binding fixtures pass; replay, expiry, wrong receiver/body and unconfigured route refused; old scenario numbers are historical proposal references |
 | S8 `cli-governed-surface` | Identity-token source, executor assertion, output modes; verbs decided and recorded in the CLI document | P2 | S3 | `apps/connectors/src/main.rs`, `docs/cli-migration-v1-to-v2.md` | the "not decided" list in the CLI document is empty or each item has a recorded decision |
 
 Cross-repository work this repository does not own, recorded here so the arrows exist when Atlas

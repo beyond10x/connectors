@@ -112,8 +112,9 @@ Adversarial (`docs/design.md:985`, repair without identity drift):
 
 ## 7. Compatibility
 
-- The `configured` profile is what every current adapter does; making it explicit changes no wire bytes. Descriptors gain an optional `connections` capability flag when `managed` is provided.
 - Old `connector-connection v0alpha1` DTOs are not carried; a compatibility facade would map `search`/`describe` onto `connections.list`/`describe` and drop channel fields.
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Only unchanged implicit configured behavior is legacy-compatible. The managed `connections` descriptor flag, invocation connection selector and new errors require the extended codec and independently admitted management operations.
+
 
 ## 8. SDK and host obligations
 
