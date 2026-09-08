@@ -12,7 +12,12 @@
 | Wire version | `v1alpha2` for every contract carried by `/v1/describe` and `/v1/invoke` |
 | Admission profiles | `static-bearer` (today's shared service token), `identity-audience` (Identity access token for an exact Connectors-owned audience), `delegated` (federation hop carrying a gateway-signed verified context) |
 | Vocabulary | verified context (tenant, principal, optional realm, authority, optional executor), policy decision, grant reference, audit reference, executor assertion |
-| Unchanged | operation ids, input/output schemas, limits, error envelope shape, `/healthz`, one-hop federation, descriptor revision and `stale_description` protocol |
+| Preserved structure | operation ids, input/output schemas, limits, success/error response variants and request correlation, `/healthz`, one-hop federation, descriptor revision and `stale_description` protocol |
+
+The proposal changes response fields and the closed error-code vocabulary (§3.4–3.5),
+including `audit_ref`; the serialized error envelope is therefore not unchanged.
+The implemented v1alpha1 readers refuse those additions. Indexing this proposal
+does not settle the wire-version choice owned by `story:contracts-wire-compatibility`.
 
 A v1alpha2 service answers four questions separately, as `docs/design.md` § 6.2 requires: implemented by this artifact, enabled in this instance, ready with its dependencies, **authorized for this caller**. v1alpha1 answers the first three. The fourth needs a caller, and a shared static bearer is not one.
 

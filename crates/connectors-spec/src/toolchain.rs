@@ -133,6 +133,9 @@ fn resolve_in(
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+    // A sibling fork can inherit a fixture's writable fd until exec closes it,
+    // making another test's exec fail with ETXTBSY. Cover both writes and probes.
+    static FIXTURE_PROCESSES: std::sync::Mutex<()> = std::sync::Mutex::new(());
     fn binary(root: &Path, name: &str, version: &str) -> PathBuf {
         let dir = root.join(name);
         std::fs::create_dir_all(&dir).unwrap();
@@ -147,6 +150,7 @@ mod tests {
     }
     #[test]
     fn default_search_is_independent_of_path_version_order() {
+        let _guard = FIXTURE_PROCESSES.lock().unwrap();
         let temp = tempfile::tempdir().unwrap();
         let matching = binary(temp.path(), "matching", &pin().unwrap().ess);
         let wrong = binary(temp.path(), "wrong", "99.0.0");
@@ -163,6 +167,7 @@ mod tests {
     }
     #[test]
     fn explicit_overrides_win_and_wrong_paths_do_not_fall_back() {
+        let _guard = FIXTURE_PROCESSES.lock().unwrap();
         let temp = tempfile::tempdir().unwrap();
         let matching = binary(temp.path(), "matching", &pin().unwrap().ess);
         let wrong = binary(temp.path(), "wrong", "99.0.0");
@@ -180,6 +185,7 @@ mod tests {
     }
     #[test]
     fn missing_pin_reports_record_and_search_locations_and_cache_is_supported() {
+        let _guard = FIXTURE_PROCESSES.lock().unwrap();
         let temp = tempfile::tempdir().unwrap();
         let wrong = binary(temp.path(), "wrong", "99.0.0");
         let cache = temp.path().join("cache/ess");

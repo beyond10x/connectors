@@ -19,7 +19,7 @@ scope:
   path: contracts/README.md
 - confidence: cited
   path: docs/design.md
-revision: 2
+revision: 3
 ---
 ## Context
 
@@ -61,3 +61,7 @@ Shared edit surfaces with `story:contracts-host-composition`, `story:contracts-m
 ## Boundary and modeling
 
 This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+
+## Partial completion during independent review remediation — 2026-09-08
+
+`story:independent-review-remediation` addresses overlapping A-M3/B-F05: the index now includes the proposed governed service document, distinguishes 22 table rows from 17 semantic documents, and lists all four deferred families including configuration. This also closes this story's original E13. The current index and design §30 agree (five implemented rows in one document; seventeen proposed rows in sixteen documents). E22's adapter dependency matrix and prerequisite-dependent reconciliations remain owned by this draft story; its lifecycle has not been advanced or declared fully complete. Evidence and final review dispositions are recorded by the remediation story.

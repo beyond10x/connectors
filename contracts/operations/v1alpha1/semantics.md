@@ -54,11 +54,13 @@ Descriptor additions to `Operation` (`crates/connectors-core/src/lib.rs:59-66`),
 | `idempotency.kind` | `none`, `keyed`, `natural` | `none`: every dispatch is a new effect; `keyed`: the receiver owns scoped reservation/replay under §5.1, with `retention_seconds` for durable known terminal results; `natural`: the provider operation is idempotent by its own semantics (documented per operation), without implying host replay storage |
 | `approval` | `not_required`, `required`, `event_claim` | which admission profile must be satisfied before dispatch |
 
-Invocation additions to `Invocation` (`crates/connectors-core/src/lib.rs:90-97`):
+Illustrative invocation additions to `Invocation` (`crates/connectors-core/src/lib.rs:90-97`).
+This is an incomplete proposed message: the version field is deliberately omitted.
+The implemented `v1alpha1` reader refuses these additions; the exact version and
+codec belong to `story:contracts-wire-compatibility`.
 
 ```json
 {
-  "version": "v1alpha1",
   "request_id": "…",
   "operation": "issue.create",
   "revision": "<descriptor revision>",

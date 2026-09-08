@@ -10,19 +10,21 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DownstreamConfig {
+    #[schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
     pub name: String,
     pub endpoint: String,
     pub credential: CredentialRef,
     #[serde(default)]
     pub allow_plaintext: bool,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FederationConfig {
     pub service: ServiceConfig,
+    #[schemars(length(min = 1, max = 32))]
     pub downstreams: Vec<DownstreamConfig>,
 }
 struct Leaf {
@@ -140,13 +142,16 @@ fn snapshot(config: &FederationConfig, leaves: BTreeMap<String, Arc<Leaf>>) -> R
             operations.push(projected);
         }
     }
+    let configuration_schema = crate::schema::schema::<FederationConfig>()?;
     let descriptor = Descriptor {
         version: WIRE_VERSION.into(),
         instance: config.service.instance.clone(),
         adapter: "federation".into(),
-        revision: digest(&json!({"config":config,"sources":sources})),
+        revision: digest(
+            &json!({"config":config,"sources":sources,"configuration_schema":configuration_schema}),
+        ),
         operations,
-        configuration_schema: json!({"type":"object"}),
+        configuration_schema,
     };
     Ok(Snapshot {
         descriptor,

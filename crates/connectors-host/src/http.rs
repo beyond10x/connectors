@@ -6,21 +6,20 @@ use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HttpConfig {
-    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 4096)))]
+    #[schemars(length(min = 1, max = 4096))]
     pub base_url: String,
     pub credential: Option<CredentialRef>,
     #[serde(default = "default_header")]
-    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 512)))]
+    #[schemars(length(min = 1, max = 512))]
     pub credential_header: String,
     #[serde(default)]
     pub bearer: bool,
     #[serde(default)]
     pub allow_plaintext: bool,
-    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 4096)))]
+    #[schemars(length(min = 1, max = 4096))]
     pub ca_file: Option<PathBuf>,
 }
 fn default_header() -> String {
