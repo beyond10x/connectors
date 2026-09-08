@@ -95,7 +95,11 @@ Child (direct):
   "adapter": { "max_window_s": 604800, "min_step_s": 1, "query_scope": { "allowed_matchers": ["job=\"api\""] } } }
 ```
 
+`http.extra_headers` is the proposed receiver-owned representation for the provider tenant header, shared by direct Loki and Prometheus in this plan. The normative rule is [logs §4.1](../../contracts/datasources/logs/v1alpha1/semantics.md#41-monitoring-tenant-header-configuration-e30): `tenant_header` is an earlier descriptive label, not an accepted alias; there is no claim that current host `HttpConfig` implements either extension. Request input cannot set or override the configured value, including case variants, and this provider tenant is not the caller's SaaS tenant authority. Header validation, placement and configuration-revision isolation belong to the future binding.
+
 Child (mediated, created by the host from a candidate): no `http.base_url`; `route: { parent: "conn_grafana_1", observation: "obs_…", profile: "grafana-datasource-proxy" }`.
+
+The admitted parent route/datasource owns downstream tenant headers; the child has no direct `extra_headers` override through mediation. Refuse a requested tenant binding the parent route cannot establish.
 
 ## 7. Discovery and routes
 

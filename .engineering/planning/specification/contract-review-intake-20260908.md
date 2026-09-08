@@ -8,7 +8,7 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 7
+revision: 8
 ---
 ## Intake
 
@@ -31,7 +31,7 @@ P0 means an established critical current failure requiring immediate containment
 | F03 | P1 | P1 | `story:contracts-federated-approval` | Accepted for remediation; assigned, not fixed. |
 | F04 | P1 | P1 | `story:contracts-refresh-coordination` | Fixed at semantic-contract/ESS level in the auth hardening wave; see `contracts/auth/acquisition/v1alpha1/verification.md`, immutable adversarial review and the full gate at `2a440495`. Runtime binding remains future work. |
 | F05 | P1 | P1 | `story:contracts-credential-evidence` | Fixed at semantic-contract/ESS level in the auth hardening wave; see `contracts/auth/evidence/v1alpha1/verification.md`, immutable adversarial review and the full gate at `2a440495`. Runtime binding remains future work. |
-| F06 | P1 | P1 | `story:contracts-session-revocation` | Accepted for remediation; assigned, not fixed. |
+| F06 | P1 | P1 | `story:contracts-session-revocation` | Fixed at semantic-contract/ESS level by `story:contracts-session-revocation`; sessions §4.1 and verification.md record bounded cutoff/teardown, independent approvals and explicit runtime obligations. |
 | F07 | P2 | P2 | `story:contracts-connection-readiness` | Accepted for remediation; assigned, not fixed. |
 | F08 | P2 | P2 | `story:contracts-permission-budgets` | Accepted for remediation; assigned, not fixed. |
 | F09 | P2 | P2 | `story:contracts-anonymous-auth` | Accepted for remediation; assigned, not fixed. |
@@ -60,7 +60,7 @@ P0 means an established critical current failure requiring immediate containment
 | E17 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
 | E18 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
 | E19 | nit | P2 | `story:contracts-connection-readiness` | Accepted for remediation; assigned, not fixed. |
-| E20 | nit | P2 | `story:contracts-session-revocation` | Accepted for remediation; assigned, not fixed. |
+| E20 | nit | P2 | `story:contracts-session-revocation` | Fixed by `story:contracts-session-revocation`: media_incompatible and media_overload share the sessions terminal vocabulary; both authored cases compile and both independent rechecks approve. |
 | E21 | nit | P2 | `story:contracts-connection-readiness` | Accepted for remediation; assigned, not fixed. |
 | E22 | nit | P3 | `story:contracts-documentation-index` | Accepted for remediation; assigned, not fixed. |
 | E23 | nit | P2 | `story:contracts-media-controls` | Accepted for remediation; assigned, not fixed. |
@@ -70,7 +70,7 @@ P0 means an established critical current failure requiring immediate containment
 | E27 | nit | P3 | `story:contracts-supported-vocabulary` | Qualified: inventory reserved support and rationale; blanket removal is not established by the cited design rule. |
 | E28 | nit | P2 | `story:contracts-persistence-ownership` | Accepted for remediation; assigned, not fixed. |
 | E29 | nit | P2 | `story:contracts-acquisition-profiles` | Accepted for remediation; assigned, not fixed. |
-| E30 | nit | P3 | `story:contracts-tenant-header` | Accepted for remediation; assigned, not fixed. |
+| E30 | nit | P3 | `story:contracts-tenant-header` | Fixed by `story:contracts-tenant-header`: logs §4.1 and the Grafana child example use receiver-owned http.extra_headers; the earlier tenant_header label is not an alias or implemented key. Textual audit and independent review pass. |
 | E31 | nit | P3 | `story:contracts-evidence-precision` | Accepted evidence limitation: an untyped item schema does not guarantee the claimed status projection. |
 | E32 | nit | P2 | `story:contracts-discovery-profiles` | Accepted for remediation; assigned, not fixed. |
 | E33 | nit | P3 | `story:contracts-evidence-precision` | Accepted for remediation; assigned, not fixed. |
@@ -89,7 +89,9 @@ The first completed hardening story is `story:contracts-mutation-outcomes`, owni
 
 ## Completion accounting
 
-F01/F02/F04/F05/E01/E11 are **fixed at the semantic-contract/model level**. E13 is **fixed in the documentation inventory** by `story:independent-review-remediation`; the remaining **41 source findings are assigned, not fixed**. Drafting or reviewing the plan is not evidence that a contract defect is fixed. Future closure records the revised normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without implementing the external reviewer's suggested architecture.
+**10 of 48 source findings are fixed; 38 remain assigned, not fixed.** F01/F02/F04/F05/F06/E01/E11/E20 are fixed at the semantic-contract/model level; E13/E30 are fixed in documentation. Six of the 27 owner stories are implemented for their specification scope: mutation outcomes, idempotency scope, refresh coordination, credential evidence, session revocation and tenant-header naming. The documentation-index story remains draft because E22 and its prerequisites remain open.
+
+The latest specification checkpoint closes F06/E20 using the session contract/model, 13 authored scenarios, a separate trace/deadline audit and two independent final approvals, plus E30 through a shared receiver-owned monitoring configuration rule. Runtime enforcement remains future work. Drafting or reviewing a plan is not evidence that its contract defect is fixed. Future closure records the normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without adopting the external reviewer's proposed architecture.
 
 ## Acceptance
 
