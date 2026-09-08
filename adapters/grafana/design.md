@@ -66,6 +66,11 @@ backend.rs:1326 and projection.rs, and design 08 at 81459ac4. The predecessor HT
 OpenAPI is repository-authored. Its exact source/license/full digest and native
 fixtures belong under this adapter before generation/extraction.
 
+All selected HTTP operations are GET. The predecessor source
+`../connectors/specs/grafana/http-api-2026-08-14.openapi.yaml:105-107`
+also declares `POST /api/ds/query` (`datasource_query`); that operation is
+unselected. Read-only selection does not make the entire source GET-only.
+
 Dashboard/list schemas, coherent enumeration and the exact proxy-target verifier
 remain native authoring obligations. An unchanged UID/type cannot prove hidden
 target equality. Shared publication/continuity are host-port obligations.
