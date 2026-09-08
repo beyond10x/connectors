@@ -6,10 +6,11 @@ rust-version.workspace = true
 license.workspace = true
 
 [features]
-schema = ["dep:schemars"]
+# Compatibility feature: runtime descriptors now always need config reflection.
+schema = []
 
 [dependencies]
-schemars = { version = "1.2", optional = true }
+schemars = "1.2"
 connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
@@ -30,3 +31,4 @@ libc = "0.2"
 rcgen = "0.14"
 tempfile.workspace = true
 tokio-rustls = { version="0.26", default-features=false, features=["ring", "tls12"] }
+tokio = { workspace = true, features = ["test-util"] }

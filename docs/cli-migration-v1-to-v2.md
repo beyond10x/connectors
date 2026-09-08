@@ -121,8 +121,10 @@ no automatic retry, no redirects.
 
 ## 6. Not decided
 
-Each item becomes a recorded decision under `story:cli-governed-surface`
-(`docs/stack-integration-proposal.md` § 4, S8). Until then, do not assume any of them.
+The proposal names `story:cli-governed-surface` as a future owner
+(`docs/stack-integration-proposal.md` § 4, S8); that artifact has not been created.
+These decisions remain unassigned in the planning store. Until they are recorded,
+do not assume any of them.
 
 1. Verb names for the config-validation, connection-management, service-discovery and
    local-lifecycle areas that `docs/design.md` § 17.3 lists.

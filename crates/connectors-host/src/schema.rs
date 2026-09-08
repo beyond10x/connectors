@@ -3,7 +3,7 @@ use connectors_core::{Error, Result};
 use schemars::{JsonSchema, generate::SchemaSettings};
 use serde_json::Value;
 
-fn schema<T: JsonSchema>() -> Result<Value> {
+pub(crate) fn schema<T: JsonSchema>() -> Result<Value> {
     let settings = SchemaSettings::draft2020_12().with(|s| {
         s.inline_subschemas = true;
         s.meta_schema = None;

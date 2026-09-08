@@ -136,7 +136,48 @@ async fn federation_preserves_result_and_reports_downstream_failure() {
         }],
     };
     let federation = Federation::connect(&config).await.unwrap();
+    let schema = federation.descriptor().configuration_schema;
+    let valid = serde_json::to_value(&config).unwrap();
+    connectors_sdk::validate(&schema, &valid).unwrap();
+    for invalid in [
+        json!({}),
+        json!({"service":valid["service"],"downstreams":[]}),
+        json!({"service":valid["service"],"downstreams":vec![valid["downstreams"][0].clone();33]}),
+        json!({"service":valid["service"],"downstreams":[{"name":"source","endpoint":5,"credential":valid["downstreams"][0]["credential"]}]}),
+        json!({"service":valid["service"],"downstreams":valid["downstreams"],"unknown":true}),
+    ] {
+        assert!(connectors_sdk::validate(&schema, &invalid).is_err());
+    }
+    let mut duplicate = config.clone();
+    duplicate.downstreams.push(config.downstreams[0].clone());
+    assert_eq!(
+        Federation::connect(&duplicate).await.err().unwrap().code,
+        ErrorCode::InvalidInput
+    );
+    let mut reserved_name = config.clone();
+    reserved_name.downstreams[0].name = "source__nested".into();
+    assert_eq!(
+        Federation::connect(&reserved_name)
+            .await
+            .err()
+            .unwrap()
+            .code,
+        ErrorCode::InvalidInput
+    );
+    let mut cycle = config.clone();
+    cycle.service.instance = "leaf".into();
+    assert_eq!(
+        Federation::connect(&cycle).await.err().unwrap().code,
+        ErrorCode::Unsupported
+    );
     let (endpoint, gateway) = start(Arc::new(federation)).await;
+    let mut nested = config.clone();
+    nested.service.instance = "outer".into();
+    nested.downstreams[0].endpoint = endpoint.clone();
+    assert_eq!(
+        Federation::connect(&nested).await.err().unwrap().code,
+        ErrorCode::Unsupported
+    );
     let client = connectors_client::Client::new(&endpoint, "service-token".into(), true).unwrap();
     let descriptor = client.describe().await.unwrap();
     assert_eq!(
@@ -364,5 +405,50 @@ fn configuration_yaml_and_json_remain_strict() {
     ] {
         std::fs::write(&path, text).unwrap();
         assert!(connectors_host::read_config::<ServiceConfig>(&path).is_err());
+    }
+    std::fs::write(&path, vec![b' '; 1024 * 1024 + 1]).unwrap();
+    assert_eq!(
+        connectors_host::read_config::<ServiceConfig>(&path)
+            .unwrap_err()
+            .message,
+        "configuration must be a bounded file"
+    );
+}
+
+#[test]
+fn environment_credentials_apply_the_same_value_bounds_as_files() {
+    const CHILD: &str = "CONNECTORS_CREDENTIAL_BOUND_TEST";
+    const VALUE: &str = "CONNECTORS_CREDENTIAL_FIXTURE_VALUE";
+    if let Ok(case) = std::env::var(CHILD) {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(CredentialRef::Environment { name: VALUE.into() }.resolve());
+        if case == "valid" {
+            assert_eq!(result.unwrap().0, b"fixture-value");
+        } else {
+            assert_eq!(result.err().unwrap().code, ErrorCode::Unauthorized);
+        }
+        return;
+    }
+    for (case, value) in [
+        ("valid", Some("fixture-value\r\n".into())),
+        ("empty", Some(String::new())),
+        ("oversized", Some("x".repeat(8193))),
+        ("missing", None),
+    ] {
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args([
+                "--exact",
+                "environment_credentials_apply_the_same_value_bounds_as_files",
+            ])
+            .env(CHILD, case)
+            .env_remove(VALUE);
+        if let Some(value) = value {
+            command.env(VALUE, value);
+        }
+        let output = command.output().unwrap();
+        assert!(output.status.success(), "environment fixture {case} failed");
     }
 }
