@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.PermissionBudget",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:34c7db3f2c925b6a8c1c3a1772fdfa84c2f627415989b4ebee358dc7be1d30bf",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.PermissionBudget": {
+      "title": "PermissionBudget",
+      "x-ess-name": "connectors.auth_access.PermissionBudget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "target_limit": {
+          "type": "integer"
+        },
+        "call_limit": {
+          "type": "integer"
+        },
+        "concurrency_limit": {
+          "type": "integer"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "target_limit",
+        "call_limit",
+        "concurrency_limit",
+        "deadline"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

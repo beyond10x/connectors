@@ -1,0 +1,256 @@
+{
+  "expected_decisions": 50,
+  "matched": 50,
+  "results": [
+    {
+      "id": "loki-anonymous",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "loki-via_parent",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "loki-bearer",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "loki-basic",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "prometheus-anonymous",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "prometheus-via_parent",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "prometheus-bearer",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "prometheus-basic",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "alertmanager-anonymous",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "alertmanager-via_parent",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "alertmanager-bearer",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "alertmanager-basic",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "static_config",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "static_entry",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "oauth2_authorization_code",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "oauth2_client_credentials",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "oauth2_password",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "workload_identity",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "exec_plugin",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "host_issued",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "pods-a",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "pods-b",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "service-list",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "service-proxy",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "deployment",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "cluster-node",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "named-pod",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "pod-logs",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "budget-default",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "budget-cache-only",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "budget-lower",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "observation-allowed-False",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "observation-allowed-True",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "observation-denied-False",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "observation-denied-True",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "observation-unavailable-False",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "observation-unavailable-True",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "allowed-coverage",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "partial-denied-coverage",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "no-unknown-success-coverage",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "no-secret-member",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-mode",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-flow",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "null-token-endpoint",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "missing-exact-subresource",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "string-budget",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "contradictory-anonymous-bearer",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "contradictory-complete-denial",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "over-ceiling-budget",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "missing-code-endpoints",
+      "accepted": true,
+      "expected_matched": true
+    }
+  ]
+}

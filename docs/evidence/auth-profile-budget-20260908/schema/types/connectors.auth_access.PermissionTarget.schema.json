@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.PermissionTarget",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:5b2b2875221ae070ad094cf6779fb0c5558493422a1c3fc481e5a244a7be1a92",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.PermissionTarget": {
+      "title": "PermissionTarget",
+      "x-ess-name": "connectors.auth_access.PermissionTarget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "verb": {
+          "type": "string"
+        },
+        "api_group": {
+          "type": "string"
+        },
+        "api_version": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "subresource": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "verb",
+        "api_group",
+        "api_version",
+        "resource",
+        "namespace",
+        "name",
+        "subresource"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "review": "AP reviewer A final independent review",
+  "baseline": "1d63519d3a98845e31311749ab40cbc4532193f6",
+  "captured_utc": "2026-09-08T16:49:51.532525+00:00",
+  "source": "Authoritative review input scope: final normative files, direct verification artifacts, retained schemas and two ignored session compile outputs. Excludes all archived reviewer reports, mutable planning workflow and aggregate dispositions. The earlier bulk source-hashes.json is a mechanical collection manifest, not a claim to have inspected every archived file.",
+  "files": [
+    {
+      "path": ".local/auth-profile-budget-20260908/sessions-authored.json",
+      "sha256": "5bb3883df5a70ef4fccd9863342125d4c6fb1b6a4e7813f25c4f3e3a7e26c11d",
+      "bytes": 161145
+    },
+    {
+      "path": ".local/auth-profile-budget-20260908/sessions-suite.json",
+      "sha256": "d08c0eb7e547c70972c3e2e986aa0e2df06aae1a4e019dac98d58ea1eae70f0d",
+      "bytes": 2423518
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+      "bytes": 9290
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "bf97c5fc296b060dc1b09b04eefdfd9f6903e0be1c960cffc8b0dcea926aeeec",
+      "bytes": 26727
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+      "bytes": 15606
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "5ff885cf6d64faed93f75aaf3badbe39fe79f5e8ba8f0d6d9a58ba4b0358d24d",
+      "bytes": 21477
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "bytes": 10098
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "da1604c03fbbdc31defe9e917f0162f4c9839c208375673de089a432186214f6",
+      "bytes": 30149
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "4cfb58b1eaab7c468bbf43e0a76f901fe4b24978e48d0256cabee614d50c115f",
+      "bytes": 14593
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+      "bytes": 17305
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "bytes": 7761
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "1ffa17de683789fcd02eea6a5bb9a17477e2367b766a8f42de1354be18336eb5",
+      "bytes": 11022
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "a69ae22697ae92342e00d7c79828a5a1613fb37b7b040eb70b0f4ceeb053e649",
+      "bytes": 10465
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "94f85984ab051e92c5201c70d0184acb39334e2ed86f424987940efdfb480822",
+      "bytes": 37676
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+      "bytes": 23016
+    },
+    {
+      "path": "docs/adapters/docker.md",
+      "sha256": "b9165c65233c52eba513a4091f5242a5e6ccc850ac68aefc947275a947d3c11a",
+      "bytes": 7342
+    },
+    {
+      "path": "docs/adapters/grafana.md",
+      "sha256": "36a2e540dfb3dce76ddbe082840b4d5e163ed3548e790dd2eb6220583d5a3ed1",
+      "bytes": 13952
+    },
+    {
+      "path": "docs/adapters/kubernetes.md",
+      "sha256": "c3b6dcd76abcec52cf77775c935ca17b8d581b506654f4273ea8bc3a3fb74299",
+      "bytes": 14498
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "678a5681264718c2a7b4c4d97eed30834dcf096fc6806ce6959c2a8dd702a791",
+      "bytes": 121905
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/fixture-audit.md",
+      "sha256": "33035dbcd045872cf9b66985b9ff38335128545511498a84d2db75cebce5f1ec",
+      "bytes": 7401
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/gate.log",
+      "sha256": "5a4cfbc24e3329df0ac34ee922a920b7668c4a1ad3333aa803a5cb7eae0d1e59",
+      "bytes": 24916
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/projection-manifest.json",
+      "sha256": "de4f3bf268a3fb5183737b126c291c769896594a8528db190b5e0964fe331133",
+      "bytes": 27984
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.AccessMode.schema.json",
+      "sha256": "48c9a82ab5d415bad79d14793c341a1e9d9c72333d342cd6352e45bc59ff0ccd",
+      "bytes": 749
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.AccessSelection.schema.json",
+      "sha256": "b2848d35639446e5f0f24bf7dded00a6dc6b33eea1473b2d7b934e38530d9795",
+      "bytes": 3852
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.AcquisitionDeclaration.schema.json",
+      "sha256": "0cc73ff3b02de5a49c4fa88670711c79c377b8c385fbf63671086d0f46df5f1f",
+      "bytes": 1948
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.AcquisitionFlow.schema.json",
+      "sha256": "658830ad93385a34dfd3a24c73c816c2e477783781f14ff1da5caf6363c00b4b",
+      "bytes": 912
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.AuthorizationCoverage.schema.json",
+      "sha256": "39698aa86a486a6701911c2e737127854a3657a043818170f2560c5073051349",
+      "bytes": 2734
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.AuthorizationResult.schema.json",
+      "sha256": "6127fe5dcb8a18531d71008163b38631575045b66c2254be018ecda83d09173c",
+      "bytes": 740
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.AuthorizationTarget.schema.json",
+      "sha256": "d6d16e959107b868e3f219aa2e8c4a9b4d7bba59fabde07c9b2bdf02410cbe7c",
+      "bytes": 2150
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.CapabilityName.schema.json",
+      "sha256": "7e9126e2d4487ac8aadab4ce4956eff89021e9b58c593ede2ef25ecf91fe776e",
+      "bytes": 981
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.PermissionBudget.schema.json",
+      "sha256": "b5dbdfb57238f13308e70ba765c3fdf94382aaac2e5b16e66c75195c8ae57707",
+      "bytes": 1150
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.PermissionObservation.schema.json",
+      "sha256": "ad14c483e264ecfce0247ca28750074c21409ad433f7f568755b7ed43078676f",
+      "bytes": 2246
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.PermissionResult.schema.json",
+      "sha256": "f9c1729def4c58b0de81dbf867e5d3398b16d4c0dc7b19e3e97c58c50f9b0821",
+      "bytes": 751
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.PermissionTarget.schema.json",
+      "sha256": "d238e0549391b1fe48ab6e2422f5ab315051cc8b6077b6c43dd39a189d41f51c",
+      "bytes": 1324
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.Purpose.schema.json",
+      "sha256": "b0a62dd28cee2f9d2cc7d18dfe8028e3c43e73f26d848e8fbc463043ec7e72db",
+      "bytes": 869
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.Scheme.schema.json",
+      "sha256": "12e0d3fed9e6fba741e5edce15e7b863e65a1e62af4c3d2ea0e04e1bed893817",
+      "bytes": 867
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/schema/types/connectors.auth_access.Subject.schema.json",
+      "sha256": "6e8eed641c7eb18b8ce377e4fdb6efbfc534c772875705842add96dc8402538e",
+      "bytes": 702
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/traces.md",
+      "sha256": "a53b12a92062784e089e569024a772b04d2e456f4523f3ed8558873eaff663c7",
+      "bytes": 9251
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/type-results.json",
+      "sha256": "8562d25c34f514536d9638d192ce30e883f73158c595926a2599945c04bee08d",
+      "bytes": 5144
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/typed-values.json",
+      "sha256": "1e43ed092bcf5ed79818b8ee7418a2a71e75e3dd2e1991288091efb34c376310",
+      "bytes": 23037
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/verification.md",
+      "sha256": "beb08016ad2ed210a9d82cc657e8017c8a9dfebff2ae0805f07f782111bb704a",
+      "bytes": 5201
+    },
+    {
+      "path": "ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+      "bytes": 5153
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+      "bytes": 8245
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "bed05424847c2e5ea39ffe6469249be5a14d5525006d2599cbd68cd2724c5e29",
+      "bytes": 455
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "review": "AP cluster initial independent reviewer A",
+  "baseline": "1d63519d3a98845e31311749ab40cbc4532193f6",
+  "created_utc": "2026-09-08T16:33:41.665869+00:00",
+  "source": "git show 1d63519:<path>; no mixed working-copy edits",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "678a5681264718c2a7b4c4d97eed30834dcf096fc6806ce6959c2a8dd702a791",
+      "bytes": 121905
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "137d4ce2ee487dc77360e9781e616347c2c210220590e27368fe56695e844b3b",
+      "bytes": 8861
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "21700d031c67496fa0ebba5c341f3685c44db8b996ed9081fbdb224c51b4cd4c",
+      "bytes": 13917
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "d43298cc0b6d820494f348c79729ceb0fe5870c89cb8fae861a9ff32edb1c5f9",
+      "bytes": 35985
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+      "bytes": 23016
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "a730e0d9f7298be6338f87ec43e41117e30509f973e5b5bc93c52868f1df70cb",
+      "bytes": 9911
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "1db065ea6c840b621fa484a6d7654709647cd345fff5afecc9a53b52848f8292",
+      "bytes": 9638
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "bytes": 7761
+    },
+    {
+      "path": "docs/adapters/grafana.md",
+      "sha256": "d27e8c6b614d2594114431be61c9df77615971efa1d482189ea573b6851f0178",
+      "bytes": 11515
+    },
+    {
+      "path": "docs/adapters/kubernetes.md",
+      "sha256": "db0de18a438a233a8d6d38cd92bde570b242ddfa613b9233d53e8eb3d78db888",
+      "bytes": 12317
+    },
+    {
+      "path": "docs/adapters/docker.md",
+      "sha256": "07208e99bdc624e7c43ef33e16f1eab9fd7f576a91706f55591f9625774470ab",
+      "bytes": 6735
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "0bcea71b5b68ed7df0f320d8223e0072b3cafaebec0666f104a7648a38e9cb0a",
+      "bytes": 428
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "path": ".engineering/planning/story/contracts-anonymous-auth.md",
+      "sha256": "b95f778446a514f953521e379c94a022dfb08163a0f08ea67b06d7066ee3786a",
+      "bytes": 4123
+    },
+    {
+      "path": ".engineering/planning/story/contracts-permission-budgets.md",
+      "sha256": "bcd041ec65e21499d391cfcccd78d3d77882f6648d6acf050a847c832a1e8873",
+      "bytes": 3600
+    },
+    {
+      "path": ".engineering/planning/story/contracts-acquisition-profiles.md",
+      "sha256": "3224aa08a3c8b0e17040d41039b94fc492f04b8933aa5c1dd62a719e17739c94",
+      "bytes": 4563
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "274b6fdbe96c935214a76e4b38bd10286e22fb204551d62e512c5bbeb9f72170",
+      "bytes": 12748
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "af19e498dca5a6616303d745932b1bc8b813d8bed4cafbec47b1951390e3f131",
+      "bytes": 13081
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "62bd6617c811c4caec5e1e129d34208e38ab01706234aa8db69d90e77ad2b9b5",
+      "bytes": 22206
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "72b9cb5db575a422005c7e29ea827966003e27c76bbb2b2fe1b4fe5847aed4a1",
+      "bytes": 21207
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "fcb1842728b298c79a8a2610ec54000b53f680dcdf81fa76332f408490d051ac",
+      "bytes": 20119
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "bytes": 10098
+    }
+  ]
+}

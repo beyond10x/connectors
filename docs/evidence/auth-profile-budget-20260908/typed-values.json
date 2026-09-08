@@ -1,0 +1,794 @@
+{
+  "scope": "Declared values and schema expectations only; no admission/flow/budget/provider/clock implementation executed.",
+  "values": [
+    {
+      "id": "loki-anonymous",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "loki.anonymous",
+        "mode": "direct_anonymous",
+        "purpose": "anonymous",
+        "subject": "none",
+        "scheme": "none",
+        "flow": "static_config",
+        "capability": "http-anonymous"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "loki-via_parent",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "loki.via_parent",
+        "mode": "parent_authenticated",
+        "purpose": "mediated_access",
+        "subject": "none",
+        "scheme": "parent",
+        "flow": "static_config",
+        "capability": "mediated-http"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "loki-bearer",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "loki.bearer",
+        "mode": "credential",
+        "purpose": "service_account",
+        "subject": "app",
+        "scheme": "http_bearer",
+        "flow": "static_config",
+        "capability": "http-bearer"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "loki-basic",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "loki.basic",
+        "mode": "credential",
+        "purpose": "service_account",
+        "subject": "app",
+        "scheme": "http_basic",
+        "flow": "static_config",
+        "capability": "http-basic"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "prometheus-anonymous",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "prometheus.anonymous",
+        "mode": "direct_anonymous",
+        "purpose": "anonymous",
+        "subject": "none",
+        "scheme": "none",
+        "flow": "static_config",
+        "capability": "http-anonymous"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "prometheus-via_parent",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "prometheus.via_parent",
+        "mode": "parent_authenticated",
+        "purpose": "mediated_access",
+        "subject": "none",
+        "scheme": "parent",
+        "flow": "static_config",
+        "capability": "mediated-http"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "prometheus-bearer",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "prometheus.bearer",
+        "mode": "credential",
+        "purpose": "service_account",
+        "subject": "app",
+        "scheme": "http_bearer",
+        "flow": "static_config",
+        "capability": "http-bearer"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "prometheus-basic",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "prometheus.basic",
+        "mode": "credential",
+        "purpose": "service_account",
+        "subject": "app",
+        "scheme": "http_basic",
+        "flow": "static_config",
+        "capability": "http-basic"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "alertmanager-anonymous",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "alertmanager.anonymous",
+        "mode": "direct_anonymous",
+        "purpose": "anonymous",
+        "subject": "none",
+        "scheme": "none",
+        "flow": "static_config",
+        "capability": "http-anonymous"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "alertmanager-via_parent",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "alertmanager.via_parent",
+        "mode": "parent_authenticated",
+        "purpose": "mediated_access",
+        "subject": "none",
+        "scheme": "parent",
+        "flow": "static_config",
+        "capability": "mediated-http"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "alertmanager-bearer",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "alertmanager.bearer",
+        "mode": "credential",
+        "purpose": "service_account",
+        "subject": "app",
+        "scheme": "http_bearer",
+        "flow": "static_config",
+        "capability": "http-bearer"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "alertmanager-basic",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "alertmanager.basic",
+        "mode": "credential",
+        "purpose": "service_account",
+        "subject": "app",
+        "scheme": "http_basic",
+        "flow": "static_config",
+        "capability": "http-basic"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "static_config",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "static_config",
+        "grants": [],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Auth declaration shape; source adequacy and required-field predicates are not executed."
+    },
+    {
+      "id": "static_entry",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "static_entry",
+        "grants": [],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Auth declaration shape; source adequacy and required-field predicates are not executed."
+    },
+    {
+      "id": "oauth2_authorization_code",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "oauth2_authorization_code",
+        "grants": [
+          "authorization_code"
+        ],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ],
+        "authorize_url": "https://auth.vendor.example/authorize",
+        "token_url": "https://auth.vendor.example/token",
+        "pkce": "S256",
+        "registration_kind": "confidential_client",
+        "callback_binding": "host_callback"
+      },
+      "schema_accepts": true,
+      "note": "Auth declaration shape; source adequacy and required-field predicates are not executed."
+    },
+    {
+      "id": "oauth2_client_credentials",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "oauth2_client_credentials",
+        "grants": [
+          "client_credentials"
+        ],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ],
+        "token_url": "https://auth.vendor.example/token",
+        "registration_kind": "confidential_client"
+      },
+      "schema_accepts": true,
+      "note": "Auth declaration shape; source adequacy and required-field predicates are not executed."
+    },
+    {
+      "id": "oauth2_password",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "oauth2_password",
+        "grants": [],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Fixture source only, not vendor evidence. Reserved values type-check but cannot advertise acquisition support."
+    },
+    {
+      "id": "workload_identity",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "workload_identity",
+        "grants": [],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Fixture source only, not vendor evidence. Reserved values type-check but cannot advertise acquisition support."
+    },
+    {
+      "id": "exec_plugin",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "exec_plugin",
+        "grants": [],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Fixture source only, not vendor evidence. Reserved values type-check but cannot advertise acquisition support."
+    },
+    {
+      "id": "host_issued",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "host_issued",
+        "grants": [],
+        "sources": [
+          "https://vendor.example/fixture-only"
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Fixture source only, not vendor evidence. Reserved values type-check but cannot advertise acquisition support."
+    },
+    {
+      "id": "pods-a",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "list",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "pods",
+        "namespace": "a",
+        "name": "",
+        "subresource": ""
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "pods-b",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "list",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "pods",
+        "namespace": "b",
+        "name": "",
+        "subresource": ""
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "service-list",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "list",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "services",
+        "namespace": "a",
+        "name": "",
+        "subresource": ""
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "service-proxy",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "get",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "services",
+        "namespace": "a",
+        "name": "prometheus",
+        "subresource": "proxy"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "deployment",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "list",
+        "api_group": "apps",
+        "api_version": "v1",
+        "resource": "deployments",
+        "namespace": "a",
+        "name": "",
+        "subresource": ""
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "cluster-node",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "list",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "nodes",
+        "namespace": "",
+        "name": "",
+        "subresource": ""
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "named-pod",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "get",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "pods",
+        "namespace": "a",
+        "name": "api-0",
+        "subresource": ""
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "pod-logs",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "get",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "pods",
+        "namespace": "a",
+        "name": "api-0",
+        "subresource": "log"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "budget-default",
+      "type": "connectors.auth_access.PermissionBudget",
+      "value": {
+        "target_limit": 64,
+        "call_limit": 64,
+        "concurrency_limit": 4,
+        "deadline": "2026-09-08T15:00:15Z"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "budget-cache-only",
+      "type": "connectors.auth_access.PermissionBudget",
+      "value": {
+        "target_limit": 64,
+        "call_limit": 0,
+        "concurrency_limit": 1,
+        "deadline": "2026-09-08T15:00:15Z"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "budget-lower",
+      "type": "connectors.auth_access.PermissionBudget",
+      "value": {
+        "target_limit": 8,
+        "call_limit": 2,
+        "concurrency_limit": 2,
+        "deadline": "2026-09-08T15:00:15Z"
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "observation-allowed-False",
+      "type": "connectors.auth_access.PermissionObservation",
+      "value": {
+        "target": {
+          "verb": "list",
+          "api_group": "",
+          "api_version": "v1",
+          "resource": "pods",
+          "namespace": "a",
+          "name": "",
+          "subresource": ""
+        },
+        "result": "allowed",
+        "cached": false
+      },
+      "schema_accepts": true,
+      "note": "Private observation shape only; unavailable never authorizes and cannot appear as denied in successful coverage."
+    },
+    {
+      "id": "observation-allowed-True",
+      "type": "connectors.auth_access.PermissionObservation",
+      "value": {
+        "target": {
+          "verb": "list",
+          "api_group": "",
+          "api_version": "v1",
+          "resource": "pods",
+          "namespace": "a",
+          "name": "",
+          "subresource": ""
+        },
+        "result": "allowed",
+        "cached": true
+      },
+      "schema_accepts": true,
+      "note": "Private observation shape only; unavailable never authorizes and cannot appear as denied in successful coverage."
+    },
+    {
+      "id": "observation-denied-False",
+      "type": "connectors.auth_access.PermissionObservation",
+      "value": {
+        "target": {
+          "verb": "list",
+          "api_group": "",
+          "api_version": "v1",
+          "resource": "pods",
+          "namespace": "a",
+          "name": "",
+          "subresource": ""
+        },
+        "result": "denied",
+        "cached": false
+      },
+      "schema_accepts": true,
+      "note": "Private observation shape only; unavailable never authorizes and cannot appear as denied in successful coverage."
+    },
+    {
+      "id": "observation-denied-True",
+      "type": "connectors.auth_access.PermissionObservation",
+      "value": {
+        "target": {
+          "verb": "list",
+          "api_group": "",
+          "api_version": "v1",
+          "resource": "pods",
+          "namespace": "a",
+          "name": "",
+          "subresource": ""
+        },
+        "result": "denied",
+        "cached": true
+      },
+      "schema_accepts": true,
+      "note": "Private observation shape only; unavailable never authorizes and cannot appear as denied in successful coverage."
+    },
+    {
+      "id": "observation-unavailable-False",
+      "type": "connectors.auth_access.PermissionObservation",
+      "value": {
+        "target": {
+          "verb": "list",
+          "api_group": "",
+          "api_version": "v1",
+          "resource": "pods",
+          "namespace": "a",
+          "name": "",
+          "subresource": ""
+        },
+        "result": "unavailable",
+        "cached": false
+      },
+      "schema_accepts": true,
+      "note": "Private observation shape only; unavailable never authorizes and cannot appear as denied in successful coverage."
+    },
+    {
+      "id": "observation-unavailable-True",
+      "type": "connectors.auth_access.PermissionObservation",
+      "value": {
+        "target": {
+          "verb": "list",
+          "api_group": "",
+          "api_version": "v1",
+          "resource": "pods",
+          "namespace": "a",
+          "name": "",
+          "subresource": ""
+        },
+        "result": "unavailable",
+        "cached": true
+      },
+      "schema_accepts": true,
+      "note": "Private observation shape only; unavailable never authorizes and cannot appear as denied in successful coverage."
+    },
+    {
+      "id": "allowed-coverage",
+      "type": "connectors.auth_access.AuthorizationCoverage",
+      "value": {
+        "complete": true,
+        "targets": [
+          {
+            "target": {
+              "verb": "list",
+              "api_group": "",
+              "api_version": "v1",
+              "resource": "pods",
+              "namespace": "a",
+              "name": "",
+              "subresource": ""
+            },
+            "result": "allowed"
+          },
+          {
+            "target": {
+              "verb": "list",
+              "api_group": "",
+              "api_version": "v1",
+              "resource": "pods",
+              "namespace": "b",
+              "name": "",
+              "subresource": ""
+            },
+            "result": "allowed"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "partial-denied-coverage",
+      "type": "connectors.auth_access.AuthorizationCoverage",
+      "value": {
+        "complete": false,
+        "targets": [
+          {
+            "target": {
+              "verb": "list",
+              "api_group": "",
+              "api_version": "v1",
+              "resource": "pods",
+              "namespace": "a",
+              "name": "",
+              "subresource": ""
+            },
+            "result": "allowed"
+          },
+          {
+            "target": {
+              "verb": "list",
+              "api_group": "",
+              "api_version": "v1",
+              "resource": "pods",
+              "namespace": "b",
+              "name": "",
+              "subresource": ""
+            },
+            "result": "denied"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "no-unknown-success-coverage",
+      "type": "connectors.auth_access.AuthorizationCoverage",
+      "value": {
+        "complete": false,
+        "targets": [
+          {
+            "target": {
+              "verb": "list",
+              "api_group": "",
+              "api_version": "v1",
+              "resource": "pods",
+              "namespace": "a",
+              "name": "",
+              "subresource": ""
+            },
+            "result": "unavailable"
+          }
+        ]
+      },
+      "schema_accepts": false,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "no-secret-member",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "loki.anonymous",
+        "mode": "direct_anonymous",
+        "purpose": "anonymous",
+        "subject": "none",
+        "scheme": "none",
+        "flow": "static_config",
+        "capability": "http-anonymous",
+        "credential": "not-allowed"
+      },
+      "schema_accepts": false,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "unknown-mode",
+      "type": "connectors.auth_access.AccessMode",
+      "value": "implicit_none",
+      "schema_accepts": false,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "unknown-flow",
+      "type": "connectors.auth_access.AcquisitionFlow",
+      "value": "auto",
+      "schema_accepts": false,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "null-token-endpoint",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "oauth2_client_credentials",
+        "token_url": null,
+        "grants": [
+          "client_credentials"
+        ],
+        "sources": []
+      },
+      "schema_accepts": false,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "missing-exact-subresource",
+      "type": "connectors.auth_access.PermissionTarget",
+      "value": {
+        "verb": "list",
+        "api_group": "",
+        "api_version": "v1",
+        "resource": "pods",
+        "namespace": "a",
+        "name": ""
+      },
+      "schema_accepts": false,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "string-budget",
+      "type": "connectors.auth_access.PermissionBudget",
+      "value": {
+        "target_limit": "64",
+        "call_limit": 64,
+        "concurrency_limit": 4,
+        "deadline": "2026-09-08T15:00:15Z"
+      },
+      "schema_accepts": false,
+      "note": "Declared value; schema shape only."
+    },
+    {
+      "id": "contradictory-anonymous-bearer",
+      "type": "connectors.auth_access.AccessSelection",
+      "value": {
+        "profile": "loki.anonymous",
+        "mode": "direct_anonymous",
+        "purpose": "anonymous",
+        "subject": "none",
+        "scheme": "http_bearer",
+        "flow": "static_config",
+        "capability": "http-anonymous"
+      },
+      "schema_accepts": true,
+      "note": "Schema accepts; profile combination rule refuses. No semantic reducer executed."
+    },
+    {
+      "id": "contradictory-complete-denial",
+      "type": "connectors.auth_access.AuthorizationCoverage",
+      "value": {
+        "complete": true,
+        "targets": [
+          {
+            "target": {
+              "verb": "list",
+              "api_group": "",
+              "api_version": "v1",
+              "resource": "pods",
+              "namespace": "a",
+              "name": "",
+              "subresource": ""
+            },
+            "result": "denied"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Schema accepts; coverage rule forbids complete:true for denial."
+    },
+    {
+      "id": "over-ceiling-budget",
+      "type": "connectors.auth_access.PermissionBudget",
+      "value": {
+        "target_limit": 65,
+        "call_limit": 65,
+        "concurrency_limit": 5,
+        "deadline": "2026-09-08T15:00:15Z"
+      },
+      "schema_accepts": true,
+      "note": "Schema accepts Integer shape; normative ceilings refuse."
+    },
+    {
+      "id": "missing-code-endpoints",
+      "type": "connectors.auth_access.AcquisitionDeclaration",
+      "value": {
+        "flow": "oauth2_authorization_code",
+        "grants": [],
+        "sources": []
+      },
+      "schema_accepts": true,
+      "note": "Schema accepts; required-flow-field/source rules refuse."
+    }
+  ]
+}

@@ -13,3 +13,4 @@ domains:
   - connectors.service_wire
   - connectors.delegation
   - connectors.connection_admission
+  - connectors.auth_access

@@ -9,7 +9,7 @@
 | Field | Value |
 |---|---|
 | Contract | `auth.acquisition/v1alpha1` |
-| Profiles | `static_entry`, `oauth2_authorization_code`, `oauth2_client_credentials`; reserved: `workload_identity`, `exec_plugin`, `host_issued` (the last is specified in [sessions](../../../sessions/v1alpha1/semantics.md)) |
+| Paths | `static_config` (deployment binding, no acquisition session); coordinator flows: `static_entry`, `oauth2_authorization_code`, `oauth2_client_credentials`; reserved here: `oauth2_password`, `workload_identity`, `exec_plugin`, `host_issued` (session authority has its separate [sessions](../../../sessions/v1alpha1/semantics.md) contract) |
 | Parties | host coordinator (shared), provider auth implementation (adapter-owned), trusted user interface, custody |
 
 Design responsibility two of four: establish, refresh, revoke, or repair authorization, owned by a shared coordinator plus the provider auth implementation (`docs/design.md:527`). The coordinator owns lifecycle, state, expiry, concurrency, recovery; the provider implementation owns request construction and response interpretation (`docs/design.md:551`).
@@ -64,12 +64,28 @@ Outcomes of refresh: `refreshed`, `reauthorization_required`, `insufficient_scop
 
 ## 4. Rules
 
-Flow (specializes `docs/design.md:543-549`):
+### 4.0 Acquisition paths and required declarations
+
+“Specified” below means this proposed contract defines a path. It does not mean the current host, adapter schema, profile reader or codec implements it. An advertised supported profile needs all of those bindings and its validation/placement implementation. Configuration flags do not promote a reserved flow to supported.
+
+| Flow | Disposition and required declaration | Fields/path not permitted |
+|---|---|---|
+| `static_config` | Specified deployment binding. Profile declares accepted material/transport shape and admitted validation plan; configuration supplies scoped references, or the explicit no-child-credential binding in profile §4.2. | No auth.begin, acquisition id, protected-entry action, OAuth endpoints, grants, registration or callback. No credential bytes in ordinary configuration/result data. |
+| `static_entry` | Specified protected entry. Profile declares expected entry fields/material shape, identity/grant interpretation and validation plan with sources. Host must bind custody, coordinator and admitted protected UI/ingress. | No OAuth endpoints, OAuth grants, redirect or browser PKCE fields. Protected form submission alone is not completion/publication. |
+| `oauth2_authorization_code` | Specified browser flow. Require nonempty authorize_url and token_url, vendor sources, authorization_code grant, explicit PKCE choice and vendor justification, registration kind and sourced client-auth method/policy, callback binding, token/identity/grant interpretation, validation and refresh policy. Refresh grant only when supported by the cited profile. | No inferred endpoints, token encoding or PKCE from another provider. Registration values remain configuration/custody. |
+| `oauth2_client_credentials` | Specified noninteractive flow. Require nonempty token_url, vendor sources, client_credentials grant, configured confidential registration and declared client-auth/token/identity/grant interpretation and validation. This first profile does not request/accept refresh-token behavior; obtaining another credential set is a new admitted acquisition. | authorize_url, callback/redirect, PKCE, browser action and refresh_token grant are rejected; no trusted browser channel is required. |
+| `oauth2_password`, `workload_identity`, `exec_plugin`, `host_issued` | Reserved in this acquisition contract. Preserve names for reviewed future bindings; reject selection/advertisement as implemented here. Exec/session mechanism constraints elsewhere remain requirements for those future/separate profiles. | No inferred generic auth.begin/completion path or flag-only enablement. |
+
+All profile declarations remain credential/reference-free, with bounded sources and material/validation descriptions. Required safe endpoint strings must meet the selected host's reviewed egress policy; their exact provider values and request formats need cited vendor evidence. This matrix changes no actual adapter-kind schema.
+
+`static_config` is activation of an explicitly configured binding, not a pasted credential or a managed acquisition. The host separately admits activation/revalidation, resolves only the configured references at that boundary, captures coherent immutable material, validates the candidate and publishes its metadata under the same binding/revocation fence as other credential paths. Read-only custody need not copy an externally supplied secret into a writable store; its immutable snapshot must remain available for dispatch. Unavailable custody/validation refuses activation. Listing does not activate, run an exec helper or resolve secrets. Changes require fresh capture/validation; filenames and revisions do not prove identity continuity. Binding metadata publication must be acknowledged, but no fictitious acquisition/completed event is emitted. Static no-credential profiles instead validate their explicit destination/route binding and applicable checks, with no capture, external identity or custody write. No static binding automatically refreshes or starts a browser.
+
+Managed-flow sequence (specializes `docs/design.md:543-549`; static_config follows the preceding activation path):
 
 1. Host admits `auth.begin` against caller, tenant, target connection (for repair), profile, and configured registration.
-2. Coordinator creates one-purpose expiring state correlated to the request and the allowed callback or entry URL. State is single-use.
+2. Coordinator creates one-purpose expiring state correlated to the request. Interactive flows bind the allowed callback or entry URL; noninteractive client credentials have no completion URL. State is single-use.
 3. For browser/protected-entry flows, the owning coordinator delivers the one-use action URL only to the separately admitted trusted UI channel. Ordinary results carry acquisition ref, expiry and action kind; no usable completion authority. Without the needed protected delivery/ingress binding that interactive flow is unavailable. Non-interactive client credentials skip this UI step and may complete in begin through their admitted registration/provider/custody path. Current authority, owner, expiry and one-use checks remain required at completion.
-4. Completion evidence (OAuth callback code and state, or a posted static credential) is validated for correlation, expiry, one-time use. The provider implementation performs the exchange and validates returned identity, token kind, and granted scopes against the profile minimum, recording actual grants; optional requested grants are not mandatory publication requirements ([profile §4.1](../../profile/v1alpha1/semantics.md#41-baseline-and-operation-requirements)).
+4. Interactive completion evidence (OAuth callback code and state, or a posted static credential) is validated for correlation, expiry, one-time use. Client credentials exchanges directly from its admitted registration. The provider implementation performs the applicable exchange/entry validation and validates returned identity, token kind and granted scopes against the profile minimum, recording actual grants; optional requested grants are not mandatory publication requirements ([profile §4.1](../../profile/v1alpha1/semantics.md#41-baseline-and-operation-requirements)).
 5. Repair: the returned external identity must match the bound one, else `identity_mismatch` and the connection remains in its prior state.
 6. Baseline validation, including any explicitly mandatory global verification, must succeed. Custody stores the complete credential set durably before the coordinator publishes its active reference under the current binding/revocation fence; both acknowledgements precede `completed`. Optional verification does not prevent publication; required operation-only checks still gate those operations. A failed independent repair preserves the prior binding subject to its own current validity, expiry and revocation.
 7. The caller receives the connection ref and safe status. Completion never executes a previously failed business operation.
@@ -180,5 +196,5 @@ The [verification record](verification.md) separates compiled authored scenarios
 | Decision | Default taken |
 |---|---|
 | Callback host placement in federation | completion terminates at the one owning logical coordinator through a separately admitted protected ingress; safe begin/status use the selected management binding; no state copying or automatic reroute/resend ([management](../../management.md)) |
-| PKCE default | `none` unless the profile source says supported; then `S256` |
+| PKCE choice | explicit per authorization-code profile with vendor justification; no inherited/default choice; absent for other first-profile flows |
 | Expiry values | 600 s / 300 s first-profile defaults |
