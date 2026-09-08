@@ -1,0 +1,3 @@
+$ .local/toolchains/ess/0.20.0/bin/ess specify validate --path ess
+connectors v1 — 7 file(s), valid
+exit: 0
