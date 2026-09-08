@@ -1,0 +1,52 @@
+{
+  "base_commit": "3fc56bddb3a53a3e1320ecc2bfdf8a2a45952e23",
+  "exact_raw_review_bodies": 6,
+  "new_review_archives": 4,
+  "archived_files_verified": 1182,
+  "declared_archived_source_hashes_verified": 1144,
+  "current_final_approved_sources": 68,
+  "all_changed_normative_files_covered": [
+    "contracts/operations/v1alpha1/semantics.md",
+    "contracts/service/compatibility.md",
+    "contracts/service/v1alpha1/semantics.md",
+    "contracts/service/v1alpha2/semantics.md",
+    "docs/adapters/atlassian.md",
+    "docs/adapters/docker.md",
+    "docs/adapters/kubernetes.md",
+    "ess/domains/declarations.yaml",
+    "ess/domains/mutations.yaml"
+  ],
+  "provider_and_compiled_payloads_verified": 11,
+  "individual_fixed_outcomes": 12,
+  "sole_owner_counts": {
+    "contracts-restart-idempotency": 9,
+    "contracts-mutation-visibility": 3
+  },
+  "original_source_items": 48,
+  "original_fixed": 32,
+  "original_open": 16,
+  "owner_story_statuses": {
+    "implemented": 20,
+    "draft": 7
+  },
+  "new_private_types": {
+    "ess/domains/declarations.yaml": [
+      "connectors.declarations.AvailabilityDecision",
+      "connectors.declarations.OperationAvailability"
+    ],
+    "ess/domains/mutations.yaml": [
+      "connectors.mutations.ContainerLifecycleAction",
+      "connectors.mutations.ContainerLifecycleIntent",
+      "connectors.mutations.DeploymentRestartTarget",
+      "connectors.mutations.IdempotencyKind",
+      "connectors.mutations.PreparedDeploymentRestart"
+    ]
+  },
+  "existing_entities_lifecycles_commands_unchanged": true,
+  "runtime_public_codec_adapter_schema_changes": false,
+  "local_file_links_checked": 119,
+  "planning_artifacts_valid": 109,
+  "historical_prose_review_warnings": 63,
+  "empty_findings_final_review_warnings": 2,
+  "evidence_limits": "Normative review, schema shapes, pinned source inspection and exact artifact integrity; no new runtime/provider/policy/race conformance or full-goal completion claim."
+}

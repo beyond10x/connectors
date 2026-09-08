@@ -1,0 +1,317 @@
+{
+  "phase": "restart/visibility narrow final recheck2",
+  "baseline": "3fc56bd",
+  "exclusions": "Other reviewer outputs; mutable AEP, ledger, dispositions and checkpoint",
+  "files": [
+    {
+      "path": "adapters/kubernetes/src/lib.rs",
+      "sha256": "9b97d3616f19f1dbaeab9d78b011f5265bd4b647de55fc5be3418c2bb82f2548",
+      "bytes": 11811
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "c23f0b0a09cc80281d248a61040f9d343bdd0806d060d2020be337fdd9b70119",
+      "bytes": 22905
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "33ab1618ddabd77f8be425504fd9994111965344b3d03d7c607a129578ed0e40",
+      "bytes": 32482
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649",
+      "bytes": 14973
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "214fd42a93d359753778be47f6327767e8679dc6d4e916c5eab9305eb5c19b58",
+      "bytes": 49213
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "9758336b416b679bda090fc8492c2a590e809da44da1e4f33d03ad0561c15fff",
+      "bytes": 39804
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1",
+      "bytes": 34883
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "37bb1e5fde462565c5e0ce45b25a174b1114f8546601006ecaa629d878177d66",
+      "bytes": 11897
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "2607b252e490d147d7f083315644307492847deb7e27739e3f64f0c3233a68f8",
+      "bytes": 30361
+    },
+    {
+      "path": "crates/connectors-client/src/lib.rs",
+      "sha256": "5a278c168bddf891fb678cd73255421e3a2708a1449edbe53b43158b9f41faa5",
+      "bytes": 6273
+    },
+    {
+      "path": "crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+      "bytes": 8489
+    },
+    {
+      "path": "crates/connectors-host/src/federation.rs",
+      "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c",
+      "bytes": 7183
+    },
+    {
+      "path": "crates/connectors-host/src/server.rs",
+      "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578",
+      "bytes": 11369
+    },
+    {
+      "path": "docs/adapters/atlassian.md",
+      "sha256": "a5c5292f3214de132b517e2426fc83521713185ac215f4cbd33f08a28148f0d8",
+      "bytes": 16011
+    },
+    {
+      "path": "docs/adapters/docker.md",
+      "sha256": "b9223da8849cbe5e83c3176ef386f2b3cb9e6fe2c1b2b76aeaae8d16b1cda69a",
+      "bytes": 14783
+    },
+    {
+      "path": "docs/adapters/kubernetes.md",
+      "sha256": "c90688198e6df54398d661d2596ac9328da1279cf24ca793c755fad926d4d6c0",
+      "bytes": 24158
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a",
+      "bytes": 139742
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/check-results.json",
+      "sha256": "eb5f3e2b6e87f95a6700192871d067a32bcd916a7b1b9f2b488c4da0201a5d62",
+      "bytes": 234
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/check-transcript.md",
+      "sha256": "9bfc37717dd0dba7a9b1c2d6a803b1d82a006f7a12468c895bdba976b406724f",
+      "bytes": 10837
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/compiled-evidence.json",
+      "sha256": "d37337b96fb3cb5a4a98e8895c143555fe2da2248aaf0e68fad40906887911d8",
+      "bytes": 615
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/docker-endpoint-audit.json",
+      "sha256": "f4c5458d5991e32c17c30a57a918f1c3dd69d87ddb7c11ae7b7be7e0d43918de",
+      "bytes": 2101
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/gate.log",
+      "sha256": "15aa3e5cf2991ef05fa0ecc0c7fd5244757e3f2bc2ded71c39a7d3883fe34dcb",
+      "bytes": 28938
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/projection-hashes.json",
+      "sha256": "e98ef5c269572f99ac8b1f0babfe211d77b5e65919fca3a3cdc5c24a0f3f0755",
+      "bytes": 41991
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/provider-evidence.md",
+      "sha256": "d29e7edb9d590f51be6b32e10c3b0e0b8340ffa6fd3ba6700095a4193ca5c40a",
+      "bytes": 5825
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/provider-source-hashes.json",
+      "sha256": "d21d970fce6a0c7f5c2608e42a02576ecaa00e3acddd86363df427e63712a3d5",
+      "bytes": 3079
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/recheck2-validation.json",
+      "sha256": "4eb8862e1871a3f33dede4f4ade08fa916fe107d96ed6ca74ab367f8829136a9",
+      "bytes": 607
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/restart-visibility-compiled.json.gz",
+      "sha256": "ecac60cc8c8255ae5477453f242189fcf5d40a87d03e8e8d2896381e3cd17705",
+      "bytes": 14607
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/rv-sessions-authored.json.gz",
+      "sha256": "78489b450dafaa9f3779f29c0f2f29f1fe675af790dcff8cdfc71054088b47cd",
+      "bytes": 4657
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/rv-sessions-suite.json.gz",
+      "sha256": "e0ac296193373b26ea6a6410c74d716984ec9989c89ac14768c8cd260c95cce3",
+      "bytes": 36012
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/schema/types/connectors.declarations.AvailabilityDecision.schema.json",
+      "sha256": "1de213bbc8a41517bd868641571d9fdc523fe9cb076b3aa08d6016407ab83a3f",
+      "bytes": 1938
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/schema/types/connectors.declarations.OperationAvailability.schema.json",
+      "sha256": "471ef264c05434ac21af574105cb17209f556e9645b229b7a5ed04779ddf5327",
+      "bytes": 1343
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/schema/types/connectors.mutations.ContainerLifecycleAction.schema.json",
+      "sha256": "a26e2983dbcddeec3d19c6c9fbbf6af142802ff132e1a7b6a1a2fd89be062ec8",
+      "bytes": 769
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/schema/types/connectors.mutations.ContainerLifecycleIntent.schema.json",
+      "sha256": "4fd5fa232c577dda560c1533e122570e9aac9ad74ddd740dfa5884c697c531ca",
+      "bytes": 1736
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/schema/types/connectors.mutations.DeploymentRestartTarget.schema.json",
+      "sha256": "50ba2b71de35a07ab0064cc69bb4bfdc65eb34d3d761098a7fc496c38c6b7955",
+      "bytes": 1286
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/schema/types/connectors.mutations.IdempotencyKind.schema.json",
+      "sha256": "22c9b3052f35d746fba7981a316c51b0395e98aa831c935f1fc666f4a4b8a13a",
+      "bytes": 733
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/schema/types/connectors.mutations.PreparedDeploymentRestart.schema.json",
+      "sha256": "280a73440d087112bdf3139ae7933c94ade0dd594876b541a59fd1129bed52d6",
+      "bytes": 1827
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/shape-results.json",
+      "sha256": "a77f7551f37d1fd343c56f7e94bedfd2210fa6c3a2f6d00ae72ac5d9574f87c6",
+      "bytes": 5568
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/typed-values.json",
+      "sha256": "9b11c2052ad8d38d9f9f10acf00f653ff965138dbd8845ede402756d1e440ebf",
+      "bytes": 21708
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/docker-v1.56.yaml.gz",
+      "sha256": "0db82a29158573840fc659011aca98a66705bb81634262e06bf3eb8da55d19bd",
+      "bytes": 85362
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-api-concepts-1.35.md.gz",
+      "sha256": "287a661d64a6be47cfdf56c742cc3d68472ca0ec27ed0c27826c4b0bed825884",
+      "bytes": 21586
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-objectmeta-1.35.go.gz",
+      "sha256": "55c3f86bd8389302f635cdd949501d75af4a15a2950d3c14e430231d42a11131",
+      "bytes": 3962
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-api_object_versioner.go.gz",
+      "sha256": "053c448bdd75e620be12706f81cb8fc553d95c1c42f13ff8d817bd64a9f03653",
+      "bytes": 1465
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-patch.go.gz",
+      "sha256": "b8da2f4b04fe47d0df7ed1e1bfa6832e5d7a71e263e0da65c2ea0b9cbf0d8f33",
+      "bytes": 8276
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-store.go.gz",
+      "sha256": "de6c89772194182a47a30fe4e9f6330d0b046f3b6ab0ed672ed93ec2344d6540",
+      "bytes": 16626
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-strategy.go.gz",
+      "sha256": "bccca1e617ea3e2f038024b558ceb7cf2dc279c9e15bb4ed9cc9bc1b0ce9ed0c",
+      "bytes": 2197
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/old-kubernetes-local_workloads.rs.gz",
+      "sha256": "ac351d3d1168e193344c853761fdcc02078bc9892b30e9d32d5626a1f6891e68",
+      "bytes": 5597
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/verification.md",
+      "sha256": "1cf67e74d49cfe9337184354a6aac23fb16154e098e54462835fa9bcb6e88fa8",
+      "bytes": 12431
+    },
+    {
+      "path": "ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+      "bytes": 5153
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240",
+      "bytes": 2600
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "a31e7871dde3d936841ab42e7d5da371f5779aaf577f64a3e38973e23a1dcd61",
+      "bytes": 4469
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "path": "ess/domains/discovery.yaml",
+      "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0",
+      "bytes": 7125
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "b1d17e96b10f7fc1ad36080231f393543820e7be5eced3e23f978310a6095b47",
+      "bytes": 12178
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38",
+      "bytes": 13375
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+      "bytes": 480
+    },
+    {
+      "path": "spec-kinds/adapter/v1/schema.json",
+      "sha256": "3289659cf5917956ae402de0d6ee5b63fb2300b667cccc26950576dd8a42f368",
+      "bytes": 1337
+    },
+    {
+      "path": "spec-kinds/adapter/v1/semantics.md",
+      "sha256": "475bf4a517d13ed46d75e6d70dcad1460b7f54ec5160295dcd820cde8d6c0315",
+      "bytes": 2784
+    }
+  ]
+}

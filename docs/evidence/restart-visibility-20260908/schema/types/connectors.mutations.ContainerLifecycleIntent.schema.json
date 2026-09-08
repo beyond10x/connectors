@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.ContainerLifecycleIntent",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "72ba9ea092904fdc68ed0063ae596853db6e5f5cb70bac7e93e610ff3f4e66cd",
+    "contract_digest": "slice-sha256/2:0f59070241113a95c76d5f5a434c1b46a79ac3038ba36f0e35c0b36cf9e39333",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.ContainerLifecycleAction": {
+      "title": "ContainerLifecycleAction",
+      "x-ess-name": "connectors.mutations.ContainerLifecycleAction",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "start",
+        "stop",
+        "restart"
+      ]
+    },
+    "connectors.mutations.ContainerLifecycleIntent": {
+      "title": "ContainerLifecycleIntent",
+      "x-ess-name": "connectors.mutations.ContainerLifecycleIntent",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "instance_ref": {
+          "type": "string"
+        },
+        "connection_ref": {
+          "type": "string"
+        },
+        "container_selector": {
+          "type": "string"
+        },
+        "expected_container_id": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/connectors.mutations.ContainerLifecycleAction"
+        },
+        "stop_signal": {
+          "type": "string"
+        },
+        "stop_timeout_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "instance_ref",
+        "connection_ref",
+        "container_selector",
+        "expected_container_id",
+        "action"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

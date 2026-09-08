@@ -1,0 +1,9 @@
+{
+  "provider_sources_pinned": 8,
+  "docker_endpoint_declarations_checked": 9,
+  "schema_artifacts_compared": 222,
+  "copied_schemas": 7,
+  "shape_expectations": 46,
+  "shape_negatives": 9,
+  "accepted_semantic_counterexamples": 19
+}

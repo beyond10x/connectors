@@ -1,0 +1,131 @@
+{
+  "/containers/json": {
+    "method": "get",
+    "operation_id": "ContainerList",
+    "response_codes": [
+      "200",
+      "400",
+      "500"
+    ],
+    "parameters": [
+      "all",
+      "limit",
+      "size",
+      "filters"
+    ]
+  },
+  "/images/json": {
+    "method": "get",
+    "operation_id": "ImageList",
+    "response_codes": [
+      "200",
+      "500"
+    ],
+    "parameters": [
+      "all",
+      "filters",
+      "shared-size",
+      "digests",
+      "manifests",
+      "identity"
+    ]
+  },
+  "/volumes": {
+    "method": "get",
+    "operation_id": "VolumeList",
+    "response_codes": [
+      "200",
+      "500"
+    ],
+    "parameters": [
+      "filters"
+    ]
+  },
+  "/networks": {
+    "method": "get",
+    "operation_id": "NetworkList",
+    "response_codes": [
+      "200",
+      "500"
+    ],
+    "parameters": [
+      "filters"
+    ]
+  },
+  "/containers/{id}/json": {
+    "method": "get",
+    "operation_id": "ContainerInspect",
+    "response_codes": [
+      "200",
+      "404",
+      "500"
+    ],
+    "parameters": [
+      "id",
+      "size"
+    ]
+  },
+  "/containers/{id}/logs": {
+    "method": "get",
+    "operation_id": "ContainerLogs",
+    "response_codes": [
+      "200",
+      "404",
+      "500"
+    ],
+    "parameters": [
+      "id",
+      "follow",
+      "stdout",
+      "stderr",
+      "since",
+      "until",
+      "timestamps",
+      "tail"
+    ]
+  },
+  "/containers/{id}/start": {
+    "method": "post",
+    "operation_id": "ContainerStart",
+    "response_codes": [
+      "204",
+      "304",
+      "400",
+      "404",
+      "500"
+    ],
+    "parameters": [
+      "id",
+      "detachKeys"
+    ]
+  },
+  "/containers/{id}/stop": {
+    "method": "post",
+    "operation_id": "ContainerStop",
+    "response_codes": [
+      "204",
+      "304",
+      "404",
+      "500"
+    ],
+    "parameters": [
+      "id",
+      "signal",
+      "t"
+    ]
+  },
+  "/containers/{id}/restart": {
+    "method": "post",
+    "operation_id": "ContainerRestart",
+    "response_codes": [
+      "204",
+      "404",
+      "500"
+    ],
+    "parameters": [
+      "id",
+      "signal",
+      "t"
+    ]
+  }
+}
