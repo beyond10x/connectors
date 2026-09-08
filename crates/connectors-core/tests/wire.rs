@@ -11,6 +11,7 @@ fn response_roundtrips_success_and_error() {
             error: Error::new(ErrorCode::Forbidden, "denied"),
         },
     ] {
+        let expected = serde_json::to_value(&outcome).unwrap();
         let response = Response {
             version: WIRE_VERSION.into(),
             request_id: "request-1".into(),
@@ -19,6 +20,8 @@ fn response_roundtrips_success_and_error() {
         let bytes = serde_json::to_vec(&response).unwrap();
         let read: Response = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(read.request_id, "request-1");
+        assert_eq!(read.version, WIRE_VERSION);
+        assert_eq!(serde_json::to_value(read.outcome).unwrap(), expected);
     }
 }
 

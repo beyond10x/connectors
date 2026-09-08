@@ -33,9 +33,12 @@ to implement them.
 - Receiver configuration binds a service token and provider connection. Runtime
   requests cannot select arbitrary credentials, remote hosts, database paths,
   issuer, tenant or realm. Requests with unknown envelope fields are refused.
-- Limits: 64 KiB request body, 4 MiB upstream/result body, 32 concurrent operations,
-  20 s service deadline, 15 s provider deadline (5 s connect), 10 s SQL statement
-  deadline and 2 s SQL lock deadline, 1–100 requested records, 1,000 SQL rows maximum,
+- Limits: 64 KiB request body, 4 MiB upstream/result body, 32 concurrent adapter operations,
+  20 s adapter-execution deadline at the service, 15 s provider request budget
+  (5 s connect). SQL spends at most 10 s executing after connection and reserves
+  up to 2 s for cancellation/cleanup within the 15 s total; a slow connection
+  reduces the available execution time. SQL starts with 10 s statement and 2 s
+  lock timeout settings. Other limits are 1–100 requested records, 1,000 SQL rows maximum,
   8 KiB query text and 300 s cursor TTL. These bounds are fixed in this profile;
   configuration does not expose overrides. Requests choose smaller page/row limits.
 - Every public failure is a structured error with a stable code and safe message.
@@ -43,9 +46,17 @@ to implement them.
   No automatic retry. Provider 401/403, 404, 410, 429, 5xx and malformed/oversized
   responses remain distinguishable. Unsupported versions and stale revisions fail
   before provider dispatch.
-- Dropped read requests may consume upstream resources until the provider deadline.
-  SQL cancellation includes a database statement deadline and connection cleanup.
-  These read profiles promise no external business mutation, not zero query cost.
+- These concurrency/deadline bounds begin at adapter execution after admission,
+  body reading and validation. They are not connection-count, header-read or
+  body-read bounds. Public ingress needs separately configured transport limits.
+- Provider deadlines bound this service's wait; a dropped connection alone does
+  not prove the provider stopped work. SQL has an independent execution deadline
+  and sends a backend-keyed cancellation request on failure, deadline or a dropped
+  invocation, using the established endpoint and captured TLS trust. Its supervisor
+  keeps driving cleanup for at most 2 s even if the caller disappears, then closes
+  the connection. Sending cancellation has no acknowledgement; an unreachable
+  database, process crash or runtime shutdown can prevent backend termination.
+  These read profiles do not promise zero query cost or certain remote termination.
 
 ## Auth and configuration
 
@@ -86,7 +97,10 @@ Source access: 2026-09-08.
 
 SQL: PostgreSQL schema discovery and parameterized, bounded single-statement reads
 through a configured role/database. Database-enforced read-only transactions and
-statement timeouts are mandatory. Schema scope is enforced by database grants,
+an adapter-owned execution deadline are mandatory. Each transaction installs
+statement/lock timeouts as additional server-side guards. Caller-accessible
+functions can change those session settings, including between portal executions;
+they cannot extend the adapter's deadline. Schema scope is enforced by database grants,
 not a string-prefix SQL filter. Preserve column type metadata, NULL, arrays/JSON
 and numeric values without silently converting unsupported values into strings.
 The first `postgresql-native-text` profile encodes non-NULL cells as PostgreSQL's
@@ -95,8 +109,9 @@ JSON null. Numeric precision, arrays, timestamps and JSON are preserved as nativ
 text rather than coerced to JavaScript numbers. Parameters are text or null with
 server-side type resolution. This representation is explicit in the descriptor.
 Report truncation explicitly; no invented resumable cursor for a fresh SQL query.
-Each request uses a fresh connection and read-only transaction, with fixed
-`search_path = public, pg_catalog`; other schemas require qualified names.
+Each request uses a fresh connection and read-only transaction, initialized with
+`search_path = public, pg_catalog`; qualify names in other schemas. Session settings
+are not a substitute for the configured role's schema and function grants.
 No connection pool is claimed in this local profile. A configured CA bundle
 replaces public trust roots for SQL and HTTP providers; empty bundles are refused.
 Do not advertise writes, transactions across requests, or dialect portability.

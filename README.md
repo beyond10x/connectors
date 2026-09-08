@@ -22,7 +22,9 @@ and the rustfmt recorded in the GitLab generated manifest (currently Rust 1.98.1
 `--msrv` additionally checks all targets on installed Rust 1.88.0. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries and ESS/AEP validation. It uses a task-owned temporary directory under
-`.local/tmp`. This local repository has no configured CI or publication target.
+`.local/tmp`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
+its `msrv/` subdirectory (default `target/msrv`). This local repository has no
+configured CI or publication target.
 
 ```sh
 mkdir -p .local/tmp
@@ -105,7 +107,7 @@ accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSO
 representations are preserved without numeric coercion. Parameters are text or null
 and PostgreSQL resolves their types. Use explicit SQL casts where inference needs
 help. The database role's grants govern accessible schemas and functions. Each request
-opens a fresh connection and read-only transaction, with `search_path = public, pg_catalog`;
+opens a fresh connection and read-only transaction, initialized with `search_path = public, pg_catalog`;
 qualify tables in other schemas (for example `reporting.sales`). There is no pool in
 this bounded local profile. Fresh connections resolve the current credential each
 time and discard session state; connection setup therefore contributes to latency.
@@ -115,9 +117,20 @@ It does not create a connection or dial the discovered address. Explicitly confi
 an SQL binding and its credential after selecting an authorized reachable endpoint.
 
 Service listeners speak HTTP; use loopback locally or a trusted TLS-terminating ingress
-for remote deployments. Upstream TLS certificate validation is enabled by default. When `ca_file` is set,
-only that PEM bundle is trusted; public roots are used only when it is absent.
+for remote deployments. The 32-operation limit and 20-second execution deadline
+apply after request admission and reading; configure connection and request-read
+limits at the ingress. Upstream TLS certificate validation is enabled by default.
+For HTTP providers and SQL, `ca_file` replaces public roots with that PEM bundle.
+Federation downstream clients currently use built-in public roots and have no
+private-CA setting; local downstreams use explicitly permitted loopback HTTP.
 `allow_plaintext` is an explicit local-test configuration, not a TLS verification bypass.
+
+SQL keeps its execution deadline independent of caller-controlled database settings.
+Timeouts and dropped invocations trigger a bounded cancellation/cleanup attempt;
+the request budget includes cleanup. Remote termination cannot be guaranteed after
+a network partition or process loss. See the [service contract](contracts/service/v1alpha1/semantics.md)
+for the exact budgets and the [SQL regression harness](adapters/sql/examples/live_deadlines.rs)
+for live timeout, caller-drop and TLS checks.
 
 No adapter in this slice advertises OAuth acquisition, writes, durable events, process
 execution, or media sessions. Those remain separate contracts in the full design.

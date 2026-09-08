@@ -1,6 +1,6 @@
 # Connectors v2: independent adapter services built from contracts
 
-- **Status:** local three-adapter implementation and wire contract verified; GitLab specification generation implemented (sections 27–28). No release or rollout is configured.
+- **Status:** local three-adapter implementation and wire contract verified; GitLab specification generation implemented, with review remediation and proposed contract documents recorded in sections 27–30. No release or rollout is configured.
 - **Recorded:** 2026-09-08.
 - **Working name:** `connectors_v2`; this is a local design repository, not a published project.
 - **Scope of this deliverable:** preserve the design decisions, their evidence, and the locally implemented slices and remaining boundaries.
@@ -1244,7 +1244,7 @@ complete earlier implementation and unfinished generator.
 
 GitLab now uses the Connectors-owned `connectors.adapter/v2` profile. The frontend
 validates pinned upstream mappings, retains source coverage and ESS import refusals,
-lowers its selected local request types into ESS 0.9.2, and generates request
+lowers its selected local request types into the pinned ESS 0.20.0, and generates request
 construction, dispatch and descriptors. ESS-generated types are consumed by the
 running adapter. Handwritten bindings own admission, pagination, response checks
 and provenance. Kubernetes/SQL remain on the strict v1 profile.
@@ -1280,8 +1280,10 @@ fixture evidence from the previous live/container proof.
 The operator asked which contracts a rebuild of Jira, Confluence, Kubernetes, Docker,
 federated Grafana (Loki, Prometheus, Alertmanager) and media sessions (SIP via sipx,
 RTVBP) would need. [contracts/README.md](../contracts/README.md) indexes every
-contract: 5 implemented in section 27, 14 proposed as textual semantics under
-`contracts/<family>/v1alpha1/semantics.md`, and 4 families deferred. One design
+contract: 5 implemented contract/profile rows share the section 27 service document;
+16 proposed semantic documents cover the remaining contracts, profiles and the
+proposed governed service binding; 4 families are deferred. The index distinguishes
+document counts from its 17 proposed rows because catalog appears twice. One design
 document per adapter under [docs/adapters/](adapters/) states which contracts it
 needs and why, with the old surface it rebuilds cited by path and line. Nothing in
 these documents is implemented; descriptors advertise none of it. Docker has no
