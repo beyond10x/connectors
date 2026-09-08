@@ -1,0 +1,151 @@
+[
+  {
+    "id": "effect-external_write",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "effect-network",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "effect-process",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "effect-local_system",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "effect-send_external",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "effect-session_establishment",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "hint-human_visible",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "hint-billable",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "hint-irreversible",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "sip-valid",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "read-network",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "missing-hints",
+    "schema_accepted": false,
+    "errors": [
+      "'semantic_effects' is a required property"
+    ]
+  },
+  {
+    "id": "unknown-executable",
+    "schema_accepted": false,
+    "errors": [
+      "'write' is not one of ['external_write', 'network', 'process', 'local_system', 'send_external', 'session_establishment']"
+    ]
+  },
+  {
+    "id": "hint-in-executable",
+    "schema_accepted": false,
+    "errors": [
+      "'human_visible' is not one of ['external_write', 'network', 'process', 'local_system', 'send_external', 'session_establishment']"
+    ]
+  },
+  {
+    "id": "executable-in-hint",
+    "schema_accepted": false,
+    "errors": [
+      "'send_external' is not one of ['human_visible', 'billable', 'irreversible']"
+    ]
+  },
+  {
+    "id": "missing-discriminator",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "read-business-write",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "duplicate-effect",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "no-receipt-not_attempted",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "no-receipt-refused",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "no-receipt-applied",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "no-receipt-unknown",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "applied-ready",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "unknown-ready",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "null-ready",
+    "schema_accepted": false,
+    "errors": [
+      "None is not of type 'string'"
+    ]
+  },
+  {
+    "id": "replayed-classification",
+    "schema_accepted": false,
+    "errors": [
+      "'replayed' is not one of ['not_attempted', 'refused', 'applied', 'unknown']"
+    ]
+  },
+  {
+    "id": "missing-effect-observation",
+    "schema_accepted": false,
+    "errors": [
+      "'mutation' is a required property"
+    ]
+  }
+]

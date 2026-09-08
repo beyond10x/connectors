@@ -62,7 +62,7 @@ Control messages over the `duplex_transport` binding (each with `session` and a 
 | `lease { expires_unix_ms }` / `revoke { reason }` | host → adapter | authenticated, session/revision-bound authority; §4.1 fixes cutoff and late-renewal rules |
 | `ping`/`pong` | either | control responsiveness under data load |
 
-Outbound establishment operation result (`operations` mutation profile, `effects` includes `session_establishment`):
+Successful outbound establishment operation result (`operations` mutation profile, `effects` includes both `external_write` and `session_establishment`, plus the binding's other applicable categories):
 
 ```json
 { "session": "sess_…", "state": "ready", "streams": [ … ], "transport": { "binding": "websocket", "endpoint": "opaque one-use locator", "authority": "auth_…" } }
@@ -84,7 +84,9 @@ Errors: base codes plus `session_not_ready`, `session_lost`, `offer_expired`, `o
 | Lease/revocation | a live data lease is mandatory for every admitted data path; authoritative revocation stops all controlled data within 2 s, including partitions (§4.1) |
 | Shutdown | host drain: no new offers; leases cannot extend past the drain deadline; data stops by that deadline, with bounded teardown and explicit task accounting (§4.1) |
 
-Establishment (`outbound`): the operation returns `ready` only after every declared stream and the application binding are ready; a terminal before readiness returns `offer_rejected`/`error` with no session ref (old `SipDialEstablished` rule). The session ref is bound to the descriptor revision and connection it was admitted under; a later configuration change follows explicit continuation or revocation (`docs/design.md:485`).
+Establishment (`outbound`): the operation returns `ready` only after every declared stream and the application binding are ready. The supervising owner serializes that ready decision/receipt with terminal facts; a terminal that wins first prevents a ready receipt and no session ref is returned (the old `SipDialEstablished` ready-handle rule). Session-level `offer_rejected`/`error` is not proof that an initiating business mutation had no effect. The enclosing operation reports its independent effect knowledge under [operations §4.1](../../operations/v1alpha1/semantics.md#41-session-establishing-mutation-outcomes): a proved SIP establishment followed by application failure is `applied` with a safe error; partial/uncertain dial work is `unknown` with `outcome_unknown`. Only proven pre-gate non-dispatch or a definitive no-effect refusal may produce the corresponding `not_attempted`/`refused` observation.
+
+A ready receipt records establishment, not continuing liveness. A later terminal does not retract the receipt or rewrite the mutation's settled effect; current admission and safe result delivery can still prevent exposing a handle or one-use authority. The session ref is bound to the descriptor revision and connection it was admitted under; a later configuration change follows explicit continuation or revocation (`docs/design.md:485`). Cancellation, teardown and owner restart never authorize redial. The first-terminal, data-cutoff and no-reattach rules below remain independent of the operation result.
 
 Inbound (`inbound_offer`): the adapter presents `offer` with a verified ingress ref, interpreted destination, stream offer, and untrusted participant context (`docs/design.md:663-669`). The host resolves the destination from receiver-owned configuration (first profile: one configured application endpoint per ingress), checks capacity and stream compatibility, and answers within the deadline. No data byte flows before `accept`. Caller identity in `participant_context` remains untrusted.
 

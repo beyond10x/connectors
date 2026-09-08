@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-mutation-classification
 kind: story
-status: draft
+status: implemented
 title: Align SIP mutation effects with the shared discriminator
 tags:
 - P2
@@ -16,9 +16,15 @@ scope:
   path: contracts/operations/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/sessions/v1alpha1/semantics.md
+- confidence: inferred
+  path: docs/adapters/atlassian.md
 - confidence: cited
   path: docs/adapters/media-session.md
-revision: 2
+- confidence: inferred
+  path: docs/evidence/mutation-profiles-20260908
+- confidence: inferred
+  path: ess/domains/mutations.yaml
+revision: 12
 ---
 ## Context
 
@@ -30,27 +36,29 @@ Baseline for all file:line citations is local commit `db1c329` unless an old-rep
 
 ## Required revision
 
-Choose whether external_write includes session establishment or other explicit effects qualify independently; align SIP declarations and conformance, keeping human visibility in semantic_effects.
+Keep external_write as the mandatory discriminator for externally observable business changes, including an outbound call. Separate executable from descriptive effects and update SIP/Atlassian examples. Define the SIP business-effect commitment separately from full stream/application readiness, preserving applied evidence after delivery/readiness failure, conservative partial/unknown outcomes and the no-redial rule. Invalid declarations must be refused before advertisement or dispatch; future validation is distinct from current ESS value-shape checks.
 
 ## Acceptance
 
-After revision, the planned SIP dial satisfies the same mutation classification rule that its validator obligation requires.
+Every SIP and related mutation declaration uses the shared effect vocabulary and discriminator, and every dial/readiness/terminal scenario has one consistent business-effect classification and ready-handle rule across operations, sessions and the adapter document.
 
 ## Verification scenarios
 
-- SIP dial accepted as a correctly declared mutation.
-- A declaration with only descriptive human visibility cannot acquire mutation authority.
-- Unsupported or incomplete effect declarations fail before execution.
-
-Verification is a textual scenario audit: record the chosen rule and expected observation/refusal for every scenario, cross-check all cited documents, and link the resulting review evidence before claiming the story complete. Runtime conformance implementation is subsequent work.
+- Correct SIP declaration; descriptive-only hints cannot authorize a mutation; network read remains a read; missing, unknown, unsupported or incompatible effects refuse before advertisement/dispatch.
+- Pre-gate refusal; definitive no-effect refusal; possible dial/lost answer; known ringing without definitive establishment; confirmed SIP establishment followed by application failure; full ready receipt; receipt delivery loss; cancellation and later termination preserve effect knowledge.
+- ESS validates minimal values and deterministic schemas; invalid shapes refuse and schema-valid semantic contradictions explicitly demonstrate predicate limits. Existing runtime regression gates do not execute these new semantics.
+- Two independent reviews and exact-source evidence are required before completion.
 
 ## Scope
 
 - cited: `contracts/operations/v1alpha1/semantics.md`
-- cited: `docs/adapters/media-session.md`
 - cited: `contracts/sessions/v1alpha1/semantics.md`
+- cited: `docs/adapters/media-session.md`
+- inferred: `docs/adapters/atlassian.md`
+- inferred: `ess/domains/mutations.yaml`
+- inferred: `docs/evidence/mutation-profiles-20260908`
 
-Source locations: `contracts/operations/v1alpha1/semantics.md:51`; `contracts/operations/v1alpha1/semantics.md:155`; `docs/adapters/media-session.md:37`; `docs/adapters/media-session.md:63`; `contracts/sessions/v1alpha1/semantics.md:65`.
+Serialized with restart/visibility owners on shared operation and adapter documents; the two initial reports also contain findings that remain assigned to those later stories.
 
 ## Dependencies and edit coordination
 
@@ -60,4 +68,8 @@ Shared edit surfaces with `story:contracts-mutation-outcomes`, `story:contracts-
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+The operator authorized local semantic hardening together with ESS models and local checkpoints. This story updates the shared effect discriminator, SIP effect knowledge versus ready-session publication, and matching adapter declarations. Minimal private values belong in the existing mutations domain; OperationDeclaration extensions and predicate/runtime enforcement remain explicitly UNMAPPED. No runtime, adapter-kind schema, public codec or adapter implementation is added. Root is the sole tracked-file writer in the primary checkout under the repository single-agent rule; independent reviewers write only isolated ignored evidence. All work and backup remain local. Restart and visibility findings stay with their own stories.
+
+## Completion evidence — 2026-09-08
+
+F10/E06 and MP-A-01/02, MP-B-01/02, MP-B-C01 are fixed in the normative contracts and minimal ESS values. Both final independent classification-only reviews approve; exact reports/snapshots and five journal outcomes are preserved. See docs/evidence/mutation-profiles-20260908/classification-verification.md and classification-dispositions.md. Runtime and source-specific protocol proof are future binding obligations. Initial restart/visibility findings remain assigned to their own stories and are not included in this completion.

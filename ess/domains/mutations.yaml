@@ -22,6 +22,32 @@ types:
       - {name: classification, type: connectors.mutations.EffectKnowledge}
       # Semantic cause, not a second public Error.code or an approved wire field.
       - {name: cause, type: "Optional<String>"}
+  - name: connectors.mutations.ExecutableEffect
+    kind: enum
+    variants: [external_write, network, process, local_system, send_external, session_establishment]
+  - name: connectors.mutations.SemanticEffect
+    kind: enum
+    variants: [human_visible, billable, irreversible]
+  - name: connectors.mutations.EffectDeclaration
+    kind: struct
+    fields:
+      - {name: profile, type: String}
+      - {name: effects, type: "List<connectors.mutations.ExecutableEffect>"}
+      - {name: semantic_effects, type: "List<connectors.mutations.SemanticEffect>"}
+    # Private excerpt, not a public codec or new OperationDeclaration fields.
+    # UNMAPPED: selected-profile support/completeness, distinct array members,
+    # mutation iff external_write for business effects, and authority checks.
+  - name: connectors.mutations.SessionEstablishmentObservation
+    kind: struct
+    fields:
+      - {name: mutation, type: connectors.mutations.Observation}
+      - {name: ready_session, type: "Optional<connectors.sessions.SessionId>"}
+    # A ready-receipt reference is historical evidence, not current liveness or
+    # authority. Optional omission here is not a public required-null encoding.
+    # UNMAPPED: trusted effect evidence (including SIP commitment), publication
+    # after full readiness, current disclosure, and serialized terminal races.
+    # A ready receipt requires applied knowledge; applied need not have a receipt.
+    # This value declares no persistent Session/Attempt ownership relation.
 
 entities:
   - name: connectors.mutations.AttemptRecord

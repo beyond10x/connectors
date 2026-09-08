@@ -1,0 +1,38 @@
+[
+  {
+    "path": "crates/integration-kubernetes/src/local_workloads.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "08d85a2bcdad8b663c16640c18842dea021783d77bf7eb50d17472566a889caf",
+    "bytes": 20038
+  },
+  {
+    "path": "crates/integration-kubernetes/src/local_workloads_tests.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "aaad9474837ecdcfacc936bf1e1f38ec2bf3cc5fdfbf5e85eb28ebcfef93df5c",
+    "bytes": 4450
+  },
+  {
+    "path": "providers/b10x.toml",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "6c77128aebcdd0afb82414619071993f56f6eb6299126d75bb0de032729ffdb9",
+    "bytes": 55655
+  },
+  {
+    "path": "crates/voice-runtime/README.md",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "918783c88fe49811cf24c7f78f9bbe6ac23011d7f90184efadb01c9539f7a7c7",
+    "bytes": 1636
+  },
+  {
+    "path": "docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54",
+    "bytes": 13800
+  },
+  {
+    "path": "docs/design/05-native-sip-and-rtvbp.md",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "15023051037e2f859de2e145651bdd1e09bab9a075edfc1b0c86a0c87503ba4b",
+    "bytes": 26680
+  }
+]
