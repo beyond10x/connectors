@@ -8,7 +8,7 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 8
+revision: 9
 ---
 ## Intake
 
@@ -42,7 +42,7 @@ P0 means an established critical current failure requiring immediate containment
 | F14 | P2 | P2 | `story:contracts-document-admission` | Accepted for remediation; assigned, not fixed. |
 | F15 | P2 | P2 | `story:contracts-read-refresh-retry` | Accepted for remediation; assigned, not fixed. |
 | E01 | blocking | P1 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
-| E02 | blocking | P1 | `story:contracts-wire-compatibility` | Qualified: unchanged configured behavior can remain compatible; new managed descriptors/errors need explicit versioning. |
+| E02 | blocking | P1 | `story:contracts-wire-compatibility` | Fixed by `story:contracts-wire-compatibility`: one version/field/profile matrix, explicit v1alpha2 routes, unchanged-read legacy projection with invoke enforcement, exact mutation/audit encoding and ESS values; 68 current decoder vectors, 27 textual response vectors, full gate and two final independent approvals. |
 | E03 | blocking | P2 | `story:contracts-host-composition` | Qualified: colocation is allowed; concrete wiring ownership must preserve the generic-host dependency invariant. |
 | E04 | should-fix | P2 | `story:contracts-management-boundary` | Qualified: the design prohibits exposing private callback authority, not every use of an operations envelope. |
 | E05 | should-fix | P2 | `story:contracts-read-refresh-retry` | Accepted for remediation; assigned, not fixed. |
@@ -89,9 +89,9 @@ The first completed hardening story is `story:contracts-mutation-outcomes`, owni
 
 ## Completion accounting
 
-**10 of 48 source findings are fixed; 38 remain assigned, not fixed.** F01/F02/F04/F05/F06/E01/E11/E20 are fixed at the semantic-contract/model level; E13/E30 are fixed in documentation. Six of the 27 owner stories are implemented for their specification scope: mutation outcomes, idempotency scope, refresh coordination, credential evidence, session revocation and tenant-header naming. The documentation-index story remains draft because E22 and its prerequisites remain open.
+**11 of 48 source findings are fixed; 37 remain assigned, not fixed.** F01/F02/F04/F05/F06/E01/E02/E11/E20 are fixed at the semantic-contract/model level; E13/E30 are fixed in documentation. Seven of the 27 owner stories are implemented for their specification scope: mutation outcomes, idempotency scope, refresh coordination, credential evidence, session revocation, tenant-header naming and wire compatibility. The documentation-index story remains draft because E22 and its prerequisites remain open.
 
-The latest specification checkpoint closes F06/E20 using the session contract/model, 13 authored scenarios, a separate trace/deadline audit and two independent final approvals, plus E30 through a shared receiver-owned monitoring configuration rule. Runtime enforcement remains future work. Drafting or reviewing a plan is not evidence that its contract defect is fixed. Future closure records the normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without adopting the external reviewer's proposed architecture.
+The preceding specification checkpoint closed F06/E20 using the session contract/model, 13 authored scenarios, a separate trace/deadline audit and two independent final approvals, plus E30 through a shared receiver-owned monitoring configuration rule. The latest checkpoint closes E02 through the complete family/wire disposition, public ESS values, 68 decoder vectors, 27 textual response vectors and two final independent approvals ([verification](../../../docs/evidence/wire-compatibility-20260908/verification.md)). F03 remains unbound and is the next foundational dependency. Runtime enforcement remains future work. Drafting or reviewing a plan is not evidence that its contract defect is fixed. Future closure records the normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without adopting the external reviewer's proposed architecture.
 
 ## Acceptance
 

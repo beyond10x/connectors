@@ -1,0 +1,25 @@
+{
+  "baseline": "3ba2d29870d577aac70c8a68ee901b3b7c6c99ac",
+  "ess": "0.20.0",
+  "ess_files": 9,
+  "legacy_decoder_vectors": 68,
+  "proposed_textual_vectors": 27,
+  "proposed_codec_tests_executed": 0,
+  "gate_exit": 0,
+  "rust_tests": {
+    "passed": 50,
+    "failed": 0,
+    "ignored": 0
+  },
+  "gate_scenarios": {
+    "compiled": 222,
+    "authored": 34,
+    "refusals": 0
+  },
+  "session_explicit_scenarios": {
+    "compiled": 201,
+    "authored": 13,
+    "refusals": 0
+  },
+  "no_runtime_or_adapter_sources_changed": true
+}

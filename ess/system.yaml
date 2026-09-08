@@ -10,3 +10,4 @@ domains:
   - connectors.refresh
   - connectors.credential_evidence
   - connectors.sessions
+  - connectors.service_wire
