@@ -1,0 +1,704 @@
+[
+  {
+    "id": "kind-none",
+    "type": "connectors.mutations.IdempotencyKind",
+    "value": "none",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "kind-natural",
+    "type": "connectors.mutations.IdempotencyKind",
+    "value": "natural",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "kind-keyed",
+    "type": "connectors.mutations.IdempotencyKind",
+    "value": "keyed",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "action-start",
+    "type": "connectors.mutations.ContainerLifecycleAction",
+    "value": "start",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "action-stop",
+    "type": "connectors.mutations.ContainerLifecycleAction",
+    "value": "stop",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "action-restart",
+    "type": "connectors.mutations.ContainerLifecycleAction",
+    "value": "restart",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "start-intent",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "start"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "stop-intent",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "stop",
+      "stop_signal": "SIGTERM",
+      "stop_timeout_seconds": 10
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "restart-intent",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "restart",
+      "stop_signal": "SIGTERM",
+      "stop_timeout_seconds": 10
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "unknown-action",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "kill"
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "missing-target",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "action": "start"
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "timeout-string",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "stop",
+      "stop_signal": "SIGTERM",
+      "stop_timeout_seconds": "10"
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "wait-out-of-bound",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "stop",
+      "stop_signal": "SIGTERM",
+      "stop_timeout_seconds": 11
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic Integer does not enforce selected 0..10 wait.",
+    "context": null
+  },
+  {
+    "id": "partial-container-id",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "abc",
+      "action": "start"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce full container identity syntax.",
+    "context": null
+  },
+  {
+    "id": "start-with-stop-options",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "start",
+      "stop_signal": "SIGTERM",
+      "stop_timeout_seconds": 10
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: action/option coupling is a normative predicate.",
+    "context": null
+  },
+  {
+    "id": "stop-missing-options",
+    "type": "connectors.mutations.ContainerLifecycleIntent",
+    "value": {
+      "instance_ref": "docker-a",
+      "connection_ref": "daemon-a",
+      "container_selector": "api",
+      "expected_container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "action": "stop"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: stop intent requires resolved fixed signal/wait despite generic Optional.",
+    "context": null
+  },
+  {
+    "id": "restart-target",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "123"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "version-not-string",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": 123
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "missing-uid",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "resource_version": "123"
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-zero",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "0"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-zero-alias",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "00"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-all-zero",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "000000"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-leading-zero",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "00042"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-plus",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "+42"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-negative",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "-1"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-leading-space",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": " 42"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-trailing-newline",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "42\n"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-radix",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "0x2a"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-non-ascii",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "\uff14\uff12"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-overflow",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "18446744073709551616"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-empty",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": ""
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not enforce the selected built-in Deployment canonical positive decimal 1..18446744073709551615 rule. No provider/predicate execution.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-minimum",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "1"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Admitted lexical/range boundary only; no proof this provider object/version exists or a PATCH would succeed.",
+    "context": null
+  },
+  {
+    "id": "conditional-version-maximum",
+    "type": "connectors.mutations.DeploymentRestartTarget",
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "cluster-a",
+      "namespace": "apps",
+      "name": "api",
+      "uid": "uid-a",
+      "resource_version": "18446744073709551615"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Admitted lexical/range boundary only; no proof this provider object/version exists or a PATCH would succeed.",
+    "context": null
+  },
+  {
+    "id": "prepared-patch",
+    "type": "connectors.mutations.PreparedDeploymentRestart",
+    "value": {
+      "target": {
+        "instance_ref": "kube-a",
+        "connection_ref": "cluster-a",
+        "namespace": "apps",
+        "name": "api",
+        "uid": "uid-a",
+        "resource_version": "123"
+      },
+      "restart_marker": "1788893000000"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "marker-number",
+    "type": "connectors.mutations.PreparedDeploymentRestart",
+    "value": {
+      "target": {
+        "instance_ref": "kube-a",
+        "connection_ref": "cluster-a",
+        "namespace": "apps",
+        "name": "api",
+        "uid": "uid-a",
+        "resource_version": "123"
+      },
+      "restart_marker": 1788893000000
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "marker-non-decimal",
+    "type": "connectors.mutations.PreparedDeploymentRestart",
+    "value": {
+      "target": {
+        "instance_ref": "kube-a",
+        "connection_ref": "cluster-a",
+        "namespace": "apps",
+        "name": "api",
+        "uid": "uid-a",
+        "resource_version": "123"
+      },
+      "restart_marker": "later"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: generic String does not prove trusted fixed epoch-ms generation.",
+    "context": null
+  },
+  {
+    "id": "available-facts",
+    "type": "connectors.declarations.OperationAvailability",
+    "value": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "lookup_admitted": true,
+      "dependency_ready": true
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "not-ready-facts",
+    "type": "connectors.declarations.OperationAvailability",
+    "value": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "lookup_admitted": true,
+      "dependency_ready": false
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "disabled-facts",
+    "type": "connectors.declarations.OperationAvailability",
+    "value": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": false,
+      "metadata_admitted": true,
+      "lookup_admitted": true,
+      "dependency_ready": true
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "facts-string-bool",
+    "type": "connectors.declarations.OperationAvailability",
+    "value": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": "false",
+      "metadata_admitted": true,
+      "lookup_admitted": true,
+      "dependency_ready": true
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "visible-decision",
+    "type": "connectors.declarations.AvailabilityDecision",
+    "value": {
+      "advertised": true
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "lookup_admitted": true,
+      "dependency_ready": true
+    }
+  },
+  {
+    "id": "disabled-decision",
+    "type": "connectors.declarations.AvailabilityDecision",
+    "value": {
+      "advertised": false,
+      "lookup_error": "forbidden"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": false,
+      "metadata_admitted": true,
+      "lookup_admitted": true,
+      "dependency_ready": true
+    }
+  },
+  {
+    "id": "disabled-advertised",
+    "type": "connectors.declarations.AvailabilityDecision",
+    "value": {
+      "advertised": true
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: schema does not compute projection from the supplied context.",
+    "context": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": false,
+      "metadata_admitted": true,
+      "lookup_admitted": true,
+      "dependency_ready": true
+    }
+  },
+  {
+    "id": "denied-lookup-proceeds",
+    "type": "connectors.declarations.AvailabilityDecision",
+    "value": {
+      "advertised": false
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: no lookup error is not proof of current admission.",
+    "context": {
+      "implemented": true,
+      "binding_supported": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "lookup_admitted": false,
+      "dependency_ready": true
+    }
+  },
+  {
+    "id": "unknown-error-code",
+    "type": "connectors.declarations.AvailabilityDecision",
+    "value": {
+      "advertised": false,
+      "lookup_error": "disabled"
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  },
+  {
+    "id": "optional-is-not-null",
+    "type": "connectors.declarations.AvailabilityDecision",
+    "value": {
+      "advertised": false,
+      "lookup_error": null
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no runtime/predicate executed.",
+    "context": null
+  }
+]

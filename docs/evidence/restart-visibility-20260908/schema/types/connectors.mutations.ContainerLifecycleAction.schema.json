@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.ContainerLifecycleAction",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "72ba9ea092904fdc68ed0063ae596853db6e5f5cb70bac7e93e610ff3f4e66cd",
+    "contract_digest": "slice-sha256/2:3ceb11d8ba8e4b5a9f174718e4932125989069605b516b21c27568e9dcc02eb8",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.ContainerLifecycleAction": {
+      "title": "ContainerLifecycleAction",
+      "x-ess-name": "connectors.mutations.ContainerLifecycleAction",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "start",
+        "stop",
+        "restart"
+      ]
+    }
+  }
+}

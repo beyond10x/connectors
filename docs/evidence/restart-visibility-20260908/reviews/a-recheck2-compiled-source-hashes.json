@@ -1,0 +1,23 @@
+{
+  "created_utc": "2026-09-08T19:22:20.774864+00:00",
+  "files": [
+    {
+      "source": ".local/mutation-profiles-20260908/rv-before-recheck2.json",
+      "snapshot": "compiled-sources/rv-before-recheck2.json",
+      "sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+      "bytes": 234435
+    },
+    {
+      "source": ".local/mutation-profiles-20260908/rv-after-recheck2.json",
+      "snapshot": "compiled-sources/rv-after-recheck2.json",
+      "sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+      "bytes": 234435
+    },
+    {
+      "source": ".local/mutation-profiles-20260908/restart-visibility-compiled.json",
+      "snapshot": "compiled-sources/restart-visibility-compiled.json",
+      "sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+      "bytes": 234435
+    }
+  ]
+}

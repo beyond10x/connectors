@@ -1,0 +1,38 @@
+[
+  {
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "conn-a",
+      "namespace": "a",
+      "name": "api",
+      "uid": "known-uid",
+      "resource_version": "0"
+    },
+    "schema_accepted": true,
+    "limitation": "Static source-derived counterexample; no provider or lifecycle execution."
+  },
+  {
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "conn-a",
+      "namespace": "a",
+      "name": "api",
+      "uid": "known-uid",
+      "resource_version": "00"
+    },
+    "schema_accepted": true,
+    "limitation": "Static source-derived counterexample; no provider or lifecycle execution."
+  },
+  {
+    "value": {
+      "instance_ref": "kube-a",
+      "connection_ref": "conn-a",
+      "namespace": "a",
+      "name": "api",
+      "uid": "known-uid",
+      "resource_version": "00042"
+    },
+    "schema_accepted": true,
+    "limitation": "Static source-derived counterexample; no provider or lifecycle execution."
+  }
+]

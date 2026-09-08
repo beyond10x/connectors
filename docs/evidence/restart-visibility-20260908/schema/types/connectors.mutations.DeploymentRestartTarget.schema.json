@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.DeploymentRestartTarget",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "72ba9ea092904fdc68ed0063ae596853db6e5f5cb70bac7e93e610ff3f4e66cd",
+    "contract_digest": "slice-sha256/2:8c7d53c362b4e2f7a277b392e5741dbf14110f52b6ffa8c7930f97106a10e1c1",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.DeploymentRestartTarget": {
+      "title": "DeploymentRestartTarget",
+      "x-ess-name": "connectors.mutations.DeploymentRestartTarget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "instance_ref": {
+          "type": "string"
+        },
+        "connection_ref": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string"
+        },
+        "resource_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance_ref",
+        "connection_ref",
+        "namespace",
+        "name",
+        "uid",
+        "resource_version"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

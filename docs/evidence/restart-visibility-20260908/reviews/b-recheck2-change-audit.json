@@ -1,0 +1,86 @@
+{
+  "files": 62,
+  "unchanged_existing_files": 46,
+  "changed_or_added": [
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "previous_sha256": "5d66adaad0c38938a3377b634a954aafbf1f5192653e41e5ec8e1b487831a401",
+      "sha256": "214fd42a93d359753778be47f6327767e8679dc6d4e916c5eab9305eb5c19b58"
+    },
+    {
+      "path": "docs/adapters/docker.md",
+      "previous_sha256": "df5402d12b027d1c47d882823bc5e7a1e01eec0dda0e1688e8c3d153972dadbc",
+      "sha256": "b9223da8849cbe5e83c3176ef386f2b3cb9e6fe2c1b2b76aeaae8d16b1cda69a"
+    },
+    {
+      "path": "docs/adapters/kubernetes.md",
+      "previous_sha256": "5ecbce601302caa9c1a2d464306f8528270ee0f4c9bcb56ff31a533d2487e632",
+      "sha256": "c90688198e6df54398d661d2596ac9328da1279cf24ca793c755fad926d4d6c0"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/check-results.json",
+      "previous_sha256": "6406e860b333d19cf271cefc127d3a2a7a399c0e7bb3b617daa1ace66eca4ffc",
+      "sha256": "eb5f3e2b6e87f95a6700192871d067a32bcd916a7b1b9f2b488c4da0201a5d62"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/check-transcript.md",
+      "previous_sha256": "ed01458e4db013324819663d4278f10b820f7fe7e8a11060454ad6485a7f4893",
+      "sha256": "9bfc37717dd0dba7a9b1c2d6a803b1d82a006f7a12468c895bdba976b406724f"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/provider-evidence.md",
+      "previous_sha256": "d0765b09bfde4a6d26fc841452bfd9901bac24e5e4f0ce0b29ba9cb6864dff29",
+      "sha256": "d29e7edb9d590f51be6b32e10c3b0e0b8340ffa6fd3ba6700095a4193ca5c40a"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/provider-source-hashes.json",
+      "previous_sha256": "19172efc4523466715abb3354e48e42246529abaefcae3d40e0553e2c8547f48",
+      "sha256": "d21d970fce6a0c7f5c2608e42a02576ecaa00e3acddd86363df427e63712a3d5"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/recheck2-validation.json",
+      "previous_sha256": null,
+      "sha256": "4eb8862e1871a3f33dede4f4ade08fa916fe107d96ed6ca74ab367f8829136a9"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/shape-results.json",
+      "previous_sha256": "c08ad8646372c99c7a5c04243437b1b8817fb521d49f3d6d880aeec18c4c0b0e",
+      "sha256": "a77f7551f37d1fd343c56f7e94bedfd2210fa6c3a2f6d00ae72ac5d9574f87c6"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/typed-values.json",
+      "previous_sha256": "e76263f8ca753d4e3bdc33ffecbfb3d0e8359ec32e2c7c8bf2acce50ec3cb5d3",
+      "sha256": "9b11c2052ad8d38d9f9f10acf00f653ff965138dbd8845ede402756d1e440ebf"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-api_object_versioner.go.gz",
+      "previous_sha256": null,
+      "sha256": "053c448bdd75e620be12706f81cb8fc553d95c1c42f13ff8d817bd64a9f03653"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-patch.go.gz",
+      "previous_sha256": null,
+      "sha256": "b8da2f4b04fe47d0df7ed1e1bfa6832e5d7a71e263e0da65c2ea0b9cbf0d8f33"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-store.go.gz",
+      "previous_sha256": null,
+      "sha256": "de6c89772194182a47a30fe4e9f6330d0b046f3b6ab0ed672ed93ec2344d6540"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-strategy.go.gz",
+      "previous_sha256": null,
+      "sha256": "bccca1e617ea3e2f038024b558ceb7cf2dc279c9e15bb4ed9cc9bc1b0ce9ed0c"
+    },
+    {
+      "path": "docs/evidence/restart-visibility-20260908/verification.md",
+      "previous_sha256": "ccca5846e8a95c6c1ce8d873525745d97ba5d7b953ac3bb1572ba89c3b3cb3bf",
+      "sha256": "1cf67e74d49cfe9337184354a6aac23fb16154e098e54462835fa9bcb6e88fa8"
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "previous_sha256": "9bada6778ace221da95d7b63572fd0e48f7aa8e83fee71382bf67a14968c0579",
+      "sha256": "b1d17e96b10f7fc1ad36080231f393543820e7be5eced3e23f978310a6095b47"
+    }
+  ]
+}

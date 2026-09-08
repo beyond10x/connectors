@@ -1,0 +1,251 @@
+[
+  {
+    "id": "kind-none",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "kind-natural",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "kind-keyed",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "action-start",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "action-stop",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "action-restart",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "start-intent",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "stop-intent",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "restart-intent",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "unknown-action",
+    "schema_accepted": false,
+    "errors": [
+      "'kill' is not one of ['start', 'stop', 'restart']"
+    ]
+  },
+  {
+    "id": "missing-target",
+    "schema_accepted": false,
+    "errors": [
+      "'expected_container_id' is a required property"
+    ]
+  },
+  {
+    "id": "timeout-string",
+    "schema_accepted": false,
+    "errors": [
+      "'10' is not of type 'integer'"
+    ]
+  },
+  {
+    "id": "wait-out-of-bound",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "partial-container-id",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "start-with-stop-options",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "stop-missing-options",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "restart-target",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "version-not-string",
+    "schema_accepted": false,
+    "errors": [
+      "123 is not of type 'string'"
+    ]
+  },
+  {
+    "id": "missing-uid",
+    "schema_accepted": false,
+    "errors": [
+      "'uid' is a required property"
+    ]
+  },
+  {
+    "id": "conditional-version-zero",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-zero-alias",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-all-zero",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-leading-zero",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-plus",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-negative",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-leading-space",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-trailing-newline",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-radix",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-non-ascii",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-overflow",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-empty",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-minimum",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "conditional-version-maximum",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "prepared-patch",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "marker-number",
+    "schema_accepted": false,
+    "errors": [
+      "1788893000000 is not of type 'string'"
+    ]
+  },
+  {
+    "id": "marker-non-decimal",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "available-facts",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "not-ready-facts",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "disabled-facts",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "facts-string-bool",
+    "schema_accepted": false,
+    "errors": [
+      "'false' is not of type 'boolean'"
+    ]
+  },
+  {
+    "id": "visible-decision",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "disabled-decision",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "disabled-advertised",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "denied-lookup-proceeds",
+    "schema_accepted": true,
+    "errors": []
+  },
+  {
+    "id": "unknown-error-code",
+    "schema_accepted": false,
+    "errors": [
+      "'disabled' is not one of ['invalid_input', 'unsupported', 'unauthorized', 'forbidden', 'not_found', 'stale_description', 'stale_cursor', 'rate_limited', 'unavailable', 'capacity', 'timeout', 'upstream_protocol', 'internal', 'approval_required', 'approval_refused', 'approval_replayed', 'idempotency_conflict', 'outcome_unknown', 'not_granted', 'stale_authority', 'connection_not_ready', 'route_unavailable', 'route_refused', 'insufficient_scope', 'session_not_ready', 'session_lost', 'offer_expired', 'offer_rejected', 'lease_expired', 'revoked']"
+    ]
+  },
+  {
+    "id": "optional-is-not-null",
+    "schema_accepted": false,
+    "errors": [
+      "None is not of type 'string'",
+      "None is not one of ['invalid_input', 'unsupported', 'unauthorized', 'forbidden', 'not_found', 'stale_description', 'stale_cursor', 'rate_limited', 'unavailable', 'capacity', 'timeout', 'upstream_protocol', 'internal', 'approval_required', 'approval_refused', 'approval_replayed', 'idempotency_conflict', 'outcome_unknown', 'not_granted', 'stale_authority', 'connection_not_ready', 'route_unavailable', 'route_refused', 'insufficient_scope', 'session_not_ready', 'session_lost', 'offer_expired', 'offer_rejected', 'lease_expired', 'revoked']"
+    ]
+  }
+]

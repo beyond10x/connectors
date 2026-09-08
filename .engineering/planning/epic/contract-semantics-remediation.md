@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 19
+revision: 20
 ---
 ## Context
 
@@ -55,7 +55,7 @@ After the child stories complete, the intake ledger maps every source finding to
 | P3 | `story:contracts-tenant-header` — Use one configuration name for the monitoring tenant header | E30 |
 | P2 | `story:contracts-mutation-visibility` — Distinguish implemented, enabled and discoverable mutations | E12 |
 
-No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. The latest checkpoint below records current closure: eighteen owner stories are implemented for semantic specification scope and nine remain draft. Earlier planning and checkpoint sections preserve their historical counts and evidence.
+No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. The latest checkpoint below records current closure: twenty owner stories are implemented for semantic specification scope and seven remain draft. Earlier planning and checkpoint sections preserve their historical counts and evidence.
 
 ## Sequencing and shared files
 
@@ -146,3 +146,11 @@ The checkpoint completes contracts-mutation-classification (F10/E06): mandatory 
 Both final independent reviewers approve with zero residual classification findings; five individual review findings have fixed outcomes. ESS 0.20.0 validates 13 files/208 declarations; 215 generated artifacts match across two projections. 27 schema cases (7 negatives, 4 accepted semantic counterexamples) and 25 textual cases state verification limits. Existing full gate/MSRV1.88 passes 50 Rust tests; separate sessions author/synthesize compiles 13/201 cases. No runtime, public codec or adapter-kind schema implementation was added. See docs/evidence/mutation-profiles-20260908/classification-verification.md and classification-dispositions.md.
 
 Current ledger: **29/48 original findings fixed, 19 open; 18 owner stories implemented, 9 draft.** Restart/visibility remain pending, including nine individual findings in this cluster's initial review. Remaining datasource/media/evidence/index/vocabulary stories and broader catalog/stack/open-decision work keep the full specification goal active. Concrete protocol proof and runtime enforcement remain explicit later binding prerequisites. All work remains local.
+
+## Current specification checkpoint — restart and visibility
+
+The checkpoint completes contracts-restart-idempotency (F11/E08) and contracts-mutation-visibility (E12). Docker/Kubernetes lifecycle targets, fixed intent, repeat and acknowledgement meanings are explicit; canonical positive Deployment versions prevent the pinned provider zero/unconditional branch. Current authority, freshness, admitted private lookup/input/key and candidate-only preflight follow one extended matrix while legacy behavior is preserved.
+
+Both final independent reviews approve, zero residuals; twelve individual findings have fixed outcomes. ESS 0.20.0 validates 13 files/215 declarations; two 222-artifact projections match. Forty-six shapes (9 negatives, 19 accepted semantic counterexamples), 48 textual cases, eight exact provider archives and the existing gate50/MSRV1.88 with separate sessions13/201 state precise verification limits. The narrow correction compiled byte-identical IR; no runtime, public codec or adapter-kind schema implementation was added. See docs/evidence/restart-visibility-20260908/verification.md, dispositions.md and checkpoint.md.
+
+Current ledger: **32/48 original findings fixed, 16 open; 20 owner stories implemented, 7 draft.** Remaining logs/document/read-retry/media/evidence/index/vocabulary work and broader catalog/stack/open-decision/model review keep the full goal active. Provider/policy/storage enforcement remains a later binding prerequisite; closing this packet is not approval of implementation or rollout. All work remains local.

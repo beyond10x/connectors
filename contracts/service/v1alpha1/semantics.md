@@ -22,6 +22,8 @@ Generic events, duplex/media sessions, OAuth acquisition, and process execution
 remain future contract families; these three data/discovery adapters do not claim
 to implement them.
 
+The implemented public lookup searches the descriptor's operation vector after authentication and revision validation (`crates/connectors-core/src/lib.rs`, `connectors-host/src/server.rs`). Kubernetes filters disabled hosts.discover from that vector; with a current revision its public invocation therefore returns not_found before reaching the adapter's separate internal forbidden guard. An old revision returns stale_description first. These facts do not establish a universal rule that every future disabled implementation is indistinguishable from absence. The proposed [extended matrix](../v1alpha2/semantics.md#321-visibility-lookup-and-refusal-precedence-e12) specifies its admitted private lookup; [legacy projection](../compatibility.md#3-legacy-projection-and-federation-intersection) deliberately keeps descriptor-only lookup. No current reader or runtime behavior is changed by that proposal.
+
 ## Wire boundary
 
 - GET /v1/describe returns the exact instance identity, specification digest,

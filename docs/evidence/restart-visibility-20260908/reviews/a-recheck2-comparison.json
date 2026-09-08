@@ -1,0 +1,23 @@
+{
+  "previous": "recheck1",
+  "changed_or_added": [
+    "contracts/operations/v1alpha1/semantics.md",
+    "docs/adapters/docker.md",
+    "docs/adapters/kubernetes.md",
+    "docs/evidence/restart-visibility-20260908/check-results.json",
+    "docs/evidence/restart-visibility-20260908/check-transcript.md",
+    "docs/evidence/restart-visibility-20260908/provider-evidence.md",
+    "docs/evidence/restart-visibility-20260908/provider-source-hashes.json",
+    "docs/evidence/restart-visibility-20260908/recheck2-validation.json",
+    "docs/evidence/restart-visibility-20260908/shape-results.json",
+    "docs/evidence/restart-visibility-20260908/typed-values.json",
+    "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-api_object_versioner.go.gz",
+    "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-patch.go.gz",
+    "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-store.go.gz",
+    "docs/evidence/restart-visibility-20260908/vendor/kubernetes-v1.35.0-strategy.go.gz",
+    "docs/evidence/restart-visibility-20260908/verification.md",
+    "ess/domains/mutations.yaml"
+  ],
+  "unchanged_current_inputs": 50,
+  "total": 66
+}

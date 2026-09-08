@@ -1,0 +1,107 @@
+{
+  "provider_archives_verified": 8,
+  "supplemental_provider_sources_preserved": 4,
+  "shape_decisions": 46,
+  "shape_negatives": 9,
+  "accepted_semantic_counterexamples": 19,
+  "added_version_cases": [
+    {
+      "id": "conditional-version-zero",
+      "value": "0",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-zero-alias",
+      "value": "00",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-all-zero",
+      "value": "000000",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-leading-zero",
+      "value": "00042",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-plus",
+      "value": "+42",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-negative",
+      "value": "-1",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-leading-space",
+      "value": " 42",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-trailing-newline",
+      "value": "42\n",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-radix",
+      "value": "0x2a",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-non-ascii",
+      "value": "\uff14\uff12",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-overflow",
+      "value": "18446744073709551616",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-empty",
+      "value": "",
+      "schema_accepts": true,
+      "declared_semantic_accepts": false
+    },
+    {
+      "id": "conditional-version-minimum",
+      "value": "1",
+      "schema_accepts": true,
+      "declared_semantic_accepts": true
+    },
+    {
+      "id": "conditional-version-maximum",
+      "value": "18446744073709551615",
+      "schema_accepts": true,
+      "declared_semantic_accepts": true
+    }
+  ],
+  "identical_projection_artifacts": 222,
+  "identical_schema_copies": 7,
+  "compiled_archives_verified": 3,
+  "session_authored": 13,
+  "session_synthesized": 201,
+  "authored_preserved": true,
+  "before_after_and_gated_ir_identical": true,
+  "ir_sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+  "recorded_tests": 50,
+  "recorded_gate_success": true,
+  "textual_traces": 48,
+  "frozen_files": 62,
+  "snapshot_hash_mismatches": [],
+  "live_changes_since_freeze": []
+}
