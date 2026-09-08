@@ -1,5 +1,10 @@
 # Three adapters: verification record
 
+Latest local review remediation: [independent review response, 2026-09-08](independent-review-response-2026-09-08.md).
+That run passed 50 tests and the full Rust 1.88/ESS 0.20.0 gate, plus 100 toolchain
+stress runs and live PostgreSQL deadline/cancellation checks over plaintext and TLS.
+The dated acceptance records below retain their original counts and scope.
+
 Verified locally on **2026-09-08** against the executable scope in
 [the v1alpha1 contract](../contracts/service/v1alpha1/semantics.md). The three
 selected adapters are Kubernetes including discovery, GitLab, and SQL. All eight

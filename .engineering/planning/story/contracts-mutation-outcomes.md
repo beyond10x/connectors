@@ -39,7 +39,7 @@ scope:
   path: ess/domains/mutations.yaml
 - confidence: cited
   path: ess/system.yaml
-revision: 9
+revision: 10
 ---
 ## Context
 
@@ -105,4 +105,4 @@ F01, E01 and E11 are fixed at the semantic-contract/model level. The normative o
 
 Pinned ESS 0.20.0 validates and compiles the three-file model. Nine authored traces and 36 generated obligations compile with zero refusals. A temporary undeclared-state negative control fails with ESS-AUTHOR-017 and exit 1. The full repository gate command in the verification record exited 0: 39 workspace tests passed, none failed or ignored; formatting, Clippy, drift, library boundaries and planning validation passed. No runtime conformance target was executed; UNMAPPED host and relation obligations remain explicit.
 
-Independent reviews `review-result:mutation-outcomes-semantics-20260908` and `review-result:mutation-outcomes-model-20260908` both approve with no in-scope findings. These reviews cover the corrected first story, not sibling outcomes or the later catalog additions. The current hardening changes remain local and uncommitted; checkpoint `57be07c` preserves the pre-hardening state.
+Independent reviews `review-result:mutation-outcomes-semantics-20260908` and `review-result:mutation-outcomes-model-20260908` both approve with no in-scope findings. These reviews cover the corrected first story, not sibling outcomes or the later catalog additions. The hardening changes were committed locally as `34f298a`; checkpoint `57be07c` preserves the pre-hardening state.

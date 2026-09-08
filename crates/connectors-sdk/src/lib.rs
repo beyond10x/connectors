@@ -31,6 +31,8 @@ pub trait Adapter: Send + Sync {
 }
 
 /// Deliberately has no Debug or Serialize implementation.
+/// Trusted credential and transport implementations can read the bytes. This
+/// prevents accidental formatting, not deliberate disclosure by a byte holder.
 pub struct Secret(pub Vec<u8>);
 
 #[async_trait]

@@ -116,6 +116,9 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
     println!("gate: generic CLI boundary holds; exit=0");
     if msrv {
         // Keep compiler metadata separate without duplicating a full binary build.
+        let target = std::env::var_os("CARGO_TARGET_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| root.join("target"));
         execute(
             command("cargo")
                 .args([
@@ -126,7 +129,7 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
                     "--locked",
                     "--offline",
                 ])
-                .env("CARGO_TARGET_DIR", root.join("target/msrv")),
+                .env("CARGO_TARGET_DIR", target.join("msrv")),
         )?;
     }
     execute(

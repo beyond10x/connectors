@@ -36,7 +36,7 @@ scope:
   path: ess/domains/mutations.yaml
 - confidence: cited
   path: ess/system.yaml
-revision: 10
+revision: 11
 ---
 ## Context
 
@@ -101,4 +101,4 @@ Pinned ESS 0.20.0 validates four files and compiles 43 declarations. The full Ru
 
 Independent final reviewers `review-result:idempotency-semantics-r2-20260908` and `review-result:idempotency-model-r2-20260908` approve. Semantic round one found IS1 (a cache-miss/claim-spend race); the authoritative admitted winner recheck now handles it, and fixed review_outcome evidence is recorded. Only contract/audit prose changed after the passing gate; ESS and scenario sources are unchanged.
 
-The user is resolving concurrent versioning documents separately. This story makes no wire-version decision or runtime mutation implementation. The F02 changes remain local and uncommitted; prerequisite changes were committed as `34f298a` at the user's request before this story started.
+The user is resolving concurrent versioning documents separately. This story makes no wire-version decision or runtime mutation implementation. The F02 changes were committed locally as `8903166`; prerequisite changes were committed as `34f298a` at the user's request before this story started.
