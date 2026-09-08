@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.ApprovalClaims",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:69ac5802b459613489f67d7f1f6e818afc497197bd9c0d30dec5c50a6b80b267",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.AdmittedAuthority": {
+      "title": "AdmittedAuthority",
+      "x-ess-name": "connectors.delegation.AdmittedAuthority",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/connectors.idempotency.AuthorityScope"
+        },
+        "current_authority": {
+          "$ref": "#/$defs/connectors.delegation.AuthoritySnapshot"
+        },
+        "executor": {
+          "$ref": "#/$defs/connectors.delegation.ExecutorBinding"
+        }
+      },
+      "required": [
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.ApprovalClaims": {
+      "title": "ApprovalClaims",
+      "x-ess-name": "connectors.delegation.ApprovalClaims",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "iss": {
+          "type": "string"
+        },
+        "aud": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "subject": {
+          "$ref": "#/$defs/connectors.delegation.CanonicalApprovalSubject"
+        },
+        "iat": {
+          "type": "integer"
+        },
+        "nbf": {
+          "type": "integer"
+        },
+        "exp": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "iss",
+        "aud",
+        "reference",
+        "subject",
+        "iat",
+        "nbf",
+        "exp"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.AuthoritySnapshot": {
+      "title": "AuthoritySnapshot",
+      "x-ess-name": "connectors.delegation.AuthoritySnapshot",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.CanonicalApprovalSubject": {
+      "title": "CanonicalApprovalSubject",
+      "x-ess-name": "connectors.delegation.CanonicalApprovalSubject",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/connectors.delegation.ExecutionTarget"
+        },
+        "authority": {
+          "$ref": "#/$defs/connectors.delegation.AdmittedAuthority"
+        },
+        "origin": {
+          "$ref": "#/$defs/connectors.idempotency.Origin"
+        },
+        "route": {
+          "$ref": "#/$defs/connectors.idempotency.RouteBinding"
+        },
+        "canonicalization": {
+          "type": "string"
+        },
+        "input_sha256": {
+          "type": "string"
+        },
+        "approval_mode": {
+          "$ref": "#/$defs/connectors.mutations.ApprovalMode"
+        }
+      },
+      "required": [
+        "format",
+        "target",
+        "authority",
+        "origin",
+        "canonicalization",
+        "input_sha256",
+        "approval_mode"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.ExecutionTarget": {
+      "title": "ExecutionTarget",
+      "x-ess-name": "connectors.delegation.ExecutionTarget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "connection": {
+          "type": "string"
+        },
+        "connection_revision": {
+          "type": "string"
+        },
+        "contract": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "descriptor_revision": {
+          "type": "string"
+        },
+        "configuration_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance",
+        "operation",
+        "connection",
+        "connection_revision",
+        "contract",
+        "profile",
+        "descriptor_revision",
+        "configuration_revision"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.ExecutorBinding": {
+      "title": "ExecutorBinding",
+      "x-ess-name": "connectors.delegation.ExecutorBinding",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "authority_snapshot": {
+          "$ref": "#/$defs/connectors.delegation.AuthoritySnapshot"
+        }
+      },
+      "required": [
+        "agent",
+        "revision",
+        "authority_snapshot"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.idempotency.AuthorityScope": {
+      "title": "AuthorityScope",
+      "x-ess-name": "connectors.idempotency.AuthorityScope",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "tenant": {
+          "type": "string"
+        },
+        "realm": {
+          "type": "string"
+        },
+        "caller": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "caller"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.idempotency.Origin": {
+      "title": "Origin",
+      "x-ess-name": "connectors.idempotency.Origin",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/connectors.idempotency.OriginKind"
+        },
+        "authority_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "authority_ref"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.idempotency.OriginKind": {
+      "title": "OriginKind",
+      "x-ess-name": "connectors.idempotency.OriginKind",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "direct",
+        "federated"
+      ]
+    },
+    "connectors.idempotency.RouteBinding": {
+      "title": "RouteBinding",
+      "x-ess-name": "connectors.idempotency.RouteBinding",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "gateway_instance": {
+          "type": "string"
+        },
+        "route_id": {
+          "type": "string"
+        },
+        "route_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "gateway_instance",
+        "route_id",
+        "route_revision"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.mutations.ApprovalMode": {
+      "title": "ApprovalMode",
+      "x-ess-name": "connectors.mutations.ApprovalMode",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "not_required",
+        "required",
+        "event_claim"
+      ]
+    }
+  }
+}

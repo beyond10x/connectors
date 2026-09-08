@@ -1,0 +1,122 @@
+{
+  "review": "F03 independent semantic recheck A round1",
+  "created_utc": "2026-09-08T15:36:43.351404+00:00",
+  "baseline": "b5ace3f29d6deb1dbc9e5ddd50a8a8b02152cb2f",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d",
+      "bytes": 121490
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "08672eaffd13a306cc05bd44bfffe245a125dd6474ad68b6a916d7362c182c6e",
+      "bytes": 32322
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "fb72c94c48b12ab984cb0bea4818e5ff5c72c85943c79e5e2a341710afe6d944",
+      "bytes": 34786
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "c67f0689fc5fbf4fde14872e10332896d1eb27775e1666d8459bf2a1b15bbf4f",
+      "bytes": 22450
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "bytes": 38950
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "71e3a3887689f612b85eda506f4f543a49b9681c7214c233cc13c64ebd04f39e",
+      "bytes": 12838
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "8938c5674e6bc0cc491a1a34906894e26b116f67dce8d7195fbb4c9d9a432413",
+      "bytes": 8610
+    },
+    {
+      "path": "docs/cli-migration-v1-to-v2.md",
+      "sha256": "3bc4c1a238f77c151c5c9a559c4f33d2331a1aab8caa41ef2e087ef6642fb88e",
+      "bytes": 15820
+    },
+    {
+      "path": "docs/stack-integration-proposal.md",
+      "sha256": "4286fe96332d9affa92a5e8e82cab3261a4c5e98b72573761ed4706906d6a99a",
+      "bytes": 16961
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "932273ff7786139fe07520c9bb13b4c874ae83a19a1f5c2821f558b717dadf6e",
+      "bytes": 392
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ff211fe967cf7ccda01e13c419f6672694f8203a4b4af4867a2519bf519bde72",
+      "bytes": 8137
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-aborted-result.yaml",
+      "sha256": "fab3b8454aed5a317c9f36b7d4508d2924a36ae46c5bb1c128f7c2d03e0a703d",
+      "bytes": 3037
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-known-result-expiry.yaml",
+      "sha256": "897b3703304ed4734a526d9648d9fc1844cfc31e88e531af4a1bf83152d17bd9",
+      "bytes": 3808
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-namespace-values.yaml",
+      "sha256": "6d0292796fe8c35eeda032f3d6c3304dfc17f64a9cbcbbf541241a5ab24d16dc",
+      "bytes": 7468
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-pending-no-expiry.yaml",
+      "sha256": "01ee2a604280dd18ea4cf417875172204026c853be9f8b17058cd7d8502a042a",
+      "bytes": 2820
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-refused-result.yaml",
+      "sha256": "492b4a1b97550d397265df1a7cf401c3e1b5869caeb4fde309033aa2c6de4a9a",
+      "bytes": 3201
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-unknown-no-expiry.yaml",
+      "sha256": "374e3aebd40491cff5cf52cdfc3f679bfde6aaebf79d7b8faeec3f4fdc66acb1",
+      "bytes": 3822
+    }
+  ]
+}

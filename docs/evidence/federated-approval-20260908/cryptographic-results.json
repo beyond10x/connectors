@@ -1,0 +1,90 @@
+{
+  "checks": 20,
+  "passed": 20,
+  "results": [
+    {
+      "id": "approval-federated-managed",
+      "signature_valid": true
+    },
+    {
+      "id": "delivery-invoke",
+      "signature_valid": true,
+      "body_digest_matches": true
+    },
+    {
+      "id": "delivery-prepare",
+      "signature_valid": true,
+      "body_digest_matches": true
+    },
+    {
+      "id": "delivery-describe",
+      "signature_valid": true,
+      "body_digest_matches": true
+    },
+    {
+      "id": "altered-payload",
+      "signature_valid": false
+    },
+    {
+      "id": "altered-header",
+      "signature_valid": false
+    },
+    {
+      "id": "changed-body-after-signing",
+      "signature_valid": true,
+      "body_digest_matches": false
+    },
+    {
+      "id": "old-module-type",
+      "signature_valid": true
+    },
+    {
+      "id": "old-polymorphic-algorithm",
+      "signature_valid": true
+    },
+    {
+      "id": "wrong-receiver-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "long-window-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "past-nbf-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "wrong-profile-window-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "future-iat-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "time-underflow-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "time-overflow-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "fractional-time-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "boolean-time-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "approval-long-window-resigned",
+      "signature_valid": true
+    },
+    {
+      "id": "approval-wrong-profile-window-resigned",
+      "signature_valid": true
+    }
+  ]
+}

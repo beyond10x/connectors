@@ -79,7 +79,7 @@ the feature waits for; verb names are not decided unless stated. "Not carried" c
 | connection | connection: `configured` profile today (one per instance), `managed` proposed | stable across reauthorization in both |
 | description lease (`description_ref`) | descriptor `revision` | `stale_description` → describe again → resubmit deliberately; never replayed |
 | grant | policy decision with `grant_ref` on the audit row (`service/v1alpha2`, proposed) | fail closed when the policy store is unavailable |
-| approval evidence ref | `approval: {reference, evidence}` on the invocation (mutation profile, proposed) | one-time spending before the dispatch gate |
+| approval evidence ref | `approval: {reference, evidence}` on the invocation after the safe preparation read exposes the canonical leaf subject ([F03](../contracts/service/delegation.md), proposed) | one-time spending by the executing leaf before its dispatch gate; gateway forwarding never spends |
 | `connector_audit_ref` | required nullable `audit_ref` plus `audit_status` on the proposed extended response | refs name acknowledged records only; unavailable audit uses null, and explicit unaudited static reads use null / not_required; see [response rules](../contracts/service/compatibility.md#5-extended-responses-audit-and-mutation-observation) |
 | owner context (tenant, agent, revision, authority snapshot) | verified context from the credential; agent identity as an `executor` assertion the receiver checks (proposed) | the body can never set tenant or realm |
 | personal-local vs hosted | one binary; the admission profile in configuration | `static-bearer` for local; `identity-audience` for hosted |

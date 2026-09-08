@@ -1,0 +1,28 @@
+{
+  "tool": "ess 0.20.0",
+  "two_runs_byte_identical": true,
+  "all_generated_artifacts": 163,
+  "selected_copies": {
+    "schema/entities/connectors.delegation.DeliveryReceipt.schema.json": "6f99137acad029a33ecc0852d743d247790370c95d2e6e50ed6b3799a611a534",
+    "schema/entities/connectors.delegation.ApprovalRedemption.schema.json": "81dfd56de9e99cd5c034d24b498f476b369b7b966ef2b07bca5b0db466ce4fa9",
+    "schema/types/connectors.delegation.ExecutionTarget.schema.json": "9348f443abe4c1bda46cc8dce6c229dd696ffab9b3be35dc929f9b34e1fd5bb0",
+    "schema/types/connectors.delegation.AuthoritySnapshot.schema.json": "e625a633c9754f8f1cc6f5ddecfac35a0ef07598ce87156d2bcc640ed907c9d1",
+    "schema/types/connectors.delegation.Presentation.schema.json": "3c5450fa1f1daf0fb506d2faafb700ad18d7d4a4db7ee75180bfa32f7ae5d146",
+    "schema/types/connectors.delegation.HttpMethod.schema.json": "4b013be1acb8de3deb53b5275051de17439c97103ef78afe62bb0e523a3e00bb",
+    "schema/types/connectors.idempotency.AuthorityScope.schema.json": "324d77cabf4883b73c755898295f5a251d5a9dfdfa8e04c33c9175ba71ca7f5e",
+    "schema/types/connectors.delegation.ApprovalPolicy.schema.json": "d1f922aab78514c4c4a140727adbfbe864d8855a756022e53d6986fc7acaef13",
+    "schema/types/connectors.delegation.ApprovalClaims.schema.json": "ce928cf909313c16e727e8402c97cec4e9e3b061e2542bdfcd3a62fde207f1a3",
+    "schema/types/connectors.delegation.ApprovalRedemption.State.schema.json": "d3937f0c2df14c926075b5f8dc576f292a56831fe787130cd5b55d39534ee8e6",
+    "schema/types/connectors.delegation.ApprovalPreparation.schema.json": "1ce7233cba8a8b24ba82f2ca0a468c0a754f62328cef9b8ee754bdc3d715519f",
+    "schema/types/connectors.delegation.ExecutorBinding.schema.json": "f88389619827afdcf88c2567dba4dd6223d96e5b1e0a29ecc2caf2872de6032a",
+    "schema/types/connectors.delegation.ProofHeader.schema.json": "2223ba48525284cc47ec3579d6ed5f7b956de1d3fa4fcb8077fcf9eac31a1aa0",
+    "schema/types/connectors.delegation.Purpose.schema.json": "e114eaea957e76151afa51e40c925cd383fe02abb846d94856f4387affd65753",
+    "schema/types/connectors.delegation.CanonicalApprovalSubject.schema.json": "223d46acf19f8b0e4fd66e26203defa7ab894be7faeea1ba92931574b495198f",
+    "schema/types/connectors.idempotency.RequestFingerprint.schema.json": "b7020f113087709a0ac0ad0f47e2fd5ee4c266872961da0114f56f132697c816",
+    "schema/types/connectors.delegation.ReceiptId.schema.json": "a231e89ddcd9e9e2f768ad723240a001ff2560ffbffdf77b88b78c4a3ead9291",
+    "schema/types/connectors.delegation.DeliveryReceipt.State.schema.json": "6a9900557926d71b1dcb11263689ba188aec070249031e2e3af5a674c271d21f",
+    "schema/types/connectors.delegation.AdmittedAuthority.schema.json": "3922eb42b8550e53244773192df8842e11a955fb0a98e80affe4d5092c3d2cdf",
+    "schema/types/connectors.delegation.DeliveryClaims.schema.json": "d569498ad449f2206b881987d19cf684ce1e295f843d054fa1294a2bbf95befe",
+    "schema/types/connectors.idempotency.RouteBinding.schema.json": "1ed42e76c405df7b0554afd7801d1bab3de8162c97cac56600a3c25d997c0a1a"
+  }
+}
