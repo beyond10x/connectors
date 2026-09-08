@@ -1,0 +1,35 @@
+{
+  "frozen_source_count": 60,
+  "source_live_mismatches": [],
+  "shape_expectations": 44,
+  "rejected_shapes": 7,
+  "accepted_semantic_counterexamples": [
+    "wrong-operation-profile-pair",
+    "non-https-origin",
+    "argo-declared-in-kubernetes"
+  ],
+  "identical_projected_artifacts": 211,
+  "byte_identical_schema_copies": 7,
+  "actual_entities": 11,
+  "textual_traces": 43,
+  "recorded_existing_tests": 50,
+  "recorded_gate_success": true,
+  "session_authored": 13,
+  "session_synthesized": 201,
+  "session_provenance_equal": true,
+  "session_authored_in_suite_unchanged": true,
+  "ir_changed_sections": [
+    "domains",
+    "types"
+  ],
+  "ir_new_types": [
+    "connectors.discovery.ConfiguredSourceIdentity",
+    "connectors.discovery.DeclaredObservationBinding",
+    "connectors.discovery.KubernetesRecognitionInput",
+    "connectors.discovery.ObservationProfile",
+    "connectors.discovery.RecognitionConfidence",
+    "connectors.discovery.RecognitionProvider",
+    "connectors.discovery.ResourceRecognition"
+  ],
+  "ir_old_types_unchanged": true
+}

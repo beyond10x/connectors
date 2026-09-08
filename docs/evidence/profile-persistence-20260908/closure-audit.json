@@ -1,0 +1,77 @@
+{
+  "baseline": "175053fd2c951dc9564ff587a636775ab8027d2e",
+  "source_findings": 48,
+  "fixed": 27,
+  "open": 21,
+  "fixed_ids": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "F06",
+    "F07",
+    "F08",
+    "F09",
+    "F13",
+    "E01",
+    "E02",
+    "E03",
+    "E04",
+    "E07",
+    "E09",
+    "E10",
+    "E11",
+    "E13",
+    "E14",
+    "E19",
+    "E20",
+    "E21",
+    "E28",
+    "E29",
+    "E30",
+    "E32"
+  ],
+  "story_statuses": {
+    "draft": 10,
+    "implemented": 17
+  },
+  "review_findings": 18,
+  "journal_outcomes_exactly_once": 18,
+  "outcome_owners": {
+    "story:contracts-discovery-profiles": 6,
+    "story:contracts-persistence-ownership": 12
+  },
+  "reviews": [
+    {
+      "review": "review-result:profile-persistence-a-initial-20260908",
+      "frozen_input_count": 44,
+      "report_and_archive_verified": true,
+      "current_inputs_match": false
+    },
+    {
+      "review": "review-result:profile-persistence-b-initial-20260908",
+      "frozen_input_count": 49,
+      "report_and_archive_verified": true,
+      "current_inputs_match": false
+    },
+    {
+      "review": "review-result:profile-persistence-a-recheck1-20260908",
+      "frozen_input_count": 57,
+      "report_and_archive_verified": true,
+      "current_inputs_match": true
+    },
+    {
+      "review": "review-result:profile-persistence-b-recheck1-20260908",
+      "frozen_input_count": 60,
+      "report_and_archive_verified": true,
+      "current_inputs_match": true
+    }
+  ],
+  "persistence_ports": 18,
+  "actual_ess_entities": 11,
+  "planning_artifacts": 99,
+  "planning_valid": true,
+  "planning_prose_only_warnings": 57,
+  "scope": "Specification checkpoint only; broader goal and implementation/model/binding prerequisites remain open"
+}

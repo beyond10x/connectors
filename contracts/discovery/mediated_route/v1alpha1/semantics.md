@@ -117,7 +117,7 @@ Retained history after denied/capped/failed discovery is not deletion and cannot
 
 | Entity | Notes |
 |---|---|
-| Persistent mediated route binding | Proposed, not declared in ESS. Fixed child/parent/observation and logical host ownership are requirements; persistent relations/lifecycle/cardinality remain UNMAPPED under persistence-ownership. This is not the unrelated gateway RouteBinding value in idempotency.yaml |
+| Persistent mediated route binding | Proposed, not declared in ESS. Fixed child/parent/observation and logical host ownership are requirements; persistent relations/lifecycle/cardinality remain UNMAPPED under the model/binding prerequisites recorded in design §31. This is not the unrelated gateway RouteBinding value in idempotency.yaml |
 | `Connection.route` | value `direct` or `via` (connection document) |
 | Revalidation and placement facts | [discovery.yaml](../../../../ess/domains/discovery.yaml) types selected values, not a running validator, installed port or persistent composition owner |
 
@@ -128,3 +128,5 @@ Retained history after denied/capped/failed discovery is not deletion and cannot
 | Exact proxy path forms | taken from the vendor references at adapter authoring (Grafana data-source proxy; Kubernetes `services/proxy`), recorded in the adapter documents, not here |
 | Non-GET methods through a route | refused in first profiles |
 | Second hop | never; not a version question |
+
+Persistence ownership is consolidated in [design §31](../../../../docs/design.md#31-host-persistence-ownership-and-atomicity). MediatedRoutePort owns fixed-route validation evidence; its current observation/parent/child comparisons participate in the selected binding metadata authority. This inventory does not supply a backend or execute its atomicity predicates.

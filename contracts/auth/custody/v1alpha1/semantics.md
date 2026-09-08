@@ -37,13 +37,14 @@ delete(scope, SecretVersionRef)     -> Deleted | Missing | Unavailable | Denied
 Host metadata (not in the store):
 
 ```json
-{ "connection": "conn_…", "active_credential": "ver_…", "revision": 12, "superseded": ["ver_…"] }
+{ "connection": "conn_…", "active_credential": "ver_…", "auth_publication_fence": 12, "superseded": ["ver_…"] }
 ```
 
 ```text
-publish_active(connection, expected_revision, new_version) -> Published(revision) | Conflict(current_revision)
+publish_active(connection, expected_auth_fence, new_version) -> Published(auth_fence) | Conflict(current_auth_fence)
 // Baseline host operation. Rotating refresh requires the guarded transaction in
 // auth.acquisition §4.1; this three-argument CAS alone is insufficient.
+// Private concurrency fence, not public connection/F02 semantic revision.
 ```
 
 `SensitiveMaterial` is an opaque bounded byte string per version. A credential *set* (access plus refresh token, or user plus secret half) is one version, so the pair is written and read together (`docs/design.md:576`). Interpretation of the bytes belongs to the provider auth implementation.
@@ -62,7 +63,7 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 - Reclaim: superseded versions are deleted once no valid use requires them, after a declared retention (first-profile default 24 h; refresh-token grace behavior is provider-specific and declared in the profile).
 - Scoped access: a capability handed to an adapter reads only its own scope. There is no list operation over values.
 - Bounded values: a version is at most 64 KiB (first-profile default; certificates with chains may need more and set it per binding).
-- No value in diagnostics: `read` errors, logs, and metrics carry the scope id and version id only.
+- No private references in diagnostics: read errors, ordinary logs and metrics expose neither values nor custody scope/version/generation ids. Use separately admitted safe correlation and error codes. Access-controlled internal custody state is not a diagnostic export.
 - Durability claims per binding: in-memory claims none; file binding claims fsync-before-return on the owner-only file; a database or Vault binding declares its own. A binding declares the guarantees it does not provide instead of emulating them (`docs/design.md:578`).
 - Startup: the host refuses to start an adapter whose required custody binding is missing rather than falling back to another binding (`docs/design.md:816`).
 
@@ -106,8 +107,8 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 
 | Entity | Notes |
 |---|---|
-| `CredentialSet` (identity: version ref), lifecycle `written → active → superseded → deleted` | relation `belongs_to → Connection` (one); material itself is not modeled |
-| `Connection.active_credential` | reference field with revision; publication couples private generation, refresh ownership and revocation in host metadata |
+| Immutable custody version / credential set | Proposed opaque material version, not an ESS entity. Active/superseded are host reference facts, not a declared custody lifecycle; Connection relation/cardinality/delete semantics remain UNMAPPED |
+| Active credential reference | Proposed ConnectionAuthorityPort field with private publication fence, not a declared ESS Connection relation; publication couples generation, refresh ownership and revocation |
 | Refresh coordination | [RefreshAttempt ESS](../../../../ess/domains/refresh.yaml), owned by acquisition/coordinator; not a custody entity or port |
 | External store layout, Vault paths | UNMAPPED, binding-private |
 
@@ -118,3 +119,5 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 | Second binding after file | SQLite through the same port tests (old repo had `state-sqlite`); Vault later |
 | Retention of superseded versions | 24 h |
 | Value bound | 64 KiB, per-binding override for certificate chains |
+
+Persistence ownership is consolidated in [design §31](../../../../docs/design.md#31-host-persistence-ownership-and-atomicity). CustodyPort owns immutable sensitive versions; ConnectionAuthorityPort/RefreshCoordinatorPort own active references, publication and consumed-source history. This inventory does not supply a backend or execute its atomicity predicates.
