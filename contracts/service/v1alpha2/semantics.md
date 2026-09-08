@@ -136,6 +136,7 @@ The protocol is specified, not implemented. Delegated support remains unadvertis
 4. Audited invocation first acknowledges an audit admission, then follows any mutation attempt preparation/spending/dispatch fence, then records its outcome. Audit and attempt records have distinct purposes. Failure handling follows compatibility §5; no log line replaces a durable claim/attempt.
 5. Federation uses only the selected per-hop codec/profile intersection and a complete trusted delegation binding. No credential/context substitution, downgrade, reroute or resend follows a refusal or lost response.
 6. Legacy projection follows compatibility §3: off by default, explicit unchanged static reads only, exact projected operation/revision checked again by invoke. Hidden mutations cannot be reached with a guessed ID or the new/full descriptor revision.
+7. [read-refresh-once/v1alpha1](../../auth/capability/v1alpha1/read-refresh-once.md) is available only when its combined native profile is explicitly authored, implemented and selected in Operation.profile. After one definitive business 401 it permits one coordinated refresh participation and at most one new-generation business redispatch, with the original request/authority/deadline and consumed permission-call ledger. A fresh DispatchAdmission is required; a refreshed capability or new generation never reopens the first admission. Existing profiles, mutations, generic realizations and mediated/federated execution gain no retry. No current adapter selects this binding.
 
 ## 5. Limits
 
@@ -153,6 +154,8 @@ Identity token lifetime/verification comes from the explicitly selected Identity
 - Admission-audit failure -> unavailable/no acknowledged ref/no dispatch. Final-audit failure after known success/refusal preserves that effect and original cause; a possible dispatch remains unknown.
 - Every mutation outcome, including replayed refusal/abort/unknown, an uncertain waiter, inaccessible original and outcome-store failure, follows the exact status/classification/cause table.
 - Delegation uses the selected canonical preparation/approval trace and exact proof fixtures in delegation.md, including valid/forged/replayed/expired/different-receiver/different-body, optional realm/executor, and describe/prepare/invoke separation. Actual verifier/store/provider conformance remains required before advertisement.
+
+- Legacy/unselected read 401 gives one business call and its documented error. An explicitly supported combined read-refresh-once profile may give 401 → one coordinated exchange/publication → one freshly admitted redispatch; a second 401 is terminal. Expired time, consumed permission slots, narrowed grants, uncertain publication, cancellation and authority changes prevent redispatch according to the binding's textual case matrix. These are runtime obligations, not conformance established by the existing ESS models.
 
 ## 7. Compatibility
 
