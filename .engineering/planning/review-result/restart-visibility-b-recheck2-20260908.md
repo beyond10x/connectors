@@ -1,0 +1,35 @@
+---
+format: aep.planning-md/1
+id: review-result:restart-visibility-b-recheck2-20260908
+kind: review-result
+status: active
+title: Independent restart and visibility review B recheck2
+relations:
+- reviews: story:contracts-restart-idempotency
+- reviews: story:contracts-mutation-visibility
+revision: 1
+---
+approve
+
+Independent reviewer B approves `story:contracts-restart-idempotency` (F11/E08) and `story:contracts-mutation-visibility` (E12) for specification stabilization. **Zero residual findings (P0/P1/P2/P3: 0/0/0/0).** RV-B-01 is closed; initial MP-B-03/04/05/06 are closed. Classification remains separately completed.
+
+The 62 normative/source/evidence files were frozen before inspection under `snapshot/`, with exact bytes in `source-hashes.json`. `change-audit.json` identifies the limited changes from recheck 1: 46 existing files are byte-identical, 11 existing files changed, and five evidence files were added. All final snapshots match their manifests and the live files at audit completion. Other reviewers' reports/archives and mutable planning, ledger, dispositions and checkpoint material were excluded. Only ignored reviewer evidence was written; no source/planning edits, provider calls or runtime suites were performed.
+
+**RV-B-01 closure.** Kubernetes §4.1 now requires the selected built-in Deployment binding's resource_version to be canonical positive ASCII decimal in 1..18446744073709551615. It rejects zero/all-zero aliases, positive leading zeros, signs, whitespace, radix prefixes, non-ASCII digits and overflow during admitted input validation before key inspection/preflight/PATCH. Accepted bytes and the original UID are preserved. The text correctly distinguishes the provider's parsed unsigned comparison from arbitrary string equality, excludes its zero/unconditional-update branch, and forbids normalization, refetch and rebase. It confines the lexical rule to this selected provider binding. The fixed candidate marker, concurrent loser handling, exact F02 replay/fingerprint, prior unknown outcome and no-redispatch rules remain intact. ESS truthfully marks the new predicate as unexecuted by its generic String field.
+
+The necessary adjacent corrections are consistent. Operations §4 now preserves nondisclosing internal resolution and orders current authority, revision, bound/enabled lookup and operation-specific input validation before key inspection, matching the unchanged extended visibility matrix. Docker and shared §5.2 now distinguish acknowledged desired-state intent from measured current state, including interference before the HTTP response. Desired_state/disposition does not claim synchronized running/stopped state, health, future liveness, historical replay or a reason to perform an extra inspect. Exact container identity, bounded preflight, configured signal/wait, current scope and natural-versus-none distinctions remain unchanged. Legacy descriptor-vector lookup and the extended private lookup remain separate; dependency readiness/approval do not become discovery authority.
+
+**Evidence independently checked.** `evidence-audit.json` and `auxiliary-hashes.json` preserve the results:
+
+- All eight compressed provider payloads match their declared hashes and byte counts. The four newly shared Kubernetes source files are byte-identical to this reviewer's frozen recheck-1 supplemental sources, including exact URL provenance. The unchanged Docker source and nine-endpoint audit retain the prior verified declarations.
+- Re-evaluated all 46 supplied values against the copied Draft 2020-12 schemas: 46 expected decisions and reported error lists match, including nine rejected shapes and 19 deliberately accepted semantic counterexamples. The 14 added version cases comprise twelve schema-valid but semantically invalid inputs and two lexical/range boundaries; they do not prove provider existence or conditional-PATCH success.
+- Both projections still match all 222 ordered artifact paths, sizes and hashes; all seven schema copies match exactly. The before/after-comment compilation files and the archived gated IR are byte-identical at SHA256 `32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb`. No entity, lifecycle, command or generated schema changed.
+- All three compiled gzip payloads match their exact hashes/sizes. Separate session artifacts retain 13 authored/201 synthesized cases, matching provenance and every authored entry unchanged.
+- Read all 48 RI/VI textual expectations against the final owner prose, including conditional-version boundaries, pre-key invalid-input refusal, hidden-schema nondisclosure and Docker interference before reply.
+- The unchanged supplied gate log records 50 existing Rust tests, Rust 1.88.0, 13 ESS files/215 declarations and 222 compiled scenarios including 34 authored, all successful. Neither this reviewer nor the narrow correction reran the full runtime gate; unchanged IR/runtime/scenario inputs justify retaining that evidence.
+
+What could not be established: actual provider races, daemon behavior, policy evaluation, public codecs, durable replay/fencing and runtime conformance. Those remain explicit implementation/advertisement prerequisites. These are textual semantics, static source analysis, schema-shape evaluation and evidence-integrity checks; the 48 declared traces and accepted semantic counterexamples are not passing runtime tests. No broader specification goal or rollout is approved by this bounded verdict.
+
+```findings
+[]
+```

@@ -37,6 +37,28 @@ types:
       - {name: query_parameters, type: "Map<String, connectors.declarations.Parameter>"}
       - {name: obligations, type: "List<String>"}
 
+  - name: connectors.declarations.OperationAvailability
+    kind: struct
+    fields:
+      - {name: implemented, type: Boolean}
+      - {name: binding_supported, type: Boolean}
+      - {name: enabled, type: Boolean}
+      - {name: metadata_admitted, type: Boolean}
+      - {name: lookup_admitted, type: Boolean}
+      - {name: dependency_ready, type: Boolean}
+  - name: connectors.declarations.AvailabilityDecision
+    kind: struct
+    fields:
+      - {name: advertised, type: Boolean}
+      - {name: lookup_error, type: "Optional<connectors.service_wire.ErrorCode>"}
+    # Private facts/decision values for service v1alpha2 §3.2.1, not public
+    # descriptor flags, caller-supplied authority, or an implemented policy engine.
+    # An absent lookup_error only allows subsequent checks, not business dispatch.
+    # UNMAPPED: fact provenance, metadata/lookup/result scope, supported profile,
+    # revision and refusal precedence, projection intersection, actual readiness,
+    # candidate-only approval/preflight and dispatch-time authority fencing.
+    # No new entity, grant relation, lifecycle or declaration field is implied.
+
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.
 entities:

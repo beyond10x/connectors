@@ -1,0 +1,12 @@
+{
+  "created_utc": "2026-09-08T19:05:02.715018+00:00",
+  "scope": "Referenced current legacy Kubernetes adapter source frozen before inspection",
+  "files": [
+    {
+      "source": "adapters/kubernetes/src/lib.rs",
+      "snapshot": "sources/adapters/kubernetes/src/lib.rs",
+      "sha256": "9b97d3616f19f1dbaeab9d78b011f5265bd4b647de55fc5be3418c2bb82f2548",
+      "bytes": 11811
+    }
+  ]
+}
