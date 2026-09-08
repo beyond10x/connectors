@@ -14,36 +14,54 @@ RTVBP stack. Session composition and authority issuance use shared host ports.
 | Contract | Profile / use | Why |
 |---|---|---|
 | `operations` `mutation` | `sip.dial` with `effects: [external_write, network, send_external, session_establishment]`, `semantic_effects: [human_visible]`, `idempotency: none`, `approval: required` | placing a call rings a real endpoint; needs approval binding and unknown-outcome semantics |
+| `datasource.records` | `sip.sessions.list` | bounded safe summaries of sessions owned by this adapter; this read does not control them |
 | `sessions` | `outbound`, `inbound_offer`, `duplex_transport` | call lifecycle, offer admission, lease, revocation, terminal races |
 | `media` | `pcm-s16le-8k-mono-20ms`; capabilities `dtmf`, `interrupt` | the negotiated duplex audio and controls the driver already implements |
 | `auth.profile` | `sip.trunk` (`sip_digest`, purpose `trunk_registration`) | trunk username/password |
+| `auth.acquisition` | `static_entry` | protected entry of the configured trunk username/password; no browser flow |
 | `auth.capability` | `sip-credential-lease`, `session-authority` (issue) | bytes released to sipx for one establishment; per-session authority toward the application side |
-| `auth.custody` | `versioned` or `read_only` | trunk secret storage |
+| `auth.custody` | `versioned` | selected `static_entry` writes an immutable trunk credential generation before publication |
 | `auth.evidence` | `custody_reachable` only | value-free readiness; never probe the trunk before an admitted operation (old `voice-runtime` rule) |
-| `auth.connection` | `configured` | one trunk binding per connection; `target` alias selects among configured trunks |
+| `auth.connection` | `managed` | one stable connection per operator-admitted trunk target; protected entry supplies its credential without changing the target |
 
 
-## Operation map
+## Exposed operations
 
 | Operation | Selected behavior |
 |---|---|
 | sip.dial | approved non-idempotent mutation returning a ready outbound session |
 | sip.sessions.list | bounded records with safe session summaries |
-| session.close | terminal session control, native hangup |
-| session.signal | negotiated DTMF media signal |
-| session.interrupt | negotiated interruption/barge-in |
-| inbound offer, accept/reject | shared inbound_offer, designed but unimplemented |
+
+## Session and media protocol messages
+
+These names travel on the selected duplex session binding. They are not operation
+ids and are not independently advertised through ordinary operation discovery.
+Adding an operation wrapper later would require its own admission, effects and
+result contract.
+
+| Message | Selected behavior |
+|---|---|
+| `close` | terminal session control mapped to native hangup |
+| `signal { kind: dtmf, ... }` | negotiated DTMF media control |
+| `interrupt { track }` | negotiated interruption/barge-in control |
+| offer, accept, reject, cancel | shared `inbound_offer` establishment messages, designed but unimplemented |
 
 ## Native authentication
 
-sip.trunk selects sip_digest, static_entry of two fields, a bounded one-establishment
-sip-credential-lease and custody_reachable evidence. No protocol code owns durable
-credential custody or application authority.
+sip.trunk selects sip_digest, static_entry of two fields, versioned custody, a
+managed connection, a bounded one-establishment sip-credential-lease and
+custody_reachable evidence. The operator-admitted trunk target remains
+configuration; that does not make its protected credential a static_config path.
+No protocol code owns durable credential custody or application authority.
 
+
+Illustrative configuration outline: the shape and numeric deployment values below
+are not selected defaults. The separately stated PCM frame, session cutoff and
+teardown bounds remain normative for the proposed binding.
 
 ```json
 { "adapter": {
-    "trunks": [ { "alias": "staging-pbx", "signaling": { "transport": "tcp", "host": "…", "port": 5060 }, "credential": { "$ref": "urn:connectors:config:v1:credential" }, "allow_dialed_numbers": true } ],
+    "trunks": [ { "alias": "staging-pbx", "signaling": { "transport": "tcp", "host": "…", "port": 5060 }, "auth_profile": "sip.trunk", "allow_dialed_numbers": true } ],
     "default_trunk": "staging-pbx",
     "network": { "mode": "loopback | operator_authorized", "media_port_range": [40000, 40100], "admitted_peers": ["10.0.0.0/24"] },
     "media": { "profiles": ["pcm-s16le-8k-mono-20ms"], "capabilities": ["dtmf", "interrupt"] },
@@ -56,7 +74,7 @@ credential custody or application authority.
 
 ## Sources, verification and deferred scope
 
-Original evidence: ../connectors/providers/b10x.toml:741–760, driver-sip README
+Original evidence: ../connectors/providers/b10x.toml:741–771, driver-sip README
 and lib.rs:40–42,104–114,359–381, integration-sip and design 05 at 81459ac4.
 The old codewandler/sipx v1.0.0-rc.23 dependency is a historical pin. Reverify/adopt
 its exact source/license and current obligations under this adapter before new
@@ -69,6 +87,8 @@ fixtures remain authoring/implementation prerequisites. Shared terminal cutoff i
 acceptance, independent of max_call_seconds; prove SIP/RTP transmit-buffer cutoff
 even if a remote PBX does not confirm shutdown.
 
-Inbound assignment/provisioning, hold/transfer, codecs beyond the narrow selected
-profile and arbitrary PBX behavior remain deferred. [Media composition](../../docs/compositions/media-session.md)
+Inbound assignment/provisioning, codecs beyond the narrow selected profile and
+arbitrary PBX behavior remain deferred. `hold` and `transfer` are reserved/refused:
+this binding does not advertise or accept them until a separately specified SIP
+profile supplies their admission, state and failure semantics. [Media composition](../../docs/compositions/media-session.md)
 owns cross-binding fixtures and separately authorized live PBX tests.
