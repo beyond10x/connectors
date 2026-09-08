@@ -1,0 +1,54 @@
+{
+  "docs/evidence/independent-review-fixes-20260908/cleanup.json": {
+    "bytes": 408,
+    "sha256": "085d68db6f3e9906411277b8359cae656555ce8e63b20c1f265c25cb816c3572"
+  },
+  "docs/evidence/independent-review-fixes-20260908/final-planning-validation.log": {
+    "bytes": 3432,
+    "sha256": "ed281a28aa6cb70c8f351f3d71a6d4bd2f7351b73094c3102021962ff9332784"
+  },
+  "docs/evidence/independent-review-fixes-20260908/full-gate.log": {
+    "bytes": 55753,
+    "sha256": "5995580ec92320dbd326828005ab7f19559de8280ef6686436ad7353cb6382ee"
+  },
+  "docs/evidence/independent-review-fixes-20260908/gate-summary.json": {
+    "bytes": 931,
+    "sha256": "c28928f083468995fd405238ba1800785f7fcde7c4af1ab0653ef8e3c6349633"
+  },
+  "docs/evidence/independent-review-fixes-20260908/inventory.json": {
+    "bytes": 165,
+    "sha256": "f3a2d71078ae598aa3f3d552daa3868157a6e3a208bccf8243909c9e93568e47"
+  },
+  "docs/evidence/independent-review-fixes-20260908/outcomes.log": {
+    "bytes": 3927,
+    "sha256": "834ef1c300b767d7d389743ea2e8af25fe2e18ba2a092d1a857c33cfb009fd40"
+  },
+  "docs/evidence/independent-review-fixes-20260908/primary-build.log": {
+    "bytes": 831,
+    "sha256": "8cc482e8259956e8f511ff64043b374e28661202490a0637a1a49fe8a40b2ac5"
+  },
+  "docs/evidence/independent-review-fixes-20260908/sql-live-harness-assertion.log": {
+    "bytes": 1613,
+    "sha256": "c512f7bde65dd944a903755ac6e5372d89a4ea4fad14d845a22757dafe16064a"
+  },
+  "docs/evidence/independent-review-fixes-20260908/sql-live.log": {
+    "bytes": 1087,
+    "sha256": "ce6605b5a939d30dc39dfdab01ef370aecb16ad5ffbff1717a67102e8c75903c"
+  },
+  "docs/evidence/independent-review-fixes-20260908/target-isolation.json": {
+    "bytes": 175,
+    "sha256": "45028ca80e6c35b55eb1c6216bfd5c6c859ae4cc8dd5d3786cc26cdf53476831"
+  },
+  "docs/evidence/independent-review-fixes-20260908/toolchain-stress.json": {
+    "bytes": 196,
+    "sha256": "73b32f05334961bbe99c851ecda7ef9d3da299e7072858db60dac00f1e904882"
+  },
+  "docs/evidence/independent-review-fixes-20260908/toolchain-stress.log": {
+    "bytes": 46792,
+    "sha256": "0acbb3095b091d575a716e67923cc97f2705e54c493867666747fe8b56a14740"
+  },
+  "docs/evidence/independent-review-fixes-20260908/verified-sources.json": {
+    "bytes": 7111,
+    "sha256": "cddba1a21fcf470ebf043ad1cb81ca365190f05bc623385ca00b0a54bcbdebbd"
+  }
+}

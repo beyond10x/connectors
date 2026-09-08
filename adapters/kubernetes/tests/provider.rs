@@ -11,7 +11,7 @@ use connectors_host::{
     server::router,
 };
 use connectors_kubernetes::{Config, Kubernetes};
-use connectors_sdk::{Credential, Secret};
+use connectors_sdk::{Adapter, AuthenticatedHttp, Credential, HttpResponse, Secret};
 use serde_json::json;
 use std::{
     collections::BTreeMap,
@@ -171,4 +171,86 @@ async fn discovery_is_attributed_paged_and_does_not_activate_observed_endpoints(
     assert_eq!(resources["items"][0]["metadata"]["name"], "postgres");
     service.abort();
     provider.abort();
+}
+
+struct ExpansionFixture {
+    calls: Arc<AtomicUsize>,
+    addresses: usize,
+}
+#[async_trait::async_trait]
+impl AuthenticatedHttp for ExpansionFixture {
+    async fn get(&self, segments: &[&str], _: &[(&str, String)]) -> Result<HttpResponse> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(segments.last(), Some(&"endpointslices"));
+        let addresses = (0..self.addresses)
+            .map(|i| format!("192.0.2.{i}"))
+            .collect::<Vec<_>>();
+        let ports = (1..=64)
+            .map(|port| json!({"port":port,"protocol":"TCP"}))
+            .collect::<Vec<_>>();
+        Ok(HttpResponse { status: 200, headers: BTreeMap::new(), body: serde_json::to_vec(&json!({
+            "metadata":{"resourceVersion":"1"},
+            "items":[{"metadata":{"uid":"slice"},"ports":ports,"endpoints":[{"addresses":addresses}]}]
+        })).unwrap() })
+    }
+}
+fn expansion_adapter(addresses: usize) -> (Kubernetes, Arc<AtomicUsize>) {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let config = Config {
+        namespaces: vec!["engineering".into()],
+        resource_kinds: vec!["services".into()],
+        discover_hosts: false,
+    };
+    let effective = json!({"service":{"instance":"bounded","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED"}},"http":{"base_url":"https://fixture.invalid/"},"adapter":config});
+    let adapter = Kubernetes::new(
+        "bounded",
+        config,
+        effective,
+        Arc::new(ExpansionFixture {
+            calls: calls.clone(),
+            addresses,
+        }),
+    )
+    .unwrap();
+    (adapter, calls)
+}
+#[tokio::test]
+async fn disabled_host_discovery_is_not_advertised_or_dispatched() {
+    let (adapter, calls) = expansion_adapter(1);
+    assert!(adapter.descriptor().operation("hosts.discover").is_err());
+    assert_eq!(
+        adapter
+            .invoke("hosts.discover", json!({"limit":1}))
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::Forbidden
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+#[tokio::test]
+async fn endpoint_cross_product_is_bounded_even_for_one_source_slice() {
+    let (adapter, calls) = expansion_adapter(64);
+    let result = adapter
+        .invoke(
+            "endpoints.discover",
+            json!({"namespace":"engineering","limit":1}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(result["items"].as_array().unwrap().len(), 4096);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let (adapter, calls) = expansion_adapter(65);
+    assert_eq!(
+        adapter
+            .invoke(
+                "endpoints.discover",
+                json!({"namespace":"engineering","limit":1})
+            )
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::Capacity
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
 }

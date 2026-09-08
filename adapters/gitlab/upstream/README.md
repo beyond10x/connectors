@@ -25,5 +25,5 @@ Source inspection found two response limitations: the issues response references
 one issue instead of an array, and file retrieval declares no response body schema.
 Handwritten response checks preserve the previously verified service contract.
 `../generated/coverage.json` records source coverage; `ess-import.json` retains the
-complete ESS 0.9.2 refusal of the original OpenAPI subset. Source refresh requires
+complete ESS 0.20.0 refusal of the original OpenAPI subset. Source refresh requires
 updating this pin, its attribution and the reviewed mappings together.
