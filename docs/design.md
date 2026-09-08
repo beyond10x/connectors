@@ -1274,3 +1274,15 @@ shared configuration schemas derive from their Rust owners; SQL has automated
 wire fixtures; and a Rust gate checks the workspace and minimum toolchain.
 The response retains dispositions for all findings and distinguishes current
 fixture evidence from the previous live/container proof.
+
+## 30. Contract and adapter design documents, 2026-09-08
+
+The operator asked which contracts a rebuild of Jira, Confluence, Kubernetes, Docker,
+federated Grafana (Loki, Prometheus, Alertmanager) and media sessions (SIP via sipx,
+RTVBP) would need. [contracts/README.md](../contracts/README.md) indexes every
+contract: 5 implemented in section 27, 14 proposed as textual semantics under
+`contracts/<family>/v1alpha1/semantics.md`, and 4 families deferred. One design
+document per adapter under [docs/adapters/](adapters/) states which contracts it
+needs and why, with the old surface it rebuilds cited by path and line. Nothing in
+these documents is implemented; descriptors advertise none of it. Docker has no
+predecessor in the old repository and is designed from the Kubernetes shape.
