@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.Purpose",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:78399be514dc0c1420b0f3019eea72b9e1288ebd8e134e8ce21344b09e90d112",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.Purpose": {
+      "title": "Purpose",
+      "x-ess-name": "connectors.delegation.Purpose",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "describe",
+        "prepare",
+        "invoke"
+      ]
+    }
+  }
+}

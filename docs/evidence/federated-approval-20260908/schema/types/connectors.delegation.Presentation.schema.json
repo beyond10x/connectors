@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.Presentation",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:c432454d17a0ea84a38f6ce2fd37a5e0f5286a9d9213da4e1be6358c42a02e2c",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.Presentation": {
+      "title": "Presentation",
+      "x-ess-name": "connectors.delegation.Presentation",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "connection": {
+          "type": "string"
+        },
+        "descriptor_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance",
+        "operation",
+        "descriptor_revision"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

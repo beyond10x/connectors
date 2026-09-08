@@ -51,8 +51,10 @@ entities:
     # OperationDeclaration.operation_id alone is not a runtime operation identity.
     # KeyReservation in connectors.idempotency explicitly references this attempt;
     # its lifecycle covers replay retention, separately from audit retention.
-    # UNMAPPED: Connection, ApprovalRedemption and admission principal/tenant
-    # entity relations remain unmodeled. Opaque fields assert no cardinalities.
+    # ApprovalRedemption in connectors.delegation references this attempt;
+    # it is a spend receipt, not the dispatch fence.
+    # UNMAPPED: Connection and admission principal/tenant entity relations
+    # remain unmodeled. Opaque fields assert no cardinalities.
     lifecycle:
       initial: Prepared
       states: [Prepared, Dispatching, Aborted, Completed, Failed, Indeterminate]

@@ -1,0 +1,422 @@
+{
+  "review": "F03 independent semantic final recheck A round3",
+  "created_utc": "2026-09-08T15:45:15.672768+00:00",
+  "baseline": "b5ace3f29d6deb1dbc9e5ddd50a8a8b02152cb2f",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "8938c5674e6bc0cc491a1a34906894e26b116f67dce8d7195fbb4c9d9a432413",
+      "bytes": 8610
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "71e3a3887689f612b85eda506f4f543a49b9681c7214c233cc13c64ebd04f39e",
+      "bytes": 12838
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/deadline-after-gate.yaml",
+      "sha256": "d84660b9a89310de4703a159e7737c0653a5fd6bca9705adabb874c88f821f0c",
+      "bytes": 2222
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/deadline-before-gate.yaml",
+      "sha256": "6d3a5fc12736a78b6fe390f1e5f31c6cabb951a07d1b91c17dc0a50396dc4704",
+      "bytes": 1979
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/definitive-refusal.yaml",
+      "sha256": "5cf0c41797cbf4fd46067864be21535bd2133e8e0c6593084681666fde9368fd",
+      "bytes": 1912
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/definitive-success.yaml",
+      "sha256": "b1927e3bbc1a5e98a00ae663a4fde47e511b76a4b3af5ab5a987b6dcada234b6",
+      "bytes": 2207
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/event-claim-uncertainty.yaml",
+      "sha256": "5c6ee6cfbc4c8848a14eae4a266a1a0b42ebd0f1de2ae805cca72ae8ceba3d00",
+      "bytes": 1623
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-aborted-result.yaml",
+      "sha256": "f43c776547aa7decadb6de6260a718cf1c4017b64d0ff85287fe85449ffac6a2",
+      "bytes": 3055
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-known-result-expiry.yaml",
+      "sha256": "752cbb7722132cd26535d9544b42122927173639f5665f180ec0980b4a48b7df",
+      "bytes": 3826
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-namespace-values.yaml",
+      "sha256": "678163bd251db2dca3d93bf120c3c98da237b0ed1a7c8eea743f5327ec26f823",
+      "bytes": 7486
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-pending-no-expiry.yaml",
+      "sha256": "dec453b53db05960471d49fbb0a4bd321b10e27e8a3549df8ed7bb057a1f789e",
+      "bytes": 2838
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-refused-result.yaml",
+      "sha256": "de59b9da4837f55cde4da015138391515ec5995f4e1e22c1a7efb367e8fcaca5",
+      "bytes": 3219
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/idempotency-unknown-no-expiry.yaml",
+      "sha256": "7959abdb3c5c300717a43d5e5f3c3b6476e65c379c1b406aa5d1995917be05ea",
+      "bytes": 3840
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/indeterminate-is-terminal.yaml",
+      "sha256": "815d779b34c478166edfbb0e1a049d3538d7b408c9f6bfed296bb740cbd65399",
+      "bytes": 2245
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/recovery-after-gate.yaml",
+      "sha256": "4306c7009a8c880e845fb1a816594ec8cbd4cb92ff4b8f205f77aa78e219144b",
+      "bytes": 1939
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/recovery-before-gate.yaml",
+      "sha256": "dc73f10741f85f0261e6d3ec5ef02333e8ec8b9195a617d49b227068826d1a8a",
+      "bytes": 1724
+    },
+    {
+      "path": "contracts/operations/v1alpha1/scenarios/response-loss-no-approval.yaml",
+      "sha256": "865e12dd40dca8d056b11a491023cd6846a766f09059b31c04ddd0c39f1f89b0",
+      "bytes": 1614
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "bytes": 38950
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "fb72c94c48b12ab984cb0bea4818e5ff5c72c85943c79e5e2a341710afe6d944",
+      "bytes": 34786
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "be3552f92c87e8b17f239d559f92889b25568890a3790053e85f7e7f4b201b92",
+      "bytes": 34529
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "c67f0689fc5fbf4fde14872e10332896d1eb27775e1666d8459bf2a1b15bbf4f",
+      "bytes": 22450
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/continuity-loss-stays-lost.yaml",
+      "sha256": "9249f2546bb763787f69b95b27a686651f136cf17c63a73faed4423340c95467",
+      "bytes": 2793
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/continuity-lost-during-closing.yaml",
+      "sha256": "d4509ec2efd962a5534e8f5630d5e3d5b49e83dd030636faafb161d3768b8b86",
+      "bytes": 2478
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/direct-partition-expiry-no-grace.yaml",
+      "sha256": "bab689969d483634d3f473964d498dda1ed18616b590f01e6b65b56417b28f31",
+      "bytes": 2693
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/drain-expiry-has-no-extra-grace.yaml",
+      "sha256": "2f2236b28b3f38ed660b0ee830112d3fd9b815a67443a0ffd53a4eb9df8a590c",
+      "bytes": 2688
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/expired-data-denial-cannot-renew.yaml",
+      "sha256": "a7380eb097997aa3d6dc00788f779ffc21cee5f4f49cb4c8cd53c61362e42987",
+      "bytes": 2611
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/first-terminal-not-replaced.yaml",
+      "sha256": "8ad681206da9da3d18b3810c43c883eca778ead2582e8792154a8a79d9a5de8a",
+      "bytes": 2747
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/late-renewal-does-not-revive.yaml",
+      "sha256": "721a958eb01581453170e7cad07a350382d036ae27b75e79f6bb803d3d3d4c12",
+      "bytes": 3349
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/media-incompatible-shared-reason.yaml",
+      "sha256": "09db581f532e8b8da5ecc42b3be43fa8735520a30095e8b1702882a866f1ef4a",
+      "bytes": 1944
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/media-overload-shared-reason.yaml",
+      "sha256": "f41f2ecfbde2c38a2ce1b0f246961dc62fb98a7df81c1f9f9adcf12b8f8efd5c",
+      "bytes": 2264
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/revocation-beats-renewal.yaml",
+      "sha256": "b986ebf4261e68c304c327b970526a29b44d876c76ae83e99dbf8141141e3299",
+      "bytes": 2909
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/revocation-refuses-data-and-renewal.yaml",
+      "sha256": "86cff7fdf8d422d18f09af86aaa5b29bf55107705693c1201618c11d2005b809",
+      "bytes": 3497
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/revoked-during-establishment.yaml",
+      "sha256": "68c5a6eb3d7ad53cd6243b5657d41b5375313158103a00c962e0aa7a8f960144",
+      "bytes": 2459
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/scenarios/unverified-lease-never-opens-data.yaml",
+      "sha256": "598fa1c91363a9d054eb3cf56b1b2b0cfaa3aaf59eb20eefa7d07567fd3d6f0e",
+      "bytes": 2984
+    },
+    {
+      "path": "docs/cli-migration-v1-to-v2.md",
+      "sha256": "3bc4c1a238f77c151c5c9a559c4f33d2331a1aab8caa41ef2e087ef6642fb88e",
+      "bytes": 15820
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d",
+      "bytes": 121490
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/cryptographic-results.json",
+      "sha256": "3168d4b26c79e9a6ff5633f0f51204d22df2b3836ac1324c051dd8e4e60b169b",
+      "bytes": 1811
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/cryptographic-vectors.json",
+      "sha256": "8201ac2d9df5b9a5e4e0027aad3e729c43f514dd232c1437ef629a49117a1449",
+      "bytes": 67027
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/fixture-harness.md",
+      "sha256": "b7003a65797aaa6cfe65cdbdd25a2936ff337fcd448ffdbd0e3556a2af67bf04",
+      "bytes": 16147
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/gate.log",
+      "sha256": "8f2bf2905b4457d783ef62f370e9094a08d0e04cee51729cffde5b9cf38fe94f",
+      "bytes": 22557
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/operations-authored.json",
+      "sha256": "1e6f081016abe7ba95425d8f1026d961f6b7c84176c73dec3c9eceb3af37fafb",
+      "bytes": 156479
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/projection-manifest.json",
+      "sha256": "dd13ee53052897d671ac40dd51f04da9a985d0ee11b810e19a16a05fcca51fc6",
+      "bytes": 3035
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/scenario-audit.md",
+      "sha256": "0f5a70e3377dc7d6e4038cd2ed7f6fe7a17253955a6a86d3992c57ad014d2d9b",
+      "bytes": 7161
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/entities/connectors.delegation.ApprovalRedemption.schema.json",
+      "sha256": "81dfd56de9e99cd5c034d24b498f476b369b7b966ef2b07bca5b0db466ce4fa9",
+      "bytes": 8659
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/entities/connectors.delegation.DeliveryReceipt.schema.json",
+      "sha256": "6f99137acad029a33ecc0852d743d247790370c95d2e6e50ed6b3799a611a534",
+      "bytes": 1928
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.AdmittedAuthority.schema.json",
+      "sha256": "3922eb42b8550e53244773192df8842e11a955fb0a98e80affe4d5092c3d2cdf",
+      "bytes": 2673
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ApprovalClaims.schema.json",
+      "sha256": "ce928cf909313c16e727e8402c97cec4e9e3b061e2542bdfcd3a62fde207f1a3",
+      "bytes": 7243
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ApprovalPolicy.schema.json",
+      "sha256": "d1f922aab78514c4c4a140727adbfbe864d8855a756022e53d6986fc7acaef13",
+      "bytes": 1331
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ApprovalPreparation.schema.json",
+      "sha256": "1ce7233cba8a8b24ba82f2ca0a468c0a754f62328cef9b8ee754bdc3d715519f",
+      "bytes": 8382
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ApprovalRedemption.State.schema.json",
+      "sha256": "d3937f0c2df14c926075b5f8dc576f292a56831fe787130cd5b55d39534ee8e6",
+      "bytes": 718
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.AuthoritySnapshot.schema.json",
+      "sha256": "e625a633c9754f8f1cc6f5ddecfac35a0ef07598ce87156d2bcc640ed907c9d1",
+      "bytes": 909
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.CanonicalApprovalSubject.schema.json",
+      "sha256": "223d46acf19f8b0e4fd66e26203defa7ab894be7faeea1ba92931574b495198f",
+      "bytes": 6398
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.DeliveryClaims.schema.json",
+      "sha256": "d569498ad449f2206b881987d19cf684ce1e295f843d054fa1294a2bbf95befe",
+      "bytes": 5579
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.DeliveryReceipt.State.schema.json",
+      "sha256": "6a9900557926d71b1dcb11263689ba188aec070249031e2e3af5a674c271d21f",
+      "bytes": 712
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ExecutionTarget.schema.json",
+      "sha256": "9348f443abe4c1bda46cc8dce6c229dd696ffab9b3be35dc929f9b34e1fd5bb0",
+      "bytes": 1473
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ExecutorBinding.schema.json",
+      "sha256": "f88389619827afdcf88c2567dba4dd6223d96e5b1e0a29ecc2caf2872de6032a",
+      "bytes": 1499
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.HttpMethod.schema.json",
+      "sha256": "4b013be1acb8de3deb53b5275051de17439c97103ef78afe62bb0e523a3e00bb",
+      "bytes": 695
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.Presentation.schema.json",
+      "sha256": "3c5450fa1f1daf0fb506d2faafb700ad18d7d4a4db7ee75180bfa32f7ae5d146",
+      "bytes": 1071
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ProofHeader.schema.json",
+      "sha256": "2223ba48525284cc47ec3579d6ed5f7b956de1d3fa4fcb8077fcf9eac31a1aa0",
+      "bytes": 951
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.Purpose.schema.json",
+      "sha256": "e114eaea957e76151afa51e40c925cd383fe02abb846d94856f4387affd65753",
+      "bytes": 709
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.delegation.ReceiptId.schema.json",
+      "sha256": "a231e89ddcd9e9e2f768ad723240a001ff2560ffbffdf77b88b78c4a3ead9291",
+      "bytes": 761
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.idempotency.AuthorityScope.schema.json",
+      "sha256": "324d77cabf4883b73c755898295f5a251d5a9dfdfa8e04c33c9175ba71ca7f5e",
+      "bytes": 1007
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.idempotency.RequestFingerprint.schema.json",
+      "sha256": "b7020f113087709a0ac0ad0f47e2fd5ee4c266872961da0114f56f132697c816",
+      "bytes": 2284
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/schema/types/connectors.idempotency.RouteBinding.schema.json",
+      "sha256": "1ed42e76c405df7b0554afd7801d1bab3de8162c97cac56600a3c25d997c0a1a",
+      "bytes": 1016
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/sessions-authored.json",
+      "sha256": "20eb1747a4eef8feb7699918ec86d2e5318cfbda72a254ddbb97df283c6b1806",
+      "bytes": 161145
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/subject-and-type-vectors.json",
+      "sha256": "40cb4975283cb9d726413875afbf449d734c314d5b2ef0ced83076a7ed062158",
+      "bytes": 39553
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/subject-equality-audit.json",
+      "sha256": "e372a7b75eecea5c93c987bfa64d1d487805ecc528632aa4d400a18b67f92f10",
+      "bytes": 4240
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/time-admission-audit.json",
+      "sha256": "7a71e8175094db39b4e3648d70b6960f9522364d8aed1e28916e98fa51c08408",
+      "bytes": 6478
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/type-projection-results.json",
+      "sha256": "b149e5a1a96862160242cfb1924b0c18af888536a2a157adf88549fbe369bac6",
+      "bytes": 2241
+    },
+    {
+      "path": "docs/evidence/federated-approval-20260908/verification.md",
+      "sha256": "07c3590539fa662f6a897a8f955dc4dd6fb3fe903b321e65aff2b6b35af9031b",
+      "bytes": 5666
+    },
+    {
+      "path": "docs/stack-integration-proposal.md",
+      "sha256": "4286fe96332d9affa92a5e8e82cab3261a4c5e98b72573761ed4706906d6a99a",
+      "bytes": 16961
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+      "bytes": 8245
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "932273ff7786139fe07520c9bb13b4c874ae83a19a1f5c2821f558b717dadf6e",
+      "bytes": 392
+    }
+  ]
+}
