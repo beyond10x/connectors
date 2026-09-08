@@ -45,6 +45,11 @@ The implemented public lookup searches the descriptor's operation vector after a
   No automatic retry. Provider 401/403, 404, 410, 429, 5xx and malformed/oversized
   responses remain distinguishable. Unsupported versions and stale revisions fail
   before provider dispatch.
+  This existing rule is unchanged by the proposed
+  [read-refresh-once/v1alpha1](../../auth/capability/v1alpha1/read-refresh-once.md)
+  binding: its distinctly advertised native profile requires v1alpha2 and is
+  excluded from legacy projection. No current adapter selects it; a capability
+  rename or refreshed credential never opts this profile into retry behavior.
 - These concurrency/deadline bounds begin at adapter execution after admission,
   body reading and validation. They are not connection-count, header-read or
   body-read bounds. Public ingress needs separately configured transport limits.
