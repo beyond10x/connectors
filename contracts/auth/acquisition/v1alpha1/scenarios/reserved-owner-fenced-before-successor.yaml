@@ -1,0 +1,82 @@
+# Ledger expectations only: trusted decisions stand for the atomic host checks.
+# ESS compiles these assertions; it does not execute concurrency, clock or I/O.
+type: ess-scenario/1
+domain: connectors.refresh
+scenario: reserved-owner-fenced-before-successor
+summary: 'F04: pre-authorization loss permits a successor only after fencing the old attempt.'
+arrange:
+- instance: refresh
+  entity: connectors.refresh.RefreshAttempt
+- instance: successor
+  entity: connectors.refresh.RefreshAttempt
+timeline:
+- command: connectors.refresh.ReserveRefresh
+  input:
+    decision: allow
+    source_generation_id: 10000000-0000-4000-8000-000000000001
+    owner: replica-a
+    ownership_token: 20000000-0000-4000-8000-000000000001
+    expected_binding_revision: binding-1
+  outcome: reserved
+  events:
+  - event: connectors.refresh.RefreshReserved
+  capture:
+    instance: refresh
+    event: connectors.refresh.RefreshReserved
+    field: attempt_id
+  at: '2026-09-08T10:00:00Z'
+- command: connectors.refresh.FenceReserved
+  input:
+    attempt_id:
+      $instance: refresh
+  outcome: fenced
+  events:
+  - event: connectors.refresh.ReservedOwnerFenced
+  at: '2026-09-08T10:00:01Z'
+- command: connectors.refresh.AuthorizeExchange
+  input:
+    decision: allow
+    attempt_id:
+      $instance: refresh
+    owner: replica-a
+    ownership_token: 20000000-0000-4000-8000-000000000001
+  outcome: wrong-state
+  error:
+    name: connectors.refresh.RefreshStateConflict
+    fields:
+      state: Fenced
+  no_events:
+  - connectors.refresh.ExchangeAuthorized
+  at: '2026-09-08T10:00:02Z'
+- command: connectors.refresh.ReserveRefresh
+  input:
+    decision: allow
+    source_generation_id: 10000000-0000-4000-8000-000000000001
+    owner: replica-b
+    ownership_token: 20000000-0000-4000-8000-000000000002
+    expected_binding_revision: binding-1
+  outcome: reserved
+  events:
+  - event: connectors.refresh.RefreshReserved
+  capture:
+    instance: successor
+    event: connectors.refresh.RefreshReserved
+    field: attempt_id
+  at: '2026-09-08T10:00:03Z'
+- command: connectors.refresh.AuthorizeExchange
+  input:
+    decision: allow
+    attempt_id:
+      $instance: successor
+    owner: replica-b
+    ownership_token: 20000000-0000-4000-8000-000000000002
+  outcome: authorized
+  events:
+  - event: connectors.refresh.ExchangeAuthorized
+  at: '2026-09-08T10:00:04Z'
+assert:
+- view: connectors.refresh.RefreshStates
+  contains:
+    attempt_id:
+      $instance: refresh
+    state: Fenced
