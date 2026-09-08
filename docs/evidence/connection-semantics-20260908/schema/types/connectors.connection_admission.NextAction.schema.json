@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.NextAction",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:ae14cbc4debc1fd8d57418bbb236d900bb8a43d8b11dc44fa537006e07ff115a",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.NextAction": {
+      "title": "NextAction",
+      "x-ess-name": "connectors.connection_admission.NextAction",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "reconnect",
+        "revalidate"
+      ]
+    }
+  }
+}

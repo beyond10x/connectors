@@ -1,0 +1,95 @@
+domain: connectors.connection_admission
+summary: Proposed connection viability, request eligibility and host management target values; no runtime checker or persistent connection lifecycle.
+
+# Normative owners: contracts/auth/connection/v1alpha1/semantics.md §4.1,
+# contracts/auth/profile/v1alpha1/semantics.md §4.1 and contracts/auth/management.md.
+# Facts and decisions are trusted host values, never authority supplied in input.
+types:
+  - name: connectors.connection_admission.ConnectionState
+    kind: enum
+    variants: [pending, ready, reauthorization_required, custody_unavailable, parent_degraded, disabled, revoked]
+  - name: connectors.connection_admission.NextAction
+    kind: enum
+    variants: [reconnect, revalidate]
+  - name: connectors.connection_admission.StatusObservation
+    kind: struct
+    fields:
+      - {name: state, type: connectors.connection_admission.ConnectionState}
+      - {name: since, type: Timestamp}
+      - {name: observed_at, type: Timestamp}
+      - {name: valid_until, type: Timestamp}
+      - {name: next_action, type: "Optional<connectors.connection_admission.NextAction>"}
+  - name: connectors.connection_admission.ViabilityFacts
+    kind: struct
+    fields:
+      - {name: metadata_available, type: Boolean}
+      - {name: locally_revoked, type: Boolean}
+      - {name: enabled, type: Boolean}
+      - {name: established_credential_failure, type: Boolean}
+      - {name: required_custody_available, type: Boolean}
+      - {name: required_parent_available, type: Boolean}
+      - {name: validated_publication, type: Boolean}
+      - {name: baseline_current, type: Boolean}
+  - name: connectors.connection_admission.ViabilityDecision
+    kind: struct
+    fields:
+      - {name: state, type: "Optional<connectors.connection_admission.ConnectionState>"}
+      - {name: error, type: "Optional<connectors.service_wire.BaseErrorCode>"}
+  - name: connectors.connection_admission.RequirementResult
+    kind: enum
+    variants: [not_required, satisfied, insufficient, denied, unavailable, stale, unknown]
+  - name: connectors.connection_admission.EligibilityFacts
+    kind: struct
+    fields:
+      - {name: authority_available, type: Boolean}
+      - {name: host_admitted, type: Boolean}
+      - {name: operation_enabled, type: Boolean}
+      - {name: viability, type: connectors.connection_admission.ViabilityDecision}
+      - {name: profile_matches, type: Boolean}
+      - {name: scope, type: connectors.connection_admission.RequirementResult}
+      - {name: permission, type: connectors.connection_admission.RequirementResult}
+      - {name: verification, type: connectors.connection_admission.RequirementResult}
+  - name: connectors.connection_admission.EligibilityDecision
+    kind: struct
+    fields:
+      - {name: eligible, type: Boolean}
+      - {name: error, type: "Optional<connectors.service_wire.ErrorCode>"}
+  - name: connectors.connection_admission.OperationCheckRequirements
+    kind: struct
+    fields:
+      - {name: operation, type: String}
+      - {name: checks, type: "List<connectors.credential_evidence.CheckKind>"}
+  - name: connectors.connection_admission.EvidenceRequirements
+    kind: struct
+    fields:
+      - {name: connection, type: "List<connectors.credential_evidence.CheckKind>"}
+      - {name: operations, type: "List<connectors.connection_admission.OperationCheckRequirements>"}
+  - name: connectors.connection_admission.ManagementAction
+    kind: enum
+    variants: [list, describe, begin_create, begin_repair, status, revoke, protected_complete]
+  - name: connectors.connection_admission.ManagementTargetKind
+    kind: enum
+    variants: [instance, connection, acquisition]
+  - name: connectors.connection_admission.ManagementTarget
+    kind: struct
+    fields:
+      - {name: owning_instance, type: String}
+      - {name: kind, type: connectors.connection_admission.ManagementTargetKind}
+      - {name: profile, type: "Optional<String>"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: acquisition, type: "Optional<String>"}
+      - {name: expected_revision, type: "Optional<String>"}
+
+# UNMAPPED: these types do not execute the ordered readiness reduction, current
+# metadata/clock checks, alternative selection, scope subset, exact target and
+# generation matching, requirement applicability, authority or final dispatch.
+# RequirementResult variants are restricted per check by the normative owner;
+# the generic type projector cannot enforce those cross-value predicates.
+# Optional projects to omission, not a required-null wire codec. Timestamp
+# fields above are semantic values, not the public Unix-millisecond spelling.
+# No persistent Connection, Acquisition or AuthProfile entity is introduced.
+# Their known qualified coordinates, profile/owner/repair/parent/publication
+# relationships and cardinalities require their dedicated persistence models;
+# these values assert no owns edge, deletion cascade or new custody owner.
+# Concrete UI/callback framing, management effects/approval/idempotency,
+# publication/revocation uniqueness and replica fencing remain binding gates.

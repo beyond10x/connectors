@@ -40,13 +40,13 @@ Discovery, readiness, authentication, authorization, and execution are separate 
     { "check": "permission_check", "result": "denied", "subject": "list pods in namespace x" },
     { "check": "verify_operation", "result": "not_run" }
   ],
-  "state": "insufficient_scope"
+  "state": "ready"
 }
 ```
 
-This JSON is the public projection. It omits credential generation IDs, snapshot handles and secret-store versions; none is a public evidence identifier. Host-private evidence additionally binds the captured generation, instance, connection, auth profile and provider authority, and records each check's source, collection time, validity deadline and exact subject where applicable. `collected_unix_ms` never replaces those per-check deadlines.
+This JSON is an illustrative public projection: the missing write grant and denied namespace belong to particular operations, while the connection baseline is assumed valid. They do not reduce the whole connection to insufficient_scope. A concrete payload binds each operation check to its declared exact subject and reports only admitted safe details. This JSON is the public projection. It omits credential generation IDs, snapshot handles and secret-store versions; none is a public evidence identifier. Host-private evidence additionally binds the captured generation, instance, connection, auth profile and provider authority, and records each check's source, collection time, validity deadline and exact subject where applicable. `collected_unix_ms` never replaces those per-check deadlines.
 
-Results: `ok`, `missing`, `invalid`, `insufficient`, `denied`, `unavailable`, `uncertain`, `not_run`. `state` is the derived connection state (`auth.connection` status vocabulary).
+Results: `ok`, `missing`, `invalid`, `insufficient`, `denied`, `unavailable`, `uncertain`, `not_run`. `state` is the global connection viability reduction in [connection §4.1](../../connection/v1alpha1/semantics.md#41-connection-viability-and-operation-eligibility), using only applicable baseline checks and administrative facts. Evidence alone does not override terminal revocation or disablement.
 
 Operation-time predicate (host-internal):
 
@@ -71,10 +71,10 @@ dispatch(admitted_pin, request) -> Dispatched | Refused(reason)
 | `permission_check` | one provider authorization query per invocation where the provider offers one (Kubernetes SelfSubjectAccessReview); otherwise `not_run` | yes |
 | `verify_operation` | the designated read, only when explicitly invoked by an operator or acquisition completion | yes |
 
-- Same predicate at description and dispatch: the state shown by `connections.describe` and the admission decision at invocation derive from the same checks; the invocation re-evaluates, the description may be cached with `collected_unix_ms`.
+- Description and dispatch use the same **two reductions** for the same question: connection-wide viability, then exact-operation eligibility. Description reports global viability under its observation/validity bounds; invocation freshly evaluates its own scope, permissions, verification and authority, then the F05 dispatch fence. An unrelated operation's failed or stale check never poisons global viability. `collected_unix_ms` is not a per-check expiry or authorization lease.
 - Provider authorization and SaaS authorization are both required and separately reported: a provider `permission_check: ok` does not admit a caller the host's policy refuses, and vice versa (`docs/design.md:381`).
-- Readiness is not authority: an `ok` evidence set does not by itself permit an operation; it is an input to admission.
-- Stale evidence: each required check must meet its own freshness bound at admission and dispatch. Age-valid evidence for another generation or binding is unusable. Re-collection must itself be permitted by the check's declared effect and admission rules; otherwise refuse with `connection_not_ready`, derived state `reauthorization_required`, rather than silently running a provider probe.
+- Readiness is not authority: an ok baseline does not itself permit an operation. Stale/unknown/not_run baseline validation yields pending (positive invalidity or consumed refresh yields reauthorization_required); unavailable custody and parent facts use their own states. Stale operation-only scope/permission/verification refuses only affected requests under connection §4.1. Not-required checks may remain not_run and supply no authority.
+- Stale evidence: each required check must meet its own freshness bound at admission and dispatch. Age-valid evidence for another generation or binding is unusable. Re-collection must itself be permitted by the check's declared effect and admission rules; otherwise refuse under the applicable reduction: stale baseline validation gives pending/connection_not_ready, stale required permission gives unavailable for that operation, and stale operation verification gives connection_not_ready without changing global state. Staleness alone is not positive credential invalidity and never authorizes an implicit probe.
 - Kubernetes profile: `permission_check` is per verb, group, version, resource, namespace, before each list; a denied namespace is skipped and reported, not treated as empty (old rule preserved).
 
 ### 4.1 Credential generation and identity
@@ -85,7 +85,7 @@ Evidence binds to that generation and to `(instance, connection, auth profile, p
 
 The rule covers bearer/basic/signing material, coherent client certificate and key snapshots, and the material returned by one exec-plugin run. Validating an exec result and running the helper again at dispatch would create an unvalidated substitution. Private generation IDs and any internal equality information must stay out of public metadata, errors and logs.
 
-Configured replacement and repair must preserve the established identity. A different subject, kind, provider authority or binding is refused with `connection_not_ready` and safe state `reauthorization_required`; the internal reason is `identity_changed` or `binding_changed`. An explicitly admitted reassignment is a distinct management action that must invalidate old admissions, evidence, cursors and sessions before admitting the new binding. This profile provides no implicit reassignment through file overwrite or refresh; where no reassignment flow is declared, refuse it.
+Configured replacement and repair must preserve the established identity. An inactive independent repair candidate with a different subject, kind, provider authority or binding is rejected as identity_mismatch (or a safe binding refusal) without replacing or poisoning a still-valid active generation. Its prior state remains subject to independently current expiry, revocation and consumed refresh. Detected substitution of the currently used material blocks dispatch pending validation; a proved identity/binding mismatch there gives connection_not_ready and reauthorization_required, with private identity_changed/binding_changed reason. Neither case permits publishing the mismatched candidate. An explicitly admitted reassignment is a distinct management action that must invalidate old admissions, evidence, cursors and sessions before admitting the new binding. This profile provides no implicit reassignment through file overwrite or refresh; where no reassignment flow is declared, refuse it.
 
 ### 4.2 Admission, validation and dispatch
 
@@ -132,7 +132,7 @@ A refresh response containing the expected identity label alone is not a lineage
 - Granted scopes lack `write:jira-work` → mutation refused with `insufficient_scope`, no dispatch; a read requiring `read:jira-work` proceeds.
 - Kubernetes fake denies SSAR for namespace `b` → list of `[a, b]` returns `a` items and reports `b` as denied.
 - Expired stored token metadata → `credential_valid: invalid` → state `reauthorization_required`; the `verify_operation` is not run automatically.
-- Provider `permission_check` ok but host policy refuses → `Forbidden`, no dispatch.
+- Provider `permission_check` ok but receiver grant policy refuses → `not_granted`, no dispatch; separate adapter/connection/resource restrictions use `forbidden`.
 
 - Replace account A material with account B material at the same configured path and revision → no business dispatch; separately admitted validation discovers the identity mismatch and refuses ordinary replacement.
 - Publish a same-account generation between admission and dispatch → the old admission refuses; a new admission validates/pins the new generation. A raw source change never substitutes new bytes into an existing pin.
@@ -172,4 +172,4 @@ A refresh response containing the expected identity label alone is not a lineage
 |---|---|
 | Whether `credential_valid` may call provider introspection by default | no; metadata only |
 | Freshness bounds | 300 s reads, 60 s mutations |
-| Whether `verify_operation` runs automatically after acquisition | yes, once, as the completion step; result recorded, failure does not delete the credential |
+| Completion-time verification | only the explicitly selected/admitted validation plan runs it. Mandatory baseline failure prevents publication/completed; optional failure preserves baseline publication but blocks any operation requiring that check. Supported is not mandatory; see [profile §4.1](../../profile/v1alpha1/semantics.md#41-baseline-and-operation-requirements). |

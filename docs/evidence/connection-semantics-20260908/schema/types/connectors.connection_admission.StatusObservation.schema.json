@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.StatusObservation",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:c4bcb28556ec01d9897a3c374487e479d4e6eeefb6537a0cb9fee5718d28772f",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.ConnectionState": {
+      "title": "ConnectionState",
+      "x-ess-name": "connectors.connection_admission.ConnectionState",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "pending",
+        "ready",
+        "reauthorization_required",
+        "custody_unavailable",
+        "parent_degraded",
+        "disabled",
+        "revoked"
+      ]
+    },
+    "connectors.connection_admission.NextAction": {
+      "title": "NextAction",
+      "x-ess-name": "connectors.connection_admission.NextAction",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "reconnect",
+        "revalidate"
+      ]
+    },
+    "connectors.connection_admission.StatusObservation": {
+      "title": "StatusObservation",
+      "x-ess-name": "connectors.connection_admission.StatusObservation",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/connectors.connection_admission.ConnectionState"
+        },
+        "since": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "next_action": {
+          "$ref": "#/$defs/connectors.connection_admission.NextAction"
+        }
+      },
+      "required": [
+        "state",
+        "since",
+        "observed_at",
+        "valid_until"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.ManagementTarget",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:10c601853f7930ceaf0eeb799115f163b39300eaea7be11ca7cbd5a241f5f679",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.ManagementTarget": {
+      "title": "ManagementTarget",
+      "x-ess-name": "connectors.connection_admission.ManagementTarget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "owning_instance": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/connectors.connection_admission.ManagementTargetKind"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "connection": {
+          "type": "string"
+        },
+        "acquisition": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owning_instance",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.connection_admission.ManagementTargetKind": {
+      "title": "ManagementTargetKind",
+      "x-ess-name": "connectors.connection_admission.ManagementTargetKind",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "instance",
+        "connection",
+        "acquisition"
+      ]
+    }
+  }
+}

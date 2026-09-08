@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.ConnectionState",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:0b73b6afbe9d88889166fd52097ea24cbd70fb9e56852cea5692a182a9300e1c",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.ConnectionState": {
+      "title": "ConnectionState",
+      "x-ess-name": "connectors.connection_admission.ConnectionState",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "pending",
+        "ready",
+        "reauthorization_required",
+        "custody_unavailable",
+        "parent_degraded",
+        "disabled",
+        "revoked"
+      ]
+    }
+  }
+}

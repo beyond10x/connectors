@@ -1,0 +1,133 @@
+{
+  "baseline": "12c11f4b43cd6cf5ff67d3243017887b28788344",
+  "captured_at_utc": "2026-09-08T16:00:44.628353+00:00",
+  "source": "Exact baseline Git objects, preserving the initial review even if primary changes during the review.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278,
+      "snapshot": "initial-snapshot/AGENTS.md"
+    },
+    {
+      "path": ".engineering/planning/story/contracts-management-boundary.md",
+      "sha256": "d39f3169f0b73cf70687b6c66d4ad53c7b3ef2f25a38faab2182c75f413f332c",
+      "bytes": 3983,
+      "snapshot": "initial-snapshot/.engineering/planning/story/contracts-management-boundary.md"
+    },
+    {
+      "path": ".engineering/planning/story/contracts-connection-readiness.md",
+      "sha256": "50f908ab1b05f64ac0e362e427bdea3bcf6ee5a402cd489bdb84e5e547fa9582",
+      "bytes": 4093,
+      "snapshot": "initial-snapshot/.engineering/planning/story/contracts-connection-readiness.md"
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d",
+      "bytes": 121490,
+      "snapshot": "initial-snapshot/docs/design.md"
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "71e3a3887689f612b85eda506f4f543a49b9681c7214c233cc13c64ebd04f39e",
+      "bytes": 12838,
+      "snapshot": "initial-snapshot/contracts/auth/connection/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "b295d6041fa49f9cee44e2f89d923afaaf7a09f474cf65fbf61fff1f8a5ea114",
+      "bytes": 20277,
+      "snapshot": "initial-snapshot/contracts/auth/acquisition/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "0f4a750ecca4089ab133a42b13b954af9d5d9c4b11c3969eb8800fbed452652b",
+      "bytes": 19143,
+      "snapshot": "initial-snapshot/contracts/auth/evidence/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "bed3bb55c43553e2a9a1f70a250067e82afdcc2afc3d07069eb19f2743befcca",
+      "bytes": 9287,
+      "snapshot": "initial-snapshot/contracts/auth/profile/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "bytes": 10098,
+      "snapshot": "initial-snapshot/contracts/auth/custody/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "c67f0689fc5fbf4fde14872e10332896d1eb27775e1666d8459bf2a1b15bbf4f",
+      "bytes": 22450,
+      "snapshot": "initial-snapshot/contracts/service/v1alpha2/semantics.md"
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "fb72c94c48b12ab984cb0bea4818e5ff5c72c85943c79e5e2a341710afe6d944",
+      "bytes": 34786,
+      "snapshot": "initial-snapshot/contracts/service/compatibility.md"
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "812ce5ff030c8a0e36c55d909abf0ee0dac9702424c57e714f19f86f8e240aeb",
+      "bytes": 34517,
+      "snapshot": "initial-snapshot/contracts/service/delegation.md"
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "bytes": 38950,
+      "snapshot": "initial-snapshot/contracts/operations/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "a730e0d9f7298be6338f87ec43e41117e30509f973e5b5bc93c52868f1df70cb",
+      "bytes": 9911,
+      "snapshot": "initial-snapshot/contracts/discovery/mediated_route/v1alpha1/semantics.md"
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "932273ff7786139fe07520c9bb13b4c874ae83a19a1f5c2821f558b717dadf6e",
+      "bytes": 392,
+      "snapshot": "initial-snapshot/ess/system.yaml"
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335,
+      "snapshot": "initial-snapshot/ess/domains/declarations.yaml"
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351,
+      "snapshot": "initial-snapshot/ess/domains/credentials.yaml"
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006,
+      "snapshot": "initial-snapshot/ess/domains/credential_evidence.yaml"
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943,
+      "snapshot": "initial-snapshot/ess/domains/refresh.yaml"
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000,
+      "snapshot": "initial-snapshot/ess/domains/service_wire.yaml"
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408,
+      "snapshot": "initial-snapshot/ess/domains/delegation.yaml"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.OperationCheckRequirements",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:298dbcef04bea8d525913d47f6b08aa0913afb4e5df50ec4d92b95833a6e0860",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.OperationCheckRequirements": {
+      "title": "OperationCheckRequirements",
+      "x-ess-name": "connectors.connection_admission.OperationCheckRequirements",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/connectors.credential_evidence.CheckKind"
+          }
+        }
+      },
+      "required": [
+        "operation",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.credential_evidence.CheckKind": {
+      "title": "CheckKind",
+      "x-ess-name": "connectors.credential_evidence.CheckKind",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "custody_reachable",
+        "credential_present",
+        "credential_valid",
+        "identity_check",
+        "scope_check",
+        "permission_check",
+        "verify_operation"
+      ]
+    }
+  }
+}
