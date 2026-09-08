@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
+pub mod toolchain;
 pub mod v2;
 
 #[derive(Serialize, Deserialize)]

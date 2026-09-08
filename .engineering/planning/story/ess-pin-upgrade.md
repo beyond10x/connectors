@@ -9,7 +9,18 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: story:gitlab-spec-service
 - depends_on: story:ess-executable-pin
-revision: 1
+scope:
+- confidence: cited
+  path: README.md
+- confidence: cited
+  path: adapters/gitlab/generated
+- confidence: cited
+  path: crates/connectors-build
+- confidence: cited
+  path: crates/connectors-spec
+- confidence: cited
+  path: docs
+revision: 3
 ---
 ## Context
 
@@ -44,3 +55,9 @@ A trial regeneration with 0.18.0 into a task-owned directory under `.local/`, co
 ## Progress
 
 Drafted 2026-09-08. Blocked; no trial has been run.
+
+## Decision
+
+The operator authorized completing both ESS stories after the current release was verified. Upgrade to ESS 0.20.0, superseding the original 0.18.0 candidate in this artifact's historical title and acceptance examples. Use official release tag commit c90ca1b2a3a5db02d7580dab63be6cbc56679e0b and verify the downloaded platform archive against release metadata. Trial generation remains the first upgrade check. Adapt to the current grouped CLI, regenerate and review GitLab outputs, reassess the old build-IR shim, run the gate and direct/federated live GitLab image acceptance. Preserve historical evidence. The resolver story is implemented first on the existing 0.9.2 pin; final resolver acceptance applies to whichever version the single repository record declares.
+
+The primary checkout is used for these explicitly requested single-agent prerequisite fixes under AGENTS.md. The Kubernetes managed checkout and its draft driven task remain separate and untouched. No paid model run is launched, and no global binary or PATH configuration is changed.

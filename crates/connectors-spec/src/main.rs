@@ -13,13 +13,14 @@ struct Args {
     /// Generate the v2 source/ESS/runtime bundle instead of only a descriptor.
     #[arg(long)]
     generate: bool,
-    #[arg(long, default_value = "ess")]
-    ess: PathBuf,
+    #[arg(long)]
+    ess: Option<PathBuf>,
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     if args.generate {
-        connectors_spec::v2::generate(&args.specification, &args.output, &args.ess, args.check)?;
+        let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
+        connectors_spec::v2::generate(&args.specification, &args.output, &ess, args.check)?;
         println!(
             "adapter bundle {}",
             if args.check { "matches" } else { "generated" }

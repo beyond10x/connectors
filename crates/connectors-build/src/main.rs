@@ -17,8 +17,8 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 struct Args {
     #[arg(long, default_value = ".")]
     root: PathBuf,
-    #[arg(long, default_value = "ess")]
-    ess: PathBuf,
+    #[arg(long)]
+    ess: Option<PathBuf>,
     #[arg(long, default_value = "adapters/gitlab/realizations/local.json")]
     declaration: PathBuf,
     #[command(subcommand)]
@@ -63,10 +63,11 @@ fn save_json(path: &Path, value: &Value) -> Result<()> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let root = args.root.canonicalize()?;
+    let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
     if let Action::Gate { msrv } = args.command {
-        return gate::run(&root, &args.ess, msrv);
+        return gate::run(&root, &ess, msrv);
     }
-    check_ess(&args.ess)?;
+    check_ess(&ess)?;
     let declaration: LocalService =
         serde_json::from_slice(&std::fs::read(inside(&root, &args.declaration)?)?)?;
     declaration.validate()?;
@@ -76,8 +77,8 @@ fn main() -> Result<()> {
     if spec.id != declaration.adapter {
         return Err("realization adapter disagrees with specification".into());
     }
-    generate(&specification, &generated, &args.ess, true)?;
-    run(Command::new(&args.ess)
+    generate(&specification, &generated, &ess, true)?;
+    run(Command::new(&ess)
         .args(["validate", "--path"])
         .arg(root.join("ess")))?;
     if let Action::Package {
@@ -183,7 +184,7 @@ fn main() -> Result<()> {
             {"id":"service","kind":"image","rootfs":"payload","config":{"entrypoint":declaration.entrypoint,"command":declaration.command,"user":declaration.user,"workdir":"/","environment":{"SSL_CERT_FILE":"/etc/ssl/certs/ca-certificates.crt"}}}
         ],"outputs":[{"name":declaration.adapter,"release_unit":declaration.package,"node":"service","kind":"oci_image","repository":declaration.repository}]});
         save_json(&output.join("build.json"), &graph)?;
-        run(Command::new(&args.ess)
+        run(Command::new(&ess)
             .args(["build", "compile", "--path"])
             .arg(output.join("build.json"))
             .arg("--out")
@@ -197,7 +198,7 @@ fn main() -> Result<()> {
             projectable["secrets"] = json!([]);
         }
         save_json(&output.join("build-ir.projectable.json"), &projectable)?;
-        run(Command::new(&args.ess)
+        run(Command::new(&ess)
             .args(["project", "buildkit", "--ir"])
             .arg(output.join("build-ir.projectable.json"))
             .arg("--out")
@@ -233,14 +234,14 @@ fn main() -> Result<()> {
             .map(|t| json!({"kind":"type","name":t["name"]}))
             .collect();
         let component = format!("{}-adapter", declaration.adapter);
-        let realization = json!({"type":"ess-realization/1","id":format!("{}-local",declaration.adapter),"specification":{"system":declaration.adapter,"version":"v1","source_digest":format!("sha256:{}",plan["provenance"]["source_digest"].as_str().ok_or("missing ESS source digest")?)},"synthesis":{"target":"rust-linux-x86_64/1","generator":"ess/0.9.2"},"components":[component],"actors":[],"implementations":[{"id":"adapter-image","components":[component],"artifact":{"kind":"container","locator":format!("docker-daemon:{image}"),"identity":image_id}}],"entrypoints":[{"id":"http-service","title":format!("Configured {} HTTP service",declaration.adapter),"summary":"Generated typed requests and explicit provider bindings served by the asynchronous host.","primary":true,"interaction":"invoke","attachment":"network","availability":"internal","support":"preview","implementation":"adapter-image","actors":[],"surfaces":surfaces,"invocation":{"kind":"argv","argv":declaration.entrypoint.iter().chain(&declaration.command).collect::<Vec<_>>()},"requires":[{"kind":"filesystem","name":"configuration","summary":"Read-only configuration mounted at /config/service.json."},{"kind":"credential","name":"service-token","summary":"Owner-only caller credential mounted separately under /secrets."},{"kind":"network","name":"provider-api","summary":"Reachability to the explicitly configured provider HTTPS endpoint."}]}]});
+        let realization = json!({"type":"ess-realization/1","id":format!("{}-local",declaration.adapter),"specification":{"system":declaration.adapter,"version":"v1","source_digest":format!("sha256:{}",plan["provenance"]["source_digest"].as_str().ok_or("missing ESS source digest")?)},"synthesis":{"target":"rust-linux-x86_64/1","generator":format!("ess/{}",connectors_spec::toolchain::pin()?.ess)},"components":[component],"actors":[],"implementations":[{"id":"adapter-image","components":[component],"artifact":{"kind":"container","locator":format!("docker-daemon:{image}"),"identity":image_id}}],"entrypoints":[{"id":"http-service","title":format!("Configured {} HTTP service",declaration.adapter),"summary":"Generated typed requests and explicit provider bindings served by the asynchronous host.","primary":true,"interaction":"invoke","attachment":"network","availability":"internal","support":"preview","implementation":"adapter-image","actors":[],"surfaces":surfaces,"invocation":{"kind":"argv","argv":declaration.entrypoint.iter().chain(&declaration.command).collect::<Vec<_>>()},"requires":[{"kind":"filesystem","name":"configuration","summary":"Read-only configuration mounted at /config/service.json."},{"kind":"credential","name":"service-token","summary":"Owner-only caller credential mounted separately under /secrets."},{"kind":"network","name":"provider-api","summary":"Reachability to the explicitly configured provider HTTPS endpoint."}]}]});
         save_json(&output.join("realization.json"), &realization)?;
-        run(Command::new(&args.ess)
+        run(Command::new(&ess)
             .args(["realization", "validate", "--path"])
             .arg(output.join("realization.json"))
             .arg("--spec")
             .arg(generated.join("ess")))?;
-        let realized = run(Command::new(&args.ess)
+        let realized = run(Command::new(&ess)
             .args(["realization", "compile", "--path"])
             .arg(output.join("realization.json"))
             .arg("--spec")
@@ -253,7 +254,7 @@ fn main() -> Result<()> {
         let git = run(Command::new("git")
             .current_dir(&root)
             .args(["rev-parse", "HEAD"]))?;
-        let evidence = json!({"format":"connectors.local-build/v1","image":image,"image_id":image_id,"binary_sha256":hash(&std::fs::read(&binary)?),"source_head":String::from_utf8(git.stdout)?.trim(),"source_manifest_sha256":hash(&std::fs::read(output.join("source.sha256.json"))?),"rootfs_manifest_sha256":hash(&std::fs::read(output.join("rootfs.sha256.json"))?),"generation_manifest_sha256":hash(&std::fs::read(generated.join("manifest.json"))?),"rustc":String::from_utf8(rustc.stdout)?.trim(),"ess":"0.9.2","profile":"dev","platform":json!({"os":declaration.platform.os,"architecture":declaration.platform.architecture}),"validation":["generation drift check","ESS declarations","ESS build compile","ESS BuildKit projection","Docker build","ESS realization validate and compile"],"publication":"local only","runtime_acceptance":"separate conformance evidence required"});
+        let evidence = json!({"format":"connectors.local-build/v1","image":image,"image_id":image_id,"binary_sha256":hash(&std::fs::read(&binary)?),"source_head":String::from_utf8(git.stdout)?.trim(),"source_manifest_sha256":hash(&std::fs::read(output.join("source.sha256.json"))?),"rootfs_manifest_sha256":hash(&std::fs::read(output.join("rootfs.sha256.json"))?),"generation_manifest_sha256":hash(&std::fs::read(generated.join("manifest.json"))?),"rustc":String::from_utf8(rustc.stdout)?.trim(),"ess":connectors_spec::toolchain::pin()?.ess,"profile":"dev","platform":json!({"os":declaration.platform.os,"architecture":declaration.platform.architecture}),"validation":["generation drift check","ESS declarations","ESS build compile","ESS BuildKit projection","Docker build","ESS realization validate and compile"],"publication":"local only","runtime_acceptance":"separate conformance evidence required"});
         save_json(&output.join("build-evidence.json"), &evidence)?;
         println!("{}", serde_json::to_string_pretty(&evidence)?);
     } else {
