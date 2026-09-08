@@ -1,0 +1,98 @@
+# Independent-review counterexample repaired: declared denial transition is terminal for data.
+# ESS author/synthesize does not execute this trace. See ../verification.md.
+type: ess-scenario/1
+domain: connectors.sessions
+scenario: expired-data-denial-cannot-renew
+summary: 'Review B: expiry observed during data admission atomically starts Closing; a later allow cannot
+  renew.'
+arrange:
+- instance: session
+  entity: connectors.sessions.Session
+timeline:
+- at: '2026-09-08T12:00:00Z'
+  command: connectors.sessions.OfferSession
+  input:
+    binding:
+      instance_ref: media-host
+      connection_ref: trunk-a
+      admitted_revision: revision-a
+      authority_ref: authority-a
+    profile: outbound
+    placement: local
+    streams:
+    - audio
+  outcome: offered
+  events:
+  - event: connectors.sessions.SessionOffered
+  capture:
+    instance: session
+    event: connectors.sessions.SessionOffered
+    field: session_id
+- at: '2026-09-08T12:00:01Z'
+  command: connectors.sessions.AcceptOffer
+  input:
+    session_id:
+      $instance: session
+  outcome: accepted
+  events:
+  - event: connectors.sessions.OfferAccepted
+- at: '2026-09-08T12:00:02Z'
+  command: connectors.sessions.EstablishReady
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    lease:
+      issued_at: '2026-09-08T12:00:02Z'
+      effective_expiry: '2026-09-08T12:00:04Z'
+      sequence: 1
+  outcome: ready
+  events:
+  - event: connectors.sessions.SessionReady
+- at: '2026-09-08T12:00:04Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: expired
+    direction: output
+  outcome: authority-terminated
+  events:
+  - event: connectors.sessions.DataAuthorityTerminated
+    payload:
+      decision: expired
+  no_events:
+  - connectors.sessions.DataPermitted
+- at: '2026-09-08T12:00:05Z'
+  command: connectors.sessions.RenewDataLease
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    lease:
+      issued_at: '2026-09-08T12:00:05Z'
+      effective_expiry: '2026-09-08T12:00:07Z'
+      sequence: 2
+  outcome: wrong-state
+  error:
+    name: connectors.sessions.StateConflict
+    fields:
+      state: Closing
+  no_events:
+  - connectors.sessions.DataLeaseRenewed
+- at: '2026-09-08T12:00:09Z'
+  command: connectors.sessions.FinishTeardown
+  input:
+    session_id:
+      $instance: session
+    decision: released
+    peer_shutdown: unconfirmed
+  outcome: closed
+  events:
+  - event: connectors.sessions.LocalResourcesReleased
+assert:
+- view: connectors.sessions.SessionStates
+  contains:
+    session_id:
+      $instance: session
+    state: Closed
