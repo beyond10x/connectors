@@ -25,8 +25,10 @@
 | `auth.evidence/v1alpha1` | [auth/evidence/v1alpha1](auth/evidence/v1alpha1/semantics.md) | proposed | value-free readiness and provider-side authorization checks |
 | `sessions/v1alpha1` | [sessions/v1alpha1](sessions/v1alpha1/semantics.md) | proposed | bidirectional sessions: offer, establishment, correlation, lease, revocation, terminal races, duplex transport |
 | `media/v1alpha1` | [media/v1alpha1](media/v1alpha1/semantics.md) | proposed | negotiated tracks, duplex frames, readiness, loss, overload, DTMF, interrupt |
+| `catalog/v1alpha1` | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) | proposed | list/describe/locate pre-compiled adapter bundles with provenance and coverage; optional; grants nothing |
+| `operations/v1alpha1` `generic-http` profile (and `datasource.records` `generic-http-page`) | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) §3.2 | proposed | an operation realized from a bundle's request mapping by one generic engine: status, JSON passthrough, provenance, status-to-code table |
 
-Deferred families with no document yet: `execution`, `events`, `resources`, `catalog` (`docs/design.md:174-186`).
+Deferred families with no document yet: `execution`, `events`, `resources` (`docs/design.md:174-186`).
 
 ## Which adapter needs which contract
 
@@ -37,6 +39,7 @@ Deferred families with no document yet: `execution`, `events`, `resources`, `cat
 | [Docker](../docs/adapters/docker.md) | operations + mutation, records, logs, endpoint_discovery, auth.profile, auth.capability, auth.evidence |
 | [Grafana, Loki, Prometheus, Alertmanager](../docs/adapters/grafana.md) | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.evidence |
 | [Media session: SIP, RTVBP, bridge, local audio](../docs/adapters/media-session.md) | operations + mutation, sessions, media, auth.profile, auth.capability, auth.custody, auth.evidence, auth.connection |
+| [Catalog and pre-compiled third-party specs](../docs/adapters/catalog.md) | catalog, operations `generic-http` + mutation, records `generic-http-page`, auth.profile, auth.acquisition, auth.capability (+ `http-header`, `http-query`), auth.evidence, auth.connection, auth.custody |
 
 ## Provider authentication at a glance
 
