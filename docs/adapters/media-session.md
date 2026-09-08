@@ -93,6 +93,8 @@ SIP:
 
 RTVBP: application endpoint(s), TLS expectations, `b10x.voice.v1` profile, queue bounds.
 
+Session termination follows [sessions §4.1](../../contracts/sessions/v1alpha1/semantics.md#41-traffic-cutoff-and-teardown-f06). SIP, RTVBP, the bridge and local audio must enforce a maximum 2 s from authoritative revocation to controlled data cutoff, zero queued-data drain after cutoff, and 5 s from terminal acceptance to local teardown/accounting. `max_call_seconds` is a separate call-duration ceiling; it cannot justify continuing traffic after revocation. A 60 s establishment authority is also separate from the mandatory live data lease of at most 2 s from host issuance. Direct paths must expire without a reachable control plane. SIP/RTP transmit buffers and local audio playback buffers need a proven cutoff; closing a WebSocket while RTP or device playback continues is nonconforming. An unresponsive PBX or application may leave remote shutdown unconfirmed, but cannot extend controlled traffic or local resource ownership. The bounds are newly selected contract ceilings, not claims about sipx or the old RTVBP implementation.
+
 ## 7. Discovery and routes
 
 None. Media bytes follow the negotiated data path; federation relays neither RTVBP nor audio (`docs/design/05:306-309`; `docs/design.md:789`).
@@ -110,3 +112,4 @@ None. Media bytes follow the negotiated data path; federation relays neither RTV
 - Fixture (`docs/design.md:1002`): two fake conforming endpoints before any protocol stack: establishment, duplex traffic, DTMF, interruption, overload, cancellation, terminal races; then SIP and RTVBP implementations through the contract-only bridge; substituting either endpoint leaves bridge and application unchanged.
 - Live (separately authorized, not in default tests): TCP SIP plus RTP echo against a dev PBX as the old `sip_dial_characterize` example did (`crates/driver-sip/README.md:15-19`).
 - Decoupling: the SIP crate has no RTVBP dependency and vice versa; the client and host build without either (`docs/design.md:1010-1015`).
+- Timed cutoff fixtures: fill input/output/device queues, ignore close on either leg, partition direct control immediately after renewal, deliver a renewal late, suspend/resume an endpoint, and revoke during establishment. Measure last controlled emission/delivery and local resource release/accounting against the 2 s / 5 s ceilings. Compile-only ESS evidence does not satisfy these runtime obligations.

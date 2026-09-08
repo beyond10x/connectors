@@ -9,3 +9,4 @@ domains:
   - connectors.credentials
   - connectors.refresh
   - connectors.credential_evidence
+  - connectors.sessions

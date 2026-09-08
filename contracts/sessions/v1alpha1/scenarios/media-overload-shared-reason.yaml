@@ -1,0 +1,81 @@
+# Compiled supervisor decisions, not executed clocks, media, queues or devices.
+# Whole-second acts express causal order; lease/gate observations are trusted inputs.
+# Deadline enforcement and first-terminal assignment remain in ../verification.md.
+type: ess-scenario/1
+domain: connectors.sessions
+scenario: media-overload-shared-reason
+summary: 'E20: media_overload is admitted by the shared sessions terminal vocabulary.'
+arrange:
+- instance: session
+  entity: connectors.sessions.Session
+timeline:
+- at: '2026-09-08T12:00:00Z'
+  command: connectors.sessions.OfferSession
+  input:
+    binding:
+      instance_ref: media-host
+      connection_ref: trunk-a
+      admitted_revision: revision-a
+      authority_ref: authority-a
+    profile: outbound
+    placement: local
+    streams:
+    - audio
+  outcome: offered
+  events:
+  - event: connectors.sessions.SessionOffered
+  capture:
+    instance: session
+    event: connectors.sessions.SessionOffered
+    field: session_id
+- at: '2026-09-08T12:00:01Z'
+  command: connectors.sessions.AcceptOffer
+  input:
+    session_id:
+      $instance: session
+  outcome: accepted
+  events:
+  - event: connectors.sessions.OfferAccepted
+- at: '2026-09-08T12:00:02Z'
+  command: connectors.sessions.EstablishReady
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    lease:
+      issued_at: '2026-09-08T12:00:02Z'
+      effective_expiry: '2026-09-08T12:00:04Z'
+      sequence: 1
+  outcome: ready
+  events:
+  - event: connectors.sessions.SessionReady
+- at: '2026-09-08T12:00:03Z'
+  command: connectors.sessions.BeginClose
+  input:
+    session_id:
+      $instance: session
+    terminal:
+      reason: media_overload
+      by: adapter
+      accepted_at: '2026-09-08T12:00:03Z'
+    cutoff_due_at: '2026-09-08T12:00:04Z'
+    teardown_due_at: '2026-09-08T12:00:08Z'
+  outcome: closing
+  events:
+  - event: connectors.sessions.ClosingBegun
+- at: '2026-09-08T12:00:08Z'
+  command: connectors.sessions.FinishTeardown
+  input:
+    session_id:
+      $instance: session
+    decision: released
+    peer_shutdown: unconfirmed
+  outcome: closed
+  events:
+  - event: connectors.sessions.LocalResourcesReleased
+assert:
+- view: connectors.sessions.SessionStates
+  contains:
+    session_id:
+      $instance: session
+    state: Closed

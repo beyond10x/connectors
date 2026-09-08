@@ -1,0 +1,37 @@
+{
+  "opening_commit": "6c8ecc2e9b1daa8e5bcac8c8311470356eb59e46",
+  "ess": "0.20.0",
+  "ess_files": 8,
+  "gate_command": "env TMPDIR=\"$PWD/.local/tmp\" CARGO_BUILD_JOBS=2 cargo run --locked --offline -p connectors-build -- --ess \"$PWD/.local/toolchains/ess/0.20.0/bin/ess\" gate --msrv",
+  "gate_exit": 0,
+  "rust_tests": {
+    "passed": 50,
+    "failed": 0,
+    "ignored": 0
+  },
+  "gate_scenarios": {
+    "compiled": 222,
+    "authored": 34,
+    "refusals": 0
+  },
+  "session_explicit_scenarios": {
+    "compiled": 201,
+    "authored": 13,
+    "refusals": 0,
+    "command": "ess verify conform synthesize --path ess --target ir --scenarios contracts/sessions/v1alpha1/scenarios",
+    "provenance": {
+      "suite_version": "ess-conformance/4",
+      "system": "connectors",
+      "specification_version": "v1",
+      "spec_digest": "191e6049e889457c37cad45360611487e99cc3cb307385f3de4b1186bd0a910d",
+      "contract_digest": "a0215a9ba523efd312bb3d897cdf1768aab70c7a90897926dc6d92af9ea05960"
+    }
+  },
+  "runtime_session_tests_executed": 0,
+  "limits": [
+    "ESS author/synthesize does not execute sequential lifecycle traces",
+    "Gate does not collect session authored directory; explicit commands are required",
+    "Final comment-only expiry clarification leaves compiled IR byte-identical to gated declarations",
+    "Clock, queues, devices, lease authority, field assignment and resource accounting remain runtime obligations"
+  ]
+}
