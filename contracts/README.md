@@ -7,7 +7,7 @@
 | Contract id | Document | Status | Defines |
 |---|---|---|---|
 | `operations/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | describe/invoke wire boundary, error envelope, limits |
-| proposed governed service binding | [service/v1alpha2](service/v1alpha2/semantics.md) | proposed | verified caller context, admission, policy, audit and delegated federation; wire version remains subject to compatibility review |
+| proposed governed service binding | [service/v1alpha2](service/v1alpha2/semantics.md) | proposed | verified caller context, admission, policy, audit and delegated federation; proposed v1alpha2 routes and codecs per the [compatibility owner](service/compatibility.md), not implemented |
 | `operations/v1alpha1` `mutation` profile | [operations/v1alpha1](operations/v1alpha1/semantics.md) | proposed | effects, idempotency, approval binding, durable attempt record, outcome-unknown |
 | `datasource.records/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | bounded pages, cursors, provenance, completeness |
 | `datasource.records/v1alpha1` `document` profile | [datasources/records/v1alpha1](datasources/records/v1alpha1/semantics.md) | proposed | single-item content bodies with representation, version, byte truncation |
@@ -32,7 +32,7 @@
 Inventory on 2026-09-08: 17 semantic documents (1 implemented service document and
 16 proposed documents). The table has 5 implemented rows and 17 proposed rows;
 multiple rows can share one document. An index entry records a proposal's presence,
-not approval of its wire version or runtime behavior.
+not implementation support. [Service compatibility](service/compatibility.md) selects the proposed extended wire binding and records every family’s disposition, independently of semantic-family and adapter-kind versions.
 
 Deferred families with no document yet: `execution`, `events`, `resources`,
 `configuration` (`docs/design.md:174-186`).

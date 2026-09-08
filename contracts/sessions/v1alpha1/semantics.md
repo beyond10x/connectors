@@ -155,6 +155,8 @@ The [verification record](verification.md) separates compiled lifecycle scenario
 
 - Old VoiceSession state vectors (`contracts/voice-session/v0alpha1/vectors.json`) are characterization input; the renamed states map `created → establishing`, others unchanged.
 - The old `sip-dial` response shape (`call`, `session`, `channel`) is not carried; a facade maps `session` and derives `call`/`channel` from streams.
+- [Service compatibility](../../service/compatibility.md) is authoritative for the binding. Unary establishment requires the mutation observation binding. Duplex control, correlation, live authority and every selected transport need their own complete versioned bindings before advertisement or readiness; the unary wire version does not supply them.
+
 
 ## 8. SDK and host obligations
 

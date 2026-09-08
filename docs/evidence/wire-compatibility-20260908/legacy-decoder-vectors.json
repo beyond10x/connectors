@@ -1,0 +1,413 @@
+{
+  "scope": "Current core strict decoding only; version, schema and admission checks occur afterward. Expected true is not invocation approval.",
+  "vectors": [
+    {
+      "id": "descriptor-unchanged",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{}}],\"configuration_schema\":{}}",
+      "expected_decode": true
+    },
+    {
+      "id": "operation-unchanged",
+      "type": "operation",
+      "bytes": "{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{}}",
+      "expected_decode": true
+    },
+    {
+      "id": "invocation-unchanged",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{}}",
+      "expected_decode": true
+    },
+    {
+      "id": "response-unchanged",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-unchanged",
+      "type": "error",
+      "bytes": "{\"code\":\"forbidden\",\"message\":\"denied\"}",
+      "expected_decode": true
+    },
+    {
+      "id": "descriptor-new-admission",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{}}],\"configuration_schema\":{},\"admission\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "descriptor-new-auth_profiles",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{}}],\"configuration_schema\":{},\"auth_profiles\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "descriptor-new-connections",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{}}],\"configuration_schema\":{},\"connections\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "descriptor-new-provides",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{}}],\"configuration_schema\":{},\"provides\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-effects",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"effects\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-semantic_effects",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"semantic_effects\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-risk",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"risk\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-idempotency",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"idempotency\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-approval",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"approval\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-requires_auth",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"requires_auth\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-realization",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"realization\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-limits",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"limits\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-new-profiles",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{},\"profiles\":null}],\"configuration_schema\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "invocation-new-connection",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{},\"connection\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "invocation-new-idempotency_key",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{},\"idempotency_key\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "invocation-new-approval",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{},\"approval\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "invocation-new-executor",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{},\"executor\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-new-audit_ref",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{},\"audit_ref\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-new-audit_status",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{},\"audit_status\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-new-source_audit",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{},\"source_audit\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-new-mutation",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{},\"mutation\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-new-effect",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{},\"effect\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-new-original_request_id",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{},\"original_request_id\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-invalid_input",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"invalid_input\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-unsupported",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"unsupported\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-unauthorized",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"unauthorized\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-forbidden",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"forbidden\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-not_found",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"not_found\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-stale_description",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"stale_description\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-stale_cursor",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"stale_cursor\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-rate_limited",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"rate_limited\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-unavailable",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"unavailable\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-capacity",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"capacity\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-timeout",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"timeout\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-upstream_protocol",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"upstream_protocol\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-internal",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"internal\",\"message\":\"safe fixture\"}}",
+      "expected_decode": true
+    },
+    {
+      "id": "error-code-approval_required",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"approval_required\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-approval_refused",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"approval_refused\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-approval_replayed",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"approval_replayed\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-idempotency_conflict",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"idempotency_conflict\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-outcome_unknown",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"outcome_unknown\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-not_granted",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"not_granted\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-stale_authority",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"stale_authority\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-connection_not_ready",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"connection_not_ready\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-route_unavailable",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"route_unavailable\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-route_refused",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"route_refused\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-insufficient_scope",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"insufficient_scope\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-session_not_ready",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"session_not_ready\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-session_lost",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"session_lost\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-offer_expired",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"offer_expired\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-offer_rejected",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"offer_rejected\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-lease_expired",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"lease_expired\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "error-code-revoked",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"revoked\",\"message\":\"safe fixture\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "nested-error-new-field",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"error\",\"error\":{\"code\":\"forbidden\",\"message\":\"denied\",\"cause\":\"timeout\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "descriptor-version-only-v99",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v99\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{}}],\"configuration_schema\":{}}",
+      "expected_decode": true
+    },
+    {
+      "id": "invocation-version-only-v99",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v99\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{}}",
+      "expected_decode": true
+    },
+    {
+      "id": "response-version-only-v99",
+      "type": "response",
+      "bytes": "{\"version\":\"v99\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{}}",
+      "expected_decode": true
+    },
+    {
+      "id": "new-version-new-invocation-field",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha2\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{},\"approval\":null}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-both-result-error",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\",\"result\":{},\"error\":{\"code\":\"forbidden\",\"message\":\"denied\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "response-missing-result",
+      "type": "response",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"status\":\"success\"}",
+      "expected_decode": false
+    },
+    {
+      "id": "duplicate-input-deep",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha1\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{\"scope\":\"a\",\"scope\":\"b\"}}",
+      "expected_decode": false
+    },
+    {
+      "id": "duplicate-version",
+      "type": "invocation",
+      "bytes": "{\"version\":\"v1alpha1\",\"version\":\"v1alpha2\",\"request_id\":\"r1\",\"operation\":\"read\",\"revision\":\"fixture-revision\",\"input\":{}}",
+      "expected_decode": false
+    },
+    {
+      "id": "operation-payload-new-schema",
+      "type": "descriptor",
+      "bytes": "{\"version\":\"v1alpha1\",\"instance\":\"fixture\",\"adapter\":\"fixture\",\"revision\":\"fixture-revision\",\"operations\":[{\"id\":\"read\",\"description\":\"fixture read\",\"contract\":\"operations/v1alpha1\",\"profile\":\"fixture-read\",\"input_schema\":{},\"output_schema\":{\"type\":\"object\",\"properties\":{\"new_field\":{\"type\":\"string\"}}}}],\"configuration_schema\":{}}",
+      "expected_decode": true
+    }
+  ]
+}

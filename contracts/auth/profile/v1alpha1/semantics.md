@@ -69,7 +69,7 @@ Closed vocabularies:
 Operation reference:
 
 ```json
-{ "id": "issue.create", "requires_auth": [ { "profile": "jira.user_oauth", "scopes": ["write:jira-work"] }, { "profile": "jira.api_token" } ] }
+{ "id": "issue.create", "requires_auth": [ { "profile": "jira.user_oauth", "scopes": ["write:jira-work"] }, { "profile": "jira.api_token", "scopes": [] } ] }
 ```
 
 ## 4. Rules
@@ -101,6 +101,8 @@ Operation reference:
 
 - Old `[[auth]]` blocks translate mechanically except `env`/`user_env` (become configuration credential references) and `entry` (becomes `acquisition.flow: static_entry`).
 - `signing` scheme providers (twilio, slack, stripe) are out of the six areas; `http_signing` is reserved in the vocabulary so they translate later without a new version.
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Only the safe auth-profile projection and one `requires_auth` alternatives array are public in the extended codec. The complete authored profile is specification/configuration data with an independent reader; reserved vocabulary grants no support.
+
 
 ## 8. SDK and host obligations
 

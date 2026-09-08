@@ -11,7 +11,7 @@
 | Contract | `operations/v1alpha1` |
 | Profile | `mutation` |
 | Existing profiles | read profiles declared per adapter (`kubernetes-list`, `gitlab-*`, `postgresql-native-text`), all promising "no external business mutation" (`contracts/service/v1alpha1/semantics.md`, Wire boundary) |
-| Relation | additive: an operation declares `profile: mutation` and gains the fields and rules below; read operations are unchanged |
+| Relation | new semantic profile: an operation declares `profile: mutation`; public fields require the selected extended service binding |
 
 A mutation is an operation whose dispatch can change external state. The profile exists because the base wire contract explicitly promises no business mutation, no retry, and no idempotency; those promises cannot cover Jira issue creation, a Kubernetes rollout restart, or a SIP dial.
 
@@ -29,7 +29,7 @@ A mutation is an operation whose dispatch can change external state. The profile
 
 ## 3. Types
 
-Descriptor additions to `Operation` (`crates/connectors-core/src/lib.rs:59-66`), all optional so read operations serialize unchanged:
+Operation curation in the proposed [extended service binding](../../service/compatibility.md#4-extended-descriptor-and-invocation-surface). These fields are required there, including for reads. The following is a descriptor excerpt; description and advertised limits are omitted. Existing legacy reads serialize unchanged only through the verified projection in §7:
 
 ```json
 {
@@ -54,13 +54,11 @@ Descriptor additions to `Operation` (`crates/connectors-core/src/lib.rs:59-66`),
 | `idempotency.kind` | `none`, `keyed`, `natural` | `none`: every dispatch is a new effect; `keyed`: the receiver owns scoped reservation/replay under §5.1, with `retention_seconds` for durable known terminal results; `natural`: the provider operation is idempotent by its own semantics (documented per operation), without implying host replay storage |
 | `approval` | `not_required`, `required`, `event_claim` | which admission profile must be satisfied before dispatch |
 
-Illustrative invocation additions to `Invocation` (`crates/connectors-core/src/lib.rs:90-97`).
-This is an incomplete proposed message: the version field is deliberately omitted.
-The implemented `v1alpha1` reader refuses these additions; the exact version and
-codec belong to `story:contracts-wire-compatibility`.
+Illustrative invocation on `POST /v1alpha2/invoke`; the implemented legacy reader refuses these additions. The [compatibility owner](../../service/compatibility.md) defines the selected codec and routes.
 
 ```json
 {
+  "version": "v1alpha2",
   "request_id": "…",
   "operation": "issue.create",
   "revision": "<descriptor revision>",
@@ -70,13 +68,7 @@ codec belong to `story:contracts-wire-compatibility`.
 }
 ```
 
-Illustrative outcome additions to `Outcome` (`crates/connectors-core/src/lib.rs:100-104`); the versioned codec is owned by `story:contracts-wire-compatibility`, not chosen by these examples:
-
-```json
-{ "status": "success", "result": {}, "effect": "applied" }
-{ "status": "success", "result": {}, "effect": "replayed", "original_request_id": "…" }
-{ "status": "error", "error": { "code": "outcome_unknown", "message": "…" } }
-```
+The proposed response carries a `mutation` observation alongside the ordinary result/error and required audit metadata. Its five members are required when the observation is disclosed: `classification`, nullable `attempt`, nullable `original_request_id`, `replayed`, and nullable `cause`. [The exact response rules and outcome table](../../service/compatibility.md#5-extended-responses-audit-and-mutation-observation) are authoritative. For example, an admitted replay of an applied result keeps classification `applied`, identifies the original attempt/request, and sets `replayed: true`; the outer request id identifies the current observation. Replay is not an effect classification. A denied observation omits mutation metadata and discloses no original outcome.
 
 New error codes beyond `ErrorCode` (`crates/connectors-core/src/lib.rs:13-27`):
 
@@ -88,7 +80,7 @@ New error codes beyond `ErrorCode` (`crates/connectors-core/src/lib.rs:13-27`):
 | `idempotency_conflict` | same namespace/key, different request fingerprint while its reservation remains live; disclose neither the stored request nor the differing axis |
 | `outcome_unknown` | the relevant attempt may have dispatched and the observer lacks definitive outcome evidence |
 
-An observation has two independent semantic dimensions: **classification** (`not_attempted`, `refused`, `applied`, `unknown`) describes knowledge of the business effect; **cause** describes why an error occurred (`Timeout`, `Unavailable`, an admission refusal, etc.). `not_attempted` is a classification, not another competing `Error.code`. For example, an unavailable attempt store before any dispatch permission gives cause `Unavailable` and classification `not_attempted`. It does not lose its cause to a second error code. These dimensions have a typed ESS home, `connectors.mutations.Observation`; its structure is not an approved public wire encoding.
+An observation has two independent semantic dimensions: **classification** (`not_attempted`, `refused`, `applied`, `unknown`) describes knowledge of the business effect; **cause** describes why an error occurred (`Timeout`, `Unavailable`, an admission refusal, etc.). `not_attempted` is a classification, not another competing `Error.code`. For example, an unavailable attempt store before any dispatch permission gives cause `Unavailable` and classification `not_attempted`. It does not lose its cause to a second error code. These dimensions have a typed ESS home, `connectors.mutations.Observation`; it remains a private semantic value. The proposed public encoding is the distinct `connectors.service_wire.MutationObservation`, governed by the compatibility owner.
 
 The mutation response code for an uncertain outcome is `outcome_unknown`; a transport timeout can remain its safe diagnostic cause, but must not replace it with a plain `Timeout` that implies non-dispatch. An HTTP status or successful transport exchange alone proves neither success nor refusal of the business effect. Read-profile error meanings are unchanged. `not_attempted` proves only that this business attempt did not dispatch: it does not restore a spent approval or promise that resubmission will be admitted.
 
@@ -144,7 +136,7 @@ Cancellation: report an aborted business attempt only after the atomic pre-gate 
 | Retry | never automatic. A caller retry with a live scoped key observes its reservation; it cannot re-dispatch. After a known-result reservation expires, §5.1 permits a freshly admitted new attempt. A keyed operation refuses a missing key; for `none`/`natural`, a new invocation is a new attempt. `retry_after_seconds` on `RateLimited` is advisory and never triggers mutation resend |
 | Concurrency | two admitted invocations with the same namespace/key and fingerprint: at most one obtains dispatch permission. The other waits for the original's terminal record; on waiter deadline it returns that outcome only if observed and still authorized, otherwise unknown or an admission refusal as §5.1 requires. A deadline alone is `outcome_unknown` with diagnostic cause `Timeout`, never `Capacity`/`not_attempted` for a possibly dispatched original. The waiter sends no additional business request |
 | Ordering | none across operations; a session-establishing mutation (`effects` includes `session_establishment`) returns a session reference and follows `sessions/v1alpha1` |
-| Limits | request body 64 KiB and 20 s service deadline as in the base; known-result replay retention is 86,400 s from durable terminal settlement, not a timeout for pending/unknown reservations (§5.1) |
+| Limits | non-generic request 64 KiB and 20 s service deadline; `realization: generic` selects 256 KiB and 40 s execution / 30 s provider / 5 s connect, including generic mutations, as defined by [service compatibility](../../service/compatibility.md#7-limits-and-compatibility-obligations); known-result replay retention is 86,400 s from durable terminal settlement, not a timeout for pending/unknown reservations (§5.1) |
 | Attempt record size | bounded; the input digest is stored, not the input |
 
 ### 5.1 Key namespace, fingerprint and replay admission
@@ -153,7 +145,7 @@ The receiving mutation host owns the keyed ledger and its durable unique index; 
 
 **Namespace:** `(receiver_instance, admitted_authority, trusted_origin)`. `admitted_authority` includes tenant (or configured local absence), optional realm, stable caller identity and executor identity. An absent realm differs from `default`; absent tenant is not a wildcard. Direct origin is tagged `direct` with the receiver's configured identity. Federated origin is tagged `federated` with the authenticated gateway/origin authority identity, independently of the resolved receiver. Credential bytes, credential rotation, connection-pool handles and caller-supplied headers never define these identities. Request input cannot choose tenant, realm, caller, executor or origin. If a binding cannot establish the originating caller and origin without collapsing callers behind one broad gateway credential, keyed mutation is refused until the F03 federation binding supplies trusted context; this story does not invent that delegation protocol.
 
-The index key is `(namespace, caller_key)`. `caller_key` is a required nonempty opaque string for keyed operations, compared exactly without trimming, case folding or Unicode normalization. It remains subject to the base request bound. Store structured fields or use an injective, versioned encoding: `mutation-key/v1` is a canonical JSON array of tag, receiver, tenant, realm, caller, executor, origin tag, origin authority, and key, in that order; preserve JSON null for absence. Delimiter concatenation and a lossy hash-only index are insufficient. A hash may index the tuple only if equality is checked against the original tuple.
+The index key is `(namespace, caller_key)`. `caller_key` is a required nonempty opaque string for keyed operations, compared exactly without trimming, case folding or Unicode normalization. It remains subject to the selected operation’s advertised request bound. Store structured fields or use an injective, versioned encoding: `mutation-key/v1` is a canonical JSON array of tag, receiver, tenant, realm, caller, executor, origin tag, origin authority, and key, in that order; preserve JSON null for absence. Delimiter concatenation and a lossy hash-only index are insufficient. A hash may index the tuple only if equality is checked against the original tuple.
 
 **Fingerprint:** resolved source-qualified operation reference, stable connection reference and its admitted metadata revision, contract/version and profile, descriptor revision, active host configuration revision, canonicalization identifier and canonical input digest. Store these coordinates under `mutation-request/v1`; if hashed, compare the stored coordinates as well. Operation/connection/revision changes are **not namespace changes**: while a reservation is live, reusing its key for any different fingerprint is a safe, axis-free `idempotency_conflict`, with no result disclosure or additional dispatch. Request correlation id, deadline, key itself, approval token/expiry and rotating credential bytes are excluded. Metadata/configuration revisions must change when a route, external identity, destination, resource interpretation or operation meaning changes. A same-identity credential refresh alone is not a semantic revision. An implementation unable to detect an effect-relevant binding change must refuse keyed dispatch; silently preserving the fingerprint is not allowed.
 
@@ -184,7 +176,7 @@ After known-result expiry the host no longer promises to deduplicate that key; c
 
 Positive:
 
-- Approval bound to exact input dispatches once; `effect: applied`; `Prepared`, `Dispatching`, `Completed` are durably ordered.
+- Approval bound to exact input dispatches once; `mutation.classification: applied`; `Prepared`, `Dispatching`, `Completed` are durably ordered.
 - Exact namespace/key/fingerprint replay under current admission returns the original result/classification with replay metadata; provider fixture sees one request. Missing/expired original approval does not trigger a second spend; a denied replay discloses no original result.
 - Recovery after spending but before the durable gate wins `Prepared → Aborted`; after the gate (whether before or after the send) yields `Indeterminate`. A spent approval cannot be re-spent. Repeat for `not_required` and `event_claim`; spending never determines the outcome.
 - A definitive provider refusal yields `Failed` / `refused`; an ambiguous 5xx yields `Indeterminate` / `unknown`.
@@ -206,7 +198,7 @@ Adversarial (`docs/design.md:982`):
 
 ## 7. Compatibility and projection
 
-- Descriptor fields are additive and optional; the current `Descriptor` deserializer uses `deny_unknown_fields` (`crates/connectors-core/src/lib.rs:70-72`), so clients at the current binary refuse descriptors that carry them. Either the wire version becomes `v1alpha2` or the current client is released with the optional fields before any adapter advertises a mutation. Default taken: `v1alpha2` wire with `v1alpha1` projection dropping mutation operations entirely (a client that cannot see effects must not be able to invoke one).
+- [Service compatibility](../../service/compatibility.md) selects the proposed `v1alpha2` routes and closed fields. Semantic `operations/v1alpha1` stays at its current family version. Optional fields are still rejected by the old strict reader. Legacy projection is off by default and admits only explicitly verified unchanged reads; it has its own revision and invoke allowlist. Hiding mutation metadata or removing operations from describe alone is insufficient.
 - Old `ConnectorOperation v0alpha1..v0alpha3` approval and rate metadata (`docs/design.md:113`) map onto `approval` and `retry_after_seconds`; a compatibility facade is a separate binding (`docs/design.md:1104`).
 
 ## 8. SDK and host obligations
@@ -214,13 +206,13 @@ Adversarial (`docs/design.md:982`):
 | Obligation | Where |
 |---|---|
 | `AuthenticatedHttp` gains `post`/`put`/`patch`/`delete` with bounded body | `crates/connectors-sdk/src/lib.rs:53-56` (GET only today) |
-| `Operation`, `Invocation`, `Outcome` gain the optional fields above | `crates/connectors-core/src/lib.rs:59-104` |
+| Separate extended `Operation`, `Invocation`, `Response` codecs implement the required/optional fields in the compatibility owner | `crates/connectors-core/src/lib.rs:59-104` |
 | Host ledger port: `prepare`, atomic `open_dispatch`/`abort_prepared`, `record_outcome`, `recover`; separate one-time `spend` port | new host module; common conformance tests for in-memory and durable bindings, with crash/durability tests on the durable binding. No approval spend may substitute for the dispatch fence |
 | Service deadline/cancellation supervisor must coordinate with the ledger, fence pre-gate dispatch and preserve post-gate uncertainty; do not classify by whether a future returned | `crates/connectors-host/src/server.rs` (read-only timeout wrapper today); future mutation binding must settle the abort/open race and any terminal-record race atomically |
 | HTTP/transport timeout must consume the mutation observation, preserve `outcome_unknown`, and never overwrite it with a generic timeout after possible dispatch. If the connection closes, the client treats missing response as unknown | `crates/connectors-host/src/http.rs` and future mutation clients; an earlier transport deadline needs the same coordinated abort or conservative unknown response |
 | Duplicate waiting is observation of the original attempt; waiter timeout/cancellation cannot mutate its lifecycle or spend another claim | future host idempotency coordinator; assert original outcome identity and zero additional sends |
 | Receiver owns atomic namespace/key reservation plus Prepared attempt, fingerprint comparison, current replay admission, retained result/index, clock and generation-safe expiry | future host ledger and admission ports, including restart, lost-acknowledgement and capacity tests in §5.1; adapter implementations supply resolved operation/connection semantics but cannot choose caller authority |
-| Safe error cause and business-effect classification remain separately observable, including ledger-write failure after a known provider result | future mutation wire binding and host diagnostics; exact fields/version belong to `story:contracts-wire-compatibility` |
+| Safe error cause and business-effect classification remain separately observable, including ledger-write failure after a known provider result | future mutation codec and host diagnostics implement the exact proposed fields/version in [service compatibility](../../service/compatibility.md) |
 | Federation forwards `idempotency_key` and `approval` unchanged and never resends on a lost downstream answer | `crates/connectors-host/src/federation.rs` |
 | Adapter spec kind gains the optional descriptor fields; compiler refuses `profile: mutation` without `effects` containing `external_write` | `spec-kinds/adapter/v1/schema.json`, `crates/connectors-spec/src/lib.rs` |
 
@@ -240,7 +232,7 @@ Adversarial (`docs/design.md:982`):
 
 | Decision | Default taken |
 |---|---|
-| Wire version bump versus additive optional fields | `v1alpha2` wire; `v1alpha1` projection hides mutation operations |
+| Service binding | proposed `v1alpha2` routes; explicit verified legacy read projection only, off by default, with invoke enforcement |
 | Idempotency retention | 86,400 s first-profile default; per-adapter override forbidden until measured |
 | Whether `event_claim` admission lives in this contract or in `events` | here, as an admission profile; `events` supplies the reference format when that family exists |
 | Attempt ledger backend | durable local file first, SQLite second, same port tests |
