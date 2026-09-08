@@ -6,7 +6,7 @@ status: draft
 title: Parallel completion of remaining semantic specifications
 relations:
 - informed_by: specification:contract-driven-connectors-design
-revision: 1
+revision: 2
 ---
 # Specification completion parallel plan, 2026-09-09
 
@@ -42,4 +42,10 @@ No remote deployment/publication is authorized. Existing retained design/Kuberne
 ## Current stage
 
 Dispatched from common checkpoint; seven original remediation stories remain open at dispatch, plus ownership closure and consolidated final consistency review. Root remains sole planning writer. Individual worker completion is not final specification readiness.
+
+## Independent review pipeline
+
+Reviewer A starts the stable shared core at immutable commit eb0815961e6ffee54c50f91f37eff2bbe11811c0 while native datasource and media/vocabulary edits finish. Managed id specs-review-a-20260909; tree /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-review-a-20260909; build target/ and scratch .local/spec-completion-20260909 inside that tree; session specs-review-a-20260909. Its original review-brief.md is on disk. Tracked sources are read-only. The final integrated commit will be supplied for its remaining coverage; this first pass cannot approve the whole specification set. A second fresh reviewer follows on the combined source. Human approval or mechanically independent runtime-verifier evidence is not claimed by an agent review.
+
+Read-retry unit head 7adcb2952ad18b86dcac4e824fdeb06e8ff1c480 is integrated by merge eb0815961e6ffee54c50f91f37eff2bbe11811c0, including coordinator-owned compatibility/v1alpha2 patches. Coordinator source/scenario review and dry merge passed; author and committer are the verified bot. The story remains active pending combined independent review. Unit and coordinator leases on the retry tree are released; it is retained, not cleanup-safe merely because its commit exists.
 
