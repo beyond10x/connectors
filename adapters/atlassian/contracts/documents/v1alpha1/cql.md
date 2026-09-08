@@ -13,7 +13,7 @@ references describe Boolean clauses, grouping, ordering, comparisons, membership
 and text predicates. [Fields](https://developer.atlassian.com/cloud/confluence/cql-fields/)
 and [functions](https://developer.atlassian.com/cloud/confluence/cql-functions/)
 retain their provider meaning and supported combinations. Exact source bytes are
-retained in the [provider manifest](../../../../../docs/evidence/datasource-semantics-20260908/provider-source-hashes.json).
+retained in the [native provider manifest](evidence/20260909/provider-source-hashes.json).
 The grammar/bounds below are receiver selections based on those constructs; the
 references do not supply a verified Rust parser or prove a deployed binding.
 
@@ -81,7 +81,7 @@ the subsequent v2 body request filters by the admitted stable space IDs.
 
 Continuation carries the same original predicate, constructed scope, ordering,
 configuration/auth context and limits. A provider link supplies only its validated
-cursor coordinate under records §4.3. Relative date functions continue to have
+cursor coordinate under the [native document transport rules](semantics.md#43-lookup-and-transport-failures). Relative date functions continue to have
 provider-native evaluation; the contract does not turn a live CQL search into a
 frozen result snapshot.
 
@@ -92,7 +92,7 @@ frozen result snapshot.
 | `label = ops OR title ~ "error" ORDER BY created DESC, title` | Wrap the complete OR expression; append both original sort keys outside the fixed conjunction |
 | `NOT (label = private OR title ~ "ORDER BY")` | Preserve NOT/grouping and treat quoted text as a value, not a suffix |
 | `created >= now("-4w") AND creator = currentUser()` | Preserve native functions and their provider interpretation |
-| `text ~ "\\\"quoted phrase\\\""` | Keep the accepted text-search escape bytes unchanged |
+| `text ~ "\"quoted phrase\""` | Raw CQL has one backslash before each inner quote; preserve those bytes before request encoding |
 | `space = forbidden OR type = blogpost` | Remains inside the conjunction; it cannot bypass fixed allowed-space/page predicates |
 | Extra `)`, a second ORDER BY, a comment or trailing statement | Refuse syntax before provider dispatch |
 | A configured key contains a quote/backslash or begins with a digit | Use one exact quoted literal or refuse an unverified binding; never concatenate raw key text |
@@ -100,3 +100,11 @@ frozen result snapshot.
 
 These are declared expectations for future parser/provider fixtures. This document
 and the ESS selection shape do not execute or independently verify them.
+
+The examples above are raw CQL text, not JSON string literals or pre-encoded URL
+parameters. The public JSON string must decode to those exact bytes; URL encoding
+then happens once for the single provider cql parameter. The official
+[text-search source](https://developer.atlassian.com/cloud/confluence/performing-text-searches-using-cql/)
+shows the escaped inner quotes used for exact phrases and is retained in the
+same native manifest. This layered encoding changes transport representation,
+not the admitted predicate or native text-search meaning.
