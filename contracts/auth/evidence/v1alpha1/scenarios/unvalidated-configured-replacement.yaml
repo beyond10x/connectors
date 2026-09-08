@@ -1,0 +1,150 @@
+# Compiled decision expectations, not runtime injection of replacement, refresh,
+# identity probes, clock or revocation. See ../verification.md.
+type: ess-scenario/1
+domain: connectors.credential_evidence
+scenario: unvalidated-configured-replacement
+summary: 'F05: unchanged file/ref/revision cannot lend generation A evidence to unvalidated
+  generation B.'
+arrange:
+- instance: stale
+  entity: connectors.credential_evidence.DispatchAdmission
+- instance: unknown
+  entity: connectors.credential_evidence.DispatchAdmission
+timeline:
+- at: '2026-09-08T09:00:00Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: unvalidated-configured-replacement-stale
+    operation_ref: kubernetes.resources.list
+    generation_id: 00000000-0000-4000-8000-000000000002
+    binding:
+      instance_id: test-instance
+      connection_ref: cluster-a
+      profile_ref: kubernetes.bearer
+      provider_authority: test-cluster
+    expected_external_identity:
+      kind: kubernetes-user
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000001
+      binding:
+        instance_id: test-instance
+        connection_ref: cluster-a
+        profile_ref: kubernetes.bearer
+        provider_authority: test-cluster
+      observed_external_identity:
+        kind: kubernetes-user
+        subject: account-a
+      checks:
+      - check: identity_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: stale
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:01Z'
+  command: connectors.credential_evidence.RejectAdmission
+  input:
+    admission_id:
+      $instance: stale
+    reason: generation_changed
+  outcome: refused
+  events:
+  - event: connectors.credential_evidence.AdmissionRefused
+    payload:
+      reason: generation_changed
+- at: '2026-09-08T09:00:02Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: stale
+    generation_id: 00000000-0000-4000-8000-000000000002
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationDispatched
+- at: '2026-09-08T09:00:03Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: unvalidated-configured-replacement-unknown
+    operation_ref: kubernetes.resources.list
+    generation_id: 00000000-0000-4000-8000-000000000002
+    binding:
+      instance_id: test-instance
+      connection_ref: cluster-a
+      profile_ref: kubernetes.bearer
+      provider_authority: test-cluster
+    expected_external_identity:
+      kind: kubernetes-user
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000002
+      binding:
+        instance_id: test-instance
+        connection_ref: cluster-a
+        profile_ref: kubernetes.bearer
+        provider_authority: test-cluster
+      observed_external_identity: null
+      checks:
+      - check: identity_check
+        result: not_run
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: unknown
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:04Z'
+  command: connectors.credential_evidence.RejectAdmission
+  input:
+    admission_id:
+      $instance: unknown
+    reason: validation_required
+  outcome: refused
+  events:
+  - event: connectors.credential_evidence.AdmissionRefused
+    payload:
+      reason: validation_required
+- at: '2026-09-08T09:00:05Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: unknown
+    generation_id: 00000000-0000-4000-8000-000000000002
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationDispatched
+assert:
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: stale
+    generation_id: 00000000-0000-4000-8000-000000000002
+    state: Refused
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: unknown
+    generation_id: 00000000-0000-4000-8000-000000000002
+    state: Refused
