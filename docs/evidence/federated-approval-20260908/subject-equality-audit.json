@@ -1,0 +1,86 @@
+{
+  "canonicalization": "fixed fixture subset of adapter-v1-canonical-json; no general new canonicalizer implemented",
+  "base_subject_sha256": "affd52d85c12cb42449c36224e1a2ba3339d395c9c4c35ade10f5c9a5b638dee",
+  "coordinate_checks": [
+    {
+      "changed_coordinate": "target.instance",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "target.operation",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "target.connection",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "target.connection_revision",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "target.contract",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "target.profile",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "target.descriptor_revision",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "target.configuration_revision",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "authority.scope.caller",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "authority.scope.realm",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "authority.scope.executor",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "authority.current_authority.id",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "origin.authority_ref",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "route.route_revision",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    },
+    {
+      "changed_coordinate": "input_sha256",
+      "subject_equal": false,
+      "expected_new_attempt": "approval_refused after current admission; live-key fingerprint changes conflict where the coordinate belongs to the fingerprint"
+    }
+  ],
+  "gateway_presentation_only_refresh": {
+    "canonical_subject_unchanged": true,
+    "requires_current_gateway_descriptor": true,
+    "automatic_resend": false
+  }
+}

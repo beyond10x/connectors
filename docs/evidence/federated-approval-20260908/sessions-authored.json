@@ -1,0 +1,6044 @@
+{
+  "provenance": {
+    "suite_version": "ess-conformance/4",
+    "system": "connectors",
+    "specification_version": "v1",
+    "spec_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "89e0b645e65b00171d7630031b47832bb6b95c6fb38c236c4d970ec17de0acc9"
+  },
+  "scenarios": {
+    "connectors.sessions/authored/continuity-loss-stays-lost": {
+      "purpose": "F06: restart/loss does not create a replacement lease or synthesize a successful close.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "relay"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.LoseContinuity",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.LoseContinuity",
+            "outcome": "lost"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ContinuityLost",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.RenewDataLease",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:06Z",
+                "issued_at": "2026-09-08T12:00:04Z",
+                "sequence": 2.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Lost"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.PermitData",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "direction": {
+              "kind": "literal",
+              "value": "output"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Lost"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Lost"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.LoseContinuity"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.PermitData"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.RenewDataLease"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.LoseContinuity",
+            "outcome": "lost"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ContinuityLost"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/continuity-lost-during-closing": {
+      "purpose": "Review B: actual owner/continuity loss during teardown becomes Lost while preserving the first terminal.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:08Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:03Z",
+                "by": "adapter",
+                "reason": "remote_hangup"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.LoseContinuity",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.LoseContinuity",
+            "outcome": "lost"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ContinuityLost",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Lost"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Lost"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.LoseContinuity"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.LoseContinuity",
+            "outcome": "lost"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ContinuityLost"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/direct-partition-expiry-no-grace": {
+      "purpose": "F06: partitioned direct path observes existing lease expiry, no extra grace or receipt-time reset.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "direct"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:09Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:04Z",
+                "by": "host",
+                "reason": "lease_expired"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.PermitData",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "expired"
+            },
+            "direction": {
+              "kind": "literal",
+              "value": "output"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.PermitData"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/drain-expiry-has-no-extra-grace": {
+      "purpose": "F06: a previously announced drain caps live authority; its deadline is already the last-data deadline.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:09Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:04Z",
+                "by": "host",
+                "reason": "revoked"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.PermitData",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "expired"
+            },
+            "direction": {
+              "kind": "literal",
+              "value": "input"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.PermitData"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/expired-data-denial-cannot-renew": {
+      "purpose": "Review B: expiry observed during data admission atomically starts Closing; a later allow cannot renew.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.PermitData",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "expired"
+            },
+            "direction": {
+              "kind": "literal",
+              "value": "output"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "authority-terminated"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.DataAuthorityTerminated",
+          "payload": {
+            "decision": "expired"
+          },
+          "shape": {
+            "decision": {
+              "holds": "enum",
+              "variants": [
+                "allow",
+                "expired",
+                "revoked",
+                "unverified"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.RenewDataLease",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:07Z",
+                "issued_at": "2026-09-08T12:00:05Z",
+                "sequence": 2.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.PermitData"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.RenewDataLease"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "authority-terminated"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataAuthorityTerminated"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/first-terminal-not-replaced": {
+      "purpose": "F06: later revocation cannot create a second terminal; uncertain cleanup does not fabricate closed.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:08Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:03Z",
+                "by": "adapter",
+                "reason": "remote_hangup"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:06Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:08Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:03Z",
+                "by": "host",
+                "reason": "revoked"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "unaccounted"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "lost"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalCleanupUnaccounted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Lost"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "lost"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalCleanupUnaccounted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/late-renewal-does-not-revive": {
+      "purpose": "F06: a delayed otherwise-authentic renewal cannot revive a locally expired terminal session.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "direct"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:09Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:04Z",
+                "by": "host",
+                "reason": "lease_expired"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.RenewDataLease",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:02Z",
+                "issued_at": "2026-09-08T12:00:00Z",
+                "sequence": 2.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:12Z",
+                "issued_at": "2026-09-08T12:00:10Z",
+                "sequence": 3.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closed"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.RenewDataLease"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/media-incompatible-shared-reason": {
+      "purpose": "E20: media_incompatible is admitted by the shared sessions terminal vocabulary.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:07Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:02Z",
+                "by": "adapter",
+                "reason": "media_incompatible"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/media-overload-shared-reason": {
+      "purpose": "E20: media_overload is admitted by the shared sessions terminal vocabulary.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:08Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:03Z",
+                "by": "adapter",
+                "reason": "media_overload"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/revocation-beats-renewal": {
+      "purpose": "F06: a trusted revoked decision atomically starts Closing, so a later observation cannot restart authority or deadlines.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.RenewDataLease",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "revoked"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:05Z",
+                "issued_at": "2026-09-08T12:00:03Z",
+                "sequence": 2.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "authority-terminated"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.DataAuthorityTerminated",
+          "payload": {
+            "decision": "revoked"
+          },
+          "shape": {
+            "decision": {
+              "holds": "enum",
+              "variants": [
+                "allow",
+                "expired",
+                "revoked",
+                "unverified"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:06Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:08Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:03Z",
+                "by": "host",
+                "reason": "revoked"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.RenewDataLease"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "authority-terminated"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataAuthorityTerminated"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/revocation-refuses-data-and-renewal": {
+      "purpose": "F06: closing cuts off local data permission and renewal; peer silence cannot prevent local release.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionReady",
+          "shape": {
+            "lease.effective_expiry": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.issued_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "lease.sequence": {
+              "holds": "primitive",
+              "kind": "integer"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.PermitData",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "direction": {
+              "kind": "literal",
+              "value": "output"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "permitted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.DataPermitted",
+          "shape": {
+            "direction": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:09Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:04Z",
+                "by": "host",
+                "reason": "revoked"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.PermitData",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "direction": {
+              "kind": "literal",
+              "value": "input"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.RenewDataLease",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:08Z",
+                "issued_at": "2026-09-08T12:00:06Z",
+                "sequence": 2.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.PermitData"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.RenewDataLease"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "ready"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "permitted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.RenewDataLease",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/revoked-during-establishment": {
+      "purpose": "F06: revocation before application/media readiness returns no ready session.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "local"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:04Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:07Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:02Z",
+                "by": "host",
+                "reason": "revoked"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.ClosingBegun",
+          "shape": {
+            "cutoff_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            },
+            "teardown_due_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.accepted_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "terminal.by": {
+              "holds": "enum",
+              "variants": [
+                "adapter",
+                "application",
+                "host"
+              ]
+            },
+            "terminal.reason": {
+              "holds": "enum",
+              "variants": [
+                "remote_hangup",
+                "local_close",
+                "cancelled",
+                "rejected",
+                "expired",
+                "revoked",
+                "lease_expired",
+                "media_overload",
+                "media_incompatible",
+                "transport_lost",
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:05Z",
+                "issued_at": "2026-09-08T12:00:03Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "closing"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    },
+    "connectors.sessions/authored/unverified-lease-never-opens-data": {
+      "purpose": "F06: an unknown deadline/trust bound prevents readiness and data admission.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.OfferSession",
+          "input": {
+            "binding": {
+              "kind": "literal",
+              "value": {
+                "admitted_revision": "revision-a",
+                "authority_ref": "authority-a",
+                "connection_ref": "trunk-a",
+                "instance_ref": "media-host"
+              }
+            },
+            "placement": {
+              "kind": "literal",
+              "value": "direct"
+            },
+            "profile": {
+              "kind": "literal",
+              "value": "outbound"
+            },
+            "streams": {
+              "kind": "literal",
+              "value": [
+                "audio"
+              ]
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.SessionOffered",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "session",
+          "entity": "connectors.sessions.Session",
+          "event": "connectors.sessions.SessionOffered",
+          "field": "session_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.AcceptOffer",
+          "input": {
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.OfferAccepted",
+          "shape": {
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.EstablishReady",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "unverified"
+            },
+            "lease": {
+              "kind": "literal",
+              "value": {
+                "effective_expiry": "2026-09-08T12:00:04Z",
+                "issued_at": "2026-09-08T12:00:02Z",
+                "sequence": 1.0
+              }
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "authority-terminated"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.DataAuthorityTerminated",
+          "payload": {
+            "decision": "unverified"
+          },
+          "shape": {
+            "decision": {
+              "holds": "enum",
+              "variants": [
+                "allow",
+                "expired",
+                "revoked",
+                "unverified"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.PermitData",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "allow"
+            },
+            "direction": {
+              "kind": "literal",
+              "value": "input"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataPermitted"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.SessionReady"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.BeginClose",
+          "input": {
+            "cutoff_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:06Z"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            },
+            "teardown_due_at": {
+              "kind": "literal",
+              "value": "2026-09-08T12:00:07Z"
+            },
+            "terminal": {
+              "kind": "literal",
+              "value": {
+                "accepted_at": "2026-09-08T12:00:02Z",
+                "by": "host",
+                "reason": "rejected"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.sessions.StateConflict",
+          "fields": {
+            "state": "Closing"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.sessions.FinishTeardown",
+          "input": {
+            "decision": {
+              "kind": "literal",
+              "value": "released"
+            },
+            "peer_shutdown": {
+              "kind": "literal",
+              "value": "unconfirmed"
+            },
+            "session_id": {
+              "kind": "instance",
+              "instance": "session"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.sessions.LocalResourcesReleased",
+          "shape": {
+            "peer_shutdown": {
+              "holds": "enum",
+              "variants": [
+                "confirmed",
+                "unconfirmed"
+              ]
+            },
+            "session_id": {
+              "holds": "primitive",
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.sessions.SessionStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.sessions.SessionStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "session_id": {
+                "kind": "instance",
+                "instance": "session"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Closed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.sessions"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Binding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.CleanupDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.DataLease"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.GateDecision"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.PeerShutdown"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Placement"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Profile"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.Session.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.SessionId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalActor"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalFact"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.sessions.TerminalReason"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.sessions.Session"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.AcceptOffer"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.BeginClose"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.EstablishReady"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.FinishTeardown"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.OfferSession"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.sessions.PermitData"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.AcceptOffer",
+            "outcome": "accepted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.BeginClose",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.EstablishReady",
+            "outcome": "authority-terminated"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.FinishTeardown",
+            "outcome": "closed"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.OfferSession",
+            "outcome": "offered"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.sessions.PermitData",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.ClosingBegun"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataAuthorityTerminated"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataLeaseRenewed"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.DataPermitted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.LocalResourcesReleased"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.OfferAccepted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionOffered"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.sessions.SessionReady"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.sessions.StateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.sessions.SessionStates"
+        }
+      ]
+    }
+  }
+}

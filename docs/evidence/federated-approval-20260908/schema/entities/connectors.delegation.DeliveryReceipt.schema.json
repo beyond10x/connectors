@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeliveryReceipt",
+  "x-ess-name": "connectors.delegation.DeliveryReceipt",
+  "x-ess-kind": "entity",
+  "type": "object",
+  "properties": {
+    "receipt_id": {
+      "$ref": "#/$defs/connectors.delegation.ReceiptId"
+    },
+    "instance_id": {
+      "type": "string",
+      "x-ess-relation": {
+        "name": "receiver",
+        "kind": "references",
+        "source": "connectors.delegation.DeliveryReceipt",
+        "target": "connectors.declarations.ServiceConfiguration",
+        "cardinality": "one",
+        "via": "instance_id"
+      }
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "state": {
+      "$ref": "#/$defs/connectors.delegation.DeliveryReceipt.State"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "instance_id",
+    "issuer",
+    "nonce",
+    "expires_at",
+    "state"
+  ],
+  "additionalProperties": false,
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:75e7466759e1033015ddeff67cc1f484143a6dbc35caa48d4b415fbaf7ebfab3",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.DeliveryReceipt.State": {
+      "title": "State",
+      "x-ess-name": "connectors.delegation.DeliveryReceipt.State",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "Consumed"
+      ]
+    },
+    "connectors.delegation.ReceiptId": {
+      "title": "ReceiptId",
+      "x-ess-name": "connectors.delegation.ReceiptId",
+      "x-ess-kind": "newtype",
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    }
+  }
+}
