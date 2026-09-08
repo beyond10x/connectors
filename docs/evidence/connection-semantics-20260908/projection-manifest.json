@@ -1,0 +1,20 @@
+{
+  "ess": "0.20.0",
+  "two_runs_identical": true,
+  "all_artifacts": 176,
+  "selected": {
+    "schema/types/connectors.connection_admission.NextAction.schema.json": "aec04ddd754d3bb3e05cd0f519f042c50fb247eb08c01ce325190e54714f5a0e",
+    "schema/types/connectors.connection_admission.ManagementTarget.schema.json": "d3a0e8f06ce4816ea37c260ff05688fff07fa601a1d1c4cc9ec52fea7a770000",
+    "schema/types/connectors.connection_admission.ConnectionState.schema.json": "c18d7e33fb792acd697778324f30222099117f1878804ae3e09bb1fb46a9e30e",
+    "schema/types/connectors.connection_admission.ManagementTargetKind.schema.json": "8b7e4bc6a1a4f3337eabaffb5a269e2822d2f142de9505fb9c5fe50f2f87b4d3",
+    "schema/types/connectors.connection_admission.ViabilityFacts.schema.json": "d1a9e4cbe43b3abd0d126bb7a4e38c83fbe0429b14fd19ba2e75da80a90ce1dd",
+    "schema/types/connectors.connection_admission.EvidenceRequirements.schema.json": "482fe4361631349b493f627f2466b500c354aaa4babf029e2b120c3f4bdf6c68",
+    "schema/types/connectors.connection_admission.ManagementAction.schema.json": "3bee298eeb4a90a8dc8b6f6efe6725331b4932cd9df7773066ad2085a8c3700a",
+    "schema/types/connectors.connection_admission.RequirementResult.schema.json": "540ae129e0b8c02dff6d60f94c19ddaeae266d71d4cb812e6309f60808bd3024",
+    "schema/types/connectors.connection_admission.StatusObservation.schema.json": "b4ab32a0a92de70c62481eac670663383340d8bee5d00c87dd5966bfb40b7ace",
+    "schema/types/connectors.connection_admission.ViabilityDecision.schema.json": "a9d6c5f4783c2ded84c33bd7c73ba074f46eb184b3b9d8d0a515f627e6b2a672",
+    "schema/types/connectors.connection_admission.EligibilityDecision.schema.json": "031d55f9f3501d2860fb832b7dc1c6321a42006c8a191d7ffe0da5e34e859e6b",
+    "schema/types/connectors.connection_admission.OperationCheckRequirements.schema.json": "03b3474b4efef33089ddf550f625f9fb535ded453c35664fe6bf474450b8af00",
+    "schema/types/connectors.connection_admission.EligibilityFacts.schema.json": "487331d14c5741e3ea191606d950a1f56d9a5496959f780a0bfc328ce3be5e93"
+  }
+}

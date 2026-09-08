@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.RequirementResult",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:e8187a88f37ca297f43b9463bc539183e0c6cfd339a1ca8c916fff9e5d213ee5",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.RequirementResult": {
+      "title": "RequirementResult",
+      "x-ess-name": "connectors.connection_admission.RequirementResult",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "not_required",
+        "satisfied",
+        "insufficient",
+        "denied",
+        "unavailable",
+        "stale",
+        "unknown"
+      ]
+    }
+  }
+}

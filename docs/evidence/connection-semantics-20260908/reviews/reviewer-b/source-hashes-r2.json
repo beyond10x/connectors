@@ -1,0 +1,145 @@
+{
+  "captured_at_utc": "2026-09-08T16:10:37.922568+00:00",
+  "baseline": "12c11f4b43cd6cf5ff67d3243017887b28788344",
+  "scope": "First semantic recheck of two-story draft. Evidence still being assembled is not part of this source snapshot.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278,
+      "snapshot": "recheck-1-snapshot/AGENTS.md"
+    },
+    {
+      "path": ".engineering/planning/story/contracts-management-boundary.md",
+      "sha256": "655c9c42e7fcd4de3a3f26203b88abed975435ceb34e8c9e18196938ed34d13c",
+      "bytes": 4857,
+      "snapshot": "recheck-1-snapshot/.engineering/planning/story/contracts-management-boundary.md"
+    },
+    {
+      "path": ".engineering/planning/story/contracts-connection-readiness.md",
+      "sha256": "e3fde0d5134beeb8ed5cd2bd5d91c1264037051ff3701dfd7db633f386453225",
+      "bytes": 4864,
+      "snapshot": "recheck-1-snapshot/.engineering/planning/story/contracts-connection-readiness.md"
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "678a5681264718c2a7b4c4d97eed30834dcf096fc6806ce6959c2a8dd702a791",
+      "bytes": 121905,
+      "snapshot": "recheck-1-snapshot/docs/design.md"
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "ed38b569ff50277ab639abe4386a852d27653c8486ea6b2581849eceb44207ed",
+      "bytes": 19669,
+      "snapshot": "recheck-1-snapshot/contracts/auth/connection/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "09e29911aeffb8eca04b125c26e8c054fe76106a7db9ba60ed3bb49d84b9e8e0",
+      "bytes": 22021,
+      "snapshot": "recheck-1-snapshot/contracts/auth/acquisition/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "2c51546007ae77ec9d39329c6e983f601eec65798e05ee83ed366c94fc09db31",
+      "bytes": 20481,
+      "snapshot": "recheck-1-snapshot/contracts/auth/evidence/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "274b6fdbe96c935214a76e4b38bd10286e22fb204551d62e512c5bbeb9f72170",
+      "bytes": 12748,
+      "snapshot": "recheck-1-snapshot/contracts/auth/profile/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "bytes": 10098,
+      "snapshot": "recheck-1-snapshot/contracts/auth/custody/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "d920da425f4046d1b94589ec4499cb9a1f42151e707b524abe0651dc3474de36",
+      "bytes": 22965,
+      "snapshot": "recheck-1-snapshot/contracts/service/v1alpha2/semantics.md"
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "b033ac44e13a1987bd644b94277e138dc6a00921ac93b972a9627cb5d13204bf",
+      "bytes": 35770,
+      "snapshot": "recheck-1-snapshot/contracts/service/compatibility.md"
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "812ce5ff030c8a0e36c55d909abf0ee0dac9702424c57e714f19f86f8e240aeb",
+      "bytes": 34517,
+      "snapshot": "recheck-1-snapshot/contracts/service/delegation.md"
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "bytes": 38950,
+      "snapshot": "recheck-1-snapshot/contracts/operations/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "a730e0d9f7298be6338f87ec43e41117e30509f973e5b5bc93c52868f1df70cb",
+      "bytes": 9911,
+      "snapshot": "recheck-1-snapshot/contracts/discovery/mediated_route/v1alpha1/semantics.md"
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "0bcea71b5b68ed7df0f320d8223e0072b3cafaebec0666f104a7648a38e9cb0a",
+      "bytes": 428,
+      "snapshot": "recheck-1-snapshot/ess/system.yaml"
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335,
+      "snapshot": "recheck-1-snapshot/ess/domains/declarations.yaml"
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351,
+      "snapshot": "recheck-1-snapshot/ess/domains/credentials.yaml"
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006,
+      "snapshot": "recheck-1-snapshot/ess/domains/credential_evidence.yaml"
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943,
+      "snapshot": "recheck-1-snapshot/ess/domains/refresh.yaml"
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000,
+      "snapshot": "recheck-1-snapshot/ess/domains/service_wire.yaml"
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408,
+      "snapshot": "recheck-1-snapshot/ess/domains/delegation.yaml"
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "2ec0b42e3d052f41c8936894e44ba6d50779e29b02612325dd5abbd195edcf54",
+      "bytes": 13343,
+      "snapshot": "recheck-1-snapshot/contracts/auth/management.md"
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085,
+      "snapshot": "recheck-1-snapshot/ess/domains/connection_admission.yaml"
+    }
+  ]
+}
