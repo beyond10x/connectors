@@ -1,0 +1,23 @@
+{
+  "baseline": "dd08cfd60aa43740da21946666dc0fa89c1160dc",
+  "files": [
+    {
+      "source": "crates/connectors-sdk/src/lib.rs",
+      "snapshot": "sources/crates/connectors-sdk/src/lib.rs",
+      "sha256": "43ebb6e2f775755a6bebb24f0a4e5075cec7c2aaeda79fcb037c5ea07d134290",
+      "bytes": 7237
+    },
+    {
+      "source": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "0a1a0c7387f102101c28e72d471a88540e7ae245beb0496015632306fd6cefab",
+      "bytes": 16597
+    },
+    {
+      "source": "contracts/auth/management.md",
+      "snapshot": "sources/contracts/auth/management.md",
+      "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649",
+      "bytes": 14973
+    }
+  ]
+}

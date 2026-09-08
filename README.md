@@ -21,7 +21,8 @@ Rust 1.88.0 is the checked minimum. The full test/generation gate uses the ESS p
 and the rustfmt recorded in the GitLab generated manifest (currently Rust 1.98.1).
 `--msrv` additionally checks all targets on installed Rust 1.88.0. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
-boundaries and ESS/AEP validation. It uses a task-owned temporary directory under
+boundaries, the [shared ESS provider boundary](adapters/README.md),
+independent adapter-model compilation and AEP validation. It uses a task-owned temporary directory under
 `.local/tmp`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`). This local repository has no
 configured CI or publication target.

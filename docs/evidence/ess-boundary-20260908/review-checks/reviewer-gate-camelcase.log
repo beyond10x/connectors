@@ -1,0 +1,12 @@
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 15 file(s), valid
+connectors v1 — 15 file(s), 226 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/.local/tmp/ess-boundary-t6Rsn4/ess-boundary-0.json
+connectors_atlassian v1 — 2 file(s), valid
+connectors_atlassian v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/.local/tmp/ess-boundary-t6Rsn4/ess-boundary-1.json
+connectors_docker v1 — 2 file(s), valid
+connectors_docker v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/.local/tmp/ess-boundary-t6Rsn4/ess-boundary-2.json
+connectors_grafana v1 — 2 file(s), valid
+connectors_grafana v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/.local/tmp/ess-boundary-t6Rsn4/ess-boundary-3.json
+connectors_kubernetes v1 — 4 file(s), valid
+connectors_kubernetes v1 — 4 file(s), 11 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/.local/tmp/ess-boundary-t6Rsn4/ess-boundary-4.json
+gate: shared and 4 adapter ESS models validated and compiled independently; exit=0

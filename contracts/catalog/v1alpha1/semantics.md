@@ -15,7 +15,7 @@
 
 A catalog answers three questions: which reviewed adapter definitions exist, with what provenance, and which artifact (by digest) realizes each. It never answers whether a caller may invoke anything; execution authority is unchanged whether a service was found directly or through a catalog (`docs/design.md:1006`). Bundles are data; the executable they name is separate trust (`docs/design.md:808`).
 
-The pipeline this contract describes has three parts, matching the old repository's three parts: ingest (third-party or hand-authored declaration → pre-compiled bundle), distribution (index and service), and generic execution (a bundle's `generic-http` operations run by one engine). The adapter that hosts the last two is [docs/adapters/catalog.md](../../../docs/adapters/catalog.md).
+The pipeline this contract describes has three parts, matching the old repository's three parts: ingest (third-party or hand-authored declaration → pre-compiled bundle), distribution (index and service), and generic execution (a bundle's `generic-http` operations run by one engine). The adapter that hosts the last two is [adapters/catalog/design.md](../../../adapters/catalog/design.md).
 
 ## 2. Old evidence and disposition
 
@@ -182,7 +182,7 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 | Generator: default `prepare` and `finish` for `generic-http`; today both are required handwritten methods (`spec-kinds/adapter/v2/semantics.md:20-21`) | `crates/connectors-spec` |
 | Bundle format: add `sources[]`, `curation`, `realization`, `license` to the manifest (`format` today `connectors.generated-bundle/v1`, fields `ess`, `files`, `rustfmt`, `specification_sha256`, `upstream_sha256`) | `adapters/*/generated/manifest.json` |
 | Index tool: `catalog build`, `check`, `diff` over every `adapters/*/spec`; `sources refresh` as the only networked verb, never in `build.rs` | `crates/connectors-build/src/main.rs` (today: local executor only, line 1) |
-| Generic engine: mapping + validated input + capability → request; response → outcome; the catalog adapter links it, no provider crate does | new crate under `crates/`, name in [docs/adapters/catalog.md](../../../docs/adapters/catalog.md) §10 |
+| Generic engine: mapping + validated input + capability → request; response → outcome; the catalog adapter links it, no provider crate does | new crate under `crates/`, name in [adapters/catalog/design.md](../../../adapters/catalog/design.md) §10 |
 | `AuthenticatedHttp` with method, body and headers; `http-header` and `http-query` credential placements (old declarations: 17 named headers, 2 query parameters) | `crates/connectors-sdk/src/lib.rs:53-56`; `contracts/auth/capability/v1alpha1/semantics.md` (reserved/unbound until the vocabulary and auth owners define support; no current descriptor may advertise it) |
 | Client: typed `catalog.*` calls and bundle locate-and-verify | `crates/connectors-client` |
 | Wire `v1alpha2` descriptor fields | `crates/connectors-core/src/lib.rs:70-78` |

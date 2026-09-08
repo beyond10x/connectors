@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "shared_protocol_names": ["sip"],
+  "forbidden_terms": [
+    "atlassian", "confluence", "jira", "jql", "cql", "adf",
+    "gitlab", "github", "bitbucket", "slack",
+    "kubernetes", "k8s", "kubectl", "kubeconfig", "kubebuilder",
+    "grafana", "loki", "logql", "prometheus", "promql", "alertmanager", "argo", "argocd",
+    "docker", "podman", "containerd", "swarm",
+    "sql", "postgres", "postgresql", "mysql", "mariadb", "sqlite", "clickhouse",
+    "aws", "amazon", "azure", "gcp", "cloudflare", "openai", "anthropic", "twilio",
+    "DeploymentRestart", "ContainerLifecycle", "container_selector", "expected_container_id",
+    "resource_version", "api_group", "subresource", "PodLogOptions", "SelfSubjectAccessReview",
+    "LogRangeSelection", "LogScopeEquality"
+  ]
+}

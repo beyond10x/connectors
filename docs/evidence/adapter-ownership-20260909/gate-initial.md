@@ -1,0 +1,15 @@
+approve
+
+Independent read-only regression review for story:extractable-adapter-contract-ownership, limited to the relocated ESS boundary gate, terminology policy and explicit Cargo adapter membership. The reviewed gate source is crates/connectors-build/src/ess_boundary.rs, SHA256 f66f6a3e58255430a1191953d80dbb6c1882facfa9aecc02102aebde3d7662f2. Source hashes are retained in .local/adapter-ownership-20260909/gate-initial-source-hashes.txt.
+
+The new traversal discovers every owner directory under adapters, including owners with no runtime crate or optional adapter declaration. It derives the owner alias before considering optional spec paths, reads a present adapter.json for its alias id, and independently validates and compiles every present spec/ess root. Absence is distinguished from malformed paths and other I/O errors. The source comment correctly limits adapter.json handling to alias discovery; full declaration schema and semantic validation remain the specification workflow's responsibility.
+
+I independently exercised the updated target/debug/connectors-build binary with pinned ESS 0.20.0 and isolated fixtures under .local/adapter-ownership-20260909. The positive fixture accepted a design-only owner and validated and compiled the shared root plus all five relocated authored adapter roots. Twelve individual adversarial cases were refused for the expected reason: a design-only owner's CamelCase alias in shared ESS; an alias obtained only from optional adapter.json; malformed JSON; a missing id; linked owner, spec directory, adapter declaration and model root; dangling spec and model links; a present model without system.yaml; and nested adapter YAML. The positive output is gate-positive.log; each negative result is retained as gate-<case>.log beside this report. These runs used the updated binary after root announced its availability; an earlier attempt against the stale binary was discarded and the positive log replaced with the actual current result.
+
+Inspection also confirms that the prior shared-source checks remain in force: decoded YAML and comment scanning, path terms, local domain inventory equality, namespace restrictions, model-source symlink rejection and independent ESS compilation. Cargo metadata resolves successfully with the three implemented top-level adapter packages explicitly listed, while native model-only directories need no Cargo package. The generated GitLab types dependency remains present as expected.
+
+No actionable gate regression was found. The check enforces the documented canonical adapters/<owner>/spec/ess layout; it does not infer that a design-only owner ought to have an authored model, discover arbitrary off-layout models, validate provider runtime behavior or replace full adapter-spec validation. The broader prose relocation and final ownership documentation were still being edited and are outside this initial gate approval. I made no tracked changes or planning mutations, used no Python and did not run the full repository gate.
+
+```findings
+[]
+```

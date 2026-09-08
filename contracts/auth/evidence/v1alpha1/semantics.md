@@ -36,15 +36,15 @@ Discovery, readiness, authentication, authorization, and execution are separate 
     { "check": "credential_present", "result": "ok" },
     { "check": "credential_valid", "result": "ok", "expires_unix_ms": 0, "source": "cached_token_metadata" },
     { "check": "identity_check", "result": "ok", "external_identity": "opaque" },
-    { "check": "scope_check", "result": "insufficient", "missing": ["write:jira-work"] },
-    { "check": "permission_check", "result": "denied", "subject": "list pods in namespace x" },
+    { "check": "scope_check", "result": "insufficient", "missing": ["required_scope"] },
+    { "check": "permission_check", "result": "denied", "subject": "declared exact target" },
     { "check": "verify_operation", "result": "not_run" }
   ],
   "state": "ready"
 }
 ```
 
-This JSON is an illustrative public projection: the missing write grant and denied namespace belong to particular operations, while the connection baseline is assumed valid. They do not reduce the whole connection to insufficient_scope. A concrete payload binds each operation check to its declared exact subject and reports only admitted safe details. This JSON is the public projection. It omits credential generation IDs, snapshot handles and secret-store versions; none is a public evidence identifier. Host-private evidence additionally binds the captured generation, instance, connection, auth profile and provider authority, and records each check's source, collection time, validity deadline and exact subject where applicable. `collected_unix_ms` never replaces those per-check deadlines.
+This JSON is an illustrative public projection: the missing write grant and denied target belong to particular operations, while the connection baseline is assumed valid. They do not reduce the whole connection to insufficient_scope. A concrete payload binds each operation check to its declared exact subject and reports only admitted safe details. This JSON is the public projection. It omits credential generation IDs, snapshot handles and secret-store versions; none is a public evidence identifier. Host-private evidence additionally binds the captured generation, instance, connection, auth profile and provider authority, and records each check's source, collection time, validity deadline and exact subject where applicable. `collected_unix_ms` never replaces those per-check deadlines.
 
 Results: `ok`, `missing`, `invalid`, `insufficient`, `denied`, `unavailable`, `uncertain`, `not_run`. `state` is the global connection viability reduction in [connection §4.1](../../connection/v1alpha1/semantics.md#41-connection-viability-and-operation-eligibility), using only applicable baseline checks and administrative facts. Evidence alone does not override terminal revocation or disablement.
 
@@ -68,14 +68,13 @@ dispatch(admitted_pin, request) -> Dispatched | Refused(reason)
 | `credential_valid` | none by default: uses stored expiry and last-known validity; a provider introspection call is a separately admitted profile | no unless introspection is enabled |
 | `identity_check` | a declared provider identity read during admitted acquisition, activation or explicit revalidation/repair; same-account refresh may use the narrowly defined lineage rule below | yes, for the exact captured generation |
 | `scope_check` | none: compares granted scopes recorded at acquisition with the operation's `requires_auth` | no |
-| `permission_check` | at most one provider authorization query per uncached exact target, within the admitted shared budget in §4.4 (Kubernetes SelfSubjectAccessReview); otherwise `not_run` | yes for the independently admitted checking connection |
+| `permission_check` | at most one provider authorization query per uncached exact target, within the admitted shared budget in §4.4; otherwise `not_run` | yes for the independently admitted checking connection |
 | `verify_operation` | the designated read, only when explicitly invoked by an operator or acquisition completion | yes |
 
 - Description and dispatch use the same **two reductions** for the same question: connection-wide viability, then exact-operation eligibility. Description reports global viability under its observation/validity bounds; invocation freshly evaluates its own scope, permissions, verification and authority, then the F05 dispatch fence. An unrelated operation's failed or stale check never poisons global viability. `collected_unix_ms` is not a per-check expiry or authorization lease.
 - Provider authorization and SaaS authorization are both required and separately reported: a provider `permission_check: ok` does not admit a caller the host's policy refuses, and vice versa (`docs/design.md:381`).
 - Readiness is not authority: an ok baseline does not itself permit an operation. Stale/unknown/not_run baseline validation yields pending (positive invalidity or consumed refresh yields reauthorization_required); unavailable custody and parent facts use their own states. Stale operation-only scope/permission/verification refuses only affected requests under connection §4.1. Not-required checks may remain not_run and supply no authority.
 - Stale evidence: each required check must meet its own freshness bound at admission and dispatch. Age-valid evidence for another generation or binding is unusable. Re-collection must itself be permitted by the check's declared effect and admission rules; otherwise refuse under the applicable reduction: stale baseline validation gives pending/connection_not_ready, stale required permission gives unavailable for that operation, and stale operation verification gives connection_not_ready without changing global state. Staleness alone is not positive credential invalidity and never authorizes an implicit probe.
-- Kubernetes profile: `permission_check` is per exact target including verb, group, version, resource, namespace, name and subresource before each list/forward. A denied namespace is skipped and reported, not treated as empty, under §4.4.
 
 ### 4.1 Credential generation and identity
 
@@ -121,19 +120,76 @@ A refresh response containing the expected identity label alone is not a lineage
 
 ### 4.4 Exact authorization targets and fan-out budget (F08)
 
-After host admission and configuration allowlist checks, build the complete bounded authorization target set from the operation and selected input before provider work. For Kubernetes a resource target is the exact `(verb, api_group, api_version, resource, namespace, name, subresource)` tuple. Empty group means core; empty subresource means none. Empty name is the selected collection-wide name attribute for list, not permission to substitute get/delete on arbitrary names. Namespace meaning depends on the declared resource and operation: a namespaced list carries its actual namespace; an explicitly selected all-namespaces list carries empty namespace; a cluster-scoped resource also carries empty namespace but is a different resource tuple. These distinctions follow Kubernetes [ResourceAttributes](https://kubernetes.io/docs/reference/kubernetes-api/definitions/resource-attributes-v1-authorization/) and cannot be inferred from a public null field or an empty result. A proxy forward has `get`, core/v1, `services`, the fixed namespace and Service name, and `proxy`. Exact configured kinds multiply finite per-namespace targets. Deduplicate identical tuples within the same checking binding and order them lexicographically by the seven fields in the order above, using their reviewed canonical UTF-8 representation. A required multi-target read with an empty normalized set is invalid_input; omitted selectors may expand only under an explicitly bounded configured selection. Neither grouping namespaces nor a list result grants permission to get another resource/name/subresource.
+After host admission and configuration checks, build the complete bounded set of
+exact authorization targets from the declared operation and selected input.
+The adapter owns its typed target codec, canonical equality/order and scope
+interpretation. Deduplicate within the same checking binding. An empty required
+multi-target selection is invalid_input; omitted selectors may expand only under
+explicitly bounded configured selection. A collection permission never implies a
+different named-resource or subresource permission.
 
-The first Service discovery profile preserves the explicitly configured all-namespaces mode: an admitted empty configured namespace list selects exactly `(list,"","v1","services","","","")`, one SSAR target and one cluster-wide collection partition. It is mutually exclusive with the finite per-namespace mode. A missing/invalid configuration, denied namespace, empty provider result or caller-supplied empty selector cannot activate this mode or fall back to it. An all-namespaces allow cannot be substituted for a per-namespace target in this exact-evidence profile, nor can several namespace allows synthesize the all-namespaces allow. Switching modes changes the selection/scope and requires fresh admission/evidence. All provider pages share the same scan object/call/byte/deadline ceilings; one target does not grant an unbounded cluster scan. The scope's private checking/profile/configuration coordinates preserve the selected resource semantics. This fixes the earlier overbroad claim that every empty namespace meant a cluster-scoped resource; it does not add wildcard matching or impersonation.
+The [Kubernetes binding](../../../../adapters/kubernetes/contracts/auth/v1alpha1/semantics.md)
+defines the concrete tuple, namespace modes and auth-validation transport for its
+profile. This is an adapter index link, not a shared provider dependency.
 
-Target equality for evidence reuse additionally includes the checking instance, connection, profile, provider authority, immutable credential generation, current binding/configuration revision and host admission scope. A mediated check uses the parent checking binding and fixed child route/observation revision. This first Kubernetes profile forbids impersonation and caller-supplied Impersonate-* headers; any future supported impersonation context must become an explicit reviewed evidence/admission coordinate. A safe public target description is not that private cache key. Reuse requires unchanged bindings and unexpired evidence at both admission and dispatch: at most 300 s for reads, 60 s for mutation authorization, or the smaller provider/profile deadline. Known revocation, replacement, policy withdrawal or evidence invalidation wins over age. Permission evidence never crosses a generation change. Denied evidence may be reused only under the same bounds and never becomes success; caching cannot replace current host authorization.
+Target equality additionally includes checking instance, connection/profile,
+provider authority, immutable credential generation, current binding/configuration
+revision and host admission scope. Mediated checks include the parent checking
+binding and fixed route/observation revision. A public target description is not
+the private cache key. Reuse requires unchanged bindings and unexpired evidence at
+both admission and dispatch: at most 300 s for reads, 60 s for mutation
+authorization, or the smaller provider/profile deadline. Revocation, replacement,
+policy withdrawal and invalidation win over age. Permission evidence never crosses
+a generation change. Denied evidence obeys the same bounds and never becomes
+success; caching cannot replace current host authorization.
 
-The first profile admits **at most 64 distinct targets and 64 provider authorization calls per business invocation**, with at most one call per uncached target, at most four concurrent authorization queries, and no automatic retries, redirects or nested checks. A deployment/operation may lower target/call/concurrency ceilings (including a zero-call cache-only policy), never raise them without a revised profile. Cached targets still count toward the target ceiling. Reserve the whole missing-evidence call budget before starting any check; a target-set overflow is invalid_input and an insufficient remaining call budget is unavailable, both before any provider request. Every attempted call consumes one slot even on timeout or ambiguous response. Concurrency counts all in-flight authorization queries across nested work; zero remaining deadline grants no send. Stop scheduling on failure/deadline, and cancel or await already in-flight checks without issuing more. Provider pagination and parent forwarding share the original invocation budget and deadline; a subrequest does not reset it. Evidence checks and business reads share the provider deadline. An ordinary call cannot invent identity/verify probes to consume spare slots.
+At most 64 distinct targets and 64 authorization calls are admitted per business
+invocation, at most one call per uncached target and four concurrent checks.
+Smaller deployment/operation ceilings, including zero-call cache-only, are allowed.
+Cached targets count toward the target ceiling. Reserve the entire missing-evidence
+budget before any check: target overflow is invalid_input; insufficient remaining
+calls are unavailable; neither sends. Every attempted call consumes a slot even
+on timeout or ambiguity. Concurrency includes nested work. Stop scheduling on
+failure/deadline and cancel or await in-flight calls without issuing more.
+Pagination, parent forwarding and checks share the original business invocation's
+provider budget/deadline. No automatic retry, redirect, nested check or undeclared
+identity/verification probe is granted.
 
-All required checks finish before the first business resource request. Only a well-formed definite allow authorizes; missing/malformed/contradictory status or a provider evaluation error is unavailable, never denial or success. Any unavailable, timed-out, unknown, not_run or stale required result refuses the invocation as unavailable, with zero business reads; completed checks may remain cached only under the original bounds. This conservative first profile does not return a successful checked prefix after budget exhaustion. A definitive authorization denial is separate: for an explicitly declared multi-target read supporting authorization coverage, skip denied targets and read only allowed targets. If all are denied, return forbidden, never a successful empty page. Single-target operations and mutations refuse denied permission with forbidden; a Kubernetes route maps exact parent permission denial to route_refused. A required result expiring or becoming invalid before dispatch cannot be reused; if earlier allowed resource reads already ran, discard their partial payload and return the applicable refusal (those read requests are not undone). no unchecked request or implicit extra check is permitted.
+All required checks finish before the first business resource request. Only a
+well-formed definite allow authorizes. Missing/malformed/contradictory status and
+provider evaluation errors are unavailable. Unknown, not_run, stale, timed-out or
+unavailable required evidence refuses with zero business reads; completed checks
+may remain cached under their original bounds. Budget exhaustion cannot return a
+successful checked prefix. An explicitly declared multi-target profile may skip
+definitively denied targets while reporting truthful authorization coverage; all
+denied is forbidden. Single-target reads and mutations refuse denial. A mediated
+permission denial uses route_refused. If evidence expires or is invalidated before
+a later dispatch, discard any partial payload and return the applicable refusal;
+earlier resource reads are not undone. No unchecked request or implicit extra
+check is permitted.
 
-The multi-target read payload must declare `authorization: {complete: boolean, targets: [{target: {verb, api_group, api_version, resource, namespace, name, subresource}, result: "allowed" | "denied"}]}` as a closed safe projection. Every requested distinct target appears exactly once under disclosure admission, in canonical target order. The array has at most 64 entries and each coordinate at most 256 UTF-8 bytes (smaller provider-specific limits still apply). Coverage and provider items together must fit the selected result byte limit; if truthful coverage cannot fit, refuse unavailable without silently dropping targets. Here authorization.complete is true only if all requested targets are allowed; any denial forces both authorization.complete and the overall result's complete to false, even when all allowed-target pages have been read. A permitted target returning zero records is distinct from a denied target. Pagination/cursors bind the original target set, denial/coverage observation and all normal configuration/authority constraints; continuation re-evaluates current admission and exact evidence. A permission/coverage change invalidates the continuation (stale_cursor), requiring a fresh read, and never silently changes the represented target set. No cursor is fabricated solely to retry a denied target. A payload reader without this coverage field cannot advertise this partial-read profile; the existing strict Page is unchanged. A discovery consumer must not call an incomplete view complete: denied/incomplete partitions provide no absence evidence. An independently complete, comparable partition may establish absence only within its exact scope even when another partition makes the overall view partial, under [resource discovery §4.2](../../../discovery/resources/v1alpha1/semantics.md#42-complete-and-incomplete-collection). Authorization coverage alone never proves provider exhaustion. Prior terminal withdrawn rows remain withdrawn; other unobserved history may become stale. Coverage discloses only admitted target coordinates, never credential generations or hidden route locators. It is authorization coverage, not proof that a discovery observation was withdrawn or that a provider collection was exhaustive.
+The selected multi-target payload declares closed
+`authorization: {complete, targets: [{target, result}]}`, with allowed/denied
+results and the adapter's closed safe target schema. Every distinct requested
+target appears once in canonical order, at most 64 entries with each textual
+coordinate at most 256 UTF-8 bytes or its smaller native limit. Coverage and items
+must fit the result byte bound; otherwise refuse unavailable. Any denial sets
+authorization.complete and overall complete false. Allowed empty collections are
+distinct from denial. Cursors bind the exact target set and coverage observation
+plus normal authority/configuration fences; a change yields stale_cursor and
+requires a fresh read. No cursor exists solely to retry denial. Readers lacking
+the declared coverage cannot advertise this partial-read profile.
 
-Kubernetes SelfSubjectAccessReview is an explicitly admitted auth-validation POST for this check, despite the business read's GET-only capability. A private check-specific capability fixes its endpoint and bounded ResourceAttributes body; it cannot be used by provider business code to POST arbitrary resources. Count its evaluation as provider work under this budget, without misclassifying it as an approved business mutation. Exact request/response interpretation and a supporting capability implementation are advertisement prerequisites; the generic read capability grants no such POST authority.
+Authorization coverage does not prove provider exhaustion or disappearance.
+[Resource coverage](../../../discovery/resources/v1alpha1/semantics.md#42-complete-and-incomplete-collection)
+governs comparable absence and terminal withdrawal. Coverage exposes only admitted
+target coordinates, never credential generations or hidden route locators.
+
+An auth-validation request outside the business capability's methods needs its
+own explicitly admitted, fixed-endpoint/body, bounded checking capability. Its
+evaluation counts as provider work; it grants no arbitrary business mutation.
+Exact native request/response interpretation and a supporting implementation are
+advertisement prerequisites.
 
 ## 5. Limits
 
@@ -179,6 +235,12 @@ Kubernetes SelfSubjectAccessReview is an explicitly admitted auth-validation POS
 | Explicit validation admission and identity/grant interpretation | host policy and provider auth profile; ordinary business requests cannot invent probes |
 
 ## 9. ESS entities
+
+Shared permission observations in [auth_access.yaml](../../../../ess/domains/auth_access.yaml)
+refer to a private binding and exact adapter-owned target. The typed adapter
+tuple is in the [adapter permission model](../../../../adapters/kubernetes/spec/ess/domains/permissions.yaml).
+Mapping/equality and current admission remain explicit binding obligations; the
+selected public authorization target tuple is unchanged by this private model split.
 
 | Entity / value | Notes |
 |---|---|

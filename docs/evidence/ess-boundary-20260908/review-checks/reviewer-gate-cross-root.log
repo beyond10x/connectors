@@ -1,0 +1,10 @@
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 15 file(s), valid
+connectors v1 — 15 file(s), 223 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/.local/tmp/ess-boundary-583EZk/ess-boundary-0.json
+/home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/contracts/adapters/atlassian/ess was refused:
+  - [undeclared_reference] types.connectors_atlassian.documents.ForeignBinding: `connectors.boundary_fixture.NeutralTarget` is not a declared type (hint: declared types: connectors_atlassian.documents.ForeignBinding)
+  - error[ESS-TYPE-001]: `connectors.boundary_fixture.NeutralTarget` is not a declared type
+  `ess-domain` refuses this as `undeclared_reference`
+  help: declared types: connectors_atlassian.documents.ForeignBinding
+  --> domains/documents.yaml:3:5
+Error: "/home/timo/beyond10x/connectors_v2/.local/ess-boundary-20260908/reviewer-gate-fixture/contracts/adapters/atlassian/ess: ESS validate exited exit status: 1"

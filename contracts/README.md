@@ -1,6 +1,6 @@
 # Contracts
 
-`contracts/` is the semantic source for every shared contract: the textual description first, then schemas, Rust bindings and fixtures when a contract is implemented (`docs/design.md:296-313`). Each contract has one document at `contracts/<family>/…/<version>/semantics.md`. Status is stated at the top of each document.
+`contracts/` owns shared protocols: textual semantics, then schemas, Rust bindings and conformance inputs. Native profiles, selectors, provider mappings and fixtures belong in [adapters/<owner>/contracts](../adapters/README.md), beside each adapter's authored spec/ess and implementation. Extracted adapters depend on reviewed versioned shared artifacts; shared contracts stay independent of the installed provider catalog. Status is stated in each document.
 
 ## Index
 
@@ -11,7 +11,7 @@
 | `operations/v1alpha1` `mutation` profile | [operations/v1alpha1](operations/v1alpha1/semantics.md) | proposed | effects, idempotency, approval binding, durable attempt record, outcome-unknown |
 | `datasource.records/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | bounded pages, cursors, provenance, completeness |
 | `datasource.records/v1alpha1` `document` profile | [datasources/records/v1alpha1](datasources/records/v1alpha1/semantics.md) | proposed | single-item content bodies with representation, version, byte truncation |
-| `datasource.relational/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | PostgreSQL schema discovery and bounded reads |
+| `datasource.relational/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | bounded relational result binding; native semantics belong to the SQL adapter |
 | `datasource.logs/v1alpha1` | [datasources/logs/v1alpha1](datasources/logs/v1alpha1/semantics.md) | proposed | log lines with stream identity, native query, window and byte bounds |
 | `datasource.series/v1alpha1` | [datasources/series/v1alpha1](datasources/series/v1alpha1/semantics.md) | proposed | labeled time series with step, PromQL, partial results |
 | `endpoint_discovery/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | address/port observations and candidates, no dial |
@@ -29,10 +29,11 @@
 | `catalog/v1alpha1` | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) | proposed | list/describe/locate pre-compiled adapter bundles with provenance and coverage; optional; grants nothing |
 | `operations/v1alpha1` `generic-http` profile (and `datasource.records` `generic-http-page`) | [catalog/v1alpha1](catalog/v1alpha1/semantics.md) §3.2 | proposed | an operation realized from a bundle's request mapping by one generic engine: status, JSON passthrough, provenance, status-to-code table |
 
-Inventory on 2026-09-08: 17 semantic documents (1 implemented service document and
-16 proposed documents). The table has 5 implemented rows and 17 proposed rows;
-multiple rows can share one document. An index entry records a proposal's presence,
-not implementation support. [Service compatibility](service/compatibility.md) selects the proposed extended wire binding and records every family’s disposition, independently of semantic-family and adapter-kind versions.
+The table indexes shared contract families/profiles, not a file or adapter count.
+Native bindings and their versions are indexed by [owner](../adapters/README.md).
+An entry records a proposal's presence, not implementation support.
+[Service compatibility](service/compatibility.md) selects the proposed extended
+wire binding, independently of semantic-family and adapter-kind versions.
 
 Deferred families with no document yet: `execution`, `events`, `resources`,
 `configuration` (`docs/design.md:174-186`).
@@ -41,12 +42,12 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 
 | Adapter document | Contracts |
 |---|---|
-| [Atlassian](../docs/adapters/atlassian.md) | operations + mutation, records + document, auth.connection, auth.profile, auth.acquisition, auth.custody, auth.capability, auth.evidence |
-| [Kubernetes](../docs/adapters/kubernetes.md) | records, endpoint_discovery, host_discovery (implemented) + logs, mutation, resource_discovery, route.mediated_http, auth.profile, auth.capability, auth.evidence |
-| [Docker](../docs/adapters/docker.md) | operations + mutation, records, logs, endpoint_discovery, auth.profile, auth.capability, auth.evidence |
-| [Grafana, Loki, Prometheus, Alertmanager](../docs/adapters/grafana.md) | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.evidence |
-| [Media session: SIP, RTVBP, bridge, local audio](../docs/adapters/media-session.md) | operations + mutation, sessions, media, auth.profile, auth.capability, auth.custody, auth.evidence, auth.connection |
-| [Catalog and pre-compiled third-party specs](../docs/adapters/catalog.md) | catalog, operations `generic-http` + mutation, records `generic-http-page`, auth.profile, auth.acquisition, auth.capability (+ `http-header`, `http-query`), auth.evidence, auth.connection, auth.custody |
+| [Atlassian](../adapters/atlassian/design.md) | operations + mutation, records + document, auth.connection, auth.profile, auth.acquisition, auth.custody, auth.capability, auth.evidence |
+| [Kubernetes](../adapters/kubernetes/design.md) | records, endpoint_discovery, host_discovery (implemented) + logs, mutation, resource_discovery, route.mediated_http, auth.profile, auth.capability, auth.evidence |
+| [Docker](../adapters/docker/design.md) | operations + mutation, records, logs, endpoint_discovery, auth.profile, auth.capability, auth.evidence |
+| [Grafana, Loki, Prometheus, Alertmanager](../docs/compositions/monitoring.md) | records, logs, series, resource_discovery, route.mediated_http, auth.connection, auth.profile, auth.acquisition, auth.capability, auth.evidence |
+| [Media session: SIP, RTVBP, bridge, local audio](../docs/compositions/media-session.md) | operations + mutation, sessions, media, auth.profile, auth.capability, auth.custody, auth.evidence, auth.connection |
+| [Catalog and pre-compiled third-party specs](../adapters/catalog/design.md) | catalog, operations `generic-http` + mutation, records `generic-http-page`, auth.profile, auth.acquisition, auth.capability (+ `http-header`, `http-query`), auth.evidence, auth.connection, auth.custody |
 
 ## Provider authentication at a glance
 
@@ -63,6 +64,6 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 
 ## Document template
 
-Every proposed contract document has ten sections: identity; old evidence and disposition; types; rules; ordering and limits; conformance scenarios; compatibility; SDK and host obligations; ESS entities; open decisions with defaults. Numeric limits marked "first-profile default" are starting values to be measured, not frozen (`docs/design.md:1146`).
+Cover identity/version, types, rules, bounds, conformance, compatibility, implementation and ESS obligations, evidence and unresolved decisions. Scale headings to the contract. Keep native source interpretation and concrete provider defaults with the adapter; shared documents define the guarantees each binding must satisfy. Informational provider examples or index links do not create shared dependencies.
 
 The auth families share [host management ownership and protected completion](auth/management.md). This cross-family boundary is not a new advertised family; management remains independently admitted and usable when provider business readiness fails.
