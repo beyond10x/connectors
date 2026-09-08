@@ -1,0 +1,160 @@
+# Compiled decision expectations, not runtime injection of replacement, refresh,
+# identity probes, clock or revocation. See ../verification.md.
+type: ess-scenario/1
+domain: connectors.credential_evidence
+scenario: rotation-before-dispatch
+summary: 'F05: publication of generation B cuts off the admitted generation A; a fresh
+  admission can use validated B.'
+arrange:
+- instance: old
+  entity: connectors.credential_evidence.DispatchAdmission
+- instance: new
+  entity: connectors.credential_evidence.DispatchAdmission
+timeline:
+- at: '2026-09-08T09:00:00Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: rotation-before-dispatch-old
+    operation_ref: kubernetes.resources.list
+    generation_id: 00000000-0000-4000-8000-000000000001
+    binding:
+      instance_id: test-instance
+      connection_ref: cluster-a
+      profile_ref: kubernetes.bearer
+      provider_authority: test-cluster
+    expected_external_identity:
+      kind: kubernetes-user
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000001
+      binding:
+        instance_id: test-instance
+        connection_ref: cluster-a
+        profile_ref: kubernetes.bearer
+        provider_authority: test-cluster
+      observed_external_identity: &id001
+        kind: kubernetes-user
+        subject: account-a
+      checks:
+      - check: identity_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: old
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:01Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: old
+  outcome: admitted
+  events:
+  - event: connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:02Z'
+  command: connectors.credential_evidence.RejectAdmission
+  input:
+    admission_id:
+      $instance: old
+    reason: generation_changed
+  outcome: refused
+  events:
+  - event: connectors.credential_evidence.AdmissionRefused
+    payload:
+      reason: generation_changed
+- at: '2026-09-08T09:00:03Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: old
+    generation_id: 00000000-0000-4000-8000-000000000002
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationDispatched
+- at: '2026-09-08T09:00:04Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: rotation-before-dispatch-new
+    operation_ref: kubernetes.resources.list
+    generation_id: 00000000-0000-4000-8000-000000000002
+    binding:
+      instance_id: test-instance
+      connection_ref: cluster-a
+      profile_ref: kubernetes.bearer
+      provider_authority: test-cluster
+    expected_external_identity:
+      kind: kubernetes-user
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000002
+      binding:
+        instance_id: test-instance
+        connection_ref: cluster-a
+        profile_ref: kubernetes.bearer
+        provider_authority: test-cluster
+      observed_external_identity: *id001
+      checks:
+      - check: identity_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - check: permission_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: list/core/v1/pods/namespace-a
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: new
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:05Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: new
+  outcome: admitted
+  events:
+  - event: connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:06Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: new
+    generation_id: 00000000-0000-4000-8000-000000000002
+  outcome: dispatched
+  events:
+  - event: connectors.credential_evidence.GenerationDispatched
+    payload:
+      generation_id: 00000000-0000-4000-8000-000000000002
+assert:
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: old
+    generation_id: 00000000-0000-4000-8000-000000000001
+    state: Refused
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: new
+    generation_id: 00000000-0000-4000-8000-000000000002
+    state: Dispatched
