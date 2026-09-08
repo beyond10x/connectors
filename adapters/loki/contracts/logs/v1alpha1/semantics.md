@@ -90,6 +90,10 @@ Configuration selects `query_scope.required_equalities`, a duplicate-free array 
 
 A reviewed parser conforming to Loki v3.7.0 must accept the complete native log-selector or log-pipeline expression and inspect every initial stream selector. Each must contain every required equality with the exact decoded label/value and equality operator. Extra matchers and native filters/parsers/formatters remain supported. A regex, text inside a string, a pipeline label filter or a rewritten output label cannot discharge an initial equality. Metric/sample syntax is not a log query: literal/vector expressions also implement the provider's LogSelectorExpr interface, so interface membership alone is insufficient. The selected root must actually be a stream selector or pipeline.
 
+The [native parser evidence](evidence/20260909/provider-sources.md) retains the
+exact AST/parser sources used to distinguish those roots. It supplies source
+evidence, not an implemented or verified local parser.
+
 Parse failure, unsupported/non-log syntax or exceeding 16 KiB UTF-8, 4,096 syntax nodes or depth 64 is InvalidInput. A valid log query missing the required scope is Forbidden. Neither dispatches. The admitted original query bytes are URL-encoded and forwarded unchanged: no reserialization, injected filters, fixed-query substitute or remote parsing probe. A missing/unverified parser cannot advertise the scoped profile. The same predicate applies through mediation and to declared verification queries.
 
 ### 4.3 Loki collection and ordering
@@ -103,6 +107,9 @@ Retain the first 500 provider stream groups in response order, counting all omit
 Apply any admitted deterministic redaction once, flag changes, and then take the longest UTF-8 prefix within max_line_bytes. Clipping shortens content, not the occurrence count. Intern group labels and retain the immutable resulting occurrences, index and original private context under the storage ceiling. If the whole observation cannot fit, return Unavailable before the first page; do not drop stored pieces while claiming complete continuation.
 
 Provider exhaustion requires a complete successful validated response with fewer than collection_limit occurrences, no known partial execution, and a provider/proxy binding verified to honor that effective limit and surface incomplete execution. A hidden smaller limit invalidates this proof. Exact-cap responses remain conservative partial even if exactly that many source entries existed. A validated empty response can establish exhaustion under the same conditions. Stats and emitted page size cannot establish it.
+
+An unverified effective limit or incomplete-execution guarantee refuses the read
+as Unavailable. A smaller emitted count cannot repair that missing binding proof.
 
 ### 4.4 Retained paging and current authority
 
@@ -136,13 +143,29 @@ Count any admitted mediated metadata/permission work inside the same 15 s provid
 
 `complete = source_exhausted AND no_occurrences_omitted AND final_retained_page`. Line clipping is separate and may coexist with complete:true.
 
-Truncation causes are duplicate-free in this order: provider_limit, provider_partial, stream_limit, page_limit, response_bytes, source_bytes, line_bytes. Record every applicable cause: provider_limit means saturated Loki collection; stream_limit means omitted groups; page_limit/response_bytes explain a retained remainder; source_bytes means a valid bounded streaming cutoff; line_bytes means clipping on this page. Provider_partial requires an explicitly supported partial indication; an unknown extension refuses. Retained remainders are not dropped occurrences. A terminal incomplete observation may have no cursor while provider_limit/stream_limit persists.
+Truncation causes are duplicate-free in this order: provider_limit, provider_partial, stream_limit, page_limit, response_bytes, source_bytes, line_bytes. The selected Loki binding uses these independent predicates:
+
+| Cause | Trigger |
+|---|---|
+| provider_limit | The fully validated provider occurrence count equals collection_limit |
+| stream_limit | The fully validated response contains more than 500 stream groups, even if an omitted group is empty |
+| page_limit | A retained remainder exists and the emitted page contains limit occurrences |
+| response_bytes | A retained remainder exists and appending its next occurrence to this page, with the required envelope/cursor for that candidate page, would exceed 4 MiB |
+| line_bytes | At least one emitted line was clipped, including clipping after admitted redaction |
+
+Evaluate page_limit and response_bytes independently; both appear when both predicates
+hold. Provider/group causes describe the whole observation and persist on every page;
+page/result/line causes are recomputed for the emitted page. No provider_partial or
+source_bytes success is selected here: unknown partial extensions and incomplete or
+oversized source JSON refuse under §4.3. Retained remainders are not dropped
+occurrences. A terminal incomplete observation may have no cursor while
+provider_limit/stream_limit persists.
 
 Occurrences_dropped and stream_groups_dropped are exact nonnegative totals only when fully observed evidence establishes them, otherwise null for each affected total. Provider saturation leaves unseen totals unknown, not zero; an exact local omission count is not the total including unknown provider losses. Line clipping alone drops zero occurrences. Redaction has its own flag and does not guarantee secret-free content.
 
 Safe base errors apply. Provider 400 for an admitted native query is InvalidInput without raw provider text. Exhausting the original execution or shared provider budget is Timeout, before or during collection; timeout is not clean EOF or a byte-cutoff success. Other failed, malformed, oversized or interrupted provider observations are Unavailable. No raw provider errors, query text, origins or credentials enter ordinary diagnostics.
 
-## 6. Conformance scenarios (`docs/design.md:988`)
+## 6. Conformance scenarios
 
 - 1,001 occurrences at timestamp T, collection_limit=1,000 and public limit=200: retain every returned occurrence including identical lines, deliver five pages, finish incomplete with no cursor and unknown unseen totals. No timestamp-edge query follows.
 - 999 source occurrences under collection_limit=1,000 and public limit=200: four full pages and one 199-entry page; only the final page is complete when nothing was omitted. Repeating a cursor returns its identical slice.
@@ -157,6 +180,11 @@ Safe base errors apply. Provider 400 for an admitted native query is InvalidInpu
 - Expiry, eviction, policy/credential/parent-route/redaction changes or key loss refuse cursor reuse without a requery. A denied caller learns no private cursor status.
 
 These are specification scenarios, not implemented fixture results. Detailed dispositions and executable shape evidence must record their actual verification boundary; ESS shape acceptance does not execute provider, ordering or authority decisions.
+
+The [F12 disposition and scenario record](evidence/20260909/scenarios.md) maps
+every initial finding to these rules and records manual expected outcomes. The
+[model check record](evidence/20260909/model-checks.md) states the separate executed
+ESS boundary.
 
 ## 7. Compatibility
 
