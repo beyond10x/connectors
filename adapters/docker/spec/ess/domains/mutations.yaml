@@ -1,0 +1,22 @@
+domain: connectors_docker.mutations
+summary: Docker-owned exact container lifecycle intent values.
+
+# Normative owner: adapters/docker/contracts/mutations/v1alpha1/semantics.md §4.1.
+types:
+  - name: connectors_docker.mutations.ContainerLifecycleAction
+    kind: enum
+    variants: [start, stop, restart]
+  - name: connectors_docker.mutations.ContainerLifecycleIntent
+    kind: struct
+    fields:
+      - {name: instance_ref, type: String}
+      - {name: connection_ref, type: String}
+      - {name: container_selector, type: String}
+      - {name: expected_container_id, type: String}
+      - {name: action, type: connectors_docker.mutations.ContainerLifecycleAction}
+      - {name: stop_signal, type: "Optional<String>"}
+      - {name: stop_timeout_seconds, type: "Optional<Integer>"}
+    # Private resolved intent, not a public lifecycle input or provider entity.
+    # UNMAPPED: daemon binding/identity, full-ID and exact-name constraints,
+    # allowlist proof, start omits stop options, stop/restart require fixed admitted
+    # options, signal vocabulary, 0..10 wait and original remaining-budget checks.

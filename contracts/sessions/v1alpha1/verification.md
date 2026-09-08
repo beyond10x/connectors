@@ -2,7 +2,7 @@
 
 Scope: `story:contracts-session-revocation`, source findings **F06 / E20**, opening commit `6c8ecc2e9b1daa8e5bcac8c8311470356eb59e46`. This is specification hardening. No runtime session, media adapter, wire codec or Rust source is added or changed.
 
-The normative owner is [sessions §4.1](semantics.md#41-traffic-cutoff-and-teardown-f06), reflected in [media](../../media/v1alpha1/semantics.md), [auth capability](../../auth/capability/v1alpha1/semantics.md) and the [media adapter design](../../../docs/adapters/media-session.md). It selects 2 s maximum from authoritative host revocation to controlled data cutoff, a live lease of at most 2 s from authoritative issuance including all uncertainty, zero data drain after cutoff, and 5 s from the first accepted terminal fact to local teardown/accounting. These are proposed normative ceilings, not measured provider/runtime performance. A binding unable to enforce them must refuse admission.
+The normative owner is [sessions §4.1](semantics.md#41-traffic-cutoff-and-teardown-f06), reflected in [media](../../media/v1alpha1/semantics.md), [auth capability](../../auth/capability/v1alpha1/semantics.md) and the [media adapter design](../../../docs/compositions/media-session.md). It selects 2 s maximum from authoritative host revocation to controlled data cutoff, a live lease of at most 2 s from authoritative issuance including all uncertainty, zero data drain after cutoff, and 5 s from the first accepted terminal fact to local teardown/accounting. These are proposed normative ceilings, not measured provider/runtime performance. A binding unable to enforce them must refuse admission.
 
 The 60 s proof-bound establishment token and the live data lease have different jobs. A disconnected direct path cannot extend the live lease; a late renewal cannot resurrect a session. Cutoff covers all controlled queues/directions and device output. Already-delivered remote bytes cannot be recalled, and remote shutdown confirmation is separate from local cleanup. First-terminal retention and explicit `lost` accounting prevent a teardown failure being reported as successful closure. Both `media_incompatible` and `media_overload` belong to the shared terminal vocabulary.
 
@@ -72,4 +72,4 @@ env TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked --offline -p 
 exit: 0
 ```
 
-Review source hashes and the [retained evidence](../../../docs/evidence/spec-stabilization-20260908/) distinguish the frozen first pass, corrected recheck and this later evidence-only append. Runtime session cases executed remain zero.
+Review source hashes and the [retained evidence](../../../docs/evidence/spec-stabilization-20260908) distinguish the frozen first pass, corrected recheck and this later evidence-only append. Runtime session cases executed remain zero.

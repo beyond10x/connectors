@@ -5,9 +5,6 @@ summary: Proposed discovery scope, coverage, publication, same-target revalidati
 # mediated_route/v1alpha1/semantics.md §4.1 and discovery/composition.md.
 # These trusted facts/decisions are not authority supplied in invocation input.
 types:
-  - name: connectors.discovery.ObservationProfile
-    kind: enum
-    variants: [grafana-datasources, kubernetes-service-targets]
   - name: connectors.discovery.ConfiguredSourceIdentity
     kind: struct
     fields:
@@ -19,28 +16,19 @@ types:
     kind: struct
     fields:
       - {name: operation_id, type: String}
-      - {name: profile, type: connectors.discovery.ObservationProfile}
+      # Opaque here; the adapter declaration fixes the admitted profile.
+      - {name: profile, type: String}
       - {name: source, type: connectors.discovery.ConfiguredSourceIdentity}
       - {name: projection_revision, type: String}
-  - name: connectors.discovery.RecognitionProvider
-    kind: enum
-    variants: [grafana, alertmanager, loki, prometheus, argocd]
   - name: connectors.discovery.RecognitionConfidence
     kind: enum
     variants: [declared, inferred]
   - name: connectors.discovery.ResourceRecognition
     kind: struct
     fields:
-      - {name: provider, type: connectors.discovery.RecognitionProvider}
+      # Observed identifier; the adapter owns the recognizer and its vocabulary.
+      - {name: provider, type: String}
       - {name: confidence, type: connectors.discovery.RecognitionConfidence}
-  - name: connectors.discovery.KubernetesRecognitionInput
-    kind: struct
-    fields:
-      - {name: service_name, type: String}
-      - {name: app_name, type: "Optional<String>"}
-      - {name: legacy_app, type: "Optional<String>"}
-      - {name: legacy_k8s_app, type: "Optional<String>"}
-      - {name: legacy_name, type: "Optional<String>"}
   - name: connectors.discovery.CollectionScope
     kind: struct
     fields:
@@ -50,9 +38,6 @@ types:
       - {name: profile, type: String}
       - {name: scope_ref, type: String}
       - {name: selection_revision, type: String}
-  - name: connectors.discovery.PartitionKind
-    kind: enum
-    variants: [collection, namespace, cluster]
   - name: connectors.discovery.PartitionState
     kind: enum
     variants: [complete, capped, denied, unavailable, not_scanned]
@@ -60,8 +45,8 @@ types:
     kind: struct
     fields:
       - {name: id, type: String}
-      - {name: kind, type: connectors.discovery.PartitionKind}
-      - {name: namespace, type: "Optional<String>"}
+      # Adapter-owned partition taxonomy and coordinates are outside this value.
+      - {name: kind, type: String}
       - {name: state, type: connectors.discovery.PartitionState}
   - name: connectors.discovery.CollectionCoverage
     kind: struct
@@ -136,8 +121,8 @@ types:
 # ConfiguredSourceIdentity is a private configured authority coordinate, not a
 # globally unique physical-cluster identity or public origin-disclosure schema.
 # UNMAPPED: declaration/profile/source compatibility, URL canonicalization/TLS
-# trust, exact Argo name OR app_name recognition (legacy aliases do not select
-# Argo), monitoring priority/case folding, nullable public recognition/candidate,
+# trust, adapter-specific recognition inputs/priority/case folding,
+# nullable public recognition/candidate and partition-coordinate codecs,
 # current admission and candidate support. These new values execute no recognizer.
 # Persistent ResourceObservation/Collection/RouteBinding/Connection/Composition
 # ownership, cardinality and lifecycle remain explicitly unmodeled under their

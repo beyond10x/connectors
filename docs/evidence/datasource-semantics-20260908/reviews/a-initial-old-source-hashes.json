@@ -1,0 +1,59 @@
+{
+  "old_baseline": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+  "files": [
+    {
+      "source": "providers/loki.toml",
+      "snapshot": "old-sources/providers/loki.toml",
+      "sha256": "7a936f77da06bd6e1aede789fec008754c52b69b957a5d5dc1cfe5bbc7b9e10e",
+      "bytes": 1433
+    },
+    {
+      "source": "specs/loki/http-api-2026-08-15.openapi.yaml",
+      "snapshot": "old-sources/specs/loki/http-api-2026-08-15.openapi.yaml",
+      "sha256": "77e769512509c9b6d8d21c08a6d576bbafbde0e4cbfde8da33abc196bfc49ee7",
+      "bytes": 1715
+    },
+    {
+      "source": "crates/integration-monitoring/src/projection.rs",
+      "snapshot": "old-sources/crates/integration-monitoring/src/projection.rs",
+      "sha256": "65e51180299364473b2dc4273357330281a8c3f9960af39b15eed8884809d344",
+      "bytes": 11854
+    },
+    {
+      "source": "providers/confluence.toml",
+      "snapshot": "old-sources/providers/confluence.toml",
+      "sha256": "b138f4f54ba8d8df0205707a7e6af0beb308521e220aa075e9f05483a702f189",
+      "bytes": 54349
+    },
+    {
+      "source": "providers/jira.toml",
+      "snapshot": "old-sources/providers/jira.toml",
+      "sha256": "73908f8f10efd84e03f7c9ca091e73aac30869a7912fadc83c0354dc9ecc2e69",
+      "bytes": 53904
+    },
+    {
+      "source": "specs/confluence/incremental-reads.openapi.yaml",
+      "snapshot": "old-sources/specs/confluence/incremental-reads.openapi.yaml",
+      "sha256": "6356ba8ac26654a84a9fcb6fffefe0d464877c4cd61c652f879cb0ff14125d52",
+      "bytes": 3382
+    },
+    {
+      "source": "specs/jira/incremental-reads.openapi.yaml",
+      "snapshot": "old-sources/specs/jira/incremental-reads.openapi.yaml",
+      "sha256": "93061a7534d964c8d238b612502fb507c7d02933a787170eaaf94b52693f377d",
+      "bytes": 5339
+    },
+    {
+      "source": "crates/integration-jira/src/backend.rs",
+      "snapshot": "old-sources/crates/integration-jira/src/backend.rs",
+      "sha256": "3dc8a4f5229371b3d68d7e79a62c4747ef46258dc3642f7414f9605b1c376c0a",
+      "bytes": 29646
+    },
+    {
+      "source": "contracts/connector-datasource/v0alpha1/README.md",
+      "snapshot": "old-sources/contracts/connector-datasource/v0alpha1/README.md",
+      "sha256": "07e74142a9ad53719f46a19aca0f63ede2f6161525a9bef5fd58db5f949b1a88",
+      "bytes": 878
+    }
+  ]
+}

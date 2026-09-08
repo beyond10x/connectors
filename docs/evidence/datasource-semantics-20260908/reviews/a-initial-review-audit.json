@@ -1,0 +1,29 @@
+{
+  "verdict": "needs-revision",
+  "findings": 8,
+  "priority_counts": {
+    "P2": 8
+  },
+  "owners": {
+    "story:contracts-log-continuation": 3,
+    "story:contracts-document-admission": 5
+  },
+  "manifests": {
+    "source-hashes.json": {
+      "sha256": "8d8d9dd1020da69d3860e86b97d18c364e3a44a8b0bbbd587dbbca9a050c0cd5",
+      "files": 38,
+      "mismatches": []
+    },
+    "supplemental-source-hashes.json": {
+      "sha256": "9cf5cc822c64f4fa41337c87a864fe0e58ab5940956c87afe84e84c3b42592f4",
+      "files": 3,
+      "mismatches": []
+    },
+    "old-source-hashes.json": {
+      "sha256": "f689241bbe7410371c54e79935c5e64d4c08eaadef658b235a962f51b6d432eb",
+      "files": 9,
+      "mismatches": []
+    }
+  },
+  "report_sha256": "9735b2d2f0896d30e785fa6ef30522ed6402545d3b7b72a9afe0374855a51252"
+}

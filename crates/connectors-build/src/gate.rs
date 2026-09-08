@@ -6,6 +6,7 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
     let base = root.join(".local/tmp");
     std::fs::create_dir_all(&base)?;
     let temp = tempfile::Builder::new().prefix("gate-").tempdir_in(base)?;
+    super::ess_boundary::run(root, ess, temp.path())?;
     let command = |program: &str| {
         let mut cmd = Command::new(program);
         cmd.current_dir(root)
@@ -132,19 +133,6 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
                 .env("CARGO_TARGET_DIR", target.join("msrv")),
         )?;
     }
-    execute(
-        Command::new(ess)
-            .current_dir(root)
-            .env("TMPDIR", temp.path())
-            .args(["specify", "validate", "--path", "ess"]),
-    )?;
-    execute(
-        Command::new(ess)
-            .current_dir(root)
-            .env("TMPDIR", temp.path())
-            .args(["specify", "compile", "--path", "ess", "--out"])
-            .arg(temp.path().join("connectors-ir.json")),
-    )?;
     // The pinned ESS authoring reader is non-recursive. Collect each explicitly
     // registered directory with a unique prefix so none silently disappears.
     let scenarios = temp.path().join("authored-scenarios");

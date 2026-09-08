@@ -9,11 +9,16 @@
 | Field | Value |
 |---|---|
 | Contract | `route.mediated_http/v1alpha1` |
-| Profiles | `grafana-datasource-proxy`, `kubernetes-service-proxy` |
-| Provided by | the *parent* adapter (Grafana, Kubernetes) as a capability |
-| Consumed by | the host, which constructs the `mediated-http` capability handed to a *child* adapter (Loki, Prometheus, Alertmanager); the child adapter does not know it is mediated |
+| Profiles | adapter-owned versioned parent-route bindings; no closed provider catalog |
+| Provided by | the *parent* adapter as a capability |
+| Consumed by | the host, which constructs the `mediated-http` capability handed to a *child* adapter ; the child adapter does not know it is mediated |
 
 A private endpoint may be unreachable from where the client runs; the design allows an adapter placed in the reachable network or a separately admitted mediated-route capability, and states that federation of discovery results does not make private addresses reachable (`docs/design.md:483`). This contract is that capability: the parent forwards a target-relative HTTP request through its own admitted connection to one resource it observed. It is distinct from host federation, which forwards *operations* between services (`crates/connectors-host/src/federation.rs`); a mediated route carries the child's *provider* traffic.
+
+Current native parent bindings are
+[Grafana](../../../../adapters/grafana/contracts/routes/v1alpha1/semantics.md) and
+[Kubernetes](../../../../adapters/kubernetes/contracts/routes/v1alpha1/semantics.md).
+These are index links, not dependencies on concrete adapters.
 
 ## 2. Old evidence and disposition
 
@@ -31,13 +36,13 @@ A private endpoint may be unreachable from where the client runs; the design all
 Parent-side capability declaration (in the parent adapter specification):
 
 ```json
-{ "provides": [ { "contract": "route.mediated_http/v1alpha1", "profile": "grafana-datasource-proxy", "targets": ["prometheus", "loki", "alertmanager"] } ] }
+{ "provides": [ { "contract": "route.mediated_http/v1alpha1", "profile": "adapter-owned-route", "targets": ["supported-child-kind"] } ] }
 ```
 
 Host-side route binding (configuration created by materialization, `resource_discovery`):
 
 ```json
-{ "child_connection": "conn_prom_7", "parent_connection": "conn_grafana_1", "observation": "obs_…", "profile": "grafana-datasource-proxy", "observation_generation": 41, "route_revision": "route_rev_7", "target_adapter": "prometheus" }
+{ "child_connection": "conn_child_7", "parent_connection": "conn_parent_1", "observation": "obs_…", "profile": "adapter-owned-route", "observation_generation": 41, "route_revision": "route_rev_7", "target_adapter": "supported-child-kind" }
 ```
 
 Parent port (Rust, private within one admitted composition; no public forwarding operation):
@@ -49,7 +54,7 @@ forward(binding, method, target_relative_segments, query, headers_allowlisted, b
 The child receives an ordinary `HttpCapability` (`auth.capability`) whose implementation calls `forward`. Its `destination` is the *target-relative root*, not a URL:
 
 ```json
-{ "connection": "conn_prom_7", "profile": "prometheus.via_parent", "destination": { "kind": "mediated", "route": "grafana-datasource-proxy", "parent": "conn_grafana_1" } }
+{ "connection": "conn_child_7", "profile": "child.via_parent", "destination": { "kind": "mediated", "route": "adapter-owned-route", "parent": "conn_parent_1" } }
 ```
 
 Errors returned to the child: base codes plus `route_unavailable` (parent not ready, observation withdrawn, generation mismatch) and `route_refused` (suffix, method, or target outside the reviewed set). The child maps them like any dependency failure; it never retries through a different route.
@@ -58,11 +63,9 @@ Errors returned to the child: base codes plus `route_unavailable` (parent not re
 
 - Transport only: the route changes how bytes reach the target. The child's business contracts, datasource profiles, operations and result semantics remain identical; its explicitly selected auth profile and safe route metadata differ from direct access. Conformance runs the same business suite direct and mediated (`docs/design.md:1035`, section 21.3).
 - Fixed binding: materialization fixes the observation incarnation, source parent, semantic target/resource/port, route profile, access mode and host owner. An observation generation is the last successfully revalidated evidence revision, not permission to change that fixed identity. Request input cannot choose the parent, resource, prefix or port. See §4.1 for same-target revalidation.
-- Path discipline: the parent prefixes its proxy route (Grafana data-source proxy for the sealed UID; Kubernetes API-server `services/proxy` for the fixed namespace, Service, port) to individually encoded target-relative segments supplied by the child's capability. Absolute URLs, `..`, empty segments, and query keys outside the child's declared set are refused before dispatch.
+- Path discipline: the parent prefixes its proxy route to individually encoded target-relative segments supplied by the child's capability. Absolute URLs, `..`, empty segments, and query keys outside the child's declared set are refused before dispatch.
 - Methods: the profile declares allowed methods; first profiles allow `GET` only (both old adapters were read-only).
 - Authority: the child's selected profile is `purpose: mediated_access`, `subject: none`, `scheme: parent`, `acquisition.flow: static_config`, capability mediated-http. It owns no provider credential, custody reference or external account. The parent capability authenticates the hop using its own current pinned generation; downstream credentials, if any, belong to the reviewed parent route/datasource binding. Child policy and route admission are required independently and never inherited from the parent. The route does not license arbitrary parent operations, copy parent grants into child scopes or expose parent secrets. Child evidence binds parent generation and the fixed route/observation revision, so parent publication/revocation or mapping changes invalidate it.
-- Kubernetes profile: before each forward, require current exact permission evidence for `get`, core/v1, resource services, subresource proxy, in the fixed namespace and Service name. Collect an uncached result under [evidence §4.4](../../../auth/evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08), sharing the original child's target/call/deadline budget; fresh exact evidence may be reused only under that rule. A denial is route_refused; required evidence unavailable or budget-exhausted is unavailable, with no proxy forward. No generic parent grant or list-services result satisfies this check.
-- Grafana profile: the parent compares the sealed semantic target against current admitted evidence. Provider re-resolution is an explicit bounded validation step, not a hidden unlimited read on every forward. Missing/changed/unknown target equality is route_unavailable and degrades the child; a public UID/digest or unchanged type alone does not prove equality.
 - Depth: exactly one hop. A parent connection that is itself `via` cannot provide a route (`route_refused` at materialization).
 - Placement: parent and child run in one process with live private ports injected by the [authored composition executable](../../composition.md). A deployment of independent processes is not this private composition. The route is never exposed as a remote capability to another host; provider-traffic federation remains out of model.
 - Redirects from the parent's provider are not followed; responses are passed through with the parent's response-size bound.
@@ -76,7 +79,7 @@ Same-target revalidation is an explicit host configuration/validation action und
 
 At one host metadata publication point, compare the expected route revision, current observation generation/incarnation, same fixed semantic binding, parent generation, current independent authority and non-revocation/enablement. An acknowledged success advances only the route evidence revision and invalidates all pending old route admissions and child verification. It creates no credential or new target. Unknown acknowledgement permits no forward; observe that owner or refuse. A stale revalidator cannot resurrect a locally revoked/disabled child or replace newer binding evidence. The final forward repeats the applicable current authority/permission/generation/deadline fence and uses the parent's pinned material. Revalidation success alone is not permanent permission.
 
-Retained history after denied/capped/failed discovery is not deletion and cannot authorize a route. A list-services denial is not proof that get-services/proxy is denied; the separate exact proxy check decides that permission. A current definite proxy denial is route_refused even when history contains an old successful list. Missing fresh observation/equality or a degraded parent remains route_unavailable, and unavailable required proxy evidence uses unavailable; no direct fallback. Local child revoked/disabled precedence remains the auth.connection reduction. A changed type, provider object incarnation, hidden fixed target, port, parent, route mode or owner cannot use this revalidation path: a new independently admitted connection is required. Title-only rename may revalidate the same fixed target. Confirmed withdrawal terminates the old observation incarnation; reappearance gets a new id and never revives its old child.
+Retained history after denied/capped/failed discovery is not deletion and cannot authorize a route. An enumeration denial is not proof that forwarding is denied; the separate exact forwarding permission decides it. A current definite proxy denial is route_refused even when history contains an old successful list. Missing fresh observation/equality or a degraded parent remains route_unavailable, and unavailable required proxy evidence uses unavailable; no direct fallback. Local child revoked/disabled precedence remains the auth.connection reduction. A changed type, provider object incarnation, hidden fixed target, port, parent, route mode or owner cannot use this revalidation path: a new independently admitted connection is required. Title-only rename may revalidate the same fixed target. Confirmed withdrawal terminates the old observation incarnation; reappearance gets a new id and never revives its old child.
 
 ## 5. Limits
 
@@ -88,13 +91,12 @@ Retained history after denied/capped/failed discovery is not deletion and cannot
 
 ## 6. Conformance scenarios (`docs/design.md:989-991`)
 
-- Same Prometheus fixture reached direct and via a fake Grafana parent → byte-identical child results and errors.
+- Same child fixture reached direct and via a fake parent → byte-identical child results and errors.
 - Child capability asked for `../api/admin` or an absolute URL → `route_refused`, parent fixture sees zero requests.
 - Parent connection revoked → child `parent_degraded`; child invocation `route_unavailable`; no direct dial attempted (fake DNS/transport records none).
 - Fresh unchanged observation at generation 42 → old admission refuses until explicitly admitted same-target revalidation; the fixed child ref may remain. Confirmed withdrawal at 42 → old observation incarnation terminal; any reappearance needs a new observation and newly admitted child.
 - Retained stale observation plus current proxy denial → route_refused when exact permission is checked, never an old-history grant. List-only denial is not substituted for proxy denial.
 - Same UID/type but changed sealed target or port → refuse old route; no automatic re-resolution to a new destination.
-- Kubernetes fake denies `get services/proxy` → `route_refused` before dispatch.
 - Materialization with a parent whose route is `via` → refused (one hop).
 - Audit rows contain no UID or URL (grep against fixture values).
 
@@ -125,7 +127,7 @@ Retained history after denied/capped/failed discovery is not deletion and cannot
 
 | Decision | Default taken |
 |---|---|
-| Exact proxy path forms | taken from the vendor references at adapter authoring (Grafana data-source proxy; Kubernetes `services/proxy`), recorded in the adapter documents, not here |
+| Exact proxy path forms | selected from provider evidence and owned by each adapter's route binding |
 | Non-GET methods through a route | refused in first profiles |
 | Second hop | never; not a version question |
 

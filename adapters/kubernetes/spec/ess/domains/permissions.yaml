@@ -1,0 +1,21 @@
+domain: connectors_kubernetes.permissions
+summary: Kubernetes-owned exact permission target tuple.
+
+# Normative owner: adapters/kubernetes/contracts/auth/v1alpha1/semantics.md §4.4.
+types:
+  - name: connectors_kubernetes.permissions.PermissionTarget
+    kind: struct
+    fields:
+      - {name: verb, type: String}
+      - {name: api_group, type: String}
+      - {name: api_version, type: String}
+      - {name: resource, type: String}
+      - {name: namespace, type: String}
+      - {name: name, type: String}
+      - {name: subresource, type: String}
+
+# UNMAPPED: exact tuple normalization/equality, admission and permission checks.
+# The adapter binds this typed tuple to the private target_ref under binding_ref
+# in shared PermissionTarget observations; neither reference is a caller grant.
+# Public authorization.target stays this exact tuple under its selected profile;
+# the shared reference value is not a replacement wire encoding.

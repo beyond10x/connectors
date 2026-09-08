@@ -15,3 +15,4 @@ domains:
   - connectors.connection_admission
   - connectors.auth_access
   - connectors.discovery
+  - connectors.datasource_reads

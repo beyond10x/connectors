@@ -1,0 +1,5 @@
+format: ess/1
+system: connectors_loki
+version: v1
+domains:
+  - connectors_loki.reads
