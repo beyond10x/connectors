@@ -1,0 +1,20 @@
+{
+  "phase": "remaining finding sources immediately before corrections",
+  "files": [
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "63da17bfb90192c7fd04157a5d1e823ce667e47475d6f9651a38d697f5cc3ef9",
+      "bytes": 15371
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "68a8768476bd1361ab47fd2c081d16955d1ba5560237637981fbb3f405f53324",
+      "bytes": 26689
+    },
+    {
+      "path": "docs/evidence/auth-profile-budget-20260908/traces.md",
+      "sha256": "a53b12a92062784e089e569024a772b04d2e456f4523f3ed8558873eaff663c7",
+      "bytes": 9251
+    }
+  ]
+}

@@ -32,12 +32,12 @@ Grafana adapter:
 | `datasource.records` | `grafana-dashboards` (list, get), `grafana-datasources` (list) | bounded dashboard and data-source metadata reads |
 | `resource_discovery` | `grafana-datasources` | data sources as observations with opaque locators (UID sealed) and candidates for the three target adapters |
 | `route.mediated_http` (provider) | `grafana-datasource-proxy` | forward a child's target-relative GET through Grafana's data-source proxy for the sealed UID; refuse suffixes, absolute URLs, unknown types |
-| `auth.profile` | `grafana.service_account` (bearer, app) | Grafana service account token |
-| `auth.acquisition` | `static_entry` | token entered once through the protected page (old `entry = connect_session`) |
+| `auth.profile` | `grafana.service_account_configured` first; `grafana.service_account` for managed entry | Same credential purpose, distinct selected acquisition paths |
+| `auth.acquisition` | `static_config` first; `static_entry` for later managed entry | Deployment references versus token entered once through protected UI |
 | `auth.capability` | `http-bearer` | bearer placement |
 | `auth.evidence` | `verify_operation` = `datasources.list` | reachability and token validity without effects |
 | `auth.connection` | `configured` first, `managed` later | one Grafana per instance; children reference it as parent |
-| `auth.custody` | `read_only` or `versioned` | token rotation |
+| `auth.custody` | `read_only` for static_config; `versioned` for static_entry | Entry requires durable writable custody; deployment capture does not copy secrets |
 
 Loki / Prometheus / Alertmanager adapters (identical structure):
 
@@ -46,8 +46,8 @@ Loki / Prometheus / Alertmanager adapters (identical structure):
 | `datasource.logs` (Loki) | `logql-range` | native LogQL range read with stream/label/timestamp identity |
 | `datasource.series` (Prometheus) | `promql-range` | native PromQL range read with step and label sets |
 | `datasource.records` (Alertmanager) | `alertmanager-alerts` | bounded alert list |
-| `auth.profile` | `<x>.none`, `<x>.bearer`, `<x>.basic` | direct deployments may be unauthenticated, bearer, or basic; when mediated the profile is `none` and the parent authenticates the hop |
-| `auth.capability` | `http-bearer`/`http-basic` direct; `mediated-http` injected by the host when the connection route is `via` | the adapter code is identical in both cases |
+| `auth.profile` | `<x>.anonymous`, `<x>.bearer`, `<x>.basic`, `<x>.via_parent` | Explicit anonymous/bearer/basic direct placement versus separately admitted parent authentication |
+| `auth.capability` | `http-anonymous`/`http-bearer`/`http-basic` direct; `mediated-http` for via_parent | Same business operations; distinct selected auth/route metadata |
 | `auth.evidence` | `verify_operation` = the range query with a trivial query | readiness |
 | `auth.connection` | `configured` (direct) or created by materialization (`via`) | route recorded on the connection |
 
@@ -70,9 +70,14 @@ All reads; no mutation profile in this slice.
 
 | Adapter | Profile | Scheme | Acquisition | Capability | Evidence |
 |---|---|---|---|---|---|
-| grafana | `grafana.service_account` | `http_bearer`, app | `static_entry` | `http-bearer` | `verify_operation` |
-| loki/prometheus/alertmanager direct | `<x>.none` / `<x>.bearer` / `<x>.basic` | none / bearer / basic | `static_config` | `http-bearer` / `http-basic` | `verify_operation` |
-| loki/prometheus/alertmanager mediated | `<x>.none` | none | — | `mediated-http` (host-injected; parent's credential authenticates the hop) | child `verify_operation` through the route |
+| grafana configured first | `grafana.service_account_configured` | `http_bearer` (purpose service_account, subject app) | `static_config` | `http-bearer` | required credential/identity checks and declared verification |
+| grafana managed entry | `grafana.service_account` | `http_bearer` (purpose service_account, subject app) | `static_entry` | `http-bearer` | same baseline with durable entry publication |
+| loki/prometheus/alertmanager direct anonymous | `<x>.anonymous` | `none` (purpose anonymous, subject none) | `static_config` | `http-anonymous`; no credential placement | `verify_operation` if explicitly required |
+| loki/prometheus/alertmanager direct bearer | `<x>.bearer` | `http_bearer` (purpose service_account, subject app) | `static_config` | `http-bearer`; pinned configured material | identity/validity and declared verification |
+| loki/prometheus/alertmanager direct basic | `<x>.basic` | `http_basic` (purpose service_account, subject app) | `static_config` | `http-basic`; pinned configured user/password material | identity/validity and declared verification |
+| loki/prometheus/alertmanager mediated | `<x>.via_parent` | `parent` (purpose mediated_access, subject none) | `static_config` route materialization | `mediated-http`; parent authenticates fixed hop | current parent/route binding; declared child verification through route |
+
+Here x is loki, prometheus or alertmanager. The old ambiguous `<x>.none` label is descriptive history, not an accepted alias. The selected profile fixes credential placement and applicable evidence under [auth.profile §4.2](../../contracts/auth/profile/v1alpha1/semantics.md#42-explicit-access-bindings-without-child-credentials). Missing bearer/basic material cannot select anonymous. A parent-mediated child has no local credential generation or provider account; it neither inherits the parent's grant nor receives the parent's secret. Direct bearer/basic profiles require a reviewed identity-validation mechanism for that deployment before advertisement; a successful query alone cannot invent a stable account identity. These are proposed profiles, not implemented auth support.
 
 Tenant header for Loki/Prometheus multi-tenant deployments (`docs/design.md:500`) is configuration on the direct connection, never caller input.
 
@@ -91,13 +96,16 @@ Grafana:
 Child (direct):
 
 ```json
-{ "http": { "base_url": "https://prometheus.internal", "credential": null, "extra_headers": { "X-Scope-OrgID": "tenant-a" } },
+{ "auth_profile": "prometheus.anonymous",
+  "http": { "base_url": "https://prometheus.internal", "extra_headers": { "X-Scope-OrgID": "tenant-a" } },
   "adapter": { "max_window_s": 604800, "min_step_s": 1, "query_scope": { "allowed_matchers": ["job=\"api\""] } } }
 ```
 
 `http.extra_headers` is the proposed receiver-owned representation for the provider tenant header, shared by direct Loki and Prometheus in this plan. The normative rule is [logs §4.1](../../contracts/datasources/logs/v1alpha1/semantics.md#41-monitoring-tenant-header-configuration-e30): `tenant_header` is an earlier descriptive label, not an accepted alias; there is no claim that current host `HttpConfig` implements either extension. Request input cannot set or override the configured value, including case variants, and this provider tenant is not the caller's SaaS tenant authority. Header validation, placement and configuration-revision isolation belong to the future binding.
 
 Child (mediated, created by the host from a candidate): no `http.base_url`; `route: { parent: "conn_grafana_1", observation: "obs_…", profile: "grafana-datasource-proxy" }`.
+
+These configuration outlines require a selected new strict reader. The anonymous form requires the explicit auth_profile selector and forbids credential/registration members, including explicit null. Bearer/basic forms require their configured references; missing or null is invalid, not anonymous. Mediated configuration selects `<x>.via_parent` and contains the sealed route binding, with no child base URL or credentials. static_config activates these bindings under host admission; it creates no auth.begin session or protected-entry action.
 
 The admitted parent route/datasource owns downstream tenant headers; the child has no direct `extra_headers` override through mediation. Refuse a requested tenant binding the parent route cannot establish.
 

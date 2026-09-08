@@ -1,0 +1,15 @@
+{
+  "encoding": "gzip; decompressed bytes exactly match reviewer auxiliary hashes and original ignored session outputs",
+  "files": [
+    {
+      "stored": "reviews/reviewer-b/final/auxiliary/sessions-authored.json.gz",
+      "uncompressed_sha256": "5bb3883df5a70ef4fccd9863342125d4c6fb1b6a4e7813f25c4f3e3a7e26c11d",
+      "compressed_sha256": "b3e7988361e2e4547f2ba9908f93b9a5f79eb495ccdee92853565031ec51ed8b"
+    },
+    {
+      "stored": "reviews/reviewer-b/final/auxiliary/sessions-suite.json.gz",
+      "uncompressed_sha256": "d08c0eb7e547c70972c3e2e986aa0e2df06aae1a4e019dac98d58ea1eae70f0d",
+      "compressed_sha256": "b4bfa50b387319b3ed0499465a41ca69f9c3ed2f116bfee0026d8b42c32cd6fc"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+domain: connectors.auth_access
+summary: Proposed access selection, acquisition declaration and exact permission-budget values; no runtime or persistent owner.
+
+# Normative owners: auth/profile §4.2, auth/acquisition §4.0, auth/evidence §4.4.
+# These values never establish current authority or create a credential for an
+# anonymous/mediated child. Existing material-bearing EvidenceSnapshot is intact.
+types:
+  - name: connectors.auth_access.AccessMode
+    kind: enum
+    variants: [credential, direct_anonymous, parent_authenticated]
+  - name: connectors.auth_access.Purpose
+    kind: enum
+    variants: [service_account, delegated_user, app_level, inbound_verification, transport_identity, trunk_registration, anonymous, mediated_access]
+  - name: connectors.auth_access.Subject
+    kind: enum
+    variants: [app, user, none]
+  - name: connectors.auth_access.Scheme
+    kind: enum
+    variants: [http_bearer, http_basic, http_signing, mtls, socket_peer, exec_plugin, sip_digest, session_authority, none, parent]
+  - name: connectors.auth_access.AcquisitionFlow
+    kind: enum
+    variants: [static_config, static_entry, oauth2_authorization_code, oauth2_client_credentials, oauth2_password, workload_identity, exec_plugin, host_issued]
+  - name: connectors.auth_access.CapabilityName
+    kind: enum
+    variants: [http-bearer, http-basic, http-signing, http-anonymous, mtls-client-identity, socket-peer, exec-credential-plugin, sip-credential-lease, session-authority, inbound-verifier, mediated-http]
+  - name: connectors.auth_access.AccessSelection
+    kind: struct
+    fields:
+      - {name: profile, type: String}
+      - {name: mode, type: connectors.auth_access.AccessMode}
+      - {name: purpose, type: connectors.auth_access.Purpose}
+      - {name: subject, type: connectors.auth_access.Subject}
+      - {name: scheme, type: connectors.auth_access.Scheme}
+      - {name: flow, type: connectors.auth_access.AcquisitionFlow}
+      - {name: capability, type: connectors.auth_access.CapabilityName}
+  - name: connectors.auth_access.AcquisitionDeclaration
+    kind: struct
+    fields:
+      - {name: flow, type: connectors.auth_access.AcquisitionFlow}
+      - {name: authorize_url, type: "Optional<String>"}
+      - {name: token_url, type: "Optional<String>"}
+      - {name: pkce, type: "Optional<String>"}
+      - {name: registration_kind, type: "Optional<String>"}
+      - {name: callback_binding, type: "Optional<String>"}
+      - {name: grants, type: "List<String>"}
+      - {name: sources, type: "List<String>"}
+  - name: connectors.auth_access.PermissionTarget
+    kind: struct
+    fields:
+      - {name: verb, type: String}
+      - {name: api_group, type: String}
+      - {name: api_version, type: String}
+      - {name: resource, type: String}
+      - {name: namespace, type: String}
+      - {name: name, type: String}
+      - {name: subresource, type: String}
+  - name: connectors.auth_access.PermissionBudget
+    kind: struct
+    fields:
+      - {name: target_limit, type: Integer}
+      - {name: call_limit, type: Integer}
+      - {name: concurrency_limit, type: Integer}
+      - {name: deadline, type: Timestamp}
+  - name: connectors.auth_access.PermissionResult
+    kind: enum
+    variants: [allowed, denied, unavailable]
+  - name: connectors.auth_access.PermissionObservation
+    kind: struct
+    fields:
+      - {name: target, type: connectors.auth_access.PermissionTarget}
+      - {name: result, type: connectors.auth_access.PermissionResult}
+      - {name: cached, type: Boolean}
+  - name: connectors.auth_access.AuthorizationResult
+    kind: enum
+    variants: [allowed, denied]
+  - name: connectors.auth_access.AuthorizationTarget
+    kind: struct
+    fields:
+      - {name: target, type: connectors.auth_access.PermissionTarget}
+      - {name: result, type: connectors.auth_access.AuthorizationResult}
+  - name: connectors.auth_access.AuthorizationCoverage
+    kind: struct
+    fields:
+      - {name: complete, type: Boolean}
+      - {name: targets, type: "List<connectors.auth_access.AuthorizationTarget>"}
+
+# UNMAPPED: cross-field mode/purpose/subject/scheme/flow/capability combinations;
+# required/forbidden flow fields, registration/validation and source adequacy;
+# supported-versus-reserved advertisement, explicit profile selection and current
+# config/route/parent-generation equality. AccessMode covers this selection
+# decision, not an exhaustive classification of every future transport profile.
+# Parent/connection/profile/route ownership and persistence relations remain
+# with their dedicated models. Strings introduce no synthetic entity/identity.
+# No provider account, child CredentialGeneration or custody record is fabricated.
+# Permission target/binding equality, numeric ceilings (64/64/4), deduplication,
+# shared budget reservation/consumption, current policy/time/dispatch fences,
+# completeness and permitted/denied reduction and cursor invalidation are not
+# executed or proven by these schemas. Shape-valid contradictions are possible.
+# Safe public coverage omits private cache/generation/route locators. Optional
+# projects to omission, not null; generic schemas are not service/config codecs.

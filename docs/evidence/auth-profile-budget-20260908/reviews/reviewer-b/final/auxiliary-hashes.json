@@ -1,0 +1,28 @@
+[
+  {
+    "source": ".local/auth-profile-budget-20260908/sessions-authored.json",
+    "snapshot": "auxiliary/sessions-authored.json",
+    "sha256": "5bb3883df5a70ef4fccd9863342125d4c6fb1b6a4e7813f25c4f3e3a7e26c11d",
+    "scenario_count": 13,
+    "provenance": {
+      "suite_version": "ess-conformance/4",
+      "system": "connectors",
+      "specification_version": "v1",
+      "spec_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+      "contract_digest": "6de3c52a6c05fb60000f46aac8a3d193b6ce032158b717de2a564b64cc71d44d"
+    }
+  },
+  {
+    "source": ".local/auth-profile-budget-20260908/sessions-suite.json",
+    "snapshot": "auxiliary/sessions-suite.json",
+    "sha256": "d08c0eb7e547c70972c3e2e986aa0e2df06aae1a4e019dac98d58ea1eae70f0d",
+    "scenario_count": 201,
+    "provenance": {
+      "suite_version": "ess-conformance/4",
+      "system": "connectors",
+      "specification_version": "v1",
+      "spec_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+      "contract_digest": "6de3c52a6c05fb60000f46aac8a3d193b6ce032158b717de2a564b64cc71d44d"
+    }
+  }
+]
