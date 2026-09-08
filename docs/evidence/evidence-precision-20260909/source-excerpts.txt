@@ -1,0 +1,93 @@
+   741	id = "sip-dial"
+   742	direction = "write"
+   743	description = "Start one native SIP voice session through a trunk configured on this Connection. `target` is an opaque Connection-owned alias, never a SIP URI, host, port, or PBX type, and may be omitted to use this Connection's default trunk. `number` is the party to dial through that trunk, digits only; the trunk decides where the call goes and whether a number may be dialled at all. Establishing a call is externally visible and may ring or answer a real endpoint"
+   744	risk = "high"
+   745	idempotency = "non_idempotent"
+   746	effects = ["write", "network"]
+   747	semantic_effects = ["send_external", "human_visible"]
+   748	interaction_shape = "session_establishment"
+   749	protocol_driver = "sip_v1"
+   750	placement_requirement = "connectors_deployment"
+   751	implementation_form = "built_in"
+   752	required_capabilities = ["private_network"]
+   753	auth = []
+   754	expose = true
+   755	
+   756	[[operations.params.body]]
+   757	name = "target"
+   758	description = "Opaque trunk alias configured by an operator on this Connection, for example `staging-pbx`; the alias cannot contain a SIP URI or network address. Omit it to use this Connection's default trunk"
+   759	required = false
+   760	schema = { type = "string", pattern = "^[A-Za-z][A-Za-z0-9_-]{0,63}$", minLength = 1, maxLength = 64 }
+   761	
+   762	[[operations.params.body]]
+   763	name = "number"
+   764	description = "The party to dial through the selected trunk, digits only, for example `12341234`. It becomes the dialled user on the trunk's own destination and cannot change which host, port, or network the call reaches. Omit it to reach the trunk's own configured endpoint. A trunk that does not admit dialled numbers refuses this"
+   765	required = false
+   766	schema = { type = "string", pattern = "^[0-9]{1,32}$", minLength = 1, maxLength = 32 }
+   767	
+   768	[operations.response_schema]
+   769	type = "object"
+   770	required = ["call", "session", "state"]
+   771	properties = { call = { type = "string", description = "Opaque call reference" }, session = { type = "string", description = "Opaque voice-session reference" }, channel = { type = "string", description = "Opaque application-channel reference, absent when the call terminates at the SIP edge with no application channel" }, state = { type = "string", enum = ["established"], description = "The SIP dialog is established, together with the voice application binding when this Connection carries one" } }
+   369	[[operations]]
+   370	effects = ["write", "network"]
+   371	interaction_shape = "unary"
+   372	protocol_driver = "http_v1"
+   373	placement_requirement = "connectors_deployment"
+   374	implementation_form = "built_in"
+   375	required_capabilities = ["public_network"]
+   376	id = "jira-issue-create"
+   315	bounded-loss/degradation case. Saturating the voice-side application-to-call queue cannot silently
+   316	drop synthesized speech, so that binding selects typed `media_overload` and closes. Application-side
+   317	speech detection owns a barge-in request; the voice endpoint clears bounded playback, while Agent
+   318	steering/cancellation remains a separate fact.
+   105	  /api/ds/query:
+   106	    post:
+   107	      operationId: datasource_query
+   108	      summary: Execute one or more read queries through Grafana data-source backends over an explicit time range
+   109	      x-b10x-source-reference: https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/#query-a-data-source
+    59	#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+    60	#[serde(deny_unknown_fields)]
+    61	pub struct Operation {
+    62	    pub id: String,
+    63	    pub description: String,
+    64	    pub contract: String,
+    65	    pub profile: String,
+    66	    pub input_schema: Value,
+    67	    pub output_schema: Value,
+    68	}
+    69	
+    70	#[derive(Clone, Debug, Serialize, Deserialize)]
+    71	#[serde(deny_unknown_fields)]
+    72	pub struct Descriptor {
+    73	    pub version: String,
+    74	    pub instance: String,
+    75	    pub adapter: String,
+    76	    pub revision: String,
+    77	    pub operations: Vec<Operation>,
+    78	    pub configuration_schema: Value,
+    79	}
+    90	#[derive(Clone, Debug, Serialize, Deserialize)]
+    91	#[serde(deny_unknown_fields)]
+    92	pub struct Invocation {
+    93	    pub version: String,
+    94	    pub request_id: String,
+    95	    pub operation: String,
+    96	    pub revision: String,
+    97	    pub input: Value,
+    98	}
+    99	
+   100	#[derive(Clone, Debug, Serialize, Deserialize)]
+   101	#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+   102	pub enum Outcome {
+   103	    Success { result: Value },
+   104	    Error { error: Error },
+   105	}
+   106	
+   107	#[derive(Clone, Debug, Serialize)]
+   108	pub struct Response {
+   109	    pub version: String,
+   110	    pub request_id: String,
+   111	    #[serde(flatten)]
+   112	    pub outcome: Outcome,
+   113	}
