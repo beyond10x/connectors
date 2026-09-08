@@ -50,6 +50,20 @@ of the selected available history. Reaching either cap remains conservatively
 partial. Line clipping is distinct from occurrence omission and can coexist with
 complete:true; use the shared cause/count rules.
 
+For this profile, provider_limit is present when at least tail_lines occurrences
+were observed; source_bytes is present when max_bytes source-text bytes were
+consumed. At that exact byte ceiling, stop without a lookahead that claims EOF.
+Line_bytes is present iff an emitted line was clipped, including a valid pending
+prefix at the source cutoff. Record all applicable causes in shared order, even
+when the tail and byte ceilings coincide. There is no retained remainder, so
+page_limit and response_bytes are not emitted. No stream-group cap or supported
+provider partial extension is selected. Oversized public framing or transport,
+and an unknown provider partial indication, refuse instead of inventing a cause.
+Occurrences_dropped is null whenever tail/source saturation leaves unseen
+occurrences unknown; otherwise it is the exact observed omission count.
+Stream_groups_dropped is zero for this one fixed pod stream, which has no
+group-selection loss. Content clipping alone leaves both dropped totals zero.
+
 The source text ceiling is max_bytes <=128 KiB; independently bound both encoded
 and decoded transport bytes to 256 KiB, headers to 16 KiB and the full public JSON
 response to 4 MiB. One exact-target permission query is permitted when fresh
@@ -67,7 +81,7 @@ and disclosure; no raw provider errors or private data enter diagnostics.
 The predecessor `kubernetes.pod.logs` selectors and 128 KiB bound are recorded at
 `../connectors/crates/integration-kubernetes/src/workloads.rs:1120-1145`.
 The pinned v1.35.0 PodLogOptions source and limits are in the
-[provider evidence](../../../../../docs/evidence/datasource-semantics-20260908/provider-evidence.md).
+[native provider evidence](evidence/20260909/provider-sources.md).
 The old text blob is deliberately projected into lines; a compatibility facade may
 join them, but that is an explicit adapter binding.
 
@@ -76,3 +90,5 @@ permission precedes GET; timestamped and untimestamped lines preserve order;
 empty lines, unterminated EOF, split UTF-8, tail/byte caps, timeout and current
 revocation remain distinct. These are specification scenarios, not test results.
 Native selectors, decoding and containment remain unimplemented binding obligations.
+The [scenario record](evidence/20260909/scenarios.md) records the corresponding
+manual observations without claiming executed provider conformance.

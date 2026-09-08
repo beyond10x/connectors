@@ -110,6 +110,13 @@ The same Atlassian API token serves Jira and Confluence but is stored per connec
 
 ## 6. Configuration outline
 
+This outline is illustrative: its IDs, keys, auth placeholders and enabled-write
+lists are examples, not built-in grants or defaults. `max_body_bytes: 262144`
+shows the selected default of the native document profile. The Jira
+`page_limit: 100` is an illustrative adapter setting; it does not establish a
+universal default or the CQL request limit. The selected CQL request default is
+25 and its maximum is 100 under the [native document contract](contracts/documents/v1alpha1/semantics.md#7-body-bearing-confluence-cql-search).
+
 ```json
 { "service": { "$ref": "urn:connectors:config:v1:service" },
   "http": { "$ref": "urn:connectors:config:v1:http" },
@@ -120,7 +127,7 @@ The same Atlassian API token serves Jira and Confluence but is stored per connec
   } }
 ```
 
-Writes are disabled unless listed. Scope entries bind provider IDs to verified keys during admitted configuration validation; IDs grant scope and keys are coordinates. A host-known scope/policy refusal precedes provider dispatch. Opaque document IDs and moved Jira keys follow the explicitly admitted lookup/scoped-read sequence in the [document contract](../../contracts/datasources/records/v1alpha1/semantics.md); they do not inherit the old key-prefix authorization rule.
+Writes are disabled unless listed. Scope entries bind provider IDs to verified keys during admitted configuration validation; IDs grant scope and keys are coordinates. A host-known scope/policy refusal precedes provider dispatch. Opaque document IDs and moved Jira keys follow the explicitly admitted lookup/scoped-read sequence in the [native document contract](contracts/documents/v1alpha1/semantics.md); they do not inherit the old key-prefix authorization rule.
 
 ### 6.1 Document and body-bearing search binding
 

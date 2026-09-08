@@ -1,0 +1,16 @@
+[
+  {
+    "file": "loki-v3.7.0-logql-ast.go",
+    "url": "https://raw.githubusercontent.com/grafana/loki/3361de24b692875d77bd7433cd6baa7c68dc0ef9/pkg/logql/syntax/ast.go",
+    "sha256": "6c3ca2bed2b7919ff32182cd79ab762744ab9215e4bd1def3d55b29f664871c8",
+    "bytes": 69114,
+    "archive": "vendor/loki-v3.7.0-logql-ast.go.gz"
+  },
+  {
+    "file": "loki-v3.7.0-logql-parser.go",
+    "url": "https://raw.githubusercontent.com/grafana/loki/3361de24b692875d77bd7433cd6baa7c68dc0ef9/pkg/logql/syntax/parser.go",
+    "sha256": "cf6389676176f4e0635006a60d89f7d75f492fc7444da7f792b702b53cb350e2",
+    "bytes": 7827,
+    "archive": "vendor/loki-v3.7.0-logql-parser.go.gz"
+  }
+]
