@@ -1,0 +1,321 @@
+{
+  "expected_decisions": 63,
+  "matched": 63,
+  "results": [
+    {
+      "id": "scope-ab",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "scope-a-only",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-complete",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-capped",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-unavailable",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "namespace-not_scanned",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "grafana-collection",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "explicit-cluster-scope",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-complete",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-complete",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-capped",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-capped",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-failed",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-failed",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "coverage-unvisited",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "snapshot-unvisited",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "evidence-observed",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "evidence-stale",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "evidence-withdrawn",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-current",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-attempt_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-predecessor_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-scope_unchanged-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-source_binding_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-parent_generation_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-authority_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-deadline_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-private_bindings_available-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-decision-published",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-decision-refused",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "publication-decision-unknown",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "same-target-revalidation",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-observation_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-fixed_binding_equal-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-parent_generation_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-exact_permission_current-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-child_enabled_and_not_revoked-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-same_binding_published",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-changed_binding",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-refused",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-unavailable",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "route-decision-unknown",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "wired-composition",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-same_process-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-parent_port_registered-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-child_implementation_registered-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-profiles_compatible-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-parent_is_direct-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "composition-independently_admitted-false",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "retired-observation-state",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-partition-state",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "public-null-not-generic-optional",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-publication-member",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "wrong-generation-type",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "missing-current-permission",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "string-process-flag",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "contradictory-complete-denied",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "missing-namespace-coordinate",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "negative-publication-generation",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "false-publisher-published-shape",
+      "accepted": true,
+      "expected_matched": true
+    }
+  ]
+}

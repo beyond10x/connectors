@@ -1,0 +1,18 @@
+{
+  "schema_expectations_reproduced": 63,
+  "negative_shapes": 7,
+  "schema_accepted_semantic_counterexamples": [
+    "contradictory-complete-denied",
+    "missing-namespace-coordinate",
+    "negative-publication-generation",
+    "false-publisher-published-shape"
+  ],
+  "selected_schema_hashes_matched": 13,
+  "both_retained_projection_sets_matched": 204,
+  "textual_traces_reviewed": 46,
+  "recorded_gate_test_pass_total": 50,
+  "gate_ends_pass": true,
+  "session_authored_count": 13,
+  "session_synthesized_count": 201,
+  "runtime_tests_run_by_reviewer": false
+}
