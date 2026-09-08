@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-refresh-coordination
 kind: story
-status: draft
+status: active
 title: Specify refresh exclusion and recovery after owner loss
 tags:
 - P1
@@ -11,13 +11,19 @@ relations:
 - decomposes: epic:contract-semantics-remediation
 - informed_by: specification:contract-review-intake-20260908
 scope:
+- confidence: inferred
+  path: contracts/auth/acquisition/v1alpha1/scenarios
 - confidence: cited
   path: contracts/auth/acquisition/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/auth/acquisition/v1alpha1/verification.md
 - confidence: cited
   path: contracts/auth/custody/v1alpha1/semantics.md
 - confidence: cited
   path: docs/adapters/atlassian.md
-revision: 2
+- confidence: inferred
+  path: ess/domains/refresh.yaml
+revision: 9
 ---
 ## Context
 
@@ -45,11 +51,18 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 ## Scope
 
-- cited: `contracts/auth/acquisition/v1alpha1/semantics.md`
-- cited: `contracts/auth/custody/v1alpha1/semantics.md`
-- cited: `docs/adapters/atlassian.md`
+Derived 2026-09-08 by `aep-drive:story-scoper`; coordinator records the approved allocation.
 
-Source locations: `contracts/auth/acquisition/v1alpha1/semantics.md:78`; `contracts/auth/custody/v1alpha1/semantics.md:57`; `docs/adapters/atlassian.md:56`.
+- **cited:** `contracts/auth/acquisition/v1alpha1/semantics.md` — existing story surface.
+- **cited:** `contracts/auth/custody/v1alpha1/semantics.md` — existing story surface.
+- **cited:** `docs/adapters/atlassian.md` — existing story surface.
+- **inferred:** `ess/domains/refresh.yaml` — private ESS/model verification authoring.
+- **inferred:** `contracts/auth/acquisition/v1alpha1/scenarios` — private ESS/model verification authoring.
+- **inferred:** `contracts/auth/acquisition/v1alpha1/verification.md` — private ESS/model verification authoring.
+
+- **Confidence: medium (inferred):** existing prose is cited; the modeling decomposition follows the approved semantic wave.
+- **Would collide (inferred):** other edits to these exact paths. Shared credential identity, ESS registration and gate changes belong to coordinator preparation, completed before the private branches fork.
+- **Coordinator allocation (inferred):** `ess/domains/credentials.yaml`, `ess/system.yaml`, and `crates/connectors-build/src/gate.rs` are prerequisites supplied by `specification:auth-hardening-wave-20260908`, not concurrent unit edit surfaces. Scopers originally named this integration overlap; it is explicitly serialized, not claimed disjoint.
 
 ## Dependencies and edit coordination
 
@@ -59,4 +72,6 @@ Shared edit surfaces with `story:contracts-idempotency-scope`, `story:contracts-
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+The operator approved F04 and F05 as a two-story semantic hardening wave, with local commits and merges and no model budget limit. This supersedes the previous ESS/commit exclusion. Scope includes textual contracts, adapter design, ESS declarations and authored conformance scenarios; it excludes runtime auth implementation, generated-schema changes, publication and adapter-set expansion.
+
+The shared identity seam is `ess/domains/credentials.yaml`; `ess/system.yaml` registers each private domain. Unsettled relations and runtime predicates remain explicit `UNMAPPED` obligations. Authored scenarios are compiled, not executed runtime conformance. Each unit requires a textual failure/scenario matrix, pinned ESS validation/compilation and authored scenario compilation with zero refusals, adversarial review and the full integration gate. See `specification:auth-hardening-wave-20260908` for scope ownership and evidence.
