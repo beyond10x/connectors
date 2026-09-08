@@ -1,0 +1,12 @@
+   Compiling ring v0.17.14
+   Compiling serde_yaml_ng v0.10.0
+   Compiling rustls-webpki v0.103.15
+   Compiling rustls v0.23.44
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-sdk v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-sdk)
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.43s

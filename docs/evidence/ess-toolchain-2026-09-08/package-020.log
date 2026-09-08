@@ -1,0 +1,39 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.15s
+     Running `target/debug/connectors-build package --output .local/gitlab-package-ess-020 --image 'connectors-v2-gitlab:ess-020-local'`
+{
+  "binary_sha256": "161aef1b55c13e424b351f598c634cfce6df2d72757f2489dfd9a9c987482733",
+  "ess": "0.20.0",
+  "format": "connectors.local-build/v1",
+  "generation_manifest_sha256": "611620346ef8a082b8be25dff3f500a92bddd26a9a315518e8924717dbbf6143",
+  "image": "connectors-v2-gitlab:ess-020-local",
+  "image_id": "sha256:1049d78855d994db3f92020b55e582697942ee2f7ca7a0ced531c8e023ee3a94",
+  "platform": {
+    "architecture": "amd64",
+    "os": "linux"
+  },
+  "profile": "dev",
+  "publication": "local only",
+  "rootfs_manifest_sha256": "e301ccb72b5dcc14dc5747ec5cd029e97b8bdb255a0ee5c93726ef60038d0134",
+  "runtime_acceptance": "separate conformance evidence required",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "source_head": "05fda2673be1cb7c610012988d21815ad8ea8038",
+  "source_manifest_sha256": "dcae9d5b38cabf396fee25fe4c2aa6dcff246c6a67a3ca3bd0fb9eba206c6b08",
+  "validation": [
+    "generation drift check",
+    "ESS declarations",
+    "ESS build compile",
+    "ESS BuildKit projection",
+    "Docker build",
+    "ESS realization validate and compile"
+  ]
+}
