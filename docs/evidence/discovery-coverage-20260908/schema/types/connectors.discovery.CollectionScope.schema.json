@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.CollectionScope",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:59227a557e4b8901f1a47ed3780ebf1d93ba4f01962bfe898041eefcded58a65",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.CollectionScope": {
+      "title": "CollectionScope",
+      "x-ess-name": "connectors.discovery.CollectionScope",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "string"
+        },
+        "source_connection": {
+          "type": "string"
+        },
+        "declaration": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "scope_ref": {
+          "type": "string"
+        },
+        "selection_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance",
+        "source_connection",
+        "declaration",
+        "profile",
+        "scope_ref",
+        "selection_revision"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

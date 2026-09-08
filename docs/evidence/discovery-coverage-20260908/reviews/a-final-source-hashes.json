@@ -1,0 +1,303 @@
+{
+  "review": "DC reviewer A final independent review",
+  "baseline": "0e4a8c11885e7008b2825cdcd0d2855cd241d9b4",
+  "created_utc": "2026-09-08T17:26:51.013546+00:00",
+  "source": "Explicit final working-tree normative/evidence allowlist frozen before analysis. Excludes all reviewer archives, aggregate dispositions, AEP workflow and checkpoint/closure bookkeeping.",
+  "files": [
+    {
+      "path": ".local/discovery-coverage-20260908/sessions-authored.json",
+      "sha256": "0d9e6d89c2153bca39a2b4e438cf71a12baa92a9d9de140e52518cf6ea120048",
+      "bytes": 161145
+    },
+    {
+      "path": ".local/discovery-coverage-20260908/sessions-suite.json",
+      "sha256": "b6b837e5bbe6da22c20eea357ad9e98e038a390b10fdef3ae7de5cb144321653",
+      "bytes": 2423518
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+      "bytes": 9290
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "bf97c5fc296b060dc1b09b04eefdfd9f6903e0be1c960cffc8b0dcea926aeeec",
+      "bytes": 26727
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+      "bytes": 15606
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "d4e0a81115a6fb4dff2aaa3c5378db08a3a5f6d9f49d8ae5dc5287e0569797f7",
+      "bytes": 21925
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "2ed63fc2bccc4552e525c7c69bffe602ec3ce679382923f97a1cea1793af2af7",
+      "bytes": 32097
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "4cfb58b1eaab7c468bbf43e0a76f901fe4b24978e48d0256cabee614d50c115f",
+      "bytes": 14593
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+      "bytes": 17305
+    },
+    {
+      "path": "contracts/catalog/v1alpha1/semantics.md",
+      "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+      "bytes": 23089
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "bytes": 7761
+    },
+    {
+      "path": "contracts/discovery/composition.md",
+      "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+      "bytes": 6686
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "47820abb3c1fa02c928aa7900aa15ded668ff8fcaee889c08644249449da13dc",
+      "bytes": 16195
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "a9455ca5090a96b23fc65be18a6a0b25a08c62593d460fa5b4f84450f20227ed",
+      "bytes": 29924
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "0f08c3d2ca50b6abfb43ebbe963891752d514e24d6006c3b15d3fcbc64a53af9",
+      "bytes": 38824
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+      "bytes": 23016
+    },
+    {
+      "path": "crates/connectors-host/src/lib.rs",
+      "sha256": "fe4602586f76cbd1c04709d2f674993e350f8e599036b520d56c819564914421",
+      "bytes": 988
+    },
+    {
+      "path": "crates/connectors-host/src/server.rs",
+      "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578",
+      "bytes": 11369
+    },
+    {
+      "path": "crates/connectors-sdk/src/lib.rs",
+      "sha256": "43ebb6e2f775755a6bebb24f0a4e5075cec7c2aaeda79fcb037c5ea07d134290",
+      "bytes": 7237
+    },
+    {
+      "path": "docs/adapters/grafana.md",
+      "sha256": "64f080b29550d49015c95361f00b649154cc6073e5dcfed598d4a15efab08032",
+      "bytes": 15357
+    },
+    {
+      "path": "docs/adapters/kubernetes.md",
+      "sha256": "6a8f38050319b22707234b7b966e626e168e548760d217e94f57aeba101e94cd",
+      "bytes": 16102
+    },
+    {
+      "path": "docs/cli-migration-v1-to-v2.md",
+      "sha256": "3bc4c1a238f77c151c5c9a559c4f33d2331a1aab8caa41ef2e087ef6642fb88e",
+      "bytes": 15820
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "b161ab04b696ec2f1be1ba70c8ae3e6e1245db54175e4aa0471d671915f3fa01",
+      "bytes": 122185
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/fixture-audit.md",
+      "sha256": "331c2562c040ef5de534b7c3f6ed353174987ed00bec3bfb7ef1ba5a557f7bc1",
+      "bytes": 7342
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/gate.log",
+      "sha256": "8de36873b4a10498fdd7bd35ba83ff7ca52b246e1b7ae4d4dd7ce4a87c72d472",
+      "bytes": 25972
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/projection-manifest.json",
+      "sha256": "b34fcebc76d152230a3808d493fff1f45e7c7fe76823f64d02592c51a96a224f",
+      "bytes": 29658
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.CollectionCoverage.schema.json",
+      "sha256": "c22999cd1c873f59265edb79f5b55f70903e0188719c00615bc0becf75375d92",
+      "bytes": 2281
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.CollectionScope.schema.json",
+      "sha256": "7fcbdcdef02bf1adaab505797c03c5d695a41d5c11d096bbf0ff125015c61cc2",
+      "bytes": 1278
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.CompositionFacts.schema.json",
+      "sha256": "1965e661d3358d266cd1600315426f9644f215d678d74221c8e13f1cd0ca29a6",
+      "bytes": 1392
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.ObservationEvidence.schema.json",
+      "sha256": "9fd82ca5bd84f50d9b8bb518e3b2ab661363d5fe3c5630c1cb329929106ee2ec",
+      "bytes": 1509
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.ObservationState.schema.json",
+      "sha256": "cecf8c66726b76bad9e3ffe4fcfd58242f920c42f179b1d3345e26460d53ad39",
+      "bytes": 743
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.PartitionCoverage.schema.json",
+      "sha256": "b057a004bf3c191473487628fa91b902a3ccb549c99c6d8ec42491ba0b886679",
+      "bytes": 1709
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.PartitionKind.schema.json",
+      "sha256": "32f35f569e704ed915a639e3a17a9604607518ea6fbca81652a329ecd89b1112",
+      "bytes": 735
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.PartitionState.schema.json",
+      "sha256": "44560f06a8339078ee47fd9ebea3e6c5f124011cf37a3b05726b80c0c07224e6",
+      "bytes": 779
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.PublicationDecision.schema.json",
+      "sha256": "e6453437d95a7dc0b04ddc8fae2c66df2e84051a4e109259a79a278491ba6116",
+      "bytes": 756
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.PublicationFacts.schema.json",
+      "sha256": "9c9f933e8eb9c9824e7dc745dc91ca1146851ac36490cafe140ce305220ea0ee",
+      "bytes": 1588
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.RouteRevalidationDecision.schema.json",
+      "sha256": "748564de22eace83b930c45149fdc40f681611f58494c24e1624c75f9e65de8c",
+      "bytes": 843
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.RouteRevalidationFacts.schema.json",
+      "sha256": "20288e7c1f03ef7b8e7c5dffc846b0efee8710cbf2f744b29db7d84eb6d417ae",
+      "bytes": 1792
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/schema/types/connectors.discovery.SnapshotSummary.schema.json",
+      "sha256": "7a6822d059fae5a326e399ec5ad2cf6cfd3a53e6ea552068330b26f59c13b9b4",
+      "bytes": 3813
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/traces.md",
+      "sha256": "e6de8e7101a7b97f6489d820eee6e940d071806ce7a2f87f9955dab7e8123254",
+      "bytes": 8835
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/type-results.json",
+      "sha256": "fcb4354eeb27c8f3b5ae75593138504b4b89d3a896aa7cbf39b1460733d2760f",
+      "bytes": 7006
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/typed-values.json",
+      "sha256": "a4232d602a62b4d2b2fd2022487504b0022cd31ea2811ada3f2939bbfbda8831",
+      "bytes": 31197
+    },
+    {
+      "path": "docs/evidence/discovery-coverage-20260908/verification.md",
+      "sha256": "cc94eddb83f650c5c267703aada4e5f46a98e68b4efc7d99cceb18d2c571870d",
+      "bytes": 4820
+    },
+    {
+      "path": "docs/stack-integration-proposal.md",
+      "sha256": "4286fe96332d9affa92a5e8e82cab3261a4c5e98b72573761ed4706906d6a99a",
+      "bytes": 16961
+    },
+    {
+      "path": "ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+      "bytes": 5153
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "path": "ess/domains/discovery.yaml",
+      "sha256": "89a2ad21006b71af6356e56f6cd331efb3d9a44743991f286e29175186071618",
+      "bytes": 5110
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+      "bytes": 8245
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+      "bytes": 480
+    }
+  ]
+}

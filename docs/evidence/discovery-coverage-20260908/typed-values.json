@@ -1,0 +1,1007 @@
+{
+  "scope": "Declared values checked for schema shape only; no coverage reducer, provider, authority, clock, store, route, composition or sequential scenario execution.",
+  "values": [
+    {
+      "id": "scope-ab",
+      "type": "connectors.discovery.CollectionScope",
+      "value": {
+        "instance": "kube-fixture",
+        "source_connection": "conn-cluster-a",
+        "declaration": "services.observe",
+        "profile": "kubernetes-service-targets",
+        "scope_ref": "scope-ab",
+        "selection_revision": "selection-7"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "scope-a-only",
+      "type": "connectors.discovery.CollectionScope",
+      "value": {
+        "instance": "kube-fixture",
+        "source_connection": "conn-cluster-a",
+        "declaration": "services.observe",
+        "profile": "kubernetes-service-targets",
+        "scope_ref": "scope-a",
+        "selection_revision": "selection-8"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "namespace-complete",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-b",
+        "kind": "namespace",
+        "namespace": "b",
+        "state": "complete"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "namespace-capped",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-b",
+        "kind": "namespace",
+        "namespace": "b",
+        "state": "capped"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "namespace-denied",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-b",
+        "kind": "namespace",
+        "namespace": "b",
+        "state": "denied"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "namespace-unavailable",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-b",
+        "kind": "namespace",
+        "namespace": "b",
+        "state": "unavailable"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "namespace-not_scanned",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-b",
+        "kind": "namespace",
+        "namespace": "b",
+        "state": "not_scanned"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "grafana-collection",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-all",
+        "kind": "collection",
+        "state": "complete"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "explicit-cluster-scope",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-cluster",
+        "kind": "cluster",
+        "state": "complete"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "coverage-complete",
+      "type": "connectors.discovery.CollectionCoverage",
+      "value": {
+        "complete": true,
+        "partitions": [
+          {
+            "id": "part-a",
+            "kind": "namespace",
+            "namespace": "a",
+            "state": "complete"
+          },
+          {
+            "id": "part-b",
+            "kind": "namespace",
+            "namespace": "b",
+            "state": "complete"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "snapshot-complete",
+      "type": "connectors.discovery.SnapshotSummary",
+      "value": {
+        "scope": {
+          "instance": "kube-fixture",
+          "source_connection": "conn-cluster-a",
+          "declaration": "services.observe",
+          "profile": "kubernetes-service-targets",
+          "scope_ref": "scope-ab",
+          "selection_revision": "selection-7"
+        },
+        "generation": 42,
+        "coverage": {
+          "complete": true,
+          "partitions": [
+            {
+              "id": "part-a",
+              "kind": "namespace",
+              "namespace": "a",
+              "state": "complete"
+            },
+            {
+              "id": "part-b",
+              "kind": "namespace",
+              "namespace": "b",
+              "state": "complete"
+            }
+          ]
+        },
+        "retention_truncated": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "coverage-capped",
+      "type": "connectors.discovery.CollectionCoverage",
+      "value": {
+        "complete": false,
+        "partitions": [
+          {
+            "id": "part-a",
+            "kind": "namespace",
+            "namespace": "a",
+            "state": "complete"
+          },
+          {
+            "id": "part-b",
+            "kind": "namespace",
+            "namespace": "b",
+            "state": "capped"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "snapshot-capped",
+      "type": "connectors.discovery.SnapshotSummary",
+      "value": {
+        "scope": {
+          "instance": "kube-fixture",
+          "source_connection": "conn-cluster-a",
+          "declaration": "services.observe",
+          "profile": "kubernetes-service-targets",
+          "scope_ref": "scope-ab",
+          "selection_revision": "selection-7"
+        },
+        "generation": 42,
+        "coverage": {
+          "complete": false,
+          "partitions": [
+            {
+              "id": "part-a",
+              "kind": "namespace",
+              "namespace": "a",
+              "state": "complete"
+            },
+            {
+              "id": "part-b",
+              "kind": "namespace",
+              "namespace": "b",
+              "state": "capped"
+            }
+          ]
+        },
+        "retention_truncated": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "coverage-denied",
+      "type": "connectors.discovery.CollectionCoverage",
+      "value": {
+        "complete": false,
+        "partitions": [
+          {
+            "id": "part-a",
+            "kind": "namespace",
+            "namespace": "a",
+            "state": "complete"
+          },
+          {
+            "id": "part-b",
+            "kind": "namespace",
+            "namespace": "b",
+            "state": "denied"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "snapshot-denied",
+      "type": "connectors.discovery.SnapshotSummary",
+      "value": {
+        "scope": {
+          "instance": "kube-fixture",
+          "source_connection": "conn-cluster-a",
+          "declaration": "services.observe",
+          "profile": "kubernetes-service-targets",
+          "scope_ref": "scope-ab",
+          "selection_revision": "selection-7"
+        },
+        "generation": 42,
+        "coverage": {
+          "complete": false,
+          "partitions": [
+            {
+              "id": "part-a",
+              "kind": "namespace",
+              "namespace": "a",
+              "state": "complete"
+            },
+            {
+              "id": "part-b",
+              "kind": "namespace",
+              "namespace": "b",
+              "state": "denied"
+            }
+          ]
+        },
+        "retention_truncated": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "coverage-failed",
+      "type": "connectors.discovery.CollectionCoverage",
+      "value": {
+        "complete": false,
+        "partitions": [
+          {
+            "id": "part-a",
+            "kind": "namespace",
+            "namespace": "a",
+            "state": "complete"
+          },
+          {
+            "id": "part-b",
+            "kind": "namespace",
+            "namespace": "b",
+            "state": "unavailable"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "snapshot-failed",
+      "type": "connectors.discovery.SnapshotSummary",
+      "value": {
+        "scope": {
+          "instance": "kube-fixture",
+          "source_connection": "conn-cluster-a",
+          "declaration": "services.observe",
+          "profile": "kubernetes-service-targets",
+          "scope_ref": "scope-ab",
+          "selection_revision": "selection-7"
+        },
+        "generation": 42,
+        "coverage": {
+          "complete": false,
+          "partitions": [
+            {
+              "id": "part-a",
+              "kind": "namespace",
+              "namespace": "a",
+              "state": "complete"
+            },
+            {
+              "id": "part-b",
+              "kind": "namespace",
+              "namespace": "b",
+              "state": "unavailable"
+            }
+          ]
+        },
+        "retention_truncated": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "coverage-unvisited",
+      "type": "connectors.discovery.CollectionCoverage",
+      "value": {
+        "complete": false,
+        "partitions": [
+          {
+            "id": "part-a",
+            "kind": "namespace",
+            "namespace": "a",
+            "state": "complete"
+          },
+          {
+            "id": "part-b",
+            "kind": "namespace",
+            "namespace": "b",
+            "state": "not_scanned"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "snapshot-unvisited",
+      "type": "connectors.discovery.SnapshotSummary",
+      "value": {
+        "scope": {
+          "instance": "kube-fixture",
+          "source_connection": "conn-cluster-a",
+          "declaration": "services.observe",
+          "profile": "kubernetes-service-targets",
+          "scope_ref": "scope-ab",
+          "selection_revision": "selection-7"
+        },
+        "generation": 42,
+        "coverage": {
+          "complete": false,
+          "partitions": [
+            {
+              "id": "part-a",
+              "kind": "namespace",
+              "namespace": "a",
+              "state": "complete"
+            },
+            {
+              "id": "part-b",
+              "kind": "namespace",
+              "namespace": "b",
+              "state": "not_scanned"
+            }
+          ]
+        },
+        "retention_truncated": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "evidence-observed",
+      "type": "connectors.discovery.ObservationEvidence",
+      "value": {
+        "state": "observed",
+        "last_seen_generation": 41,
+        "observed_at": "2026-09-08T17:00:00Z",
+        "valid_until": "2026-09-08T17:05:00Z"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "evidence-stale",
+      "type": "connectors.discovery.ObservationEvidence",
+      "value": {
+        "state": "stale",
+        "last_seen_generation": 41,
+        "observed_at": "2026-09-08T17:00:00Z",
+        "valid_until": "2026-09-08T17:05:00Z"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "evidence-withdrawn",
+      "type": "connectors.discovery.ObservationEvidence",
+      "value": {
+        "state": "withdrawn",
+        "last_seen_generation": 41,
+        "observed_at": "2026-09-08T17:00:00Z",
+        "valid_until": "2026-09-08T17:05:00Z"
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-current",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-attempt_current-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": false,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-predecessor_current-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": false,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-scope_unchanged-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": false,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-source_binding_current-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": false,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-parent_generation_current-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": false,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-authority_current-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": false,
+        "deadline_current": true,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-deadline_current-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": false,
+        "private_bindings_available": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-private_bindings_available-false",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-decision-published",
+      "type": "connectors.discovery.PublicationDecision",
+      "value": "published",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-decision-refused",
+      "type": "connectors.discovery.PublicationDecision",
+      "value": "refused",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "publication-decision-unknown",
+      "type": "connectors.discovery.PublicationDecision",
+      "value": "unknown",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "same-target-revalidation",
+      "type": "connectors.discovery.RouteRevalidationFacts",
+      "value": {
+        "expected_route_revision": "route-7",
+        "old_observation_generation": 41,
+        "new_observation_generation": 42,
+        "observation_current": true,
+        "fixed_binding_equal": true,
+        "parent_generation_current": true,
+        "independently_admitted": true,
+        "exact_permission_current": true,
+        "child_enabled_and_not_revoked": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-observation_current-false",
+      "type": "connectors.discovery.RouteRevalidationFacts",
+      "value": {
+        "expected_route_revision": "route-7",
+        "old_observation_generation": 41,
+        "new_observation_generation": 42,
+        "observation_current": false,
+        "fixed_binding_equal": true,
+        "parent_generation_current": true,
+        "independently_admitted": true,
+        "exact_permission_current": true,
+        "child_enabled_and_not_revoked": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-fixed_binding_equal-false",
+      "type": "connectors.discovery.RouteRevalidationFacts",
+      "value": {
+        "expected_route_revision": "route-7",
+        "old_observation_generation": 41,
+        "new_observation_generation": 42,
+        "observation_current": true,
+        "fixed_binding_equal": false,
+        "parent_generation_current": true,
+        "independently_admitted": true,
+        "exact_permission_current": true,
+        "child_enabled_and_not_revoked": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-parent_generation_current-false",
+      "type": "connectors.discovery.RouteRevalidationFacts",
+      "value": {
+        "expected_route_revision": "route-7",
+        "old_observation_generation": 41,
+        "new_observation_generation": 42,
+        "observation_current": true,
+        "fixed_binding_equal": true,
+        "parent_generation_current": false,
+        "independently_admitted": true,
+        "exact_permission_current": true,
+        "child_enabled_and_not_revoked": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-exact_permission_current-false",
+      "type": "connectors.discovery.RouteRevalidationFacts",
+      "value": {
+        "expected_route_revision": "route-7",
+        "old_observation_generation": 41,
+        "new_observation_generation": 42,
+        "observation_current": true,
+        "fixed_binding_equal": true,
+        "parent_generation_current": true,
+        "independently_admitted": true,
+        "exact_permission_current": false,
+        "child_enabled_and_not_revoked": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-child_enabled_and_not_revoked-false",
+      "type": "connectors.discovery.RouteRevalidationFacts",
+      "value": {
+        "expected_route_revision": "route-7",
+        "old_observation_generation": 41,
+        "new_observation_generation": 42,
+        "observation_current": true,
+        "fixed_binding_equal": true,
+        "parent_generation_current": true,
+        "independently_admitted": true,
+        "exact_permission_current": true,
+        "child_enabled_and_not_revoked": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-decision-same_binding_published",
+      "type": "connectors.discovery.RouteRevalidationDecision",
+      "value": "same_binding_published",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-decision-changed_binding",
+      "type": "connectors.discovery.RouteRevalidationDecision",
+      "value": "changed_binding",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-decision-refused",
+      "type": "connectors.discovery.RouteRevalidationDecision",
+      "value": "refused",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-decision-unavailable",
+      "type": "connectors.discovery.RouteRevalidationDecision",
+      "value": "unavailable",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "route-decision-unknown",
+      "type": "connectors.discovery.RouteRevalidationDecision",
+      "value": "unknown",
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "wired-composition",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": true,
+        "parent_port_registered": true,
+        "child_implementation_registered": true,
+        "profiles_compatible": true,
+        "parent_is_direct": true,
+        "independently_admitted": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "composition-same_process-false",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": false,
+        "parent_port_registered": true,
+        "child_implementation_registered": true,
+        "profiles_compatible": true,
+        "parent_is_direct": true,
+        "independently_admitted": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "composition-parent_port_registered-false",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": true,
+        "parent_port_registered": false,
+        "child_implementation_registered": true,
+        "profiles_compatible": true,
+        "parent_is_direct": true,
+        "independently_admitted": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "composition-child_implementation_registered-false",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": true,
+        "parent_port_registered": true,
+        "child_implementation_registered": false,
+        "profiles_compatible": true,
+        "parent_is_direct": true,
+        "independently_admitted": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "composition-profiles_compatible-false",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": true,
+        "parent_port_registered": true,
+        "child_implementation_registered": true,
+        "profiles_compatible": false,
+        "parent_is_direct": true,
+        "independently_admitted": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "composition-parent_is_direct-false",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": true,
+        "parent_port_registered": true,
+        "child_implementation_registered": true,
+        "profiles_compatible": true,
+        "parent_is_direct": false,
+        "independently_admitted": true
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "composition-independently_admitted-false",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": true,
+        "parent_port_registered": true,
+        "child_implementation_registered": true,
+        "profiles_compatible": true,
+        "parent_is_direct": true,
+        "independently_admitted": false
+      },
+      "schema_accepts": true,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "retired-observation-state",
+      "type": "connectors.discovery.ObservationState",
+      "value": "ready",
+      "schema_accepts": false,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "unknown-partition-state",
+      "type": "connectors.discovery.PartitionState",
+      "value": "empty_means_complete",
+      "schema_accepts": false,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "public-null-not-generic-optional",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-all",
+        "kind": "collection",
+        "namespace": null,
+        "state": "complete"
+      },
+      "schema_accepts": false,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "unknown-publication-member",
+      "type": "connectors.discovery.PublicationFacts",
+      "value": {
+        "attempt_current": true,
+        "predecessor_current": true,
+        "scope_unchanged": true,
+        "source_binding_current": true,
+        "parent_generation_current": true,
+        "authority_current": true,
+        "deadline_current": true,
+        "private_bindings_available": true,
+        "credential": "forbidden-field"
+      },
+      "schema_accepts": false,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "wrong-generation-type",
+      "type": "connectors.discovery.SnapshotSummary",
+      "value": {
+        "scope": {
+          "instance": "kube-fixture",
+          "source_connection": "conn-cluster-a",
+          "declaration": "services.observe",
+          "profile": "kubernetes-service-targets",
+          "scope_ref": "scope-ab",
+          "selection_revision": "selection-7"
+        },
+        "generation": "42",
+        "coverage": {
+          "complete": true,
+          "partitions": [
+            {
+              "id": "part-a",
+              "kind": "namespace",
+              "namespace": "a",
+              "state": "complete"
+            }
+          ]
+        },
+        "retention_truncated": false
+      },
+      "schema_accepts": false,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "missing-current-permission",
+      "type": "connectors.discovery.RouteRevalidationFacts",
+      "value": {
+        "expected_route_revision": "route-7",
+        "old_observation_generation": 41,
+        "new_observation_generation": 42,
+        "observation_current": true,
+        "fixed_binding_equal": true,
+        "parent_generation_current": true,
+        "independently_admitted": true,
+        "child_enabled_and_not_revoked": true
+      },
+      "schema_accepts": false,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "string-process-flag",
+      "type": "connectors.discovery.CompositionFacts",
+      "value": {
+        "same_process": "true",
+        "parent_port_registered": true,
+        "child_implementation_registered": true,
+        "profiles_compatible": true,
+        "parent_is_direct": true,
+        "independently_admitted": true
+      },
+      "schema_accepts": false,
+      "note": "Declared semantic value; schema shape only."
+    },
+    {
+      "id": "contradictory-complete-denied",
+      "type": "connectors.discovery.CollectionCoverage",
+      "value": {
+        "complete": true,
+        "partitions": [
+          {
+            "id": "part-a",
+            "kind": "namespace",
+            "namespace": "a",
+            "state": "denied"
+          }
+        ]
+      },
+      "schema_accepts": true,
+      "note": "Schema accepts; collection completeness predicate refuses."
+    },
+    {
+      "id": "missing-namespace-coordinate",
+      "type": "connectors.discovery.PartitionCoverage",
+      "value": {
+        "id": "part-b",
+        "kind": "namespace",
+        "state": "complete"
+      },
+      "schema_accepts": true,
+      "note": "Schema accepts Optional omission; selected namespace-kind predicate requires the coordinate."
+    },
+    {
+      "id": "negative-publication-generation",
+      "type": "connectors.discovery.SnapshotSummary",
+      "value": {
+        "scope": {
+          "instance": "kube-fixture",
+          "source_connection": "conn-cluster-a",
+          "declaration": "services.observe",
+          "profile": "kubernetes-service-targets",
+          "scope_ref": "scope-ab",
+          "selection_revision": "selection-7"
+        },
+        "generation": -1,
+        "coverage": {
+          "complete": true,
+          "partitions": [
+            {
+              "id": "part-a",
+              "kind": "namespace",
+              "namespace": "a",
+              "state": "complete"
+            }
+          ]
+        },
+        "retention_truncated": false
+      },
+      "schema_accepts": true,
+      "note": "Schema accepts Integer; normative generation bounds refuse."
+    },
+    {
+      "id": "false-publisher-published-shape",
+      "type": "connectors.discovery.PublicationDecision",
+      "value": "published",
+      "schema_accepts": true,
+      "note": "This decision shape is also accepted alongside predecessor_current:false. No cross-value publication predicate or store was executed."
+    }
+  ]
+}

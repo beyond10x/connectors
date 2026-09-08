@@ -1,0 +1,166 @@
+{
+  "baseline": "0e4a8c11885e7008b2825cdcd0d2855cd241d9b4",
+  "phase": "Initial revised normative packet; evidence pending",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "0f68147a2bbfa7b72dc6a6da94f37f8cf56ead7a71bdf9fd01bd08aaa7337794",
+      "bytes": 1407
+    },
+    {
+      "path": "adapters/kubernetes/Cargo.toml",
+      "sha256": "c688c9b2f1c9961ca229ef6b7e45c5a44666097a121b5d051e5035aaadca4151",
+      "bytes": 781
+    },
+    {
+      "path": "adapters/kubernetes/src/lib.rs",
+      "sha256": "9b97d3616f19f1dbaeab9d78b011f5265bd4b647de55fc5be3418c2bb82f2548",
+      "bytes": 11811
+    },
+    {
+      "path": "adapters/kubernetes/src/main.rs",
+      "sha256": "121e4cdf587e0bba26a565431105cdd16253f3282aa6dab2d802fa92290a4d48",
+      "bytes": 1147
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+      "bytes": 9290
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+      "bytes": 15606
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "d4e0a81115a6fb4dff2aaa3c5378db08a3a5f6d9f49d8ae5dc5287e0569797f7",
+      "bytes": 21925
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "da1604c03fbbdc31defe9e917f0162f4c9839c208375673de089a432186214f6",
+      "bytes": 30149
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "4cfb58b1eaab7c468bbf43e0a76f901fe4b24978e48d0256cabee614d50c115f",
+      "bytes": 14593
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+      "bytes": 17305
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "bytes": 7761
+    },
+    {
+      "path": "contracts/discovery/composition.md",
+      "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+      "bytes": 6686
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "47820abb3c1fa02c928aa7900aa15ded668ff8fcaee889c08644249449da13dc",
+      "bytes": 16195
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "bb11c5cb8aff64105ea9c7e5e1a08a427b7ad3cc4c1c8ed49223ae0a635f3c0b",
+      "bytes": 26906
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "8e2fa8665903f865cdef12930e10800fa967d89fb919444a6133717d46c66b58",
+      "bytes": 38478
+    },
+    {
+      "path": "crates/connectors-contracts/src/lib.rs",
+      "sha256": "2f6ee686defde5c29a0e3749b5496fdcb54725f1346c7f4844508a36c37bde74",
+      "bytes": 1357
+    },
+    {
+      "path": "crates/connectors-host/Cargo.toml",
+      "sha256": "af54c8a0e17c5062d30906cf59f2267890f4c9836b33b4e6cc01c30f14b2e56a",
+      "bytes": 879
+    },
+    {
+      "path": "crates/connectors-host/src/federation.rs",
+      "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c",
+      "bytes": 7183
+    },
+    {
+      "path": "crates/connectors-host/src/lib.rs",
+      "sha256": "fe4602586f76cbd1c04709d2f674993e350f8e599036b520d56c819564914421",
+      "bytes": 988
+    },
+    {
+      "path": "crates/connectors-host/src/server.rs",
+      "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578",
+      "bytes": 11369
+    },
+    {
+      "path": "crates/connectors-sdk/src/lib.rs",
+      "sha256": "43ebb6e2f775755a6bebb24f0a4e5075cec7c2aaeda79fcb037c5ea07d134290",
+      "bytes": 7237
+    },
+    {
+      "path": "crates/connectors-sdk/tests/cursor.rs",
+      "sha256": "5d67a2af9087011b52b90341586d5ccfce24069d16a17b351885ea6f5d59471d",
+      "bytes": 855
+    },
+    {
+      "path": "docs/adapters/grafana.md",
+      "sha256": "3f115d87eaa8a425a2a17bfd219f3b20bd46a9529fa21e16b805cb3f48d18709",
+      "bytes": 15196
+    },
+    {
+      "path": "docs/adapters/kubernetes.md",
+      "sha256": "ca1b1449453d2e6e19d2374256461af5f0d91d0794649e3ec11e4c0a712d2393",
+      "bytes": 15619
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "b161ab04b696ec2f1be1ba70c8ae3e6e1245db54175e4aa0471d671915f3fa01",
+      "bytes": 122185
+    },
+    {
+      "path": "ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+      "bytes": 5153
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "path": "ess/domains/discovery.yaml",
+      "sha256": "11eca896bb7e61b4c42bbb027c6b8ee243209a49df3328a82dd1b7156ded512c",
+      "bytes": 5022
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+      "bytes": 480
+    }
+  ]
+}

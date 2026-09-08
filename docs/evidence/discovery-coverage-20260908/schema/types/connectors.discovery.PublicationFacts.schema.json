@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.PublicationFacts",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:3a0e843cbfb4d94297984b5305ce343ae9fcc7ada905306460eefffee4e0d575",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.PublicationFacts": {
+      "title": "PublicationFacts",
+      "x-ess-name": "connectors.discovery.PublicationFacts",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "attempt_current": {
+          "type": "boolean"
+        },
+        "predecessor_current": {
+          "type": "boolean"
+        },
+        "scope_unchanged": {
+          "type": "boolean"
+        },
+        "source_binding_current": {
+          "type": "boolean"
+        },
+        "parent_generation_current": {
+          "type": "boolean"
+        },
+        "authority_current": {
+          "type": "boolean"
+        },
+        "deadline_current": {
+          "type": "boolean"
+        },
+        "private_bindings_available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "attempt_current",
+        "predecessor_current",
+        "scope_unchanged",
+        "source_binding_current",
+        "parent_generation_current",
+        "authority_current",
+        "deadline_current",
+        "private_bindings_available"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "original": ".local/discovery-coverage-20260908/sessions-authored.json",
+    "storage": "sessions-authored.json.gz",
+    "original_bytes": 161145,
+    "original_sha256": "0d9e6d89c2153bca39a2b4e438cf71a12baa92a9d9de140e52518cf6ea120048",
+    "compressed_sha256": "874e388f0b6865aa672da6110899fa76c12b5ac9981388a13e941e1b92fe9b3f"
+  },
+  {
+    "original": ".local/discovery-coverage-20260908/sessions-suite.json",
+    "storage": "sessions-suite.json.gz",
+    "original_bytes": 2423518,
+    "original_sha256": "b6b837e5bbe6da22c20eea357ad9e98e038a390b10fdef3ae7de5cb144321653",
+    "compressed_sha256": "7fdd2be60a8f87af9a260845acc0ad5715de1285e398f9b59f20e88ed8d2de1f"
+  }
+]

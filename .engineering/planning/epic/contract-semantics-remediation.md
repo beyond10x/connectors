@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 14
+revision: 16
 ---
 ## Context
 
@@ -55,7 +55,7 @@ After the child stories complete, the intake ledger maps every source finding to
 | P3 | `story:contracts-tenant-header` — Use one configuration name for the monitoring tenant header | E30 |
 | P2 | `story:contracts-mutation-visibility` — Distinguish implemented, enabled and discoverable mutations | E12 |
 
-No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. The latest checkpoint below records current closure: thirteen owner stories are implemented for semantic specification scope and fourteen remain draft. Earlier planning and checkpoint sections preserve their historical counts and evidence.
+No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. The latest checkpoint below records current closure: fifteen owner stories are implemented for semantic specification scope and twelve remain draft. Earlier planning and checkpoint sections preserve their historical counts and evidence.
 
 ## Sequencing and shared files
 
@@ -122,3 +122,11 @@ The checkpoint completes contracts-anonymous-auth (F09/E10), contracts-permissio
 Both final independent reviewers approve with zero remaining findings; 21 individual review findings have fixed outcomes. ESS 0.20.0 validates 12 files / 183 declarations, two 191-artifact projections match, 50 schema expectations and 44 textual traces document the actual verification boundary. Full gate/MSRV 1.88 passed 50 existing Rust tests; no new runtime or adapter-kind schema implementation. See docs/evidence/auth-profile-budget-20260908/verification.md and checkpoint.md.
 
 Current ledger: **21/48 original findings fixed, 27 open; 13 owner stories implemented, 14 draft.** This supersedes earlier checkpoint counts without rewriting their evidence. The broader specification goal remains active, including discovery/datasource/media semantics, persistence, catalog/stack and remaining open decisions. All work remains local.
+
+## Current specification checkpoint — discovery coverage and composition
+
+The checkpoint completes contracts-discovery-coverage (F13) and contracts-host-composition (E03) for semantic-contract/ESS-value scope. Exact comparable coverage separates truthful partial evidence from withdrawal; terminal incarnations, bounded history, stale-publisher fencing, immutable view paging and same-target route validation are explicit. An authored executable owns concrete library construction/injection into generic SDK ports in one OS process. The coordinated F08 clarification preserves explicitly configured all-namespaces Service discovery with an exact target and unchanged scan ceilings.
+
+Both final independent reviewers approve with zero residual findings; 23 individual review findings have fixed outcomes. ESS 0.20.0 validates 13 files/197 declarations, two 204-artifact projections match, 63 schema expectations and 46 textual traces record the verification boundary. Existing full gate/MSRV1.88 passes 50 Rust tests; no new runtime or adapter-kind schema implementation. See docs/evidence/discovery-coverage-20260908/verification.md and checkpoint.md.
+
+Current ledger: **23/48 original findings fixed, 25 open; 15 owner stories implemented, 12 draft.** This supersedes earlier historical counts. Discovery-profiles and persistence can now follow the completed coverage prerequisite; their remaining findings and broader catalog/stack/open-decision work keep the goal active. All work remains local.
