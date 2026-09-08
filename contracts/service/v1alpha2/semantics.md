@@ -3,7 +3,7 @@
 - **Status:** proposed, not implemented. Nothing in this document is advertised by any descriptor.
 - **Family:** service. Predecessor: [service/v1alpha1](../v1alpha1/semantics.md) (implemented). Siblings that this envelope carries: [operations mutation profile](../../operations/v1alpha1/semantics.md), [auth.connection](../../auth/connection/v1alpha1/semantics.md), [auth.custody](../../auth/custody/v1alpha1/semantics.md).
 - **Recorded:** 2026-09-08.
-- **Why it exists:** the review of 2026-09-08 (`.local/review/2026-09-08-concept-and-stack-integration-review.md`, gaps G1–G3, G6, G7, G9) found that the v1alpha1 wire and host carry no verified caller context, so nothing downstream of admission can be governed per caller. Every current consumer of the old Connectors passes an owner context and receives grant and audit facts. This document is the one wire change that closes that gap; it is the "Beyond10x service binding" that `docs/design.md` § 7 reserves without specifying.
+- **Why it exists:** the [preserved review of 2026-09-08](../../../.engineering/planning/review-result/concept-stack-integration-20260908.md) (gaps G1–G3, G6, G7, G9) found that the v1alpha1 wire and host carry no verified caller context, so nothing downstream of admission can be governed per caller. Every current consumer of the old Connectors passes an owner context and receives grant and audit facts. This document is the one wire change that closes that gap; it is the "Beyond10x service binding" that `docs/design.md` § 7 reserves without specifying.
 
 ## 1. Identity
 

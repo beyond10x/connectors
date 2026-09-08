@@ -1,0 +1,5 @@
+public_import_panicked=true
+
+thread 'main' (539448) panicked at crates/connectors-spec/src/v2.rs:379:30:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,47 @@
+[
+  {
+    "case": "valid",
+    "input": "{\"code\":\"forbidden\",\"message\":\"provider-message\"}",
+    "exit": 1,
+    "output": {
+      "code": "forbidden",
+      "message": "provider-message"
+    }
+  },
+  {
+    "case": "duplicate-code",
+    "input": "{\"code\":\"forbidden\",\"code\":\"timeout\",\"message\":\"provider-message\"}",
+    "exit": 1,
+    "output": {
+      "code": "forbidden",
+      "message": "service refused request or returned an invalid response"
+    }
+  },
+  {
+    "case": "duplicate-message",
+    "input": "{\"code\":\"forbidden\",\"message\":\"first\",\"message\":\"second\"}",
+    "exit": 1,
+    "output": {
+      "code": "forbidden",
+      "message": "service refused request or returned an invalid response"
+    }
+  },
+  {
+    "case": "duplicate-retry",
+    "input": "{\"code\":\"rate_limited\",\"message\":\"provider-message\",\"retry_after_seconds\":1,\"retry_after_seconds\":2}",
+    "exit": 1,
+    "output": {
+      "code": "forbidden",
+      "message": "service refused request or returned an invalid response"
+    }
+  },
+  {
+    "case": "unknown-field",
+    "input": "{\"code\":\"forbidden\",\"message\":\"provider-message\",\"extra\":{\"x\":1,\"x\":2}}",
+    "exit": 1,
+    "output": {
+      "code": "forbidden",
+      "message": "service refused request or returned an invalid response"
+    }
+  }
+]
