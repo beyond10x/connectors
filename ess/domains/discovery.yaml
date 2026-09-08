@@ -1,0 +1,105 @@
+domain: connectors.discovery
+summary: Proposed discovery scope, coverage, publication, same-target revalidation and composition values; no runtime or persistent owner.
+
+# Normative owners: contracts/discovery/resources/v1alpha1/semantics.md §§4–5,
+# mediated_route/v1alpha1/semantics.md §4.1 and discovery/composition.md.
+# These trusted facts/decisions are not authority supplied in invocation input.
+types:
+  - name: connectors.discovery.CollectionScope
+    kind: struct
+    fields:
+      - {name: instance, type: String}
+      - {name: source_connection, type: String}
+      - {name: declaration, type: String}
+      - {name: profile, type: String}
+      - {name: scope_ref, type: String}
+      - {name: selection_revision, type: String}
+  - name: connectors.discovery.PartitionKind
+    kind: enum
+    variants: [collection, namespace, cluster]
+  - name: connectors.discovery.PartitionState
+    kind: enum
+    variants: [complete, capped, denied, unavailable, not_scanned]
+  - name: connectors.discovery.PartitionCoverage
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: kind, type: connectors.discovery.PartitionKind}
+      - {name: namespace, type: "Optional<String>"}
+      - {name: state, type: connectors.discovery.PartitionState}
+  - name: connectors.discovery.CollectionCoverage
+    kind: struct
+    fields:
+      - {name: complete, type: Boolean}
+      - {name: partitions, type: "List<connectors.discovery.PartitionCoverage>"}
+  - name: connectors.discovery.ObservationState
+    kind: enum
+    variants: [observed, stale, withdrawn]
+  - name: connectors.discovery.ObservationEvidence
+    kind: struct
+    fields:
+      - {name: state, type: connectors.discovery.ObservationState}
+      - {name: last_seen_generation, type: Integer}
+      - {name: observed_at, type: Timestamp}
+      - {name: valid_until, type: Timestamp}
+  - name: connectors.discovery.SnapshotSummary
+    kind: struct
+    fields:
+      - {name: scope, type: connectors.discovery.CollectionScope}
+      - {name: generation, type: Integer}
+      - {name: coverage, type: connectors.discovery.CollectionCoverage}
+      - {name: retention_truncated, type: Boolean}
+  - name: connectors.discovery.PublicationFacts
+    kind: struct
+    fields:
+      - {name: attempt_current, type: Boolean}
+      - {name: predecessor_current, type: Boolean}
+      - {name: scope_unchanged, type: Boolean}
+      - {name: source_binding_current, type: Boolean}
+      - {name: parent_generation_current, type: Boolean}
+      - {name: authority_current, type: Boolean}
+      # Original outer execution/publication deadline; provider expiry cannot renew it.
+      - {name: deadline_current, type: Boolean}
+      - {name: private_bindings_available, type: Boolean}
+  - name: connectors.discovery.PublicationDecision
+    kind: enum
+    variants: [published, refused, unknown]
+  - name: connectors.discovery.RouteRevalidationFacts
+    kind: struct
+    fields:
+      - {name: expected_route_revision, type: String}
+      - {name: old_observation_generation, type: Integer}
+      - {name: new_observation_generation, type: Integer}
+      - {name: observation_current, type: Boolean}
+      - {name: fixed_binding_equal, type: Boolean}
+      - {name: parent_generation_current, type: Boolean}
+      - {name: independently_admitted, type: Boolean}
+      - {name: exact_permission_current, type: Boolean}
+      - {name: child_enabled_and_not_revoked, type: Boolean}
+  - name: connectors.discovery.RouteRevalidationDecision
+    kind: enum
+    variants: [same_binding_published, changed_binding, refused, unavailable, unknown]
+  - name: connectors.discovery.CompositionFacts
+    kind: struct
+    fields:
+      - {name: same_process, type: Boolean}
+      - {name: parent_port_registered, type: Boolean}
+      - {name: child_implementation_registered, type: Boolean}
+      - {name: profiles_compatible, type: Boolean}
+      - {name: parent_is_direct, type: Boolean}
+      - {name: independently_admitted, type: Boolean}
+
+# UNMAPPED: canonical private scope/membership/authority equality, source and
+# physical cluster identity, provider exhaustion/coherent-list evidence, numeric
+# caps, whole-view merge/retention/order, original clocks/expiry, no false absence,
+# immutable paging/cursor admission, exact incarnation/hidden-target comparison,
+# atomic publication and private-index consistency, stale publisher rejection,
+# crash recovery/epochs, route/credential/observation fences, installed live ports
+# and physical process identity. These values do not execute those predicates.
+# CollectionScope is a safe reference shape, not a second authority namespace.
+# Persistent ResourceObservation/Collection/RouteBinding/Connection/Composition
+# ownership, cardinality and lifecycle remain explicitly unmodeled under their
+# dedicated persistence owner; no invented owns edge or synthetic lifecycle.
+# This is distinct from the gateway idempotency.RouteBinding fingerprint value.
+# Optional projects to omission, not required-null public JSON; Timestamp and
+# SnapshotSummary are semantic shapes, not complete discovery payload codecs.

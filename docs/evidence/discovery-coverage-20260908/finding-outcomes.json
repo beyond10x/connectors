@@ -1,0 +1,140 @@
+[
+  {
+    "finding": "DC-A-01",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-02",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-03",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-04",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-05",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-06",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-host-composition",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-07",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-host-composition",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-08",
+    "review": "review-result:discovery-a-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-01",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-02",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-03",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-04",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-05",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-06",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-07",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-host-composition",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-08",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-host-composition",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-09",
+    "review": "review-result:discovery-b-initial-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-R2-01",
+    "review": "review-result:discovery-a-recheck1-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-R2-02",
+    "review": "review-result:discovery-a-recheck1-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-A-R2-03",
+    "review": "review-result:discovery-a-recheck1-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-R01",
+    "review": "review-result:discovery-b-recheck1-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-R02",
+    "review": "review-result:discovery-b-recheck1-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "DC-B-R03",
+    "review": "review-result:discovery-b-recheck1-20260908",
+    "owner": "story:contracts-discovery-coverage",
+    "outcome": "fixed"
+  }
+]

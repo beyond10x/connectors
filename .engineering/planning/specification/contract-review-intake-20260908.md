@@ -8,7 +8,7 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 12
+revision: 14
 ---
 ## Intake
 
@@ -38,12 +38,12 @@ P0 means an established critical current failure requiring immediate containment
 | F10 | P2 | P2 | `story:contracts-mutation-classification` | Accepted for remediation; assigned, not fixed. |
 | F11 | P2 | P2 | `story:contracts-restart-idempotency` | Accepted for remediation; assigned, not fixed. |
 | F12 | P2 | P2 | `story:contracts-log-continuation` | Accepted for remediation; assigned, not fixed. |
-| F13 | P2 | P2 | `story:contracts-discovery-coverage` | Accepted for remediation; assigned, not fixed. |
+| F13 | P2 | P2 | `story:contracts-discovery-coverage` | Fixed at semantic-contract/ESS-value level: exact comparable partition scope, truthful partial positives/history and terminal withdrawal, bounded fenced publication/immutable paging, and explicit same-target route revalidation. Both final independent reviews approve; see docs/evidence/discovery-coverage-20260908/verification.md. Runtime remains unimplemented. |
 | F14 | P2 | P2 | `story:contracts-document-admission` | Accepted for remediation; assigned, not fixed. |
 | F15 | P2 | P2 | `story:contracts-read-refresh-retry` | Accepted for remediation; assigned, not fixed. |
 | E01 | blocking | P1 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | E02 | blocking | P1 | `story:contracts-wire-compatibility` | Fixed by `story:contracts-wire-compatibility`: one version/field/profile matrix, explicit v1alpha2 routes, unchanged-read legacy projection with invoke enforcement, exact mutation/audit encoding and ESS values; 68 current decoder vectors, 27 textual response vectors, full gate and two final independent approvals. |
-| E03 | blocking | P2 | `story:contracts-host-composition` | Qualified: colocation is allowed; concrete wiring ownership must preserve the generic-host dependency invariant. |
+| E03 | blocking | P2 | `story:contracts-host-composition` | Fixed: an authored composition executable alone links concrete parent/child libraries and injects private SDK ports into the generic host. The selected mediated profile requires one OS process with live compatible ports; independent direct adapters remain independent. Both final independent reviews approve; no composition executable was implemented. |
 | E04 | should-fix | P2 | `story:contracts-management-boundary` | Fixed by host-owned separately admitted management, explicit instance/connection/acquisition targets, one coordinator through federation, protected UI/completion boundaries and separate local/provider revocation observations. Operation-envelope reuse does not assign coordination to adapters; concrete bindings remain advertisement gates. |
 | E05 | should-fix | P2 | `story:contracts-read-refresh-retry` | Accepted for remediation; assigned, not fixed. |
 | E06 | should-fix | P2 | `story:contracts-mutation-classification` | Accepted for remediation; assigned, not fixed. |
@@ -89,11 +89,11 @@ The first completed hardening story is `story:contracts-mutation-outcomes`, owni
 
 ## Completion accounting
 
-**21 of 48 source findings are fixed; 27 remain assigned, not fixed.** Thirteen of the 27 owner stories are implemented for their specification scope; fourteen remain draft. The documentation-index story remains draft for E22 and its dependencies even though E13 is fixed. Each source ID retains exactly one owner in the table above.
+**23 of 48 source findings are fixed; 25 remain assigned, not fixed.** Fifteen of the 27 owner stories are implemented for their specification scope; twelve remain draft. The documentation-index story remains draft for E22 and its dependencies even though E13 is fixed. Each source ID retains exactly one owner in the table above.
 
-The latest checkpoint closes F08/F09/E09/E10/E29 through explicit anonymous/parent-authenticated access, bounded exact-target permission checks and flow-specific acquisition paths. Both independent final reviewers approve; 21 individual review findings have fixed outcomes. Evidence: [verification](../../../docs/evidence/auth-profile-budget-20260908/verification.md), [dispositions](../../../docs/evidence/auth-profile-budget-20260908/dispositions.md), [review provenance](../../../docs/evidence/auth-profile-budget-20260908/checkpoint.md). ESS values and schema checks do not execute runtime authority, transport, acquisition, cache or budget behavior.
+The latest checkpoint closes F13/E03 through exact discovery scope/coverage, terminal historical evidence, bounded fenced publication, same-target route revalidation and explicit same-process composition ownership. Both independent final reviewers approve; 23 individual review findings have fixed outcomes. Evidence: [verification](../../../docs/evidence/discovery-coverage-20260908/verification.md), [dispositions](../../../docs/evidence/discovery-coverage-20260908/dispositions.md), [review provenance](../../../docs/evidence/discovery-coverage-20260908/checkpoint.md). ESS value/schema checks do not execute provider completeness, current authority, metadata atomicity, route equality, process placement or persistent ownership.
 
-Earlier reviewed checkpoints remain recorded in the owning stories and epic: mutation outcomes/idempotency, refresh/credential evidence, session revocation/tenant headers, complete wire compatibility, federated approval, and connection viability/host management. Persistence consolidation still depends on discovery coverage. Remaining original findings and the broader catalog/stack/open-decision scope keep the overall goal active. A plan/review alone is not a fixed defect; future closure requires the corresponding normative revision and honest verification evidence.
+Earlier reviewed checkpoints remain recorded in the owning stories and epic: mutation outcomes/idempotency, refresh/credential evidence, session revocation/tenant headers, wire compatibility, federated approval, connection viability/host management and auth access/permission budgets/acquisition. Discovery-profiles E07/E14/E32 remains draft and can now follow its coverage prerequisite; persistence consolidation can likewise follow coverage. Remaining original findings and broader catalog/stack/open-decision work keep the overall goal active. A plan/review alone is not a fixed defect; closure requires the normative revision and honest verification evidence.
 
 ## Acceptance
 

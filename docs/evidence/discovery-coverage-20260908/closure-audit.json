@@ -1,0 +1,83 @@
+{
+  "baseline": "0e4a8c11885e7008b2825cdcd0d2855cd241d9b4",
+  "source_findings": 48,
+  "fixed": 23,
+  "open": 25,
+  "fixed_ids": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "F06",
+    "F07",
+    "F08",
+    "F09",
+    "F13",
+    "E01",
+    "E02",
+    "E03",
+    "E04",
+    "E09",
+    "E10",
+    "E11",
+    "E13",
+    "E19",
+    "E20",
+    "E21",
+    "E29",
+    "E30"
+  ],
+  "story_statuses": {
+    "draft": 12,
+    "implemented": 15
+  },
+  "review_findings": 23,
+  "outcome_owners": {
+    "story:contracts-discovery-coverage": 19,
+    "story:contracts-host-composition": 4
+  },
+  "reviews": [
+    {
+      "review": "review-result:discovery-a-initial-20260908",
+      "source_count": 38,
+      "archive_and_report_match": true,
+      "final_current_sources_match": null
+    },
+    {
+      "review": "review-result:discovery-a-recheck1-20260908",
+      "source_count": 40,
+      "archive_and_report_match": true,
+      "final_current_sources_match": null
+    },
+    {
+      "review": "review-result:discovery-b-initial-20260908",
+      "source_count": 33,
+      "archive_and_report_match": true,
+      "final_current_sources_match": null
+    },
+    {
+      "review": "review-result:discovery-b-recheck1-20260908",
+      "source_count": 32,
+      "archive_and_report_match": true,
+      "final_current_sources_match": null
+    },
+    {
+      "review": "review-result:discovery-a-final-20260908",
+      "source_count": 59,
+      "archive_and_report_match": true,
+      "final_current_sources_match": true
+    },
+    {
+      "review": "review-result:discovery-b-final-20260908",
+      "source_count": 52,
+      "archive_and_report_match": true,
+      "final_current_sources_match": true
+    }
+  ],
+  "planning_artifacts": 95,
+  "planning_valid": true,
+  "planning_prose_only_warnings": 53,
+  "scope": "Semantic contract and ESS value stabilization; no runtime conformance or overall goal completion",
+  "journal_outcomes_exactly_once": 23
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.discovery.PublicationDecision",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "c7fc8198d852d9c3567a443e38aed4f00db8ff32f2517b683cadcc8479924892",
+    "contract_digest": "slice-sha256/2:fe0dc5a37af8adb04a5d7736c382325414bbc0acb148d991dd64e4e5058b9b13",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.discovery.PublicationDecision": {
+      "title": "PublicationDecision",
+      "x-ess-name": "connectors.discovery.PublicationDecision",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "published",
+        "refused",
+        "unknown"
+      ]
+    }
+  }
+}

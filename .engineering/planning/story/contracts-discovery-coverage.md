@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-discovery-coverage
 kind: story
-status: draft
+status: implemented
 title: Separate incomplete discovery from confirmed withdrawal
 tags:
 - P2
@@ -12,15 +12,27 @@ relations:
 - informed_by: specification:contract-review-intake-20260908
 - depends_on: story:contracts-permission-budgets
 scope:
+- confidence: inferred
+  path: contracts/auth/connection/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/auth/evidence/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/discovery/mediated_route/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/discovery/resources/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/service/compatibility.md
 - confidence: cited
   path: docs/adapters/grafana.md
 - confidence: cited
   path: docs/adapters/kubernetes.md
-revision: 2
+- confidence: inferred
+  path: docs/evidence/discovery-coverage-20260908
+- confidence: inferred
+  path: ess/domains/discovery.yaml
+- confidence: inferred
+  path: ess/system.yaml
+revision: 11
 ---
 ## Context
 
@@ -48,12 +60,16 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 ## Scope
 
-- cited: `contracts/discovery/resources/v1alpha1/semantics.md`
+- inferred: `contracts/auth/connection/v1alpha1/semantics.md`
+- inferred: `contracts/auth/evidence/v1alpha1/semantics.md`
 - cited: `contracts/discovery/mediated_route/v1alpha1/semantics.md`
-- cited: `docs/adapters/kubernetes.md`
+- cited: `contracts/discovery/resources/v1alpha1/semantics.md`
+- inferred: `contracts/service/compatibility.md`
 - cited: `docs/adapters/grafana.md`
-
-Source locations: `contracts/discovery/resources/v1alpha1/semantics.md:68`; `contracts/discovery/resources/v1alpha1/semantics.md:78`; `contracts/discovery/resources/v1alpha1/semantics.md:80`; `contracts/discovery/resources/v1alpha1/semantics.md:87`.
+- cited: `docs/adapters/kubernetes.md`
+- inferred: `docs/evidence/discovery-coverage-20260908`
+- inferred: `ess/domains/discovery.yaml`
+- inferred: `ess/system.yaml`
 
 ## Dependencies and edit coordination
 
@@ -63,4 +79,8 @@ Shared edit surfaces with `story:contracts-credential-evidence`, `story:contract
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+This approved local specification-hardening story revises contracts/adapter design, models settled values with pinned ESS0.20.0, and records explicit UNMAPPED semantics/ownership plus independent review evidence. Runtime code and current adapter-kind schemas remain unchanged. Generic schema/compiled-scenario checking does not execute admission, observation, transport or persistence. Local commits and local recovery backup are authorized; no external publication. Root is the sole tracked-file editor in primary main under the repository override; two independent reviewers write ignored snapshots only. Shared surfaces are serialized through root, not a concurrent implementation wave. Discovery-profiles remains separately owned and draft pending discovery-coverage completion.
+
+## Completion evidence
+
+F13 is fixed for this approved semantic specification scope. Exact normative corrections, 46 declared textual traces, 63 schema expectations and their limits are recorded in [verification](../../../docs/evidence/discovery-coverage-20260908/verification.md) and [dispositions](../../../docs/evidence/discovery-coverage-20260908/dispositions.md). Both immutable final independent reviews discovery-a-final-20260908 and discovery-b-final-20260908 approve with zero residual findings. ESS 0.20.0 validates 13 files/197 declarations; two 204-artifact projections match; the existing full gate/MSRV1.88 passes 50 Rust tests. This is not execution of provider, publisher, route, authority or composition semantics. No runtime/adapter-kind schema change or external publication. Discovery-profiles E07/E14/E32 and persistent ownership bindings remain separate work.
