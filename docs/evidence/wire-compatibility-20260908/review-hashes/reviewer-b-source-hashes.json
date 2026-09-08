@@ -1,0 +1,74 @@
+{
+  "head": "3ba2d29870d577aac70c8a68ee901b3b7c6c99ac",
+  "scope": "independent read-only review; no implementation or tracked-file edits; no other reviewer report read",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b"
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d"
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358"
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "6728369ca800497ecbce72b118cf49c5eb8f0fc9c6c6ca5a5a50d597a7ac52fd"
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "cb8050c677cde0c42d01f47f8c5215e45f7fb30d055d1e84adc08246a4280dfb"
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "30f1d2b75b2df15a0b7f3d6ec3b9e6f7e13b561aa95c70202be7ddb227cd534e"
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "ff2bebf12a62e0704fe0e1463291c704aeab77ec58c1b984652874cb1aeaac2c"
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "34d6fc4a5328cf02d29dd42906489ea4b9bb3a87003004c08091014a84735f57"
+    },
+    {
+      "path": "docs/stack-integration-proposal.md",
+      "sha256": "4a83d70fc618da1ec759457c349402241016bdf3d886ab75c77daa2483386931"
+    },
+    {
+      "path": "docs/cli-migration-v1-to-v2.md",
+      "sha256": "5dc8808f05d87912e708b0cee25b8c20260ca910388d379dd4ec8b3222a95b1d"
+    },
+    {
+      "path": "crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8"
+    },
+    {
+      "path": "crates/connectors-core/tests/wire.rs",
+      "sha256": "188784bc22c08dbc484a354cddd734ace2163f085b872a3ef399bef3537e9307"
+    },
+    {
+      "path": "crates/connectors-host/src/server.rs",
+      "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578"
+    },
+    {
+      "path": "crates/connectors-host/src/federation.rs",
+      "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c"
+    },
+    {
+      "path": "crates/connectors-host/tests/service.rs",
+      "sha256": "37f177ceba5a079fc48a8ac27ec29feaa4f61664d864ce73662cc1b77e3d393e"
+    },
+    {
+      "path": "crates/connectors-client/src/lib.rs",
+      "sha256": "5a278c168bddf891fb678cd73255421e3a2708a1449edbe53b43158b9f41faa5"
+    },
+    {
+      "path": ".engineering/planning/story/contracts-wire-compatibility.md",
+      "sha256": "a6c500cacacd45914a3abceece778552220522b6809bd8cd43d0e334821a8608"
+    }
+  ]
+}

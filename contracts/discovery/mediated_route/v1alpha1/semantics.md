@@ -40,7 +40,7 @@ Host-side route binding (configuration created by materialization, `resource_dis
 { "child_connection": "conn_prom_7", "parent_connection": "conn_grafana_1", "observation": "obs_…", "profile": "grafana-datasource-proxy", "generation": 41, "target_adapter": "prometheus" }
 ```
 
-Parent port (Rust, host-internal; the wire is the parent's `operations` surface):
+Parent port (Rust, private within one admitted composition; no public forwarding operation):
 
 ```text
 forward(binding, method, target_relative_segments, query, headers_allowlisted, body_bounded) -> HttpResponse
@@ -89,6 +89,8 @@ Errors returned to the child: base codes plus `route_unavailable` (parent not re
 ## 7. Compatibility
 
 - Old `grafana_datasource_proxy_v1` and `kubernetes_service_proxy_v1` route adapters map one-to-one to the two profiles. Old Grafana `datasource_query` (`expose = false`) is not carried; children query their own API through the route.
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Safe capability advertising needs the extended Descriptor.provides field; forwarding remains a private same-composition port. Child-visible route errors require the extended error set. No public generic forwarding endpoint is introduced.
+
 
 ## 8. SDK and host obligations
 

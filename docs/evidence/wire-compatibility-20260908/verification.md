@@ -1,0 +1,48 @@
+# E02 service compatibility verification
+
+Baseline: `3ba2d29870d577aac70c8a68ee901b3b7c6c99ac`. This is specification hardening for `story:contracts-wire-compatibility`, not a codec implementation or a release. The [compatibility owner](../../../contracts/service/compatibility.md) and [governed binding](../../../contracts/service/v1alpha2/semantics.md) define the proposed behavior. Runtime, adapter kinds and generated adapter schemas remain unchanged.
+
+## Executed checks
+
+- **68/68 legacy decoding vectors passed** against the unchanged current `connectors-core::read_json`. [Bytes and expectations](legacy-decoder-vectors.json), [observations](legacy-decoder-results.json), and [exact temporary Rust harness](legacy-probe.md) preserve the check. It covers all four new Descriptor root members, nine Operation candidates including rejected plural profiles, four Invocation members, six Response candidates, all 13 old and 17 proposed error codes, nested unknown error fields, version-only differences, contradictory responses and recursive duplicate fields.
+- This is a **core decode** check. An accepted version string is not admission or version support: the client/server compare versions after decoding. Source inspection of the unchanged core, client and server establishes the later diagnostic distinctions in compatibility §2. The full gate also executes `connectors-host/tests/service.rs::wire_admission_and_freshness_refuse_before_dispatch`, which checks unauthorized describe, stale revision, bad input and wrong-version invoke with **zero adapter calls**, followed by one admitted call. No new mock-client negotiation test is claimed.
+- The full project [gate](gate.log) exited **0**, including format, generation drift, clippy, **50 Rust tests**, and MSRV 1.88. The pinned ESS **0.20.0** validated **9 files** and compiled the value domain. The ordinary gate compiled 222 obligations (34 authored), zero refusals. Separate session author/synthesize commands compiled 13 authored scenarios / 201 obligations, zero refusals. Generated obligations overlap between these totals and are not independent tests.
+- ESS validates declarations, references and types. Its author/synthesize commands do **not execute sequential traces**. The value-only service-wire domain introduces no fake entity, command, persistence relation or runtime target. Mandatory-null emission, bounds, conditional response rules, authority/audit behavior and exact codec projection remain explicitly UNMAPPED executable obligations.
+
+Commands, from the repository root:
+
+```sh
+env TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked --offline -p connectors-build -- --ess "$PWD/.local/toolchains/ess/0.20.0/bin/ess" gate --msrv
+.local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/sessions/v1alpha1/scenarios --out .local/wire-compatibility-20260908/sessions-authored.json
+.local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --scenarios contracts/sessions/v1alpha1/scenarios --out .local/wire-compatibility-20260908/sessions-synthesized.json
+```
+
+## Proposed response scenario audit
+
+The [27 proposed vectors](proposed-observation-vectors.json) are complete example responses plus expected textual conformance decisions, **not outputs from an implemented v1alpha2 decoder**. The positive cases cover describe success/refusal, three singular generic profile/limit combinations, early audit failure, unaudited static read, all four effect classifications and their admitted durable replay forms, unknown lookup, pending waiter, denied original observation, pre-dispatch and final-audit failures, terminal-store failure after known success, undeliverable known effect, and distinct gateway/leaf audit observations. Negative cases cover replay as classification, success/unknown, omitted required-null cause, half an original identity, unknown under timeout, fabricated audit reference and HTTP/application mismatch.
+
+| Scenario | Chosen rule and expected observation |
+|---|---|
+| Extended describe success / refusal | Common Response, request_id null, required audit fields; success result contains the complete Descriptor and both versions agree. Errors have no result and use the specified HTTP code. Legacy describe remains bare Descriptor. |
+| New descriptor or error to old reader | Strict refusal before any new semantics can be used; diagnostic depends on decoding stage and HTTP fallback, not a universal unsupported result. |
+| New client chooses legacy binding | Explicit codec and verified unchanged read surface only; preserve complete original semantics, limits, schemas, errors, auth and cursor meaning. No fallback or implicit retry. |
+| Hidden mutation guessed on legacy invoke | Projection is off by default; an enabled projection has a separate revision and exact invoke set. Hidden names are not_found with zero dispatch. This remains a future runtime fixture. |
+| Generic read / mutation / page | One profile each, realization generic, same 256 KiB / 4 MiB / 40 s / 30 s / 5 s limits. A smaller host refuses the selected profile instead of clipping it. |
+| Known applied/refused result; settlement failure | Retain effect knowledge and original safe refusal/result; a secondary cause reports persistence trouble. Applied-but-undeliverable result is error/applied. |
+| Unknown original / pending waiter | outcome_unknown; safe identity only when known/admitted; waiting never changes the original or spends again. Returning a durable unknown observation can be replayed without granting redispatch. |
+| Current caller/result admission denied | Omit mutation metadata entirely; reveal no original existence, correlation, result or effect. |
+| Audit unavailable before dispatch | No provider dispatch and no invented audit reference. If an admitted new candidate is definitely unsent, not_attempted is representable with null original identity. |
+| Final audit unavailable after dispatch | Keep actual effect knowledge, acknowledged anchor and audit_status incomplete. Complete audit does not imply a known business outcome. |
+| Delegation / callbacks / media | Explicitly unbound until their owners supply complete verification/framing protocols. Merely choosing v1alpha2 cannot advertise support. |
+
+No runtime projection, v1alpha2 HTTP route, provider mutation, audit persistence, signed delegation, callback or duplex/media conformance was executed. Those are subsequent binding obligations. E02 acceptance concerns their explicit compatibility disposition, not implementation completion.
+
+## Family coverage and reviewer corrections
+
+Compatibility §6 covers all **15 proposed v1alpha1 family documents**: operations; six auth documents; records/logs/series; resource discovery and mediated routes; sessions; media; catalog. The proposed service v1alpha2 document supplies the sixteenth proposed semantic document. Every public §3 shape is assigned to an extended envelope member, a selected operation payload/schema, a private port, a reserved profile, an independent artifact/configuration reader, or a separately unbound callback/control/data transport. Existing configured service v1alpha1 remains the baseline, not a new compatibility promise for unsupported profiles. Deferred execution/events/resource-management/configuration families gain no binding.
+
+Both independent first reviews identified eight findings each. Their overlap is preserved rather than summed into unique findings. Corrections include strict-reader refusal, explicit describe selection, exact mutation/replay/audit encoding, invoke-enforced legacy projection, authenticated versus admitted executor context, safe field inventory, private mediated forwarding, explicit generic limits and independent version axes. The incomplete HMAC sketch is withdrawn and F03 remains unbound; this is a compatibility disposition, not closure of F03.
+
+Recheck A identified four P2 inconsistencies: inaccurate records/series inventory, missing scopes, generic limit selector and completion-port designation. Recheck B identified one P1 and three P2 inconsistencies: describe framing, generic limits, missing scopes, and stale CLI/stack guidance. These prompted complete describe envelopes, exact HTTP mapping, singular generic selection across all three profiles, corrected literal schemas and protected completion designation. Root additionally corrected unsafe catalog error-message copying and provider-status-to-mutation classification; these are explicit additional defects, not invented original finding IDs.
+
+Final independent rechecks are preserved as [family review](../../../.engineering/planning/review-result/wire-family-r3-20260908.md) and [binding review](../../../.engineering/planning/review-result/wire-binding-r3-20260908.md). Earlier reports remain immutable: [family first pass](../../../.engineering/planning/review-result/wire-family-r1-20260908.md), [binding first pass](../../../.engineering/planning/review-result/wire-binding-r1-20260908.md), [family recheck](../../../.engineering/planning/review-result/wire-family-r2-20260908.md), [binding recheck](../../../.engineering/planning/review-result/wire-binding-r2-20260908.md). Final editorial clarifications put series minimum-step/window constraints in their selected input schema/profile rather than Operation.limits, and replace the remaining historical numbered scenario reference. Source hashes for each review are retained in [review-hashes](review-hashes/). [Machine summary](summary.json) records check totals. The original E02 is closed only after final source review and planning validation; sibling behavioral findings and the broader stabilization goal remain open.

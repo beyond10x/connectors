@@ -1,0 +1,739 @@
+{
+  "validation": "Textual semantic vectors reviewed against the proposed contract; not executed by a v1alpha2 codec. No such runtime is implemented.",
+  "vectors": [
+    {
+      "id": "describe-success-generic-read-mutation-page",
+      "expected_conforming": true,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": null,
+        "status": "success",
+        "audit_ref": null,
+        "audit_status": "not_required",
+        "result": {
+          "version": "v1alpha2",
+          "instance": "fixture",
+          "adapter": "fixture",
+          "revision": "full-fixture-revision",
+          "operations": [
+            {
+              "id": "read",
+              "description": "fixture operation",
+              "contract": "operations/v1alpha1",
+              "profile": "generic-http",
+              "input_schema": {},
+              "output_schema": {},
+              "effects": [
+                "network"
+              ],
+              "semantic_effects": [],
+              "risk": "low",
+              "idempotency": {
+                "kind": "natural"
+              },
+              "approval": "not_required",
+              "requires_auth": [
+                {
+                  "profile": "fixture.configured",
+                  "scopes": []
+                }
+              ],
+              "realization": "generic",
+              "limits": {
+                "request_bytes": 262144,
+                "result_bytes": 4194304,
+                "execution_ms": 40000,
+                "provider_ms": 30000,
+                "connect_ms": 5000
+              }
+            },
+            {
+              "id": "write",
+              "description": "fixture operation",
+              "contract": "operations/v1alpha1",
+              "profile": "mutation",
+              "input_schema": {},
+              "output_schema": {},
+              "effects": [
+                "external_write",
+                "network"
+              ],
+              "semantic_effects": [],
+              "risk": "medium",
+              "idempotency": {
+                "kind": "none"
+              },
+              "approval": "required",
+              "requires_auth": [
+                {
+                  "profile": "fixture.configured",
+                  "scopes": []
+                }
+              ],
+              "realization": "generic",
+              "limits": {
+                "request_bytes": 262144,
+                "result_bytes": 4194304,
+                "execution_ms": 40000,
+                "provider_ms": 30000,
+                "connect_ms": 5000
+              }
+            },
+            {
+              "id": "page",
+              "description": "fixture operation",
+              "contract": "datasource.records/v1alpha1",
+              "profile": "generic-http-page",
+              "input_schema": {},
+              "output_schema": {},
+              "effects": [
+                "network"
+              ],
+              "semantic_effects": [],
+              "risk": "low",
+              "idempotency": {
+                "kind": "natural"
+              },
+              "approval": "not_required",
+              "requires_auth": [
+                {
+                  "profile": "fixture.configured",
+                  "scopes": []
+                }
+              ],
+              "realization": "generic",
+              "limits": {
+                "request_bytes": 262144,
+                "result_bytes": 4194304,
+                "execution_ms": 40000,
+                "provider_ms": 30000,
+                "connect_ms": 5000
+              }
+            }
+          ],
+          "configuration_schema": {},
+          "admission": {
+            "profile": "static-bearer"
+          }
+        }
+      },
+      "semantic_audit": "Complete Descriptor is nested in result; both versions agree, GET correlation null. Three singular profiles select identical generic limits. Fixture names imply no production profile support."
+    },
+    {
+      "id": "describe-unauthorized",
+      "expected_conforming": true,
+      "http_status": 401,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": null,
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "unauthorized",
+          "message": "safe classification"
+        }
+      },
+      "semantic_audit": "Describe refusal is the same response shape, with null correlation and no result."
+    },
+    {
+      "id": "malformed-invoke-audit-unavailable",
+      "expected_conforming": true,
+      "http_status": 503,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": null,
+        "status": "error",
+        "audit_ref": null,
+        "audit_status": "unavailable",
+        "error": {
+          "code": "unavailable",
+          "message": "safe classification"
+        }
+      },
+      "semantic_audit": "No valid envelope and no acknowledged record; null request/audit refs; no dispatch."
+    },
+    {
+      "id": "read-static-unaudited",
+      "expected_conforming": true,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": null,
+        "audit_status": "not_required",
+        "result": {}
+      },
+      "semantic_audit": "Explicit static read uses required null ref, not field omission."
+    },
+    {
+      "id": "fresh-applied",
+      "expected_conforming": true,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "mutation": {
+          "classification": "applied",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "Effect classification and cause are independent; identified attempt is the original business subject."
+    },
+    {
+      "id": "replayed-applied",
+      "expected_conforming": true,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "mutation": {
+          "classification": "applied",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": true,
+          "cause": null
+        }
+      },
+      "semantic_audit": "Current admitted observation returns durable original outcome and original identity without another dispatch/spend."
+    },
+    {
+      "id": "fresh-refused",
+      "expected_conforming": true,
+      "http_status": 403,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "forbidden",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "refused",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "Effect classification and cause are independent; identified attempt is the original business subject."
+    },
+    {
+      "id": "replayed-refused",
+      "expected_conforming": true,
+      "http_status": 403,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "forbidden",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "refused",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": true,
+          "cause": null
+        }
+      },
+      "semantic_audit": "Current admitted observation returns durable original outcome and original identity without another dispatch/spend."
+    },
+    {
+      "id": "fresh-not_attempted",
+      "expected_conforming": true,
+      "http_status": 403,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "approval_refused",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "not_attempted",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "Effect classification and cause are independent; identified attempt is the original business subject."
+    },
+    {
+      "id": "replayed-not_attempted",
+      "expected_conforming": true,
+      "http_status": 403,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "approval_refused",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "not_attempted",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": true,
+          "cause": null
+        }
+      },
+      "semantic_audit": "Current admitted observation returns durable original outcome and original identity without another dispatch/spend."
+    },
+    {
+      "id": "fresh-unknown",
+      "expected_conforming": true,
+      "http_status": 502,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "outcome_unknown",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "unknown",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": {
+            "code": "timeout",
+            "stage": "observation"
+          }
+        }
+      },
+      "semantic_audit": "Effect classification and cause are independent; identified attempt is the original business subject."
+    },
+    {
+      "id": "replayed-unknown",
+      "expected_conforming": true,
+      "http_status": 502,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "outcome_unknown",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "unknown",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": true,
+          "cause": {
+            "code": "timeout",
+            "stage": "observation"
+          }
+        }
+      },
+      "semantic_audit": "Current admitted observation returns durable original outcome and original identity without another dispatch/spend."
+    },
+    {
+      "id": "lookup-uncertain-without-identity",
+      "expected_conforming": true,
+      "http_status": 502,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "outcome_unknown",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "unknown",
+          "attempt": null,
+          "original_request_id": null,
+          "replayed": false,
+          "cause": {
+            "code": "unavailable",
+            "stage": "attempt_store"
+          }
+        }
+      },
+      "semantic_audit": "Cannot establish governing original; no invented reference and no claim of non-dispatch."
+    },
+    {
+      "id": "pending-waiter-expired",
+      "expected_conforming": true,
+      "http_status": 502,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "outcome_unknown",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "unknown",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": {
+            "code": "timeout",
+            "stage": "observation"
+          }
+        }
+      },
+      "semantic_audit": "Original correlation is known, replayed false, original lifecycle unchanged."
+    },
+    {
+      "id": "denied-original-observation",
+      "expected_conforming": true,
+      "http_status": 403,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "not_granted",
+          "message": "safe classification"
+        }
+      },
+      "semantic_audit": "Omit mutation entirely; cannot disclose original existence/result or label its effect not_attempted."
+    },
+    {
+      "id": "admitted-candidate-audit-unavailable",
+      "expected_conforming": true,
+      "http_status": 503,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": null,
+        "audit_status": "unavailable",
+        "error": {
+          "code": "unavailable",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "not_attempted",
+          "attempt": null,
+          "original_request_id": null,
+          "replayed": false,
+          "cause": {
+            "code": "unavailable",
+            "stage": "audit"
+          }
+        }
+      },
+      "semantic_audit": "Admitted new candidate definitely did not dispatch; no acknowledged audit anchor."
+    },
+    {
+      "id": "applied-final-audit-failure",
+      "expected_conforming": true,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "incomplete",
+        "result": {},
+        "mutation": {
+          "classification": "applied",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": {
+            "code": "unavailable",
+            "stage": "audit"
+          }
+        }
+      },
+      "semantic_audit": "Known effect/result preserved, acknowledged admission ref retained, final audit unconfirmed."
+    },
+    {
+      "id": "applied-terminal-store-failure",
+      "expected_conforming": true,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "mutation": {
+          "classification": "applied",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": {
+            "code": "unavailable",
+            "stage": "attempt_store"
+          }
+        }
+      },
+      "semantic_audit": "Live result known even if attempt settlement fails; separate audit may still be complete."
+    },
+    {
+      "id": "applied-undeliverable-result",
+      "expected_conforming": true,
+      "http_status": 413,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "capacity",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "applied",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "Error does not change definitive effect knowledge; no result supplied."
+    },
+    {
+      "id": "gateway-source-audit",
+      "expected_conforming": true,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "source_audit": {
+          "instance": "leaf",
+          "audit_ref": "aud-leaf",
+          "audit_status": "complete"
+        }
+      },
+      "semantic_audit": "Distinct current gateway and verified leaf audit observations; this is a response shape, not executable F03 delegation support."
+    },
+    {
+      "id": "bad-effect-replayed",
+      "expected_conforming": false,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "mutation": {
+          "classification": "replayed",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "classification: replayed is never an effect"
+    },
+    {
+      "id": "bad-success-unknown",
+      "expected_conforming": false,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "mutation": {
+          "classification": "unknown",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "success cannot claim unknown"
+    },
+    {
+      "id": "bad-missing-cause",
+      "expected_conforming": false,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "mutation": {
+          "classification": "applied",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false
+        }
+      },
+      "semantic_audit": "cause is required-null, not optional emission"
+    },
+    {
+      "id": "bad-half-original",
+      "expected_conforming": false,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {},
+        "mutation": {
+          "classification": "applied",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": null,
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "attempt/request identity must be co-present"
+    },
+    {
+      "id": "bad-unknown-timeout-code",
+      "expected_conforming": false,
+      "http_status": 504,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "error",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "error": {
+          "code": "timeout",
+          "message": "safe classification"
+        },
+        "mutation": {
+          "classification": "unknown",
+          "attempt": {
+            "instance": "origin",
+            "id": "00000000-0000-4000-8000-000000000001"
+          },
+          "original_request_id": "original-request",
+          "replayed": false,
+          "cause": null
+        }
+      },
+      "semantic_audit": "unknown requires outcome_unknown, with timeout only as secondary cause"
+    },
+    {
+      "id": "bad-unavailable-audit-ref",
+      "expected_conforming": false,
+      "http_status": 200,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "invented",
+        "audit_status": "unavailable",
+        "result": {}
+      },
+      "semantic_audit": "unavailable requires null ref; a plausible string is not an acknowledged record"
+    },
+    {
+      "id": "bad-http-success-status",
+      "expected_conforming": false,
+      "http_status": 503,
+      "response": {
+        "version": "v1alpha2",
+        "request_id": "current-request",
+        "status": "success",
+        "audit_ref": "aud-current",
+        "audit_status": "complete",
+        "result": {}
+      },
+      "semantic_audit": "HTTP status and application status must agree"
+    }
+  ]
+}

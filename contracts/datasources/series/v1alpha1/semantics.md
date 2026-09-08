@@ -62,7 +62,7 @@ Errors: base codes; provider 400 (bad PromQL) → `InvalidInput` with a safe cla
 
 - Native query preserved unchanged; the contract does not parse PromQL. A configured query scope (allowed metric prefixes or label matchers) is enforced before dispatch where configured (`docs/design.md:500`).
 - Window and step bounded: `end - start` ≤ maximum (first-profile default 7 d); `(end - start) / step` ≤ `max_samples_per_series`; violations are `InvalidInput` before dispatch.
-- Step is explicit: no adapter-chosen resolution; the descriptor states the minimum step (default 1 s).
+- Step is explicit: no adapter-chosen resolution; the descriptor states the minimum step (default 1 s) through the selected operation input_schema (`step_s` minimum). The maximum window is a selected profile cross-field constraint. `min_step_s`/`max_window_s` in the proposed authoring model refer to those constraints; they are not extra keys in the five-field service Operation.limits object.
 - Ordering: series order as returned by the provider; samples ascending by timestamp within a series.
 - Truncation: series beyond `max_series` are dropped and flagged; samples beyond `max_samples_per_series` are dropped from the end and flagged per series. Both set `complete: false`.
 - No aggregation, downsampling, or unit conversion in the adapter.
@@ -91,6 +91,8 @@ Errors: base codes; provider 400 (bad PromQL) → `InvalidInput` with a safe cla
 ## 7. Compatibility
 
 - New contract. Old projection fields `status` and `value` (instant) are not carried in `promql-range`; instant becomes its own profile.
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Series schemas require explicit profile support and compatible declared limits. Their numeric timestamps and string sample values cannot be coerced into existing record or SQL payloads; instant/labels remain reserved.
+
 
 ## 8. SDK and host obligations
 

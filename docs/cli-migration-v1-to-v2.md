@@ -35,7 +35,7 @@
 | Authority is receiver-owned configuration and policy; a request cannot widen it | `docs/design.md` § 3.2, § 7; `contracts/service/v1alpha2/semantics.md` § 4 (proposed) | `--allow writes`, `--operator-network` as client flags |
 | Discovery never dials, authenticates or materializes; an observation is not a grant | `contracts/service/v1alpha1/semantics.md`, Kubernetes paragraph; `docs/design.md` § 10 | `connection activate` and `connection materialize` as one-step actions |
 | Telephony controls are a media session capability, not an operation | `docs/design.md` § 14.1 | `operation signal` |
-| One wire version per client build; refusal, not fallback | `docs/design.md` § 5 | `--protocol-version` |
+| One explicit codec per interaction; no automatic fallback or resend, even if a future binary supports several | [service compatibility](../contracts/service/compatibility.md) | `--protocol-version` |
 | Secrets never travel through the CLI to a hosted instance as values the CLI can read back; custody is the Secrets service | ADR 0023; `docs/design.md` § 12 | `admin credentials set` in its current shape (open, see § 6) |
 
 ## 3. Path-by-path mapping
@@ -80,7 +80,7 @@ the feature waits for; verb names are not decided unless stated. "Not carried" c
 | description lease (`description_ref`) | descriptor `revision` | `stale_description` → describe again → resubmit deliberately; never replayed |
 | grant | policy decision with `grant_ref` on the audit row (`service/v1alpha2`, proposed) | fail closed when the policy store is unavailable |
 | approval evidence ref | `approval: {reference, evidence}` on the invocation (mutation profile, proposed) | one-time spending before the dispatch gate |
-| `connector_audit_ref` | `audit_ref` on every governed response, including refusals (proposed) | absent under the local static-bearer profile |
+| `connector_audit_ref` | required nullable `audit_ref` plus `audit_status` on the proposed extended response | refs name acknowledged records only; unavailable audit uses null, and explicit unaudited static reads use null / not_required; see [response rules](../contracts/service/compatibility.md#5-extended-responses-audit-and-mutation-observation) |
 | owner context (tenant, agent, revision, authority snapshot) | verified context from the credential; agent identity as an `executor` assertion the receiver checks (proposed) | the body can never set tenant or realm |
 | personal-local vs hosted | one binary; the admission profile in configuration | `static-bearer` for local; `identity-audience` for hosted |
 | event channel | deferred `events` family | no date |
