@@ -101,7 +101,8 @@ Every capability carries the binding it was created for. The host-private bindin
 ## 7. Compatibility
 
 - `http-bearer` is today's `AuthenticatedHttp` renamed; `get` remains as a convenience.
-- No wire change; capability names appear in descriptors only as strings inside profile declarations.
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Private capability ports do not themselves change wire bytes. Publishing capability names through `Descriptor.auth_profiles` requires the extended codec; only an unchanged configured port and public surface may keep legacy behavior.
+
 
 ## 8. SDK and host obligations
 

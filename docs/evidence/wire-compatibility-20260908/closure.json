@@ -1,0 +1,31 @@
+{
+  "original_findings": 48,
+  "fixed": [
+    "F01",
+    "F02",
+    "F04",
+    "F05",
+    "F06",
+    "E01",
+    "E02",
+    "E11",
+    "E13",
+    "E20",
+    "E30"
+  ],
+  "open": 37,
+  "owner_story_statuses": {
+    "draft": 20,
+    "implemented": 7
+  },
+  "planning_artifacts": 70,
+  "planning_valid": true,
+  "prose_review_warnings": 28,
+  "final_review_verdicts": {
+    "family": "approve; zero residual E02 findings",
+    "binding": "approve; zero residual E02 findings"
+  },
+  "reviewed_semantic_and_evidence_hashes_unchanged": true,
+  "runtime_adapter_and_generated_schema_diff": [],
+  "boundary": "E02 specification closure; broader goal remains active; F03 next"
+}

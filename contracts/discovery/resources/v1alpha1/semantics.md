@@ -98,8 +98,8 @@ Errors: base codes; `Forbidden` when the profile is not enabled in configuration
 - No materialization occurs from observation alone: the fake host's connection store is unchanged after observe.
 
 ## 7. Compatibility
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Discovery observations and page generation/coverage use a selected new payload schema. Existing endpoint discovery and the closed Page reader do not gain fields automatically.
 
-- Additive: new operation on the Grafana and Kubernetes adapters. `endpoint_discovery` stays as is; re-expressing it as a profile here is a later decision.
 
 ## 8. SDK and host obligations
 

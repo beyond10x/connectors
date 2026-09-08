@@ -1,0 +1,345 @@
+{
+  "passed": 68,
+  "results": [
+    {
+      "accepted": true,
+      "id": "descriptor-unchanged",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "operation-unchanged",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "invocation-unchanged",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "response-unchanged",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-unchanged",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "descriptor-new-admission",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "descriptor-new-auth_profiles",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "descriptor-new-connections",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "descriptor-new-provides",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-effects",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-semantic_effects",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-risk",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-idempotency",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-approval",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-requires_auth",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-realization",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-limits",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "operation-new-profiles",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "invocation-new-connection",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "invocation-new-idempotency_key",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "invocation-new-approval",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "invocation-new-executor",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-new-audit_ref",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-new-audit_status",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-new-source_audit",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-new-mutation",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-new-effect",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-new-original_request_id",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-invalid_input",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-unsupported",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-unauthorized",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-forbidden",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-not_found",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-stale_description",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-stale_cursor",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-rate_limited",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-unavailable",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-capacity",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-timeout",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-upstream_protocol",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "error-code-internal",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-approval_required",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-approval_refused",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-approval_replayed",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-idempotency_conflict",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-outcome_unknown",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-not_granted",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-stale_authority",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-connection_not_ready",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-route_unavailable",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-route_refused",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-insufficient_scope",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-session_not_ready",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-session_lost",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-offer_expired",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-offer_rejected",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-lease_expired",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "error-code-revoked",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "nested-error-new-field",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "descriptor-version-only-v99",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "invocation-version-only-v99",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "response-version-only-v99",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "new-version-new-invocation-field",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-both-result-error",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "response-missing-result",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "duplicate-input-deep",
+      "passed": true
+    },
+    {
+      "accepted": false,
+      "id": "duplicate-version",
+      "passed": true
+    },
+    {
+      "accepted": true,
+      "id": "operation-payload-new-schema",
+      "passed": true
+    }
+  ]
+}

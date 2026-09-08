@@ -67,12 +67,12 @@ The pipeline this contract describes has three parts, matching the old repositor
 
 `catalog.provider.describe` `{ "adapter": "alertmanager" }` → the bundle's descriptor (shape of `adapters/gitlab/generated/descriptor.json`: `adapter`, `configuration_schema`, operations) plus a coverage summary per operation (`generated`, `requires_implementation`, `refused`, from `adapters/gitlab/generated/coverage.json`, format `connectors.import-coverage/v1`) and the curation block per operation.
 
-`catalog.operations.list` `{ "adapter": null, "contract": "operations/v1alpha1", "profile": "generic-http", "effects": ["external_write"], "limit": 100, "cursor": null }` → items:
+`catalog.operations.list` `{ "adapter": null, "contract": "operations/v1alpha1", "profile": "mutation", "effects": ["external_write"], "limit": 100, "cursor": null }` → items:
 
 ```json
-{ "adapter": "zendesk", "id": "ticket.create", "contract": "operations/v1alpha1", "profiles": ["generic-http", "mutation"],
+{ "adapter": "zendesk", "id": "ticket.create", "contract": "operations/v1alpha1", "profile": "mutation",
   "effects": ["external_write", "network"], "risk": "medium", "idempotency": { "kind": "none" },
-  "requires_auth": "zendesk.api_token", "realization": "generic" }
+  "requires_auth": [{ "profile": "zendesk.api_token", "scopes": [] }], "realization": "generic" }
 ```
 
 `catalog.bundle.describe` `{ "adapter": "zendesk", "digest": "sha256:…" }` → manifest fields (`format`, `specification_sha256`, `upstream_sha256`, `ess`, `rustfmt`, `files` with per-file digests, as in `adapters/gitlab/generated/manifest.json`) plus `locations: [ { "kind": "path" | "oci" | "https", "reference": "…" } ]`. Bytes are not served over this contract; a host fetches by location and verifies the digest.
@@ -91,19 +91,20 @@ Errors: base codes; `NotFound` for an unknown adapter or digest; `Unsupported` f
 
 ### 3.2 The `generic-http` profile
 
-An operation carrying `profile: generic-http` is realized from its mapping by the engine, not by provider code. Descriptor entry:
+A generic read carries `profile: generic-http` and `realization: generic`. A generic mutation carries the singular `profile: mutation` and `realization: generic`, including all mutation admission/observation rules. The following is an illustrative extended read descriptor; profile availability remains subject to the auth vocabulary owner:
 
 ```json
-{ "id": "alerts.list", "contract": "operations/v1alpha1", "profiles": ["generic-http"], "realization": "generic",
-  "effects": ["network"], "risk": "low", "idempotency": { "kind": "natural" },
-  "requires_auth": "alertmanager.none",
+{ "id": "alerts.list", "description": "Read alerts", "contract": "operations/v1alpha1", "profile": "generic-http", "realization": "generic",
+  "effects": ["network"], "semantic_effects": [], "risk": "low", "idempotency": { "kind": "natural" }, "approval": "not_required",
+  "limits": { "request_bytes": 262144, "result_bytes": 4194304, "execution_ms": 40000, "provider_ms": 30000, "connect_ms": 5000 },
+  "requires_auth": [{ "profile": "alertmanager.configured", "scopes": [] }],
   "input_schema": { "type": "object", "properties": { "active": { "type": "boolean" } }, "additionalProperties": false },
   "output_schema": { "type": "object", "required": ["status", "body", "provenance"] } }
 ```
 
 Outcome: `status` (provider HTTP status), `body` (provider JSON, bounded, passed through unchanged), `provenance` (`instance`, `resource` = the mapping's path with parameters redacted to their names, `observed_at_unix_ms`, `source_revision` = the bundle digest).
 
-Status to `ErrorCode` (`crates/connectors-core/src/lib.rs:13-27`):
+Status to safe `ErrorCode` for **generic reads only** (base vocabulary in `crates/connectors-core/src/lib.rs:13-27`):
 
 | Provider result | Code |
 |---|---|
@@ -111,15 +112,17 @@ Status to `ErrorCode` (`crates/connectors-core/src/lib.rs:13-27`):
 | 401 | `Unauthorized` |
 | 403 | `Forbidden` |
 | 404, 410 | `NotFound` |
-| 409, 412 | `InvalidInput` for reads; `idempotency_conflict` under the mutation profile |
+| 409, 412 | `InvalidInput` |
 | 429 | `RateLimited`, `retry_after_seconds` from `Retry-After` when present |
 | 5xx, connection refused, TLS failure | `Unavailable` |
-| deadline exceeded before dispatch | `Timeout`; after dispatch under the mutation profile: `outcome_unknown` (`contracts/operations/v1alpha1/semantics.md`) |
+| deadline exceeded | `Timeout` |
 | non-JSON body, oversize body, redirect | `UpstreamProtocol` |
 
-When the mapping declares an error envelope, the extracted provider code and message are placed in `Error.message`, bounded to 512 bytes; they never select `Error.code`.
+The public `Error.message` is a host-selected safe classification, bounded to 512 UTF-8 bytes. Never copy raw provider messages, codes, response bodies, URLs or credential material into it. Declared error-envelope pointers may contribute to a reviewed operation-specific classifier; they do not authorize public disclosure or select a core code automatically.
 
-Profile combinations: a `generic-http` operation whose curation declares `external_write` also carries the `mutation` profile and all its rules. A mapping that declares `pagination` is exposed as `datasource.records/v1alpha1` profile `generic-http-page` (items from the declared items pointer, cursor from the page or cursor parameter, `complete` from the declared end condition) instead of `generic-http`.
+For **generic mutations**, status alone does not prove business-effect knowledge. Use the mutation contract’s admitted `not_attempted`, proven `refused`, known `applied`, or conservative `unknown` observation. Ambiguous 5xx, lost responses, malformed or oversized replies after possible dispatch give `outcome_unknown` unless independent definitive evidence exists, with a safe secondary cause. A provider 409/412 is not the receiver’s `idempotency_conflict`; that code belongs exclusively to a conflict in its admitted key namespace. Any definitive refusal mapping must prove no business effect under the selected operation semantics.
+
+Profile selection is singular: a generic operation whose curation declares `external_write` selects `mutation` with `realization: generic` and all its rules. A mapping that declares `pagination` is exposed as `datasource.records/v1alpha1` profile `generic-http-page` (items from the declared items pointer, cursor from the page or cursor parameter, `complete` from the declared end condition) instead of `generic-http`.
 
 ## 4. Rules
 
@@ -142,11 +145,13 @@ Profile combinations: a `generic-http` operation whose curation declares `extern
 |---|---|
 | Page | 1–100 as `datasource.records` |
 | Index size | unbounded, paged; one generation at a time |
-| Request body | 256 KiB, first-profile default, to be measured |
-| Response body | 4 MiB, first-profile default, to be measured; larger is `UpstreamProtocol`, not truncation |
-| Provider timeout | from configuration; default 30 s, first-profile default |
+| Generic request | 256 KiB including the extended envelope; selected first-profile ceiling |
+| Generic result | 4 MiB including envelope and metadata; a provider body too large to fit gives safe `UpstreamProtocol` for reads; mutations preserve actual effect knowledge |
+| Generic deadlines | 40 s total execution, 30 s provider within it, 5 s connect within provider time; advertised through Operation.limits. No independent budget reset or silent clipping to the legacy 20 s execution limit |
 | Retry | none by the engine; `RateLimited` carries `retry_after_seconds` for the caller |
 | Refresh | never on read; only by the refresh tool |
+
+The [service compatibility limits](../../service/compatibility.md#7-limits-and-compatibility-obligations) own envelope accounting and admission. These new generic limits are not implemented legacy host capabilities. Catalog inventory reads use the ordinary read limits; only generic execution selects the generic ceilings.
 
 ## 6. Conformance scenarios (`docs/design.md:1006`)
 
@@ -155,7 +160,7 @@ Profile combinations: a `generic-http` operation whose curation declares `extern
 - Curation truth: an imported operation without `risk` → `unresolved`; adding the curation block makes it `generic`.
 - Tamper: change one byte of a bundle file → `catalog.bundle.describe` returns `Unavailable` naming the file; the index generation is not served.
 - Format refusal: an index with format version `v9` → `Unsupported` before any record is served.
-- Engine: fixture 200 with JSON → `body` byte-identical, `provenance.resource` carries parameter names not values; 429 with `Retry-After: 7` → `RateLimited`, `retry_after_seconds: 7`; 404 → `NotFound`; 500 → `Unavailable`; `text/html` body → `UpstreamProtocol`; 4 MiB + 1 byte body → `UpstreamProtocol`; 302 → `UpstreamProtocol` and no second request.
+- Read engine: fixture 200 with JSON → `body` structurally identical, `provenance.resource` carries parameter names not values; 429 with `Retry-After: 7` → `RateLimited`, `retry_after_seconds: 7`; 404 → `NotFound`; 500 → `Unavailable`; `text/html` body → `UpstreamProtocol`; body that exceeds the total response budget after metadata/envelope accounting → `UpstreamProtocol`; 302 → `UpstreamProtocol` and no second request.
 - Engine discipline: an input containing a URL-shaped string in a path parameter is percent-encoded into its segment; the fixture observes exactly one request to the declared path.
 - Paged: a mapping with `pagination.page` → `generic-http-page` returns `complete: true` when the fixture returns fewer items than the page size; the cursor is opaque and bound to the input digest.
 - No network: run generation and every catalog operation with a network sentinel; zero connections (old `tests/main/no_network.rs` shape).
@@ -165,7 +170,7 @@ Profile combinations: a `generic-http` operation whose curation declares `extern
 ## 7. Compatibility
 
 - New contract; new profile strings `generic-http` and `generic-http-page`.
-- Descriptor gains `realization` and the curation fields (`effects`, `risk`, `idempotency`, `requires_auth`). `Descriptor` denies unknown fields (`crates/connectors-core/src/lib.rs:70-78`), so this lands with the mutation profile in wire `v1alpha2`, not as an additive change to `v1alpha1`.
+- [Service compatibility](../../service/compatibility.md) owns the extended descriptor fields, singular profile, auth alternatives and generic limits. These require the proposed `v1alpha2` codec. Index, adapter-kind, bundle and configuration readers retain their own independent version decisions; a service-wire bump does not extend them.
 - Old `catalog/<id>.catalog.json` documents and `catalog.pack` bytes are not preserved (`docs/design.md:911`). Old operation ids are preserved only where the migration contract selects them (`docs/design.md:1095`).
 - The published `codewandler-connector-catalog-reader` crate has no successor in this design; its consumers need an explicit migration decision (`docs/design.md:151`).
 
@@ -178,7 +183,7 @@ Profile combinations: a `generic-http` operation whose curation declares `extern
 | Bundle format: add `sources[]`, `curation`, `realization`, `license` to the manifest (`format` today `connectors.generated-bundle/v1`, fields `ess`, `files`, `rustfmt`, `specification_sha256`, `upstream_sha256`) | `adapters/*/generated/manifest.json` |
 | Index tool: `catalog build`, `check`, `diff` over every `adapters/*/spec`; `sources refresh` as the only networked verb, never in `build.rs` | `crates/connectors-build/src/main.rs` (today: local executor only, line 1) |
 | Generic engine: mapping + validated input + capability → request; response → outcome; the catalog adapter links it, no provider crate does | new crate under `crates/`, name in [docs/adapters/catalog.md](../../../docs/adapters/catalog.md) §10 |
-| `AuthenticatedHttp` with method, body and headers; `http-header` and `http-query` credential placements (old declarations: 17 named headers, 2 query parameters) | `crates/connectors-sdk/src/lib.rs:53-56`; `contracts/auth/capability/v1alpha1/semantics.md` (rows to add) |
+| `AuthenticatedHttp` with method, body and headers; `http-header` and `http-query` credential placements (old declarations: 17 named headers, 2 query parameters) | `crates/connectors-sdk/src/lib.rs:53-56`; `contracts/auth/capability/v1alpha1/semantics.md` (reserved/unbound until the vocabulary and auth owners define support; no current descriptor may advertise it) |
 | Client: typed `catalog.*` calls and bundle locate-and-verify | `crates/connectors-client` |
 | Wire `v1alpha2` descriptor fields | `crates/connectors-core/src/lib.rs:70-78` |
 

@@ -1,0 +1,113 @@
+{
+  "review": "independent wire-family compatibility inventory",
+  "reviewer": "reviewer-a",
+  "created_utc": "2026-09-08T14:25:20.555709+00:00",
+  "head": "3ba2d29870d577aac70c8a68ee901b3b7c6c99ac",
+  "files": [
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "e2b767998c2d043d71a9346fd1d9bff0f984abae4d86ed11baf60ffef5bc623f",
+      "bytes": 19697
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "30f1d2b75b2df15a0b7f3d6ec3b9e6f7e13b561aa95c70202be7ddb227cd534e",
+      "bytes": 12854
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "ff2bebf12a62e0704fe0e1463291c704aeab77ec58c1b984652874cb1aeaac2c",
+      "bytes": 12702
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "d3a623b4f7d7d0c3b96a4662fa5f2f16fa2e47ac01935565cac70aaea70502f6",
+      "bytes": 9808
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "f8bb38e0d154a21b617d519e8c76ee76eb39b9b0b9e3906ecff3d9aa08516d12",
+      "bytes": 18957
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "e8ccde1ee1f3e48c3c8227daad75f6a855775d5af17a92c273efe7ecc0cf84c3",
+      "bytes": 8929
+    },
+    {
+      "path": "contracts/catalog/v1alpha1/semantics.md",
+      "sha256": "4408d4a7db56bd670e18aada688ec140e891c0012b2fe9bda71f7196ea64b19b",
+      "bytes": 21133
+    },
+    {
+      "path": "contracts/datasources/logs/v1alpha1/semantics.md",
+      "sha256": "42ee907785f87799c29e60a8f8d08e1b84b2b5baf4dea0ba7c88a3a2457329b5",
+      "bytes": 10693
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "2a2bb4fe21484ea95ee36adc491143ec80084de23722e9dcde0d8862a21bca80",
+      "bytes": 7544
+    },
+    {
+      "path": "contracts/datasources/series/v1alpha1/semantics.md",
+      "sha256": "3fd71529e97ec15af722e2b80ef398659f17339b8d813548556298d9ee340b40",
+      "bytes": 6429
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "7a5cd1591781240132886139d02e1f74bd8e0facfa5cec0a1248a7eee73da169",
+      "bytes": 9566
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "4a61c783a7afaa79617fe73e9609c8060dece6ce4c468adac0b7272ca64458b5",
+      "bytes": 9523
+    },
+    {
+      "path": "contracts/media/v1alpha1/semantics.md",
+      "sha256": "b852b16f591d17a5ad69dab8a7dd239298a7ef450b58a6a07cd93341274a0664",
+      "bytes": 10743
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "cb8050c677cde0c42d01f47f8c5215e45f7fb30d055d1e84adc08246a4280dfb",
+      "bytes": 36969
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "34d6fc4a5328cf02d29dd42906489ea4b9bb3a87003004c08091014a84735f57",
+      "bytes": 20903
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d",
+      "bytes": 121490
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "5887d977481eb91faaad1cc64e8fe150bf99f7c7340d0f5f6758935dac120b89",
+      "bytes": 8354
+    },
+    {
+      "path": "crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+      "bytes": 8489
+    },
+    {
+      "path": "crates/connectors-contracts/src/lib.rs",
+      "sha256": "2f6ee686defde5c29a0e3749b5496fdcb54725f1346c7f4844508a36c37bde74",
+      "bytes": 1357
+    }
+  ]
+}
