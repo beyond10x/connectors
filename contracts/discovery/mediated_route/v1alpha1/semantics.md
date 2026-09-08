@@ -49,19 +49,19 @@ forward(binding, method, target_relative_segments, query, headers_allowlisted, b
 The child receives an ordinary `HttpCapability` (`auth.capability`) whose implementation calls `forward`. Its `destination` is the *target-relative root*, not a URL:
 
 ```json
-{ "connection": "conn_prom_7", "profile": "prometheus.none", "destination": { "kind": "mediated", "route": "grafana-datasource-proxy", "parent": "conn_grafana_1" } }
+{ "connection": "conn_prom_7", "profile": "prometheus.via_parent", "destination": { "kind": "mediated", "route": "grafana-datasource-proxy", "parent": "conn_grafana_1" } }
 ```
 
 Errors returned to the child: base codes plus `route_unavailable` (parent not ready, observation withdrawn, generation mismatch) and `route_refused` (suffix, method, or target outside the reviewed set). The child maps them like any dependency failure; it never retries through a different route.
 
 ## 4. Rules
 
-- Transport only: the route changes how bytes reach the target. The child's contract, profiles, operations, descriptor, and result semantics are identical to a direct connection. Conformance runs the same suite direct and mediated (`docs/design.md:1035`, section 21.3).
+- Transport only: the route changes how bytes reach the target. The child's business contracts, datasource profiles, operations and result semantics remain identical; its explicitly selected auth profile and safe route metadata differ from direct access. Conformance runs the same business suite direct and mediated (`docs/design.md:1035`, section 21.3).
 - Fixed binding: the target is fixed at materialization (observation id + generation). Request input cannot choose the parent, the resource, a path prefix, or a port.
 - Path discipline: the parent prefixes its proxy route (Grafana data-source proxy for the sealed UID; Kubernetes API-server `services/proxy` for the fixed namespace, Service, port) to individually encoded target-relative segments supplied by the child's capability. Absolute URLs, `..`, empty segments, and query keys outside the child's declared set are refused before dispatch.
 - Methods: the profile declares allowed methods; first profiles allow `GET` only (both old adapters were read-only).
-- Authority: the parent's credential authenticates the hop. The child connection still requires its own admission and evidence; the parent's admission is not inherited. The route does not license any parent operation.
-- Kubernetes profile: before each forward, `permission_check` (`auth.evidence`) for `get` on `services/proxy` in the exact namespace and Service; a denial is `route_refused`.
+- Authority: the child's selected profile is `purpose: mediated_access`, `subject: none`, `scheme: parent`, `acquisition.flow: static_config`, capability mediated-http. It owns no provider credential, custody reference or external account. The parent capability authenticates the hop using its own current pinned generation; downstream credentials, if any, belong to the reviewed parent route/datasource binding. Child policy and route admission are required independently and never inherited from the parent. The route does not license arbitrary parent operations, copy parent grants into child scopes or expose parent secrets. Child evidence binds parent generation and the fixed route/observation revision, so parent publication/revocation or mapping changes invalidate it.
+- Kubernetes profile: before each forward, require current exact permission evidence for `get`, core/v1, resource services, subresource proxy, in the fixed namespace and Service name. Collect an uncached result under [evidence §4.4](../../../auth/evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08), sharing the original child's target/call/deadline budget; fresh exact evidence may be reused only under that rule. A denial is route_refused; required evidence unavailable or budget-exhausted is unavailable, with no proxy forward. No generic parent grant or list-services result satisfies this check.
 - Grafana profile: the parent re-resolves the sealed UID for the current generation; a changed type or missing source is `route_unavailable` and degrades the child.
 - Depth: exactly one hop. A parent connection that is itself `via` cannot provide a route (`route_refused` at materialization).
 - Placement: parent and child run in the same host process or composition; a route is never exposed as a remote capability to another host (that would be federation of provider traffic; out of model).

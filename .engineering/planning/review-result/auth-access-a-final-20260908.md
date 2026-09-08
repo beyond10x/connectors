@@ -1,0 +1,44 @@
+---
+format: aep.planning-md/1
+id: review-result:auth-access-a-final-20260908
+kind: review-result
+status: active
+title: Auth access and permission budgets reviewer A final approval
+relations:
+- reviews: story:contracts-anonymous-auth
+- reviews: story:contracts-permission-budgets
+- reviews: story:contracts-acquisition-profiles
+revision: 1
+---
+# Auth-profile and permission-budget cluster — reviewer A final
+
+**Verdict: APPROVE. Residual findings: P0 0 / P1 0 / P2 0 / P3 0.** The three existing stories are semantically coherent at this specification checkpoint. Approval is of the proposed contracts and their accurately limited evidence; it is not runtime or provider-support approval.
+
+The final reviewed scope contains 55 frozen normative/evidence inputs, identified by exact SHA256 in `source-hashes-reviewed.json` and retained under `sources/`. `scope-note.md` distinguishes this authoritative review scope from the original mechanical archive collection. Planning workflow and aggregate reviewer dispositions are excluded. No other reviewer's text was inspected or used. No tracked/planning file was edited and no runtime test was run by this reviewer.
+
+## Findings closed
+
+- **AP-A-01–02:** profile §4.2 specifies deliberate direct anonymous access and separate parent-authenticated child access, with closed purpose/subject/scheme/flow/capability combinations, no missing-credential fallback, no implicit upgrade after 401, independent host/parent/child admission, and no copied parent grants or credentials. Grafana's active contract/profile/configuration maps now consistently use `.anonymous` and `.via_parent`. Discovery source-auth metadata is expressly placement evidence, not inherited authority.
+- **AP-A-03:** material-bearing F05 requirements remain intact. Anonymous and mediated children have no fabricated credential generation, custody record or provider account; required-null identity can persist when ready. The parent retains its own current pinned material and fence. Socket peer/path admission is expressly distinct and UNMAPPED until its concrete binding exists. ESS selection values claim no synthetic identity or persistent owner.
+- **AP-A-04–05:** evidence §4.4 defines exact authorization targets and private binding equality; 64 targets / 64 query attempts / four concurrent checks; bounded exact cache reuse, original expiry, no generation transfer or retry; whole missing-call reservation and shared deadlines. Unknown, malformed, ambiguous or unavailable checks refuse before business reads; definitive denied subsets require closed admitted coverage and cannot establish authoritative discovery withdrawal. All denied is forbidden. Public coverage has explicit ordering, cardinality, coordinate and total-byte bounds, and requires a supporting payload reader rather than silently extending strict Page.
+- **AP-A-06–08:** acquisition §4.0 separates static_config activation/materialization from managed acquisition sessions and protects coherent material capture/publication where applicable. Management rejects unsupported static/reserved begin before state allocation and requires registration only for the applicable OAuth flow. Authorization-code and client-credentials declarations have distinct required/forbidden fields, sourced client-auth/PKCE behavior and truthful reserved/implemented gates. Grafana configured-first/read_only and managed-entry/versioned paths are now separately named.
+- **AP-A-R2-01:** corrected Grafana contract map at adapter §3 matches its detailed §5/§6 profiles and placement rules.
+- **AP-A-R2-02:** capability §4 and §6 scope coordinated refresh to an admitted refresh-capable profile. Read redispatch additionally requires a separately supported retry binding, fresh current-generation admission/permission and the original remaining budget/deadline. Anonymous/static_config and mediated-child exceptions are explicit; mutation redispatch stays prohibited. This leaves the separately owned read-retry design unimplemented and unadvertised.
+- **AP-A-R2-03:** connection §4 and profile §4.2 require a newly admitted connection for route kind, fixed parent/target, access mode or host ownership changes. Revisions may revalidate only the same fixed binding; evidence/cursor invalidation alone cannot authorize ref repurposing. No reassignment flow is invented here.
+
+## Independent evidence assessment
+
+`independent-checks.json` records the read-only inspection results:
+
+- Reproduced all **50 schema expectations**, including **seven rejected shapes**, against the retained unmodified JSON Schemas. Results exactly match type-results.json.
+- Confirmed the four deliberately schema-accepted semantic contradictions: anonymous/bearer combination, complete denied coverage, over-ceiling budget and missing authorization-code endpoints. The written normative rules reject these values; the generic schema does not. The report correctly states that limit.
+- Verified all **15 selected schema hashes** and compared both retained projection directories against the manifest: **191 matching artifact hashes** in each.
+- Reviewed all **44 distinct textual traces** (13 access, 20 permission, 11 acquisition) against the final rules. They assert expected consequences, not executed budget, cache, provider, authority or coordinator behavior.
+- Inspected the retained gate log: **50 existing Rust test passes**, Rust **1.88** MSRV success, **12 ESS files / 183 declarations**, **222 synthesized scenarios including 34 authored**, zero authoring refusals, and the final all-checks-passed marker. The new auth_access domain has **15 value declarations**, no entity or lifecycle.
+- Inspected separate session output counts: **13 authored / 201 synthesized including those authored cases**. This is separate compile/author evidence, not a claim that the standard gate executes sessions or sequential semantic traces.
+
+The verification record, fixture transcript, manifest and trace labeling agree on these facts. The new work changes semantic documents, adapter documentation and ESS values, not runtime code or the current adapter-kind schema. Vendor.example fixtures are explicitly invented, not provider evidence.
+
+## Remaining implementation boundaries
+
+Current authority/time, exact cache binding, target normalization and budget consumption, completeness reduction, dispatch/revocation ordering, coherent transport pinning, flow correlation/provider interpretation, protected ingress and strict public/configuration readers remain real implementation and advertisement prerequisites. Persistent Connection/Acquisition/AuthProfile/cache ownership remains separately modeled work. Optional omission and generic Timestamp projection are not wire null/Unix-millisecond codecs. No provider/network operation, auth flow, permission query, refresh, discovery generation reducer or transport was executed in this review. These accurately stated limits do not leave a concrete contradiction in the approved three-story specification scope.

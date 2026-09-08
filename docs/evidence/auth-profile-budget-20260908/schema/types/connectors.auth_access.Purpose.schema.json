@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.Purpose",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:bec6e6c271d753c1f31b9784823c75bedef56fd5a7895d30431b1dcdd17f05cd",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.Purpose": {
+      "title": "Purpose",
+      "x-ess-name": "connectors.auth_access.Purpose",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "service_account",
+        "delegated_user",
+        "app_level",
+        "inbound_verification",
+        "transport_identity",
+        "trunk_registration",
+        "anonymous",
+        "mediated_access"
+      ]
+    }
+  }
+}
