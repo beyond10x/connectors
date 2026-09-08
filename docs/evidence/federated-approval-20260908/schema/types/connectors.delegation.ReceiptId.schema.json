@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.ReceiptId",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:33fb580ef581b4deb784b4c3eff8fb5a1e40c569dde0cecb105a949d82793092",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.ReceiptId": {
+      "title": "ReceiptId",
+      "x-ess-name": "connectors.delegation.ReceiptId",
+      "x-ess-kind": "newtype",
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    }
+  }
+}

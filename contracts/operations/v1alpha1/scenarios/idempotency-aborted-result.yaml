@@ -50,6 +50,7 @@ timeline:
       profile: mutation
       descriptor_revision: descriptor-r1
       configuration_revision: config-r1
+      route: null
       canonicalization_version: adapter-v1-canonical-json
       input_digest: test-digest
     attempt_id:
