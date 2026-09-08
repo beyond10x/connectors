@@ -8,7 +8,7 @@ This is a proposed semantic contract and ESS model. It does not implement mutati
 
 - [Normative rules](semantics.md), especially §3's classification/cause separation, §4's dispatch fence and outcome table, §5's duplicate waiting, and §8's service/transport obligations.
 - [ESS source](../../../ess/domains/mutations.yaml): six attempt states, five transitions with command causation, three approval modes, four effect classifications, one explicit instance reference, and an internal state view.
-- [Nine authored scenarios](scenarios/): command/outcome/error/event/view/field/state references compile against the model. Wrong-state branches assert the existing state and absence of the forbidden event.
+- [Nine authored scenarios](scenarios): command/outcome/error/event/view/field/state references compile against the model. Wrong-state branches assert the existing state and absence of the forbidden event.
 - Generated conformance obligations and the authored scenarios compile in the Rust [repository gate](../../../crates/connectors-build/src/gate.rs). They are not run against a mutation implementation.
 
 The unreleased model addition retains system version `v1`; it changes no ESS format or existing wire identity. The wire compatibility decision remains with `story:contracts-wire-compatibility`.

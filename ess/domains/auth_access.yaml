@@ -47,13 +47,11 @@ types:
   - name: connectors.auth_access.PermissionTarget
     kind: struct
     fields:
-      - {name: verb, type: String}
-      - {name: api_group, type: String}
-      - {name: api_version, type: String}
-      - {name: resource, type: String}
-      - {name: namespace, type: String}
-      - {name: name, type: String}
-      - {name: subresource, type: String}
+      - {name: binding_ref, type: String}
+      - {name: target_ref, type: String}
+    # Private references to an admitted adapter binding and its exact typed
+    # target. Neither is a caller grant or a public target codec. The adapter
+    # owns target syntax, canonical equality and resource/protocol coordinates.
   - name: connectors.auth_access.PermissionBudget
     kind: struct
     fields:

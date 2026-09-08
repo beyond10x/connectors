@@ -1,0 +1,103 @@
+domain: connectors.datasource_reads
+summary: Proposed bounded datasource selection and read-decision values; no runtime or persistent provider owner.
+
+# Normative owner: contracts/datasources/logs/v1alpha1/semantics.md §§3–5.
+# These are private observations and decisions, not authority supplied by a caller.
+types:
+  - name: connectors.datasource_reads.LogCollectionFacts
+    kind: struct
+    fields:
+      - {name: provider_response_valid, type: Boolean}
+      - {name: effective_limit_verified, type: Boolean}
+      - {name: source_exhausted, type: Boolean}
+      - {name: source_saturated, type: Boolean}
+      - {name: received_occurrences, type: Integer}
+      - {name: retained_occurrences, type: Integer}
+      - {name: retained_stream_groups, type: Integer}
+      - {name: total_occurrences_dropped, type: "Optional<Integer>"}
+      - {name: total_stream_groups_dropped, type: "Optional<Integer>"}
+  - name: connectors.datasource_reads.LogPageFacts
+    kind: struct
+    fields:
+      - {name: offset, type: Integer}
+      - {name: end_offset, type: Integer}
+      - {name: retained_occurrences, type: Integer}
+      - {name: source_exhausted, type: Boolean}
+      - {name: no_occurrences_omitted, type: Boolean}
+      - {name: line_clipped, type: Boolean}
+  - name: connectors.datasource_reads.LogPageDecision
+    kind: enum
+    variants: [complete, retained_continuation, terminal_partial, refused]
+  - name: connectors.datasource_reads.LogTruncationCause
+    kind: enum
+    variants: [provider_limit, provider_partial, stream_limit, page_limit, response_bytes, source_bytes, line_bytes]
+
+  # Normative owner: datasource.records document/search semantics §§2–7.
+  # These are private receiver selections and observations, not caller grants.
+  - name: connectors.datasource_reads.DocumentContentForm
+    kind: enum
+    variants: [text, structured]
+  - name: connectors.datasource_reads.DocumentReadSelection
+    kind: struct
+    fields:
+      - {name: requested_id, type: String}
+      # A representation identifier is opaque here; the selected adapter schema
+      # owns its admitted values and source-specific payload shape.
+      - {name: representation, type: String}
+      - {name: max_body_bytes, type: Integer}
+  - name: connectors.datasource_reads.DocumentMembershipFacts
+    kind: struct
+    fields:
+      - {name: host_lookup_admitted, type: Boolean}
+      - {name: source_binding_current, type: Boolean}
+      - {name: provider_scope_predicate_applied, type: "Optional<Boolean>"}
+      - {name: canonical_identity_matches, type: "Optional<Boolean>"}
+      - {name: returned_scope_allowed, type: "Optional<Boolean>"}
+      - {name: result_admission_current, type: Boolean}
+      - {name: same_provider_version, type: "Optional<Boolean>"}
+      - {name: original_body_age_within_limit, type: "Optional<Boolean>"}
+  - name: connectors.datasource_reads.DocumentBodyFacts
+    kind: struct
+    fields:
+      - {name: content_form, type: connectors.datasource_reads.DocumentContentForm}
+      - {name: bounded_source_complete_and_valid, type: Boolean}
+      - {name: full_representation_bytes, type: "Optional<Integer>"}
+      - {name: max_body_bytes, type: Integer}
+      - {name: full_body_fits_result, type: "Optional<Boolean>"}
+      - {name: required_metadata_fits_result, type: "Optional<Boolean>"}
+      - {name: native_values_preserved, type: "Optional<Boolean>"}
+  - name: connectors.datasource_reads.DocumentBodyDecision
+    kind: enum
+    variants: [full, text_prefix, structured_omitted, refused]
+  - name: connectors.datasource_reads.DocumentReadDecision
+    kind: enum
+    variants: [scoped_fetch, metadata_revalidation, cache_reuse, not_found, forbidden, refused]
+
+# UNMAPPED: adapter-owned query grammar and root recognition, selector equality
+# admission, original-byte preservation, canonical timestamp parsing and numeric
+# ranges, checked interval arithmetic, effective provider limits, source exhaustion
+# and no silent malformed-entry skipping. Boolean observations do not prove these.
+# UNMAPPED: occurrence multiplicity, stable local order/offset progress, byte and
+# storage accounting, Unicode/redaction/framing, exact versus unknown counts,
+# immutable retained context and all current auth/source/projection equality,
+# clock/TTL/restart/key-loss behavior and atomic publication/disclosure fencing.
+# PageFacts and LogPageDecision do not execute the completeness reduction.
+# UNMAPPED: per-profile public input/result schemas, provider-native JSON payloads,
+# native stream options and framing/target preparation. No generic JSON property
+# bag is introduced as a substitute for a declared provider representation.
+# Retained observations are bounded ephemeral values under ReadCursorCachePort,
+# not new persistent provider entities or discovery views. Undeclared persistent
+# Connection/cache ownership/cardinality/lifecycle relations remain under the
+# broader ESS modeling audit in docs/design.md §31; no invented owns edge.
+# UNMAPPED: adapter-owned identifier syntax and native representation schemas,
+# scope-filter and canonical-object resolution guarantees, native query grammar,
+# quoting/order/continuation, metadata/body observation correlation,
+# and current per-dispatch/disclosure authority. Optional observations distinguish
+# unestablished facts from observed false; they do not execute provider checks.
+# UNMAPPED: complete bounded lossless JSON decoding, duplicate-key refusal,
+# representation-specific byte counts, scalar-aligned text prefixes, full-object
+# omission, serialized page/envelope accounting, original deadlines and aggregate
+# source-call/byte limits, original-age cache reuse and cursor/cache invalidation.
+# The Document*Decision values name the textual reduction outcomes; the schema
+# does not prove that supplied facts justify one. Provider-specific native values
+# and public output schemas remain adapter-owned codec obligations, not Any fields.

@@ -1,0 +1,30 @@
+domain: connectors_kubernetes.mutations
+summary: Kubernetes-owned conditional Deployment restart preparation values.
+
+# Normative owner: adapters/kubernetes/contracts/mutations/v1alpha1/semantics.md, deployment.rollout_restart.
+types:
+  - name: connectors_kubernetes.mutations.DeploymentRestartTarget
+    kind: struct
+    fields:
+      - {name: instance_ref, type: String}
+      - {name: connection_ref, type: String}
+      - {name: namespace, type: String}
+      - {name: name, type: String}
+      - {name: uid, type: String}
+      - {name: resource_version, type: String}
+    # UNMAPPED: the selected built-in Deployment conditional binding requires
+    # canonical positive ASCII decimal resource_version in 1..18446744073709551615.
+    # Reject zero/aliases/noncanonical/overflow before key inspection or dispatch;
+    # copy accepted bytes unchanged. String does not enforce this provider-specific
+    # predicate. It must not be generalized to other Kubernetes API bindings.
+  - name: connectors_kubernetes.mutations.PreparedDeploymentRestart
+    kind: struct
+    fields:
+      - {name: target, type: connectors_kubernetes.mutations.DeploymentRestartTarget}
+      - {name: restart_marker, type: String}
+    # Private candidate preparation. Marker is a once-generated host epoch-ms
+    # decimal annotation, not caller input, provider UID, authority or host key.
+    # UNMAPPED: trusted source qualification, exact provider preconditions,
+    # marker generation/fixity, immutable body associated with the winning attempt,
+    # validated patch-accepted proof, no-effect evidence and F02 replay admission.
+    # No provider-resource entity, lifecycle or persistent ownership is introduced.
