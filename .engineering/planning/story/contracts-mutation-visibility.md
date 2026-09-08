@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-mutation-visibility
 kind: story
-status: draft
+status: implemented
 title: Distinguish implemented, enabled and discoverable mutations
 tags:
 - P2
@@ -15,11 +15,21 @@ relations:
 scope:
 - confidence: cited
   path: contracts/operations/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/service/compatibility.md
 - confidence: cited
   path: contracts/service/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/service/v1alpha2/semantics.md
 - confidence: cited
   path: docs/adapters/atlassian.md
-revision: 2
+- confidence: inferred
+  path: docs/adapters/docker.md
+- confidence: inferred
+  path: docs/evidence/restart-visibility-20260908
+- confidence: inferred
+  path: ess/domains/declarations.yaml
+revision: 8
 ---
 ## Context
 
@@ -31,19 +41,15 @@ Baseline for all file:line citations is local commit `db1c329` unless an old-rep
 
 ## Required revision
 
-Document a visibility and refusal matrix for unimplemented, implemented-disabled and enabled-but-unauthorized operations; preserve the design's separate implemented/enabled/ready/authorized facts. Do not add a disabled field or remove Forbidden solely on the unsupported inference.
+Select one extended describe/lookup/admission matrix for static-bearer, identity-audience and delegated bindings. Keep implementation, binding support, enablement, metadata/result authority and dependency readiness separate. Define safe refusal precedence and exact-key replay before new-attempt readiness. Preserve actual legacy descriptor-only lookup and private adapter guard behavior without new public disabled fields.
 
 ## Acceptance
 
-After revision, each mutation availability state has one documented discovery and invocation result.
+Every availability row has a consistent current-revision discovery and invocation result, with explicit auth/stale/refusal precedence, safe result disclosure, federation intersection and unchanged legacy projection behavior.
 
 ## Verification scenarios
 
-- Unimplemented ID → advertised/lookup behavior explicitly distinguished from configured-disabled operation.
-- Disabled implementation is consistently visible or hidden under a stated policy.
-- Enabled but unauthorized caller cannot gain access through discovery.
-
-Verification is a textual scenario audit: record the chosen rule and expected observation/refusal for every scenario, cross-check all cited documents, and link the resulting review evidence before claiming the story complete. Runtime conformance implementation is subsequent work.
+Unimplemented/unbound; implemented-disabled; host-policy denial/unavailability; connection/resource denial; not-ready dependency; missing execution approval; exact admitted replay despite unavailable new-attempt dependencies; current/old descriptor revisions; guessed hidden ID; static shared principal and delegated leaf intersection. Read actual core/server/Kubernetes filter/guard; minimal private ESS facts/decision shapes do not implement policy; two independent reviewers and bounded verification.
 
 ## Scope
 
@@ -53,6 +59,12 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 Source locations: `contracts/operations/v1alpha1/semantics.md:98`; `contracts/service/v1alpha1/semantics.md:19`; `docs/adapters/atlassian.md:111`; `crates/connectors-core/src/lib.rs:86`; `docs/design.md:350`.
 
+- inferred: `contracts/service/v1alpha2/semantics.md`
+- inferred: `contracts/service/compatibility.md`
+- inferred: `docs/adapters/docker.md`
+- inferred: `ess/domains/declarations.yaml`
+- inferred: `docs/evidence/restart-visibility-20260908`
+
 ## Dependencies and edit coordination
 
 Semantic prerequisites: `story:contracts-wire-compatibility`, `story:contracts-mutation-classification`.
@@ -61,4 +73,12 @@ Shared edit surfaces with `story:contracts-mutation-outcomes`, `story:contracts-
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+The operator authorized local semantic hardening together with ESS models and local checkpoints. Root is the sole tracked-file editor in the primary checkout under the repository single-agent rule; two independent reviewers use isolated ignored evidence. This story edits normative contracts, minimal private values and review evidence, with concrete unsupported predicates/relations kept UNMAPPED. No runtime, public codec, adapter-kind schema or additional adapter implementation is added. Work and recovery copies stay local. The original text-only/no-ESS/no-commit boundary is superseded by the authorized specification goal. Shared files are edited serially by root; restart and visibility keep separate finding ownership.
+
+## Reviewed completion — 2026-09-08
+
+The extended matrix covers static-bearer, identity-audience and delegated profiles with separate implementation/binding/enablement/metadata/lookup/result/readiness facts. Current authority precedes stale/private disclosure; permitted fresh bound/enabled lookup precedes operation schema and key observation; only new candidates require fresh approval/dependency preflight. Descriptions are metadata-only, federation intersects current admission, and legacy descriptor-vector lookup remains distinct. Three individual findings (MP-A-07, MP-B-06 and RV-A-01) are fixed; E12 closes in the original ledger.
+
+Both final independent rechecks approve this story with zero residuals: review-result:restart-visibility-a-recheck2-20260908 and review-result:restart-visibility-b-recheck2-20260908. Exact reports, frozen sources and individual outcomes are preserved in docs/evidence/restart-visibility-20260908/dispositions.md and reviews/.
+
+Verification: ESS 0.20.0 validates 13 files / 215 declarations; two 222-artifact projections match and seven private values have unchanged generated copies. Forty-six shape expectations include nine rejected shapes and nineteen accepted semantic counterexamples; forty-eight textual cases and eight exact provider archives distinguish selected behavior from execution. Existing full gate/MSRV1.88 passes 50 Rust tests and compiles 222 scenarios/34 authored; separate sessions compile 13/201. The narrow final correction changes an ESS comment only and compiles byte-identical IR, so the existing runtime gate was retained. No new runtime, public codec or adapter-kind schema implementation; provider/policy/storage predicates remain explicit later binding obligations. Root edited tracked files serially; work and checkpoints stay local.

@@ -1,0 +1,102 @@
+{
+  "shape_expectations": 46,
+  "negative_shapes": 9,
+  "accepted_semantic_counterexamples": 19,
+  "independently_audited_version_examples": [
+    {
+      "id": "conditional-version-zero",
+      "value": "0",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-zero-alias",
+      "value": "00",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-all-zero",
+      "value": "000000",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-leading-zero",
+      "value": "00042",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-plus",
+      "value": "+42",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-negative",
+      "value": "-1",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-leading-space",
+      "value": " 42",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-trailing-newline",
+      "value": "42\n",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-radix",
+      "value": "0x2a",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-non-ascii",
+      "value": "\uff14\uff12",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-overflow",
+      "value": "18446744073709551616",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-empty",
+      "value": "",
+      "normative_accepts": false
+    },
+    {
+      "id": "conditional-version-minimum",
+      "value": "1",
+      "normative_accepts": true
+    },
+    {
+      "id": "conditional-version-maximum",
+      "value": "18446744073709551615",
+      "normative_accepts": true
+    }
+  ],
+  "selected_schemas": 7,
+  "prior_frozen_projections_copied_and_rechecked": 222,
+  "provider_archives_exact": 8,
+  "docker_endpoint_audit_exact": 9,
+  "compiled_archives": [
+    {
+      "source": "restart-visibility-compiled.json",
+      "scenarios": null
+    },
+    {
+      "source": "rv-sessions-authored.json",
+      "scenarios": 13
+    },
+    {
+      "source": "rv-sessions-suite.json",
+      "scenarios": 201
+    }
+  ],
+  "before_after_and_gated_ir_identical_sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+  "ess_semantic_yaml_unchanged": true,
+  "gate_bytes_unchanged": true,
+  "recorded_gate_passed_tests": 50,
+  "textual_cases": 48,
+  "no_runtime_suite_or_provider_calls": true,
+  "limitations": "Offline shape/hash and normative input-example audit only; source-path interpretation is not live provider/race conformance. Prior immutable projections reused, not a new compiler/projection run by reviewer."
+}

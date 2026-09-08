@@ -1,0 +1,33 @@
+{
+  "provider_archives_verified": 4,
+  "docker_endpoints_verified": 9,
+  "shape_decisions": 32,
+  "shape_negatives": 9,
+  "accepted_semantic_counterexamples": 7,
+  "identical_projections": 222,
+  "identical_schema_copies": 7,
+  "compiled_archives_verified": 3,
+  "session_authored": 13,
+  "session_synthesized": 201,
+  "authored_preserved": true,
+  "ir_new_types": [
+    "connectors.declarations.AvailabilityDecision",
+    "connectors.declarations.OperationAvailability",
+    "connectors.mutations.ContainerLifecycleAction",
+    "connectors.mutations.ContainerLifecycleIntent",
+    "connectors.mutations.DeploymentRestartTarget",
+    "connectors.mutations.IdempotencyKind",
+    "connectors.mutations.PreparedDeploymentRestart"
+  ],
+  "old_types_unchanged": true,
+  "ir_changed_sections": [
+    "domains",
+    "types"
+  ],
+  "recorded_tests": 50,
+  "recorded_gate_success": true,
+  "textual_traces": 42,
+  "frozen_files": 57,
+  "snapshot_hash_mismatches": [],
+  "live_changes_since_freeze": []
+}

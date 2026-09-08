@@ -1,0 +1,14 @@
+{
+  "ess_version": "0.20.0",
+  "validate": "exit 0; connectors v1 \u2014 13 file(s), valid",
+  "compile": "exit 0; byte-identical before/after comment correction and to the gated IR",
+  "ir_sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+  "compared_files": [
+    "rv-before-recheck2.json",
+    "rv-after-recheck2.json",
+    "restart-visibility-compiled.json"
+  ],
+  "runtime_or_schema_change_since_gate": false,
+  "full_gate_rerun": false,
+  "reason": "Normative text/evidence corrections and an ESS UNMAPPED comment; compiled IR and all runtime/scenario sources unchanged."
+}

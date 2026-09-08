@@ -1,0 +1,20 @@
+[
+  {
+    "source": "restart-visibility-compiled.json",
+    "archive": "restart-visibility-compiled.json.gz",
+    "sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+    "bytes": 234435
+  },
+  {
+    "source": "rv-sessions-authored.json",
+    "archive": "rv-sessions-authored.json.gz",
+    "sha256": "9101b8cc172894f6938ee15277e2fabf02a106e92d76fd4e9113dd8068b26b9c",
+    "bytes": 161145
+  },
+  {
+    "source": "rv-sessions-suite.json",
+    "archive": "rv-sessions-suite.json.gz",
+    "sha256": "cafe955c51c13c838f0438ebee44e892ff31b2c871f7c19383fb0ca5da932ccf",
+    "bytes": 2423518
+  }
+]

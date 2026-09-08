@@ -1,0 +1,26 @@
+[
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go",
+    "path": "supplemental-provider/staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go",
+    "sha256": "d7d0341f475e4de43a985419d15800ced365dafeafdee59269d8b687579d3ee3",
+    "bytes": 64050
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/pkg/registry/apps/deployment/strategy.go",
+    "path": "supplemental-provider/pkg/registry/apps/deployment/strategy.go",
+    "sha256": "fb159281b8a2342e5df2ba988d722446e1665d3cd42d5fe2d2c781d3d0303fdb",
+    "bytes": 7701
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apiserver/pkg/storage/api_object_versioner.go",
+    "path": "supplemental-provider/staging/src/k8s.io/apiserver/pkg/storage/api_object_versioner.go",
+    "sha256": "e69bb647fbff622302800b7452fe0a2e620aa9b16519faea5e77f71767e9bfe0",
+    "bytes": 4003
+  },
+  {
+    "source": "https://raw.githubusercontent.com/kubernetes/kubernetes/66452049f3d692768c39c797b21b793dce80314e/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/patch.go",
+    "path": "supplemental-provider/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/patch.go",
+    "sha256": "430804c7244ce5ffedea3a5502554eef8d908e02c34cd50ec3da0402e7f291c5",
+    "bytes": 31792
+  }
+]

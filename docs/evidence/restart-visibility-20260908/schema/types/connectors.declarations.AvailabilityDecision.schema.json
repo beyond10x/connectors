@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.declarations.AvailabilityDecision",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "72ba9ea092904fdc68ed0063ae596853db6e5f5cb70bac7e93e610ff3f4e66cd",
+    "contract_digest": "slice-sha256/2:a9c514f89bd221e3f596706ecf272bdd9a322a16b7ca03564dd034ecf7347a80",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.declarations.AvailabilityDecision": {
+      "title": "AvailabilityDecision",
+      "x-ess-name": "connectors.declarations.AvailabilityDecision",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "advertised": {
+          "type": "boolean"
+        },
+        "lookup_error": {
+          "$ref": "#/$defs/connectors.service_wire.ErrorCode"
+        }
+      },
+      "required": [
+        "advertised"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.service_wire.ErrorCode": {
+      "title": "ErrorCode",
+      "x-ess-name": "connectors.service_wire.ErrorCode",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "invalid_input",
+        "unsupported",
+        "unauthorized",
+        "forbidden",
+        "not_found",
+        "stale_description",
+        "stale_cursor",
+        "rate_limited",
+        "unavailable",
+        "capacity",
+        "timeout",
+        "upstream_protocol",
+        "internal",
+        "approval_required",
+        "approval_refused",
+        "approval_replayed",
+        "idempotency_conflict",
+        "outcome_unknown",
+        "not_granted",
+        "stale_authority",
+        "connection_not_ready",
+        "route_unavailable",
+        "route_refused",
+        "insufficient_scope",
+        "session_not_ready",
+        "session_lost",
+        "offer_expired",
+        "offer_rejected",
+        "lease_expired",
+        "revoked"
+      ]
+    }
+  }
+}
