@@ -1,0 +1,16 @@
+service:
+  instance: kubernetes-local
+  listen: 127.0.0.1:7102
+  service_credential: {kind: file, path: service.secret}
+http:
+  base_url: https://kubernetes.default.svc/
+  # Bind a private regular token file; projected Kubernetes symlinks require a
+  # host-owned credential binding rather than this strict file implementation.
+  credential: {kind: file, path: kubernetes.secret}
+  credential_header: authorization
+  bearer: true
+  ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+adapter:
+  namespaces: [engineering]
+  resource_kinds: [pods, services, deployments, endpointslices]
+  discover_hosts: false

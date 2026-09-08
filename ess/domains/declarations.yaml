@@ -1,0 +1,67 @@
+domain: connectors.declarations
+
+# Immutable declarations, not the lifecycle of a running process or connection.
+# Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.
+entities:
+  - name: connectors.declarations.AdapterSpecification
+    identity:
+      name: adapter_id
+      type: String
+    fields:
+      - name: kind_version
+        type: String
+      - name: implementation_version
+        type: String
+    relations:
+      - name: operations
+        kind: owns
+        target: connectors.declarations.OperationDeclaration
+        cardinality: many
+        via: adapter_id
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  - name: connectors.declarations.OperationDeclaration
+    identity:
+      name: operation_id
+      type: String
+    fields:
+      - name: adapter_id
+        type: String
+      - name: contract
+        type: String
+      - name: profile
+        type: String
+      - name: input_schema_json
+        type: String
+      - name: output_schema_json
+        type: String
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  - name: connectors.declarations.ServiceConfiguration
+    identity:
+      name: instance_id
+      type: String
+    fields:
+      - name: adapter_id
+        type: String
+      - name: revision
+        type: String
+    relations:
+      - name: adapter
+        kind: references
+        target: connectors.declarations.AdapterSpecification
+        cardinality: one
+        via: adapter_id
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  # UNMAPPED: multi-tenant SaaS ownership/assignment cardinality remains outside
+  # this local, explicitly configured service slice. No tenant is caller-selected.

@@ -1,0 +1,1 @@
+{"query":"SELECT $1::numeric AS exact_decimal, NULL::text AS absent","parameters":["12345678901234567890.123456789"],"limit":10}

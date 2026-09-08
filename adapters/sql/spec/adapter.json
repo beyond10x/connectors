@@ -1,0 +1,411 @@
+{
+  "kind": "connectors.adapter/v1",
+  "id": "sql",
+  "version": "0.1.0",
+  "sources": [
+    "https://www.postgresql.org/docs/current/sql-set-transaction.html",
+    "https://www.postgresql.org/docs/current/runtime-config-client.html",
+    "https://www.postgresql.org/docs/current/protocol-flow.html"
+  ],
+  "configuration_schema": {
+    "type": "object",
+    "properties": {
+      "service": {
+        "type": "object",
+        "properties": {
+          "instance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "listen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "service_credential": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "environment"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "kind",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "file"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "kind",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "instance",
+          "listen",
+          "service_credential"
+        ],
+        "additionalProperties": false
+      },
+      "password": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "environment"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "kind",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "file"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            },
+            "required": [
+              "kind",
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "adapter": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "database": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "user": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "allow_plaintext": {
+            "type": "boolean"
+          },
+          "ca_file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "database",
+          "user"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "service",
+      "password",
+      "adapter"
+    ],
+    "additionalProperties": false
+  },
+  "operations": [
+    {
+      "id": "schema.list",
+      "description": "Read column metadata visible to the configured PostgreSQL role.",
+      "contract": "datasource.relational/v1alpha1",
+      "profile": "postgresql-native-text",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "schema",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "native_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "name",
+                "native_type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "truncated",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "query.read",
+      "description": "Execute a bounded read-only PostgreSQL query with text-format parameters.",
+      "contract": "datasource.relational/v1alpha1",
+      "profile": "postgresql-native-text",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          },
+          "parameters": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 8192
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "query",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "native_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "name",
+                "native_type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "truncated",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
