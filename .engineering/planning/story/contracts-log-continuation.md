@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-log-continuation
 kind: story
-status: active
+status: implemented
 title: Make bounded log continuation truthful at timestamp ties
 tags:
 - P1
@@ -33,7 +33,7 @@ scope:
   path: ess/domains/datasource_reads.yaml
 - confidence: cited
   path: ess/system.yaml
-revision: 11
+revision: 14
 ---
 ## Context
 
@@ -90,3 +90,11 @@ Current priority is P1 because the deeper review found scope/correctness failure
 ## Adapter ownership correction — 2026-09-09
 
 story:extractable-adapter-contract-ownership relocates native authority under adapters/<owner>/contracts and authored spec/ess. Shared root contracts retain envelopes and common obligations. Initial review snapshots retain original paths and bytes. This relocation does not close any datasource finding or claim final semantic approval; this story remains active pending its own scenario/disposition evidence and independent review.
+
+## Completion evidence — 2026-09-09
+
+F12 and LD-A-01–03/LD-B-01–04 are fixed. Immutable Loki occurrences/offsets, current authority, independent partial causes and honest Kubernetes/Docker native exhaustion rules are supported by 41 manual cases in the native log evidence directories under adapters/{loki,kubernetes,docker}/contracts/logs/v1alpha1/evidence/20260909. Docker support still requires its explicitly declared driver-tail proof.
+
+Both independent final reviews spec-completion-a-final-20260909 and spec-completion-b-final-20260909 approve the selected specification scope at d1dc83f5d600816c699db07dd843f079ded0e72b. The complete checkpoint, unchanged reports and exact source archive are retained in [checkpoint](../../../docs/evidence/spec-completion-20260909/checkpoint.md). The full repository gate including MSRV 1.88 passed with 58 Rust tests; ESS synthesis/compilation and textual scenarios do not execute runtime conformance. No runtime implementation or public codec change was added in this wave.
+
+The approved parallel plan supersedes earlier single-primary-writer dispatch wording: isolated workers changed only their assigned sources, coordinator alone wrote planning/shared joins. This story is complete for its enumerated specification findings; the overall goal remains active for the separately scoped persistent ESS model closure. Original immutable review bodies and historical source references remain unchanged.
