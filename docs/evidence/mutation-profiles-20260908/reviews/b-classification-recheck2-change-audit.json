@@ -1,0 +1,16 @@
+{
+  "frozen_files": 39,
+  "unchanged_files": 37,
+  "changes": [
+    {
+      "path": "docs/adapters/media-session.md",
+      "previous_sha256": "6a17552a1c62ac80225f7fbb8847a0308394d25d0962f64176c13b1e2c81637a",
+      "sha256": "61892e6ae282ccb3a620f41577f0f6a08b7debec512d0d89ad34d93faa61855a"
+    },
+    {
+      "path": "docs/evidence/mutation-profiles-20260908/classification-verification.md",
+      "previous_sha256": "2509f3c39e1e1fac70a352f8916f151855822f53ec454c318462460428ecf146",
+      "sha256": "2528da3a97d9be88ef56ab595c149fd26d87f132bbb4d4247bca323a042e49a5"
+    }
+  ]
+}

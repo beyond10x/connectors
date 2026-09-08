@@ -1,0 +1,8 @@
+[
+  {
+    "source": ".local/mutation-profiles-20260908/baseline-compiled.json",
+    "snapshot": "auxiliary/baseline-compiled.json",
+    "sha256": "9372f8e52d97fbb674fc9c90904dac62b738879946d6052f1c74828ae8d8b49b",
+    "bytes": 224831
+  }
+]

@@ -66,26 +66,28 @@ Not needed: discovery (no observations), sessions/media, mediated routes.
 
 ## 4. Operation map
 
-| New id | Contract / profile | Effects | Old id |
-|---|---|---|---|
-| `jira.projects.list` | records list `jira-projects` | read | `jira-project-list` |
-| `jira.issues.search_incremental` | records list `jira-issues-incremental` | read | `jira-issue-search` |
-| `jira.issue.get` | records document `jira-issue` | read | `jira-issue-get` |
-| `jira.issue.comments.list` | records list `jira-comments` | read | `jira-issue-comment-list`, `jira-issue-comments-read` |
-| `jira.issue.transitions.list` | records list `jira-transitions` | read | `jira-issue-transitions-list` |
-| `jira.issue.create` | mutation, `idempotency: keyed`, `approval: required` | external_write | `jira-issue-create` |
-| `jira.issue.edit` | mutation, keyed, approval required | external_write | `jira-issue-edit` |
-| `jira.issue.transition` | mutation, keyed, approval required | external_write | `jira-issue-transition` |
-| `jira.issue.comment.add` | mutation, keyed, approval required | external_write, human_visible | `jira-issue-comment-add` |
-| `jira.issue.comment.edit` | mutation, keyed, approval required | external_write, human_visible | `jira-issue-comment-edit` |
-| `jira.issue.link.add` | mutation, keyed, approval required | external_write | `jira-issue-link-add` |
-| `confluence.spaces.list` | records list | read | `confluence-space-list` |
-| `confluence.space.get` | records list (single) | read | `confluence-space-get` |
-| `confluence.space.pages.list` | records list | read | `confluence-space-pages` |
-| `confluence.page.get` | records document `confluence-page` | read | `confluence-page-get` |
-| `confluence.pages.search` | records list `confluence-cql` | read | `confluence-page-search` |
-| `confluence.page.create` | mutation, keyed, approval required | external_write, human_visible | `confluence-page-create` |
-| `confluence.comment.add` | mutation, keyed, approval required | external_write, human_visible | `confluence-comment-add` |
+Executable and descriptive effects use the separate closed vocabularies in [operations §3](../../contracts/operations/v1alpha1/semantics.md#3-types). `read` below is a summary of the read profile, not an executable-effect enum; HTTP reads declare `network`. An em dash in the semantic column means an empty array. Full extended descriptors require both arrays. Human visibility does not grant write authority.
+
+| New id | Contract / profile | Executable effects / read summary | Semantic effects | Old id |
+|---|---|---|---|---|
+| `jira.projects.list` | records list `jira-projects` | read | — | `jira-project-list` |
+| `jira.issues.search_incremental` | records list `jira-issues-incremental` | read | — | `jira-issue-search` |
+| `jira.issue.get` | records document `jira-issue` | read | — | `jira-issue-get` |
+| `jira.issue.comments.list` | records list `jira-comments` | read | — | `jira-issue-comment-list`, `jira-issue-comments-read` |
+| `jira.issue.transitions.list` | records list `jira-transitions` | read | — | `jira-issue-transitions-list` |
+| `jira.issue.create` | mutation, `idempotency: keyed`, `approval: required` | external_write, network | — | `jira-issue-create` |
+| `jira.issue.edit` | mutation, keyed, approval required | external_write, network | — | `jira-issue-edit` |
+| `jira.issue.transition` | mutation, keyed, approval required | external_write, network | — | `jira-issue-transition` |
+| `jira.issue.comment.add` | mutation, keyed, approval required | external_write, network | human_visible | `jira-issue-comment-add` |
+| `jira.issue.comment.edit` | mutation, keyed, approval required | external_write, network | human_visible | `jira-issue-comment-edit` |
+| `jira.issue.link.add` | mutation, keyed, approval required | external_write, network | — | `jira-issue-link-add` |
+| `confluence.spaces.list` | records list | read | — | `confluence-space-list` |
+| `confluence.space.get` | records list (single) | read | — | `confluence-space-get` |
+| `confluence.space.pages.list` | records list | read | — | `confluence-space-pages` |
+| `confluence.page.get` | records document `confluence-page` | read | — | `confluence-page-get` |
+| `confluence.pages.search` | records list `confluence-cql` | read | — | `confluence-page-search` |
+| `confluence.page.create` | mutation, keyed, approval required | external_write, network | human_visible | `confluence-page-create` |
+| `confluence.comment.add` | mutation, keyed, approval required | external_write, network | human_visible | `confluence-comment-add` |
 
 Jira stays on REST v2 for plain-string comment bodies; ADF (v3) is a later `jira.adf` representation (`jira.toml:18-60`).
 

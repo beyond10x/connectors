@@ -1,0 +1,334 @@
+[
+  {
+    "id": "effect-external_write",
+    "type": "connectors.mutations.ExecutableEffect",
+    "value": "external_write",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "effect-network",
+    "type": "connectors.mutations.ExecutableEffect",
+    "value": "network",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "effect-process",
+    "type": "connectors.mutations.ExecutableEffect",
+    "value": "process",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "effect-local_system",
+    "type": "connectors.mutations.ExecutableEffect",
+    "value": "local_system",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "effect-send_external",
+    "type": "connectors.mutations.ExecutableEffect",
+    "value": "send_external",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "effect-session_establishment",
+    "type": "connectors.mutations.ExecutableEffect",
+    "value": "session_establishment",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "hint-human_visible",
+    "type": "connectors.mutations.SemanticEffect",
+    "value": "human_visible",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "hint-billable",
+    "type": "connectors.mutations.SemanticEffect",
+    "value": "billable",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "hint-irreversible",
+    "type": "connectors.mutations.SemanticEffect",
+    "value": "irreversible",
+    "schema_accepts": true,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "sip-valid",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "mutation",
+      "effects": [
+        "external_write",
+        "network",
+        "send_external",
+        "session_establishment"
+      ],
+      "semantic_effects": [
+        "human_visible"
+      ]
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "read-network",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "kubernetes-list",
+      "effects": [
+        "network"
+      ],
+      "semantic_effects": []
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "missing-hints",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "mutation",
+      "effects": [
+        "external_write"
+      ]
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "unknown-executable",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "mutation",
+      "effects": [
+        "external_write",
+        "write"
+      ],
+      "semantic_effects": [
+        "human_visible"
+      ]
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "hint-in-executable",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "mutation",
+      "effects": [
+        "external_write",
+        "human_visible"
+      ],
+      "semantic_effects": [
+        "human_visible"
+      ]
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "executable-in-hint",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "mutation",
+      "effects": [
+        "external_write",
+        "network",
+        "send_external",
+        "session_establishment"
+      ],
+      "semantic_effects": [
+        "send_external"
+      ]
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "missing-discriminator",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "mutation",
+      "effects": [
+        "network",
+        "send_external",
+        "session_establishment"
+      ],
+      "semantic_effects": [
+        "human_visible"
+      ]
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: shape-valid but mutation discriminator is missing; future semantic validator must refuse."
+  },
+  {
+    "id": "read-business-write",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "kubernetes-list",
+      "effects": [
+        "external_write",
+        "network",
+        "send_external",
+        "session_establishment"
+      ],
+      "semantic_effects": [
+        "human_visible"
+      ]
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: a read cannot claim external business mutation; schema does not execute profile compatibility."
+  },
+  {
+    "id": "duplicate-effect",
+    "type": "connectors.mutations.EffectDeclaration",
+    "value": {
+      "profile": "mutation",
+      "effects": [
+        "external_write",
+        "external_write"
+      ],
+      "semantic_effects": [
+        "human_visible"
+      ]
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: semantic distinct-member rule is not projected by List<T>."
+  },
+  {
+    "id": "no-receipt-not_attempted",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "not_attempted"
+      }
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "no-receipt-refused",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "refused"
+      }
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "no-receipt-applied",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "applied"
+      }
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "no-receipt-unknown",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "unknown"
+      }
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "applied-ready",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "applied"
+      },
+      "ready_session": "sess-a"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": true,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "unknown-ready",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "unknown"
+      },
+      "ready_session": "sess-a"
+    },
+    "schema_accepts": true,
+    "semantic_accepts": false,
+    "note": "Counterexample: a trusted ready receipt requires applied knowledge; the generic schema does not check the relation."
+  },
+  {
+    "id": "null-ready",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "applied"
+      },
+      "ready_session": null
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Private Optional<T> projects omission, not public required-null encoding."
+  },
+  {
+    "id": "replayed-classification",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {
+      "mutation": {
+        "classification": "replayed"
+      }
+    },
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  },
+  {
+    "id": "missing-effect-observation",
+    "type": "connectors.mutations.SessionEstablishmentObservation",
+    "value": {},
+    "schema_accepts": false,
+    "semantic_accepts": null,
+    "note": "Shape only; no semantic predicate executed."
+  }
+]

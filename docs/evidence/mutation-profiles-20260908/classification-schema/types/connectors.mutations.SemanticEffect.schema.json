@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.SemanticEffect",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "4530e7c2f955c1012539d7c3b70742a41527bdb2331e236fd307ac4aa5bcb2a4",
+    "contract_digest": "slice-sha256/2:8a979314060891946f18406f39ca31462f2a636ef7f93c260232e5062b55c36d",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.SemanticEffect": {
+      "title": "SemanticEffect",
+      "x-ess-name": "connectors.mutations.SemanticEffect",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "human_visible",
+        "billable",
+        "irreversible"
+      ]
+    }
+  }
+}
