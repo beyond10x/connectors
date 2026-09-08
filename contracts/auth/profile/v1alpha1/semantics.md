@@ -60,10 +60,10 @@ Closed vocabularies:
 
 | Field | Values |
 |---|---|
-| `purpose` | `service_account`, `delegated_user`, `app_level`, `inbound_verification`, `transport_identity`, `trunk_registration` |
-| `subject` | `app`, `user`, `none` (inbound verification, transport identity) |
-| `scheme` | `http_bearer`, `http_basic`, `http_signing`, `mtls`, `socket_peer`, `exec_plugin`, `sip_digest`, `session_authority` |
-| `acquisition.flow` | `static_entry`, `static_config`, `oauth2_authorization_code`, `oauth2_client_credentials`, `oauth2_password` (declared for compatibility only; refused by default), `workload_identity`, `exec_plugin`, `host_issued` |
+| `purpose` | `service_account`, `delegated_user`, `app_level`, `inbound_verification`, `transport_identity`, `trunk_registration`, `anonymous`, `mediated_access` |
+| `subject` | `app`, `user`, `none` (no child provider credential subject; see §4.2) |
+| `scheme` | `http_bearer`, `http_basic`, `http_signing`, `mtls`, `socket_peer`, `exec_plugin`, `sip_digest`, `session_authority`, `none`, `parent` |
+| `acquisition.flow` | `static_entry`, `static_config`, `oauth2_authorization_code`, `oauth2_client_credentials`; reserved: `oauth2_password`, `workload_identity`, `exec_plugin`, `host_issued` (support matrix in acquisition §4.0) |
 | `capabilities` | names from `auth.capability` |
 | `evidence` | names from `auth.evidence` |
 
@@ -75,12 +75,12 @@ Operation reference:
 
 ## 4. Rules
 
-- A profile is provider-owned and reviewed: `sources` must cite the vendor page for URLs, PKCE, token response shape, refresh behavior, and revocation. The compiler refuses a profile whose `acquisition` names an OAuth flow without `authorize_url`/`token_url` and a source.
+- A profile is provider-owned and reviewed: `sources` must cite the vendor page for each claimed URL, PKCE, token response shape, refresh behavior and revocation. Flow-specific required and forbidden fields follow [acquisition §4.0](../../acquisition/v1alpha1/semantics.md#40-acquisition-paths-and-required-declarations). In particular, authorization code requires authorize and token endpoints; client credentials requires only a token endpoint and refuses browser-only fields. These are obligations for the future profile reader, not checks implemented by the current adapter compiler.
 - A profile declares; it never contains a credential value, a secret reference, or a redirect secret. Registration secrets (client id/secret) are configuration bound at the host through `auth.custody`.
 - `requires_auth` alternatives are evaluated at execution against the selected connection's profile and granted scopes (`auth.evidence`); description metadata never authorizes (`docs/design.md:358`).
 - `purpose` differences are semantic, not cosmetic: an `app_level` credential cannot satisfy a `delegated_user` requirement even when the scheme matches (`docs/design.md:539`).
-- Profiles with `subject: none` (`inbound_verification`, `transport_identity`) attach to an instance or ingress, not to a per-user connection.
-- `oauth2_password` is refused unless configuration explicitly enables it; it exists only to document the one old provider that uses it.
+- Inbound verification and transport-identity profiles with `subject: none` attach to an instance or ingress. The explicit anonymous and mediated-access cases in §4.2 may back host-governed connections without a provider account. Subject describes the provider credential, not the inbound caller or connection owner.
+- Reserved acquisition vocabulary is not selectable in this profile; a feature flag alone cannot implement an omitted flow. `oauth2_password` preserves the old provider's vocabulary only.
 - A profile change is a specification change: it changes the descriptor revision and requires review of every connection that references it.
 
 
@@ -92,7 +92,22 @@ Operation reference:
 
 For every credential-bearing profile, F05's current material/identity/validity requirements and minimum-scope rule are mandatory even if omitted from this list. Required custody follows the selected binding. The declaration cannot disable these safeguards. Additional universal verification must pass under separately admitted validation before activation/publication, and remain fresh for global viability. Operation-only verification is required solely for that operation. A supported but non-required hook may remain not_run. There is no blanket automatic verification call inferred from a hook name; any completion-time verification is selected and admitted in the profile's validation plan with its own effect/deadline budget.
 
-Completion means that custody and a validated baseline publication were definitely acknowledged at that point. It is not a perpetual ready state or a grant to invoke. Mandatory baseline verification failure prevents publication/completed; optional verification failure neither deletes valid material nor prevents baseline publication, though an operation requiring that verification remains ineligible. Private uncommitted candidates/orphan cleanup are custody/coordinator facts, never completed connections. Refresh may publish narrowed optional grants when baseline validation holds; failure after the rotating source was consumed cannot restore that source's authority. See [connection reduction](../../connection/v1alpha1/semantics.md#41-connection-viability-and-operation-eligibility) and [acquisition](../../acquisition/v1alpha1/semantics.md).
+For managed credential acquisition, completion means that custody and a validated baseline publication were definitely acknowledged at that point. Static configuration and non-material bindings use the separately admitted activation/materialization path in acquisition §4.0, not a fictitious completed acquisition. It is not a perpetual ready state or a grant to invoke. Mandatory baseline verification failure prevents publication/completed; optional verification failure neither deletes valid material nor prevents baseline publication, though an operation requiring that verification remains ineligible. Private uncommitted candidates/orphan cleanup are custody/coordinator facts, never completed connections. Refresh may publish narrowed optional grants when baseline validation holds; failure after the rotating source was consumed cannot restore that source's authority. See [connection reduction](../../connection/v1alpha1/semantics.md#41-connection-viability-and-operation-eligibility) and [acquisition](../../acquisition/v1alpha1/semantics.md).
+
+### 4.2 Explicit access bindings without child credentials
+
+These are separately selected profiles, never fallback behavior. The following combinations are closed for the first monitoring profiles:
+
+| Binding | Purpose / subject / scheme | Acquisition | Capability | Credential placement |
+|---|---|---|---|---|
+| Direct anonymous | `anonymous` / `none` / `none` | `static_config` | `http-anonymous` | No credential, cookie jar, ambient HTTP authentication, client certificate, signing or Authorization header. Receiver-owned admitted tenant headers remain possible. |
+| Parent-authenticated route | `mediated_access` / `none` / `parent` | `static_config` | `mediated-http` | Child owns no credential. Host uses the independently admitted parent's pinned capability for the fixed proxy hop; any downstream authentication is owned by the reviewed parent route/datasource binding. |
+
+Both have empty requestable/minimum/granted provider scopes and no child identity/custody/credential checks. Refuse nonempty scope requirements or credential configuration for either combination. A declared child verify_operation may still be required and uses the selected destination/route only. Its success proves that bounded read, not a provider account. Host caller authentication, connection/operation grants, allowlists, tenant isolation, deadlines and final binding/revocation checks remain mandatory.
+
+No synthetic credential generation, custody reference or external identity is created to satisfy credential-bearing ESS values. The child's `external_identity` remains required-null even when ready; its host scope and actor still describe who owns/uses the connection. Anonymous evidence binds `(instance, connection, profile, configuration revision, admitted destination and tenant-header binding)`. Mediated evidence additionally binds the fixed parent, current parent credential generation/admission and route/observation revision. A change invalidates prior admissions and child verification. Parent identity/grants are never copied as child identity/scopes. Parent credentials never enter child provider code.
+
+Selection fixes direct versus mediated access before admission. A missing bearer/basic credential, provider 401, parent outage or unsupported route refuses the selected profile; none may select an anonymous profile, borrow another connection, or dial directly. Changing access mode, route kind, parent, fixed target or host ownership requires a new independently admitted connection; no reassignment flow for those changes is selected here. A configuration revision only revalidates the same fixed connection binding under admitted policy and invalidates its old evidence, admissions, cursors and sessions where affected. It is not authority to repurpose a ref or perform credential repair. Business datasource contracts remain the same across routes; auth-profile ids and placement differ deliberately. Reserved and unimplemented capabilities still cannot be advertised through a safe descriptor.
 
 ## 5. Limits
 
@@ -104,7 +119,9 @@ Completion means that custody and a validated baseline publication were definite
 
 ## 6. Conformance scenarios
 
-- Compiler: a profile without `sources` → refused; OAuth flow without URLs → refused; an operation naming an unknown profile → refused.
+- Future profile reader: missing sources, unknown profile references or missing flow-specific requirements → refused. Client credentials with a token endpoint and source needs no authorize endpoint.
+- Explicit anonymous binding → admitted bounded direct read without credential use; missing bearer material → connection_not_ready, no anonymous fallback.
+- Parent-authenticated child → independently admitted fixed proxy hop; no child credential or inherited parent grant; parent failure → route_unavailable, no direct dispatch.
 - Runtime: operation requiring `write:jira-work` invoked over a connection whose granted scopes are `read:jira-work` → `insufficient_scope`, no dispatch.
 - Purpose mismatch: connection on an `app_level` profile used for a `delegated_user` requirement → `Forbidden`, no dispatch.
 - Descriptor output contains profile ids, purposes, schemes, and flows but no URL secret, client secret, or credential reference.
@@ -131,6 +148,7 @@ Completion means that custody and a validated baseline publication were definite
 | Auth profile identity and declaration | Proposed entity, not yet declared in declarations.yaml; no implemented ownership relation is claimed here. Baseline/operation requirement values are modeled in [connection_admission.yaml](../../../../ess/domains/connection_admission.yaml). |
 | `OperationDeclaration.requires_auth` | list of `{profile, scopes}` values |
 | Registration (client id/secret) per deployment | belongs to `ServiceConfiguration`, secret material UNMAPPED into custody |
+| Access and acquisition declaration values | [auth_access.yaml](../../../../ess/domains/auth_access.yaml) models the new closed selection vocabulary and declaration shapes; cross-field combinations, live authority and no-secret placement remain normative predicates, not executed ESS checks. |
 
 ## 10. Open decisions
 
@@ -138,4 +156,4 @@ Completion means that custody and a validated baseline publication were definite
 |---|---|
 | Whether scopes are opaque strings or provider-parsed | opaque; equality and subset checks only |
 | Where the Atlassian `cloud_id` site selection lives (old `base_url = "https://api.atlassian.com/ex/jira/{cloud_id}"`, `providers/jira.toml:206`) | connection attribute filled during acquisition from the accessible-resources endpoint, cited in the adapter document |
-| `oauth2_password` presence | declared, refused by default |
+| `oauth2_password` presence | reserved and refused in this profile; support needs a separately reviewed flow contract |

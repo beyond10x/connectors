@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.AuthorizationResult",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:8f4cb77b30517f8bfb0f5e6ec5f70f17d19d20b1aaaa72196eec23009fafaa30",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.AuthorizationResult": {
+      "title": "AuthorizationResult",
+      "x-ess-name": "connectors.auth_access.AuthorizationResult",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "allowed",
+        "denied"
+      ]
+    }
+  }
+}

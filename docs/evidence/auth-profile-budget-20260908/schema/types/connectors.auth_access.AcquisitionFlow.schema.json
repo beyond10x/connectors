@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.AcquisitionFlow",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:4d445477175ed25353aae0899231d75e11c43288a0b26f6149f25ad0a2b05b35",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.AcquisitionFlow": {
+      "title": "AcquisitionFlow",
+      "x-ess-name": "connectors.auth_access.AcquisitionFlow",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "static_config",
+        "static_entry",
+        "oauth2_authorization_code",
+        "oauth2_client_credentials",
+        "oauth2_password",
+        "workload_identity",
+        "exec_plugin",
+        "host_issued"
+      ]
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.auth_access.Subject",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "0b04cc3ac91037c139169a14a805fb074e429c30f6e3592a5ac86a7aef99fd27",
+    "contract_digest": "slice-sha256/2:723b70ac4cde5a784fea16dd31f12bae77b1523a8bca40afb41d5cadd933a743",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.auth_access.Subject": {
+      "title": "Subject",
+      "x-ess-name": "connectors.auth_access.Subject",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "app",
+        "user",
+        "none"
+      ]
+    }
+  }
+}

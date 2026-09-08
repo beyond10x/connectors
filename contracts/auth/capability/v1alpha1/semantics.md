@@ -9,7 +9,7 @@
 | Field | Value |
 |---|---|
 | Contract | `auth.capability/v1alpha1` |
-| Capabilities | `http-bearer`, `http-basic`, `http-signing`, `mtls-client-identity`, `socket-peer`, `exec-credential-plugin`, `sip-credential-lease`, `session-authority`, `inbound-verifier`, `mediated-http` |
+| Capabilities | `http-bearer`, `http-basic`, `http-signing`, `http-anonymous`, `mtls-client-identity`, `socket-peer`, `exec-credential-plugin`, `sip-credential-lease`, `session-authority`, `inbound-verifier`, `mediated-http` |
 | Nature | the runtime side of authentication: a connection-bound object handed to provider code that authenticates one permitted request at the trusted execution boundary |
 
 Design responsibility four of four (`docs/design.md:529`): "Authenticate a permitted provider request — connection-bound authentication capability at the execution boundary." The requirement is a defined trusted boundary, no general secret-store access from business operations, and no leakage through public interfaces (`docs/design.md:592`).
@@ -34,8 +34,8 @@ Each capability is a Rust port in the SDK; none is a wire type. The wire only ev
 ```text
 HttpCapability
   request(method, segments, query, headers_allowlisted, body_bounded) -> HttpResponse
-  // bound to: connection, profile, validated generation pin, allowed origin/base path, deadline, body limits
-  // variants: http-bearer, http-basic, http-signing (adds canonical-request signing), mediated-http
+  // bound to: connection, profile, admitted credential/configuration/route binding, destination aperture, deadline, body limits
+  // variants: http-bearer, http-basic, http-signing, http-anonymous, mediated-http
 
 TransportIdentity
   tls_client_config() -> ClientIdentity            // mtls-client-identity: certificate chain + key handle
@@ -55,7 +55,7 @@ InboundVerifier
   redeem(authority_id) -> Redeemed | AlreadyRedeemed
 ```
 
-Every capability carries the binding it was created for. The host-private binding additionally contains the validated credential-generation pin and its admission; these do not appear in this safe descriptive example:
+Every capability carries the binding it was created for. Credential-bearing bindings additionally contain the validated generation pin and its admission. Anonymous direct and mediated child capabilities use the explicit no-child-credential binding in profile §4.2; the parent's own capability retains its generation pin. Private bindings do not appear in this safe descriptive example:
 
 ```json
 { "connection": "conn_…", "profile": "jira.user_oauth", "destination": { "origin": "https://api.atlassian.com", "base_path": "/ex/jira/<cloud_id>" }, "limits": { "deadline_ms": 15000, "body_bytes": 4194304 } }
@@ -64,11 +64,13 @@ Every capability carries the binding it was created for. The host-private bindin
 ## 4. Rules
 
 - Binding: a capability is constructed by the host for one connection and one profile, with the admitted destination and limits. Provider code cannot change the credential, the destination origin, or the limits through the request it builds (`docs/design.md:590`).
-- Placement: the host captures immutable material, validates it through the declared admitted auth flow, and pins that exact generation with the evidence used for admission. Immediately before dispatch the capability places the pinned material; it must not resolve a mutable path afresh or silently substitute a newer custody reference. Provider code never sees `http-bearer`/`http-basic` bytes. The pin is host-private and no public serializer or diagnostic exposes its generation or snapshot reference.
-- Dispatch consistency: final dispatch must establish that the pin, evidence and selected connection binding agree and the generation remains current and usable. Known revocation/expiry, stale required checks, a detected unvalidated replacement, or an unresolved authorized rotating refresh refuses even a pin. Successful refresh/replacement publication atomically cuts off old pending admissions; a new admission is required for the new generation. A capability cannot renew authority just by reloading credentials. See [evidence §4](../../evidence/v1alpha1/semantics.md#4-rules).
+- Placement for credential-bearing capabilities: the host captures immutable material, validates it through the declared admitted auth flow, and pins that exact generation with the evidence used for admission. Immediately before dispatch the capability places the pinned material; it must not resolve a mutable path afresh or silently substitute a newer custody reference. Provider code never sees `http-bearer`/`http-basic` bytes. The pin is host-private and no public serializer or diagnostic exposes its generation or snapshot reference.
+- `http-anonymous` is bound only to the explicit anonymous profile and admitted destination/configuration revision. It performs no credential resolution, placement, cookie/ambient authentication or refresh. Provider/user input cannot add Authorization or select another access profile. A 401 is a provider refusal, never a trigger to acquire credentials or retry under another mode. `mediated-http` similarly owns no child credential: it passes only reviewed target-relative traffic to the independently admitted parent's fixed route, never the parent's secret or arbitrary destination.
+- Dispatch consistency for credential-bearing capabilities: final dispatch must establish that the pin, evidence and selected connection binding agree and the generation remains current and usable. Known revocation/expiry, stale required checks, a detected unvalidated replacement, or an unresolved authorized rotating refresh refuses even a pin. Successful refresh/replacement publication atomically cuts off old pending admissions; a new admission is required for the new generation. A capability cannot renew authority just by reloading credentials. See [evidence §4](../../evidence/v1alpha1/semantics.md#4-rules).
+- Non-material dispatch still requires a current host admission and immutable configuration/route aperture ordered against revocation and binding changes. `socket-peer` validates and pins the admitted local path/peer/transport identity for use; it does not turn socket metadata into CredentialGeneration or anonymous HTTP. Its concrete peer/path race checks and typed transport admission remain UNMAPPED advertisement gates. Anonymous and mediated binding predicates likewise cannot be represented as a fake material-bearing DispatchAdmission.
 - Destination: `http-*` capabilities refuse a request whose resolved URL leaves the admitted origin and base path; redirects are not followed (`docs/design.md:590`; current host behavior).
-- Methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` with a bounded body; a mutation method is refused when the operation's profile is not `mutation` (`operations` document).
-- Preflight: a `401` from the provider triggers at most one coordinated refresh through `auth.acquisition` and one re-dispatch for reads; for mutations a refresh never re-dispatches (`docs/design.md:600`). The preflight's own effects are separate from the business operation (`docs/design.md:373`).
+- Business methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` with a bounded body; a mutation method is refused when the operation's profile is not `mutation` (`operations` document). Separately admitted auth checks use private purpose-specific capabilities: for example the bounded SSAR POST in [evidence §4.4](../../evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08) grants no business POST authority.
+- Preflight for a selected refresh-capable credential profile: a `401` from the provider permits at most one admitted coordinated refresh through `auth.acquisition`. At most one read re-dispatch is permitted only by a separately selected supported read-retry binding, with fresh current-generation admission/permission checks and the original remaining target/call/deadline budget; otherwise no automatic read re-dispatch. For mutations a refresh never re-dispatches (`docs/design.md:600`). The preflight's own effects are separate from the business operation (`docs/design.md:373`). No refresh support is inferred from a capability name; anonymous and static_config bindings never acquire/refresh implicitly. A mediated response never grants the child authority to refresh parent material; any admitted parent maintenance belongs to its coordinator and cannot silently redispatch child traffic.
 - Leases (`sip-credential-lease`, `exec-credential-plugin`): material is released for one establishment or one helper run, within a deadline, and is not retained by provider code beyond the protocol object that consumes it. The lease records purpose and time, never the value.
 - `exec-credential-plugin` runs only when configuration enables it and only inside an admitted operation or explicitly admitted activation/revalidation step, never during listing or description (old rule preserved). One helper output is one captured generation: identity validation and dispatch must consume the same output. Running the helper a second time needs a new generation and admission. Client-certificate capabilities similarly pin one coherent certificate/key pair through transport use. An identity probe needed for replacement belongs to the declared validation step; it is not an implicit expansion of a business operation.
 - `session-authority`: issued per admitted session with a bound lifetime (old profile: 60 s, single redemption); the verifier redeems atomically before any media or data byte is accepted; a second presentation is `AlreadyRedeemed`.
@@ -90,7 +92,7 @@ Every capability carries the binding it was created for. The host-private bindin
 - Fake transport records the header for `http-bearer` and `http-basic`; provider code has no access to the value (type-level: the capability owns it).
 - Request built with an absolute URL or a `..` segment → refused before dispatch.
 - Redirect from the fake provider → not followed; `UpstreamProtocol`.
-- `401` on a read → one refresh, one re-dispatch; `401` on a mutation → one refresh, zero re-dispatch.
+- `401` under a selected refresh-capable profile → at most one admitted coordinated refresh and at most one separately permitted read re-dispatch; mutation re-dispatch remains zero. Anonymous/static_config read 401 → no refresh or auth upgrade; mediated child cannot refresh the parent or silently repeat the forward. Exact read-retry support remains with its owner story.
 - Lease released twice → second release is a no-op; lease used after deadline → refused.
 - Authority redeemed twice → `AlreadyRedeemed`; media bytes before redemption → refused.
 - Swap the custody implementation while preserving the exact immutable snapshot semantics → authentication behavior remains compatible. Swapping material is a new generation, never permission to retain old evidence.
