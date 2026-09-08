@@ -1,0 +1,26 @@
+[
+  {
+    "path": ".local/profile-persistence-20260908/sessions-authored.json",
+    "snapshot": "auxiliary/sessions-authored.json",
+    "sha256": "8deb50e622d2e4a5e4169c4ba219a3de5adb2ef680bcf97c5fd12e24ece0eba8",
+    "bytes": 161145
+  },
+  {
+    "path": ".local/profile-persistence-20260908/sessions-suite.json",
+    "snapshot": "auxiliary/sessions-suite.json",
+    "sha256": "7fe155459db07f4077791f3750e2633c187b400a58b78f70bc846b13fcfad7e9",
+    "bytes": 2423518
+  },
+  {
+    "path": ".local/profile-persistence-20260908/compiled.json",
+    "snapshot": "auxiliary/compiled.json",
+    "sha256": "9372f8e52d97fbb674fc9c90904dac62b738879946d6052f1c74828ae8d8b49b",
+    "bytes": 224831
+  },
+  {
+    "path": ".local/profile-persistence-20260908/baseline-compiled.json",
+    "snapshot": "auxiliary/baseline-compiled.json",
+    "sha256": "c2be566be32bb28db36af3b27cad9963d0013cfdfab3e8ad29ab6aca9bdecbd5",
+    "bytes": 219245
+  }
+]

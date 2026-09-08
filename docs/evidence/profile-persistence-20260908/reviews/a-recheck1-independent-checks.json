@@ -1,0 +1,40 @@
+{
+  "schema_decisions": 44,
+  "negative_shapes": 7,
+  "accepted_semantic_counterexamples": [
+    "wrong-operation-profile-pair",
+    "non-https-origin",
+    "argo-declared-in-kubernetes"
+  ],
+  "selected_schemas": 7,
+  "projection_artifacts_per_run": 211,
+  "projections_byte_identical": true,
+  "entity_inventory_exact": true,
+  "entity_count": 11,
+  "textual_trace_count": 43,
+  "logical_port_rows": 18,
+  "recorded_gate_passed_tests": 50,
+  "session_compilation": {
+    "sessions-authored.json": {
+      "count": 13,
+      "provenance": {
+        "suite_version": "ess-conformance/4",
+        "system": "connectors",
+        "specification_version": "v1",
+        "spec_digest": "906f53651110c796906843c9338e67b527761c3c5b354af86ca7e949785e1f6e",
+        "contract_digest": "e81182c1e67cbf39f74867686086f81239e821c41ff45b3799c75726f0653b4c"
+      }
+    },
+    "sessions-suite.json": {
+      "count": 201,
+      "provenance": {
+        "suite_version": "ess-conformance/4",
+        "system": "connectors",
+        "specification_version": "v1",
+        "spec_digest": "906f53651110c796906843c9338e67b527761c3c5b354af86ca7e949785e1f6e",
+        "contract_digest": "e81182c1e67cbf39f74867686086f81239e821c41ff45b3799c75726f0653b4c"
+      }
+    }
+  },
+  "limits": "Read-only shape, manifest, inventory and recorded transcript audit; no recognizer, storage, authority, provider, clock or runtime tests executed."
+}
