@@ -1,0 +1,1035 @@
+{
+  "scope": "Generic ESS Optional projection uses omission and rejects explicit null. semantic_value removes null optional members only to test the typed value projection. It is not the normative wire encoding.",
+  "canonical_subjects": [
+    {
+      "id": "federated-managed",
+      "subject": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "canonical_utf8": "{\"approval_mode\":\"required\",\"authority\":{\"current_authority\":{\"id\":\"authority-a\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"executor\":null,\"scope\":{\"caller\":\"principal-a\",\"executor\":null,\"realm\":null,\"tenant\":\"tenant-a\"}},\"canonicalization\":\"adapter-v1-canonical-json\",\"format\":\"connectors.approval-subject/v1\",\"input_sha256\":\"b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9\",\"origin\":{\"authority_ref\":\"gateway-prod\",\"kind\":\"federated\"},\"route\":{\"gateway_instance\":\"gateway-prod\",\"route_id\":\"prod\",\"route_revision\":\"route-r3\"},\"target\":{\"configuration_revision\":\"leaf-config4\",\"connection\":\"conn-team\",\"connection_revision\":\"connection-r7\",\"contract\":\"operations/v1alpha1\",\"descriptor_revision\":\"leaf-d9\",\"instance\":\"leaf-prod\",\"operation\":\"issue.create\",\"profile\":\"mutation\"}}",
+      "subject_sha256": "affd52d85c12cb42449c36224e1a2ba3339d395c9c4c35ade10f5c9a5b638dee"
+    },
+    {
+      "id": "federated-configured",
+      "subject": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "configured-main",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "canonical_utf8": "{\"approval_mode\":\"required\",\"authority\":{\"current_authority\":{\"id\":\"authority-a\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"executor\":null,\"scope\":{\"caller\":\"principal-a\",\"executor\":null,\"realm\":null,\"tenant\":\"tenant-a\"}},\"canonicalization\":\"adapter-v1-canonical-json\",\"format\":\"connectors.approval-subject/v1\",\"input_sha256\":\"b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9\",\"origin\":{\"authority_ref\":\"gateway-prod\",\"kind\":\"federated\"},\"route\":{\"gateway_instance\":\"gateway-prod\",\"route_id\":\"prod\",\"route_revision\":\"route-r3\"},\"target\":{\"configuration_revision\":\"leaf-config4\",\"connection\":\"configured-main\",\"connection_revision\":\"connection-r7\",\"contract\":\"operations/v1alpha1\",\"descriptor_revision\":\"leaf-d9\",\"instance\":\"leaf-prod\",\"operation\":\"issue.create\",\"profile\":\"mutation\"}}",
+      "subject_sha256": "af0f0f25cc007abf11be2fb0d1c4371d572592ea1bc3304116a8f6dcf26c2467"
+    },
+    {
+      "id": "direct-managed",
+      "subject": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "origin": {
+          "kind": "direct",
+          "authority_ref": "leaf-prod"
+        },
+        "route": null,
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "canonical_utf8": "{\"approval_mode\":\"required\",\"authority\":{\"current_authority\":{\"id\":\"authority-a\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"executor\":null,\"scope\":{\"caller\":\"principal-a\",\"executor\":null,\"realm\":null,\"tenant\":\"tenant-a\"}},\"canonicalization\":\"adapter-v1-canonical-json\",\"format\":\"connectors.approval-subject/v1\",\"input_sha256\":\"b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9\",\"origin\":{\"authority_ref\":\"leaf-prod\",\"kind\":\"direct\"},\"route\":null,\"target\":{\"configuration_revision\":\"leaf-config4\",\"connection\":\"conn-team\",\"connection_revision\":\"connection-r7\",\"contract\":\"operations/v1alpha1\",\"descriptor_revision\":\"leaf-d9\",\"instance\":\"leaf-prod\",\"operation\":\"issue.create\",\"profile\":\"mutation\"}}",
+      "subject_sha256": "192f4105ec8098db3d83ca7f4741efa04ee77cf22350d140393e518b6a0435ed"
+    },
+    {
+      "id": "direct-configured",
+      "subject": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "configured-main",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": null,
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": null,
+          "executor": null
+        },
+        "origin": {
+          "kind": "direct",
+          "authority_ref": "leaf-prod"
+        },
+        "route": null,
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "canonical_utf8": "{\"approval_mode\":\"required\",\"authority\":{\"current_authority\":null,\"executor\":null,\"scope\":{\"caller\":\"principal-a\",\"executor\":null,\"realm\":null,\"tenant\":null}},\"canonicalization\":\"adapter-v1-canonical-json\",\"format\":\"connectors.approval-subject/v1\",\"input_sha256\":\"b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9\",\"origin\":{\"authority_ref\":\"leaf-prod\",\"kind\":\"direct\"},\"route\":null,\"target\":{\"configuration_revision\":\"leaf-config4\",\"connection\":\"configured-main\",\"connection_revision\":\"connection-r7\",\"contract\":\"operations/v1alpha1\",\"descriptor_revision\":\"leaf-d9\",\"instance\":\"leaf-prod\",\"operation\":\"issue.create\",\"profile\":\"mutation\"}}",
+      "subject_sha256": "d4d3601a11c8e51c386dc0c7af3b2b7eb1d9c84ceb02f4c9050e3845f21f24af"
+    },
+    {
+      "id": "federated-executor",
+      "subject": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": "agent-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": {
+            "agent": "agent-a",
+            "revision": "agent-r2",
+            "authority_snapshot": {
+              "id": "executor-authority-a",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "canonical_utf8": "{\"approval_mode\":\"required\",\"authority\":{\"current_authority\":{\"id\":\"authority-a\",\"sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"executor\":{\"agent\":\"agent-a\",\"authority_snapshot\":{\"id\":\"executor-authority-a\",\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"revision\":\"agent-r2\"},\"scope\":{\"caller\":\"principal-a\",\"executor\":\"agent-a\",\"realm\":null,\"tenant\":\"tenant-a\"}},\"canonicalization\":\"adapter-v1-canonical-json\",\"format\":\"connectors.approval-subject/v1\",\"input_sha256\":\"b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9\",\"origin\":{\"authority_ref\":\"gateway-prod\",\"kind\":\"federated\"},\"route\":{\"gateway_instance\":\"gateway-prod\",\"route_id\":\"prod\",\"route_revision\":\"route-r3\"},\"target\":{\"configuration_revision\":\"leaf-config4\",\"connection\":\"conn-team\",\"connection_revision\":\"connection-r7\",\"contract\":\"operations/v1alpha1\",\"descriptor_revision\":\"leaf-d9\",\"instance\":\"leaf-prod\",\"operation\":\"issue.create\",\"profile\":\"mutation\"}}",
+      "subject_sha256": "7befd9e8370a2b8f1365db9720ea50cf42f855dd565edd3701c2bde11b140412"
+    }
+  ],
+  "values": [
+    {
+      "id": "federated-managed",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "wire_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "federated-configured",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "wire_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "configured-main",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "configured-main",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "direct-managed",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "wire_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "origin": {
+          "kind": "direct",
+          "authority_ref": "leaf-prod"
+        },
+        "route": null,
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "origin": {
+          "kind": "direct",
+          "authority_ref": "leaf-prod"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "direct-configured",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "wire_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "configured-main",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": null,
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": null,
+          "executor": null
+        },
+        "origin": {
+          "kind": "direct",
+          "authority_ref": "leaf-prod"
+        },
+        "route": null,
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "configured-main",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "caller": "principal-a"
+          }
+        },
+        "origin": {
+          "kind": "direct",
+          "authority_ref": "leaf-prod"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "federated-executor",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "wire_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": "agent-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": {
+            "agent": "agent-a",
+            "revision": "agent-r2",
+            "authority_snapshot": {
+              "id": "executor-authority-a",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a",
+            "executor": "agent-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": {
+            "agent": "agent-a",
+            "revision": "agent-r2",
+            "authority_snapshot": {
+              "id": "executor-authority-a",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "approval-federated-managed",
+      "type": "connectors.delegation.ApprovalClaims",
+      "wire_value": {
+        "iss": "approval-issuer",
+        "aud": "leaf-approval-audience",
+        "reference": "1111111111111111111111111111111111111111111111111111111111111111",
+        "subject": {
+          "format": "connectors.approval-subject/v1",
+          "target": {
+            "instance": "leaf-prod",
+            "operation": "issue.create",
+            "connection": "conn-team",
+            "connection_revision": "connection-r7",
+            "contract": "operations/v1alpha1",
+            "profile": "mutation",
+            "descriptor_revision": "leaf-d9",
+            "configuration_revision": "leaf-config4"
+          },
+          "authority": {
+            "scope": {
+              "tenant": "tenant-a",
+              "realm": null,
+              "caller": "principal-a",
+              "executor": null
+            },
+            "current_authority": {
+              "id": "authority-a",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "executor": null
+          },
+          "origin": {
+            "kind": "federated",
+            "authority_ref": "gateway-prod"
+          },
+          "route": {
+            "gateway_instance": "gateway-prod",
+            "route_id": "prod",
+            "route_revision": "route-r3"
+          },
+          "canonicalization": "adapter-v1-canonical-json",
+          "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+          "approval_mode": "required"
+        },
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788869095
+      },
+      "semantic_value": {
+        "iss": "approval-issuer",
+        "aud": "leaf-approval-audience",
+        "reference": "1111111111111111111111111111111111111111111111111111111111111111",
+        "subject": {
+          "format": "connectors.approval-subject/v1",
+          "target": {
+            "instance": "leaf-prod",
+            "operation": "issue.create",
+            "connection": "conn-team",
+            "connection_revision": "connection-r7",
+            "contract": "operations/v1alpha1",
+            "profile": "mutation",
+            "descriptor_revision": "leaf-d9",
+            "configuration_revision": "leaf-config4"
+          },
+          "authority": {
+            "scope": {
+              "tenant": "tenant-a",
+              "caller": "principal-a"
+            },
+            "current_authority": {
+              "id": "authority-a",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "origin": {
+            "kind": "federated",
+            "authority_ref": "gateway-prod"
+          },
+          "route": {
+            "gateway_instance": "gateway-prod",
+            "route_id": "prod",
+            "route_revision": "route-r3"
+          },
+          "canonicalization": "adapter-v1-canonical-json",
+          "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+          "approval_mode": "required"
+        },
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788869095
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "delivery-invoke",
+      "type": "connectors.delegation.DeliveryClaims",
+      "wire_value": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "semantic_value": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "delivery-prepare",
+      "type": "connectors.delegation.DeliveryClaims",
+      "wire_value": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "prepare",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "96fd3abc0cb25c7623a5f6e46f7c19e4a8699198dfb6ef101b3fa3cb42e2a3f6",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-prepare-1",
+        "request_id": "leaf-prepare-1",
+        "operation": "host.approval.prepare",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "semantic_value": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "prepare",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "96fd3abc0cb25c7623a5f6e46f7c19e4a8699198dfb6ef101b3fa3cb42e2a3f6",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-prepare-1",
+        "request_id": "leaf-prepare-1",
+        "operation": "host.approval.prepare",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "delivery-describe",
+      "type": "connectors.delegation.DeliveryClaims",
+      "wire_value": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "describe",
+        "method": "GET",
+        "target": "/v1alpha2/describe",
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": null,
+        "request_id": null,
+        "operation": null,
+        "connection": null,
+        "descriptor_revision": null,
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "semantic_value": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "describe",
+        "method": "GET",
+        "target": "/v1alpha2/describe",
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "semantic_schema_accepts": true
+    },
+    {
+      "id": "missing-operation",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_schema_accepts": false
+    },
+    {
+      "id": "wrong-target-type",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": 3,
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required"
+      },
+      "semantic_schema_accepts": false
+    },
+    {
+      "id": "unknown-subject-field",
+      "type": "connectors.delegation.CanonicalApprovalSubject",
+      "semantic_value": {
+        "format": "connectors.approval-subject/v1",
+        "target": {
+          "instance": "leaf-prod",
+          "operation": "issue.create",
+          "connection": "conn-team",
+          "connection_revision": "connection-r7",
+          "contract": "operations/v1alpha1",
+          "profile": "mutation",
+          "descriptor_revision": "leaf-d9",
+          "configuration_revision": "leaf-config4"
+        },
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "caller": "principal-a"
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "origin": {
+          "kind": "federated",
+          "authority_ref": "gateway-prod"
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "canonicalization": "adapter-v1-canonical-json",
+        "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+        "approval_mode": "required",
+        "surprise": true
+      },
+      "semantic_schema_accepts": false
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.idempotency.RequestFingerprint",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:2c589708dd7a8730f7eb2e6f64627836b2dc365761d818ccd3de1b2d8d5faeb2",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.idempotency.RequestFingerprint": {
+      "title": "RequestFingerprint",
+      "x-ess-name": "connectors.idempotency.RequestFingerprint",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "operation_ref": {
+          "type": "string"
+        },
+        "connection_ref": {
+          "type": "string"
+        },
+        "connection_revision": {
+          "type": "string"
+        },
+        "contract_ref": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "descriptor_revision": {
+          "type": "string"
+        },
+        "configuration_revision": {
+          "type": "string"
+        },
+        "canonicalization_version": {
+          "type": "string"
+        },
+        "input_digest": {
+          "type": "string"
+        },
+        "route": {
+          "$ref": "#/$defs/connectors.idempotency.RouteBinding"
+        }
+      },
+      "required": [
+        "operation_ref",
+        "connection_ref",
+        "connection_revision",
+        "contract_ref",
+        "profile",
+        "descriptor_revision",
+        "configuration_revision",
+        "canonicalization_version",
+        "input_digest"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.idempotency.RouteBinding": {
+      "title": "RouteBinding",
+      "x-ess-name": "connectors.idempotency.RouteBinding",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "gateway_instance": {
+          "type": "string"
+        },
+        "route_id": {
+          "type": "string"
+        },
+        "route_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "gateway_instance",
+        "route_id",
+        "route_revision"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

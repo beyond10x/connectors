@@ -1,0 +1,1031 @@
+{
+  "warning": "PUBLIC DETERMINISTIC TEST MATERIAL. Not real approval, credentials or authorized dispatch. Ed25519 primitive checks only; no Connectors verifier/store/provider is executed.",
+  "fixture_time": 1788868800,
+  "keys": {
+    "approval": {
+      "public_test_seed_hex": "87d3ae39407230978bf7b9378994f1becb440551c09be479f9891166037d3643",
+      "public_key_hex": "2be1fad2e4df4e2ec06555b0905f170e1bd109ef9a43dc4264a5299e1647ebf4"
+    },
+    "delivery": {
+      "public_test_seed_hex": "346b7a78e11543670ae2c89b381172e3753dcb39c485070bfbf5d873cfadf2de",
+      "public_key_hex": "74eb77ff0c07e2c6e2faf89f8dd175c355d52fc23955cabb448d59660dba4084"
+    }
+  },
+  "proofs": [
+    {
+      "id": "approval-federated-managed",
+      "kind": "approval",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "approval-fixture-key",
+        "typ": "b10x.connectors-approval.v1+jws"
+      },
+      "claims": {
+        "iss": "approval-issuer",
+        "aud": "leaf-approval-audience",
+        "reference": "1111111111111111111111111111111111111111111111111111111111111111",
+        "subject": {
+          "format": "connectors.approval-subject/v1",
+          "target": {
+            "instance": "leaf-prod",
+            "operation": "issue.create",
+            "connection": "conn-team",
+            "connection_revision": "connection-r7",
+            "contract": "operations/v1alpha1",
+            "profile": "mutation",
+            "descriptor_revision": "leaf-d9",
+            "configuration_revision": "leaf-config4"
+          },
+          "authority": {
+            "scope": {
+              "tenant": "tenant-a",
+              "realm": null,
+              "caller": "principal-a",
+              "executor": null
+            },
+            "current_authority": {
+              "id": "authority-a",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "executor": null
+          },
+          "origin": {
+            "kind": "federated",
+            "authority_ref": "gateway-prod"
+          },
+          "route": {
+            "gateway_instance": "gateway-prod",
+            "route_id": "prod",
+            "route_revision": "route-r3"
+          },
+          "canonicalization": "adapter-v1-canonical-json",
+          "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+          "approval_mode": "required"
+        },
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788869095
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiYXBwcm92YWwtZml4dHVyZS1rZXkiLCJ0eXAiOiJiMTB4LmNvbm5lY3RvcnMtYXBwcm92YWwudjErandzIn0.eyJhdWQiOiJsZWFmLWFwcHJvdmFsLWF1ZGllbmNlIiwiZXhwIjoxNzg4ODY5MDk1LCJpYXQiOjE3ODg4Njg4MDAsImlzcyI6ImFwcHJvdmFsLWlzc3VlciIsIm5iZiI6MTc4ODg2ODc5NSwicmVmZXJlbmNlIjoiMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInN1YmplY3QiOnsiYXBwcm92YWxfbW9kZSI6InJlcXVpcmVkIiwiYXV0aG9yaXR5Ijp7ImN1cnJlbnRfYXV0aG9yaXR5Ijp7ImlkIjoiYXV0aG9yaXR5LWEiLCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0sImV4ZWN1dG9yIjpudWxsLCJzY29wZSI6eyJjYWxsZXIiOiJwcmluY2lwYWwtYSIsImV4ZWN1dG9yIjpudWxsLCJyZWFsbSI6bnVsbCwidGVuYW50IjoidGVuYW50LWEifX0sImNhbm9uaWNhbGl6YXRpb24iOiJhZGFwdGVyLXYxLWNhbm9uaWNhbC1qc29uIiwiZm9ybWF0IjoiY29ubmVjdG9ycy5hcHByb3ZhbC1zdWJqZWN0L3YxIiwiaW5wdXRfc2hhMjU2IjoiYjU5NzkxMzY5YjM3NWIwMWZmZDM3MmIzNThmODllYTBjYWZhZDY3YmNjN2RmZDcwY2RiNjIzNWQ1YTFlNjBkOSIsIm9yaWdpbiI6eyJhdXRob3JpdHlfcmVmIjoiZ2F0ZXdheS1wcm9kIiwia2luZCI6ImZlZGVyYXRlZCJ9LCJyb3V0ZSI6eyJnYXRld2F5X2luc3RhbmNlIjoiZ2F0ZXdheS1wcm9kIiwicm91dGVfaWQiOiJwcm9kIiwicm91dGVfcmV2aXNpb24iOiJyb3V0ZS1yMyJ9LCJ0YXJnZXQiOnsiY29uZmlndXJhdGlvbl9yZXZpc2lvbiI6ImxlYWYtY29uZmlnNCIsImNvbm5lY3Rpb24iOiJjb25uLXRlYW0iLCJjb25uZWN0aW9uX3JldmlzaW9uIjoiY29ubmVjdGlvbi1yNyIsImNvbnRyYWN0Ijoib3BlcmF0aW9ucy92MWFscGhhMSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiaW5zdGFuY2UiOiJsZWFmLXByb2QiLCJvcGVyYXRpb24iOiJpc3N1ZS5jcmVhdGUiLCJwcm9maWxlIjoibXV0YXRpb24ifX19.DRMMvXG9tU-XPlECCIGpc-W0KQ01MYqNjhEoh1E02bnctrI640PYIRlPADeAVqyuqcg77NZ5gCG56LkDYrRADg",
+      "expect_signature": true,
+      "protocol_expectation": "valid only under the selected issuer/current authority/subject/spend conditions"
+    },
+    {
+      "id": "delivery-invoke",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "body_utf8": "{\"approval\":{\"evidence\":\"eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiYXBwcm92YWwtZml4dHVyZS1rZXkiLCJ0eXAiOiJiMTB4LmNvbm5lY3RvcnMtYXBwcm92YWwudjErandzIn0.eyJhdWQiOiJsZWFmLWFwcHJvdmFsLWF1ZGllbmNlIiwiZXhwIjoxNzg4ODY5MDk1LCJpYXQiOjE3ODg4Njg4MDAsImlzcyI6ImFwcHJvdmFsLWlzc3VlciIsIm5iZiI6MTc4ODg2ODc5NSwicmVmZXJlbmNlIjoiMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInN1YmplY3QiOnsiYXBwcm92YWxfbW9kZSI6InJlcXVpcmVkIiwiYXV0aG9yaXR5Ijp7ImN1cnJlbnRfYXV0aG9yaXR5Ijp7ImlkIjoiYXV0aG9yaXR5LWEiLCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0sImV4ZWN1dG9yIjpudWxsLCJzY29wZSI6eyJjYWxsZXIiOiJwcmluY2lwYWwtYSIsImV4ZWN1dG9yIjpudWxsLCJyZWFsbSI6bnVsbCwidGVuYW50IjoidGVuYW50LWEifX0sImNhbm9uaWNhbGl6YXRpb24iOiJhZGFwdGVyLXYxLWNhbm9uaWNhbC1qc29uIiwiZm9ybWF0IjoiY29ubmVjdG9ycy5hcHByb3ZhbC1zdWJqZWN0L3YxIiwiaW5wdXRfc2hhMjU2IjoiYjU5NzkxMzY5YjM3NWIwMWZmZDM3MmIzNThmODllYTBjYWZhZDY3YmNjN2RmZDcwY2RiNjIzNWQ1YTFlNjBkOSIsIm9yaWdpbiI6eyJhdXRob3JpdHlfcmVmIjoiZ2F0ZXdheS1wcm9kIiwia2luZCI6ImZlZGVyYXRlZCJ9LCJyb3V0ZSI6eyJnYXRld2F5X2luc3RhbmNlIjoiZ2F0ZXdheS1wcm9kIiwicm91dGVfaWQiOiJwcm9kIiwicm91dGVfcmV2aXNpb24iOiJyb3V0ZS1yMyJ9LCJ0YXJnZXQiOnsiY29uZmlndXJhdGlvbl9yZXZpc2lvbiI6ImxlYWYtY29uZmlnNCIsImNvbm5lY3Rpb24iOiJjb25uLXRlYW0iLCJjb25uZWN0aW9uX3JldmlzaW9uIjoiY29ubmVjdGlvbi1yNyIsImNvbnRyYWN0Ijoib3BlcmF0aW9ucy92MWFscGhhMSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiaW5zdGFuY2UiOiJsZWFmLXByb2QiLCJvcGVyYXRpb24iOiJpc3N1ZS5jcmVhdGUiLCJwcm9maWxlIjoibXV0YXRpb24ifX19.DRMMvXG9tU-XPlECCIGpc-W0KQ01MYqNjhEoh1E02bnctrI640PYIRlPADeAVqyuqcg77NZ5gCG56LkDYrRADg\",\"reference\":\"1111111111111111111111111111111111111111111111111111111111111111\"},\"connection\":\"conn-team\",\"idempotency_key\":\"business-key-1\",\"input\":{\"metadata\":{\"a\":1,\"z\":2},\"title\":\"fixture issue\"},\"operation\":\"issue.create\",\"request_id\":\"leaf-request-1\",\"revision\":\"leaf-d9\",\"version\":\"v1alpha2\"}",
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.cFAf8_NK-WSwlZ1njWvaoCrA68_jM4tRdvgOLHKtkDhjeQ4mTe7DPn8Rk7NmoblpcuivMEFv-0UNpLVi_cu2CQ",
+      "expect_signature": true,
+      "expect_body_digest": true,
+      "protocol_expectation": "requires current receiver/key/time/purpose/authority and unused durable nonce; crypto alone is insufficient"
+    },
+    {
+      "id": "delivery-prepare",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "prepare",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "96fd3abc0cb25c7623a5f6e46f7c19e4a8699198dfb6ef101b3fa3cb42e2a3f6",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-prepare-1",
+        "request_id": "leaf-prepare-1",
+        "operation": "host.approval.prepare",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "body_utf8": "{\"connection\":\"conn-team\",\"input\":{\"input\":{\"metadata\":{\"a\":1,\"z\":2},\"title\":\"fixture issue\"},\"operation\":\"issue.create\"},\"operation\":\"host.approval.prepare\",\"request_id\":\"leaf-prepare-1\",\"revision\":\"leaf-d9\",\"version\":\"v1alpha2\"}",
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI5NmZkM2FiYzBjYjI1Yzc2MjNhNWY2ZTQ2ZjdjMTllNGE4Njk5MTk4ZGZiNmVmMTAxYjNmYTNjYjQyZTJhM2Y2IiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaG9zdC5hcHByb3ZhbC5wcmVwYXJlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcHJlcGFyZS0xIiwicHVycG9zZSI6InByZXBhcmUiLCJyZWNlaXZlciI6ImxlYWYtcHJvZCIsInJlcXVlc3RfaWQiOiJsZWFmLXByZXBhcmUtMSIsInJvdXRlIjp7ImdhdGV3YXlfaW5zdGFuY2UiOiJnYXRld2F5LXByb2QiLCJyb3V0ZV9pZCI6InByb2QiLCJyb3V0ZV9yZXZpc2lvbiI6InJvdXRlLXIzIn0sInRhcmdldCI6Ii92MWFscGhhMi9pbnZva2UifQ.zBHOa92lYvCH_eZZAEQAEiQeGUfQkMLJEepFI1Y9NSWZx6JeXx9--84DdyDeO0ucewGUUbzZs97dTqk3SJXOBw",
+      "expect_signature": true,
+      "expect_body_digest": true,
+      "protocol_expectation": "requires current receiver/key/time/purpose/authority and unused durable nonce; crypto alone is insufficient"
+    },
+    {
+      "id": "delivery-describe",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "describe",
+        "method": "GET",
+        "target": "/v1alpha2/describe",
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": null,
+        "request_id": null,
+        "operation": null,
+        "connection": null,
+        "descriptor_revision": null,
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "body_utf8": "",
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwiY29ubmVjdGlvbiI6bnVsbCwiZGVzY3JpcHRvcl9yZXZpc2lvbiI6bnVsbCwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiI0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0IiwibWV0aG9kIjoiR0VUIiwibmJmIjoxNzg4ODY4Nzk1LCJvcGVyYXRpb24iOm51bGwsIm9yaWdpbl9yZXF1ZXN0X2lkIjpudWxsLCJwdXJwb3NlIjoiZGVzY3JpYmUiLCJyZWNlaXZlciI6ImxlYWYtcHJvZCIsInJlcXVlc3RfaWQiOm51bGwsInJvdXRlIjp7ImdhdGV3YXlfaW5zdGFuY2UiOiJnYXRld2F5LXByb2QiLCJyb3V0ZV9pZCI6InByb2QiLCJyb3V0ZV9yZXZpc2lvbiI6InJvdXRlLXIzIn0sInRhcmdldCI6Ii92MWFscGhhMi9kZXNjcmliZSJ9.TJC4TUhRFnMNOuJEM_hlZK0xCvjvge_7vwryYAxrENquPmolw46Ud6o1i6FjUFbTQBbFSFI5hzf-xDdEj1z7Dw",
+      "expect_signature": true,
+      "expect_body_digest": true,
+      "protocol_expectation": "requires current receiver/key/time/purpose/authority and unused durable nonce; crypto alone is insufficient"
+    },
+    {
+      "id": "altered-payload",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "other-leaf",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoib3RoZXItbGVhZiIsInJlcXVlc3RfaWQiOiJsZWFmLXJlcXVlc3QtMSIsInJvdXRlIjp7ImdhdGV3YXlfaW5zdGFuY2UiOiJnYXRld2F5LXByb2QiLCJyb3V0ZV9pZCI6InByb2QiLCJyb3V0ZV9yZXZpc2lvbiI6InJvdXRlLXIzIn0sInRhcmdldCI6Ii92MWFscGhhMi9pbnZva2UifQ.cFAf8_NK-WSwlZ1njWvaoCrA68_jM4tRdvgOLHKtkDhjeQ4mTe7DPn8Rk7NmoblpcuivMEFv-0UNpLVi_cu2CQ",
+      "expect_signature": false,
+      "protocol_expectation": "unauthorized; no trusted application context"
+    },
+    {
+      "id": "altered-header",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "other-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoib3RoZXIta2V5IiwidHlwIjoiYjEweC5jb25uZWN0b3JzLWRlbGVnYXRpb24udjErandzIn0.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.cFAf8_NK-WSwlZ1njWvaoCrA68_jM4tRdvgOLHKtkDhjeQ4mTe7DPn8Rk7NmoblpcuivMEFv-0UNpLVi_cu2CQ",
+      "expect_signature": false,
+      "protocol_expectation": "unauthorized; no trusted application context"
+    },
+    {
+      "id": "changed-body-after-signing",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "body_utf8": "{\"approval\":{\"evidence\":\"eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiYXBwcm92YWwtZml4dHVyZS1rZXkiLCJ0eXAiOiJiMTB4LmNvbm5lY3RvcnMtYXBwcm92YWwudjErandzIn0.eyJhdWQiOiJsZWFmLWFwcHJvdmFsLWF1ZGllbmNlIiwiZXhwIjoxNzg4ODY5MDk1LCJpYXQiOjE3ODg4Njg4MDAsImlzcyI6ImFwcHJvdmFsLWlzc3VlciIsIm5iZiI6MTc4ODg2ODc5NSwicmVmZXJlbmNlIjoiMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInN1YmplY3QiOnsiYXBwcm92YWxfbW9kZSI6InJlcXVpcmVkIiwiYXV0aG9yaXR5Ijp7ImN1cnJlbnRfYXV0aG9yaXR5Ijp7ImlkIjoiYXV0aG9yaXR5LWEiLCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0sImV4ZWN1dG9yIjpudWxsLCJzY29wZSI6eyJjYWxsZXIiOiJwcmluY2lwYWwtYSIsImV4ZWN1dG9yIjpudWxsLCJyZWFsbSI6bnVsbCwidGVuYW50IjoidGVuYW50LWEifX0sImNhbm9uaWNhbGl6YXRpb24iOiJhZGFwdGVyLXYxLWNhbm9uaWNhbC1qc29uIiwiZm9ybWF0IjoiY29ubmVjdG9ycy5hcHByb3ZhbC1zdWJqZWN0L3YxIiwiaW5wdXRfc2hhMjU2IjoiYjU5NzkxMzY5YjM3NWIwMWZmZDM3MmIzNThmODllYTBjYWZhZDY3YmNjN2RmZDcwY2RiNjIzNWQ1YTFlNjBkOSIsIm9yaWdpbiI6eyJhdXRob3JpdHlfcmVmIjoiZ2F0ZXdheS1wcm9kIiwia2luZCI6ImZlZGVyYXRlZCJ9LCJyb3V0ZSI6eyJnYXRld2F5X2luc3RhbmNlIjoiZ2F0ZXdheS1wcm9kIiwicm91dGVfaWQiOiJwcm9kIiwicm91dGVfcmV2aXNpb24iOiJyb3V0ZS1yMyJ9LCJ0YXJnZXQiOnsiY29uZmlndXJhdGlvbl9yZXZpc2lvbiI6ImxlYWYtY29uZmlnNCIsImNvbm5lY3Rpb24iOiJjb25uLXRlYW0iLCJjb25uZWN0aW9uX3JldmlzaW9uIjoiY29ubmVjdGlvbi1yNyIsImNvbnRyYWN0Ijoib3BlcmF0aW9ucy92MWFscGhhMSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiaW5zdGFuY2UiOiJsZWFmLXByb2QiLCJvcGVyYXRpb24iOiJpc3N1ZS5jcmVhdGUiLCJwcm9maWxlIjoibXV0YXRpb24ifX19.DRMMvXG9tU-XPlECCIGpc-W0KQ01MYqNjhEoh1E02bnctrI640PYIRlPADeAVqyuqcg77NZ5gCG56LkDYrRADg\",\"reference\":\"1111111111111111111111111111111111111111111111111111111111111111\"},\"connection\":\"conn-team\",\"idempotency_key\":\"business-key-1\",\"input\":{\"metadata\":{\"a\":1,\"z\":2},\"title\":\"fixture issue\"},\"operation\":\"issue.create\",\"request_id\":\"leaf-request-1\",\"revision\":\"leaf-d9\",\"version\":\"v1alpha2\"} ",
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.cFAf8_NK-WSwlZ1njWvaoCrA68_jM4tRdvgOLHKtkDhjeQ4mTe7DPn8Rk7NmoblpcuivMEFv-0UNpLVi_cu2CQ",
+      "expect_signature": true,
+      "expect_body_digest": false,
+      "protocol_expectation": "signature remains valid, but exact body binding refuses"
+    },
+    {
+      "id": "old-module-type",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.module-request.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHgubW9kdWxlLXJlcXVlc3QudjErandzIn0.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.OGnXxu8PzBYaznCszViBapeH2dGfmjY3RWXgeKb_Xq750aXqjzt41M5fxXtVEl8bE64dDsRH5k4x1qE0CvKGBw",
+      "expect_signature": true,
+      "protocol_expectation": "cryptographically valid but the selected protocol must refuse this type/algorithm/receiver/time mismatch"
+    },
+    {
+      "id": "old-polymorphic-algorithm",
+      "kind": "delivery",
+      "header": {
+        "alg": "EdDSA",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZERTQSIsImtpZCI6ImdhdGV3YXktZml4dHVyZS1rZXkiLCJ0eXAiOiJiMTB4LmNvbm5lY3RvcnMtZGVsZWdhdGlvbi52MStqd3MifQ.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.fZ0EcHJ9mDjqIRj4GgIaTeX2WEOdxpnLdtGuWaikN26bONGZIgxNHmIyZNsvnIRmkNOgnrknL19HaBDVaZyuBA",
+      "expect_signature": true,
+      "protocol_expectation": "cryptographically valid but the selected protocol must refuse this type/algorithm/receiver/time mismatch"
+    },
+    {
+      "id": "wrong-receiver-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "other-leaf",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoib3RoZXItbGVhZiIsInJlcXVlc3RfaWQiOiJsZWFmLXJlcXVlc3QtMSIsInJvdXRlIjp7ImdhdGV3YXlfaW5zdGFuY2UiOiJnYXRld2F5LXByb2QiLCJyb3V0ZV9pZCI6InByb2QiLCJyb3V0ZV9yZXZpc2lvbiI6InJvdXRlLXIzIn0sInRhcmdldCI6Ii92MWFscGhhMi9pbnZva2UifQ.tWIMRe_hG0grz-8cwlU_To2RHVOKrdZCbDxUcbvaoGEMu-lDcIEnBF8bOQv3pQh1e47R6d5FgUp539H9BTH8BQ",
+      "expect_signature": true,
+      "protocol_expectation": "cryptographically valid but the selected protocol must refuse this type/algorithm/receiver/time mismatch"
+    },
+    {
+      "id": "long-window-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788955200,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODk1NTIwMCwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.sOJtUkAF6rHWxTne3kxsKHabqMC9lnsJebvyw8MzdTYT-uriGJ--ierwNYFqLBZ4fqgsiwjEXi5u4GCAXlzICQ",
+      "expect_signature": true,
+      "protocol_expectation": "cryptographically valid but the selected protocol must refuse this type/algorithm/receiver/time mismatch"
+    },
+    {
+      "id": "past-nbf-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868300,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODMwMCwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.JMvcbJWAnivOI3KZtfygj5O7xW22ykoCjOQkBOwA2o4dU_gXC0XU19vnqA80M_T5zC7KZgIKDOJwVMCnIIJkCw",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "wrong-profile-window-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788869095,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2OTA5NSwiaWF0IjoxNzg4ODY4ODAwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.ej0hIeGGU5Qi5u4MaBpwKbVqfiPgQGOgvqg7K3GRxxSqjTwot7FnpxX0Ij7RQJN4_yRFVFqN0GPpxE_fLoXYCg",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "future-iat-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868820,
+        "nbf": 1788868815,
+        "exp": 1788868845,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODg0NSwiaWF0IjoxNzg4ODY4ODIwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODgxNSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.ZHKBRKcD626ET-0oyJfbCks6xLPjovASUM5Y_QrYr7MI94OD5XFMi8zqoqIMGvxTYyf_HJYqV0h_xha8EbT_AQ",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "time-underflow-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 2,
+        "nbf": -3,
+        "exp": 27,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MjcsImlhdCI6MiwiaXNzIjoiZ2F0ZXdheS1wcm9kIiwianRpIjoiMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMiIsIm1ldGhvZCI6IlBPU1QiLCJuYmYiOi0zLCJvcGVyYXRpb24iOiJpc3N1ZS5jcmVhdGUiLCJvcmlnaW5fcmVxdWVzdF9pZCI6ImNsaWVudC1yZXF1ZXN0LTEiLCJwdXJwb3NlIjoiaW52b2tlIiwicmVjZWl2ZXIiOiJsZWFmLXByb2QiLCJyZXF1ZXN0X2lkIjoibGVhZi1yZXF1ZXN0LTEiLCJyb3V0ZSI6eyJnYXRld2F5X2luc3RhbmNlIjoiZ2F0ZXdheS1wcm9kIiwicm91dGVfaWQiOiJwcm9kIiwicm91dGVfcmV2aXNpb24iOiJyb3V0ZS1yMyJ9LCJ0YXJnZXQiOiIvdjFhbHBoYTIvaW52b2tlIn0.2NURYDVtmQQiAKH9rAmHOaZK3qGfxt5_bfjM1OgKn4IHnYrDH_6lv4kFT1vlXfUtUG1kdx3JOQ50DnWLj_CjAQ",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "time-overflow-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 9007199254740990,
+        "nbf": 9007199254740985,
+        "exp": 9007199254741015,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6OTAwNzE5OTI1NDc0MTAxNSwiaWF0Ijo5MDA3MTk5MjU0NzQwOTkwLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6OTAwNzE5OTI1NDc0MDk4NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.9Aa2W5lVtYcTKSoIHX7dLsIAZDOMmnYICtEacReEcDsMqjILZ6B9aoi9uMd4fgVszqeQ314D7zGQUgbY9qXXBw",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "fractional-time-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": 1788868800.5,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0IjoxNzg4ODY4ODAwLjUsImlzcyI6ImdhdGV3YXktcHJvZCIsImp0aSI6IjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIiLCJtZXRob2QiOiJQT1NUIiwibmJmIjoxNzg4ODY4Nzk1LCJvcGVyYXRpb24iOiJpc3N1ZS5jcmVhdGUiLCJvcmlnaW5fcmVxdWVzdF9pZCI6ImNsaWVudC1yZXF1ZXN0LTEiLCJwdXJwb3NlIjoiaW52b2tlIiwicmVjZWl2ZXIiOiJsZWFmLXByb2QiLCJyZXF1ZXN0X2lkIjoibGVhZi1yZXF1ZXN0LTEiLCJyb3V0ZSI6eyJnYXRld2F5X2luc3RhbmNlIjoiZ2F0ZXdheS1wcm9kIiwicm91dGVfaWQiOiJwcm9kIiwicm91dGVfcmV2aXNpb24iOiJyb3V0ZS1yMyJ9LCJ0YXJnZXQiOiIvdjFhbHBoYTIvaW52b2tlIn0.gBvH_Dyt40zwkmPJOJn2Cs5nVOIcAn-AzLB4yJ7xSMj0Weix83ZjA1ii0E42CNBJPBAosXx4V-j8YBvHyuYpDA",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "boolean-time-resigned",
+      "kind": "delivery",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "gateway-fixture-key",
+        "typ": "b10x.connectors-delegation.v1+jws"
+      },
+      "claims": {
+        "iss": "gateway-prod",
+        "aud": "leaf-delegation-audience",
+        "receiver": "leaf-prod",
+        "purpose": "invoke",
+        "method": "POST",
+        "target": "/v1alpha2/invoke",
+        "body_sha256": "7586cb00b1aebae6139260effc698650f9df623bcbf9caafa2c3adf22fb801f2",
+        "authority": {
+          "scope": {
+            "tenant": "tenant-a",
+            "realm": null,
+            "caller": "principal-a",
+            "executor": null
+          },
+          "current_authority": {
+            "id": "authority-a",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "executor": null
+        },
+        "route": {
+          "gateway_instance": "gateway-prod",
+          "route_id": "prod",
+          "route_revision": "route-r3"
+        },
+        "origin_request_id": "client-request-1",
+        "request_id": "leaf-request-1",
+        "operation": "issue.create",
+        "connection": "conn-team",
+        "descriptor_revision": "leaf-d9",
+        "execution_deadline_unix_ms": 1788868820000,
+        "iat": true,
+        "nbf": 1788868795,
+        "exp": 1788868825,
+        "jti": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiZ2F0ZXdheS1maXh0dXJlLWtleSIsInR5cCI6ImIxMHguY29ubmVjdG9ycy1kZWxlZ2F0aW9uLnYxK2p3cyJ9.eyJhdWQiOiJsZWFmLWRlbGVnYXRpb24tYXVkaWVuY2UiLCJhdXRob3JpdHkiOnsiY3VycmVudF9hdXRob3JpdHkiOnsiaWQiOiJhdXRob3JpdHktYSIsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEifSwiZXhlY3V0b3IiOm51bGwsInNjb3BlIjp7ImNhbGxlciI6InByaW5jaXBhbC1hIiwiZXhlY3V0b3IiOm51bGwsInJlYWxtIjpudWxsLCJ0ZW5hbnQiOiJ0ZW5hbnQtYSJ9fSwiYm9keV9zaGEyNTYiOiI3NTg2Y2IwMGIxYWViYWU2MTM5MjYwZWZmYzY5ODY1MGY5ZGY2MjNiY2JmOWNhYWZhMmMzYWRmMjJmYjgwMWYyIiwiY29ubmVjdGlvbiI6ImNvbm4tdGVhbSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiZXhlY3V0aW9uX2RlYWRsaW5lX3VuaXhfbXMiOjE3ODg4Njg4MjAwMDAsImV4cCI6MTc4ODg2ODgyNSwiaWF0Ijp0cnVlLCJpc3MiOiJnYXRld2F5LXByb2QiLCJqdGkiOiIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyIiwibWV0aG9kIjoiUE9TVCIsIm5iZiI6MTc4ODg2ODc5NSwib3BlcmF0aW9uIjoiaXNzdWUuY3JlYXRlIiwib3JpZ2luX3JlcXVlc3RfaWQiOiJjbGllbnQtcmVxdWVzdC0xIiwicHVycG9zZSI6Imludm9rZSIsInJlY2VpdmVyIjoibGVhZi1wcm9kIiwicmVxdWVzdF9pZCI6ImxlYWYtcmVxdWVzdC0xIiwicm91dGUiOnsiZ2F0ZXdheV9pbnN0YW5jZSI6ImdhdGV3YXktcHJvZCIsInJvdXRlX2lkIjoicHJvZCIsInJvdXRlX3JldmlzaW9uIjoicm91dGUtcjMifSwidGFyZ2V0IjoiL3YxYWxwaGEyL2ludm9rZSJ9.tiJIi02jRmv_-5ZlE4zeodm4uGPja_Clpo-PknRQ0YdoojP_o-9qaCiyTDwkvIm-3jYjcDwE-OgadKCpYDzpCw",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "approval-long-window-resigned",
+      "kind": "approval",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "approval-fixture-key",
+        "typ": "b10x.connectors-approval.v1+jws"
+      },
+      "claims": {
+        "iss": "approval-issuer",
+        "aud": "leaf-approval-audience",
+        "reference": "1111111111111111111111111111111111111111111111111111111111111111",
+        "subject": {
+          "format": "connectors.approval-subject/v1",
+          "target": {
+            "instance": "leaf-prod",
+            "operation": "issue.create",
+            "connection": "conn-team",
+            "connection_revision": "connection-r7",
+            "contract": "operations/v1alpha1",
+            "profile": "mutation",
+            "descriptor_revision": "leaf-d9",
+            "configuration_revision": "leaf-config4"
+          },
+          "authority": {
+            "scope": {
+              "tenant": "tenant-a",
+              "realm": null,
+              "caller": "principal-a",
+              "executor": null
+            },
+            "current_authority": {
+              "id": "authority-a",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "executor": null
+          },
+          "origin": {
+            "kind": "federated",
+            "authority_ref": "gateway-prod"
+          },
+          "route": {
+            "gateway_instance": "gateway-prod",
+            "route_id": "prod",
+            "route_revision": "route-r3"
+          },
+          "canonicalization": "adapter-v1-canonical-json",
+          "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+          "approval_mode": "required"
+        },
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788955200
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiYXBwcm92YWwtZml4dHVyZS1rZXkiLCJ0eXAiOiJiMTB4LmNvbm5lY3RvcnMtYXBwcm92YWwudjErandzIn0.eyJhdWQiOiJsZWFmLWFwcHJvdmFsLWF1ZGllbmNlIiwiZXhwIjoxNzg4OTU1MjAwLCJpYXQiOjE3ODg4Njg4MDAsImlzcyI6ImFwcHJvdmFsLWlzc3VlciIsIm5iZiI6MTc4ODg2ODc5NSwicmVmZXJlbmNlIjoiMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInN1YmplY3QiOnsiYXBwcm92YWxfbW9kZSI6InJlcXVpcmVkIiwiYXV0aG9yaXR5Ijp7ImN1cnJlbnRfYXV0aG9yaXR5Ijp7ImlkIjoiYXV0aG9yaXR5LWEiLCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0sImV4ZWN1dG9yIjpudWxsLCJzY29wZSI6eyJjYWxsZXIiOiJwcmluY2lwYWwtYSIsImV4ZWN1dG9yIjpudWxsLCJyZWFsbSI6bnVsbCwidGVuYW50IjoidGVuYW50LWEifX0sImNhbm9uaWNhbGl6YXRpb24iOiJhZGFwdGVyLXYxLWNhbm9uaWNhbC1qc29uIiwiZm9ybWF0IjoiY29ubmVjdG9ycy5hcHByb3ZhbC1zdWJqZWN0L3YxIiwiaW5wdXRfc2hhMjU2IjoiYjU5NzkxMzY5YjM3NWIwMWZmZDM3MmIzNThmODllYTBjYWZhZDY3YmNjN2RmZDcwY2RiNjIzNWQ1YTFlNjBkOSIsIm9yaWdpbiI6eyJhdXRob3JpdHlfcmVmIjoiZ2F0ZXdheS1wcm9kIiwia2luZCI6ImZlZGVyYXRlZCJ9LCJyb3V0ZSI6eyJnYXRld2F5X2luc3RhbmNlIjoiZ2F0ZXdheS1wcm9kIiwicm91dGVfaWQiOiJwcm9kIiwicm91dGVfcmV2aXNpb24iOiJyb3V0ZS1yMyJ9LCJ0YXJnZXQiOnsiY29uZmlndXJhdGlvbl9yZXZpc2lvbiI6ImxlYWYtY29uZmlnNCIsImNvbm5lY3Rpb24iOiJjb25uLXRlYW0iLCJjb25uZWN0aW9uX3JldmlzaW9uIjoiY29ubmVjdGlvbi1yNyIsImNvbnRyYWN0Ijoib3BlcmF0aW9ucy92MWFscGhhMSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiaW5zdGFuY2UiOiJsZWFmLXByb2QiLCJvcGVyYXRpb24iOiJpc3N1ZS5jcmVhdGUiLCJwcm9maWxlIjoibXV0YXRpb24ifX19.R_aVDY2bov-74QBff0e2Nqw1I6BvE1TcK7BwwglOnj3CVehavTKW25_xJ032AWbNvSO_bMjjVAwEgC7UButdDw",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    },
+    {
+      "id": "approval-wrong-profile-window-resigned",
+      "kind": "approval",
+      "header": {
+        "alg": "Ed25519",
+        "kid": "approval-fixture-key",
+        "typ": "b10x.connectors-approval.v1+jws"
+      },
+      "claims": {
+        "iss": "approval-issuer",
+        "aud": "leaf-approval-audience",
+        "reference": "1111111111111111111111111111111111111111111111111111111111111111",
+        "subject": {
+          "format": "connectors.approval-subject/v1",
+          "target": {
+            "instance": "leaf-prod",
+            "operation": "issue.create",
+            "connection": "conn-team",
+            "connection_revision": "connection-r7",
+            "contract": "operations/v1alpha1",
+            "profile": "mutation",
+            "descriptor_revision": "leaf-d9",
+            "configuration_revision": "leaf-config4"
+          },
+          "authority": {
+            "scope": {
+              "tenant": "tenant-a",
+              "realm": null,
+              "caller": "principal-a",
+              "executor": null
+            },
+            "current_authority": {
+              "id": "authority-a",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "executor": null
+          },
+          "origin": {
+            "kind": "federated",
+            "authority_ref": "gateway-prod"
+          },
+          "route": {
+            "gateway_instance": "gateway-prod",
+            "route_id": "prod",
+            "route_revision": "route-r3"
+          },
+          "canonicalization": "adapter-v1-canonical-json",
+          "input_sha256": "b59791369b375b01ffd372b358f89ea0cafad67bcc7dfd70cdb6235d5a1e60d9",
+          "approval_mode": "required"
+        },
+        "iat": 1788868800,
+        "nbf": 1788868795,
+        "exp": 1788868825
+      },
+      "jws": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoiYXBwcm92YWwtZml4dHVyZS1rZXkiLCJ0eXAiOiJiMTB4LmNvbm5lY3RvcnMtYXBwcm92YWwudjErandzIn0.eyJhdWQiOiJsZWFmLWFwcHJvdmFsLWF1ZGllbmNlIiwiZXhwIjoxNzg4ODY4ODI1LCJpYXQiOjE3ODg4Njg4MDAsImlzcyI6ImFwcHJvdmFsLWlzc3VlciIsIm5iZiI6MTc4ODg2ODc5NSwicmVmZXJlbmNlIjoiMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMSIsInN1YmplY3QiOnsiYXBwcm92YWxfbW9kZSI6InJlcXVpcmVkIiwiYXV0aG9yaXR5Ijp7ImN1cnJlbnRfYXV0aG9yaXR5Ijp7ImlkIjoiYXV0aG9yaXR5LWEiLCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0sImV4ZWN1dG9yIjpudWxsLCJzY29wZSI6eyJjYWxsZXIiOiJwcmluY2lwYWwtYSIsImV4ZWN1dG9yIjpudWxsLCJyZWFsbSI6bnVsbCwidGVuYW50IjoidGVuYW50LWEifX0sImNhbm9uaWNhbGl6YXRpb24iOiJhZGFwdGVyLXYxLWNhbm9uaWNhbC1qc29uIiwiZm9ybWF0IjoiY29ubmVjdG9ycy5hcHByb3ZhbC1zdWJqZWN0L3YxIiwiaW5wdXRfc2hhMjU2IjoiYjU5NzkxMzY5YjM3NWIwMWZmZDM3MmIzNThmODllYTBjYWZhZDY3YmNjN2RmZDcwY2RiNjIzNWQ1YTFlNjBkOSIsIm9yaWdpbiI6eyJhdXRob3JpdHlfcmVmIjoiZ2F0ZXdheS1wcm9kIiwia2luZCI6ImZlZGVyYXRlZCJ9LCJyb3V0ZSI6eyJnYXRld2F5X2luc3RhbmNlIjoiZ2F0ZXdheS1wcm9kIiwicm91dGVfaWQiOiJwcm9kIiwicm91dGVfcmV2aXNpb24iOiJyb3V0ZS1yMyJ9LCJ0YXJnZXQiOnsiY29uZmlndXJhdGlvbl9yZXZpc2lvbiI6ImxlYWYtY29uZmlnNCIsImNvbm5lY3Rpb24iOiJjb25uLXRlYW0iLCJjb25uZWN0aW9uX3JldmlzaW9uIjoiY29ubmVjdGlvbi1yNyIsImNvbnRyYWN0Ijoib3BlcmF0aW9ucy92MWFscGhhMSIsImRlc2NyaXB0b3JfcmV2aXNpb24iOiJsZWFmLWQ5IiwiaW5zdGFuY2UiOiJsZWFmLXByb2QiLCJvcGVyYXRpb24iOiJpc3N1ZS5jcmVhdGUiLCJwcm9maWxlIjoibXV0YXRpb24ifX19.K3ntTa87BrMUaRDfXNoq7cVhZ7aniOQfLWZW9e6Ngkn50qvAEPUv_UQPuDL-jZ_Iw3ncsUBBLAQ1jZBvK740DA",
+      "expect_signature": true,
+      "protocol_expectation": "valid signature; refuse the malformed/out-of-time proof before entry or spending at fixture clock [t-1,t+1]"
+    }
+  ]
+}

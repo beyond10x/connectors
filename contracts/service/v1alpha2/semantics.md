@@ -3,7 +3,7 @@
 - **Status:** proposed, not implemented. Nothing in this document is advertised by any descriptor.
 - **Family:** service. Predecessor: [service/v1alpha1](../v1alpha1/semantics.md) (implemented). Siblings that this envelope carries: [operations mutation profile](../../operations/v1alpha1/semantics.md), [auth.connection](../../auth/connection/v1alpha1/semantics.md), [auth.custody](../../auth/custody/v1alpha1/semantics.md).
 - **Recorded:** 2026-09-08.
-- **Why it exists:** the [preserved review of 2026-09-08](../../../.engineering/planning/review-result/concept-stack-integration-20260908.md) (gaps G1–G3, G6, G7, G9) found that the v1alpha1 wire and host carry no verified caller context, so nothing downstream of admission can be governed per caller. Every current consumer of the old Connectors passes an owner context and receives grant and audit facts. This document proposes the service envelope and admission boundary for that gap. The [compatibility decision](../compatibility.md) selects its local binding and exact public encoding; delegated verification, policy/audit persistence and runtime conformance remain explicit obligations.
+- **Why it exists:** the [preserved review of 2026-09-08](../../../.engineering/planning/review-result/concept-stack-integration-20260908.md) (gaps G1–G3, G6, G7, G9) found that the v1alpha1 wire and host carry no verified caller context, so nothing downstream of admission can be governed per caller. Every current consumer of the old Connectors passes an owner context and receives grant and audit facts. This document proposes the service envelope and admission boundary for that gap. The [compatibility decision](../compatibility.md) selects its local binding and exact public encoding; [one-hop delegation](../delegation.md) selects its proof/approval subjects; policy/audit persistence and runtime conformance remain explicit obligations.
 
 ## 1. Identity
 
@@ -30,7 +30,7 @@ A v1alpha2 service answers four questions separately, as `docs/design.md` § 6.2
 | Hosted admission verifies an exact Identity audience owned by Connectors | `../connectors/crates/server/src/hosted/routing.rs:31-41` (`identity_audience: CONNECTORS_AUDIENCE`) | preserve as the `identity-audience` profile. Audience and scope bytes are Connectors deployment data and opaque to Identity (ADR 0021) |
 | Trusted access exchange: a product BFF exchanges an external token for the minimum Connector scope, then "lets Connectors re-check the current description, Connection, Grant and approval evidence" | `../atlas/architecture/adr/0031-trusted-access-exchange-preserves-publication-confinement.md`, Decision | preserve; the exchange is Identity's; Connectors sees only the resulting token and re-checks everything itself |
 | Grant evaluation is a separate policy from approval redemption | `docs/design.md` § 2.2 and § 2.3; old `docs/design/13-grant-evaluation-and-approval-redemption.md` | preserve: a `Policy` port decides admission; approval spending stays in the mutation profile |
-| The old hosted read path can proceed through receiver policy when grant evaluation refuses or is unavailable | `docs/design.md` § 2.3, last paragraph | change: **fail closed**. Policy `Unavailable` is `unavailable` with no dispatch, for reads too. A `static-bearer` instance uses an explicit allow-all policy; that is a configured fact, not a fallback |
+| The old hosted read path can proceed through receiver policy when grant evaluation refuses or is unavailable | `docs/design.md` § 2.3, last paragraph | change: **fail closed**. Policy `Unavailable` is `unavailable` with no dispatch, for reads too. A `static-bearer` instance uses an explicit configured local policy; that is a configured fact, not a fallback |
 | `None` and `Some("default")` realm are distinct in credentials, namespaces, idempotency scope, logs and Connector dispatch; Connectors propagates the verified optional realm across signed service dispatch | `../atlas/architecture/adr/0026-authentication-owns-optional-realm-context.md`, Decision | preserve in the verified context, cursor binding, idempotency scope, cache partition, audit and the `delegated` profile |
 | Shared static service token compared in constant time | `crates/connectors-host/src/server.rs:57-70` | preserve as the `static-bearer` profile for local and test placements |
 | `ResponseEnvelope.connector_audit_ref`, `execution_ref` on every hosted result | `../connectors/crates/protocol/src/operation.rs:185-190` | preserve acknowledged audit correlation; explicit unavailable/incomplete cases and source provenance use compatibility §5 |
@@ -92,11 +92,13 @@ The receiver's audit_ref/audit_status and optional `{instance,audit_ref,audit_st
 
 The closed extended code set is listed in compatibility §5. not_granted is host policy refusal; forbidden is a selected adapter/connection/resource refusal. stale_authority requires fresh authority and a new describe before a deliberate new interaction. Payload states, private auth outcomes and media terminal reasons are not automatically ErrorCode values. Current v1alpha1 readers reject new codes; no error is tunneled through message text to pretend compatibility.
 
-### 3.6 Delegated federation — not yet bound
+### 3.6 Delegated federation — selected proposal
 
-The former request-id-only HMAC header was an incomplete sketch, **not a usable verification protocol**. Delegated support remains unadvertisable until `story:contracts-federated-approval` (F03) selects and models the full binding. It must preserve the originating verified context while authenticating a configured gateway, and bind receiver/audience, method/route, canonical operation/connection/revisions and the actual request bytes, including approval/key/executor semantics. It needs a describe correlation rule distinct from invoke's body request ID, bounded unambiguous framing/canonicalization, clock/replay limits, key selection/rotation and one redemption owner. Raw-body signature checks before application decode must be distinguished from correlation checks after strict decode. No guessed replay-store cardinality or header name is frozen by this placeholder.
+[One-hop delegated approval and dispatch](../delegation.md) now owns the complete canonical subject, safe preparation read, fixed Ed25519 JWS types, request/receiver/GET correlation, bounded time and durable nonce rules, and sole executing-leaf approval redemption. Its separate proof types replace the withdrawn HMAC sketch; they do not extend the predecessor module-request v1 token. Provider credentials remain at the executing leaf, and a broad downstream bearer supplies no originating caller authority.
 
-The current static-credential read gateway supplies none of that authority. A broad gateway token cannot substitute for the originating caller in a keyed mutation namespace or approval subject. One-hop topology and no-resend remain mandatory. Both origin and gateway audit observations have explicit output slots in §3.4; absent leaf evidence is not manufactured.
+The `host.approval.prepare` operation uses the ordinary extended envelope and its own selected `approval-subject` payload/limits, covering both configured and managed connections. It performs no provider use, business reservation or approval spend. Preparation/issuer presentation is not execution authority. Current policy, exact subject reconstruction and the existing keyed-outcome lookup still precede new approval redemption. Direct and federated origin are distinct; only the leaf spends and owns the business attempt.
+
+The protocol is specified, not implemented. Delegated support remains unadvertised until the selected verifier, policy, clock, uniqueness stores and conformance exist. Multi-hop and event-claim ingress remain unavailable; no automatic resign/resend or broad-token fallback is allowed.
 
 ## 4. Admission and execution rules
 
@@ -111,7 +113,7 @@ The current static-credential read gateway supplies none of that authority. A br
 
 Operation request/result/execution/provider/connect limits are explicit descriptor values from compatibility §7. The ordinary profile retains 64 KiB / 4 MiB and 20 s / 15 s / 5 s; every generic realization (read, mutation or page) requires 256 KiB / 4 MiB and 40 s / 30 s / 5 s. Policy evaluation's proposed 2 s ceiling is inside, not added to, the operation execution budget. Authentication, transport ingress, callbacks, session/control/data and delegation need their own bounded binding rules; ordinary unary support cannot stand in for those rules.
 
-Identity token lifetime/verification comes from the explicitly selected Identity contract and deployment, not a universal lifetime invented by this document. Delegated assertion lifetime and anti-replay enforcement are not finalized until F03. Audit admission and completion must be bounded inside the execution/delivery policy while preserving actual effect knowledge when a reply cannot be sent.
+Identity token lifetime/verification comes from the explicitly selected Identity contract and deployment, not a universal lifetime invented by this document. The independent delegation/approval proof windows and nonce/spend rules are fixed by [delegation §5](../delegation.md#5-time-deadlines-and-durable-uniqueness). Audit admission and completion must be bounded inside the execution/delivery policy while preserving actual effect knowledge when a reply cannot be sent.
 
 ## 6. Conformance requirements
 
@@ -122,7 +124,7 @@ Identity token lifetime/verification comes from the explicitly selected Identity
 - Executor mismatch -> not_granted; policy outage -> unavailable, no dispatch. Describe/invoke authority changes are rechecked; realm None and default stay distinct.
 - Admission-audit failure -> unavailable/no acknowledged ref/no dispatch. Final-audit failure after known success/refusal preserves that effect and original cause; a possible dispatch remains unknown.
 - Every mutation outcome, including replayed refusal/abort/unknown, an uncertain waiter, inaccessible original and outcome-store failure, follows the exact status/classification/cause table.
-- Delegation cannot be enabled from the HMAC sketch. F03 must supply valid/forged/replayed/expired/different-receiver/different-body and describe/invoke fixtures with zero unauthorized dispatch and one redemption owner.
+- Delegation uses the selected canonical preparation/approval trace and exact proof fixtures in delegation.md, including valid/forged/replayed/expired/different-receiver/different-body, optional realm/executor, and describe/prepare/invoke separation. Actual verifier/store/provider conformance remains required before advertisement.
 
 ## 7. Compatibility
 
@@ -138,7 +140,7 @@ Old OwnerContext fields are characterization input, not trusted new context. Ten
 | Authentication, current policy and executor/grant verification | host ports; static configuration, Identity audience and delegation are explicit different bindings |
 | Audit admission plus linked final observation and truthful failure handling | host persistence port; no prescribed JSONL/store implementation here |
 | Mutation attempt/approval/idempotency semantics | operations contract and existing ESS domains; wire values do not implement the dispatch fence |
-| Delegated request/approval subjects and verification | F03; unavailable until complete, no current broad-token substitute |
+| Delegated request/approval subjects and verification | [F03 proposal](../delegation.md); runtime binding must implement and prove it, with no broad-token substitute |
 | Safe auth/connection metadata and protected acquisition ingress | auth family owner stories; ordinary invoke is not secret entry |
 | Adapter authoring curation and generated schemas | Connectors-owned kind/compiler compatibility decision separate from this wire; no silent strict-format extension |
 | CLI, service-sdk, Secrets, Identity and consumer bindings | later explicitly scoped implementation/modeling work; no external consumer or Atlas mutation authorized here |
@@ -151,4 +153,4 @@ Authenticated/admitted contexts remain host values whose trusted derivation must
 
 ## 10. Remaining binding decisions
 
-Complete F03 delegation; choose and model policy/audit persistence bindings; verify executor and Identity/Secrets integration against their authoritative contracts; define protected callback and duplex/data codecs; and run version/profile/failure conformance before any advertisement. The wire identifier, paths, field/error shapes and legacy projection rules in compatibility.md are this local proposed contract, not unresolved implementation defaults. Consumer rollout, package installation, Atlas registration and external publication remain separately authorized work.
+Implement and prove the selected F03 delegation binding; choose and model policy/audit persistence bindings; verify executor and Identity/Secrets integration against their authoritative contracts; define protected callback and duplex/data codecs; and run version/profile/failure conformance before any advertisement. The wire identifier, paths, field/error shapes and legacy projection rules in compatibility.md are this local proposed contract, not unresolved implementation defaults. Consumer rollout, package installation, Atlas registration and external publication remain separately authorized work.

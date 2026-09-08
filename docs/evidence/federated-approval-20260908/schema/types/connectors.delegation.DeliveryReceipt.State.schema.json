@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.DeliveryReceipt.State",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:5cb24177eb173d1e53a0bdc0ea6204fb980a2a80143d63515ae4f1a08a09a115",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.DeliveryReceipt.State": {
+      "title": "State",
+      "x-ess-name": "connectors.delegation.DeliveryReceipt.State",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "Consumed"
+      ]
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.ApprovalPolicy",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:2bd4816fc4904fd5fef66e82a886708cdba931ef16f9ae63a54c9a603655b598",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.ApprovalPolicy": {
+      "title": "ApprovalPolicy",
+      "x-ess-name": "connectors.delegation.ApprovalPolicy",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/connectors.mutations.ApprovalMode"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "string"
+        },
+        "max_lifetime_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.mutations.ApprovalMode": {
+      "title": "ApprovalMode",
+      "x-ess-name": "connectors.mutations.ApprovalMode",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "not_required",
+        "required",
+        "event_claim"
+      ]
+    }
+  }
+}

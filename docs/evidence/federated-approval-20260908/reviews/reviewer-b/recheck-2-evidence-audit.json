@@ -1,0 +1,275 @@
+{
+  "scope": "Independent offline audit of frozen evidence bytes, Ed25519 primitives, generated schema values, canonical fixture coordinates, arithmetic and declared-fact truth tables. No receiver, wire codec, clock, store, policy, admission, spend or provider runtime executed. No repository gate rerun.",
+  "cryptographic_checks": [
+    {
+      "id": "approval-federated-managed",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "delivery-invoke",
+      "signature_valid": true,
+      "record_matches": true,
+      "body_digest_matches": true
+    },
+    {
+      "id": "delivery-prepare",
+      "signature_valid": true,
+      "record_matches": true,
+      "body_digest_matches": true
+    },
+    {
+      "id": "delivery-describe",
+      "signature_valid": true,
+      "record_matches": true,
+      "body_digest_matches": true
+    },
+    {
+      "id": "altered-payload",
+      "signature_valid": false,
+      "record_matches": true
+    },
+    {
+      "id": "altered-header",
+      "signature_valid": false,
+      "record_matches": true
+    },
+    {
+      "id": "changed-body-after-signing",
+      "signature_valid": true,
+      "record_matches": true,
+      "body_digest_matches": false
+    },
+    {
+      "id": "old-module-type",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "old-polymorphic-algorithm",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "wrong-receiver-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "long-window-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "past-nbf-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "wrong-profile-window-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "future-iat-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "time-underflow-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "time-overflow-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "fractional-time-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "boolean-time-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "approval-long-window-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    },
+    {
+      "id": "approval-wrong-profile-window-resigned",
+      "signature_valid": true,
+      "record_matches": true
+    }
+  ],
+  "purpose_request_correlations": 3,
+  "type_checks": [
+    {
+      "id": "federated-managed",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "federated-configured",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "direct-managed",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "direct-configured",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "federated-executor",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "approval-federated-managed",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "delivery-invoke",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "delivery-prepare",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "delivery-describe",
+      "semantic_schema_accepted": true,
+      "generic_schema_accepts_required_null_wire": false
+    },
+    {
+      "id": "missing-operation",
+      "semantic_schema_accepted": false
+    },
+    {
+      "id": "wrong-target-type",
+      "semantic_schema_accepted": false
+    },
+    {
+      "id": "unknown-subject-field",
+      "semantic_schema_accepted": false
+    }
+  ],
+  "canonical_subjects_checked": 5,
+  "coordinate_checks": 15,
+  "time_checks": [
+    {
+      "id": "approval-federated-managed",
+      "time_predicate_accepts": true
+    },
+    {
+      "id": "delivery-invoke",
+      "time_predicate_accepts": true
+    },
+    {
+      "id": "long-window-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "past-nbf-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "wrong-profile-window-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "future-iat-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "time-underflow-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "time-overflow-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "fractional-time-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "boolean-time-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "approval-long-window-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "approval-wrong-profile-window-resigned",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "not-before-equality",
+      "time_predicate_accepts": true
+    },
+    {
+      "id": "before-not-before",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "before-expiry",
+      "time_predicate_accepts": true
+    },
+    {
+      "id": "expiry-equality",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "after-expiry",
+      "time_predicate_accepts": false
+    },
+    {
+      "id": "post-ack-all-current",
+      "entry_eligible": true,
+      "declared_facts_only": true
+    },
+    {
+      "id": "post-ack-expired",
+      "entry_eligible": false,
+      "declared_facts_only": true
+    },
+    {
+      "id": "post-ack-key-revoked",
+      "entry_eligible": false,
+      "declared_facts_only": true
+    },
+    {
+      "id": "post-ack-projection-denied",
+      "entry_eligible": false,
+      "declared_facts_only": true
+    },
+    {
+      "id": "post-ack-clock-uncertain",
+      "entry_eligible": false,
+      "declared_facts_only": true
+    },
+    {
+      "id": "post-ack-deadline-exhausted",
+      "entry_eligible": false,
+      "declared_facts_only": true
+    }
+  ],
+  "schema_artifacts_byte_identical": 163,
+  "selected_schema_hashes_match": 21,
+  "gate_log_tests_passed": 50,
+  "all_checks_matched": true
+}

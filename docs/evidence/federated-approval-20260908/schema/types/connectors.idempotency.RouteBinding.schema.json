@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.idempotency.RouteBinding",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:6b536743a53c366322bbb0bdf9403b14571bf427f90352c9c49813bfc73b88b5",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.idempotency.RouteBinding": {
+      "title": "RouteBinding",
+      "x-ess-name": "connectors.idempotency.RouteBinding",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "gateway_instance": {
+          "type": "string"
+        },
+        "route_id": {
+          "type": "string"
+        },
+        "route_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "gateway_instance",
+        "route_id",
+        "route_revision"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

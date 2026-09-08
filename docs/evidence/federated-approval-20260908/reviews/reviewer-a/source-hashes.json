@@ -1,0 +1,141 @@
+{
+  "review": "Independent F03 semantic subject/ownership intake A",
+  "created_utc": "2026-09-08T15:12:58.636415+00:00",
+  "baseline": "b5ace3f29d6deb1dbc9e5ddd50a8a8b02152cb2f",
+  "old_repository_head": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+  "old_repository_note": "Old repository has one unrelated untracked docs/design/21-clean-room-rewrite.md; inspected evidence files are unmodified tracked files. Old implementation is evidence, not authority for the new architecture.",
+  "files": [
+    {
+      "repository": "connectors_v2",
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d",
+      "bytes": 121490
+    },
+    {
+      "repository": "connectors_v2",
+      "path": ".engineering/planning/story/contracts-federated-approval.md",
+      "sha256": "93a178691c0dcbaabdce4ae02a6e91727002301a5ccd185d6207be9efd9cd1ec",
+      "bytes": 3704
+    },
+    {
+      "repository": "connectors_v2",
+      "path": ".engineering/planning/review-result/contract-semantics-20260908.md",
+      "sha256": "63961820d7c7f2a49088bc25a600f0303ed11f7a51dfa68149b0d242f90e0e9c",
+      "bytes": 21722
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "d5b26fa43a5e963d7e7d54cdf823f64b9224876050c0ee0c74dcbd572bcd0e05",
+      "bytes": 37870
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "contracts/service/compatibility.md",
+      "sha256": "b93d704226f86694c712e11031043316545a1917b07d1c80578d3fb4b3290758",
+      "bytes": 33947
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "eeaf77a97a3205638c146cd63bb5c5c786407a75862aa9b4493d8d0784c88381",
+      "bytes": 22044
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "71e3a3887689f612b85eda506f4f543a49b9681c7214c233cc13c64ebd04f39e",
+      "bytes": 12838
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "ess/system.yaml",
+      "sha256": "44121a4d4acbd641dab4a1395063b93b62ebf9c3fccbc2bcfcfb66ef7c46a383",
+      "bytes": 335
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ff211fe967cf7ccda01e13c419f6672694f8203a4b4af4867a2519bf519bde72",
+      "bytes": 8137
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e50028c2e59852f8d25d9dcb62bd5a971e94a2330ef6f71faa07cfe95dc77419",
+      "bytes": 7331
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+      "bytes": 8489
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "crates/connectors-host/src/federation.rs",
+      "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c",
+      "bytes": 7183
+    },
+    {
+      "repository": "connectors_v2",
+      "path": "crates/connectors-client/src/lib.rs",
+      "sha256": "5a278c168bddf891fb678cd73255421e3a2708a1449edbe53b43158b9f41faa5",
+      "bytes": 6273
+    },
+    {
+      "repository": "connectors",
+      "path": "crates/domain/src/approval.rs",
+      "sha256": "3494c2fbe13a19492877bb37713c98e5a7d625c85b870c287bdad3358836dd27",
+      "bytes": 39514
+    },
+    {
+      "repository": "connectors",
+      "path": "crates/server/src/hosted/approval.rs",
+      "sha256": "fd30e2a997da4dd5ef55b31d632454acde67e9e9d62741dd736b5b1a20a8635b",
+      "bytes": 4696
+    },
+    {
+      "repository": "connectors",
+      "path": "crates/server/src/hosted/enforcement.rs",
+      "sha256": "5bb790be251a3092ccdde06d6c5a3e2b02d20b0e72fc9513062f9b5a41b72c99",
+      "bytes": 27610
+    },
+    {
+      "repository": "connectors",
+      "path": "crates/protocol/src/approval.rs",
+      "sha256": "9d5f7fd4f16eacf9451ca0e5dc66f5a57519b2961d508f325f9aeea1da7119ed",
+      "bytes": 5509
+    },
+    {
+      "repository": "connectors",
+      "path": "docs/design/13-grant-evaluation-and-approval-redemption.md",
+      "sha256": "132adcb44def03a80851d4ceeea5536da052c9da73eb87b7db404edc34661664",
+      "bytes": 9355
+    }
+  ]
+}
