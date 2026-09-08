@@ -1,0 +1,458 @@
+{
+  "archived_source_entries_verified": 305,
+  "archived_projection_entries_verified": 430,
+  "current_final_review_hashes_verified": 88,
+  "raw_review_bodies_equal": 6,
+  "individual_outcomes_exactly_once": 5,
+  "original_ledger_findings": 48,
+  "fixed": 29,
+  "open": 19,
+  "story_statuses": {
+    "draft": 9,
+    "implemented": 18
+  },
+  "local_links_checked": 53,
+  "runtime_or_adapter_schema_changes": false,
+  "current_final_sources": [
+    {
+      "reviewer": "a",
+      "source": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/README.md",
+      "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/media/v1alpha1/semantics.md",
+      "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "09f3e71a5050f1ec5650451530f06293fda58c69621d12466a75ee36e191872c"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/service/compatibility.md",
+      "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/service/delegation.md",
+      "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7"
+    },
+    {
+      "reviewer": "a",
+      "source": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "e429c77cc87eefb886eb4b13e61b0057bd622e48059bb87cc13408286c064344"
+    },
+    {
+      "reviewer": "a",
+      "source": "crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8"
+    },
+    {
+      "reviewer": "a",
+      "source": "crates/connectors-host/src/server.rs",
+      "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/adapters/atlassian.md",
+      "sha256": "b514e1c277cd8e68338943747535f7b3b317bae9575023bfe3bd8d41bef6fcb5"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/adapters/media-session.md",
+      "sha256": "61892e6ae282ccb3a620f41577f0f6a08b7debec512d0d89ad34d93faa61855a"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/design.md",
+      "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-check-transcript.md",
+      "sha256": "c3f1a402cb029e0f743669950520082dbbf9f3375e3ee03dabb20ce8216445b7"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-compiled-evidence.json",
+      "sha256": "608df9e2b7358ab10a491a07f5b793de8d0fbb92e381a608a98c228861a63fe9"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-compiled.json.gz",
+      "sha256": "9c9448a2add87dbb12e504e619817be9f1495395288f4ff89543ed708c589254"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-gate.log",
+      "sha256": "266a9754f0b0c7daa7d796801c74207c100b04e21d61edd1d96d0cd0b4236298"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-projection-hashes.json",
+      "sha256": "6848ee938cb1727a9303f95b2c5ac9473167228d9c687ee2f8cdcb9a1d9c2fc3"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.EffectDeclaration.schema.json",
+      "sha256": "56b60359dba586420a76cfa04a3829548ab5294100a2045b3203bb727b07bbaa"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.ExecutableEffect.schema.json",
+      "sha256": "66045fe03bf8a7fd8a46898afab625568e837a65dbcb3002071155fdefc7421f"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.SemanticEffect.schema.json",
+      "sha256": "c3e790ae50dab60fbc5d6b9334e8ca7dd2cf55adae30575529e444ec3750d1fa"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.SessionEstablishmentObservation.schema.json",
+      "sha256": "fa6ea433a7c04171225686fcd9b8ffcd6769ff15f692b2ad85eee20d0d7e6d78"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-sessions-authored.json.gz",
+      "sha256": "5d700742831838599b6afaf1fa14578d3e1712adc867138e570b36dc9f522f48"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-sessions-suite.json.gz",
+      "sha256": "9e6c14b3a8e30f7589a2f9fb8c5d4048921ff4f09f05b89eb0dbb457c80d4495"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-shape-results.json",
+      "sha256": "d9187aeba635eddcfb2cc30af94537fc38123ca432b313945c5470f9cd438c9b"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-values.json",
+      "sha256": "fd9a48a5ad405dd5cffe8c87dc774630cf539033d952b455d96d0d238e8fc979"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-verification.md",
+      "sha256": "2528da3a97d9be88ef56ab595c149fd26d87f132bbb4d4247bca323a042e49a5"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/initial-source-audit.json",
+      "sha256": "1e4f5162e6af0a818afe0f2585de4f6d16adb1d8a8301456dc5536e20c972aac"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/reviews/a-initial-packet.tar.gz",
+      "sha256": "10915d385b5fa6b61f9b1f87ec3993ec615bd5690592dbe802c4cf09b5c2ef32"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/reviews/a-initial-source-hashes.json",
+      "sha256": "925bc42da4d1659d17650a09a1b07dfb94fda092d26f9cc60a42e62b2dc490fb"
+    },
+    {
+      "reviewer": "a",
+      "source": "docs/evidence/mutation-profiles-20260908/reviews/a-initial-supplemental-source-hashes.json",
+      "sha256": "ea4d0ee37dbe6a46f5926268cb7b725ece5ade926c7d30387e46869d732e9377"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/credentials.yaml",
+      "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/discovery.yaml",
+      "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/mutations.yaml",
+      "sha256": "2c3a0af284a122a780285092bd694d4db17cab23dcc2d33071bc0ce9c9a9e111"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/refresh.yaml",
+      "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3"
+    },
+    {
+      "reviewer": "a",
+      "source": "ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0"
+    },
+    {
+      "reviewer": "a",
+      "source": "spec-kinds/adapter/v1/schema.json",
+      "sha256": "3289659cf5917956ae402de0d6ee5b63fb2300b667cccc26950576dd8a42f368"
+    },
+    {
+      "reviewer": "a",
+      "source": "spec-kinds/adapter/v1/semantics.md",
+      "sha256": "475bf4a517d13ed46d75e6d70dcad1460b7f54ec5160295dcd820cde8d6c0315"
+    },
+    {
+      "reviewer": "a",
+      "source": "spec-kinds/adapter/v2/schema.json",
+      "sha256": "d4e7df149b7d4fefd8bc919e620a104c1365f633cf2fe136d53c367509fae2d6"
+    },
+    {
+      "reviewer": "a",
+      "source": "spec-kinds/adapter/v2/semantics.md",
+      "sha256": "f142a7b7f97328f4ffc25b1491b5a4ca8673d94c2e8a5c93dfc3957fbe000efc"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/media/v1alpha1/semantics.md",
+      "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "09f3e71a5050f1ec5650451530f06293fda58c69621d12466a75ee36e191872c"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/service/compatibility.md",
+      "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/service/delegation.md",
+      "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7"
+    },
+    {
+      "reviewer": "b",
+      "source": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "e429c77cc87eefb886eb4b13e61b0057bd622e48059bb87cc13408286c064344"
+    },
+    {
+      "reviewer": "b",
+      "source": "crates/connectors-client/src/lib.rs",
+      "sha256": "5a278c168bddf891fb678cd73255421e3a2708a1449edbe53b43158b9f41faa5"
+    },
+    {
+      "reviewer": "b",
+      "source": "crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8"
+    },
+    {
+      "reviewer": "b",
+      "source": "crates/connectors-host/src/server.rs",
+      "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578"
+    },
+    {
+      "reviewer": "b",
+      "source": "crates/connectors-spec/src/lib.rs",
+      "sha256": "cb63c331da0ca2bacba28e4f3a9d0171887772eea00b0c48fcd0431f68ba4383"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/adapters/atlassian.md",
+      "sha256": "b514e1c277cd8e68338943747535f7b3b317bae9575023bfe3bd8d41bef6fcb5"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/adapters/media-session.md",
+      "sha256": "61892e6ae282ccb3a620f41577f0f6a08b7debec512d0d89ad34d93faa61855a"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/design.md",
+      "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-check-transcript.md",
+      "sha256": "c3f1a402cb029e0f743669950520082dbbf9f3375e3ee03dabb20ce8216445b7"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-compiled-evidence.json",
+      "sha256": "608df9e2b7358ab10a491a07f5b793de8d0fbb92e381a608a98c228861a63fe9"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-compiled.json.gz",
+      "sha256": "9c9448a2add87dbb12e504e619817be9f1495395288f4ff89543ed708c589254"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-gate.log",
+      "sha256": "266a9754f0b0c7daa7d796801c74207c100b04e21d61edd1d96d0cd0b4236298"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-projection-hashes.json",
+      "sha256": "6848ee938cb1727a9303f95b2c5ac9473167228d9c687ee2f8cdcb9a1d9c2fc3"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.EffectDeclaration.schema.json",
+      "sha256": "56b60359dba586420a76cfa04a3829548ab5294100a2045b3203bb727b07bbaa"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.ExecutableEffect.schema.json",
+      "sha256": "66045fe03bf8a7fd8a46898afab625568e837a65dbcb3002071155fdefc7421f"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.SemanticEffect.schema.json",
+      "sha256": "c3e790ae50dab60fbc5d6b9334e8ca7dd2cf55adae30575529e444ec3750d1fa"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-schema/types/connectors.mutations.SessionEstablishmentObservation.schema.json",
+      "sha256": "fa6ea433a7c04171225686fcd9b8ffcd6769ff15f692b2ad85eee20d0d7e6d78"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-sessions-authored.json.gz",
+      "sha256": "5d700742831838599b6afaf1fa14578d3e1712adc867138e570b36dc9f522f48"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-sessions-suite.json.gz",
+      "sha256": "9e6c14b3a8e30f7589a2f9fb8c5d4048921ff4f09f05b89eb0dbb457c80d4495"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-shape-results.json",
+      "sha256": "d9187aeba635eddcfb2cc30af94537fc38123ca432b313945c5470f9cd438c9b"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-values.json",
+      "sha256": "fd9a48a5ad405dd5cffe8c87dc774630cf539033d952b455d96d0d238e8fc979"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/classification-verification.md",
+      "sha256": "2528da3a97d9be88ef56ab595c149fd26d87f132bbb4d4247bca323a042e49a5"
+    },
+    {
+      "reviewer": "b",
+      "source": "docs/evidence/mutation-profiles-20260908/initial-source-audit.json",
+      "sha256": "1e4f5162e6af0a818afe0f2585de4f6d16adb1d8a8301456dc5536e20c972aac"
+    },
+    {
+      "reviewer": "b",
+      "source": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68"
+    },
+    {
+      "reviewer": "b",
+      "source": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd"
+    },
+    {
+      "reviewer": "b",
+      "source": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5"
+    },
+    {
+      "reviewer": "b",
+      "source": "ess/domains/mutations.yaml",
+      "sha256": "2c3a0af284a122a780285092bd694d4db17cab23dcc2d33071bc0ce9c9a9e111"
+    },
+    {
+      "reviewer": "b",
+      "source": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b"
+    },
+    {
+      "reviewer": "b",
+      "source": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3"
+    },
+    {
+      "reviewer": "b",
+      "source": "ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0"
+    },
+    {
+      "reviewer": "b",
+      "source": "spec-kinds/adapter/v1/schema.json",
+      "sha256": "3289659cf5917956ae402de0d6ee5b63fb2300b667cccc26950576dd8a42f368"
+    },
+    {
+      "reviewer": "b",
+      "source": "spec-kinds/adapter/v1/semantics.md",
+      "sha256": "475bf4a517d13ed46d75e6d70dcad1460b7f54ec5160295dcd820cde8d6c0315"
+    }
+  ]
+}

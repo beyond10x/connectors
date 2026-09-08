@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.ExecutableEffect",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "4530e7c2f955c1012539d7c3b70742a41527bdb2331e236fd307ac4aa5bcb2a4",
+    "contract_digest": "slice-sha256/2:5325ead774247e20d76c133eb26e13806170aa4e88a4f88eff88488e922c0019",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.ExecutableEffect": {
+      "title": "ExecutableEffect",
+      "x-ess-name": "connectors.mutations.ExecutableEffect",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "external_write",
+        "network",
+        "process",
+        "local_system",
+        "send_external",
+        "session_establishment"
+      ]
+    }
+  }
+}

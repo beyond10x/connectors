@@ -1,0 +1,9 @@
+{
+  "compared_inputs": 51,
+  "changed": [
+    "docs/adapters/media-session.md",
+    "docs/evidence/mutation-profiles-20260908/classification-verification.md"
+  ],
+  "unchanged": 49,
+  "previous_manifest_sha256": "149cc5f2ece23bc3ab0469b282ecc1a479fea8afb41a5f15224423ad1fcc1676"
+}
