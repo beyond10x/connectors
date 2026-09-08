@@ -13,6 +13,21 @@ Two independent adapters implement the same two contracts, [sessions](../../cont
 
 Rebuild means: outbound dial parity with `sip-dial`, the narrow PCM profile, DTMF and barge-in, the RTVBP `b10x.voice.v1` binding, and the bridge, on the new contracts; inbound offers to one configured destination; tenant assignment stays deferred.
 
+## Interaction and evidence classification
+
+| Surface | Classification | Admission/observation boundary |
+|---|---|---|
+| `sip.dial` | ordinary `operations` mutation | independent approval, effect and terminal-result contract |
+| `sip.sessions.list` | ordinary `datasource.records` read | bounded safe session summaries; no control authority |
+| offer, accept, reject, cancel, close | `sessions` duplex control messages | session establishment/lifecycle authority; not operation discovery |
+| `signal { kind: dtmf, ... }`, `interrupt { track }` | `media` control messages | negotiated `dtmf`/`interrupt` capability; not operation discovery |
+| issue and redeem establishment authority | `session-authority` and `inbound-verifier` capabilities | the serving endpoint atomically redeems before data; the ledger is capability implementation state |
+| `custody_reachable` | SIP `auth.evidence` check | value-free custody readiness; it neither proves trunk behavior nor redeems an authority |
+
+No RTVBP-specific `auth.evidence` check is selected. A descriptor must keep the
+operation, duplex-message, capability and evidence namespaces distinct; an
+unsupported name refuses rather than falling through to another namespace.
+
 
 ## Composition ownership
 
@@ -35,6 +50,9 @@ drain, 5 s to local teardown/accounting after terminal acceptance. A call-durati
 ceiling or 60 s establishment authority cannot extend the <=2 s live data lease.
 Device playback/transmit buffers need a proven cutoff; closing one transport is
 insufficient. Remote shutdown uncertainty cannot extend local ownership.
+These numbers are selected shared requirements. Any deployment/configuration
+shape cited by a native adapter is illustrative unless that adapter separately
+selects a bound as normative.
 
 Local device evidence is ../connectors/crates/voice-local-audio, driver-audio
 (audio_v1, PipeWire/PulseAudio/ALSA, NullAudioDevice) at 81459ac4. Treat an eventual
@@ -46,8 +64,9 @@ protocol vocabulary. Asterisk ARI remains a separate optional HTTP adapter.
 No resource discovery route is selected. Federation relays neither RTVBP nor
 audio; media follows negotiated paths and live dialogs never migrate.
 Native adapter-kind and codec obligations live with each adapter. Tenant
-assignment/provisioning, hold/transfer, WebRTC and wider codec scope remain
-deferred under the shared/media design.
+assignment/provisioning, WebRTC and wider codec scope remain deferred under the
+shared/media design. `hold` and `transfer` are reserved/refused: neither native
+adapter advertises, negotiates or accepts them in the selected profile.
 
 ## 10. Evidence required
 
