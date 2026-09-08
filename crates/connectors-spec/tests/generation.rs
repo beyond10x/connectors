@@ -2,6 +2,12 @@ use connectors_spec::v2::{Spec, generate, hash, import, tree};
 use serde_json::{Value, json};
 use std::path::Path;
 
+fn ess() -> std::path::PathBuf {
+    std::env::var_os("CONNECTORS_ESS")
+        .map(Into::into)
+        .unwrap_or_else(|| "ess".into())
+}
+
 fn root() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
 }
@@ -20,7 +26,7 @@ fn checked_in_bundle_matches_its_pinned_sources_and_toolchain() {
     generate(
         &root().join("adapters/gitlab/spec/adapter.json"),
         &root().join("adapters/gitlab/generated"),
-        Path::new("ess"),
+        &ess(),
         true,
     )
     .unwrap();
@@ -101,20 +107,20 @@ fn regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift() 
     let temp = tempfile::tempdir().unwrap();
     let spec = root().join("adapters/gitlab/spec/adapter.json");
     let out = temp.path().join("generated");
-    generate(&spec, &out, Path::new("ess"), false).unwrap();
+    generate(&spec, &out, &ess(), false).unwrap();
     let original = tree(&out).unwrap();
     let other = temp.path().join("other");
-    generate(&spec, &other, Path::new("ess"), false).unwrap();
+    generate(&spec, &other, &ess(), false).unwrap();
     assert_eq!(original, tree(&other).unwrap());
     std::fs::write(out.join("handwritten.rs"), b"keep this\n").unwrap();
-    generate(&spec, &out, Path::new("ess"), false).unwrap();
+    generate(&spec, &out, &ess(), false).unwrap();
     assert_eq!(
         std::fs::read(out.join("handwritten.rs")).unwrap(),
         b"keep this\n"
     );
-    generate(&spec, &out, Path::new("ess"), true).unwrap();
+    generate(&spec, &out, &ess(), true).unwrap();
     std::fs::write(out.join("runtime.rs"), b"corrupt").unwrap();
-    assert!(generate(&spec, &out, Path::new("ess"), true).is_err());
+    assert!(generate(&spec, &out, &ess(), true).is_err());
     // Malformed ownership is refused before touching any generated file.
     let mut manifest: Value =
         serde_json::from_slice(&std::fs::read(out.join("manifest.json")).unwrap()).unwrap();
@@ -124,7 +130,7 @@ fn regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift() 
         serde_json::to_vec(&manifest).unwrap(),
     )
     .unwrap();
-    assert!(generate(&spec, &out, Path::new("ess"), false).is_err());
+    assert!(generate(&spec, &out, &ess(), false).is_err());
     assert_eq!(std::fs::read(out.join("runtime.rs")).unwrap(), b"corrupt");
 }
 
@@ -135,12 +141,12 @@ fn regeneration_refuses_unowned_files_and_output_symlinks() {
     let out = temp.path().join("generated");
     std::fs::create_dir(&out).unwrap();
     std::fs::write(out.join("runtime.rs"), b"handwritten").unwrap();
-    assert!(generate(&spec, &out, Path::new("ess"), false).is_err());
+    assert!(generate(&spec, &out, &ess(), false).is_err());
     assert_eq!(tree(&out).unwrap().len(), 1);
     #[cfg(unix)]
     {
         let linked = temp.path().join("linked");
         std::os::unix::fs::symlink(&out, &linked).unwrap();
-        assert!(generate(&spec, &linked, Path::new("ess"), false).is_err());
+        assert!(generate(&spec, &linked, &ess(), false).is_err());
     }
 }

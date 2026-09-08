@@ -239,7 +239,9 @@ impl Spec {
     }
     pub fn descriptor(&self) -> Result<Descriptor> {
         let mut descriptor = self.legacy_descriptor()?;
-        descriptor.revision = digest(&serde_json::to_value(self).map_err(|_| Error::internal())?);
+        descriptor.revision = digest(
+            &json!({"specification":self, "configuration_schema":descriptor.configuration_schema}),
+        );
         Ok(descriptor)
     }
     fn legacy_descriptor(&self) -> Result<Descriptor> {
@@ -268,8 +270,8 @@ pub fn import(spec: &Spec, spec_path: &Path) -> Result<(Value, Value)> {
             "upstream source digest mismatch or byte limit exceeded",
         ));
     }
-    let yaml: serde_yaml::Value =
-        serde_yaml::from_slice(&bytes).map_err(|_| refuse("invalid or ambiguous upstream YAML"))?;
+    let yaml: serde_yaml_ng::Value = serde_yaml_ng::from_slice(&bytes)
+        .map_err(|_| refuse("invalid or ambiguous upstream YAML"))?;
     let source =
         serde_json::to_value(yaml).map_err(|_| refuse("upstream must be JSON-compatible YAML"))?;
     if !source["openapi"]
@@ -557,8 +559,13 @@ pub fn ess(executable: &Path, args: &[&str]) -> Result<Vec<u8>> {
     Ok(output.stdout)
 }
 pub fn check_ess(executable: &Path) -> Result<()> {
-    if String::from_utf8_lossy(&ess(executable, &["--version"])?).trim() != ESS_VERSION {
-        return Err(refuse("generation requires pinned ess 0.9.2"));
+    let actual = String::from_utf8_lossy(&ess(executable, &["--version"])?)
+        .trim()
+        .to_owned();
+    if actual != ESS_VERSION {
+        return Err(refuse(format!(
+            "generation requires {ESS_VERSION}; found {actual}. Select the pinned executable with --ess (CONNECTORS_ESS for tests)"
+        )));
     }
     Ok(())
 }

@@ -18,6 +18,16 @@ pub use async_trait::async_trait as adapter_trait;
 pub trait Adapter: Send + Sync {
     fn descriptor(&self) -> Descriptor;
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value>;
+    /// Dynamic adapters override this to select a route from the admitted snapshot.
+    async fn invoke_at(&self, revision: &str, operation: &str, input: Value) -> Result<Value> {
+        if self.descriptor().revision != revision {
+            return Err(Error::new(
+                ErrorCode::StaleDescription,
+                "refresh the descriptor before resubmitting",
+            ));
+        }
+        self.invoke(operation, input).await
+    }
 }
 
 /// Deliberately has no Debug or Serialize implementation.

@@ -1,9 +1,9 @@
 # Connectors v2: independent adapter services built from contracts
 
-- **Status:** design handoff; no implementation or wire contract has been released.
+- **Status:** local three-adapter implementation and wire contract verified; GitLab specification generation implemented (sections 27–28). No release or rollout is configured.
 - **Recorded:** 2026-09-08.
 - **Working name:** `connectors_v2`; this is a local design repository, not a published project.
-- **Scope of this deliverable:** preserve the design conversation and the evidence needed for a new implementer to begin specification extraction and implementation.
+- **Scope of this deliverable:** preserve the design decisions, their evidence, and the locally implemented slices and remaining boundaries.
 
 Navigation: [intent and evidence](#1-purpose-and-how-to-read-this-document), [repository layout](#4-monorepo-layout-and-dependencies), [contracts and operations](#5-shared-contract-ownership-and-evolution), [sessions](#8-bidirectional-sessions), [data and discovery](#9-datasources-and-execution-profiles), [configuration](#11-configuration-and-caching), [auth](#12-authentication-and-secret-store-independence), [resources and SaaS](#13-resource-management-and-saas-ownership), [media and SIP](#14-sip-rtvbp-webrtc-and-mediasession), [webhooks](#15-webhooks-and-durable-events), [federation](#16-federation), [local distribution](#17-local-execution-service-distribution-and-composition), [ESS adapter kind](#18-the-connectors-owned-ess-adapter-specification-kind), [provider scope](#19-provider-scope-and-extraction-priorities), [conformance](#21-conformance-and-validation-strategy), [implementation order](#22-implementation-order-and-completion-criteria), [migration](#23-specification-extraction-and-migration-records), [open decisions](#24-open-decisions-and-recommended-defaults), [workspace handoff](#25-local-workspace-and-implementation-handoff), [sources](#26-evidence-map-and-references).
 
@@ -1263,3 +1263,14 @@ SQL regression run. [The operating guide](gitlab-generation.md) and
 [verification evidence](verification.md#gitlab-specification-to-service-completion-2026-09-08)
 record commands, tool compatibility adaptations, source licensing and limitations.
 Everything remains local; Atlas integration and publication remain deferred.
+
+## 29. Full review remediation
+
+The local review of the first slice is addressed in
+[the full review response](review-response-2026-09-08.md), under
+`story:full-review-remediation`. Custom CA bindings replace public roots;
+federation refreshes stale leaf descriptions without replaying invocations;
+shared configuration schemas derive from their Rust owners; SQL has automated
+wire fixtures; and a Rust gate checks the workspace and minimum toolchain.
+The response retains dispositions for all findings and distinguishes current
+fixture evidence from the previous live/container proof.

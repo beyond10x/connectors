@@ -1,0 +1,360 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.62s
+     Running `target/debug/connectors-build gate --msrv`
+gate: ["fmt", "--all", "--", "--check"]
+gate: gitlab descriptor matches
+gate: kubernetes descriptor matches
+gate: sql descriptor matches
+gate: ["build", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.84s
+gate: ["test", "--workspace", "--locked", "--offline"]
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 0.80s
+     Running unittests src/main.rs (target/debug/deps/connectors-e353054912b5d7b7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/input.rs (target/debug/deps/input-9a4f2003ded84093)
+
+running 1 test
+test duplicate_input_keys_are_refused_before_service_contact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_build-a87142f8288e6e2c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_client-b6c77ade1c095e5d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_conformance-afab23f51da3f4f6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_contracts-3f7d74457960be3c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_core-1124beec67631947)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire.rs (target/debug/deps/wire-98d8c392a2070060)
+
+running 4 tests
+test canonicalization_is_recursive_and_order_independent ... ok
+test contradictory_response_payloads_are_refused ... ok
+test duplicate_keys_are_refused_at_every_depth ... ok
+test response_roundtrips_success_and_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_gitlab-1f018179d5f67ab1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_gitlab-46c99abf9e3bdc6c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/obligations.rs (target/debug/deps/obligations-3c9fe3e130f692fc)
+
+running 4 tests
+test generated_file_mapping_passes_unencoded_segments_to_the_scoped_transport ... ok
+test generated_dispatch_rejects_invalid_inputs_before_transport ... ok
+test empty_pages_with_continuation_and_full_pages_without_headers_are_partial ... ok
+test response_failures_and_nonadvancing_pagination_remain_explicit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/provider.rs (target/debug/deps/provider-73908231c6756c99)
+
+running 1 test
+test project_issue_pagination_and_file_reads_use_scoped_auth_over_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_host-e394843e8811505a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/http.rs (target/debug/deps/http-60ed5b0674485c3b)
+
+running 3 tests
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+test custom_ca_accepts_its_endpoint_and_refuses_other_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/service.rs (target/debug/deps/service-1c8f8a1351fe43b6)
+
+running 6 tests
+test credential_stores_are_substitutable_and_file_permissions_are_enforced ... ok
+test configuration_yaml_and_json_remain_strict ... ok
+test invalid_identifiers_cannot_inject_log_lines_or_terminal_controls ... ok
+test wire_admission_and_freshness_refuse_before_dispatch ... ok
+test federation_preserves_result_and_reports_downstream_failure ... ok
+test federation_refreshes_atomically_without_replaying_and_rotates_credentials ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_kubernetes-4aa3ea5378117aec)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_kubernetes-3cde772f3cc7548a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/provider.rs (target/debug/deps/provider-5cd2f5a6536edc70)
+
+running 1 test
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sdk-79c1a0b8d3ba734d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cursor.rs (target/debug/deps/cursor-8334e62a8dc883b3)
+
+running 1 test
+test cursors_cannot_be_rebound_forged_or_reused_after_restart ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_spec-947424d9e406b0c3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_spec-a27cb07f1d606a5b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compiler.rs (target/debug/deps/compiler-8f744a8f5d28a3eb)
+
+running 4 tests
+test configuration_examples_are_data_not_imports ... ok
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+test shared_configuration_imports_keep_constraints_and_reject_unknown_versions ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/generation.rs (target/debug/deps/generation-4c3661c2dc5663ed)
+
+running 5 tests
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test checked_in_bundle_matches_its_pinned_sources_and_toolchain ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.40s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sql-a48b6b33f0c790ca)
+
+running 1 test
+test tls_tests::configured_ca_replaces_public_roots_and_requires_certificates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_sql-fcaa409137b1bc0b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-1417fa4bb675d4fb)
+
+running 3 tests
+test parsing_and_limits_refuse_before_credentials_or_connection ... ok
+test rows_nulls_native_types_and_truncation_are_preserved ... ok
+test authentication_database_errors_and_row_capacity_are_sanitized ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.96s
+
+   Doc-tests connectors_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_gitlab
+
+running 1 test
+test adapters/gitlab/src/lib.rs - (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests connectors_host
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+gate: ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+    Checking ring v0.17.14
+    Checking connectors-sdk v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-sdk)
+    Checking rustls-webpki v0.103.15
+    Checking rcgen v0.14.10
+    Checking connectors-core v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-core)
+    Checking rustls v0.23.44
+    Checking tokio-rustls v0.26.5
+    Checking connectors-contracts v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-contracts)
+    Checking hyper-rustls v0.27.9
+    Checking reqwest v0.12.28
+    Checking tokio-postgres-rustls v0.14.0
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.26s
+gate: ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+   Compiling connectors-sdk v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-sdk)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.60s
+gate: connectors-gitlab library boundary holds
+gate: ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s
+gate: connectors-kubernetes library boundary holds
+gate: ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+   Compiling rustls v0.23.44
+   Compiling connectors-sdk v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-sdk)
+   Compiling tokio-rustls v0.26.5
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.03s
+gate: connectors-sql library boundary holds
+gate: generic CLI boundary holds
+gate: ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+   Compiling ring v0.17.14
+    Checking connectors-sdk v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-sdk)
+   Compiling rustls v0.23.44
+    Checking connectors-core v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-core)
+    Checking connectors-contracts v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-contracts)
+    Checking rustls-webpki v0.103.15
+    Checking rcgen v0.14.10
+    Checking tokio-rustls v0.26.5
+    Checking hyper-rustls v0.27.9
+    Checking tokio-postgres-rustls v0.14.0
+    Checking reqwest v0.12.28
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.93s
+gate: ["validate", "--path", "ess"]
+connectors v1 — 2 file(s), valid
+gate: ["plan", "artifact", "validate"]
+4 file(s) in /home/timo/beyond10x/connectors_v2/.engineering/planning: 4 artifact(s)
+1 without a scope:
+  - story:full-review-remediation is active and declares no scope, so nothing can tell whether it may be worked beside another story — `aep artifact scope story:full-review-remediation --add <path>` records one
+valid
+gate: all checks passed

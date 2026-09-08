@@ -1,0 +1,18 @@
+$ aep plan artifact explain story:gitlab-spec-service
+story:gitlab-spec-service in /home/timo/beyond10x/connectors_v2/.engineering/planning: implemented, revision 8
+  draft -> proposed  2026-09-08T06:46:52Z  (revision 2)
+    no record: nothing was recorded about how this was decided
+  proposed -> active  2026-09-08T06:46:52Z  (revision 3)
+    no record: nothing was recorded about how this was decided
+  active -> implemented  2026-09-08T07:37:33Z  (revision 8)
+    test_result from Workspace tests, generation refusals and drift, offline independent builds, ESS build/realization checks and exact-image direct/federated live acceptance (docs/evidence/gitlab-spec-service-2026-09-08/), observed 2026-09-08T07:37:33Z, admitted at revision 7
+  next: archived needs no record
+$ aep plan artifact explain story:three-adapters-e2e
+story:three-adapters-e2e in /home/timo/beyond10x/connectors_v2/.engineering/planning: implemented, revision 7
+  draft -> proposed  2026-09-08T01:43:25Z  (revision 2)
+    no record: nothing was recorded about how this was decided
+  proposed -> active  2026-09-08T01:43:25Z  (revision 3)
+    no record: nothing was recorded about how this was decided
+  active -> implemented  2026-09-08T02:26:58Z  (revision 7)
+    test_result from Local workspace tests, independent builds, descriptor/ESS checks and live direct/federated acceptance (docs/verification.md), observed 2026-09-08T02:26:58Z, admitted at revision 6
+  next: archived needs no record

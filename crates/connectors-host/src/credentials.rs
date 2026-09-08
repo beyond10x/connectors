@@ -14,10 +14,17 @@ use std::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CredentialRef {
-    Environment { name: String },
-    File { path: PathBuf },
+    Environment {
+        #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 512)))]
+        name: String,
+    },
+    File {
+        #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 4096)))]
+        path: PathBuf,
+    },
 }
 
 #[async_trait]
