@@ -18,7 +18,7 @@ Rebuild adds what the old integration had and the first slice did not: pod logs,
 
 | Old surface | Source | Disposition |
 |---|---|---|
-| `kubernetes.deployment.status` | `crates/integration-kubernetes/src/workloads.rs:48` | preserve → `resources.list` with `kind: deployments` already returns status; add `deployment.get` records single item if a consumer needs one object |
+| `kubernetes.deployment.status` | `crates/integration-kubernetes/src/workloads.rs:48` | preserve the status-read requirement; current `resources.list` with `kind: deployments` returns the object as listed, but its untyped item schema does not guarantee a status projection. Declare that projection before claiming equivalent status coverage; add `deployment.get` records single item if a consumer needs one object |
 | `kubernetes.deployment.rollout-restart` | `workloads.rs:49` | preserve → `operations` `mutation` (PATCH of the pod template annotation) |
 | `kubernetes.pod.logs`: `namespace`, `pod`, `container`, `tail_lines` 1–1000 (200), `since_seconds` ≤ 86400, 128 KiB, namespace grant as containment | `workloads.rs:50,1120-1145` | preserve → `datasource.logs` profile `kubernetes-pod-logs` |
 | `kubernetes.workloads` datasource (value-projected, excludes Secrets, env, labels, annotations, raw objects, event messages) | `workloads.rs:51`; `contracts/connector-datasource/v0alpha1/README.md:13-15` | change: `resources.list` returns provider-native objects with a declared projection; the exclusion list becomes a configured projection, not a contract |
@@ -89,7 +89,7 @@ Ambient and kubeconfig HTTP proxies stay disabled (old rule, `docs/design/10-…
 
 ## 6. Configuration outline
 
-Extends the implemented schema:
+Illustrative outline of proposed extensions to the implemented schema; this is not a currently accepted configuration document. Namespaces, target lists, enablement and `resource_limit: 500` are example selections, not implied defaults. The `logs.max_bytes: 131072` value is the selected native pod-log default and ceiling, as specified by the [log binding](contracts/logs/v1alpha1/semantics.md).
 
 ```json
 { "adapter": {
