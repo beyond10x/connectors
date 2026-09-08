@@ -1,0 +1,107 @@
+{
+  "command": "cargo test --locked --offline -p connectors-spec --lib",
+  "runs": [
+    {
+      "run": 1,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 2,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 3,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 4,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 5,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 6,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 7,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 8,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 9,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 10,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 11,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 12,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 13,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 14,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 15,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 16,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 17,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 18,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 19,
+      "exit": 0,
+      "text_file_busy": false
+    },
+    {
+      "run": 20,
+      "exit": 0,
+      "text_file_busy": false
+    }
+  ],
+  "failed": 0,
+  "etxtbsy": 0
+}
