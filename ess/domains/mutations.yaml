@@ -1,0 +1,187 @@
+domain: connectors.mutations
+
+summary: Proposed host-owned mutation attempt ledger; not a public API or a runtime binding.
+
+# These commands describe trusted ledger decisions. They grant no caller authority,
+# perform no provider I/O, and do not model approval redemption. See the normative
+# dispatch fence and evidence rules in contracts/operations/v1alpha1/semantics.md.
+types:
+  - name: connectors.mutations.AttemptId
+    kind: newtype
+    of: Uuid
+  - name: connectors.mutations.ApprovalMode
+    kind: enum
+    variants: [not_required, required, event_claim]
+  - name: connectors.mutations.EffectKnowledge
+    kind: enum
+    variants: [not_attempted, refused, applied, unknown]
+  - name: connectors.mutations.Observation
+    kind: struct
+    fields:
+      - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
+      - {name: classification, type: connectors.mutations.EffectKnowledge}
+      # Semantic cause, not a second public Error.code or an approved wire field.
+      - {name: cause, type: "Optional<String>"}
+
+entities:
+  - name: connectors.mutations.AttemptRecord
+    identity:
+      name: attempt_id
+      type: connectors.mutations.AttemptId
+    fields:
+      - {name: instance_id, type: String}
+      - {name: request_id, type: String}
+      - {name: operation_id, type: String}
+      - {name: connection_ref, type: String}
+      - {name: input_digest, type: String}
+      - {name: approval_mode, type: connectors.mutations.ApprovalMode}
+      - {name: approval_ref, type: "Optional<String>"}
+      - {name: idempotency_key, type: "Optional<String>"}
+    relations:
+      - name: instance
+        kind: references
+        target: connectors.declarations.ServiceConfiguration
+        cardinality: one
+        via: instance_id
+    # UNMAPPED: the operation reference needs instance/adapter qualification;
+    # OperationDeclaration.operation_id alone is not a runtime operation identity.
+    # UNMAPPED: Connection, ApprovalRedemption, admission principal/tenant, and
+    # idempotency ownership/retention are not modeled yet. The opaque fields above
+    # assert neither their relationship cardinality nor ownership. F02/F03/E28 own
+    # those decisions; no synthetic entities or relations stand in for them.
+    lifecycle:
+      initial: Prepared
+      states: [Prepared, Dispatching, Aborted, Completed, Failed, Indeterminate]
+      terminal: [Aborted, Completed, Failed, Indeterminate]
+      transitions:
+        - {name: open_dispatch, from: [Prepared], to: Dispatching}
+        - {name: abort, from: [Prepared], to: Aborted}
+        - {name: complete, from: [Dispatching], to: Completed}
+        - {name: refuse, from: [Dispatching], to: Failed}
+        - {name: lose_outcome, from: [Dispatching], to: Indeterminate}
+
+errors:
+  - name: connectors.mutations.AttemptStateConflict
+    # The ledger state does not allow this transition; it remains unchanged.
+    fields:
+      - {name: state, type: connectors.mutations.AttemptRecord.State}
+
+commands:
+  - name: connectors.mutations.PrepareAttempt
+    # Anchor an admitted attempt before opening its dispatch fence.
+    input:
+      - {name: instance_id, type: String}
+      - {name: request_id, type: String}
+      - {name: operation_id, type: String}
+      - {name: connection_ref, type: String}
+      - {name: input_digest, type: String}
+      - {name: approval_mode, type: connectors.mutations.ApprovalMode}
+      - {name: approval_ref, type: "Optional<String>"}
+      - {name: idempotency_key, type: "Optional<String>"}
+    outcomes:
+      - name: prepared
+        creates: connectors.mutations.AttemptRecord
+        instance: attempt_id
+        emits: [connectors.mutations.AttemptPrepared]
+
+  - name: connectors.mutations.OpenDispatch
+    # Durably win the one-shot dispatch permission; not proof of a send.
+    input:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: opened
+        moves: connectors.mutations.AttemptRecord.open_dispatch
+        instance: attempt_id
+        emits: [connectors.mutations.DispatchOpened]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.mutations.AttemptStateConflict
+
+  - name: connectors.mutations.AbortPrepared
+    # Fence dispatch on cancellation, deadline or recovery while still Prepared.
+    input:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: aborted
+        moves: connectors.mutations.AttemptRecord.abort
+        instance: attempt_id
+        emits: [connectors.mutations.AttemptAborted]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.mutations.AttemptStateConflict
+
+  - name: connectors.mutations.RecordCompletion
+    # Persist a definitive provider success; transport completion alone is insufficient.
+    input:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: completed
+        moves: connectors.mutations.AttemptRecord.complete
+        instance: attempt_id
+        emits: [connectors.mutations.AttemptCompleted]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.mutations.AttemptStateConflict
+
+  - name: connectors.mutations.RecordRefusal
+    # Persist a definitive provider refusal with evidence that no business effect occurred.
+    input:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: refused
+        moves: connectors.mutations.AttemptRecord.refuse
+        instance: attempt_id
+        emits: [connectors.mutations.AttemptRefused]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.mutations.AttemptStateConflict
+
+  - name: connectors.mutations.RecordUncertainty
+    # Persist uncertainty after dispatch permission, including recovery with no terminal evidence.
+    input:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: indeterminate
+        moves: connectors.mutations.AttemptRecord.lose_outcome
+        instance: attempt_id
+        emits: [connectors.mutations.AttemptIndeterminate]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.mutations.AttemptStateConflict
+
+events:
+  - name: connectors.mutations.AttemptPrepared
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: approval_mode, type: connectors.mutations.ApprovalMode}
+  - name: connectors.mutations.DispatchOpened
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+  - name: connectors.mutations.AttemptAborted
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+  - name: connectors.mutations.AttemptCompleted
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+  - name: connectors.mutations.AttemptRefused
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+  - name: connectors.mutations.AttemptIndeterminate
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+
+views:
+  - name: connectors.mutations.AttemptStates
+    # Internal ledger observation for conformance; not public lookup authorization.
+    source: connectors.mutations.AttemptRecord
+    consistency: read_your_writes
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: approval_mode, type: connectors.mutations.ApprovalMode}
+      - {name: state, type: connectors.mutations.AttemptRecord.State}
+
+# UNMAPPED: durable compare-and-set, evidence provenance, actual send cardinality,
+# crash recovery, deadline races, and classification/cause projection require host
+# port tests. ESS checks this state graph and scenario references, not those facts.
+# UNMAPPED: Observation's classification mapping is the normative table in the
+# contract. No executable expression here derives it from state or transport data.

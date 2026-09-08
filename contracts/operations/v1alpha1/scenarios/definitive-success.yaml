@@ -1,0 +1,71 @@
+type: ess-scenario/1
+domain: connectors.mutations
+scenario: definitive-success
+summary: "F01/E11: a definitive success is Completed; the ledger cannot later abort or reopen."
+
+# These are ledger command expectations. The named crash/deadline/provider event
+# is not injected by ESS authoring; the host obligation is in ../verification.md.
+arrange:
+  - instance: attempt
+    entity: connectors.mutations.AttemptRecord
+
+timeline:
+  - at: 2026-09-08T09:00:00Z
+    command: connectors.mutations.PrepareAttempt
+    input:
+      instance_id: test-instance
+      request_id: definitive-success
+      operation_id: issue.create
+      connection_ref: test-connection
+      input_digest: test-digest
+      approval_mode: not_required
+      approval_ref: null
+      idempotency_key: null
+    outcome: prepared
+    events:
+      - event: connectors.mutations.AttemptPrepared
+        payload: {approval_mode: not_required}
+    capture: {instance: attempt, event: connectors.mutations.AttemptPrepared, field: attempt_id}
+
+  - at: 2026-09-08T09:00:01Z
+    command: connectors.mutations.OpenDispatch
+    input:
+      attempt_id: {$instance: attempt}
+    outcome: opened
+    events:
+      - event: connectors.mutations.DispatchOpened
+
+  - at: 2026-09-08T09:00:02Z
+    command: connectors.mutations.RecordCompletion
+    input:
+      attempt_id: {$instance: attempt}
+    outcome: completed
+    events:
+      - event: connectors.mutations.AttemptCompleted
+
+  - at: 2026-09-08T09:00:03Z
+    command: connectors.mutations.AbortPrepared
+    input:
+      attempt_id: {$instance: attempt}
+    outcome: wrong-state
+    error:
+      name: connectors.mutations.AttemptStateConflict
+      fields: {state: Completed}
+    no_events: [connectors.mutations.AttemptAborted]
+
+  - at: 2026-09-08T09:00:04Z
+    command: connectors.mutations.OpenDispatch
+    input:
+      attempt_id: {$instance: attempt}
+    outcome: wrong-state
+    error:
+      name: connectors.mutations.AttemptStateConflict
+      fields: {state: Completed}
+    no_events: [connectors.mutations.DispatchOpened]
+
+assert:
+  - view: connectors.mutations.AttemptStates
+    contains:
+      attempt_id: {$instance: attempt}
+      approval_mode: not_required
+      state: Completed

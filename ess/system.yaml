@@ -4,3 +4,4 @@ system: connectors
 version: v1
 domains:
   - connectors.declarations
+  - connectors.mutations

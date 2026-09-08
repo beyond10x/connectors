@@ -130,6 +130,33 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
             .env("TMPDIR", temp.path())
             .args(["specify", "validate", "--path", "ess"]),
     )?;
+    execute(
+        Command::new(ess)
+            .current_dir(root)
+            .env("TMPDIR", temp.path())
+            .args(["specify", "compile", "--path", "ess", "--out"])
+            .arg(temp.path().join("connectors-ir.json")),
+    )?;
+    // Compile both generated obligations and authored mutation traces. This is
+    // a model check, not runtime conformance: no mutation binding exists yet.
+    execute(
+        Command::new(ess)
+            .current_dir(root)
+            .env("TMPDIR", temp.path())
+            .args([
+                "verify",
+                "conform",
+                "synthesize",
+                "--path",
+                "ess",
+                "--target",
+                "ir",
+                "--scenarios",
+                "contracts/operations/v1alpha1/scenarios",
+                "--out",
+            ])
+            .arg(temp.path().join("mutation-conformance.json")),
+    )?;
     execute(command("aep").args(["plan", "artifact", "validate"]))?;
     println!("gate: all checks passed");
     Ok(())

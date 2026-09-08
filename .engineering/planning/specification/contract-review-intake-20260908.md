@@ -8,7 +8,7 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 2
+revision: 4
 ---
 ## Intake
 
@@ -26,7 +26,7 @@ P0 means an established critical current failure requiring immediate containment
 
 | Source | Original severity | Triaged | Sole story owner | Disposition |
 |---|---|---|---|---|
-| F01 | P1 | P1 | `story:contracts-mutation-outcomes` | Accepted for remediation; assigned, not fixed. |
+| F01 | P1 | P1 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | F02 | P1 | P1 | `story:contracts-idempotency-scope` | Accepted for remediation; assigned, not fixed. |
 | F03 | P1 | P1 | `story:contracts-federated-approval` | Accepted for remediation; assigned, not fixed. |
 | F04 | P1 | P1 | `story:contracts-refresh-coordination` | Accepted for remediation; assigned, not fixed. |
@@ -41,7 +41,7 @@ P0 means an established critical current failure requiring immediate containment
 | F13 | P2 | P2 | `story:contracts-discovery-coverage` | Accepted for remediation; assigned, not fixed. |
 | F14 | P2 | P2 | `story:contracts-document-admission` | Accepted for remediation; assigned, not fixed. |
 | F15 | P2 | P2 | `story:contracts-read-refresh-retry` | Accepted for remediation; assigned, not fixed. |
-| E01 | blocking | P1 | `story:contracts-mutation-outcomes` | Qualified: missing future binding obligations are real; current read-only timeout code is not an implemented mutation regression. |
+| E01 | blocking | P1 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | E02 | blocking | P1 | `story:contracts-wire-compatibility` | Qualified: unchanged configured behavior can remain compatible; new managed descriptors/errors need explicit versioning. |
 | E03 | blocking | P2 | `story:contracts-host-composition` | Qualified: colocation is allowed; concrete wiring ownership must preserve the generic-host dependency invariant. |
 | E04 | should-fix | P2 | `story:contracts-management-boundary` | Qualified: the design prohibits exposing private callback authority, not every use of an operations envelope. |
@@ -51,7 +51,7 @@ P0 means an established critical current failure requiring immediate containment
 | E08 | should-fix | P2 | `story:contracts-restart-idempotency` | Qualified duplicate: old UID/resourceVersion preconditions prevent asserting that every repeated dispatch causes another rollout. |
 | E09 | should-fix | P2 | `story:contracts-acquisition-profiles` | Accepted for remediation; assigned, not fixed. |
 | E10 | should-fix | P2 | `story:contracts-anonymous-auth` | Accepted for remediation; assigned, not fixed. |
-| E11 | should-fix | P2 | `story:contracts-mutation-outcomes` | Accepted representation ambiguity; a new error field is one possible resolution, not an approved implementation choice. |
+| E11 | should-fix | P2 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | E12 | should-fix | P2 | `story:contracts-mutation-visibility` | Not established as stated: implemented-only advertisement does not imply disabled operations are hidden; story resolves the actual visibility ambiguity. |
 | E13 | should-fix | P3 | `story:contracts-documentation-index` | Accepted for remediation; assigned, not fixed. |
 | E14 | should-fix | P2 | `story:contracts-discovery-profiles` | Accepted with correction: the old rule uses exact name OR exact stable name label, not a mandatory name-and-label conjunction. |
@@ -83,11 +83,13 @@ The first review's additional open decisions remain visible, but were not among 
 
 ## Modeling boundary
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+The operator subsequently authorized hardening semantic contracts together with their ESS models, after local checkpoint `57be07c` on 2026-09-08. The original text-only planning boundary is superseded for activated hardening stories. Model settled identities, fields and lifecycle rules with the pinned ESS workflow; compile corresponding scenarios and keep unsupported semantics and unresolved relations explicitly UNMAPPED. Runtime mutation implementation, wire expansion, extra adapters, publication and Atlas changes remain outside this epic. Refine each owning story's machine-readable scope before activation; ESS files add shared edit surfaces and do not authorize a concurrent implementation wave.
+
+The first completed hardening story is `story:contracts-mutation-outcomes`, owning F01/E01/E11. Its typed home is `ess/domains/mutations.yaml`; its gate checks are specification validation and scenario compilation, not a claim of a runtime conformance binding.
 
 ## Completion accounting
 
-Every source row is currently **assigned, not fixed**. Drafting or reviewing the plan is not evidence that a contract defect is fixed. Future closure records the revised normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without implementing the external reviewer's suggested architecture.
+F01/E01/E11 are **fixed at the semantic-contract/model level**; the remaining **45 source findings are assigned, not fixed**. Drafting or reviewing the plan is not evidence that a contract defect is fixed. Future closure records the revised normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without implementing the external reviewer's suggested architecture.
 
 ## Acceptance
 
