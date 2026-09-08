@@ -75,13 +75,14 @@ Errors: base `ErrorCode` plus `connection_not_ready` (state is not `ready`; mess
 
 ## 4. Rules
 
-- Identity: the connection ref is stable across reauthorization, refresh, token rotation, compatible adapter upgrade, and process restart. A repair whose returned external identity differs from the bound one is refused unless an explicitly authorized reassignment flow says otherwise (`docs/design.md:547`).
+- Identity: the connection ref is stable across same-identity reauthorization, refresh, token rotation, compatible adapter upgrade, and process restart. Identity equality means `(kind, stable subject)` within the same provider authority, instance and auth profile; display labels are not identity. A repair or configured replacement whose observed identity differs from the bound one is refused unless an explicitly admitted reassignment flow says otherwise (`docs/design.md:547`). File overwrite and refresh are never reassignment. Before a separately authorized reassignment can publish, old evidence, admissions, cursors and sessions must be invalidated; profiles without such a flow refuse reassignment.
 - Selection: an invocation selects a connection by ref or, for the `configured` profile, implicitly. A request cannot select a connection outside the caller's admitted scope; the receiver resolves the scope from verified caller context, never from a request field (`docs/design.md:383`).
 - Separation of facts: implemented, enabled, ready, authorized remain separately answerable (`docs/design.md:350`). `status.state` answers only "ready"; authorization is per invocation.
 - Value freedom: no response, log, or error carries a credential, secret reference, provider base URL of a private deployment, proxy path, or parent resource binding.
 - Route: fixed at creation. One mediated hop. A connection cannot be its own parent. Parent revocation or degradation moves every child to `parent_degraded`; children never fall back to a direct route (`docs/design/08:146-148` in the old repo: no accidental direct-egress fallback).
 - Multiplicity: one adapter instance holds many connections; one auth profile may back many connections (many users); one external identity may back at most one non-revoked connection per instance and profile.
-- Concurrency: status transitions are serialized per connection; a repair completing while a revoke is in flight yields `revoked` (revocation wins).
+- Concurrency: status transitions are serialized per connection; a repair completing while a revoke is in flight yields `revoked` (revocation wins). Publication of a validated generation atomically cuts off old pending dispatch admissions. Unresolved rotating refresh also withholds dispatch on possibly consumed material. Final dispatch admission participates in the same ordering; a pin does not bypass revocation, refresh uncertainty or publication.
+- Credential identity: connection `revision` and credential generation are distinct. Evidence is bound to a host-private immutable material generation, not a path, store version or revision. Detecting a replacement blocks dispatch until its identity and required checks are validated in an explicitly admitted auth-validation step. If that step is unavailable or not admitted, return `connection_not_ready`; an ordinary invocation must not invent an identity probe. See [evidence §§4.1–4.3](../../evidence/v1alpha1/semantics.md#41-credential-generation-and-identity).
 
 ## 5. Ordering, limits
 
@@ -97,11 +98,14 @@ Positive:
 
 - Reauthorize a connection through a fake acquisition flow; ref unchanged; cursors bound to it remain valid.
 - Two users connect the same profile on one instance; two refs; each invocation uses its own credential (fake transport records the header).
-- Replace the bound token file for a `configured` connection; ref and revision unchanged; next invocation uses the new bytes.
+- Replace the bound token file for a `configured` connection with same-account material; ref and configuration revision may stay unchanged, but the material has a new private generation. The next invocation uses those bytes only after admitted replacement validation and publication; pending old-generation admissions are invalidated. Without validation, invocation refuses.
+- Replace it with another account's token → ordinary replacement refuses; cached identity evidence for the old generation is unusable even within its age bound.
 
 Adversarial (`docs/design.md:985`, repair without identity drift):
 
 - Repair returns a different external identity → refused; connection stays `reauthorization_required`.
+- The file changes between admission and dispatch → a pin never silently substitutes bytes. If replacement has been detected or published, old admission refuses and a new validated admission is required; if the host has not observed a change, a still-current pin can dispatch only its original validated material.
+- Refresh is authorized and unresolved, or a credential is known revoked/expired → even a previously admitted pin refuses.
 - Request names a connection outside admitted scope → `Forbidden`; no provider dispatch.
 - Parent revoked → child `parent_degraded`; child invocation fails `route_unavailable`; fake transport sees no direct dial.
 - Describe output serialized and grepped for the fixture's secret bytes and base URL → no match.
@@ -115,7 +119,7 @@ Adversarial (`docs/design.md:985`, repair without identity drift):
 
 | Obligation | Where |
 |---|---|
-| Connection metadata store port: create, read, update status, list by scope; CAS on revision | new host module (design: host metadata store owns the active credential reference, `docs/design.md:576`) |
+| Connection metadata store port: create, read, update status, list by scope; CAS on revision plus generation publication and admission invalidation | new host module (design: host metadata store owns the active credential reference, `docs/design.md:576`) |
 | `Adapter::invoke` receives a resolved connection context rather than the ambient single credential | `crates/connectors-sdk/src/lib.rs:18-31` |
 | `ScopedHttp` constructed per connection, not per instance | `crates/connectors-host/src/http.rs:30-36` |
 | Cursor binding includes connection ref | `crates/connectors-sdk/src/lib.rs:161` (`Cursors`) |
@@ -125,7 +129,8 @@ Adversarial (`docs/design.md:985`, repair without identity drift):
 | Entity | Notes |
 |---|---|
 | `Connection` (identity: connection ref) with lifecycle `pending → ready ↔ reauthorization_required/insufficient_scope/custody_unavailable/parent_degraded → revoked` | relations: `instance → ServiceConfiguration` (one), `profile → AuthProfile` (one), `parent → Connection` (zero or one), `active_credential → CredentialSet` (zero or one, see custody) |
-| `ExternalIdentity` | value embedded in `Connection` |
+| `ExternalIdentity` | value embedded in `Connection`; shared typed kind/subject in [credentials.yaml](../../../../ess/domains/credentials.yaml), scoped by provider authority |
+| `EvidenceSnapshot` | generation-bound value embedded in `Connection`, modeled in [credential_evidence.yaml](../../../../ess/domains/credential_evidence.yaml); no independent evidence-store ownership |
 | Tenant / principal ownership of a connection | UNMAPPED, consistent with `ess/domains/declarations.yaml` |
 
 ## 10. Open decisions

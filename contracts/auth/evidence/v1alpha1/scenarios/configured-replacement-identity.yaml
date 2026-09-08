@@ -1,0 +1,44 @@
+# Authored expectations; trusted identity observation and material capture are
+# runtime obligations, not executed by this compiler.
+type: ess-scenario/1
+domain: connectors.credential_evidence
+scenario: configured-replacement-identity
+summary: 'F05: account B material cannot inherit account A evidence or dispatch authority.'
+arrange:
+  - {instance: admission, entity: connectors.credential_evidence.DispatchAdmission}
+timeline:
+  - at: '2026-09-08T09:00:00Z'
+    command: connectors.credential_evidence.InspectGeneration
+    input:
+      request_id: configured-replacement
+      operation_ref: kubernetes.resources.list
+      generation_id: '00000000-0000-4000-8000-000000000002'
+      binding: {instance_id: test-instance, connection_ref: cluster-a, profile_ref: kubernetes.bearer, provider_authority: test-cluster}
+      expected_external_identity: {kind: kubernetes-user, subject: account-a}
+      evidence:
+        generation_id: '00000000-0000-4000-8000-000000000002'
+        binding: {instance_id: test-instance, connection_ref: cluster-a, profile_ref: kubernetes.bearer, provider_authority: test-cluster}
+        observed_external_identity: {kind: kubernetes-user, subject: account-b}
+        checks:
+          - {check: identity_check, result: invalid, source: provider_read, source_generation_id: null, subject_ref: null, collected_at: '2026-09-08T09:00:00Z', valid_until: '2026-09-08T09:01:00Z'}
+    outcome: inspected
+    events: [{event: connectors.credential_evidence.GenerationInspected}]
+    capture: {instance: admission, event: connectors.credential_evidence.GenerationInspected, field: admission_id}
+  - at: '2026-09-08T09:00:01Z'
+    command: connectors.credential_evidence.RejectAdmission
+    input: {admission_id: {$instance: admission}, reason: identity_changed}
+    outcome: refused
+    events:
+      - event: connectors.credential_evidence.AdmissionRefused
+        payload: {reason: identity_changed}
+  - at: '2026-09-08T09:00:02Z'
+    command: connectors.credential_evidence.DispatchGeneration
+    input: {admission_id: {$instance: admission}, generation_id: '00000000-0000-4000-8000-000000000002'}
+    outcome: wrong-state
+    error:
+      name: connectors.credential_evidence.AdmissionStateConflict
+      fields: {state: Refused}
+    no_events: [connectors.credential_evidence.GenerationDispatched]
+assert:
+  - view: connectors.credential_evidence.AdmissionStates
+    contains: {admission_id: {$instance: admission}, generation_id: '00000000-0000-4000-8000-000000000002', state: Refused}
