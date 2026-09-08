@@ -1,0 +1,75 @@
+{
+  "passed": 12,
+  "results": [
+    {
+      "id": "federated-managed",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "federated-configured",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "direct-managed",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "direct-configured",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "federated-executor",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "approval-federated-managed",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "delivery-invoke",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "delivery-prepare",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "delivery-describe",
+      "semantic_schema_accepted": true,
+      "expected_matched": true,
+      "wire_bytes_shape_accepted_by_generic_ess_schema": false
+    },
+    {
+      "id": "missing-operation",
+      "semantic_schema_accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "wrong-target-type",
+      "semantic_schema_accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-subject-field",
+      "semantic_schema_accepted": false,
+      "expected_matched": true
+    }
+  ],
+  "limitation": "Generic ESS JSON Schema does not implement mandatory-null wire fields, fixed proof constants, bounds, signatures or cross-field admission. Never use this generated schema as the wire codec."
+}

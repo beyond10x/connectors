@@ -1,0 +1,180 @@
+{
+  "repository_heads": {
+    "connectors-v2": "b5ace3f29d6deb1dbc9e5ddd50a8a8b02152cb2f",
+    "connectors-old": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "platform-old": "b04014154f6ee0cf7c0231f0dee5d85dbee03c24",
+    "service-sdk": "6e5141f3ead0e4d0c8f75787aec7051e2a1f41d0",
+    "atlas": "38033fb4557e3b01c85379be95530f9f5e15e6ca"
+  },
+  "sources": [
+    {
+      "repository": "connectors-v2",
+      "path": "AGENTS.md",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/AGENTS.md"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": "docs/design.md",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/docs/design.md",
+      "sha256": "304191308cf291e5b1ecd62e4999f3fd47ebd448d7fb5f5f673ba61ac951056d",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/docs/design.md"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": ".engineering/planning/story/contracts-federated-approval.md",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/.engineering/planning/story/contracts-federated-approval.md",
+      "sha256": "93a178691c0dcbaabdce4ae02a6e91727002301a5ccd185d6207be9efd9cd1ec",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/.engineering/planning/story/contracts-federated-approval.md"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": "contracts/service/compatibility.md",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/contracts/service/compatibility.md",
+      "sha256": "b93d704226f86694c712e11031043316545a1917b07d1c80578d3fb4b3290758",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/contracts/service/compatibility.md"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/contracts/service/v1alpha1/semantics.md"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/contracts/service/v1alpha2/semantics.md",
+      "sha256": "eeaf77a97a3205638c146cd63bb5c5c786407a75862aa9b4493d8d0784c88381",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/contracts/service/v1alpha2/semantics.md"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/contracts/operations/v1alpha1/semantics.md",
+      "sha256": "d5b26fa43a5e963d7e7d54cdf823f64b9224876050c0ee0c74dcbd572bcd0e05",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/contracts/operations/v1alpha1/semantics.md"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": "crates/connectors-core/src/lib.rs",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/crates/connectors-core/src/lib.rs"
+    },
+    {
+      "repository": "connectors-v2",
+      "path": "crates/connectors-host/src/federation.rs",
+      "absolute_source": "/home/timo/beyond10x/connectors_v2/crates/connectors-host/src/federation.rs",
+      "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-v2/crates/connectors-host/src/federation.rs"
+    },
+    {
+      "repository": "connectors-old",
+      "path": "docs/design/11-hosted-module-request-authority.md",
+      "absolute_source": "/home/timo/beyond10x/connectors/docs/design/11-hosted-module-request-authority.md",
+      "sha256": "b0896357fab401ada2272cff4585cabc2b6224fbe354f31881814b274ae5f7f6",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-old/docs/design/11-hosted-module-request-authority.md"
+    },
+    {
+      "repository": "connectors-old",
+      "path": "docs/design/13-grant-evaluation-and-approval-redemption.md",
+      "absolute_source": "/home/timo/beyond10x/connectors/docs/design/13-grant-evaluation-and-approval-redemption.md",
+      "sha256": "132adcb44def03a80851d4ceeea5536da052c9da73eb87b7db404edc34661664",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-old/docs/design/13-grant-evaluation-and-approval-redemption.md"
+    },
+    {
+      "repository": "connectors-old",
+      "path": "crates/integration-platform/src/module_signing.rs",
+      "absolute_source": "/home/timo/beyond10x/connectors/crates/integration-platform/src/module_signing.rs",
+      "sha256": "903606537da2f08c5209cc369bdc4f6a7f995babf1b5bad250725e1b12187a8b",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-old/crates/integration-platform/src/module_signing.rs"
+    },
+    {
+      "repository": "connectors-old",
+      "path": "crates/integration-platform/src/surface.rs",
+      "absolute_source": "/home/timo/beyond10x/connectors/crates/integration-platform/src/surface.rs",
+      "sha256": "0c3984db449748161a82a1e71ae51596777b6d0d74e4419462f5185c1c88937b",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-old/crates/integration-platform/src/surface.rs"
+    },
+    {
+      "repository": "connectors-old",
+      "path": "crates/integration-platform/src/tests.rs",
+      "absolute_source": "/home/timo/beyond10x/connectors/crates/integration-platform/src/tests.rs",
+      "sha256": "86fb320f90686c7a6358a253eb190d5d5b502389f66ef23b7f64f9f595b07e5c",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-old/crates/integration-platform/src/tests.rs"
+    },
+    {
+      "repository": "connectors-old",
+      "path": "crates/service/src/runtime.rs",
+      "absolute_source": "/home/timo/beyond10x/connectors/crates/service/src/runtime.rs",
+      "sha256": "fc8e2b1a7b8ee535cbc27da8e1a650efce650845b4175da891df14bead303838",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/connectors-old/crates/service/src/runtime.rs"
+    },
+    {
+      "repository": "platform-old",
+      "path": "architecture/adr/0041-hosted-domain-modules-require-connector-signed-request-authority.md",
+      "absolute_source": "/home/timo/beyond10x/platform/architecture/adr/0041-hosted-domain-modules-require-connector-signed-request-authority.md",
+      "sha256": "e9e833b5f559f71389438aaf70bd74904da7ca320479a43c64a3299f2c457019",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/platform-old/architecture/adr/0041-hosted-domain-modules-require-connector-signed-request-authority.md"
+    },
+    {
+      "repository": "platform-old",
+      "path": "model/modules/contracts/module/v0alpha1/schemas/module-request-claims.schema.json",
+      "absolute_source": "/home/timo/beyond10x/platform/model/modules/contracts/module/v0alpha1/schemas/module-request-claims.schema.json",
+      "sha256": "e06250071eea4a26279fdfa73eef6b48df6eb60b7d678abf07f0ef8b9fc0be3e",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/platform-old/model/modules/contracts/module/v0alpha1/schemas/module-request-claims.schema.json"
+    },
+    {
+      "repository": "platform-old",
+      "path": "model/modules/contracts/module/v0alpha1/schemas/module-request-protected.schema.json",
+      "absolute_source": "/home/timo/beyond10x/platform/model/modules/contracts/module/v0alpha1/schemas/module-request-protected.schema.json",
+      "sha256": "a2f866c4b9bddd1a58391aa832e04212f93932decee607b2ca6742c607db3a79",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/platform-old/model/modules/contracts/module/v0alpha1/schemas/module-request-protected.schema.json"
+    },
+    {
+      "repository": "platform-old",
+      "path": "model/modules/sdk/module-http/src/lib.rs",
+      "absolute_source": "/home/timo/beyond10x/platform/model/modules/sdk/module-http/src/lib.rs",
+      "sha256": "e16e9b3bdc7ce4fed007a0ee4d4396fbbf8a616519b4578182710c2416a7a88d",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/platform-old/model/modules/sdk/module-http/src/lib.rs"
+    },
+    {
+      "repository": "platform-old",
+      "path": "model/modules/sdk/module-eventlog/src/lib.rs",
+      "absolute_source": "/home/timo/beyond10x/platform/model/modules/sdk/module-eventlog/src/lib.rs",
+      "sha256": "b46afd29fbf49f9d44ff0f61e5295c99a7cff758fe6783781fa0229c5144eb6e",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/platform-old/model/modules/sdk/module-eventlog/src/lib.rs"
+    },
+    {
+      "repository": "service-sdk",
+      "path": "crates/service-connectors/src/lib.rs",
+      "absolute_source": "/home/timo/beyond10x/service-sdk/crates/service-connectors/src/lib.rs",
+      "sha256": "d4c24789d89fa4631ef4c126294ef658afdadd6e692499a8541c15252835e45e",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/service-sdk/crates/service-connectors/src/lib.rs"
+    },
+    {
+      "repository": "atlas",
+      "path": "architecture/adr/0021-identity-registration-is-relying-party-agnostic.md",
+      "absolute_source": "/home/timo/.local/state/worktree/trees/b10x/atlas/wt-0347dc4f3986/architecture/adr/0021-identity-registration-is-relying-party-agnostic.md",
+      "sha256": "3ce99c90d5be61d62dd60894239916b1e6f6f6b5b1a00f922a9d8c740782d18c",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/atlas/architecture/adr/0021-identity-registration-is-relying-party-agnostic.md"
+    },
+    {
+      "repository": "atlas",
+      "path": "architecture/adr/0026-authentication-owns-optional-realm-context.md",
+      "absolute_source": "/home/timo/.local/state/worktree/trees/b10x/atlas/wt-0347dc4f3986/architecture/adr/0026-authentication-owns-optional-realm-context.md",
+      "sha256": "a6dd88042330dd01f2e0cb6d12df4475fe0476693bc07f63674a4782742ebb65",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/atlas/architecture/adr/0026-authentication-owns-optional-realm-context.md"
+    },
+    {
+      "repository": "atlas",
+      "path": "architecture/adr/0031-trusted-access-exchange-preserves-publication-confinement.md",
+      "absolute_source": "/home/timo/.local/state/worktree/trees/b10x/atlas/wt-0347dc4f3986/architecture/adr/0031-trusted-access-exchange-preserves-publication-confinement.md",
+      "sha256": "302f8fde4391fe5f6c43f0c4f0bb6d9b6f1f4539ab94cf9bfbece72b118f0e0d",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/snapshot/atlas/architecture/adr/0031-trusted-access-exchange-preserves-publication-confinement.md"
+    }
+  ],
+  "scope": "Independent source review; no runtime, integration, signing, key read or replay-store test was executed. Current Atlas authority is local clean commit; fresh remote verification was supplied by root, not repeated by reviewer."
+}

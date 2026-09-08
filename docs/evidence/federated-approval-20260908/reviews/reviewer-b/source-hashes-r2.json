@@ -1,0 +1,45 @@
+{
+  "scope": "F03 uncommitted semantic draft; independent protocol recheck, evidence vectors not yet supplied.",
+  "sources": [
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "08672eaffd13a306cc05bd44bfffe245a125dd6474ad68b6a916d7362c182c6e",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/contracts/service/delegation.md"
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "c67f0689fc5fbf4fde14872e10332896d1eb27775e1666d8459bf2a1b15bbf4f",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/contracts/service/v1alpha2/semantics.md"
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "fb72c94c48b12ab984cb0bea4818e5ff5c72c85943c79e5e2a341710afe6d944",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/contracts/service/compatibility.md"
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/contracts/operations/v1alpha1/semantics.md"
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/ess/domains/delegation.yaml"
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/ess/domains/idempotency.yaml"
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/ess/domains/service_wire.yaml"
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "932273ff7786139fe07520c9bb13b4c874ae83a19a1f5c2821f558b717dadf6e",
+      "snapshot": ".local/federated-approval-20260908/reviewer-b/recheck-1-snapshot/ess/system.yaml"
+    }
+  ]
+}

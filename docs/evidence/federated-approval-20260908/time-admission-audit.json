@@ -1,0 +1,262 @@
+{
+  "scope": "Offline integer/arithmetic and boolean truth-table audit. Declared trusted facts, no actual clock, nonce wait, policy revocation, admission, spend or provider execution.",
+  "checks": 23,
+  "passed": 23,
+  "cases": [
+    {
+      "id": "approval-federated-managed",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": true,
+      "time_predicate_accepts": true,
+      "expected_matched": true
+    },
+    {
+      "id": "delivery-invoke",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": true,
+      "time_predicate_accepts": true,
+      "expected_matched": true
+    },
+    {
+      "id": "long-window-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "past-nbf-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "wrong-profile-window-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "future-iat-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": true,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "time-underflow-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": false,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "time-overflow-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": false,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "fractional-time-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": false,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "boolean-time-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": false,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "approval-long-window-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "approval-wrong-profile-window-resigned",
+      "clock_interval": [
+        1788868799,
+        1788868801
+      ],
+      "integer_bounds": true,
+      "exact_profile_shape": false,
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "not-before-equality",
+      "clock_interval": [
+        1788868795,
+        1788868799
+      ],
+      "time_predicate_accepts": true,
+      "expected_matched": true
+    },
+    {
+      "id": "before-not-before",
+      "clock_interval": [
+        1788868794,
+        1788868798
+      ],
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "before-expiry",
+      "clock_interval": [
+        1788868820,
+        1788868824
+      ],
+      "time_predicate_accepts": true,
+      "expected_matched": true
+    },
+    {
+      "id": "expiry-equality",
+      "clock_interval": [
+        1788868821,
+        1788868825
+      ],
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "after-expiry",
+      "clock_interval": [
+        1788868822,
+        1788868826
+      ],
+      "time_predicate_accepts": false,
+      "expected_matched": true
+    },
+    {
+      "id": "post-ack-all-current",
+      "definite_nonce_consume_ack": true,
+      "final_trusted_facts": {
+        "time_valid": true,
+        "key_valid": true,
+        "projection_admitted": true,
+        "deadline_remaining": true
+      },
+      "entry_eligible": true,
+      "nonce_stays_consumed": true,
+      "expected_matched": true
+    },
+    {
+      "id": "post-ack-expired",
+      "definite_nonce_consume_ack": true,
+      "final_trusted_facts": {
+        "time_valid": false,
+        "key_valid": true,
+        "projection_admitted": true,
+        "deadline_remaining": true
+      },
+      "entry_eligible": false,
+      "nonce_stays_consumed": true,
+      "expected_matched": true
+    },
+    {
+      "id": "post-ack-key-revoked",
+      "definite_nonce_consume_ack": true,
+      "final_trusted_facts": {
+        "time_valid": true,
+        "key_valid": false,
+        "projection_admitted": true,
+        "deadline_remaining": true
+      },
+      "entry_eligible": false,
+      "nonce_stays_consumed": true,
+      "expected_matched": true
+    },
+    {
+      "id": "post-ack-projection-denied",
+      "definite_nonce_consume_ack": true,
+      "final_trusted_facts": {
+        "time_valid": true,
+        "key_valid": true,
+        "projection_admitted": false,
+        "deadline_remaining": true
+      },
+      "entry_eligible": false,
+      "nonce_stays_consumed": true,
+      "expected_matched": true
+    },
+    {
+      "id": "post-ack-clock-uncertain",
+      "definite_nonce_consume_ack": true,
+      "final_trusted_facts": {
+        "time_valid": false,
+        "key_valid": true,
+        "projection_admitted": true,
+        "deadline_remaining": true
+      },
+      "entry_eligible": false,
+      "nonce_stays_consumed": true,
+      "expected_matched": true
+    },
+    {
+      "id": "post-ack-deadline-exhausted",
+      "definite_nonce_consume_ack": true,
+      "final_trusted_facts": {
+        "time_valid": true,
+        "key_valid": true,
+        "projection_admitted": true,
+        "deadline_remaining": false
+      },
+      "entry_eligible": false,
+      "nonce_stays_consumed": true,
+      "expected_matched": true
+    }
+  ]
+}

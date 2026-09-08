@@ -7,7 +7,7 @@
 | Contract id | Document | Status | Defines |
 |---|---|---|---|
 | `operations/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | describe/invoke wire boundary, error envelope, limits |
-| proposed governed service binding | [service/v1alpha2](service/v1alpha2/semantics.md) | proposed | verified caller context, admission, policy, audit and delegated federation; proposed v1alpha2 routes and codecs per the [compatibility owner](service/compatibility.md), not implemented |
+| proposed governed service binding | [service/v1alpha2](service/v1alpha2/semantics.md) | proposed | verified caller context, admission, policy, audit and [one-hop delegated approval](service/delegation.md); proposed v1alpha2 routes and codecs per the [compatibility owner](service/compatibility.md), not implemented |
 | `operations/v1alpha1` `mutation` profile | [operations/v1alpha1](operations/v1alpha1/semantics.md) | proposed | effects, idempotency, approval binding, durable attempt record, outcome-unknown |
 | `datasource.records/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | bounded pages, cursors, provenance, completeness |
 | `datasource.records/v1alpha1` `document` profile | [datasources/records/v1alpha1](datasources/records/v1alpha1/semantics.md) | proposed | single-item content bodies with representation, version, byte truncation |

@@ -63,6 +63,7 @@ timeline:
       profile: mutation
       descriptor_revision: descriptor-r1
       configuration_revision: config-r1
+      route: null
       canonicalization_version: adapter-v1-canonical-json
       input_digest: test-digest
     attempt_id:
@@ -202,7 +203,20 @@ timeline:
         kind: federated
         authority_ref: trusted-gateway
     caller_key: create-1
-    fingerprint: *id001
+    fingerprint:
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      route:
+        gateway_instance: trusted-gateway
+        route_id: fixture-route
+        route_revision: route-r1
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
     attempt_id:
       $instance: origin-attempt
   outcome: reserved

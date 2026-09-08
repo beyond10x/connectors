@@ -1,0 +1,173 @@
+domain: connectors.delegation
+summary: Proposed one-hop approval subjects, request authority and immutable receiver receipts; no runtime verifier.
+
+# Owner: contracts/service/delegation.md. These are canonical/admitted values,
+# never trust derived from matching a caller-written string. Codec and policy
+# predicates below remain explicit obligations, not simulated ESS commands.
+types:
+  - name: connectors.delegation.ReceiptId
+    kind: newtype
+    of: Uuid
+  - name: connectors.delegation.AuthoritySnapshot
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: sha256, type: String}
+  - name: connectors.delegation.ExecutorBinding
+    kind: struct
+    fields:
+      - {name: agent, type: String}
+      - {name: revision, type: String}
+      - {name: authority_snapshot, type: connectors.delegation.AuthoritySnapshot}
+  - name: connectors.delegation.AdmittedAuthority
+    kind: struct
+    fields:
+      - {name: scope, type: connectors.idempotency.AuthorityScope}
+      - {name: current_authority, type: "Optional<connectors.delegation.AuthoritySnapshot>"}
+      - {name: executor, type: "Optional<connectors.delegation.ExecutorBinding>"}
+  - name: connectors.delegation.ExecutionTarget
+    kind: struct
+    fields:
+      - {name: instance, type: String}
+      - {name: operation, type: String}
+      - {name: connection, type: String}
+      - {name: connection_revision, type: String}
+      - {name: contract, type: String}
+      - {name: profile, type: String}
+      - {name: descriptor_revision, type: String}
+      - {name: configuration_revision, type: String}
+  - name: connectors.delegation.CanonicalApprovalSubject
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: target, type: connectors.delegation.ExecutionTarget}
+      - {name: authority, type: connectors.delegation.AdmittedAuthority}
+      - {name: origin, type: connectors.idempotency.Origin}
+      - {name: route, type: "Optional<connectors.idempotency.RouteBinding>"}
+      - {name: canonicalization, type: String}
+      - {name: input_sha256, type: String}
+      - {name: approval_mode, type: connectors.mutations.ApprovalMode}
+  - name: connectors.delegation.Presentation
+    kind: struct
+    fields:
+      - {name: instance, type: String}
+      - {name: operation, type: String}
+      - {name: connection, type: "Optional<String>"}
+      - {name: descriptor_revision, type: String}
+  - name: connectors.delegation.ApprovalPolicy
+    kind: struct
+    fields:
+      - {name: mode, type: connectors.mutations.ApprovalMode}
+      - {name: issuer, type: "Optional<String>"}
+      - {name: audience, type: "Optional<String>"}
+      - {name: max_lifetime_seconds, type: "Optional<Integer>"}
+  - name: connectors.delegation.ApprovalPreparation
+    kind: struct
+    fields:
+      - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
+      - {name: subject_sha256, type: String}
+      - {name: presentation, type: connectors.delegation.Presentation}
+      - {name: approval_policy, type: connectors.delegation.ApprovalPolicy}
+  - name: connectors.delegation.ProofHeader
+    kind: struct
+    fields:
+      - {name: alg, type: String}
+      - {name: kid, type: String}
+      - {name: typ, type: String}
+  - name: connectors.delegation.Purpose
+    kind: enum
+    variants: [describe, prepare, invoke]
+  - name: connectors.delegation.HttpMethod
+    kind: enum
+    variants: [GET, POST]
+  - name: connectors.delegation.DeliveryClaims
+    kind: struct
+    fields:
+      - {name: iss, type: String}
+      - {name: aud, type: String}
+      - {name: receiver, type: String}
+      - {name: purpose, type: connectors.delegation.Purpose}
+      - {name: method, type: connectors.delegation.HttpMethod}
+      - {name: target, type: String}
+      - {name: body_sha256, type: String}
+      - {name: authority, type: connectors.delegation.AdmittedAuthority}
+      - {name: route, type: connectors.idempotency.RouteBinding}
+      - {name: origin_request_id, type: "Optional<String>"}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: operation, type: "Optional<String>"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: descriptor_revision, type: "Optional<String>"}
+      - {name: execution_deadline_unix_ms, type: Integer}
+      - {name: iat, type: Integer}
+      - {name: nbf, type: Integer}
+      - {name: exp, type: Integer}
+      - {name: jti, type: String}
+  - name: connectors.delegation.ApprovalClaims
+    kind: struct
+    fields:
+      - {name: iss, type: String}
+      - {name: aud, type: String}
+      - {name: reference, type: String}
+      - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
+      - {name: iat, type: Integer}
+      - {name: nbf, type: Integer}
+      - {name: exp, type: Integer}
+
+# Receipts are immutable acknowledged facts. They do not authenticate a request,
+# open a business gate, or prove atomicity simply by existing in this model.
+entities:
+  - name: connectors.delegation.DeliveryReceipt
+    identity: {name: receipt_id, type: connectors.delegation.ReceiptId}
+    fields:
+      - {name: instance_id, type: String}
+      - {name: issuer, type: String}
+      - {name: nonce, type: String}
+      - {name: expires_at, type: Timestamp}
+    relations:
+      - name: receiver
+        kind: references
+        target: connectors.declarations.ServiceConfiguration
+        cardinality: one
+        via: instance_id
+    lifecycle:
+      initial: Consumed
+      states: [Consumed]
+      terminal: [Consumed]
+  - name: connectors.delegation.ApprovalRedemption
+    identity: {name: receipt_id, type: connectors.delegation.ReceiptId}
+    fields:
+      - {name: instance_id, type: String}
+      - {name: issuer, type: String}
+      - {name: reference, type: String}
+      - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: spent_at, type: Timestamp}
+    relations:
+      - name: receiver
+        kind: references
+        target: connectors.declarations.ServiceConfiguration
+        cardinality: one
+        via: instance_id
+      - name: attempt
+        kind: references
+        target: connectors.mutations.AttemptRecord
+        cardinality: one
+        via: attempt_id
+    lifecycle:
+      initial: Spent
+      states: [Spent]
+      terminal: [Spent]
+
+# UNMAPPED: proof constants, integer/string bounds, mandatory-null emission,
+# canonical JSON/base64url, signature/key provenance, purpose/correlation and
+# co-presence predicates, approved authority/target reconstruction and disclosure.
+# Issuer, grant, principal, connection and route CONFIGURATION entities await
+# their owners; these structured correlation values do not guess their relations.
+# Known receipt->receiver and redemption->attempt links are modeled above;
+# actual atomic uniqueness (issuer/receiver/nonce and issuer/reference), one
+# approval per prepared attempt, cross-record state checks/fencing, trusted clocks,
+# live-key revocation, durability/replicas and anti-rollback remain host obligations.
+# Retiring a nonce INDEX after safe expiry does not erase this historical receipt;
+# physical retention/compaction and all receipt creation are persistence bindings.
+# No fake state transition/command simulates Ed25519 verification or a policy gate.
+# ESS compilation validates declarations and references, not sequential execution.

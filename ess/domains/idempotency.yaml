@@ -14,7 +14,7 @@ types:
       - {name: tenant, type: "Optional<String>"}
       - {name: realm, type: "Optional<String>"}
       - {name: caller, type: String}
-      - {name: executor, type: String}
+      - {name: executor, type: "Optional<String>"}
   - name: connectors.idempotency.OriginKind
     kind: enum
     variants: [direct, federated]
@@ -29,6 +29,12 @@ types:
       - {name: receiver_instance, type: String}
       - {name: authority, type: connectors.idempotency.AuthorityScope}
       - {name: origin, type: connectors.idempotency.Origin}
+  - name: connectors.idempotency.RouteBinding
+    kind: struct
+    fields:
+      - {name: gateway_instance, type: String}
+      - {name: route_id, type: String}
+      - {name: route_revision, type: String}
   - name: connectors.idempotency.RequestFingerprint
     kind: struct
     fields:
@@ -41,6 +47,7 @@ types:
       - {name: configuration_revision, type: String}
       - {name: canonicalization_version, type: String}
       - {name: input_digest, type: String}
+      - {name: route, type: "Optional<connectors.idempotency.RouteBinding>"}
 
 entities:
   - name: connectors.idempotency.KeyReservation

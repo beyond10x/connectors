@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.ExecutionTarget",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:98ea9c0a480aa16838a01a36ed33673e44be170852c18d4bf9b7ace4d3ea066c",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.ExecutionTarget": {
+      "title": "ExecutionTarget",
+      "x-ess-name": "connectors.delegation.ExecutionTarget",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "instance": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "connection": {
+          "type": "string"
+        },
+        "connection_revision": {
+          "type": "string"
+        },
+        "contract": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "descriptor_revision": {
+          "type": "string"
+        },
+        "configuration_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance",
+        "operation",
+        "connection",
+        "connection_revision",
+        "contract",
+        "profile",
+        "descriptor_revision",
+        "configuration_revision"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

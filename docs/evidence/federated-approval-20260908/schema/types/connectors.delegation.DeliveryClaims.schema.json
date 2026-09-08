@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.DeliveryClaims",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:11de96b1c061a44111b776ba2758978e74b21c9677c892163aa9e72471f6ee25",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.AdmittedAuthority": {
+      "title": "AdmittedAuthority",
+      "x-ess-name": "connectors.delegation.AdmittedAuthority",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/connectors.idempotency.AuthorityScope"
+        },
+        "current_authority": {
+          "$ref": "#/$defs/connectors.delegation.AuthoritySnapshot"
+        },
+        "executor": {
+          "$ref": "#/$defs/connectors.delegation.ExecutorBinding"
+        }
+      },
+      "required": [
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.AuthoritySnapshot": {
+      "title": "AuthoritySnapshot",
+      "x-ess-name": "connectors.delegation.AuthoritySnapshot",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.DeliveryClaims": {
+      "title": "DeliveryClaims",
+      "x-ess-name": "connectors.delegation.DeliveryClaims",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "iss": {
+          "type": "string"
+        },
+        "aud": {
+          "type": "string"
+        },
+        "receiver": {
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/$defs/connectors.delegation.Purpose"
+        },
+        "method": {
+          "$ref": "#/$defs/connectors.delegation.HttpMethod"
+        },
+        "target": {
+          "type": "string"
+        },
+        "body_sha256": {
+          "type": "string"
+        },
+        "authority": {
+          "$ref": "#/$defs/connectors.delegation.AdmittedAuthority"
+        },
+        "route": {
+          "$ref": "#/$defs/connectors.idempotency.RouteBinding"
+        },
+        "origin_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "connection": {
+          "type": "string"
+        },
+        "descriptor_revision": {
+          "type": "string"
+        },
+        "execution_deadline_unix_ms": {
+          "type": "integer"
+        },
+        "iat": {
+          "type": "integer"
+        },
+        "nbf": {
+          "type": "integer"
+        },
+        "exp": {
+          "type": "integer"
+        },
+        "jti": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "iss",
+        "aud",
+        "receiver",
+        "purpose",
+        "method",
+        "target",
+        "body_sha256",
+        "authority",
+        "route",
+        "execution_deadline_unix_ms",
+        "iat",
+        "nbf",
+        "exp",
+        "jti"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.ExecutorBinding": {
+      "title": "ExecutorBinding",
+      "x-ess-name": "connectors.delegation.ExecutorBinding",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "authority_snapshot": {
+          "$ref": "#/$defs/connectors.delegation.AuthoritySnapshot"
+        }
+      },
+      "required": [
+        "agent",
+        "revision",
+        "authority_snapshot"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.HttpMethod": {
+      "title": "HttpMethod",
+      "x-ess-name": "connectors.delegation.HttpMethod",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST"
+      ]
+    },
+    "connectors.delegation.Purpose": {
+      "title": "Purpose",
+      "x-ess-name": "connectors.delegation.Purpose",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "describe",
+        "prepare",
+        "invoke"
+      ]
+    },
+    "connectors.idempotency.AuthorityScope": {
+      "title": "AuthorityScope",
+      "x-ess-name": "connectors.idempotency.AuthorityScope",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "tenant": {
+          "type": "string"
+        },
+        "realm": {
+          "type": "string"
+        },
+        "caller": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "caller"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.idempotency.RouteBinding": {
+      "title": "RouteBinding",
+      "x-ess-name": "connectors.idempotency.RouteBinding",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "gateway_instance": {
+          "type": "string"
+        },
+        "route_id": {
+          "type": "string"
+        },
+        "route_revision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "gateway_instance",
+        "route_id",
+        "route_revision"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

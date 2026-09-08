@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.delegation.ExecutorBinding",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "slice-sha256/2:e5883d1b009d8c964bdaa83367b7b6d8773159b6a711606ed5360e6366aa3120",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.delegation.AuthoritySnapshot": {
+      "title": "AuthoritySnapshot",
+      "x-ess-name": "connectors.delegation.AuthoritySnapshot",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.delegation.ExecutorBinding": {
+      "title": "ExecutorBinding",
+      "x-ess-name": "connectors.delegation.ExecutorBinding",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "authority_snapshot": {
+          "$ref": "#/$defs/connectors.delegation.AuthoritySnapshot"
+        }
+      },
+      "required": [
+        "agent",
+        "revision",
+        "authority_snapshot"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

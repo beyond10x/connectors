@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 10
+revision: 11
 ---
 ## Context
 
@@ -100,3 +100,9 @@ Current ledger: 10/48 source findings fixed, 38 assigned and open; six contract 
 `story:contracts-wire-compatibility` closes E02 with one matrix covering all 15 proposed v1alpha1 families and the governed service binding. Explicit v1alpha2 paths, complete describe/invoke/audit/mutation shapes, exact error mapping, an invoke-enforced unchanged-read projection, safe catalog errors and consistent generic limits resolve the incompatible defaults. Public ESS values preserve existing effect/attempt semantics without introducing runtime code or guessed persistence. Both independent final reviewers approve with zero residual E02 findings. Evidence includes 68 existing-decoder vectors, 27 proposed textual vectors and the full gate with 50 Rust tests/MSRV 1.88; ESS 0.20.0 validates nine files. See [verification](../../../docs/evidence/wire-compatibility-20260908/verification.md).
 
 Current ledger: **11/48 original findings fixed, 37 open; seven owner stories implemented for specification scope, 20 draft**. This supersedes the earlier checkpoint counts. F03 federated approval is now the next foundational semantic dependency; delegation remains explicitly unbound until it is settled. The broader specification goal remains active. No runtime or adapter-kind/generated schema change, external publication or implementation wave is included.
+
+## Current specification checkpoint — federated approval
+
+F03 is fixed by `story:contracts-federated-approval`: one canonical leaf subject exposed through safe admitted preparation, distinct exact delegated/issuer proof framing, receiver-enforced proof windows and post-nonce acknowledgement admission, sole-leaf redemption and unchanged F01/F02 effect/replay ownership. ESS models the values and immutable receipts with known links; concrete runtime/policy/issuer/persistence bindings remain advertisement prerequisites. Both final independent reviewers approve with zero residual findings; 21 individual review findings have fixed outcomes. Evidence is `docs/evidence/federated-approval-20260908/verification.md` and `checkpoint.md`. Full gate/MSRV1.88 passes with 50 existing Rust tests; ESS0.20.0 validates 10 files/153 declarations and deterministically produces 163 schema artifacts. No runtime or adapter implementation changed.
+
+Current ledger: **12/48 source findings fixed, 36 assigned and open; eight owner stories implemented, 19 draft.** This supersedes the historical counts above, not their evidence. The broad specification stabilization goal remains active. Connection management/readiness, remaining auth/discovery/datasource/media semantics, persistence consolidation, catalog and later stack review obligations still need their own closure. All work remains local.

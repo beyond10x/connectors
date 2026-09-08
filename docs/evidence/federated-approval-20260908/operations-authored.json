@@ -1,0 +1,5616 @@
+{
+  "provenance": {
+    "suite_version": "ess-conformance/4",
+    "system": "connectors",
+    "specification_version": "v1",
+    "spec_digest": "5e9995191966691905306b0907d15cf1844a9c252b2b30c4c240223252982175",
+    "contract_digest": "89e0b645e65b00171d7630031b47832bb6b95c6fb38c236c4d970ec17de0acc9"
+  },
+  "scenarios": {
+    "connectors.idempotency/authored/idempotency-aborted-result": {
+      "purpose": "F02: a proved Aborted attempt retains its not-attempted result without reopening dispatch.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-aborted-result-first"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.AbortPrepared",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "aborted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptAborted",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.RetainResult",
+          "input": {
+            "replay_expires_at": {
+              "kind": "literal",
+              "value": "2026-09-09T09:00:02Z"
+            },
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            },
+            "settled_at": {
+              "kind": "literal",
+              "value": "2026-09-08T09:00:02Z"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "retained"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.ResultRetained",
+          "shape": {
+            "replay_expires_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            },
+            "settled_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "first-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Replayable"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "first-attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Aborted"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.idempotency"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.AuthorityScope"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyNamespace"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyReservation.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.Origin"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.OriginKind"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RequestFingerprint"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.ReservationId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RouteBinding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.idempotency.KeyReservation"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ReserveKey"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.RetainResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.AbortPrepared"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "retained"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "aborted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.KeyReserved"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultRetained"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.idempotency/authored/idempotency-known-result-expiry": {
+      "purpose": "F02: only a known-result reservation can expire; an expired generation cannot retain another result.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-known-result-expiry-first"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordCompletion",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "completed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptCompleted",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.RetainResult",
+          "input": {
+            "replay_expires_at": {
+              "kind": "literal",
+              "value": "2026-09-09T09:00:03Z"
+            },
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            },
+            "settled_at": {
+              "kind": "literal",
+              "value": "2026-09-08T09:00:03Z"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "retained"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.ResultRetained",
+          "shape": {
+            "replay_expires_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            },
+            "settled_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ExpireResult",
+          "input": {
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "expired"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.ResultExpired",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.RetainResult",
+          "input": {
+            "replay_expires_at": {
+              "kind": "literal",
+              "value": "2026-09-09T09:00:03Z"
+            },
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            },
+            "settled_at": {
+              "kind": "literal",
+              "value": "2026-09-08T09:00:03Z"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.idempotency.ReservationStateConflict",
+          "fields": {
+            "state": "Expired"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.idempotency.ResultRetained"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "first-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Expired"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "first-attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Completed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.idempotency"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.AuthorityScope"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyNamespace"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyReservation.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.Origin"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.OriginKind"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RequestFingerprint"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.ReservationId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RouteBinding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.idempotency.KeyReservation"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ExpireResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ReserveKey"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.RetainResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordCompletion"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "expired"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "retained"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "completed"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.KeyReserved"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultExpired"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultRetained"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptCompleted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.idempotency.ReservationStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.idempotency/authored/idempotency-namespace-values": {
+      "purpose": "F02: typed namespace values preserve distinct caller, realm absence and trusted origin; this is not an admission/isolation runtime test.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-namespace-values-first"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ExpireResult",
+          "input": {
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.idempotency.ReservationStateConflict",
+          "fields": {
+            "state": "Pending"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.idempotency.ResultExpired"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-namespace-values-second"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "second-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "second-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "bob",
+                  "executor": "bob",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "second-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-namespace-values-realm"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "realm-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "realm-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": "default",
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "realm-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-namespace-values-origin"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "origin-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "origin-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": {
+                  "gateway_instance": "trusted-gateway",
+                  "route_id": "fixture-route",
+                  "route_revision": "route-r1"
+                }
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "trusted-gateway",
+                  "kind": "federated"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "origin-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "first-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Pending"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "first-attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Prepared"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "bob",
+                    "executor": "bob",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "second-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Pending"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": "default",
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "realm-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Pending"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "trusted-gateway",
+                    "kind": "federated"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "origin-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Pending"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "counts",
+            "at_least": 4,
+            "at_most": 4
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.idempotency"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.AuthorityScope"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyNamespace"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyReservation.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.Origin"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.OriginKind"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RequestFingerprint"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.ReservationId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RouteBinding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.idempotency.KeyReservation"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ExpireResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ReserveKey"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.KeyReserved"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultExpired"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.idempotency.ReservationStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.idempotency/authored/idempotency-pending-no-expiry": {
+      "purpose": "F02: a Pending reservation cannot expire into another dispatch.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-pending-no-expiry-first"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ExpireResult",
+          "input": {
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.idempotency.ReservationStateConflict",
+          "fields": {
+            "state": "Pending"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.idempotency.ResultExpired"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "first-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Pending"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "first-attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Prepared"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.idempotency"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.AuthorityScope"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyNamespace"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyReservation.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.Origin"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.OriginKind"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RequestFingerprint"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.ReservationId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RouteBinding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.idempotency.KeyReservation"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ExpireResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ReserveKey"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.KeyReserved"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultExpired"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.idempotency.ReservationStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.idempotency/authored/idempotency-refused-result": {
+      "purpose": "F02: a definitive Failed attempt retains the known refusal, not a success response.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-refused-result-first"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordRefusal",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordRefusal",
+            "outcome": "refused"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptRefused",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.RetainResult",
+          "input": {
+            "replay_expires_at": {
+              "kind": "literal",
+              "value": "2026-09-09T09:00:03Z"
+            },
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            },
+            "settled_at": {
+              "kind": "literal",
+              "value": "2026-09-08T09:00:03Z"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "retained"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.ResultRetained",
+          "shape": {
+            "replay_expires_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            },
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            },
+            "settled_at": {
+              "holds": "primitive",
+              "kind": "timestamp"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "first-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Replayable"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "first-attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Failed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.idempotency"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.AuthorityScope"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyNamespace"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyReservation.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.Origin"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.OriginKind"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RequestFingerprint"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.ReservationId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RouteBinding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.idempotency.KeyReservation"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ReserveKey"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.RetainResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordRefusal"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "retained"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordRefusal",
+            "outcome": "refused"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.KeyReserved"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultRetained"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptRefused"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.idempotency/authored/idempotency-unknown-no-expiry": {
+      "purpose": "F02: Indeterminate quarantines its key; no expiry or automatic reconciliation is allowed.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "jira.issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "idempotency-unknown-no-expiry-first"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ReserveKey",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            },
+            "caller_key": {
+              "kind": "literal",
+              "value": "create-1"
+            },
+            "fingerprint": {
+              "kind": "literal",
+              "value": {
+                "canonicalization_version": "adapter-v1-canonical-json",
+                "configuration_revision": "config-r1",
+                "connection_ref": "test-connection",
+                "connection_revision": "connection-r1",
+                "contract_ref": "operations/v1alpha1",
+                "descriptor_revision": "descriptor-r1",
+                "input_digest": "test-digest",
+                "operation_ref": "test-instance/jira.issue.create",
+                "profile": "mutation",
+                "route": null
+              }
+            },
+            "namespace": {
+              "kind": "literal",
+              "value": {
+                "authority": {
+                  "caller": "alice",
+                  "executor": "alice",
+                  "realm": null,
+                  "tenant": "tenant-a"
+                },
+                "origin": {
+                  "authority_ref": "test-instance",
+                  "kind": "direct"
+                },
+                "receiver_instance": "test-instance"
+              }
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyReserved",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "first-reservation",
+          "entity": "connectors.idempotency.KeyReservation",
+          "event": "connectors.idempotency.KeyReserved",
+          "field": "reservation_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordUncertainty",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "first-attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptIndeterminate",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.QuarantineKey",
+          "input": {
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.QuarantineKey",
+            "outcome": "quarantined"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.idempotency.KeyQuarantined",
+          "shape": {
+            "reservation_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.ExpireResult",
+          "input": {
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.idempotency.ReservationStateConflict",
+          "fields": {
+            "state": "Quarantined"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.idempotency.ResultExpired"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.idempotency.RetainResult",
+          "input": {
+            "replay_expires_at": {
+              "kind": "literal",
+              "value": "2026-09-09T09:00:03Z"
+            },
+            "reservation_id": {
+              "kind": "instance",
+              "instance": "first-reservation"
+            },
+            "settled_at": {
+              "kind": "literal",
+              "value": "2026-09-08T09:00:03Z"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.idempotency.ReservationStateConflict",
+          "fields": {
+            "state": "Quarantined"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.idempotency.ResultRetained"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.idempotency.ReservationStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "caller_key": {
+                "kind": "literal",
+                "value": "create-1"
+              },
+              "namespace": {
+                "kind": "literal",
+                "value": {
+                  "authority": {
+                    "caller": "alice",
+                    "executor": "alice",
+                    "realm": null,
+                    "tenant": "tenant-a"
+                  },
+                  "origin": {
+                    "authority_ref": "test-instance",
+                    "kind": "direct"
+                  },
+                  "receiver_instance": "test-instance"
+                }
+              },
+              "reservation_id": {
+                "kind": "instance",
+                "instance": "first-reservation"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Quarantined"
+              }
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "first-attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Indeterminate"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.idempotency"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.AuthorityScope"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyNamespace"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.KeyReservation.State"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.Origin"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.OriginKind"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RequestFingerprint"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.ReservationId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.idempotency.RouteBinding"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.idempotency.KeyReservation"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ExpireResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.QuarantineKey"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.ReserveKey"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.idempotency.RetainResult"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordUncertainty"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ExpireResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.QuarantineKey",
+            "outcome": "quarantined"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.ReserveKey",
+            "outcome": "reserved"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.idempotency.RetainResult",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.KeyQuarantined"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.KeyReserved"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultExpired"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.idempotency.ResultRetained"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptIndeterminate"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.idempotency.ReservationStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.idempotency.ReservationStates"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/deadline-after-gate": {
+      "purpose": "E01: post-gate timeout cannot abort or acquire another dispatch permission.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": "opaque-test-reference"
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "deadline-after-gate"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.AbortPrepared",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Dispatching"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Dispatching"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordUncertainty",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptIndeterminate",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Indeterminate"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.AbortPrepared"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordUncertainty"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptIndeterminate"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.mutations.AttemptStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/deadline-before-gate": {
+      "purpose": "E01: pre-gate deadline wins abort; a late worker cannot open dispatch.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "deadline-before-gate"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "not_required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.AbortPrepared",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "aborted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptAborted",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Aborted"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordCompletion",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Aborted"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.AttemptCompleted"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "not_required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Aborted"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.AbortPrepared"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordCompletion"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "aborted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptCompleted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.mutations.AttemptStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/definitive-refusal": {
+      "purpose": "F01/E11: evidence of provider refusal without a business effect is Failed, not a pre-dispatch abort.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": "opaque-test-reference"
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "definitive-refusal"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordRefusal",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordRefusal",
+            "outcome": "refused"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptRefused",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.AbortPrepared",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Failed"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Failed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.AbortPrepared"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordRefusal"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordRefusal",
+            "outcome": "refused"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptRefused"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.mutations.AttemptStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/definitive-success": {
+      "purpose": "F01/E11: a definitive success is Completed; the ledger cannot later abort or reopen.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "definitive-success"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "not_required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordCompletion",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "completed"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptCompleted",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.AbortPrepared",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Completed"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Completed"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "not_required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Completed"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.AbortPrepared"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordCompletion"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "completed"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptCompleted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.mutations.AttemptStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/event-claim-uncertainty": {
+      "purpose": "F01: event-claim admission obeys the same uncertain-outcome lifecycle.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "event_claim"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": "opaque-test-reference"
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "event-claim-uncertainty"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "event_claim"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordUncertainty",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptIndeterminate",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "event_claim"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Indeterminate"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordUncertainty"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptIndeterminate"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/indeterminate-is-terminal": {
+      "purpose": "F01: an unknown first observation grants no retry or implicit reconciliation.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": "opaque-test-reference"
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "indeterminate-is-terminal"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordUncertainty",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptIndeterminate",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Indeterminate"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordCompletion",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Indeterminate"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.AttemptCompleted"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Indeterminate"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordCompletion"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordUncertainty"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordCompletion",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptCompleted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptIndeterminate"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.mutations.AttemptStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/recovery-after-gate": {
+      "purpose": "F01: after the gate, a crash before send and a crash after send have the same durable evidence.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": "opaque-test-reference"
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "recovery-after-gate"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordUncertainty",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptIndeterminate",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.AbortPrepared",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Indeterminate"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Indeterminate"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.AbortPrepared"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordUncertainty"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptIndeterminate"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.mutations.AttemptStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/recovery-before-gate": {
+      "purpose": "F01: recovered Prepared is aborted even if its approval was spent; spend itself is a host fault-injection obligation.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": "opaque-test-reference"
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "recovery-before-gate"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.AbortPrepared",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "aborted"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptAborted",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "step": "expect_error",
+          "error": "connectors.mutations.AttemptStateConflict",
+          "fields": {
+            "state": "Aborted"
+          }
+        },
+        {
+          "step": "expect_no_event",
+          "event": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Aborted"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.AbortPrepared"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.AbortPrepared",
+            "outcome": "aborted"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "wrong-state"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptAborted"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "error",
+          "name": "connectors.mutations.AttemptStateConflict"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    },
+    "connectors.mutations/authored/response-loss-no-approval": {
+      "purpose": "F01: response loss remains unknown when there was no approval to spend.",
+      "steps": [
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.PrepareAttempt",
+          "input": {
+            "approval_mode": {
+              "kind": "literal",
+              "value": "not_required"
+            },
+            "approval_ref": {
+              "kind": "literal",
+              "value": null
+            },
+            "connection_ref": {
+              "kind": "literal",
+              "value": "test-connection"
+            },
+            "idempotency_key": {
+              "kind": "literal",
+              "value": null
+            },
+            "input_digest": {
+              "kind": "literal",
+              "value": "test-digest"
+            },
+            "instance_id": {
+              "kind": "literal",
+              "value": "test-instance"
+            },
+            "operation_id": {
+              "kind": "literal",
+              "value": "issue.create"
+            },
+            "request_id": {
+              "kind": "literal",
+              "value": "response-loss-no-approval"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptPrepared",
+          "payload": {
+            "approval_mode": "not_required"
+          },
+          "shape": {
+            "approval_mode": {
+              "holds": "enum",
+              "variants": [
+                "not_required",
+                "required",
+                "event_claim"
+              ]
+            },
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "capture_instance",
+          "instance": "attempt",
+          "entity": "connectors.mutations.AttemptRecord",
+          "event": "connectors.mutations.AttemptPrepared",
+          "field": "attempt_id"
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.OpenDispatch",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.DispatchOpened",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "execute_command",
+          "command": "connectors.mutations.RecordUncertainty",
+          "input": {
+            "attempt_id": {
+              "kind": "instance",
+              "instance": "attempt"
+            }
+          }
+        },
+        {
+          "step": "expect_outcome",
+          "outcome": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "step": "expect_event",
+          "event": "connectors.mutations.AttemptIndeterminate",
+          "shape": {
+            "attempt_id": {
+              "holds": "primitive",
+              "kind": "uuid"
+            }
+          }
+        },
+        {
+          "step": "query_view",
+          "view": "connectors.mutations.AttemptStates"
+        },
+        {
+          "step": "expect_view",
+          "view": "connectors.mutations.AttemptStates",
+          "expectation": {
+            "expect": "contains",
+            "fields": {
+              "approval_mode": {
+                "kind": "literal",
+                "value": "not_required"
+              },
+              "attempt_id": {
+                "kind": "instance",
+                "instance": "attempt"
+              },
+              "state": {
+                "kind": "literal",
+                "value": "Indeterminate"
+              }
+            }
+          }
+        }
+      ],
+      "source": [
+        {
+          "kind": "domain",
+          "name": "connectors.mutations"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.ApprovalMode"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptId"
+        },
+        {
+          "kind": "type",
+          "name": "connectors.mutations.AttemptRecord.State"
+        },
+        {
+          "kind": "entity",
+          "name": "connectors.mutations.AttemptRecord"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.OpenDispatch"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.PrepareAttempt"
+        },
+        {
+          "kind": "command",
+          "name": "connectors.mutations.RecordUncertainty"
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.OpenDispatch",
+            "outcome": "opened"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.PrepareAttempt",
+            "outcome": "prepared"
+          }
+        },
+        {
+          "kind": "outcome",
+          "name": {
+            "command": "connectors.mutations.RecordUncertainty",
+            "outcome": "indeterminate"
+          }
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptIndeterminate"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.AttemptPrepared"
+        },
+        {
+          "kind": "event",
+          "name": "connectors.mutations.DispatchOpened"
+        },
+        {
+          "kind": "view",
+          "name": "connectors.mutations.AttemptStates"
+        }
+      ]
+    }
+  }
+}
