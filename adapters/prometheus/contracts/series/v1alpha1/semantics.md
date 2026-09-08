@@ -10,10 +10,17 @@
 | Field | Value |
 |---|---|
 | Contract | `datasource.series/v1alpha1` |
-| Profiles | `promql-range`; reserved `promql-instant`, `promql-labels` |
+| Profiles | selected: `promql-range`; reserved/refused: `promql-instant`, `promql-labels` |
 | Shared with records | provenance and completeness semantics; not the page shape |
 
 A series read returns labeled time series of numeric samples for a native query over a time range with a step. The design requires instant/range semantics, timestamps, step/resolution, label sets, the native query, and partial/error behavior to be preserved, and states that a series is not a log record (`docs/design.md:455`).
+
+Support disposition is explicit: `promql-range` is the only proposed selectable
+profile. `promql-instant` is reserved/refused because the old range projection's
+optional instant value does not define a separately admitted request/result
+contract. `promql-labels` is reserved/refused because no selected source operation,
+schema, completeness rule or conformance input defines it. Neither reserved name
+may appear in an advertised profile list or be accepted as an invocation profile.
 
 ## 2. Old evidence and disposition
 
@@ -91,8 +98,8 @@ Errors: base codes; provider 400 (bad PromQL) → `InvalidInput` with a safe cla
 
 ## 7. Compatibility
 
-- New contract. Old projection fields `status` and `value` (instant) are not carried in `promql-range`; instant becomes its own profile.
-- [Service compatibility](../../../../../contracts/service/compatibility.md) is authoritative for the binding. Series schemas require explicit profile support and compatible declared limits. Their numeric timestamps and string sample values cannot be coerced into existing record or SQL payloads; instant/labels remain reserved.
+- New contract. Old projection fields `status` and `value` (instant) are not carried in `promql-range`; a future instant profile needs its own complete declaration.
+- [Service compatibility](../../../../../contracts/service/compatibility.md) is authoritative for the binding. Series schemas require explicit profile support and compatible declared limits. Their numeric timestamps and string sample values cannot be coerced into existing record or SQL payloads; instant/labels remain reserved/refused and unadvertised.
 
 
 ## 8. SDK and host obligations
@@ -115,4 +122,4 @@ Errors: base codes; provider 400 (bad PromQL) → `InvalidInput` with a safe cla
 |---|---|
 | Sample values as strings versus numbers | strings (lossless) |
 | Window maximum | 7 d |
-| Instant and label profiles | reserved, not documented until an adapter needs them |
+| Instant and label profiles | reserved/refused and unadvertised until a separately reviewed source operation, schema and conformance set selects each one |
