@@ -1,0 +1,134 @@
+{
+  "system": "gitlab",
+  "version": 1,
+  "naming": {},
+  "summary": "Typed adapter request inputs. Connectors owns operation/result and provider-binding semantics.",
+  "domains": {
+    "gitlab.requests": {
+      "name": "gitlab.requests",
+      "naming": {},
+      "types": [
+        "gitlab.requests.FileGetRequest",
+        "gitlab.requests.IssuesListRequest",
+        "gitlab.requests.ProjectGetRequest"
+      ],
+      "entities": [],
+      "commands": [],
+      "events": [],
+      "errors": [],
+      "views": [],
+      "actors": []
+    }
+  },
+  "types": {
+    "gitlab.requests.FileGetRequest": {
+      "name": "gitlab.requests.FileGetRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "path",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "ref",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.IssuesListRequest": {
+      "name": "gitlab.requests.IssuesListRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cursor",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "limit",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.ProjectGetRequest": {
+      "name": "gitlab.requests.ProjectGetRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    }
+  },
+  "conversions": [],
+  "entities": {},
+  "commands": {},
+  "events": {},
+  "errors": {},
+  "views": {},
+  "actors": {},
+  "bindings": {},
+  "components": {
+    "gitlab-adapter": {
+      "name": "gitlab-adapter",
+      "owns": [
+        "gitlab.requests"
+      ],
+      "accepts": [],
+      "publishes": [],
+      "naming": {}
+    }
+  },
+  "workloads": {}
+}

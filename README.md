@@ -4,8 +4,11 @@ Independent Rust adapter services for **Kubernetes discovery, GitLab, and SQL**,
 consumed directly or through a provider-independent federation host.
 
 This is a local implementation of the first data/discovery profile. It is not registered in Atlas.
-The current end-to-end goal and evidence are tracked in
-[the implementation story](.engineering/planning/story/three-adapters-e2e.md).
+The initial end-to-end implementation is tracked in
+[the three-adapter story](.engineering/planning/story/three-adapters-e2e.md).
+The subsequent [GitLab generation story](.engineering/planning/story/gitlab-spec-service.md)
+adds specification-driven runtime generation and local container packaging.
+See [generation and packaging](docs/gitlab-generation.md) for that workflow.
 See [the full design](docs/design.md) and
 [the executable first-slice contract](contracts/service/v1alpha1/semantics.md).
 Run [the live acceptance recipe](docs/live-e2e.md) and read
@@ -21,17 +24,19 @@ ess validate --path ess
 aep plan artifact validate
 ```
 
-Normal builds consume the committed descriptors and need neither ESS nor networked
-vendor-source refresh. When editing an adapter specification, regenerate its
-descriptor explicitly, for example:
+Normal builds consume checked-in generated files and need neither ESS nor networked
+vendor-source refresh. GitLab uses the full v2 generation pipeline:
 
 ```sh
 cargo run --locked -p connectors-spec -- \
+  --generate \
   --specification adapters/gitlab/spec/adapter.json \
-  --output adapters/gitlab/generated/descriptor.json
+  --output adapters/gitlab/generated
 ```
 
-Repeat with `--check` to verify that the committed descriptor matches its source.
+Repeat with `--check` to verify the complete bundle. Generation and its tests need
+ESS 0.9.2 and the recorded rustfmt version. Kubernetes and SQL retain v1 descriptor
+generation: omit `--generate` and select their `generated/descriptor.json` output.
 
 Each adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:
