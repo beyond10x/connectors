@@ -137,7 +137,7 @@ Profile selection is singular: a generic operation whose curation declares `exte
 - Refusal by name: an unknown bundle or index format version is refused before any record is served.
 - Engine discipline: the request is built only from the mapping, the validated input, and the host-injected credential capability; the caller supplies no URL, method, header, or path; body comes from the declared template with `$param` splices only; the response is bounded; redirects are not followed; one hop.
 - Unary only: the generic profile serves unary HTTP operations; datasources beyond `generic-http-page`, events, channels, discoveries and acquisition are not served by the engine (old `integration-catalog` exclusions preserved).
-- Value freedom: bundle files, descriptors, index, and every catalog output contain credential references only, never values (old `catalog` README rule).
+- Public authentication metadata: bundle files, descriptors, indexes and catalog outputs may name safe auth-profile identifiers and configuration requirements, but contain neither credential values nor actual runtime credential locators (custody/version references, environment-variable names, filesystem paths or secret-store addresses). A schema may describe a protected configuration slot; it cannot populate that slot with a deployment's credential location. The receiving host owns those private bindings and injects an admitted capability at runtime. Reject an artifact violating this boundary before publication or serving; value freedom alone is insufficient.
 
 ## 5. Ordering and limits
 
@@ -160,12 +160,13 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 - Curation truth: an imported operation without `risk` → `unresolved`; adding the curation block makes it `generic`.
 - Tamper: change one byte of a bundle file → `catalog.bundle.describe` returns `Unavailable` naming the file; the index generation is not served.
 - Format refusal: an index with format version `v9` → `Unsupported` before any record is served.
+- Credential-location refusal: a bundle/descriptor/index containing `{ "kind": "environment", "name": "ZENDESK_TOKEN" }` or a real custody/file locator → refused before publication or catalog disclosure, even though it contains no secret bytes. A safe auth-profile requirement and an unpopulated protected-slot schema are permitted; they grant no credential access.
 - Read engine: fixture 200 with JSON → `body` structurally identical, `provenance.resource` carries parameter names not values; 429 with `Retry-After: 7` → `RateLimited`, `retry_after_seconds: 7`; 404 → `NotFound`; 500 → `Unavailable`; `text/html` body → `UpstreamProtocol`; body that exceeds the total response budget after metadata/envelope accounting → `UpstreamProtocol`; 302 → `UpstreamProtocol` and no second request.
 - Engine discipline: an input containing a URL-shaped string in a path parameter is percent-encoded into its segment; the fixture observes exactly one request to the declared path.
 - Paged: a mapping with `pagination.page` → `generic-http-page` returns `complete: true` when the fixture returns fewer items than the page size; the cursor is opaque and bound to the input digest.
 - No network: run generation and every catalog operation with a network sentinel; zero connections (old `tests/main/no_network.rs` shape).
 - Determinism: generate the same adapter twice with the pinned toolchain; manifests and index digest are identical.
-- Value freedom: serialize every catalog output and bundle file; grep for the fixture's token; no match.
+- Public authentication metadata: serialize every catalog output and bundle file; neither the fixture's secret token nor its actual environment/custody/file locator may appear. Safe profile requirements remain distinguishable from private runtime bindings.
 
 ## 7. Compatibility
 
