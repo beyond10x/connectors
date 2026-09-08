@@ -282,3 +282,71 @@ both refused the absent 0.9.2 binary, naming the pin and searched locations:
 No installed executable was renamed. Isolated resolver tests also cover matching
 and mismatching explicit flags/environment paths, cache selection, both PATH
 orders, and agreement between the committed manifest and the repository pin.
+
+## ESS pin upgrade — 2026-09-08
+
+Upgraded the repository pin to official ESS 0.20.0 after the preceding resolver
+acceptance. [Release metadata](evidence/ess-toolchain-2026-09-08/release.json)
+records the exact tag commit, platform archive checksum and executable hashes.
+The verified release is at `.local/toolchains/ess/0.20.0/bin/ess`; both global
+installations remain unchanged. [Generation documentation](gitlab-generation.md#ess-upgrade-reviewed-on-2026-09-08)
+reviews the two changed bundle files and the preserved vendor-import refusal.
+
+All of these commands exited 0 with `TMPDIR="$PWD/.local/tmp"`,
+`CARGO_BUILD_JOBS=2` and `CONNECTORS_ESS` unset:
+
+```sh
+cargo run --locked -p connectors-spec -- --generate --specification adapters/gitlab/spec/adapter.json --output .local/ess-020-trial
+cargo run --locked -p connectors-spec -- --generate --specification adapters/gitlab/spec/adapter.json --output adapters/gitlab/generated
+cargo run --locked -p connectors-build -- gate --msrv
+target/debug/connectors-spec --generate --specification adapters/gitlab/spec/adapter.json --output adapters/gitlab/generated --check
+cargo run --locked -p connectors-build -- package --output .local/gitlab-package-ess-020 --image connectors-v2-gitlab:ess-020-local
+```
+
+The [full gate](evidence/ess-toolchain-2026-09-08/gate-020.log) reports 39 passing
+tests (including generation 5/5, GitLab obligations 4/4 and the compile-fail test),
+zero failures/ignored tests, formatting, Clippy with warnings denied, offline
+builds, adapter/CLI dependency boundaries, Rust 1.88 all-target checks, and ESS/AEP
+validation. The explicit [drift check](evidence/ess-toolchain-2026-09-08/drift-020.log)
+passes. The [package run](evidence/ess-toolchain-2026-09-08/package-020.log)
+validates and compiles the physical realization and projects the compiler's
+unmodified build IR. No `build-ir.projectable.json` or empty-secrets shim is needed.
+
+The retained image is `connectors-v2-gitlab:ess-020-local`,
+`sha256:1049d78855d994db3f92020b55e582697942ee2f7ca7a0ced531c8e023ee3a94`.
+Its [build evidence](evidence/ess-toolchain-2026-09-08/build-evidence.json) binds
+the toolchain, generated manifest, complete source snapshot and root filesystem.
+An [artifact check](evidence/ess-toolchain-2026-09-08/artifact-020.json) confirms
+the running image identity, reads its binary back and matches SHA-256
+`161aef1b55c13e424b351f598c634cfce6df2d72757f2489dfd9a9c987482733`, and
+rechecks all 81 code/Cargo source inputs against the package snapshot. Later
+documentation, evidence and planning updates describe the run; they are not claimed
+to have existed in that snapshot.
+
+Following the [container recipe](gitlab-generation.md#run-and-prove-the-container),
+the task created container `connectors-v2-ess-020-20260908`, exposed only
+`127.0.0.1:27201`, and ran a generic gateway on `127.0.0.1:27200`. Configuration
+and a fresh owner-only caller credential were mounted separately and read-only.
+The provider was public GitLab HTTPS with `gitlab-org/gitlab` as the sole allowed
+project and no upstream credential. After direct authenticated discovery passed,
+the gateway started and this command exited 0:
+
+```sh
+target/debug/connectors-conformance --gitlab-only --token-file .local/ess-020-live/secrets/service.secret --gitlab http://127.0.0.1:27201/ --gateway http://127.0.0.1:27200/ --allow-plaintext
+```
+
+The [live report](evidence/ess-toolchain-2026-09-08/live-020.json) passes all three
+groups: authenticated discovery/token refusal, direct reads/refusals, and federated
+reads/refusals. An explicit [continuation check](evidence/ess-toolchain-2026-09-08/continuation-020.json)
+additionally requires a cursor and a distinct second issue on both paths. Both
+services [exited 0 on SIGTERM](evidence/ess-toolchain-2026-09-08/shutdown-020.json);
+the task container, copied probe binary and caller credential were removed. The
+image and non-secret build reports remain local.
+
+Limits: the first gateway launch preceded downstream readiness and returned
+`{"code":"unavailable","message":"dependency unavailable"}`; it was restarted
+after successful direct discovery. Connectors exposed no admitted Docker operations,
+so the existing Docker executor was used. Private GitLab credentials remain fixture
+coverage; Kubernetes/SQL live acceptance was not rerun for this ESS-only upgrade.
+Historical evidence remains unchanged. No global executable, Atlas, remote,
+registry or consumer state was changed.

@@ -79,7 +79,7 @@ fn main() -> Result<()> {
     }
     generate(&specification, &generated, &ess, true)?;
     run(Command::new(&ess)
-        .args(["validate", "--path"])
+        .args(["specify", "validate", "--path"])
         .arg(root.join("ess")))?;
     if let Action::Package {
         output,
@@ -185,22 +185,13 @@ fn main() -> Result<()> {
         ],"outputs":[{"name":declaration.adapter,"release_unit":declaration.package,"node":"service","kind":"oci_image","repository":declaration.repository}]});
         save_json(&output.join("build.json"), &graph)?;
         run(Command::new(&ess)
-            .args(["build", "compile", "--path"])
+            .args(["generate", "build", "compile", "--path"])
             .arg(output.join("build.json"))
             .arg("--out")
             .arg(output.join("build-ir.json")))?;
-        // ESS 0.9.2 omits empty secrets on serialization but requires the
-        // field on IR input. Retain canonical bytes and make only this explicit
-        // empty-default adaptation for the pinned reader.
-        let mut projectable: Value =
-            serde_json::from_slice(&std::fs::read(output.join("build-ir.json"))?)?;
-        if projectable.get("secrets").is_none() {
-            projectable["secrets"] = json!([]);
-        }
-        save_json(&output.join("build-ir.projectable.json"), &projectable)?;
         run(Command::new(&ess)
-            .args(["project", "buildkit", "--ir"])
-            .arg(output.join("build-ir.projectable.json"))
+            .args(["generate", "project", "buildkit", "--ir"])
+            .arg(output.join("build-ir.json"))
             .arg("--out")
             .arg(output.join("buildkit")))?;
         let image_build = run(Command::new("docker")
@@ -237,12 +228,12 @@ fn main() -> Result<()> {
         let realization = json!({"type":"ess-realization/1","id":format!("{}-local",declaration.adapter),"specification":{"system":declaration.adapter,"version":"v1","source_digest":format!("sha256:{}",plan["provenance"]["source_digest"].as_str().ok_or("missing ESS source digest")?)},"synthesis":{"target":"rust-linux-x86_64/1","generator":format!("ess/{}",connectors_spec::toolchain::pin()?.ess)},"components":[component],"actors":[],"implementations":[{"id":"adapter-image","components":[component],"artifact":{"kind":"container","locator":format!("docker-daemon:{image}"),"identity":image_id}}],"entrypoints":[{"id":"http-service","title":format!("Configured {} HTTP service",declaration.adapter),"summary":"Generated typed requests and explicit provider bindings served by the asynchronous host.","primary":true,"interaction":"invoke","attachment":"network","availability":"internal","support":"preview","implementation":"adapter-image","actors":[],"surfaces":surfaces,"invocation":{"kind":"argv","argv":declaration.entrypoint.iter().chain(&declaration.command).collect::<Vec<_>>()},"requires":[{"kind":"filesystem","name":"configuration","summary":"Read-only configuration mounted at /config/service.json."},{"kind":"credential","name":"service-token","summary":"Owner-only caller credential mounted separately under /secrets."},{"kind":"network","name":"provider-api","summary":"Reachability to the explicitly configured provider HTTPS endpoint."}]}]});
         save_json(&output.join("realization.json"), &realization)?;
         run(Command::new(&ess)
-            .args(["realization", "validate", "--path"])
+            .args(["specify", "realization", "validate", "--path"])
             .arg(output.join("realization.json"))
             .arg("--spec")
             .arg(generated.join("ess")))?;
         let realized = run(Command::new(&ess)
-            .args(["realization", "compile", "--path"])
+            .args(["specify", "realization", "compile", "--path"])
             .arg(output.join("realization.json"))
             .arg("--spec")
             .arg(generated.join("ess"))

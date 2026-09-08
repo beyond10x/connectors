@@ -575,7 +575,7 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
     // ESS imports source facts independently. Its coverage is retained even when
     // opaque response schemas are outside its supported interface subset.
     let imported = Command::new(executable)
-        .args(["import", "openapi", "--path"])
+        .args(["infra", "import", "openapi", "--path"])
         .arg(root.join("upstream.openapi.json"))
         .args(["--format", "json"])
         .output()
@@ -589,11 +589,17 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
     lower(&spec, &root.join("ess"))?;
     ess(
         executable,
-        &["validate", "--path", root.join("ess").to_str().unwrap()],
+        &[
+            "specify",
+            "validate",
+            "--path",
+            root.join("ess").to_str().unwrap(),
+        ],
     )?;
     let ir = ess(
         executable,
         &[
+            "specify",
             "compile",
             "--path",
             root.join("ess").to_str().unwrap(),
@@ -605,6 +611,7 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
     ess(
         executable,
         &[
+            "generate",
             "synthesize",
             "--path",
             root.join("ess").to_str().unwrap(),

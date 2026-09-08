@@ -128,7 +128,7 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
         Command::new(ess)
             .current_dir(root)
             .env("TMPDIR", temp.path())
-            .args(["validate", "--path", "ess"]),
+            .args(["specify", "validate", "--path", "ess"]),
     )?;
     execute(command("aep").args(["plan", "artifact", "validate"]))?;
     println!("gate: all checks passed");

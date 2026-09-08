@@ -1,0 +1,32 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.ess
+#1 transferring dockerfile:
+#1 transferring dockerfile: 315B done
+#1 DONE 0.5s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.12
+#2 DONE 1.1s
+
+#3 docker-image://docker.io/docker/dockerfile:1.12@sha256:93bfd3b68c109427185cd78b4779fc82b484b0b7618e36d0f104d4d801e66d25
+#3 CACHED
+
+#4 [internal] load .dockerignore
+#4 transferring context:
+#4 transferring context: 2B done
+#4 DONE 0.4s
+
+#5 [internal] load build context
+#5 transferring context:
+#5 transferring context: 61.36MB 0.2s done
+#5 DONE 0.6s
+
+#6 [payload 1/1] COPY [rootfs,/]
+#6 DONE 0.4s
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers 0.3s done
+#7 writing image sha256:1049d78855d994db3f92020b55e582697942ee2f7ca7a0ced531c8e023ee3a94 done
+#7 naming to docker.io/library/connectors-v2-gitlab:ess-020-local 0.0s done
+#7 DONE 0.4s

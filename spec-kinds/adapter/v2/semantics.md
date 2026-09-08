@@ -32,7 +32,7 @@ source pointers, excluded optional parameters, and implementation obligations in
 `upstream.openapi.json` and `coverage.json`. Unselected operations create no runtime
 capability. Source authentication declarations never supply credentials or admission.
 
-ESS 0.9.2 cannot directly import this GitLab OpenAPI 3.0 document. The complete
+The pinned ESS release cannot directly import this GitLab OpenAPI 3.0 document. The complete
 attempt and refusals remain in `ess-import.json`; that file is not a successful ESS
 import. Connectors validates its supported source mappings and lowers the selected
 local request types into an `ess/1` domain and an owning component. ESS validates,

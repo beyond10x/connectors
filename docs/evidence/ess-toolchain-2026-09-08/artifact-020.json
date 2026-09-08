@@ -1,0 +1,22 @@
+{
+  "image_id": "sha256:1049d78855d994db3f92020b55e582697942ee2f7ca7a0ced531c8e023ee3a94",
+  "binary_sha256": "161aef1b55c13e424b351f598c634cfce6df2d72757f2489dfd9a9c987482733",
+  "image_binary_matches_build_evidence": true,
+  "code_and_cargo_sources_match_build_snapshot": true,
+  "checked_source_files": 81,
+  "build_ir_projected_without_modification": true,
+  "build_ir_has_secrets_field": false,
+  "bind_mounts": [
+    {
+      "destination": "/config",
+      "read_only": true
+    },
+    {
+      "destination": "/secrets",
+      "read_only": true
+    }
+  ],
+  "image_read_only": true,
+  "container_name": "/connectors-v2-ess-020-20260908",
+  "publication": "local only"
+}
