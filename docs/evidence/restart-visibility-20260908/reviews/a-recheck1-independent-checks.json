@@ -1,0 +1,47 @@
+{
+  "shape_expectations": 32,
+  "negative_shapes": 9,
+  "accepted_semantic_counterexamples": 7,
+  "copied_schemas": 7,
+  "identical_projection_files": 222,
+  "provider_archives_exact": 4,
+  "docker_endpoint_audit_exact": 9,
+  "old_provider_source_matches_own_initial_snapshot": true,
+  "compiled_archives": [
+    {
+      "source": "restart-visibility-compiled.json",
+      "count": null
+    },
+    {
+      "source": "rv-sessions-authored.json",
+      "count": 13
+    },
+    {
+      "source": "rv-sessions-suite.json",
+      "count": 201
+    }
+  ],
+  "added_private_values": [
+    "connectors.declarations.AvailabilityDecision",
+    "connectors.declarations.OperationAvailability",
+    "connectors.mutations.ContainerLifecycleAction",
+    "connectors.mutations.ContainerLifecycleIntent",
+    "connectors.mutations.DeploymentRestartTarget",
+    "connectors.mutations.IdempotencyKind",
+    "connectors.mutations.PreparedDeploymentRestart"
+  ],
+  "entity_fields_lifecycles_and_relations_unchanged": true,
+  "runtime_and_adapter_schemas_unchanged": [
+    "crates/connectors-core/src/lib.rs",
+    "crates/connectors-host/src/server.rs",
+    "adapters/kubernetes/src/lib.rs",
+    "spec-kinds/adapter/v1/semantics.md",
+    "spec-kinds/adapter/v1/schema.json",
+    "spec-kinds/adapter/v2/semantics.md",
+    "spec-kinds/adapter/v2/schema.json"
+  ],
+  "own_initial_source_archive_verified": 57,
+  "textual_cases": 42,
+  "recorded_gate_passed_tests": 50,
+  "limit": "No runtime, provider, policy, clock or race suite rerun; shapes, hashes, source interpretation, and recorded gate evidence only."
+}

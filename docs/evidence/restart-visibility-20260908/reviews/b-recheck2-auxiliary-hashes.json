@@ -1,0 +1,20 @@
+[
+  {
+    "source": ".local/mutation-profiles-20260908/rv-before-recheck2.json",
+    "snapshot": "auxiliary/rv-before-recheck2.json",
+    "sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+    "bytes": 234435
+  },
+  {
+    "source": ".local/mutation-profiles-20260908/rv-after-recheck2.json",
+    "snapshot": "auxiliary/rv-after-recheck2.json",
+    "sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+    "bytes": 234435
+  },
+  {
+    "source": ".local/mutation-profiles-20260908/restart-visibility-compiled.json",
+    "snapshot": "auxiliary/restart-visibility-compiled.json",
+    "sha256": "32e87a8fe96a9aa984f205bc847db54510b5596143a7a3ccbce99526fac1d2bb",
+    "bytes": 234435
+  }
+]
