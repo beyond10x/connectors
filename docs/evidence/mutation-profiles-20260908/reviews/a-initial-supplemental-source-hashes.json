@@ -1,0 +1,30 @@
+{
+  "created_utc": "2026-09-08T18:15:03.148987+00:00",
+  "files": [
+    {
+      "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/workloads.rs",
+      "snapshot": "old-source/crates/integration-kubernetes/src/workloads.rs",
+      "sha256": "b4d66b222e8e708b3cd19c762897f80991090ddf9e6c49908600067091bd4c3f",
+      "bytes": 47966
+    },
+    {
+      "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:providers/b10x.toml",
+      "snapshot": "old-source/providers/b10x.toml",
+      "sha256": "6c77128aebcdd0afb82414619071993f56f6eb6299126d75bb0de032729ffdb9",
+      "bytes": 55655
+    },
+    {
+      "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/local.rs",
+      "snapshot": "old-source/crates/integration-kubernetes/src/local.rs",
+      "sha256": "1fdb7c95fd27bf41d411055b50438e7043be6f8d0b092e458c7fe4c58c40f3ce",
+      "bytes": 53281
+    },
+    {
+      "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/local_tests.rs",
+      "snapshot": "old-source/crates/integration-kubernetes/src/local_tests.rs",
+      "sha256": "97ca3c46a20864885c4e496bdb18d70c3a205af51f5c3cca528b80f5b1db190b",
+      "bytes": 12500
+    }
+  ],
+  "scope": "Pinned old request/declaration and adapter behavior, supplementary to initial freeze"
+}

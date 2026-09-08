@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 18
+revision: 19
 ---
 ## Context
 
@@ -55,7 +55,7 @@ After the child stories complete, the intake ledger maps every source finding to
 | P3 | `story:contracts-tenant-header` — Use one configuration name for the monitoring tenant header | E30 |
 | P2 | `story:contracts-mutation-visibility` — Distinguish implemented, enabled and discoverable mutations | E12 |
 
-No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. The latest checkpoint below records current closure: seventeen owner stories are implemented for semantic specification scope and ten remain draft. Earlier planning and checkpoint sections preserve their historical counts and evidence.
+No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. The latest checkpoint below records current closure: eighteen owner stories are implemented for semantic specification scope and nine remain draft. Earlier planning and checkpoint sections preserve their historical counts and evidence.
 
 ## Sequencing and shared files
 
@@ -138,3 +138,11 @@ The checkpoint completes contracts-discovery-profiles (E07/E14/E32) and contract
 Both final independent reviewers approve with zero residual findings; eighteen individual review findings have fixed outcomes. ESS 0.20.0 validates 13 files/204 declarations, two 211-artifact projections match, 44 schema expectations and 43 textual traces record verification limits. Existing full gate/MSRV1.88 passes 50 Rust tests; no runtime or adapter-kind schema implementation. See docs/evidence/profile-persistence-20260908/verification.md and checkpoint.md.
 
 Current ledger: **27/48 original findings fixed, 21 open; 17 owner stories implemented, 10 draft.** This supersedes historical checkpoint counts. Remaining mutation/datasource/media and evidence/index/vocabulary stories, plus broader catalog/stack/open-decision work, keep the goal active. Logical port inventory is not a completed persistent entity graph or runtime backend proof. All work remains local.
+
+## Current specification checkpoint — mutation classification
+
+The checkpoint completes contracts-mutation-classification (F10/E06): mandatory external_write discriminator, complete closed executable and descriptive categories, remapped SIP and corrected Atlassian declarations, and separately settled SIP-leg effect, full ready receipt and session terminal/liveness facts. Known SIP establishment stays applied after application failure; partial outreach cannot become a no-effect refusal. Specific terminal errors preserve revocation/expiry/confirmed-close versus lost continuity.
+
+Both final independent reviewers approve with zero residual classification findings; five individual review findings have fixed outcomes. ESS 0.20.0 validates 13 files/208 declarations; 215 generated artifacts match across two projections. 27 schema cases (7 negatives, 4 accepted semantic counterexamples) and 25 textual cases state verification limits. Existing full gate/MSRV1.88 passes 50 Rust tests; separate sessions author/synthesize compiles 13/201 cases. No runtime, public codec or adapter-kind schema implementation was added. See docs/evidence/mutation-profiles-20260908/classification-verification.md and classification-dispositions.md.
+
+Current ledger: **29/48 original findings fixed, 19 open; 18 owner stories implemented, 9 draft.** Restart/visibility remain pending, including nine individual findings in this cluster's initial review. Remaining datasource/media/evidence/index/vocabulary stories and broader catalog/stack/open-decision work keep the full specification goal active. Concrete protocol proof and runtime enforcement remain explicit later binding prerequisites. All work remains local.

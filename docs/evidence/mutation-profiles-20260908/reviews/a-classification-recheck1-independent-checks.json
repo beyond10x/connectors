@@ -1,0 +1,53 @@
+{
+  "value_expectations": 27,
+  "negative_shapes": 7,
+  "accepted_semantic_counterexamples": 4,
+  "projection_count": 215,
+  "projection_bytes_identical": true,
+  "selected_schema_copies": 4,
+  "gzip_evidence_hashes_verified": [
+    {
+      "source": "classification-compiled.json",
+      "top_level": [
+        "system",
+        "version",
+        "naming",
+        "domains",
+        "types",
+        "conversions",
+        "entities",
+        "commands",
+        "events",
+        "errors",
+        "views",
+        "actors",
+        "bindings",
+        "components",
+        "workloads"
+      ],
+      "scenario_count": null
+    },
+    {
+      "source": "classification-sessions-authored.json",
+      "top_level": [
+        "provenance",
+        "scenarios"
+      ],
+      "scenario_count": 13
+    },
+    {
+      "source": "classification-sessions-suite.json",
+      "top_level": [
+        "provenance",
+        "scenarios"
+      ],
+      "scenario_count": 201
+    }
+  ],
+  "own_archived_initial_sources": 57,
+  "recorded_total_archived_sources": 125,
+  "peer_archive_limit": "Peer reports and archives were not opened; 125 aggregate is recorded transcript/audit evidence, while own 57 source entries were independently verified.",
+  "textual_traces": 25,
+  "recorded_gate_passed_tests": 50,
+  "runtime_tests_rerun": false
+}
