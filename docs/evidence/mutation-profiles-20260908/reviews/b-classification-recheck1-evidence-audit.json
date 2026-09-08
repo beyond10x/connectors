@@ -1,0 +1,31 @@
+{
+  "shape_decisions": 27,
+  "shape_negative": 7,
+  "accepted_semantic_counterexamples": 4,
+  "identical_projection_artifacts": 215,
+  "exact_schema_copies": 4,
+  "compiled_archives_verified": 3,
+  "sessions_authored": 13,
+  "sessions_suite": 201,
+  "sessions_authored_unchanged": true,
+  "recorded_existing_tests": 50,
+  "recorded_gate_success": true,
+  "textual_expectations": 25,
+  "own_archived_source_entries_verified": 68,
+  "own_archived_report_byte_identical": true,
+  "peer_archive_not_inspected": true,
+  "frozen_files": 39,
+  "snapshot_hash_mismatches": [],
+  "live_source_changes_since_freeze": [],
+  "ir_new_types": [
+    "connectors.mutations.EffectDeclaration",
+    "connectors.mutations.ExecutableEffect",
+    "connectors.mutations.SemanticEffect",
+    "connectors.mutations.SessionEstablishmentObservation"
+  ],
+  "ir_old_types_unchanged": true,
+  "ir_changed_sections": [
+    "domains",
+    "types"
+  ]
+}

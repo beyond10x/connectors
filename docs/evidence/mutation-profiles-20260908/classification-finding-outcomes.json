@@ -1,0 +1,37 @@
+[
+  {
+    "id": "MP-A-01",
+    "owner": "story:contracts-mutation-classification",
+    "review": "review-result:mutation-profiles-a-initial-20260908",
+    "outcome": "fixed",
+    "ref": "docs/evidence/mutation-profiles-20260908/classification-dispositions.md#mp-a-01"
+  },
+  {
+    "id": "MP-A-02",
+    "owner": "story:contracts-mutation-classification",
+    "review": "review-result:mutation-profiles-a-initial-20260908",
+    "outcome": "fixed",
+    "ref": "docs/evidence/mutation-profiles-20260908/classification-dispositions.md#mp-a-02"
+  },
+  {
+    "id": "MP-B-01",
+    "owner": "story:contracts-mutation-classification",
+    "review": "review-result:mutation-profiles-b-initial-20260908",
+    "outcome": "fixed",
+    "ref": "docs/evidence/mutation-profiles-20260908/classification-dispositions.md#mp-b-01"
+  },
+  {
+    "id": "MP-B-02",
+    "owner": "story:contracts-mutation-classification",
+    "review": "review-result:mutation-profiles-b-initial-20260908",
+    "outcome": "fixed",
+    "ref": "docs/evidence/mutation-profiles-20260908/classification-dispositions.md#mp-b-02"
+  },
+  {
+    "id": "MP-B-C01",
+    "owner": "story:contracts-mutation-classification",
+    "review": "review-result:mutation-classification-b-recheck1-20260908",
+    "outcome": "fixed",
+    "ref": "docs/evidence/mutation-profiles-20260908/classification-dispositions.md#mp-b-c01"
+  }
+]

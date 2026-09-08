@@ -1,0 +1,325 @@
+{
+  "baseline": "c7cd05aab947d09992e55bc217aef5db3546f4ec",
+  "created_utc": "2026-09-08T18:12:36.354965+00:00",
+  "scope": "Exact git-show initial sources; no working-tree revisions or other reviewer output",
+  "files": [
+    {
+      "source": ".engineering/planning/story/contracts-mutation-classification.md",
+      "snapshot": "sources/.engineering/planning/story/contracts-mutation-classification.md",
+      "sha256": "86a084182b12d78d5b543f2511151f690adac49e5848a4275f6f14863f7aeb98",
+      "bytes": 3794
+    },
+    {
+      "source": ".engineering/planning/story/contracts-mutation-visibility.md",
+      "snapshot": "sources/.engineering/planning/story/contracts-mutation-visibility.md",
+      "sha256": "9a2b0dc42fddcb73dbdc351cec97f6b8869c0aaabeabb361f7d63975028e30bc",
+      "bytes": 4102
+    },
+    {
+      "source": ".engineering/planning/story/contracts-restart-idempotency.md",
+      "snapshot": "sources/.engineering/planning/story/contracts-restart-idempotency.md",
+      "sha256": "371e793fac48cfba5b7f3a3a35c864d519f865659ef5980cd97a14af3cce2cd2",
+      "bytes": 4021
+    },
+    {
+      "source": "AGENTS.md",
+      "snapshot": "sources/AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "source": "contracts/README.md",
+      "snapshot": "sources/contracts/README.md",
+      "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+      "bytes": 9290
+    },
+    {
+      "source": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "c69e52961194b65b8d305adfb00316afcfa5b2beded322d31fea8d77f548fa9d",
+      "bytes": 27170
+    },
+    {
+      "source": "contracts/auth/capability/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+      "bytes": 15606
+    },
+    {
+      "source": "contracts/auth/connection/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "c23f0b0a09cc80281d248a61040f9d343bdd0806d060d2020be337fdd9b70119",
+      "bytes": 22905
+    },
+    {
+      "source": "contracts/auth/custody/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "787b2b7aee0aa3871e82859bb0f0af7c1ba8db62a817ede9f0d94d22e7491d61",
+      "bytes": 10845
+    },
+    {
+      "source": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "33ab1618ddabd77f8be425504fd9994111965344b3d03d7c607a129578ed0e40",
+      "bytes": 32482
+    },
+    {
+      "source": "contracts/auth/management.md",
+      "snapshot": "sources/contracts/auth/management.md",
+      "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649",
+      "bytes": 14973
+    },
+    {
+      "source": "contracts/auth/profile/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+      "bytes": 17305
+    },
+    {
+      "source": "contracts/catalog/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/catalog/v1alpha1/semantics.md",
+      "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+      "bytes": 23089
+    },
+    {
+      "source": "contracts/datasources/logs/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/datasources/logs/v1alpha1/semantics.md",
+      "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+      "bytes": 11014
+    },
+    {
+      "source": "contracts/datasources/records/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "bytes": 7761
+    },
+    {
+      "source": "contracts/datasources/series/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/datasources/series/v1alpha1/semantics.md",
+      "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+      "bytes": 7034
+    },
+    {
+      "source": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "0a1a0c7387f102101c28e72d471a88540e7ae245beb0496015632306fd6cefab",
+      "bytes": 16597
+    },
+    {
+      "source": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "e471a745e3bdb0667d20434d9dd23455c3de79123c766cb563bf7408a048aaaf",
+      "bytes": 37524
+    },
+    {
+      "source": "contracts/media/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/media/v1alpha1/semantics.md",
+      "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+      "bytes": 11049
+    },
+    {
+      "source": "contracts/operations/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/operations/v1alpha1/semantics.md",
+      "sha256": "8d03e7ef2e690397444784ca1501847ed9af714a76ade2c5c3ea72356fc35a96",
+      "bytes": 39553
+    },
+    {
+      "source": "contracts/service/compatibility.md",
+      "snapshot": "sources/contracts/service/compatibility.md",
+      "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537",
+      "bytes": 39435
+    },
+    {
+      "source": "contracts/service/delegation.md",
+      "snapshot": "sources/contracts/service/delegation.md",
+      "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1",
+      "bytes": 34883
+    },
+    {
+      "source": "contracts/service/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "source": "contracts/service/v1alpha2/semantics.md",
+      "snapshot": "sources/contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+      "bytes": 23016
+    },
+    {
+      "source": "contracts/sessions/v1alpha1/semantics.md",
+      "snapshot": "sources/contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "cf4d1f0f7ec1dc886822c5ceffcda0fd36d1f27ade1b34349f2ec3185da4821f",
+      "bytes": 21623
+    },
+    {
+      "source": "crates/connectors-core/src/lib.rs",
+      "snapshot": "sources/crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+      "bytes": 8489
+    },
+    {
+      "source": "crates/connectors-host/src/lib.rs",
+      "snapshot": "sources/crates/connectors-host/src/lib.rs",
+      "sha256": "fe4602586f76cbd1c04709d2f674993e350f8e599036b520d56c819564914421",
+      "bytes": 988
+    },
+    {
+      "source": "crates/connectors-host/src/server.rs",
+      "snapshot": "sources/crates/connectors-host/src/server.rs",
+      "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578",
+      "bytes": 11369
+    },
+    {
+      "source": "docs/adapters/atlassian.md",
+      "snapshot": "sources/docs/adapters/atlassian.md",
+      "sha256": "52563e6bb1a117b51995d2f000f9136b22ed8289f0ab71be6870da742a4c8396",
+      "bytes": 14799
+    },
+    {
+      "source": "docs/adapters/docker.md",
+      "snapshot": "sources/docs/adapters/docker.md",
+      "sha256": "b9165c65233c52eba513a4091f5242a5e6ccc850ac68aefc947275a947d3c11a",
+      "bytes": 7342
+    },
+    {
+      "source": "docs/adapters/kubernetes.md",
+      "snapshot": "sources/docs/adapters/kubernetes.md",
+      "sha256": "1aefdd83173c941acf126bb357a7b80ed3ad88262412f5e3d6cb7b9c3ea4725b",
+      "bytes": 17035
+    },
+    {
+      "source": "docs/adapters/media-session.md",
+      "snapshot": "sources/docs/adapters/media-session.md",
+      "sha256": "b3a1f2a27a1903a5f98e1cf8ad7c312fee4af96227289451f686a5ca21b3255a",
+      "bytes": 13537
+    },
+    {
+      "source": "docs/design.md",
+      "snapshot": "sources/docs/design.md",
+      "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a",
+      "bytes": 139742
+    },
+    {
+      "source": "ess/domains/auth_access.yaml",
+      "snapshot": "sources/ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+      "bytes": 5153
+    },
+    {
+      "source": "ess/domains/connection_admission.yaml",
+      "snapshot": "sources/ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "source": "ess/domains/credential_evidence.yaml",
+      "snapshot": "sources/ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "source": "ess/domains/credentials.yaml",
+      "snapshot": "sources/ess/domains/credentials.yaml",
+      "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240",
+      "bytes": 2600
+    },
+    {
+      "source": "ess/domains/declarations.yaml",
+      "snapshot": "sources/ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "source": "ess/domains/delegation.yaml",
+      "snapshot": "sources/ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "source": "ess/domains/discovery.yaml",
+      "snapshot": "sources/ess/domains/discovery.yaml",
+      "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0",
+      "bytes": 7125
+    },
+    {
+      "source": "ess/domains/idempotency.yaml",
+      "snapshot": "sources/ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "source": "ess/domains/mutations.yaml",
+      "snapshot": "sources/ess/domains/mutations.yaml",
+      "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+      "bytes": 8245
+    },
+    {
+      "source": "ess/domains/refresh.yaml",
+      "snapshot": "sources/ess/domains/refresh.yaml",
+      "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38",
+      "bytes": 13375
+    },
+    {
+      "source": "ess/domains/service_wire.yaml",
+      "snapshot": "sources/ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "source": "ess/domains/sessions.yaml",
+      "snapshot": "sources/ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208
+    },
+    {
+      "source": "ess/system.yaml",
+      "snapshot": "sources/ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+      "bytes": 480
+    },
+    {
+      "source": "spec-kinds/adapter/v1/schema.json",
+      "snapshot": "sources/spec-kinds/adapter/v1/schema.json",
+      "sha256": "3289659cf5917956ae402de0d6ee5b63fb2300b667cccc26950576dd8a42f368",
+      "bytes": 1337
+    },
+    {
+      "source": "spec-kinds/adapter/v1/semantics.md",
+      "snapshot": "sources/spec-kinds/adapter/v1/semantics.md",
+      "sha256": "475bf4a517d13ed46d75e6d70dcad1460b7f54ec5160295dcd820cde8d6c0315",
+      "bytes": 2784
+    },
+    {
+      "source": "spec-kinds/adapter/v2/schema.json",
+      "snapshot": "sources/spec-kinds/adapter/v2/schema.json",
+      "sha256": "d4e7df149b7d4fefd8bc919e620a104c1365f633cf2fe136d53c367509fae2d6",
+      "bytes": 7014
+    },
+    {
+      "source": "spec-kinds/adapter/v2/semantics.md",
+      "snapshot": "sources/spec-kinds/adapter/v2/semantics.md",
+      "sha256": "f142a7b7f97328f4ffc25b1491b5a4ca8673d94c2e8a5c93dfc3957fbe000efc",
+      "bytes": 4652
+    },
+    {
+      "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/local_workloads.rs",
+      "snapshot": "old-source/crates/integration-kubernetes/src/local_workloads.rs",
+      "sha256": "08d85a2bcdad8b663c16640c18842dea021783d77bf7eb50d17472566a889caf",
+      "bytes": 20038
+    },
+    {
+      "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/local_workloads_tests.rs",
+      "snapshot": "old-source/crates/integration-kubernetes/src/local_workloads_tests.rs",
+      "sha256": "aaad9474837ecdcfacc936bf1e1f38ec2bf3cc5fdfbf5e85eb28ebcfef93df5c",
+      "bytes": 4450
+    },
+    {
+      "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+      "snapshot": "old-source/docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+      "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54",
+      "bytes": 13800
+    }
+  ]
+}

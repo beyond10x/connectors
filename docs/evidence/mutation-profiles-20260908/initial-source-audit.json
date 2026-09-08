@@ -1,0 +1,627 @@
+[
+  {
+    "reviewer": "a",
+    "snapshot": "sources/.engineering/planning/story/contracts-mutation-classification.md",
+    "sha256": "86a084182b12d78d5b543f2511151f690adac49e5848a4275f6f14863f7aeb98"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/.engineering/planning/story/contracts-mutation-visibility.md",
+    "sha256": "9a2b0dc42fddcb73dbdc351cec97f6b8869c0aaabeabb361f7d63975028e30bc"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/.engineering/planning/story/contracts-restart-idempotency.md",
+    "sha256": "371e793fac48cfba5b7f3a3a35c864d519f865659ef5980cd97a14af3cce2cd2"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/AGENTS.md",
+    "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/README.md",
+    "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/auth/acquisition/v1alpha1/semantics.md",
+    "sha256": "c69e52961194b65b8d305adfb00316afcfa5b2beded322d31fea8d77f548fa9d"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/auth/capability/v1alpha1/semantics.md",
+    "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/auth/connection/v1alpha1/semantics.md",
+    "sha256": "c23f0b0a09cc80281d248a61040f9d343bdd0806d060d2020be337fdd9b70119"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/auth/custody/v1alpha1/semantics.md",
+    "sha256": "787b2b7aee0aa3871e82859bb0f0af7c1ba8db62a817ede9f0d94d22e7491d61"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/auth/evidence/v1alpha1/semantics.md",
+    "sha256": "33ab1618ddabd77f8be425504fd9994111965344b3d03d7c607a129578ed0e40"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/auth/management.md",
+    "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/auth/profile/v1alpha1/semantics.md",
+    "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/catalog/v1alpha1/semantics.md",
+    "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/datasources/logs/v1alpha1/semantics.md",
+    "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/datasources/records/v1alpha1/semantics.md",
+    "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/datasources/series/v1alpha1/semantics.md",
+    "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+    "sha256": "0a1a0c7387f102101c28e72d471a88540e7ae245beb0496015632306fd6cefab"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/discovery/resources/v1alpha1/semantics.md",
+    "sha256": "e471a745e3bdb0667d20434d9dd23455c3de79123c766cb563bf7408a048aaaf"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/media/v1alpha1/semantics.md",
+    "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/operations/v1alpha1/semantics.md",
+    "sha256": "8d03e7ef2e690397444784ca1501847ed9af714a76ade2c5c3ea72356fc35a96"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/service/compatibility.md",
+    "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/service/delegation.md",
+    "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/service/v1alpha1/semantics.md",
+    "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/service/v1alpha2/semantics.md",
+    "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/contracts/sessions/v1alpha1/semantics.md",
+    "sha256": "cf4d1f0f7ec1dc886822c5ceffcda0fd36d1f27ade1b34349f2ec3185da4821f"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/crates/connectors-core/src/lib.rs",
+    "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/crates/connectors-host/src/lib.rs",
+    "sha256": "fe4602586f76cbd1c04709d2f674993e350f8e599036b520d56c819564914421"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/crates/connectors-host/src/server.rs",
+    "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/docs/adapters/atlassian.md",
+    "sha256": "52563e6bb1a117b51995d2f000f9136b22ed8289f0ab71be6870da742a4c8396"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/docs/adapters/docker.md",
+    "sha256": "b9165c65233c52eba513a4091f5242a5e6ccc850ac68aefc947275a947d3c11a"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/docs/adapters/kubernetes.md",
+    "sha256": "1aefdd83173c941acf126bb357a7b80ed3ad88262412f5e3d6cb7b9c3ea4725b"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/docs/adapters/media-session.md",
+    "sha256": "b3a1f2a27a1903a5f98e1cf8ad7c312fee4af96227289451f686a5ca21b3255a"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/docs/design.md",
+    "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/auth_access.yaml",
+    "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/connection_admission.yaml",
+    "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/credential_evidence.yaml",
+    "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/credentials.yaml",
+    "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/declarations.yaml",
+    "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/delegation.yaml",
+    "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/discovery.yaml",
+    "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/idempotency.yaml",
+    "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/mutations.yaml",
+    "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/refresh.yaml",
+    "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/service_wire.yaml",
+    "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/domains/sessions.yaml",
+    "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/ess/system.yaml",
+    "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/spec-kinds/adapter/v1/schema.json",
+    "sha256": "3289659cf5917956ae402de0d6ee5b63fb2300b667cccc26950576dd8a42f368"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/spec-kinds/adapter/v1/semantics.md",
+    "sha256": "475bf4a517d13ed46d75e6d70dcad1460b7f54ec5160295dcd820cde8d6c0315"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/spec-kinds/adapter/v2/schema.json",
+    "sha256": "d4e7df149b7d4fefd8bc919e620a104c1365f633cf2fe136d53c367509fae2d6"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "sources/spec-kinds/adapter/v2/semantics.md",
+    "sha256": "f142a7b7f97328f4ffc25b1491b5a4ca8673d94c2e8a5c93dfc3957fbe000efc"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "old-source/crates/integration-kubernetes/src/local_workloads.rs",
+    "sha256": "08d85a2bcdad8b663c16640c18842dea021783d77bf7eb50d17472566a889caf"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "old-source/crates/integration-kubernetes/src/local_workloads_tests.rs",
+    "sha256": "aaad9474837ecdcfacc936bf1e1f38ec2bf3cc5fdfbf5e85eb28ebcfef93df5c"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "old-source/docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+    "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "old-source/crates/integration-kubernetes/src/workloads.rs",
+    "sha256": "b4d66b222e8e708b3cd19c762897f80991090ddf9e6c49908600067091bd4c3f"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "old-source/providers/b10x.toml",
+    "sha256": "6c77128aebcdd0afb82414619071993f56f6eb6299126d75bb0de032729ffdb9"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "old-source/crates/integration-kubernetes/src/local.rs",
+    "sha256": "1fdb7c95fd27bf41d411055b50438e7043be6f8d0b092e458c7fe4c58c40f3ce"
+  },
+  {
+    "reviewer": "a",
+    "snapshot": "old-source/crates/integration-kubernetes/src/local_tests.rs",
+    "sha256": "97ca3c46a20864885c4e496bdb18d70c3a205af51f5c3cca528b80f5b1db190b"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/.engineering/planning/story/contracts-mutation-classification.md",
+    "sha256": "86a084182b12d78d5b543f2511151f690adac49e5848a4275f6f14863f7aeb98"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/.engineering/planning/story/contracts-mutation-visibility.md",
+    "sha256": "9a2b0dc42fddcb73dbdc351cec97f6b8869c0aaabeabb361f7d63975028e30bc"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/.engineering/planning/story/contracts-restart-idempotency.md",
+    "sha256": "371e793fac48cfba5b7f3a3a35c864d519f865659ef5980cd97a14af3cce2cd2"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/AGENTS.md",
+    "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/adapters/kubernetes/src/lib.rs",
+    "sha256": "9b97d3616f19f1dbaeab9d78b011f5265bd4b647de55fc5be3418c2bb82f2548"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/adapters/kubernetes/src/main.rs",
+    "sha256": "121e4cdf587e0bba26a565431105cdd16253f3282aa6dab2d802fa92290a4d48"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/README.md",
+    "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/auth/acquisition/v1alpha1/semantics.md",
+    "sha256": "c69e52961194b65b8d305adfb00316afcfa5b2beded322d31fea8d77f548fa9d"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/auth/capability/v1alpha1/semantics.md",
+    "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/auth/connection/v1alpha1/semantics.md",
+    "sha256": "c23f0b0a09cc80281d248a61040f9d343bdd0806d060d2020be337fdd9b70119"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/auth/custody/v1alpha1/semantics.md",
+    "sha256": "787b2b7aee0aa3871e82859bb0f0af7c1ba8db62a817ede9f0d94d22e7491d61"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/auth/evidence/v1alpha1/semantics.md",
+    "sha256": "33ab1618ddabd77f8be425504fd9994111965344b3d03d7c607a129578ed0e40"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/auth/management.md",
+    "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/auth/profile/v1alpha1/semantics.md",
+    "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/catalog/v1alpha1/semantics.md",
+    "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/datasources/logs/v1alpha1/semantics.md",
+    "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/datasources/records/v1alpha1/semantics.md",
+    "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/datasources/series/v1alpha1/semantics.md",
+    "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/discovery/composition.md",
+    "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+    "sha256": "0a1a0c7387f102101c28e72d471a88540e7ae245beb0496015632306fd6cefab"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/discovery/resources/v1alpha1/semantics.md",
+    "sha256": "e471a745e3bdb0667d20434d9dd23455c3de79123c766cb563bf7408a048aaaf"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/media/v1alpha1/semantics.md",
+    "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/operations/v1alpha1/semantics.md",
+    "sha256": "8d03e7ef2e690397444784ca1501847ed9af714a76ade2c5c3ea72356fc35a96"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/service/compatibility.md",
+    "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/service/delegation.md",
+    "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/service/v1alpha1/semantics.md",
+    "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/service/v1alpha2/semantics.md",
+    "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/contracts/sessions/v1alpha1/semantics.md",
+    "sha256": "cf4d1f0f7ec1dc886822c5ceffcda0fd36d1f27ade1b34349f2ec3185da4821f"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-client/src/lib.rs",
+    "sha256": "5a278c168bddf891fb678cd73255421e3a2708a1449edbe53b43158b9f41faa5"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-core/src/lib.rs",
+    "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-host/src/credentials.rs",
+    "sha256": "d033e1012a944ed81047bd1896d5217a87834bc28e1cf5cc013a576f2e2c04c0"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-host/src/federation.rs",
+    "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-host/src/http.rs",
+    "sha256": "ec87963a6f54a7a66a8d486c00e874173104b917c721f75248fb6552df478b79"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-host/src/lib.rs",
+    "sha256": "fe4602586f76cbd1c04709d2f674993e350f8e599036b520d56c819564914421"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-host/src/schema.rs",
+    "sha256": "3d19cb40bcdf1cfca31af59ad3e70ccaf17c2b5648d06c6b23339d22d2e34e6c"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-host/src/server.rs",
+    "sha256": "f840c856cb8e72f1685872314caede0fbca76ce831b62c42e1da1779d6f16578"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-sdk/src/lib.rs",
+    "sha256": "43ebb6e2f775755a6bebb24f0a4e5075cec7c2aaeda79fcb037c5ea07d134290"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/adapters/atlassian.md",
+    "sha256": "52563e6bb1a117b51995d2f000f9136b22ed8289f0ab71be6870da742a4c8396"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/adapters/catalog.md",
+    "sha256": "2c8f49551bf7102b7292b2382a8658b6004d03df74e3f731bcc6cff4bd7e8861"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/adapters/docker.md",
+    "sha256": "b9165c65233c52eba513a4091f5242a5e6ccc850ac68aefc947275a947d3c11a"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/adapters/grafana.md",
+    "sha256": "aee87ea211c97ddda65bd032be79fd40cde2bc34106a7e1925360532a863c602"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/adapters/kubernetes.md",
+    "sha256": "1aefdd83173c941acf126bb357a7b80ed3ad88262412f5e3d6cb7b9c3ea4725b"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/adapters/media-session.md",
+    "sha256": "b3a1f2a27a1903a5f98e1cf8ad7c312fee4af96227289451f686a5ca21b3255a"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/cli-migration-v1-to-v2.md",
+    "sha256": "3bc4c1a238f77c151c5c9a559c4f33d2331a1aab8caa41ef2e087ef6642fb88e"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/design.md",
+    "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/docs/stack-integration-proposal.md",
+    "sha256": "4286fe96332d9affa92a5e8e82cab3261a4c5e98b72573761ed4706906d6a99a"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/auth_access.yaml",
+    "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/connection_admission.yaml",
+    "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/credential_evidence.yaml",
+    "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/credentials.yaml",
+    "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/declarations.yaml",
+    "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/delegation.yaml",
+    "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/discovery.yaml",
+    "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/idempotency.yaml",
+    "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/mutations.yaml",
+    "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/refresh.yaml",
+    "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/service_wire.yaml",
+    "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/domains/sessions.yaml",
+    "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/ess/system.yaml",
+    "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/spec-kinds/adapter/v1/schema.json",
+    "sha256": "3289659cf5917956ae402de0d6ee5b63fb2300b667cccc26950576dd8a42f368"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/spec-kinds/adapter/v1/semantics.md",
+    "sha256": "475bf4a517d13ed46d75e6d70dcad1460b7f54ec5160295dcd820cde8d6c0315"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "snapshot/crates/connectors-spec/src/lib.rs",
+    "sha256": "cb63c331da0ca2bacba28e4f3a9d0171887772eea00b0c48fcd0431f68ba4383"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "historical/crates/integration-kubernetes/src/local_workloads.rs",
+    "sha256": "08d85a2bcdad8b663c16640c18842dea021783d77bf7eb50d17472566a889caf"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "historical/crates/integration-kubernetes/src/local_workloads_tests.rs",
+    "sha256": "aaad9474837ecdcfacc936bf1e1f38ec2bf3cc5fdfbf5e85eb28ebcfef93df5c"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "historical/providers/b10x.toml",
+    "sha256": "6c77128aebcdd0afb82414619071993f56f6eb6299126d75bb0de032729ffdb9"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "historical/crates/voice-runtime/README.md",
+    "sha256": "918783c88fe49811cf24c7f78f9bbe6ac23011d7f90184efadb01c9539f7a7c7"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "historical/docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+    "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54"
+  },
+  {
+    "reviewer": "b",
+    "snapshot": "historical/docs/design/05-native-sip-and-rtvbp.md",
+    "sha256": "15023051037e2f859de2e145651bdd1e09bab9a075edfc1b0c86a0c87503ba4b"
+  }
+]

@@ -14,7 +14,7 @@ Rebuild means: outbound dial parity with `sip-dial`, the narrow PCM profile, DTM
 
 | Old surface | Source | Disposition |
 |---|---|---|
-| `sip-dial`: `session_establishment`, `sip_v1`, risk high, non-idempotent, `send_external`, `human_visible`; `target` opaque trunk alias (never URI/host/port), `number` digits only; response `call`, `session`, optional `channel`, `state = established` | `providers/b10x.toml:741-760` | preserve → `operations` `mutation` with `effects: [session_establishment, send_external]` returning a session ref (`sessions` `outbound` profile) |
+| `sip-dial`: `interaction_shape = session_establishment`, `sip_v1`, risk high, non-idempotent; old `effects = [write, network]`, `semantic_effects = [send_external, human_visible]`; `target` opaque trunk alias (never URI/host/port), `number` digits only; response `call`, `session`, optional `channel`, `state = established` | `providers/b10x.toml:741-760` | preserve behavior with explicitly remapped vocabulary → `operations` `mutation`, `effects: [external_write, network, send_external, session_establishment]`, `semantic_effects: [human_visible]`, returning a session ref only on a ready result (`sessions` `outbound` profile) |
 | Connectors owns the configured SIP Connection, trunk credentials, destination/listener aperture, grant admission, inbound tenant/channel binding, driver selection, placement, call lifecycle, session-authority issuance, audit; `sip_v1` driver uses pinned `codewandler/sipx`; the endpoint is a user agent, not a proxy/registrar/PBX/TURN/IVR; caller ID untrusted | `docs/design/05:33-49` | preserve; tenant/channel binding deferred |
 | `driver-sip`: only crate opening SIP/RTP sockets; consumes non-serializable `AdmittedSipPlan`; implements `TelephonySession`; sipx `v1.0.0-rc.23`; loopback by default; `OperatorAuthorizedDevelopment` mode for explicit non-loopback apertures; sipx binds its media port internally and can transmit to SDP-learned peers before validation, so every learnable address and port range must be pre-admitted; production deps contain sipx but not RTVBP | `crates/driver-sip/README.md:1-25` | preserve the socket-ownership and aperture rules; drop the service-layer `AdmittedSipPlan` dependency (`docs/design.md:82`): the adapter takes configuration and a `sip-credential-lease` |
 | Credentials: exactly username then password, passed to `sipx_call::Credentials` | `crates/driver-sip/src/lib.rs:40-42,104-114` | preserve → `auth.capability` `sip-credential-lease` |
@@ -34,7 +34,7 @@ SIP adapter:
 
 | Contract | Profile / use | Why |
 |---|---|---|
-| `operations` `mutation` | `sip.dial` with `effects: [session_establishment, send_external, human_visible]`, `idempotency: none`, `approval: required` | placing a call rings a real endpoint; needs approval binding and unknown-outcome semantics |
+| `operations` `mutation` | `sip.dial` with `effects: [external_write, network, send_external, session_establishment]`, `semantic_effects: [human_visible]`, `idempotency: none`, `approval: required` | placing a call rings a real endpoint; needs approval binding and unknown-outcome semantics |
 | `sessions` | `outbound`, `inbound_offer`, `duplex_transport` | call lifecycle, offer admission, lease, revocation, terminal races |
 | `media` | `pcm-s16le-8k-mono-20ms`; capabilities `dtmf`, `interrupt` | the negotiated duplex audio and controls the driver already implements |
 | `auth.profile` | `sip.trunk` (`sip_digest`, purpose `trunk_registration`) | trunk username/password |
@@ -60,12 +60,36 @@ Local audio (composition binding): consumes `media` with the same profile; devic
 
 | New id | Contract / profile | Effects | Old id |
 |---|---|---|---|
-| `sip.dial` | mutation → sessions `outbound` | session_establishment, send_external, human_visible | `sip-dial` |
+| `sip.dial` | mutation → sessions `outbound`; `idempotency: none`, approval required, risk high | external_write, network, send_external, session_establishment; **semantic_effects:** human_visible | `sip-dial` |
 | `sip.sessions.list` | records list (safe session summaries) | read | — |
 | `session.close` | sessions control | terminal | hangup via driver |
 | `session.signal` (dtmf) | media capability | — | driver DTMF |
 | `session.interrupt` | media capability | — | barge-in |
 | (inbound) `offer` → host `accept`/`reject` | sessions `inbound_offer` | — | designed, not shipped |
+
+### 4.1 Dial effect and ready-session result
+
+This profile selects **confirmed establishment of the exact admitted SIP leg** as definitive dial-effect success. The adapter must provide trusted protocol evidence for that exact trunk, destination and attempt. A local port, open socket, provisional ringing, generic HTTP/SIP transport success or caller assertion is insufficient. The binding must specify how its SIP implementation proves establishment and proves a no-effect refusal before it may advertise this operation; the old runtime's sequencing is evidence of separate phases, not that proof. This is a selected semantic boundary, not a claim that the predecessor implemented mutation outcome metadata.
+
+The public successful operation result additionally requires the authenticated application binding and every declared stream to be ready. It is the full ready receipt, not an early SIP port. These two facts use [operations §4.1](../../contracts/operations/v1alpha1/semantics.md#41-session-establishing-mutation-outcomes) and the existing applied-plus-error response rule:
+
+| Observed sequence | Mutation classification / ordinary result | Ready handle |
+|---|---|---|
+| Input, grant, approval or preflight refuses; dispatch gate definitely did not open | `not_attempted` / specific safe refusal | none |
+| Dispatch may have occurred; no definitive establishment or complete no-effect evidence | `unknown` / `outcome_unknown` | none |
+| Definitive binding evidence proves the entire dial was refused without business effects, including no provisional outreach | `refused` / safe provider refusal | none |
+| Target may have rung, including known ringing, but establishment is unproved; final rejection, cancellation or application failure follows | `unknown` / `outcome_unknown`; known partial outreach must not be erased | none |
+| Exact SIP establishment confirmed, then application connection, authority redemption or media readiness fails | `applied` / safe error (`unavailable`, `offer_rejected` or `session_not_ready` as applicable) | none |
+| Exact SIP establishment and all streams/application ready; ready decision wins before a terminal and result remains safely deliverable | `applied` / success with `state: ready` | one ready receipt |
+| SIP established; terminal wins before full readiness | `applied` / `offer_rejected` or other applicable safe session error | none |
+| Full ready decision wins; terminal follows before result delivery | preserve `applied`; if terminal is observed before result encoding, return the applicable safe session error: `revoked`, `lease_expired`, `session_not_ready` for confirmed close/hangup, or `session_lost` only for continuity loss | never present a terminated or revoked session as currently usable |
+| Host knows establishment, but outcome persistence fails | live observer preserves `applied` and the result/delivery error, reporting storage failure separately; recovery without the evidence remains `unknown` | only if full readiness and safe delivery are independently proved |
+| Response is lost, or owner restarts without effect evidence | caller/recovery sees `unknown`; a stored terminal outcome is not rewritten | no fabricated or reattached handle |
+| Ready result delivered; session later closes, expires or is lost | original `applied` result remains settled; separate session terminal fact governs ongoing use | original reference grants no renewed authority |
+
+Known ringing establishes a narrower partial effect, not the selected SIP-establishment success; `unknown` in that row means the attempt lacks a definitive success/no-effect outcome, not that every fact about the call is unknown. Conversely, confirmed SIP establishment remains applied even if no ready-session receipt can ever be delivered. A final provider error or successful CANCEL/BYE alone cannot prove that no dial effect occurred. Teardown controls remaining resources; it cannot undo outreach or retroactively convert an applied/unknown attempt into a refusal.
+
+Only safe closed error codes and sanitized causes cross the service boundary; provider signaling, private call identifiers and credentials do not enter messages. Current observation authority precedes all mutation/result disclosure. `sip.dial` remains `idempotency: none`: a deliberate new invocation needs fresh admission and required approval and may place another call; there is no automatic resend, redial, refresh-triggered retry, reattach or approval restoration. Readiness/terminal serialization, the 2 s cutoff and 5 s local teardown bounds are unchanged. Detailed protocol evidence and enforcement tests are future binding prerequisites, not implemented by the ESS values.
 
 ## 5. Auth
 

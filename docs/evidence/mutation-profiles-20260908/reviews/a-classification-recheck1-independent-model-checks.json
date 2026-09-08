@@ -1,0 +1,10 @@
+{
+  "added_value_types": [
+    "connectors.mutations.EffectDeclaration",
+    "connectors.mutations.ExecutableEffect",
+    "connectors.mutations.SemanticEffect",
+    "connectors.mutations.SessionEstablishmentObservation"
+  ],
+  "existing_ess_entities_fields_lifecycles_relations_unchanged": true,
+  "reviewed_legacy_core_server_and_adapter_schemas_unchanged": true
+}

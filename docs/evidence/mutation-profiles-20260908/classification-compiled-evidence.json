@@ -1,0 +1,20 @@
+[
+  {
+    "source": "classification-compiled.json",
+    "archive": "classification-compiled.json.gz",
+    "sha256": "0ceb069f94a1c9053af7ff1799c5aaaf45f53b8d26e755554283daf3e70ccbd7",
+    "bytes": 227467
+  },
+  {
+    "source": "classification-sessions-authored.json",
+    "archive": "classification-sessions-authored.json.gz",
+    "sha256": "f2fc6c4ec3f690a532b746d6e259862631a91dae92490b0b2d7e90d56938a943",
+    "bytes": 161145
+  },
+  {
+    "source": "classification-sessions-suite.json",
+    "archive": "classification-sessions-suite.json.gz",
+    "sha256": "a4764da37d71b4447976c7bf4215ef310092e6eadca0f1108ad168d5fb5cce28",
+    "bytes": 2423518
+  }
+]
