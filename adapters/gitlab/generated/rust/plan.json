@@ -1,0 +1,41 @@
+{
+  "provenance": {
+    "system": "gitlab",
+    "specification_version": "v1",
+    "source_digest": "5464a959b36fe5673bd570eecf3f661540dd261b60c0fde2fd37f4a5bf2d97f3",
+    "contract_digest": "c3d3a9b408c90c2a8b03daf08984379733603f2c84f483640772f01ea8aea190"
+  },
+  "scope": {
+    "profile": "component-skeletons"
+  },
+  "capabilities": [
+    {
+      "kind": "domain_type",
+      "source": "gitlab.requests.FileGetRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "gitlab.requests.IssuesListRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "gitlab.requests.ProjectGetRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "component_port",
+      "source": "gitlab-adapter",
+      "disposition": {
+        "disposition": "generated"
+      }
+    }
+  ]
+}

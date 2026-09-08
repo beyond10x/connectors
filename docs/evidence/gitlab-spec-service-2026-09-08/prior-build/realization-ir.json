@@ -1,0 +1,82 @@
+{
+  "type": "ess-realization-ir/1",
+  "id": "gitlab-local",
+  "realization_digest": "sha256:ba3fb7e2bcfee575c0e8c3724783571e00f18504297be5d38fc68d4ee3e81075",
+  "specification": {
+    "system": "gitlab",
+    "version": 1,
+    "source_digest": "sha256:5464a959b36fe5673bd570eecf3f661540dd261b60c0fde2fd37f4a5bf2d97f3"
+  },
+  "synthesis": {
+    "target": "rust-linux-x86_64/1",
+    "generator": "ess/0.9.2"
+  },
+  "components": [
+    "gitlab-adapter"
+  ],
+  "actors": [],
+  "implementations": {
+    "adapter-image": {
+      "components": [
+        "gitlab-adapter"
+      ],
+      "artifact": {
+        "kind": "container",
+        "locator": "docker-daemon:connectors-v2-gitlab:spec-local",
+        "identity": "sha256:dd862af241d8020ac9b0360e78a43019b28375198fa96637c05401848c50c4a9"
+      }
+    }
+  },
+  "entrypoints": {
+    "http-service": {
+      "title": "Configured gitlab HTTP service",
+      "summary": "Generated typed requests and explicit provider bindings served by the asynchronous host.",
+      "primary": true,
+      "interaction": "invoke",
+      "attachment": "network",
+      "availability": "internal",
+      "support": "preview",
+      "implementation": "adapter-image",
+      "actors": [],
+      "surfaces": [
+        {
+          "kind": "type",
+          "name": "gitlab.requests.FileGetRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.IssuesListRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.ProjectGetRequest"
+        }
+      ],
+      "invocation": {
+        "kind": "argv",
+        "argv": [
+          "/usr/local/bin/connectors-gitlab",
+          "--config",
+          "/config/service.json"
+        ]
+      },
+      "requires": [
+        {
+          "kind": "filesystem",
+          "name": "configuration",
+          "summary": "Read-only configuration mounted at /config/service.json."
+        },
+        {
+          "kind": "network",
+          "name": "provider-api",
+          "summary": "Reachability to the explicitly configured provider HTTPS endpoint."
+        },
+        {
+          "kind": "credential",
+          "name": "service-token",
+          "summary": "Owner-only caller credential mounted separately under /secrets."
+        }
+      ]
+    }
+  }
+}

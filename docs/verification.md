@@ -174,3 +174,74 @@ spec kind and descriptor compiler are implemented; ESS validates the separate
 declaration model. Unsettled multi-tenant assignment cardinality stays explicitly
 `UNMAPPED`. The work and all planning/evidence remain local. Atlas and the old
 Connectors checkout were not integrated or changed by this implementation.
+
+## GitLab specification-to-service completion, 2026-09-08
+
+The follow-up story is `story:gitlab-spec-service`. Local commit
+`75f1c7275d7b227d5a2e4a3e95bfc5c9b2de262a` preserves the previous workspace before
+this implementation. [Generation and packaging](gitlab-generation.md) explains
+reproduction; [the evidence directory](evidence/gitlab-spec-service-2026-09-08/)
+contains the exact build, source, test, runtime and shutdown observations.
+
+Observed verification:
+
+- `cargo fmt --all -- --check` and
+  `cargo clippy --workspace --all-targets --locked -- -D warnings`: exit 0.
+- `cargo test --workspace --locked`: **24 passed, 0 failed, 0 ignored**, including
+  generation reproducibility/drift/ownership/refusal cases, GitLab request/policy/
+  pagination/response fixtures, and a missing-binding compile-fail doctest.
+- `cargo build --workspace --locked --offline`: exit 0. Ordinary source builds
+  consume checked-in generated Rust; no ESS invocation or source refresh occurs.
+- Each of GitLab, Kubernetes and SQL built with `--lib --no-default-features`.
+  Normal dependency trees exclude host/client/sibling adapters from those
+  libraries and exclude all adapter implementations from the generic CLI.
+- `connectors-build check`, repository ESS validation, generated ESS validation/
+  compilation/synthesis, ESS build compilation, BuildKit projection, Docker image
+  build and exact-image realization validation/compilation passed.
+- The final Rust live acceptance runner passed **nine scenario groups** against
+  the packaged GitLab service, a new k3s fixture, and PostgreSQL 17.11. All eight
+  operations and selected refusal cases worked directly and through federation.
+  The actual Kubernetes EndpointSlice observation was selected to configure SQL;
+  the observation itself did not dial or supply a credential.
+- The running GitLab container used the recorded image and executable digest,
+  a read-only root filesystem, and separate read-only `/config` and `/secrets`
+  mounts. The configured upstream was public GitLab over verified HTTPS.
+- SIGTERM produced exit 0 for the GitLab container and all three host processes
+  (gateway, Kubernetes adapter, SQL adapter). All three owned containers were
+  removed. The PostgreSQL fixture exited 0; the k3s fixture exited 2 on Docker stop
+  after acceptance had passed. `shutdown.json` preserves this distinction.
+
+The retained local image is `connectors-v2-gitlab:spec-local`, identity
+`sha256:220b27a8a4f91cd69618c0324dc7243cd446cd7f97454f8cd35bb4cfe8b9b247`.
+Its executable SHA-256 is
+`382a3e1401941248d282fdff10a97b4ede957960c37c3b4ab90a3dd3b56032c6`.
+`build-evidence.json` binds the binary, source snapshot, rootfs manifest, toolchain,
+and generation manifest. Code/Cargo inputs were compared back to that source snapshot after acceptance.
+A final generator change normalizes ESS Rust through rustfmt. All 13 affected
+generation/GitLab tests and Clippy were rerun, the image was rebuilt, and the three
+GitLab acceptance groups were rerun against that exact final image. The original
+nine-group run and its earlier image checks remain recorded under `prior-build/`. Subsequent evidence and planning updates describe the
+run; they are not claimed to have existed inside the earlier build snapshot.
+
+Limits and encountered refusals:
+
+- ESS **0.9.2** cannot directly import the vendor's OpenAPI 3.0 document. The complete
+  refusal is retained in `adapters/gitlab/generated/ess-import.json`. The Connectors
+  frontend imports the supported selected request mappings and ESS synthesizes
+  the separately declared local request types. Vendor response schemas remain
+  uncorrected source evidence; handwritten response obligations are tested.
+- ESS's image graph requires a repository label even for local execution. The
+  recorded label names the local image; no registry or publication was configured.
+  Its omitted-empty-`secrets` reader mismatch is handled by the documented separate
+  projection-input adaptation, retaining the original canonical build IR.
+- The system temporary filesystem exhausted its quota during an early generator
+  run and a later independent SQL build. Both passed using the task-owned `TMPDIR`.
+- GitLab private credentials are covered by fixtures, not a private live account.
+  The PostgreSQL live fixture uses explicit plaintext; its TLS path remains covered
+  by the existing implementation and prior stated limits. The image is a native
+  Linux x86_64 development build with host runtime library hashes, not a production
+  release or a claim of reproducible images across build hosts.
+
+No Atlas, original Connectors checkout, remote repository, registry or consumer
+state was changed. The final image is retained locally. Owned probe images and
+reproducible rootfs copies were removed; reports and the source workspace remain.

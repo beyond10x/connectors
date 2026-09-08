@@ -1,5 +1,42 @@
 domain: connectors.declarations
 
+# Value declarations inside the Connectors-owned v2 adapter document. The v1
+# declarations remain usable without these optional v2 fields.
+types:
+  - name: connectors.declarations.UpstreamSource
+    kind: struct
+    fields:
+      - {name: path, type: String}
+      - {name: url, type: String}
+      - {name: revision, type: String}
+      - {name: sha256, type: String}
+      - {name: base_path, type: String}
+  - name: connectors.declarations.NamedParameter
+    kind: struct
+    fields:
+      - {name: name, type: String}
+  - name: connectors.declarations.ConstantParameter
+    kind: struct
+    fields:
+      - {name: value, type: String}
+  - name: connectors.declarations.Parameter
+    kind: union
+    tag: kind
+    variants:
+      input: connectors.declarations.NamedParameter
+      binding: connectors.declarations.NamedParameter
+      constant: connectors.declarations.ConstantParameter
+  - name: connectors.declarations.RequestMapping
+    kind: struct
+    fields:
+      - {name: operation, type: String}
+      - {name: upstream_operation, type: String}
+      - {name: path, type: String}
+      - {name: method, type: String}
+      - {name: path_parameters, type: "Map<String, connectors.declarations.Parameter>"}
+      - {name: query_parameters, type: "Map<String, connectors.declarations.Parameter>"}
+      - {name: obligations, type: "List<String>"}
+
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.
 entities:
@@ -12,6 +49,8 @@ entities:
         type: String
       - name: implementation_version
         type: String
+      - name: upstream
+        type: Optional<connectors.declarations.UpstreamSource>
     relations:
       - name: operations
         kind: owns
@@ -38,6 +77,8 @@ entities:
         type: String
       - name: output_schema_json
         type: String
+      - name: request_mapping
+        type: Optional<connectors.declarations.RequestMapping>
     lifecycle:
       initial: Declared
       states: [Declared]

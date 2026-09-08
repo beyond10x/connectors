@@ -1234,3 +1234,32 @@ Start with [the README](../README.md), then [the live acceptance recipe](live-e2
 and [verification evidence](verification.md). The governing implementation record
 is [story:three-adapters-e2e](../.engineering/planning/story/three-adapters-e2e.md).
 This extension keeps the work local and does not register or integrate it into Atlas.
+
+## 28. GitLab specification-to-service slice, 2026-09-08
+
+The subsequent authorized implementation is
+[story:gitlab-spec-service](../.engineering/planning/story/gitlab-spec-service.md).
+The operator requested a local snapshot first; commit `75f1c72` preserves the
+complete earlier implementation and unfinished generator.
+
+GitLab now uses the Connectors-owned `connectors.adapter/v2` profile. The frontend
+validates pinned upstream mappings, retains source coverage and ESS import refusals,
+lowers its selected local request types into ESS 0.9.2, and generates request
+construction, dispatch and descriptors. ESS-generated types are consumed by the
+running adapter. Handwritten bindings own admission, pagination, response checks
+and provenance. Kubernetes/SQL remain on the strict v1 profile.
+
+This extends section 27's first slice with bounded generation and local OCI
+packaging; it does not implement automatic lossless vendor-API realization. ESS's
+refusal of GitLab's original OpenAPI remains visible. The asynchronous host owns
+the service runtime, and no external GitLab entity lifecycle is invented.
+
+The Rust local build executor checks the complete bundle, builds through Cargo,
+packages the binary and required runtime files through an ESS build graph, and
+validates a physical realization against the exact local image and ESS digest.
+Configuration and credentials are mounted separately. All selected reads passed
+from the container directly and through federation, alongside a fresh Kubernetes/
+SQL regression run. [The operating guide](gitlab-generation.md) and
+[verification evidence](verification.md#gitlab-specification-to-service-completion-2026-09-08)
+record commands, tool compatibility adaptations, source licensing and limitations.
+Everything remains local; Atlas integration and publication remain deferred.

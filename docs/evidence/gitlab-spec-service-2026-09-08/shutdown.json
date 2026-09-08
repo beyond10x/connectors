@@ -1,0 +1,24 @@
+{
+  "services": {
+    "gitlab_container": 0,
+    "federation_process": 0,
+    "kubernetes_adapter_process": 0,
+    "sql_adapter_process": 0
+  },
+  "fixtures": {
+    "postgres_stop_exit": 0,
+    "k3s_stop_exit": 2
+  },
+  "containers_removed": [
+    "connectors-v2-spec-gitlab",
+    "connectors-v2-spec-postgres",
+    "connectors-v2-spec-k3s"
+  ],
+  "retained_image": "connectors-v2-gitlab:spec-local",
+  "probe_image_removed": "connectors-v2-gitlab:local-probe",
+  "final_formatted_image_services": {
+    "gitlab_container": 0,
+    "federation_process": 0
+  },
+  "final_image_id": "sha256:220b27a8a4f91cd69618c0324dc7243cd446cd7f97454f8cd35bb4cfe8b9b247"
+}

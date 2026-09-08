@@ -1,0 +1,1 @@
+{"domains":["gitlab.requests"],"format":"ess/1","summary":"Typed adapter request inputs. Connectors owns operation/result and provider-binding semantics.","system":"gitlab","version":"v1"}

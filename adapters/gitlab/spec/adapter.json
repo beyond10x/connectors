@@ -1,5 +1,5 @@
 {
-  "kind": "connectors.adapter/v1",
+  "kind": "connectors.adapter/v2",
   "id": "gitlab",
   "version": "0.1.0",
   "sources": [
@@ -434,6 +434,92 @@
         ],
         "additionalProperties": false
       }
+    }
+  ],
+  "upstream": {
+    "path": "../upstream/openapi_v3.yaml",
+    "url": "https://gitlab.com/gitlab-org/gitlab/-/raw/2ff8d865e5016b14b724d1c2ce745f8300696192/doc/api/openapi/openapi_v3.yaml",
+    "revision": "2ff8d865e5016b14b724d1c2ce745f8300696192",
+    "sha256": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530",
+    "base_path": "/api/v4"
+  },
+  "mappings": [
+    {
+      "operation": "project.get",
+      "upstream_operation": "getApiV4ProjectsId",
+      "path": "/api/v4/projects/{id}",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        }
+      },
+      "query_parameters": {},
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
+    },
+    {
+      "operation": "issues.list",
+      "upstream_operation": "getApiV4ProjectsIdIssues",
+      "path": "/api/v4/projects/{id}/issues",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        }
+      },
+      "query_parameters": {
+        "per_page": {
+          "kind": "input",
+          "name": "limit"
+        },
+        "page": {
+          "kind": "binding",
+          "name": "page"
+        },
+        "order_by": {
+          "kind": "constant",
+          "value": "created_at"
+        },
+        "sort": {
+          "kind": "constant",
+          "value": "asc"
+        }
+      },
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
+    },
+    {
+      "operation": "file.get",
+      "upstream_operation": "getApiV4ProjectsIdRepositoryFilesFilePath",
+      "path": "/api/v4/projects/{id}/repository/files/{file_path}",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        },
+        "file_path": {
+          "kind": "input",
+          "name": "path"
+        }
+      },
+      "query_parameters": {
+        "ref": {
+          "kind": "input",
+          "name": "ref"
+        }
+      },
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
     }
   ]
 }

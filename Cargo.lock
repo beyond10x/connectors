@@ -330,6 +330,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-build"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "connectors-spec",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "connectors-client"
 version = "0.1.0"
 dependencies = [
@@ -385,6 +395,7 @@ dependencies = [
  "connectors-core",
  "connectors-host",
  "connectors-sdk",
+ "gitlab-types",
  "serde",
  "serde_json",
  "tempfile",
@@ -453,9 +464,12 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "connectors-core",
+ "hex",
  "jsonschema",
  "serde",
  "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
  "tempfile",
 ]
 
@@ -797,6 +811,10 @@ dependencies = [
  "rand_core",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "gitlab-types"
+version = "1.0.0"
 
 [[package]]
 name = "hashbrown"
