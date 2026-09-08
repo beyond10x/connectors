@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:ess-pin-upgrade
 kind: story
-status: draft
+status: implemented
 title: Decide and, if approved, upgrade the ESS pin from 0.9.2 to 0.18.0
 summary: Trial regeneration with 0.18.0, bundle review and live GitLab re-acceptance; or record that 0.9.2 stays.
 relations:
@@ -20,7 +20,9 @@ scope:
   path: crates/connectors-spec
 - confidence: cited
   path: docs
-revision: 3
+- confidence: cited
+  path: spec-kinds/adapter/v2/semantics.md
+revision: 8
 ---
 ## Context
 
@@ -28,7 +30,7 @@ The repository pins ESS 0.9.2 for GitLab generation (`crates/connectors-spec/src
 
 Whether 0.18.0 accepts the same `import openapi`, `build compile`, `project buildkit`, `realization validate` and `realization compile` invocations, and produces a byte-identical or reviewable bundle, is not known. It has not been tried.
 
-This story is not scheduled. It is blocked on the operator's decision recorded in `decision-blocker:ess-upgrade-decision`.
+The initial scheduling blocker was cleared by the operator decision below. The implemented target is 0.20.0, superseding the original 0.18.0 candidate named in the historical title.
 
 ## Specification
 
@@ -46,15 +48,16 @@ Either outcome is acceptable and must be recorded:
 - `crates/connectors-spec/toolchain.json` (after `story:ess-executable-pin`), `crates/connectors-spec/src/v2.rs`, `crates/connectors-build/src/main.rs`.
 - `adapters/gitlab/generated/` (all files, including `manifest.json`).
 - `docs/gitlab-generation.md`, `docs/verification.md`, `README.md:19-20`.
+- `spec-kinds/adapter/v2/semantics.md`: replace the stale literal version with a reference to the pin; supported semantics are unchanged.
 - Not in scope: Kubernetes and SQL adapters (v1 specifications, no ESS generation), `ess/` declarations.
 
 ## Verification
 
-A trial regeneration with 0.18.0 into a task-owned directory under `.local/`, comparing against the committed bundle, is the first step and decides feasibility before any committed change. Then the gate, then the live GitLab run. Record every command and output.
+A trial regeneration with the approved 0.20.0 release into a task-owned directory under `.local/`, comparing against the committed bundle, is the first upgrade step before replacing any committed generated file. Then the gate, then the live GitLab run. Record commands and output.
 
 ## Progress
 
-Drafted 2026-09-08. Blocked; no trial has been run.
+Implemented 2026-09-08 after story:ess-executable-pin. Verified official 0.20.0 archive and installed only in the checkout-local versioned cache. Trial generation changed only the ESS import report and manifest; the other 20 generated files are byte-identical. Adopted the grouped CLI and removed the empty-secrets build-IR adaptation after direct projection succeeded. Full gate with Rust 1.88: 39 tests, zero failures/ignored, all checks passed. Generation 5/5, obligations 4/4 and explicit bundle drift check pass. Local image packaging and ESS physical realization validation/compilation pass. All three direct/federated public GitLab live acceptance groups pass; explicit continuation checks return distinct second issues. Readback binary hash and all 81 code/Cargo inputs match the package evidence. Both services exited 0; the task container, credential and copied probe binary were removed. Evidence and commands: docs/verification.md, ESS pin upgrade section, and docs/evidence/ess-toolchain-2026-09-08/. The image remains local; no publication or global installation change.
 
 ## Decision
 

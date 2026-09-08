@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "placement": "direct",
+      "first_page_size": 1,
+      "second_page_size": 1,
+      "continuation_present": true,
+      "distinct_issue_ids": true
+    },
+    {
+      "placement": "federated",
+      "first_page_size": 1,
+      "second_page_size": 1,
+      "continuation_present": true,
+      "distinct_issue_ids": true
+    }
+  ]
+}

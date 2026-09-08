@@ -1,0 +1,11 @@
+# syntax=docker/dockerfile:1.12
+FROM scratch AS payload
+COPY ["rootfs","/"]
+
+FROM payload AS service
+ENTRYPOINT ["/usr/local/bin/connectors-gitlab"]
+CMD ["--config","/config/service.json"]
+USER 65532:65532
+WORKDIR /
+ENV SSL_CERT_FILE="/etc/ssl/certs/ca-certificates.crt"
+

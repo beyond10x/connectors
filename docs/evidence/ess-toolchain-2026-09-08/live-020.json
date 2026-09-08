@@ -1,0 +1,10 @@
+{
+  "checks": [
+    "gitlab: authenticated discovery and token refusal",
+    "gitlab: direct supported operation and refusal scenarios",
+    "gitlab: federated supported operation and refusal scenarios"
+  ],
+  "evidence": "live configured upstream; public GitLab reads",
+  "status": "passed",
+  "wire": "v1alpha1"
+}

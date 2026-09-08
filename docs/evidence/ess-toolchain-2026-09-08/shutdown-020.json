@@ -1,0 +1,9 @@
+{
+  "container_exit_code": 0,
+  "oom_killed": false,
+  "gateway_exit_code": 0,
+  "termination": "SIGTERM; both services exited successfully",
+  "container_removed_after_inspection": true,
+  "task_credential_removed": true,
+  "image_retained": "connectors-v2-gitlab:ess-020-local"
+}

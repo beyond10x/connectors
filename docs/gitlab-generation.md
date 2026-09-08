@@ -66,15 +66,37 @@ build graph, ESS-projected Dockerfile, and a validated physical realization tied
 to the exact image and ESS source digest. A local repository name is required by
 ESS's image-output schema; this executor never pushes an image or changes a registry.
 
-ESS 0.9.2's build compiler omits an empty `secrets` field that its BuildKit reader
-requires. `build-ir.json` preserves the original compiler result;
-`build-ir.projectable.json` adds only the absent `secrets: []` for that pinned reader.
-No build secret, credential, or network permission is introduced by this adaptation.
+The BuildKit projection consumes the compiler's original `build-ir.json` directly.
+The former empty-`secrets` adaptation was removed after verifying that the current
+reader accepts the unmodified compiler output with that optional field omitted.
 The Docker packaging step uses `--network=none`; its source context contains the
 binary, runtime dependencies, certificates and available system license notices.
 The public GitLab specification is a generation input, not part of the service image.
 The image uses the local host's exact runtime libraries; the manifest makes this
 checkable but does not claim reproducible images across different build hosts.
+
+## ESS upgrade reviewed on 2026-09-08
+
+The pin was upgraded from 0.9.2 to the verified official **0.20.0** release
+([release provenance and archive checksum](evidence/ess-toolchain-2026-09-08/release.json)).
+The existing global 0.9.2 and 0.18.0 executables were preserved; the verified binary
+is installed only in this checkout's versioned `.local/toolchains/ess/` cache.
+The CLI calls now use `specify validate/compile/realization`,
+`infra import openapi`, and `generate synthesize/build/project`.
+
+A [trial regeneration](evidence/ess-toolchain-2026-09-08/upgrade-trial.log) into
+`.local/ess-020-trial` preceded replacing the committed bundle. The complete
+[reviewed diff](evidence/ess-toolchain-2026-09-08/trial.diff) changes only
+`manifest.json` (ESS version and import-report hash) and `ess-import.json`.
+The other 20 files, including generated Rust, descriptor, source selection,
+coverage and typed IR, are byte-identical. ESS now stops at the OpenAPI 3.0.0
+version refusal instead of also reporting downstream object-schema problems.
+It still exits 1 with null import output. This is not successful vendor import;
+the existing explicit Connectors mapping and response obligations still apply.
+The vendor document and handwritten implementation were not edited to bypass it.
+
+The subsequent gate, image build and direct/federated live GitLab results are
+recorded in [verification](verification.md#ess-pin-upgrade--2026-09-08).
 
 ## Run and prove the container
 
