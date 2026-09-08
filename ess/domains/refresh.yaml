@@ -47,6 +47,9 @@ entities:
       - {name: source_generation_id, type: connectors.credentials.CredentialGenerationId}
       - {name: initial_owner, type: String}
       - {name: initial_ownership_token, type: connectors.refresh.OwnershipToken}
+      # Existing carrier names the private auth publication fence, not the
+      # public connection/F02 semantic revision; same-identity refresh is not
+      # a semantic fingerprint change (docs/design.md §31.2).
       - {name: expected_binding_revision, type: String}
       - {name: candidate_generation_id, type: "Optional<connectors.credentials.CredentialGenerationId>"}
     relations:
@@ -102,6 +105,9 @@ commands:
       - {name: source_generation_id, type: connectors.credentials.CredentialGenerationId}
       - {name: owner, type: String}
       - {name: ownership_token, type: connectors.refresh.OwnershipToken}
+      # Existing carrier names the private auth publication fence, not the
+      # public connection/F02 semantic revision; same-identity refresh is not
+      # a semantic fingerprint change (docs/design.md §31.2).
       - {name: expected_binding_revision, type: String}
     outcomes:
       - name: reserved

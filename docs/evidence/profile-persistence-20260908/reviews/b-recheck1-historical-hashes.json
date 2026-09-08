@@ -1,0 +1,14 @@
+[
+  {
+    "path": "crates/integration-kubernetes/src/local.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "1fdb7c95fd27bf41d411055b50438e7043be6f8d0b092e458c7fe4c58c40f3ce",
+    "bytes": 53281
+  },
+  {
+    "path": "crates/integration-kubernetes/src/local_tests.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "97ca3c46a20864885c4e496bdb18d70c3a205af51f5c3cca528b80f5b1db190b",
+    "bytes": 12500
+  }
+]

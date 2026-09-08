@@ -1,0 +1,349 @@
+{
+  "baseline": "175053fd2c951dc9564ff587a636775ab8027d2e",
+  "source": "Exact Git objects, including explicitly pinned historical design references",
+  "files": [
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": ".engineering/planning/story/contracts-discovery-profiles.md",
+      "sha256": "034e3e2574ef828c81bed4c2d891a1e792911bec25031a7abf259da9749fe795",
+      "bytes": 4397
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": ".engineering/planning/story/contracts-persistence-ownership.md",
+      "sha256": "9eb6c908fb185b3b829ef5e12c8f0cb26a532f1e35436ea662d899dd367fa524",
+      "bytes": 5812
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "adapters/kubernetes/src/lib.rs",
+      "sha256": "9b97d3616f19f1dbaeab9d78b011f5265bd4b647de55fc5be3418c2bb82f2548",
+      "bytes": 11811
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/README.md",
+      "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+      "bytes": 9290
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "bf97c5fc296b060dc1b09b04eefdfd9f6903e0be1c960cffc8b0dcea926aeeec",
+      "bytes": 26727
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+      "bytes": 15606
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "d4e0a81115a6fb4dff2aaa3c5378db08a3a5f6d9f49d8ae5dc5287e0569797f7",
+      "bytes": 21925
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "bytes": 10098
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "2ed63fc2bccc4552e525c7c69bffe602ec3ce679382923f97a1cea1793af2af7",
+      "bytes": 32097
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/auth/management.md",
+      "sha256": "4cfb58b1eaab7c468bbf43e0a76f901fe4b24978e48d0256cabee614d50c115f",
+      "bytes": 14593
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+      "bytes": 17305
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/catalog/v1alpha1/semantics.md",
+      "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+      "bytes": 23089
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/datasources/logs/v1alpha1/semantics.md",
+      "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+      "bytes": 11014
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "bytes": 7761
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/datasources/series/v1alpha1/semantics.md",
+      "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+      "bytes": 7034
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/discovery/composition.md",
+      "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+      "bytes": 6686
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "47820abb3c1fa02c928aa7900aa15ded668ff8fcaee889c08644249449da13dc",
+      "bytes": 16195
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "a9455ca5090a96b23fc65be18a6a0b25a08c62593d460fa5b4f84450f20227ed",
+      "bytes": 29924
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/media/v1alpha1/semantics.md",
+      "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+      "bytes": 11049
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "bytes": 38950
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/service/compatibility.md",
+      "sha256": "0f08c3d2ca50b6abfb43ebbe963891752d514e24d6006c3b15d3fcbc64a53af9",
+      "bytes": 38824
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/service/delegation.md",
+      "sha256": "812ce5ff030c8a0e36c55d909abf0ee0dac9702424c57e714f19f86f8e240aeb",
+      "bytes": 34517
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+      "bytes": 23016
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "cc97dca14eadfdec912bc851bb87f9ff98704daa34e6319b769d6e7d68b8f722",
+      "bytes": 21255
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "crates/connectors-contracts/src/lib.rs",
+      "sha256": "2f6ee686defde5c29a0e3749b5496fdcb54725f1346c7f4844508a36c37bde74",
+      "bytes": 1357
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "crates/connectors-core/src/lib.rs",
+      "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+      "bytes": 8489
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "crates/connectors-host/src/credentials.rs",
+      "sha256": "d033e1012a944ed81047bd1896d5217a87834bc28e1cf5cc013a576f2e2c04c0",
+      "bytes": 3695
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "crates/connectors-host/src/federation.rs",
+      "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c",
+      "bytes": 7183
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "crates/connectors-sdk/src/lib.rs",
+      "sha256": "43ebb6e2f775755a6bebb24f0a4e5075cec7c2aaeda79fcb037c5ea07d134290",
+      "bytes": 7237
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "docs/adapters/grafana.md",
+      "sha256": "64f080b29550d49015c95361f00b649154cc6073e5dcfed598d4a15efab08032",
+      "bytes": 15357
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "docs/adapters/kubernetes.md",
+      "sha256": "6a8f38050319b22707234b7b966e626e168e548760d217e94f57aeba101e94cd",
+      "bytes": 16102
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "docs/design.md",
+      "sha256": "b161ab04b696ec2f1be1ba70c8ae3e6e1245db54175e4aa0471d671915f3fa01",
+      "bytes": 122185
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+      "bytes": 5153
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/discovery.yaml",
+      "sha256": "89a2ad21006b71af6356e56f6cd331efb3d9a44743991f286e29175186071618",
+      "bytes": 5110
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+      "bytes": 8245
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208
+    },
+    {
+      "repository": "connectors-v2",
+      "revision": "175053fd2c951dc9564ff587a636775ab8027d2e",
+      "path": "ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+      "bytes": 480
+    },
+    {
+      "repository": "connectors-old",
+      "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+      "path": "docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+      "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54",
+      "bytes": 13800
+    },
+    {
+      "repository": "connectors-old",
+      "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+      "path": "docs/design/08-discovery-observations-and-mediated-connections.md",
+      "sha256": "ee3e597a230afa061bb5bbf485cbb11bb60f785cb8999f3d891bafc4c01bba84",
+      "bytes": 17341
+    }
+  ]
+}

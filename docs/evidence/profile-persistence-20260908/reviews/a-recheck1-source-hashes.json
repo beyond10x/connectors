@@ -1,0 +1,292 @@
+{
+  "review": "Independent reviewer A recheck 1",
+  "created_utc": "2026-09-08T17:55:13.660678+00:00",
+  "scope": "Working-tree normative/evidence inputs frozen before review; excludes other reviewer output, dispositions, planning and provenance bookkeeping",
+  "files": [
+    {
+      "path": ".local/profile-persistence-20260908/compiled.json",
+      "sha256": "9372f8e52d97fbb674fc9c90904dac62b738879946d6052f1c74828ae8d8b49b",
+      "bytes": 224831
+    },
+    {
+      "path": ".local/profile-persistence-20260908/sessions-authored.json",
+      "sha256": "8deb50e622d2e4a5e4169c4ba219a3de5adb2ef680bcf97c5fd12e24ece0eba8",
+      "bytes": 161145
+    },
+    {
+      "path": ".local/profile-persistence-20260908/sessions-suite.json",
+      "sha256": "7fe155459db07f4077791f3750e2633c187b400a58b78f70bc846b13fcfad7e9",
+      "bytes": 2423518
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278
+    },
+    {
+      "path": "contracts/README.md",
+      "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+      "bytes": 9290
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "c69e52961194b65b8d305adfb00316afcfa5b2beded322d31fea8d77f548fa9d",
+      "bytes": 27170
+    },
+    {
+      "path": "contracts/auth/capability/v1alpha1/semantics.md",
+      "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+      "bytes": 15606
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "c23f0b0a09cc80281d248a61040f9d343bdd0806d060d2020be337fdd9b70119",
+      "bytes": 22905
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "787b2b7aee0aa3871e82859bb0f0af7c1ba8db62a817ede9f0d94d22e7491d61",
+      "bytes": 10845
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "33ab1618ddabd77f8be425504fd9994111965344b3d03d7c607a129578ed0e40",
+      "bytes": 32482
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649",
+      "bytes": 14973
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+      "bytes": 17305
+    },
+    {
+      "path": "contracts/catalog/v1alpha1/semantics.md",
+      "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+      "bytes": 23089
+    },
+    {
+      "path": "contracts/datasources/logs/v1alpha1/semantics.md",
+      "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+      "bytes": 11014
+    },
+    {
+      "path": "contracts/datasources/records/v1alpha1/semantics.md",
+      "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+      "bytes": 7761
+    },
+    {
+      "path": "contracts/datasources/series/v1alpha1/semantics.md",
+      "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+      "bytes": 7034
+    },
+    {
+      "path": "contracts/discovery/composition.md",
+      "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+      "bytes": 6686
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "0a1a0c7387f102101c28e72d471a88540e7ae245beb0496015632306fd6cefab",
+      "bytes": 16597
+    },
+    {
+      "path": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "sha256": "e471a745e3bdb0667d20434d9dd23455c3de79123c766cb563bf7408a048aaaf",
+      "bytes": 37524
+    },
+    {
+      "path": "contracts/media/v1alpha1/semantics.md",
+      "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+      "bytes": 11049
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "8d03e7ef2e690397444784ca1501847ed9af714a76ade2c5c3ea72356fc35a96",
+      "bytes": 39553
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537",
+      "bytes": 39435
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1",
+      "bytes": 34883
+    },
+    {
+      "path": "contracts/service/v1alpha1/semantics.md",
+      "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+      "bytes": 10990
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+      "bytes": 23016
+    },
+    {
+      "path": "contracts/sessions/v1alpha1/semantics.md",
+      "sha256": "cf4d1f0f7ec1dc886822c5ceffcda0fd36d1f27ade1b34349f2ec3185da4821f",
+      "bytes": 21623
+    },
+    {
+      "path": "docs/adapters/grafana.md",
+      "sha256": "aee87ea211c97ddda65bd032be79fd40cde2bc34106a7e1925360532a863c602",
+      "bytes": 15965
+    },
+    {
+      "path": "docs/adapters/kubernetes.md",
+      "sha256": "1aefdd83173c941acf126bb357a7b80ed3ad88262412f5e3d6cb7b9c3ea4725b",
+      "bytes": 17035
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a",
+      "bytes": 139742
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/ess-entity-inventory.json",
+      "sha256": "26d2a8c287b4bdfadab7d56c1c7ae7138bb73beaf5fd963f46f19e8b164e7bf0",
+      "bytes": 12592
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/fixture-audit.md",
+      "sha256": "2cc5efa72f09a5f9aa6715868abc62cb39de8f2a1fb24a52d949fd3985e1804b",
+      "bytes": 6237
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/gate.log",
+      "sha256": "3ed95fd6eb1776799969873618fb426fc7d7253958772f1bb90c5e9718ad51c3",
+      "bytes": 27038
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/projection-manifest.json",
+      "sha256": "727d59ee02a5fb26cd7ab1c181332dd6501e7e9ab4fff1c2c053e9cc64e15c01",
+      "bytes": 30094
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ConfiguredSourceIdentity.schema.json",
+      "sha256": "b2d48a250a665dc9ac193c29d3547b784e640cdc34b7db23fe5a7ee182c582cb",
+      "bytes": 1166
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.DeclaredObservationBinding.schema.json",
+      "sha256": "95223f559e5c8166a98540c1eef84be185c0494b377d81dfeef520c627f4d69d",
+      "bytes": 2228
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.KubernetesRecognitionInput.schema.json",
+      "sha256": "6a9997dafecc8dabfe129fdfd6d80dd9ab2ab80fe9cac360ab67644c22d2d002",
+      "bytes": 1137
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ObservationProfile.schema.json",
+      "sha256": "31e5bc994be93940130da2ae7378d94efb5f044f82714b296f3758fe92ccaa5c",
+      "bytes": 762
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionConfidence.schema.json",
+      "sha256": "f17173b8e225e1e5e3eca79e982866d6950f71303ef90a13c65568bc5a33cad3",
+      "bytes": 745
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionProvider.schema.json",
+      "sha256": "1900e2ba5713da236e2a7f87c60d81b590c1c6ef07127c41cf5c98e2ceaf45ee",
+      "bytes": 796
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ResourceRecognition.schema.json",
+      "sha256": "b9ea31d7d7918868a7a3efa7cf63ae1228a2932a00dc45a8f0b5ed19e686d968",
+      "bytes": 1633
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/traces.md",
+      "sha256": "3db7f6a2cf5fd890a12cf19c87192ac6b372cd7a10a8d796f884b54def3b0c30",
+      "bytes": 8656
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/type-results.json",
+      "sha256": "9828568a46685237b3db47ef7497641575720b5758647801a02fc02e887526bf",
+      "bytes": 4234
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/typed-values.json",
+      "sha256": "58f2e052d5b3944a3ec98d001f6775c5278c0b8e70977c3ff821ec476620e629",
+      "bytes": 13140
+    },
+    {
+      "path": "docs/evidence/profile-persistence-20260908/verification.md",
+      "sha256": "194698bc703941d9b285a14ead32c87534c51085bba6e62e6f0dd106ddb0d164",
+      "bytes": 4638
+    },
+    {
+      "path": "ess/domains/auth_access.yaml",
+      "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+      "bytes": 5153
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240",
+      "bytes": 2600
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408
+    },
+    {
+      "path": "ess/domains/discovery.yaml",
+      "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0",
+      "bytes": 7125
+    },
+    {
+      "path": "ess/domains/idempotency.yaml",
+      "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+      "bytes": 7626
+    },
+    {
+      "path": "ess/domains/mutations.yaml",
+      "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+      "bytes": 8245
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38",
+      "bytes": 13375
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000
+    },
+    {
+      "path": "ess/domains/sessions.yaml",
+      "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+      "bytes": 12208
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+      "bytes": 480
+    }
+  ]
+}

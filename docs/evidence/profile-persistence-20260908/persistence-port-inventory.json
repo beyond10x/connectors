@@ -1,0 +1,114 @@
+{
+  "source": "docs/design.md#31-host-persistence-ownership-and-atomicity",
+  "rows": [
+    {
+      "owner": "CustodyPort",
+      "owned_state": "Scoped immutable sensitive versions; coherent bounded credential sets; write_new/read/delete",
+      "handoff": "Required durable write acknowledgement precedes publication. Unknown write is no usable publication proof; orphan cleanup does not establish exchange outcome. Keep material needed by valid uses; deletion never erases refresh consumption",
+      "normative_contract": "[custody \u00a7\u00a73\u20135](../contracts/auth/custody/v1alpha1/semantics.md)"
+    },
+    {
+      "owner": "ConnectionAuthorityPort",
+      "owned_state": "Stable connection/owner/fixed target, enabled/revoked facts, active generation/version reference, semantic revision and private publication fence",
+      "handoff": "Serialize terminal revoke, replacement, publication and final dispatch admission. Readiness is a current fact reduction, not an independently writable status. Unknown metadata refuses; provider revoke outcome is separate",
+      "normative_contract": "[connection \u00a74](../contracts/auth/connection/v1alpha1/semantics.md)"
+    },
+    {
+      "owner": "AcquisitionCoordinatorPort",
+      "owned_state": "One logical owner's acquisition correlation, admitted origin/scope/profile/registration, repair relation, one-use completion and terminal result",
+      "handoff": "Protected-entry/code correlation is consumed once before exchange; current scope checked again before publication. Custody then metadata acknowledgement precede completed. Unknown exchange never grants resend; gateway cannot move/recreate the owner",
+      "normative_contract": "[acquisition \u00a74](../contracts/auth/acquisition/v1alpha1/semantics.md), [management \u00a73](../contracts/auth/management.md)"
+    },
+    {
+      "owner": "RefreshCoordinatorPort",
+      "owned_state": "Per-source rotating-material alias association, reservation/current fence, authorize-once consumption, stored response and publication/recovery record",
+      "handoff": "Authorize consumes source and invalidates admissions atomically before send. Only the original live acknowledged winner sends once. Lost response/owner is uncertain; acknowledged stored response permits publication-only recovery. No lease or backup can make a consumed source reusable",
+      "normative_contract": "[acquisition \u00a74.1](../contracts/auth/acquisition/v1alpha1/semantics.md#41-refresh-exclusion-authorization-and-recovery)"
+    },
+    {
+      "owner": "MaterialAdmissionPort",
+      "owned_state": "Immutable capture association and generation evidence/provenance; transient inspected/admitted transport pins",
+      "handoff": "Capture alone grants nothing. Recover verifiable snapshot association or capture/validate anew, subject to refresh alias uniqueness. Final dispatch participates in connection/refresh fencing; missing snapshot or stale evidence refuses without rereading mutable sources",
+      "normative_contract": "[evidence \u00a7\u00a74.1\u20134.3](../contracts/auth/evidence/v1alpha1/semantics.md)"
+    },
+    {
+      "owner": "PermissionEvidenceCachePort",
+      "owned_state": "Optional bounded exact-target evidence with original collection/deadline and binding coordinates",
+      "handoff": "Cache loss supplies neither denial nor success. Re-collection requires the existing admitted F08 budget or refusal. No independent durable database or permission grant is implied",
+      "normative_contract": "[evidence \u00a74.4](../contracts/auth/evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08)"
+    },
+    {
+      "owner": "MutationAttemptPort",
+      "owned_state": "Durable prepare, dispatch/abort fence and first terminal outcome for one immutable attempt",
+      "handoff": "Prepare grants no send; only the original live acknowledged gate winner sends once. Recovery never sends. Pre-gate abort races atomically with dispatch; unknown gate or terminal persistence keeps conservative recovery knowledge",
+      "normative_contract": "[operations \u00a74](../contracts/operations/v1alpha1/semantics.md)"
+    },
+    {
+      "owner": "MutationKeyPort",
+      "owned_state": "Exact namespace/key/fingerprint index, reservation-to-attempt link, retained result and settlement/expiry",
+      "handoff": "Reserve plus Prepared attempt is one atomic write; terminal settlement plus replay state/times is another. Pending/Quarantined never expire automatically; known-result expiry is generation-safe. Capacity refuses new reservations, never evicts live deduplication facts",
+      "normative_contract": "[operations \u00a75.1](../contracts/operations/v1alpha1/semantics.md#51-key-namespace-fingerprint-and-replay-admission)"
+    },
+    {
+      "owner": "ApprovalSpendPort",
+      "owned_state": "Executing leaf's issuer/reference tombstone, canonical subject and one Prepared attempt link; at most one successful redemption per attempt",
+      "handoff": "Acknowledged spend is separate from the dispatch gate. Unknown spend grants no gate/send; spent then aborted stays spent. Direct and gateway ingress share this owner. First-profile tombstones have no automatic expiry; capacity refuses new spending",
+      "normative_contract": "[delegation \u00a7\u00a74.2\u20136](../contracts/service/delegation.md)"
+    },
+    {
+      "owner": "DelegationNoncePort",
+      "owned_state": "Executing leaf's exact gateway-issuer/receiver/jti receipt",
+      "handoff": "Atomic durable consume precedes entry; ambiguous acknowledgement grants no entry. Recheck current proof/key/policy/time/deadline after acknowledgement. Retire only at trustworthy lower >= exp; uncertain time/restart extends retention",
+      "normative_contract": "[delegation \u00a75](../contracts/service/delegation.md#5-time-deadlines-and-durable-uniqueness)"
+    },
+    {
+      "owner": "ExecutionAuditPort",
+      "owned_state": "Each admitting hop's durable admission anchor and linked outcome observation, with safe correlation",
+      "handoff": "Unacknowledged admission blocks dispatch. Final append failure preserves known business effect and reports incomplete audit; it does not retry the effect. Gateway and leaf audits are distinct and not one transaction. Required retained audit outlives replay payload deletion",
+      "normative_contract": "[compatibility \u00a75](../contracts/service/compatibility.md), [delegation \u00a76](../contracts/service/delegation.md#6-end-to-end-admission-and-single-spend)"
+    },
+    {
+      "owner": "DiscoveryPublicationPort",
+      "owned_state": "Exact scope/epoch/selection, attempt/predecessor, immutable classified view and matching private observation index",
+      "handoff": "Publish whole view/index atomically under current source/material/policy/deadline fences. Stale attempt discarded; unknown acknowledgement observed by same attempt. Recover verifiable continuity or invalidate handles/new epoch. Bounded eviction is not disappearance",
+      "normative_contract": "[resources \u00a74.4](../contracts/discovery/resources/v1alpha1/semantics.md#44-publication-retention-and-public-paging)"
+    },
+    {
+      "owner": "MediatedRoutePort",
+      "owned_state": "Fixed child/parent/observation/target relation, private route evidence revision and current validation",
+      "handoff": "Same-target CAS checks current observation, parent generation, independent admission and child enablement/revocation; invalidates old admissions/verification. Unknown acknowledgement grants no forward. Route change cannot repoint a connection; unavailable private proof/port refuses",
+      "normative_contract": "[mediated route \u00a74.1](../contracts/discovery/mediated_route/v1alpha1/semantics.md#41-observation-continuity-and-route-revalidation)"
+    },
+    {
+      "owner": "SessionRedemptionPort",
+      "owned_state": "Serving endpoint's one-use establishment authority and redemption decision",
+      "handoff": "Redeem before data; distinct from approval, transport nonce and renewable data lease. A supporting authority binding must prevent reuse across its selected ingress/replica/restart scope. Loss of continuity cannot recreate an accepted establishment token; exact ledger/format remains an advertisement prerequisite",
+      "normative_contract": "[sessions \u00a74](../contracts/sessions/v1alpha1/semantics.md), [auth capability](../contracts/auth/capability/v1alpha1/semantics.md)"
+    },
+    {
+      "owner": "SessionSupervisorPort",
+      "owned_state": "One live owner's serialized state, first terminal fact, lease/revoke/drain decisions and task/resource accounting",
+      "handoff": "Enforce the existing 2 s data cutoff and 5 s teardown, independently at controlled endpoints. Restart/continuity loss is lost, never reattach or reconstructed live leases. Durable terminal records, if selected, do not restore live sockets/devices or permit token reuse",
+      "normative_contract": "[sessions \u00a74.1](../contracts/sessions/v1alpha1/semantics.md#41-traffic-cutoff-and-teardown-f06)"
+    },
+    {
+      "owner": "ReadCursorCachePort",
+      "owned_state": "Optional bounded read cache/context/key/expiry; no second discovery view or mutation-result authority",
+      "handoff": "Default ephemeral cursor-key loss invalidates continuations. Discovery cursors refer to DiscoveryPublicationPort's immutable view and cannot retain it past its limits. Cache absence proves no provider absence. Durable subscription checkpoints are a different deferred port",
+      "normative_contract": "[records](../contracts/datasources/records/v1alpha1/semantics.md), [resources \u00a74.4](../contracts/discovery/resources/v1alpha1/semantics.md#44-publication-retention-and-public-paging)"
+    },
+    {
+      "owner": "DeploymentConfigurationPort",
+      "owned_state": "Authoritative admitted instance/operation/profile/route/configuration/projection meaning and selected issuer/trust policy inputs",
+      "handoff": "Deployment files/artifacts may supply immutable configuration; no live configuration database is implied. Effective connection facts belong to ConnectionAuthorityPort. A configuration backup cannot reset another port's uniqueness or revive old identities, target bindings, grants or private history",
+      "normative_contract": "[\u00a718](#18-the-connectors-owned-ess-adapter-specification-kind), [delegation \u00a7\u00a72,5](../contracts/service/delegation.md)"
+    },
+    {
+      "owner": "EventClaimSpendPort \u2014 unselected",
+      "owned_state": "Conceptual one-shot event-derived claim, separate from event receipt and mutation attempt",
+      "handoff": "Exact claim ingress/proof remains unbound. An event or its persisted receipt is not approval. This named future owner cannot advertise spending until its dedicated proof/issuer/ingress contract is settled",
+      "normative_contract": "[operations \u00a74](../contracts/operations/v1alpha1/semantics.md), [delegation \u00a78](../contracts/service/delegation.md#8-ess-and-verification-boundary)"
+    }
+  ],
+  "limitation": "Textual inventory extraction, not a port implementation or atomicity proof."
+}
