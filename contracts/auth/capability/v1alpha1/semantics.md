@@ -34,7 +34,7 @@ Each capability is a Rust port in the SDK; none is a wire type. The wire only ev
 ```text
 HttpCapability
   request(method, segments, query, headers_allowlisted, body_bounded) -> HttpResponse
-  // bound to: connection, profile, allowed origin and base path, deadline, body limits
+  // bound to: connection, profile, validated generation pin, allowed origin/base path, deadline, body limits
   // variants: http-bearer, http-basic, http-signing (adds canonical-request signing), mediated-http
 
 TransportIdentity
@@ -55,7 +55,7 @@ InboundVerifier
   redeem(authority_id) -> Redeemed | AlreadyRedeemed
 ```
 
-Every capability carries the binding it was created for:
+Every capability carries the binding it was created for. The host-private binding additionally contains the validated credential-generation pin and its admission; these do not appear in this safe descriptive example:
 
 ```json
 { "connection": "conn_…", "profile": "jira.user_oauth", "destination": { "origin": "https://api.atlassian.com", "base_path": "/ex/jira/<cloud_id>" }, "limits": { "deadline_ms": 15000, "body_bytes": 4194304 } }
@@ -64,12 +64,13 @@ Every capability carries the binding it was created for:
 ## 4. Rules
 
 - Binding: a capability is constructed by the host for one connection and one profile, with the admitted destination and limits. Provider code cannot change the credential, the destination origin, or the limits through the request it builds (`docs/design.md:590`).
-- Placement: the capability resolves the credential from custody and places it immediately before dispatch; provider code never sees `http-bearer`/`http-basic` bytes.
+- Placement: the host captures immutable material, validates it through the declared admitted auth flow, and pins that exact generation with the evidence used for admission. Immediately before dispatch the capability places the pinned material; it must not resolve a mutable path afresh or silently substitute a newer custody reference. Provider code never sees `http-bearer`/`http-basic` bytes. The pin is host-private and no public serializer or diagnostic exposes its generation or snapshot reference.
+- Dispatch consistency: final dispatch must establish that the pin, evidence and selected connection binding agree and the generation remains current and usable. Known revocation/expiry, stale required checks, a detected unvalidated replacement, or an unresolved authorized rotating refresh refuses even a pin. Successful refresh/replacement publication atomically cuts off old pending admissions; a new admission is required for the new generation. A capability cannot renew authority just by reloading credentials. See [evidence §4](../../evidence/v1alpha1/semantics.md#4-rules).
 - Destination: `http-*` capabilities refuse a request whose resolved URL leaves the admitted origin and base path; redirects are not followed (`docs/design.md:590`; current host behavior).
 - Methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` with a bounded body; a mutation method is refused when the operation's profile is not `mutation` (`operations` document).
 - Preflight: a `401` from the provider triggers at most one coordinated refresh through `auth.acquisition` and one re-dispatch for reads; for mutations a refresh never re-dispatches (`docs/design.md:600`). The preflight's own effects are separate from the business operation (`docs/design.md:373`).
 - Leases (`sip-credential-lease`, `exec-credential-plugin`): material is released for one establishment or one helper run, within a deadline, and is not retained by provider code beyond the protocol object that consumes it. The lease records purpose and time, never the value.
-- `exec-credential-plugin` runs only when configuration enables it and only inside an admitted operation, never during listing or description (old rule preserved).
+- `exec-credential-plugin` runs only when configuration enables it and only inside an admitted operation or explicitly admitted activation/revalidation step, never during listing or description (old rule preserved). One helper output is one captured generation: identity validation and dispatch must consume the same output. Running the helper a second time needs a new generation and admission. Client-certificate capabilities similarly pin one coherent certificate/key pair through transport use. An identity probe needed for replacement belongs to the declared validation step; it is not an implicit expansion of a business operation.
 - `session-authority`: issued per admitted session with a bound lifetime (old profile: 60 s, single redemption); the verifier redeems atomically before any media or data byte is accepted; a second presentation is `AlreadyRedeemed`.
 - `inbound-verifier` verifies over the original received bytes, not a re-serialized copy (`docs/design.md:726`).
 - No public serializer or `Debug` on any type that can hold material (`Secret` pattern, `crates/connectors-sdk/src/lib.rs:33-34`).
@@ -91,7 +92,10 @@ Every capability carries the binding it was created for:
 - `401` on a read → one refresh, one re-dispatch; `401` on a mutation → one refresh, zero re-dispatch.
 - Lease released twice → second release is a no-op; lease used after deadline → refused.
 - Authority redeemed twice → `AlreadyRedeemed`; media bytes before redemption → refused.
-- Swap the custody binding → capability behavior unchanged.
+- Swap the custody implementation while preserving the exact immutable snapshot semantics → authentication behavior remains compatible. Swapping material is a new generation, never permission to retain old evidence.
+- Publish a replacement between admission and dispatch → the old capability refuses; a fresh admitted capability uses only the validated new generation.
+- A helper returns account A material during validation and would return B on a second run → dispatch uses the captured A output or refuses; it never runs the helper again under A's evidence.
+- Revoke/expire a pinned generation or authorize a rotating refresh without a definitive result → the pin refuses dispatch.
 
 ## 7. Compatibility
 
@@ -104,6 +108,7 @@ Every capability carries the binding it was created for:
 |---|---|
 | `AuthenticatedHttp` → `HttpCapability` with methods and body; basic scheme with user half | `crates/connectors-sdk/src/lib.rs:53-56`; `crates/connectors-host/src/http.rs:11-35` |
 | TLS client identity and unix-socket transport in the host HTTP client | `crates/connectors-host/src/http.rs` |
+| Generation pin and dispatch/publication/revocation ordering | host admission/capability boundary with the shared auth coordinator |
 | Lease, plugin, authority, verifier ports | `crates/connectors-sdk` (traits), `crates/connectors-host` (bindings) |
 | Mediated-http implementation | host, per [mediated_route](../../../discovery/mediated_route/v1alpha1/semantics.md) |
 
@@ -113,7 +118,8 @@ Every capability carries the binding it was created for:
 |---|---|
 | `AuthProfile.capabilities` | value list (profile document) |
 | `SessionAuthority` (identity: authority id), lifecycle `issued → redeemed | expired` | relation `for → Session` (sessions document) |
-| Leases | not persisted; transient adapter state (`docs/design.md:959`) |
+| Leases | not persisted; transient adapter state (`docs/design.md:959`); generation pins are trusted host state |
+| `DispatchAdmission` | transient host decision modeled in [credential_evidence.yaml](../../../../ess/domains/credential_evidence.yaml); references one [CredentialGeneration](../../../../ess/domains/credentials.yaml), without inventing a durable lease entity |
 
 ## 10. Open decisions
 
