@@ -1,0 +1,101 @@
+{
+  "version": 2,
+  "ok": true,
+  "assessments": [
+    {
+      "record": {
+        "id": "connectors-v2-auth-wave-20260908",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908",
+        "purpose": "F04 F05 semantic auth wave integration; local only",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788866612,
+        "last_seen_at": 1788871060,
+        "finished_at": 1788871060,
+        "head": "f5848015640aedcec2edcf4f985a881b3e5c35e4"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": {
+        "operation": "remove",
+        "id": "connectors-v2-auth-wave-20260908",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908",
+        "head": "f5848015640aedcec2edcf4f985a881b3e5c35e4",
+        "recovery": {
+          "head": "f5848015640aedcec2edcf4f985a881b3e5c35e4",
+          "refs": [
+            "local-recovery:refs/heads/main",
+            "local-recovery:refs/heads/wave/auth-hardening-20260908"
+          ],
+          "observed_at": 1788871072
+        },
+        "recorded_at": 1788871072
+      }
+    },
+    {
+      "record": {
+        "id": "connectors-v2-auth-evidence-20260908",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908",
+        "purpose": "F04 F05 auth semantic wave evidence; local only",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788866844,
+        "last_seen_at": 1788871060,
+        "finished_at": 1788871060,
+        "head": "f55020ae799464ac09dfcc5a3ac54d02edc213b7"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": {
+        "operation": "remove",
+        "id": "connectors-v2-auth-evidence-20260908",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908",
+        "head": "f55020ae799464ac09dfcc5a3ac54d02edc213b7",
+        "recovery": {
+          "head": "f55020ae799464ac09dfcc5a3ac54d02edc213b7",
+          "refs": [
+            "local-recovery:refs/heads/impl/contracts-credential-evidence",
+            "local-recovery:refs/heads/main",
+            "local-recovery:refs/heads/wave/auth-hardening-20260908"
+          ],
+          "observed_at": 1788871072
+        },
+        "recorded_at": 1788871072
+      }
+    },
+    {
+      "record": {
+        "id": "connectors-v2-auth-refresh-20260908",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908",
+        "purpose": "F04 F05 auth semantic wave refresh; local only",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788866844,
+        "last_seen_at": 1788871060,
+        "finished_at": 1788871060,
+        "head": "9fa4ba0346552fd3c34acd25e974717fd4c8c61c"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": {
+        "operation": "remove",
+        "id": "connectors-v2-auth-refresh-20260908",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908",
+        "head": "9fa4ba0346552fd3c34acd25e974717fd4c8c61c",
+        "recovery": {
+          "head": "9fa4ba0346552fd3c34acd25e974717fd4c8c61c",
+          "refs": [
+            "local-recovery:refs/heads/impl/contracts-refresh-coordination",
+            "local-recovery:refs/heads/main",
+            "local-recovery:refs/heads/wave/auth-hardening-20260908"
+          ],
+          "observed_at": 1788871072
+        },
+        "recorded_at": 1788871072
+      }
+    }
+  ]
+}

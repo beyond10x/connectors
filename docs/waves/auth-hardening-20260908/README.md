@@ -6,4 +6,4 @@ The [gate summary](integration/gate-summary.json) records 39 Rust tests passed, 
 
 Original briefs, implementor reports and adversarial reports/logs are retained in refresh/ and evidence/. They are historical records of their individual branches; final combined results live above. The extra reviewer scenarios remain in the contract scenario directories. Both reviews returned no findings; each added one structural boundary case.
 
-[Disposable cleanup](integration/disposable-cleanup.json) records exact removed build/scratch/tool directories. Source checkouts remain locally retained because no remote recovery is configured. No publication or release occurred.
+[Disposable cleanup](integration/disposable-cleanup.json) records exact removed build/scratch/tool directories. The three wave source checkouts were subsequently removed through managed GC after the operator requested cleanup; [removal receipts](integration/managed-cleanup.json) record recovery through a persistent [local bare Git backup](integration/local-recovery.json). No external publication or release occurred.

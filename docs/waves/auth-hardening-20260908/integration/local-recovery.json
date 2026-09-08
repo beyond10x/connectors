@@ -1,0 +1,7 @@
+{
+  "remote": "local-recovery",
+  "path": "/home/timo/.local/state/worktree/recovery/connectors_v2.git",
+  "kind": "persistent local bare Git repository; independent object copies, no alternates",
+  "external_publication": false,
+  "advertised_refs": "f55020ae799464ac09dfcc5a3ac54d02edc213b7\trefs/heads/impl/contracts-credential-evidence\n9fa4ba0346552fd3c34acd25e974717fd4c8c61c\trefs/heads/impl/contracts-refresh-coordination\nf5848015640aedcec2edcf4f985a881b3e5c35e4\trefs/heads/main\nf5848015640aedcec2edcf4f985a881b3e5c35e4\trefs/heads/wave/auth-hardening-20260908\n"
+}
