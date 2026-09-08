@@ -1,0 +1,7 @@
+{"database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit", "container": "connectors-review-sql-03d099de", "image": "sha256:1bea307dfb3ee30541a7acf7de14b58bcd6948da98e5d31a04c627c4d35ec64b"}
+{"case": "control", "query": "SELECT pg_sleep(30)::text AS value", "exit": 1, "seconds": 10.08, "stdout": "", "stderr": "{\"code\":\"timeout\",\"message\":\"database could not complete the requested read\"}", "active_backends": ""}
+{"case": "bypass", "query": "SELECT set_config('statement_timeout','0',true) AS value UNION ALL SELECT pg_sleep(40)::text", "exit": 1, "seconds": 15.03, "stdout": "", "stderr": "{\"code\":\"timeout\",\"message\":\"database request timed out\"}", "active_backends": "107|active|15"}
+{"case": "bypass-after-three-seconds", "active_backends": "107|active|18"}
+{"case": "after-adapter-exit", "adapter_exit": 0, "active_backends": "107|active|18"}
+{"case": "cleanup-cancel-own-backend", "result": "t"}
+{"cleanup_container": "connectors-review-sql-03d099de", "exit": 0}
