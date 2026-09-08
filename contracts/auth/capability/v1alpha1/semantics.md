@@ -28,6 +28,16 @@ Design responsibility four of four (`docs/design.md:529`): "Authenticate a permi
 | Grafana data-source proxy and Kubernetes service proxy route adapters | `../connectors/docs/design/08-…:159-176`, `10-…:102-116` | preserve as `mediated-http`, specified in [mediated_route](../../../discovery/mediated_route/v1alpha1/semantics.md) |
 | Docker Engine API over unix socket or TLS client certificate | no old source; vendor facts to verify at authoring | `socket-peer`, `mtls-client-identity` |
 
+### 2.1 Reserved capability disposition
+
+`http-signing` is reserved/refused. The historical Twilio, Slack and Stripe
+declarations preserve the name for later translation, but this version selects
+no canonicalization algorithm, signed-component policy, provider profile or
+conformance source. A profile or descriptor cannot select or advertise it, and
+an incoming selection is refused before provider use. A future supported binding
+requires those independently reviewed semantics; enum membership and historical
+provider declarations do not confer support.
+
 ## 3. Types
 
 Each capability is a Rust port in the SDK; none is a wire type. The wire only ever sees the capability *name* in descriptors and profiles.

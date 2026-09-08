@@ -10,10 +10,23 @@
 |---|---|
 | Contract | `media/v1alpha1` |
 | Profiles (track formats) | `pcm-s16le-8k-mono-20ms` |
-| Capabilities | `dtmf`, `interrupt`; reserved `hold`, `transfer` |
+| Capabilities | selected: `dtmf`, `interrupt`; reserved/refused: `hold`, `transfer` |
 | Vocabulary | track descriptor, frame, sequence, timestamp, ready, loss, overload, terminal |
 
 `MediaSession` adds to a session: negotiated track descriptions (encoding, sample format and rate, channels, timing, bounds), duplex streams with sequence and timestamp semantics, explicit readiness, interruption, loss, overload and termination behavior, and capability negotiation (`docs/design.md:628-633`). SIP/RTP, WebRTC and RTVBP expose the same media semantics through independent implementations; their protocol code must not depend on one another (`docs/design.md:30`).
+
+### 1.1 Capability support disposition
+
+| Name | Disposition | Requirement/source rationale |
+|---|---|---|
+| `dtmf` | selected for the first profile | The old SIP binding sends negotiated RFC 4733 telephone-events; protocol realization stays adapter-native. |
+| `interrupt` | selected for the first profile | The old application-side barge-in clears bounded playback without becoming Agent steering. |
+| `hold` | reserved/refused | Design §14.1 treats call-specific hold as a separate profile decision; no selected adapter supplies its state, admission or failure semantics. |
+| `transfer` | reserved/refused | Design §14.1 treats call-specific transfer as a separate profile decision; no selected adapter supplies target admission, effects or outcome semantics. |
+
+Reserved/refused capabilities are retained as explicit future vocabulary only.
+They are absent from supported capability negotiation and descriptors, and an
+incoming control that names one is refused as unsupported.
 
 ## 2. Old evidence and disposition
 
@@ -28,6 +41,11 @@
 | Bridge: forwards compatible semantic media and controls; joint termination policy; imports neither SIP nor RTVBP | `docs/design.md:653` | preserve; bridge is a composition component conforming to this contract twice |
 
 ## 3. Types
+
+The JSON snippets below are illustrative semantic views, not selected wire
+codecs. Their field relationships and the numeric first-profile values are
+normative requirements unless a later table explicitly marks a value for
+measurement.
 
 Track descriptor (negotiated per stream at session establishment):
 
@@ -68,8 +86,8 @@ Terminal reasons added to `sessions`: `media_overload`, `media_incompatible`.
 - Sequence and timestamp: `seq` increments by one per frame per direction; `timestamp_samples` increments by `frame_ms × sample_rate / 1000` per frame; a gap in `seq` is loss and must be reported by the receiver with `loss`.
 - Loss policy: input direction (from the remote party toward the application) drops the oldest frame on overflow and emits `loss`; output direction (application → remote) never silently drops: on overflow the endpoint emits `overload`, then either degrades (declared per binding) or terminates `media_overload`.
 - Data/control isolation: frames travel on a bounded data path scheduled separately from control; a saturated stream must not delay `close`, `revoke`, or `ping` beyond the session's control bound (`docs/design.md:637`).
-- Capabilities are explicit: an endpoint without `dtmf` refuses a `signal` with `Unsupported`; it never accepts and discards (`docs/design.md:635`). `hold`/`transfer` are not promised by this version.
-- Interrupt: clears the endpoint's bounded output queue and reports the number of frames cleared; it does not cancel anything at the application (`docs/design.md:315` in old design 05, steering is separate).
+- Capabilities are explicit: an endpoint without `dtmf` refuses a `signal` with `Unsupported`; it never accepts and discards (`docs/design.md:635`). `hold`/`transfer` are reserved/refused and cannot be negotiated or advertised by this version.
+- Interrupt: clears the endpoint's bounded output queue and reports the number of frames cleared; it does not cancel anything at the application (`../connectors/docs/design/05-native-sip-and-rtvbp.md:315-318` at `81459ac4`; steering is separate).
 - Termination: first accepted terminal wins (sessions rule); `stream_end` in one direction leaves the other usable only while the session's live data authority remains valid. Revocation and any session terminal stop both directions under [sessions §4.1](../../sessions/v1alpha1/semantics.md#41-traffic-cutoff-and-teardown-f06): at most 2 s from host revocation, no grace after lease expiry, no queued-data drain, and at most 5 s to local teardown/accounting. Queued input, output, DTMF, playback and bridge forwarding are discarded at cutoff with local accounting. This declared termination discard does not change the live-session overflow rule. A remote close acknowledgement is not required, and bytes already beyond the last controlled boundary cannot be recalled.
 - Bridge: a bridge holds two MediaSessions, checks profile and capability compatibility before forwarding, forwards frames and signals, and applies a declared joint termination policy (first profile: either side's terminal closes both, propagating the originating reason unless the other side already accepted an earlier terminal). It imports no protocol crate. Both legs enforce their own live leases; terminal propagation cannot extend either lease or add a per-hop cutoff allowance. An unresponsive leg cannot retain queued audio after its cutoff.
 - Participant context (caller number, display name) is untrusted data on the session; it never selects a tenant or destination (`docs/design.md:671`).
@@ -127,5 +145,5 @@ Terminal reasons added to `sessions`: `media_overload`, `media_incompatible`.
 |---|---|
 | Queue depths | 50 frames each way |
 | Degrade versus terminate on output overload | binding-declared; SIP binding terminates (old behavior), local audio may degrade |
-| `hold`/`transfer` | reserved, not specified |
+| `hold`/`transfer` | reserved/refused; not advertised or accepted until a separately specified adapter profile supplies complete semantics and conformance |
 | WebRTC | interoperability target; no claim until an implementation passes this suite (`docs/design.md:947`) |
