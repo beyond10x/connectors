@@ -28,7 +28,7 @@ Three discoveries are distinct: service, contract, resource (`docs/design.md:319
 
 ## 3. Types
 
-An admitted observation operation returns pages of one published discovery view. The receiver-selected declaration/profile fixes the coverage source; request data cannot choose another profile. Exact adapter operation naming and recognition remain with discovery-profiles (E07/E14/E32); `resources.observe` here names the conceptual read. This selected payload is new, not the current Page reader:
+An admitted observation operation returns pages of one published discovery view. The receiver-selected declaration/profile fixes the coverage source; request data cannot choose another profile. The concrete declarations and recognition rules in §4.5 fix their bindings; `resources.observe` here names the conceptual read, not a reserved wire id or wildcard dispatcher. This selected payload is new, not the current Page reader:
 
 ```json
 { "limit": 100, "cursor": null }
@@ -42,6 +42,7 @@ An admitted observation operation returns pages of one published discovery view.
       "source_connection": "conn_grafana_1",
       "observed_type": "prometheus",
       "title": "prod-prometheus",
+      "recognition": { "provider": "prometheus", "confidence": "declared" },
       "locator": { "kind": "opaque", "digest": "sha256:…" },
       "candidate": { "target_adapter": "prometheus", "route_profile": "grafana-datasource-proxy", "confidence": "declared" },
       "auth_requirement": { "kind": "inherited_from_source" },
@@ -65,7 +66,8 @@ An admitted observation operation returns pages of one published discovery view.
 | Field | Rule |
 |---|---|
 | `locator.kind` | `opaque` (digest of the provider identity; the identity itself stays private), `address` (reserved; `endpoint_discovery` covers it today) |
-| `candidate` | present only for recognized `observed_type` values from the profile's mapping table; `confidence` is `declared` (provider states the type) or `inferred` (name/label heuristics, Kubernetes) |
+| `recognition` | required-null when unrecognized, otherwise the closed provider/confidence value in §4.5; an inferred marker is not proof of an API or an available adapter |
+| `candidate` | required-null unless the selected mapping supplies a potential adapter/route/auth placement; confidence agrees with recognition. Recognition can exist without a candidate, including Argo CD |
 | `auth_requirement.kind` | `inherited_from_source` (mediated route uses the source connection's credential), `separate` (a direct connection needs its own), `unknown` |
 | `reachability` | `via_source_only`, `direct_possible`, `unknown` |
 | `generation` | non-reusable publication revision in one qualified coverage scope; every item on a page names that view's generation, not its last positive observation or a credential generation |
@@ -94,7 +96,7 @@ Errors: base codes plus the selected auth connection_not_ready refusal; forbidde
 
 ### 4.1 Exact coverage scope
 
-The logical collection key is `(owning instance, source connection, receiver-selected discovery declaration/profile and revision, admitted provider authority, normalized finite membership selection, interpretation/projection revision, host admission/disclosure scope)`. Configuration supplies these inputs; a caller-filtered result is never the global source inventory. The host retains their canonical equality form privately and exposes only safe scope_ref/selection_revision. Physical cluster identity beyond the configured binding remains E32's separate authoring requirement; this contract cannot infer it from a display/context name.
+The logical collection key is `(owning instance, source connection, receiver-selected discovery declaration/profile and revision, admitted provider authority, normalized finite membership selection, interpretation/projection revision, host admission/disclosure scope)`. Configuration supplies these inputs; a caller-filtered result is never the global source inventory. The host retains their canonical equality form privately and exposes only safe scope_ref/selection_revision. Section 4.5 selects configured instance/API-origin identity and explicitly defers physical-cluster identity; a display/context name is not either identity.
 
 Membership selection includes every configured namespace/resource selector/filter that can exclude an object. Partitions divide this exact scope; a complete namespace a proves nothing about b. A changed source/profile/provider authority, narrower namespace set, mapping/allowlist/projection or disclosure scope creates a different coverage scope/selection revision. Its complete result cannot withdraw observations from the previous one. Locally excluded candidates cease eligibility immediately under current policy, but exclusion is not provider disappearance. Unchanged partitions may be compared only when their full membership/interpretation/admission coordinates are equal; label equality is insufficient. This first profile requires equality of the whole selection revision for absence comparison rather than attempting predicate subsumption across changed filters.
 
@@ -135,6 +137,29 @@ Known configuration/permission/revocation changes cut off conflicting admission 
 A fresh initial observation request performs the admitted bounded collection, then pages one acknowledged immutable view in observation-id byte order. A public cursor is not a provider continuation. It binds owning instance/source, exact scope/selection, publication generation, projection/disclosure/authorization coverage, page position and expiry; a newer publication in that same scope or changed current authorization/coverage invalidates it (stale_cursor after current access admission, with denied access refused first). Limit changes cannot retarget the scope. Subsequent pages do not rescan or reset provider budgets. Each page reports the same coverage and generation; exhaustion of public rows only makes next_cursor null. Root complete is true only on the final page of a complete collection with no retention truncation. A final page from an incomplete collection remains complete:false and next_cursor:null, which is truthful terminal partial output rather than a retry promise.
 
 Snapshot classifications describe their publication time; original evidence deadlines and current authority are re-evaluated before materialization/route use. Neither immutable paging nor retained history preserves a permission grant. At most one current view per admitted scope is served; newer publication invalidates older cursors, so historical views need no paging lease beyond the bounded metadata-retention policy. The supporting strict reader must understand all root/row/coverage fields and F08 authorization coverage; the existing Page is unchanged.
+
+### 4.5 Fixed declarations, recognition and configured source identity
+
+| Adapter declaration | Contract/profile fixed by the receiver | Source selection |
+|---|---|---|
+| Grafana `datasources.observe` | resource_discovery/v1alpha1, grafana-datasources | The admitted configured Grafana source connection and its authority; never a backend URL from request data |
+| Kubernetes `services.observe` | resource_discovery/v1alpha1, kubernetes-service-targets | The admitted configured Kubernetes source connection/API origin; only core/v1 Services under the configured namespace mode |
+
+These are adapter-chosen ids; another authored id may implement the same contract only with its own exact, unambiguous descriptor/declaration binding. There is no magic resources.observe dispatcher and no caller-selectable profile. Each declaration fixes one profile and one receiver-owned source-selection rule; each admitted invocation resolves exactly one configured source binding. The first adapter examples each have one configured source connection. Missing, ambiguous or incompatible source selection refuses before provider work; an explicit Invocation.connection must match the selected admitted source under the service binding. A gateway alias resolves to the same source-qualified leaf declaration and cannot replace its contract/profile/source meaning. Duplicate or conflicting declarations are authoring/admission failures. Advertise only a supported strict reader and implemented realization; these documents do not add descriptor fields or operations to today's readers.
+
+The selected input is closed to limit/cursor. A request profile, source URL, namespace override, mapping table or target adapter is invalid_input; it cannot retarget the declared scan. Receiver configuration owns namespace mode/filters/mapping, and its revision participates in scope/cursor equality. F08 permission preflight and F13 provider coverage remain independent. A declaration/profile/configuration change requires the corresponding new source/selection/projection identity; old cursors refuse rather than reinterpret it.
+
+For Kubernetes, every well-formed admitted Service considered by the profile yields an observation, including an unrecognized Service with recognition:null, candidate:null, auth_requirement.kind:unknown and reachability:unknown. Invalid/incomplete provider objects follow §4.2's malformed-data rule; recognition never hides provider work from the scan limits. The observed_type remains kubernetes_service. Recognition uses the Service name and identity labels as specified below, with ASCII lowercase normalization. Missing labels contribute no token; there is no whitespace trimming, fuzzy matching or locale-dependent comparison. The old implementation consulted app.kubernetes.io/name, app, k8s-app and name (old local.rs:1170–1225 at 81459ac4). This selected Argo rule uses only the name and stable app.kubernetes.io/name label: the three broader legacy aliases do not independently establish the API marker. That is an explicit profile change, not a claim of complete old recognizer equivalence; monitoring keeps its older four-label inputs.
+
+1. If **the Service name OR app.kubernetes.io/name whole token equals argocd-server**, report recognition {provider:argocd,confidence:inferred}. Exact Service name OR exact stable app.kubernetes.io/name label suffices; the other legacy labels cannot supply that match. This arm precedes monitoring substring recognition. It never matches argocd, argocd-repo-server, argocd-server-metrics or argocd-redis merely by their name/ordinary component labels. A Helm-prefixed name with the stable exact label matches. A falsely supplied exact label can still produce an inference: this is provider metadata, not verified application identity.
+2. Otherwise apply the preserved monitoring substring arms in order grafana, alertmanager, loki, prometheus across the name and all four legacy identity-label tokens. The first matching arm supplies the inferred marker; there is no implicit additional adapter kind or arbitrary proxy. This ordering makes multiple legacy hints deterministic without claiming they prove the service type.
+3. Otherwise recognition and candidate are null. Grafana instead maps its reviewed provider type values prometheus/loki/alertmanager to declared recognition; unknown plugins remain observable with recognition:null and candidate:null. An allowlist can suppress a candidate without changing the observed provider type.
+
+Argo recognition always has candidate:null in this profile, no mediated route and no callable Argo adapter. Recognizing a marker is not a capability advertisement. Other candidates still require the closed source-specific adapter/route/auth mapping and all explicit materialization, fixed-target, implementation and current-authority checks; a name or label cannot select a credential or bypass those checks. The first Kubernetes mediated suite remains Prometheus/Loki/Alertmanager; recognized Grafana is informational unless a separately specified compatible mapping exists. A recognition marker does not assert routability or invent separate service credentials.
+
+Configured source identity is the host-qualified tuple (stable service instance, admitted connection ref, canonical configured HTTPS API origin, transport trust/identity-policy revision). Origin means scheme/host/effective port under the selected strict URL binding, with no userinfo, query, fragment or non-root path; ambient/kubeconfig proxies stay disabled. Equivalent accepted origin spellings share the canonical value; display names, kubeconfig context names, aliases and resolved IP addresses are not source identity. TLS trust is receiver configuration, not a value supplied in the discovery request. Changing origin or admitted trust/authority boundary requires a new independently admitted source connection; same-identity credential rotation alone does not merge or reassign it. Different configured instances/connections remain distinct even when their origins or labels coincide; no automatic cross-connection cluster deduplication is selected.
+
+This is deliberately **configured authority identity**, not a globally unique or remotely attested physical-cluster id. The profile does not probe namespaces, nodes, kube-system UID, certificates or arbitrary endpoints to manufacture such an id. Detecting physical replacement behind an unchanged configured authority is not guaranteed by this first profile; any known replacement invalidates old continuity and requires explicit re-admission with a new source binding. Physical identity/automatic migration requires a separately specified bounded attestation and continuity contract before it can be claimed. Provider UID and target equality in §4.3 remain qualified by the selected source, never global identities. This explicit limit disposes of E32 without advertising physical-cluster continuity.
 
 ## 5. Limits
 
@@ -183,7 +208,7 @@ Observation ids, scope refs and selection/partition refs are bounded safe string
 
 | Entity | Notes |
 |---|---|
-| `ResourceObservation` persistent identity/relations | Proposed, not yet declared. Its logical source, incarnation, target interpretation and retained history belong to the host metadata boundary above; exact persistent ownership/cardinality remains UNMAPPED under persistence-ownership |
+| `ResourceObservation` persistent identity/relations | Proposed, not yet declared. Its logical source, incarnation, target interpretation and retained history belong to the host metadata boundary above; exact persistent ownership/cardinality remains UNMAPPED under the model/binding prerequisites recorded in design §31 |
 | `Materialization` | not an entity here; it is the creation of a `Connection` with a parent |
 | Multiplicity: one resource may have several source observations; one observation may back several child connections | Conceptual relationship only; no Connection.parent reverse relation is currently recorded in ESS. Ownership remains UNMAPPED (`docs/design.md:487`) |
 | Coverage/publication/revalidation values | [discovery.yaml](../../../../ess/domains/discovery.yaml) models settled shapes; provider completeness, scope equality, current time/authority, atomic publication, retention and route revalidation are not executed schema predicates |
@@ -195,3 +220,5 @@ Observation ids, scope refs and selection/partition refs are bounded safe string
 | Whether `endpoint_discovery` becomes a profile of this contract | later; both stay until a third discovery profile exists |
 | Kubernetes recognizer markers | the old four plus `argocd` as observation-only |
 | Refresh interval | configuration; default 300 s |
+
+Persistence ownership is consolidated in [design §31](../../../../docs/design.md#31-host-persistence-ownership-and-atomicity). DiscoveryPublicationPort owns the complete view/private-index transaction; required current binding comparisons share the selected host metadata authority. This inventory does not supply a backend or execute its atomicity predicates.

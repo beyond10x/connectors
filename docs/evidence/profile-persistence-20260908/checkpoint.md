@@ -1,0 +1,15 @@
+# Local discovery-profile and persistence checkpoint — 2026-09-08
+
+Baseline: `175053fd2c951dc9564ff587a636775ab8027d2e`. This checkpoint closes E07/E14/E32 and E28 through the two existing owner stories. Root serialized tracked edits in primary main under the repository override. Two independent reviewers wrote only ignored snapshots; no managed worktree or runtime implementation was created.
+
+Both final reviewers approve with zero residual findings. A froze 57 normative/evidence inputs and B froze 60; all remain byte-identical to the reviewed files. The four immutable AEP review-result bodies match their exact copied reports. [Review provenance](review-provenance.json) retains reports, hashes and compressed complete reviewer packets, including historical/supplemental evidence and A's separately frozen projection sets. [Closure audit](closure-audit.json) verifies report/archive/input equality and all eighteen journal outcomes exactly once. Reviewers excluded each other's output and mutable disposition/planning bookkeeping.
+
+Eighteen individual findings have fixed outcomes: six for discovery profiles and twelve for persistence ownership. [Dispositions](dispositions.md) connect them to the normative revisions and [43 declared textual traces](traces.md). The [verification](verification.md) reports 44 schema expectations, seven rejected shapes, three accepted semantic counterexamples, 211 deterministic schema artifacts, pinned ESS0.20.0 and the passing existing full gate/MSRV1.88 with 50 Rust tests. [Session storage hashes](session-evidence-storage.json) preserve the separately compiled 13/201 expectations. None executes the new recognizer, canonicalizer, storage, authority or fault behavior.
+
+The [port inventory extraction](persistence-port-inventory.json) records eighteen unique logical responsibilities; [ESS inventory](ess-entity-inventory.json) records the eleven actually declared entities. Neither claims a durable backend or a complete missing persistence entity graph. Configured authority identity does not attest physical cluster continuity. These limits and the required later bindings remain explicit.
+
+[Final AEP validation](planning-final.log): 99 artifacts valid, with 57 warnings for immutable prose-only review records. The verbatim output is retained; reports were not rewritten to silence the planning enumeration limitation. Original source IDs and all new finding outcomes have separate explicit accounting.
+
+Current ledger: **27/48 original findings fixed, 21 open; 17 owner stories implemented, 10 draft.** Remaining mutation/datasource/media/index/evidence/vocabulary stories and broader catalog/stack/open-decision review keep the unbounded specification goal active. No implementation/adapter-kind schema changes or external publication are included.
+
+Final report SHA-256: A `a488e41fa7ec520d2f19c3da09c652d820fda6638ee32d10c382b0051b0c13df`; B `dc13d8a549728b0c31cac2a05542feb92e1b00877ef6c335622a4e2640f1cb34`. The commit carrying this record is the local checkpoint; its backup is the configured local recovery bare repository under the separately verified bot identity.
