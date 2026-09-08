@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.EligibilityFacts",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:1c9e27d5639818cbc7aa41f4a55eae8a39ece461f9e04b617ef3549b50ec2450",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.ConnectionState": {
+      "title": "ConnectionState",
+      "x-ess-name": "connectors.connection_admission.ConnectionState",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "pending",
+        "ready",
+        "reauthorization_required",
+        "custody_unavailable",
+        "parent_degraded",
+        "disabled",
+        "revoked"
+      ]
+    },
+    "connectors.connection_admission.EligibilityFacts": {
+      "title": "EligibilityFacts",
+      "x-ess-name": "connectors.connection_admission.EligibilityFacts",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "authority_available": {
+          "type": "boolean"
+        },
+        "host_admitted": {
+          "type": "boolean"
+        },
+        "operation_enabled": {
+          "type": "boolean"
+        },
+        "viability": {
+          "$ref": "#/$defs/connectors.connection_admission.ViabilityDecision"
+        },
+        "profile_matches": {
+          "type": "boolean"
+        },
+        "scope": {
+          "$ref": "#/$defs/connectors.connection_admission.RequirementResult"
+        },
+        "permission": {
+          "$ref": "#/$defs/connectors.connection_admission.RequirementResult"
+        },
+        "verification": {
+          "$ref": "#/$defs/connectors.connection_admission.RequirementResult"
+        }
+      },
+      "required": [
+        "authority_available",
+        "host_admitted",
+        "operation_enabled",
+        "viability",
+        "profile_matches",
+        "scope",
+        "permission",
+        "verification"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.connection_admission.RequirementResult": {
+      "title": "RequirementResult",
+      "x-ess-name": "connectors.connection_admission.RequirementResult",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "not_required",
+        "satisfied",
+        "insufficient",
+        "denied",
+        "unavailable",
+        "stale",
+        "unknown"
+      ]
+    },
+    "connectors.connection_admission.ViabilityDecision": {
+      "title": "ViabilityDecision",
+      "x-ess-name": "connectors.connection_admission.ViabilityDecision",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/connectors.connection_admission.ConnectionState"
+        },
+        "error": {
+          "$ref": "#/$defs/connectors.service_wire.BaseErrorCode"
+        }
+      },
+      "additionalProperties": false
+    },
+    "connectors.service_wire.BaseErrorCode": {
+      "title": "BaseErrorCode",
+      "x-ess-name": "connectors.service_wire.BaseErrorCode",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "invalid_input",
+        "unsupported",
+        "unauthorized",
+        "forbidden",
+        "not_found",
+        "stale_description",
+        "stale_cursor",
+        "rate_limited",
+        "unavailable",
+        "capacity",
+        "timeout",
+        "upstream_protocol",
+        "internal"
+      ]
+    }
+  }
+}

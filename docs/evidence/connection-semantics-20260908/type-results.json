@@ -1,0 +1,415 @@
+{
+  "expectations": 80,
+  "matched": 80,
+  "results": [
+    {
+      "id": "baseline-ready-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "baseline-ready-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "new-unpublished-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "new-unpublished-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "stale-baseline-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "stale-baseline-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-identity-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-identity-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "provider-credential-revoked-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "provider-credential-revoked-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "consumed-refresh-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "consumed-refresh-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "custody-unavailable-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "custody-unavailable-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "parent-degraded-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "parent-degraded-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "disabled-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "disabled-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "terminal-revoked-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "terminal-revoked-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "revoked-all-failures-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "revoked-all-failures-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "disabled-all-failures-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "disabled-all-failures-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "known-invalid-with-custody-outage-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "known-invalid-with-custody-outage-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "custody-before-parent-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "custody-before-parent-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "parent-before-baseline-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "parent-before-baseline-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "metadata-unavailable-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "metadata-unavailable-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "read-without-optional-write-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "read-without-optional-write-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "write-missing-grant-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "write-missing-grant-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-operation-grants-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-operation-grants-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "target-permission-denied-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "target-permission-denied-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "target-permission-stale-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "target-permission-stale-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "permission-unavailable-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "permission-unavailable-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "operation-verification-not-current-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "operation-verification-not-current-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "required-verification-unknown-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "required-verification-unknown-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "optional-verification-not-required-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "optional-verification-not-required-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "current-grant-denied-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "current-grant-denied-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "grant-policy-unavailable-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "grant-policy-unavailable-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "operation-disabled-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "operation-disabled-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "profile-purpose-mismatch-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "profile-purpose-mismatch-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "explicit-configured-no-alternatives-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "explicit-configured-no-alternatives-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "pending-connection-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "pending-connection-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "revoked-connection-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "revoked-connection-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "degraded-route-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "degraded-route-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "host-denial-before-private-state-facts",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "host-denial-before-private-state-decision",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "list",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "begin_create",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "describe",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "begin_repair",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "revoke",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "status",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "protected_complete",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "evidence-requirements",
+      "accepted": true,
+      "expected_matched": true
+    },
+    {
+      "id": "retired-global-scope-state",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "typo-error",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "missing-metadata-fact",
+      "accepted": false,
+      "expected_matched": true
+    },
+    {
+      "id": "unknown-target-member",
+      "accepted": false,
+      "expected_matched": true
+    }
+  ],
+  "known_limit": {
+    "value": {
+      "eligible": true,
+      "error": "not_granted"
+    },
+    "generic_schema_accepts": true,
+    "semantic_contract_refuses": true,
+    "reason": "Cross-value decision predicates remain explicit UNMAPPED obligations."
+  }
+}

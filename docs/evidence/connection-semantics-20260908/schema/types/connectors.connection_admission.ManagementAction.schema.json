@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.ManagementAction",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:7efc26d38065d8293dab0659d04a6b0b4737e985c0dd7436e534f38ba4433772",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.ManagementAction": {
+      "title": "ManagementAction",
+      "x-ess-name": "connectors.connection_admission.ManagementAction",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "list",
+        "describe",
+        "begin_create",
+        "begin_repair",
+        "status",
+        "revoke",
+        "protected_complete"
+      ]
+    }
+  }
+}

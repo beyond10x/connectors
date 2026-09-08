@@ -1,0 +1,1625 @@
+{
+  "scope": "Declared textual expectations over trusted facts; no readiness reducer, admission checker, clock, database, provider or management implementation executed. Optional semantic fields use omission, not a wire-null codec.",
+  "viability": [
+    {
+      "id": "baseline-ready",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "ready"
+      }
+    },
+    {
+      "id": "new-unpublished",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": false,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "pending"
+      }
+    },
+    {
+      "id": "stale-baseline",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "expected": {
+        "state": "pending"
+      }
+    },
+    {
+      "id": "unknown-identity",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "expected": {
+        "state": "pending"
+      }
+    },
+    {
+      "id": "provider-credential-revoked",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": true,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "reauthorization_required"
+      }
+    },
+    {
+      "id": "consumed-refresh",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": true,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "expected": {
+        "state": "reauthorization_required"
+      }
+    },
+    {
+      "id": "custody-unavailable",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": false,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "custody_unavailable"
+      }
+    },
+    {
+      "id": "parent-degraded",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "parent_degraded"
+      }
+    },
+    {
+      "id": "disabled",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": false,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "disabled"
+      }
+    },
+    {
+      "id": "terminal-revoked",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": true,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "revoked"
+      }
+    },
+    {
+      "id": "revoked-all-failures",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": true,
+        "enabled": false,
+        "established_credential_failure": true,
+        "required_custody_available": false,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "revoked"
+      }
+    },
+    {
+      "id": "disabled-all-failures",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": false,
+        "established_credential_failure": true,
+        "required_custody_available": false,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "disabled"
+      }
+    },
+    {
+      "id": "known-invalid-with-custody-outage",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": true,
+        "required_custody_available": false,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "reauthorization_required"
+      }
+    },
+    {
+      "id": "custody-before-parent",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": false,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "state": "custody_unavailable"
+      }
+    },
+    {
+      "id": "parent-before-baseline",
+      "facts": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "expected": {
+        "state": "parent_degraded"
+      }
+    },
+    {
+      "id": "metadata-unavailable",
+      "facts": {
+        "metadata_available": false,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "expected": {
+        "error": "unavailable"
+      }
+    }
+  ],
+  "eligibility": [
+    {
+      "id": "read-without-optional-write",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": true
+      }
+    },
+    {
+      "id": "write-missing-grant",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "insufficient",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "insufficient_scope"
+      }
+    },
+    {
+      "id": "unknown-operation-grants",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "unknown",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      }
+    },
+    {
+      "id": "target-permission-denied",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "denied",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "forbidden"
+      }
+    },
+    {
+      "id": "target-permission-stale",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "stale",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "unavailable"
+      }
+    },
+    {
+      "id": "permission-unavailable",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "unavailable",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "unavailable"
+      }
+    },
+    {
+      "id": "operation-verification-not-current",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "stale"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      }
+    },
+    {
+      "id": "required-verification-unknown",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "unknown"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      }
+    },
+    {
+      "id": "optional-verification-not-required",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": true
+      }
+    },
+    {
+      "id": "current-grant-denied",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": false,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "not_granted"
+      }
+    },
+    {
+      "id": "grant-policy-unavailable",
+      "facts": {
+        "authority_available": false,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "unavailable"
+      }
+    },
+    {
+      "id": "operation-disabled",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": false,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "forbidden"
+      }
+    },
+    {
+      "id": "profile-purpose-mismatch",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": false,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "forbidden"
+      }
+    },
+    {
+      "id": "explicit-configured-no-alternatives",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "not_required",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": true
+      }
+    },
+    {
+      "id": "pending-connection",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "pending"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      }
+    },
+    {
+      "id": "revoked-connection",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "revoked"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      }
+    },
+    {
+      "id": "degraded-route",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "parent_degraded"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "route_unavailable"
+      }
+    },
+    {
+      "id": "host-denial-before-private-state",
+      "facts": {
+        "authority_available": true,
+        "host_admitted": false,
+        "operation_enabled": true,
+        "viability": {
+          "state": "revoked"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "expected": {
+        "eligible": false,
+        "error": "not_granted"
+      }
+    }
+  ],
+  "management_targets": [
+    {
+      "action": "list",
+      "target": {
+        "owning_instance": "leaf-a",
+        "kind": "instance"
+      }
+    },
+    {
+      "action": "begin_create",
+      "target": {
+        "owning_instance": "leaf-a",
+        "kind": "instance",
+        "profile": "fixture.user"
+      }
+    },
+    {
+      "action": "describe",
+      "target": {
+        "owning_instance": "leaf-a",
+        "kind": "connection",
+        "connection": "conn-a"
+      }
+    },
+    {
+      "action": "begin_repair",
+      "target": {
+        "owning_instance": "leaf-a",
+        "kind": "connection",
+        "connection": "conn-a",
+        "profile": "fixture.user",
+        "expected_revision": "r7"
+      }
+    },
+    {
+      "action": "revoke",
+      "target": {
+        "owning_instance": "leaf-a",
+        "kind": "connection",
+        "connection": "conn-a"
+      }
+    },
+    {
+      "action": "status",
+      "target": {
+        "owning_instance": "leaf-a",
+        "kind": "acquisition",
+        "acquisition": "acq-a"
+      }
+    },
+    {
+      "action": "protected_complete",
+      "target": {
+        "owning_instance": "leaf-a",
+        "kind": "acquisition",
+        "acquisition": "acq-a"
+      }
+    }
+  ],
+  "typed_values": [
+    {
+      "id": "baseline-ready-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "baseline-ready-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "ready"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "new-unpublished-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": false,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "new-unpublished-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "pending"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "stale-baseline-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "stale-baseline-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "pending"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "unknown-identity-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "unknown-identity-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "pending"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "provider-credential-revoked-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": true,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "provider-credential-revoked-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "reauthorization_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "consumed-refresh-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": true,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "consumed-refresh-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "reauthorization_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "custody-unavailable-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": false,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "custody-unavailable-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "custody_unavailable"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "parent-degraded-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "parent-degraded-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "parent_degraded"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "disabled-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": false,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "disabled-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "disabled"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "terminal-revoked-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": true,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "terminal-revoked-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "revoked"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "revoked-all-failures-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": true,
+        "enabled": false,
+        "established_credential_failure": true,
+        "required_custody_available": false,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "revoked-all-failures-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "revoked"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "disabled-all-failures-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": false,
+        "established_credential_failure": true,
+        "required_custody_available": false,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "disabled-all-failures-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "disabled"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "known-invalid-with-custody-outage-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": true,
+        "required_custody_available": false,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "known-invalid-with-custody-outage-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "reauthorization_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "custody-before-parent-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": false,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "custody-before-parent-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "custody_unavailable"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "parent-before-baseline-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": true,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": false,
+        "validated_publication": true,
+        "baseline_current": false
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "parent-before-baseline-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "state": "parent_degraded"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "metadata-unavailable-facts",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "metadata_available": false,
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "metadata-unavailable-decision",
+      "type": "connectors.connection_admission.ViabilityDecision",
+      "value": {
+        "error": "unavailable"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "read-without-optional-write-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "read-without-optional-write-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "write-missing-grant-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "insufficient",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "write-missing-grant-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "insufficient_scope"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "unknown-operation-grants-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "unknown",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "unknown-operation-grants-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "target-permission-denied-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "denied",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "target-permission-denied-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "forbidden"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "target-permission-stale-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "stale",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "target-permission-stale-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "unavailable"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "permission-unavailable-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "unavailable",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "permission-unavailable-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "unavailable"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "operation-verification-not-current-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "stale"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "operation-verification-not-current-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "required-verification-unknown-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "unknown"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "required-verification-unknown-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "optional-verification-not-required-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "optional-verification-not-required-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "current-grant-denied-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": false,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "current-grant-denied-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "not_granted"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "grant-policy-unavailable-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": false,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "grant-policy-unavailable-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "unavailable"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "operation-disabled-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": false,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "operation-disabled-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "forbidden"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "profile-purpose-mismatch-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": false,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "profile-purpose-mismatch-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "forbidden"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "explicit-configured-no-alternatives-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "ready"
+        },
+        "profile_matches": true,
+        "scope": "not_required",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "explicit-configured-no-alternatives-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": true
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "pending-connection-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "pending"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "pending-connection-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "revoked-connection-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "revoked"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "revoked-connection-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "connection_not_ready"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "degraded-route-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": true,
+        "operation_enabled": true,
+        "viability": {
+          "state": "parent_degraded"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "degraded-route-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "route_unavailable"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "host-denial-before-private-state-facts",
+      "type": "connectors.connection_admission.EligibilityFacts",
+      "value": {
+        "authority_available": true,
+        "host_admitted": false,
+        "operation_enabled": true,
+        "viability": {
+          "state": "revoked"
+        },
+        "profile_matches": true,
+        "scope": "satisfied",
+        "permission": "not_required",
+        "verification": "not_required"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "host-denial-before-private-state-decision",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "not_granted"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "list",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "instance"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "begin_create",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "instance",
+        "profile": "fixture.user"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "describe",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "connection",
+        "connection": "conn-a"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "begin_repair",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "connection",
+        "connection": "conn-a",
+        "profile": "fixture.user",
+        "expected_revision": "r7"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "revoke",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "connection",
+        "connection": "conn-a"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "status",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "acquisition",
+        "acquisition": "acq-a"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "protected_complete",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "acquisition",
+        "acquisition": "acq-a"
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "evidence-requirements",
+      "type": "connectors.connection_admission.EvidenceRequirements",
+      "value": {
+        "connection": [
+          "identity_check",
+          "scope_check"
+        ],
+        "operations": [
+          {
+            "operation": "issue.create",
+            "checks": [
+              "permission_check"
+            ]
+          }
+        ]
+      },
+      "schema_accepts": true
+    },
+    {
+      "id": "retired-global-scope-state",
+      "type": "connectors.connection_admission.ConnectionState",
+      "value": "insufficient_scope",
+      "schema_accepts": false
+    },
+    {
+      "id": "typo-error",
+      "type": "connectors.connection_admission.EligibilityDecision",
+      "value": {
+        "eligible": false,
+        "error": "scope_insufficient"
+      },
+      "schema_accepts": false
+    },
+    {
+      "id": "missing-metadata-fact",
+      "type": "connectors.connection_admission.ViabilityFacts",
+      "value": {
+        "locally_revoked": false,
+        "enabled": true,
+        "established_credential_failure": false,
+        "required_custody_available": true,
+        "required_parent_available": true,
+        "validated_publication": true,
+        "baseline_current": true
+      },
+      "schema_accepts": false
+    },
+    {
+      "id": "unknown-target-member",
+      "type": "connectors.connection_admission.ManagementTarget",
+      "value": {
+        "owning_instance": "leaf-a",
+        "kind": "instance",
+        "credential": "forbidden-field"
+      },
+      "schema_accepts": false
+    }
+  ]
+}

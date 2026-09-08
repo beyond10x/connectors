@@ -20,14 +20,14 @@ Design responsibility two of four: establish, refresh, revoke, or repair authori
 |---|---|---|
 | Three copies of the authorization-code flow: GitLab PKCE S256 form-encoded, Jira no PKCE JSON body, Slack HTTP Basic through an egress gate; only Jira refreshed under a double-checked lock with skew | `../connectors/crates/connector-oauth/src/lib.rs` module header (measured 2026-08-25) | change: one coordinator, provider-declared differences (`docs/design.md:551`) |
 | Connect session: `connect_session_create` returns a short-lived `completion_endpoint` and optional `browser_completion_url`; creator polls `connect_session_status`; only a terminal completed status names `connection_ref` | `../connectors/contracts/connector-connection/v0alpha1/README.md:13-22` | preserve the shape (begin → action → poll → connection ref) |
-| Pasted credential posts directly to the Connector process; the agent sees only the opaque one-use URL | same README | preserve: ordinary model results never contain secret material or reusable completion authority (`docs/design.md:545`) |
+| Pasted credential posts directly to the Connector process; the old agent saw the opaque one-use URL | same README | change disclosure: a separately admitted trusted UI receives continuation authority; ordinary results get safe refs/action kinds only ([management](../../management.md)) |
 | Custody topologies: pasted once, external credential source, stored at execution, workload identity, OAuth2 acquisition | `../connectors/docs/design/07-credential-custody-topologies.md:121-200` | preserve the first, third and fifth as profiles here; second and fourth reserved |
 | Slack rotating refresh tokens: exchange and persistence cannot be one transaction; lost response may require reauthorization | `docs/design.md:598` | preserve as the `uncertain_refresh` outcome |
 | Refresh coordination per credential set across replicas | `docs/design.md:596` | preserve |
 
 ## 3. Types
 
-Coordinator interfaces have distinct bindings. Safe `auth.begin` and `auth.status` are admitted management operations; forwarding additionally needs the complete selected federation binding. `auth.complete` is a trusted callback/protected-entry port, not ordinary invoke input or a generic forwardable operation. Refresh and revoke retain their private/admitted entry points below (`docs/design.md:785`):
+Coordinator interfaces have distinct bindings, owned as specified in [management](../../management.md). Safe-payload `auth.begin` and `auth.status` are host-owned admitted management operations; forwarding additionally needs the complete selected federation binding. `auth.complete` is a trusted callback/protected-entry port, not ordinary invoke input or a generic forwardable operation. Refresh and revoke retain their private/admitted entry points below (`docs/design.md:785`):
 
 ```text
 auth.begin(profile, requested_scopes?, repair_of?: connection) -> AuthorizationAction
@@ -39,13 +39,15 @@ auth.revoke(connection)                                         -> RevocationOut
 
 ```json
 { "acquisition": "acq_…", "expires_unix_ms": 0,
-  "action": { "kind": "browser", "url": "https://<host callback service>/…one-use…" } }
+  "action": { "kind": "browser" } }
 { "acquisition": "acq_…", "expires_unix_ms": 0,
-  "action": { "kind": "protected_entry", "url": "https://<host>/…one-use…", "fields": ["token", "user"] } }
+  "action": { "kind": "protected_entry" } }
 { "acquisition": "acq_…", "state": "pending" }
 { "acquisition": "acq_…", "state": "completed", "connection": "conn_…" }
-{ "acquisition": "acq_…", "state": "failed", "reason": "expired | refused_by_provider | identity_mismatch | scope_insufficient | custody_unavailable" }
+{ "acquisition": "acq_…", "state": "failed", "reason": "expired | refused_by_provider | identity_mismatch | insufficient_scope | custody_unavailable" }
 ```
+
+These ordinary result examples contain no actionable URL. The separately bound trusted UI channel receives the expiring owner-bound URL and protected-entry field schema; status/discovery never reissue them. `pending` is acquisition state and need not identify a public Connection. A completed acquisition records acknowledged baseline publication, while current connection status is queried separately.
 
 Private provider interface (adapter-owned, never serialized):
 
@@ -66,10 +68,10 @@ Flow (specializes `docs/design.md:543-549`):
 
 1. Host admits `auth.begin` against caller, tenant, target connection (for repair), profile, and configured registration.
 2. Coordinator creates one-purpose expiring state correlated to the request and the allowed callback or entry URL. State is single-use.
-3. The action URL is presented by a trusted interface. Ordinary results carry the URL once; it is not reusable authority after completion or expiry.
-4. Completion evidence (OAuth callback code and state, or a posted static credential) is validated for correlation, expiry, one-time use. The provider implementation performs the exchange and validates returned identity, token kind, and granted scopes against the profile.
+3. For browser/protected-entry flows, the owning coordinator delivers the one-use action URL only to the separately admitted trusted UI channel. Ordinary results carry acquisition ref, expiry and action kind; no usable completion authority. Without the needed protected delivery/ingress binding that interactive flow is unavailable. Non-interactive client credentials skip this UI step and may complete in begin through their admitted registration/provider/custody path. Current authority, owner, expiry and one-use checks remain required at completion.
+4. Completion evidence (OAuth callback code and state, or a posted static credential) is validated for correlation, expiry, one-time use. The provider implementation performs the exchange and validates returned identity, token kind, and granted scopes against the profile minimum, recording actual grants; optional requested grants are not mandatory publication requirements ([profile §4.1](../../profile/v1alpha1/semantics.md#41-baseline-and-operation-requirements)).
 5. Repair: the returned external identity must match the bound one, else `identity_mismatch` and the connection remains in its prior state.
-6. Custody: the credential set is written durably (`auth.custody`) before the connection's active reference is published; both happen before `completed` is observable.
+6. Baseline validation, including any explicitly mandatory global verification, must succeed. Custody stores the complete credential set durably before the coordinator publishes its active reference under the current binding/revocation fence; both acknowledgements precede `completed`. Optional verification does not prevent publication; required operation-only checks still gate those operations. A failed independent repair preserves the prior binding subject to its own current validity, expiry and revocation.
 7. The caller receives the connection ref and safe status. Completion never executes a previously failed business operation.
 
 ### 4.1 Refresh exclusion, authorization and recovery
@@ -135,8 +137,8 @@ Client credentials (`oauth2_client_credentials`): no browser; `begin` performs t
 - Callback with mismatched state → refused, no exchange call on the fake provider.
 - Callback replayed after completion → refused, one connection exists.
 - Expired acquisition completed → `expired`.
-- Repair returning a different account id → `identity_mismatch`; prior credential still active.
-- Fake provider returns fewer scopes than `minimum` → `scope_insufficient`; nothing written to custody.
+- Repair returning a different account id → `identity_mismatch`; no replacement publication. Prior material is usable only if independently still current, valid and unconsumed.
+- Fake provider returns fewer scopes than `minimum` → `insufficient_scope`; no candidate publication/completed (ordinary validation precedes custody write). Optional requested write scope omitted with minimum read scope present → baseline publication/completed permitted, read eligible and write insufficient_scope.
 - Two replicas refresh the same generation concurrently → one committed authorization and at most one exchange; both eventually observe the new generation or the same refusal. Exercise the coordinator binding, not a fake custody lease.
 - Owner loss before authorization → fence old attempt before successor reservation. Loss after authorization (including before send) → no second exchange.
 - Committed response recovery → current publication owner succeeds; stale owner is refused; revocation/identity replacement wins without resurrection.
@@ -156,7 +158,7 @@ Client credentials (`oauth2_client_credentials`): no browser; `begin` performs t
 | Obligation | Where |
 |---|---|
 | Coordinator module with acquisition state store (expiring, one-use), durable per-generation refresh ledger, atomic authorization/fencing and publication/revocation | new host module |
-| Callback/entry HTTP ingress with bounded bodies, separate from the operations surface | `crates/connectors-host/src/server.rs` (new routes) |
+| Separately admitted protected UI delivery and callback/entry ingress with bounded bodies and owner/correlation/one-use checks | future host binding; exact codec/paths remain unselected, no generic invocation or discovery disclosure |
 | SDK trait for the private provider interface (`begin`/`exchange`/`refresh`/`revoke`) with a `CredentialUpdate` type that has no `Debug`/`Serialize` on its sensitive half (pattern: `Secret`, `crates/connectors-sdk/src/lib.rs:33-34`) | `crates/connectors-sdk` |
 | Shared OAuth mechanics (state, PKCE optional, token response parsing) as SDK helpers without owning the transport | `crates/connectors-sdk` (old rationale: `connector-oauth` header, "does not own the request") |
 
@@ -164,7 +166,7 @@ Client credentials (`oauth2_client_credentials`): no browser; `begin` performs t
 
 | Entity | Notes |
 |---|---|
-| `Acquisition` (identity: acquisition ref), lifecycle `pending → completed | failed | expired` | relations: `for_profile → AuthProfile` (one), `repairs → Connection` (zero or one), `yields → Connection` (zero or one) |
+| `Acquisition` (identity: acquisition ref), proposed lifecycle pending → completed / failed / expired | Not yet declared in ESS; its owner, optional repair target and yielded connection are coordinator facts whose persistent model remains an explicit obligation. No implemented entity/relations are claimed here. |
 | `CredentialSet` | defined in custody; custody version is not refresh identity |
 | `RefreshAttempt` | [ESS](../../../../ess/domains/refresh.yaml): `Reserved → Authorized → ResponseStored → Published`, pre-authorization fencing, stored-response recovery, terminal uncertainty/discard; exactly one source-generation reference |
 | `CredentialGeneration` | [shared ESS](../../../../ess/domains/credentials.yaml): host-private immutable capture; expected identity, not verified evidence |
@@ -177,6 +179,6 @@ The [verification record](verification.md) separates compiled authored scenarios
 
 | Decision | Default taken |
 |---|---|
-| Callback host placement in federation | the owning adapter service's host serves the callback; the gateway forwards `auth.begin`/`status` as management operations (`docs/design.md:785`) |
+| Callback host placement in federation | completion terminates at the one owning logical coordinator through a separately admitted protected ingress; safe begin/status use the selected management binding; no state copying or automatic reroute/resend ([management](../../management.md)) |
 | PKCE default | `none` unless the profile source says supported; then `S256` |
 | Expiry values | 600 s / 300 s first-profile defaults |

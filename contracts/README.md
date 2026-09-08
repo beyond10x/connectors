@@ -64,3 +64,5 @@ Deferred families with no document yet: `execution`, `events`, `resources`,
 ## Document template
 
 Every proposed contract document has ten sections: identity; old evidence and disposition; types; rules; ordering and limits; conformance scenarios; compatibility; SDK and host obligations; ESS entities; open decisions with defaults. Numeric limits marked "first-profile default" are starting values to be measured, not frozen (`docs/design.md:1146`).
+
+The auth families share [host management ownership and protected completion](auth/management.md). This cross-family boundary is not a new advertised family; management remains independently admitted and usable when provider business readiness fails.

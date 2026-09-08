@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 11
+revision: 12
 ---
 ## Context
 
@@ -106,3 +106,11 @@ Current ledger: **11/48 original findings fixed, 37 open; seven owner stories im
 F03 is fixed by `story:contracts-federated-approval`: one canonical leaf subject exposed through safe admitted preparation, distinct exact delegated/issuer proof framing, receiver-enforced proof windows and post-nonce acknowledgement admission, sole-leaf redemption and unchanged F01/F02 effect/replay ownership. ESS models the values and immutable receipts with known links; concrete runtime/policy/issuer/persistence bindings remain advertisement prerequisites. Both final independent reviewers approve with zero residual findings; 21 individual review findings have fixed outcomes. Evidence is `docs/evidence/federated-approval-20260908/verification.md` and `checkpoint.md`. Full gate/MSRV1.88 passes with 50 existing Rust tests; ESS0.20.0 validates 10 files/153 declarations and deterministically produces 163 schema artifacts. No runtime or adapter implementation changed.
 
 Current ledger: **12/48 source findings fixed, 36 assigned and open; eight owner stories implemented, 19 draft.** This supersedes the historical counts above, not their evidence. The broad specification stabilization goal remains active. Connection management/readiness, remaining auth/discovery/datasource/media semantics, persistence consolidation, catalog and later stack review obligations still need their own closure. All work remains local.
+
+## Current specification checkpoint — connection viability and management
+
+The latest checkpoint implements story:contracts-connection-readiness (F07/E19/E21) and story:contracts-management-boundary (E04) for their semantic scope. One ordered connection-wide viability reduction is separate from exact-operation scope/permission/verification and current authority. Host-owned management remains independently admitted when business credentials fail; exact targets, one acquisition coordinator, protected continuation/completion, and local-versus-provider revocation are explicit. ESS adds minimal typed values and identifies absent persistent owner models honestly. Both final independent reviewers approve with zero remaining findings; 25 individual reviewer findings have fixed outcomes.
+
+The full gate/MSRV1.88 passes with 50 existing Rust tests; ESS0.20.0 validates 11 files/167 declarations and two generations of 176 schema artifacts match byte-for-byte. Eighty schema expectations and the declared decision/textual cases have precisely bounded evidence in docs/evidence/connection-semantics-20260908/verification.md. No runtime or adapter implementation changed.
+
+Current ledger: **16/48 source findings fixed, 32 assigned and open; ten owner stories implemented, 17 draft.** This supersedes prior counts without rewriting their historical evidence. The broad specification goal remains active, including remaining auth/discovery/datasource/media semantics, persistence consolidation, catalog and later stack review. All work remains local.

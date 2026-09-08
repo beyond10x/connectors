@@ -548,7 +548,7 @@ The shared coordinator owns a bounded connection/authorization flow:
 6. Credentials are durably stored; safe metadata and the active credential reference are published consistently.
 7. The application receives a connection reference, safe status, and required next action. Completion does not automatically execute a previously failed business operation.
 
-The coordinator owns common lifecycle, state, expiry, concurrency, and recovery. A provider auth implementation owns exchange/refresh/revocation request construction and response interpretation. Shared OAuth code supplies standard mechanics; it must allow explicitly modeled provider differences without one giant speculative OAuth workflow language.
+The coordinator owns common lifecycle, state, expiry, concurrency, and recovery. A provider auth implementation owns exchange/refresh/revocation request construction and response interpretation. Shared OAuth code supplies standard mechanics; it must allow explicitly modeled provider differences without one giant speculative OAuth workflow language. The selected [host management boundary](../contracts/auth/management.md) keeps safe control operations separately admitted and completion authority on a trusted UI/ingress channel. The [connection reduction](../contracts/auth/connection/v1alpha1/semantics.md#41-connection-viability-and-operation-eligibility) separates global viability from per-operation eligibility; these proposed bindings remain unimplemented.
 
 Conceptual private interface:
 

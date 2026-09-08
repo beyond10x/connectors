@@ -1,0 +1,421 @@
+{
+  "scope": "Independent read-only inspection of frozen specification/evidence bytes and offline generated-schema shape checks. Declared outcomes were manually assessed against the prose, not observed from a reducer, authority engine, store, clock, provider or management runtime.",
+  "manual_semantic_assessment": {
+    "viability_cases_consistent": 16,
+    "eligibility_cases_consistent": 18,
+    "management_targets_consistent": 7,
+    "textual_traces_consistent": 16
+  },
+  "type_expectations": [
+    {
+      "id": "baseline-ready-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "baseline-ready-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "new-unpublished-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "new-unpublished-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "stale-baseline-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "stale-baseline-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "unknown-identity-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "unknown-identity-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "provider-credential-revoked-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "provider-credential-revoked-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "consumed-refresh-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "consumed-refresh-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "custody-unavailable-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "custody-unavailable-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "parent-degraded-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "parent-degraded-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "disabled-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "disabled-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "terminal-revoked-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "terminal-revoked-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "revoked-all-failures-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "revoked-all-failures-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "disabled-all-failures-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "disabled-all-failures-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "known-invalid-with-custody-outage-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "known-invalid-with-custody-outage-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "custody-before-parent-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "custody-before-parent-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "parent-before-baseline-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "parent-before-baseline-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "metadata-unavailable-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "metadata-unavailable-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "read-without-optional-write-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "read-without-optional-write-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "write-missing-grant-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "write-missing-grant-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "unknown-operation-grants-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "unknown-operation-grants-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "target-permission-denied-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "target-permission-denied-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "target-permission-stale-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "target-permission-stale-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "permission-unavailable-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "permission-unavailable-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "operation-verification-not-current-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "operation-verification-not-current-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "required-verification-unknown-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "required-verification-unknown-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "optional-verification-not-required-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "optional-verification-not-required-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "current-grant-denied-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "current-grant-denied-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "grant-policy-unavailable-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "grant-policy-unavailable-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "operation-disabled-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "operation-disabled-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "profile-purpose-mismatch-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "profile-purpose-mismatch-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "explicit-configured-no-alternatives-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "explicit-configured-no-alternatives-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "pending-connection-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "pending-connection-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "revoked-connection-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "revoked-connection-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "degraded-route-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "degraded-route-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "host-denial-before-private-state-facts",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "host-denial-before-private-state-decision",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "list",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "begin_create",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "describe",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "begin_repair",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "revoke",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "status",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "protected_complete",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "evidence-requirements",
+      "schema_accepted": true,
+      "record_matches": true
+    },
+    {
+      "id": "retired-global-scope-state",
+      "schema_accepted": false,
+      "record_matches": true
+    },
+    {
+      "id": "typo-error",
+      "schema_accepted": false,
+      "record_matches": true
+    },
+    {
+      "id": "missing-metadata-fact",
+      "schema_accepted": false,
+      "record_matches": true
+    },
+    {
+      "id": "unknown-target-member",
+      "schema_accepted": false,
+      "record_matches": true
+    }
+  ],
+  "expected_schema_refusals": 4,
+  "contradictory_decision_schema_accepts": true,
+  "contradictory_decision_semantically_refused": true,
+  "generated_artifacts_identical": 176,
+  "selected_copy_hashes_match": 13,
+  "existing_gate_tests_in_log": 50,
+  "authored_session_scenarios": 13,
+  "synthesized_session_scenarios": 201,
+  "final_source_hashes_match": 43,
+  "all_evidence_checks_matched": true
+}
