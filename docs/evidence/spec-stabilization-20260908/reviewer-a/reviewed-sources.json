@@ -1,0 +1,20 @@
+{
+  "contracts/sessions/v1alpha1/semantics.md": "5725193897e8142e44877860afc50cd0599bc68fdb5c18b9fa981f50e805cbe7",
+  "contracts/sessions/v1alpha1/verification.md": "0dfb598699901468d4662eadc139c01ca64cdae5b72e048ab4cbfe602c0ba659",
+  "contracts/media/v1alpha1/semantics.md": "b852b16f591d17a5ad69dab8a7dd239298a7ef450b58a6a07cd93341274a0664",
+  "contracts/auth/capability/v1alpha1/semantics.md": "30f1d2b75b2df15a0b7f3d6ec3b9e6f7e13b561aa95c70202be7ddb227cd534e",
+  "docs/adapters/media-session.md": "b3a1f2a27a1903a5f98e1cf8ad7c312fee4af96227289451f686a5ca21b3255a",
+  "ess/domains/sessions.yaml": "446dc073b9c27464fa693828b943b9d4550c4a0919c3f93ad589a688c65a600a",
+  "ess/system.yaml": "c41df9937d466f0bb57dd88eafca4ba2a8197396caeb7bbb9486b632df9cdd61",
+  "contracts/sessions/v1alpha1/scenarios/continuity-loss-stays-lost.yaml": "9249f2546bb763787f69b95b27a686651f136cf17c63a73faed4423340c95467",
+  "contracts/sessions/v1alpha1/scenarios/direct-partition-expiry-no-grace.yaml": "bab689969d483634d3f473964d498dda1ed18616b590f01e6b65b56417b28f31",
+  "contracts/sessions/v1alpha1/scenarios/drain-expiry-has-no-extra-grace.yaml": "2f2236b28b3f38ed660b0ee830112d3fd9b815a67443a0ffd53a4eb9df8a590c",
+  "contracts/sessions/v1alpha1/scenarios/first-terminal-not-replaced.yaml": "e36e37ba436a3f89fbbb5c84733552e3d8fab0d6c4ee3880e5e358c8c21d280e",
+  "contracts/sessions/v1alpha1/scenarios/late-renewal-does-not-revive.yaml": "721a958eb01581453170e7cad07a350382d036ae27b75e79f6bb803d3d3d4c12",
+  "contracts/sessions/v1alpha1/scenarios/media-incompatible-shared-reason.yaml": "09db581f532e8b8da5ecc42b3be43fa8735520a30095e8b1702882a866f1ef4a",
+  "contracts/sessions/v1alpha1/scenarios/media-overload-shared-reason.yaml": "ffd28c73e46fbb46f4daf24d8d98b810e89791219874ba4ae5ce1e095228df23",
+  "contracts/sessions/v1alpha1/scenarios/revocation-beats-renewal.yaml": "a1f551726d200427fe9c42d77ecb1147e6a51abe8cbaa33830fc35ef1782cfd0",
+  "contracts/sessions/v1alpha1/scenarios/revocation-refuses-data-and-renewal.yaml": "0f50cd4825c723c911e52d3a5fad67c3c88ec7156b8a8586487cd63179ecf865",
+  "contracts/sessions/v1alpha1/scenarios/revoked-during-establishment.yaml": "68c5a6eb3d7ad53cd6243b5657d41b5375313158103a00c962e0aa7a8f960144",
+  "contracts/sessions/v1alpha1/scenarios/unverified-lease-never-opens-data.yaml": "e08c979ebb03d2811b2c2acafd19f05d28058366ad3b0e607314d3b5e0db7107"
+}
