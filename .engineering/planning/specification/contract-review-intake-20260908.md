@@ -8,7 +8,7 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: review-result:contract-semantics-20260908
 - informed_by: review-result:contract-docs-external-20260908
-revision: 5
+revision: 6
 ---
 ## Intake
 
@@ -29,8 +29,8 @@ P0 means an established critical current failure requiring immediate containment
 | F01 | P1 | P1 | `story:contracts-mutation-outcomes` | Fixed in semantic contracts/ESS by `story:contracts-mutation-outcomes`; see `contracts/operations/v1alpha1/verification.md` and both immutable mutation-outcomes review records. Runtime binding remains future work. |
 | F02 | P1 | P1 | `story:contracts-idempotency-scope` | Fixed in semantic contracts/ESS by `story:contracts-idempotency-scope`; see `contracts/operations/v1alpha1/idempotency-verification.md` and both final independent review records. Runtime algorithms remain future binding work. |
 | F03 | P1 | P1 | `story:contracts-federated-approval` | Accepted for remediation; assigned, not fixed. |
-| F04 | P1 | P1 | `story:contracts-refresh-coordination` | Accepted for remediation; assigned, not fixed. |
-| F05 | P1 | P1 | `story:contracts-credential-evidence` | Accepted for remediation; assigned, not fixed. |
+| F04 | P1 | P1 | `story:contracts-refresh-coordination` | Fixed at semantic-contract/ESS level in the auth hardening wave; see `contracts/auth/acquisition/v1alpha1/verification.md`, immutable adversarial review and the full gate at `2a440495`. Runtime binding remains future work. |
+| F05 | P1 | P1 | `story:contracts-credential-evidence` | Fixed at semantic-contract/ESS level in the auth hardening wave; see `contracts/auth/evidence/v1alpha1/verification.md`, immutable adversarial review and the full gate at `2a440495`. Runtime binding remains future work. |
 | F06 | P1 | P1 | `story:contracts-session-revocation` | Accepted for remediation; assigned, not fixed. |
 | F07 | P2 | P2 | `story:contracts-connection-readiness` | Accepted for remediation; assigned, not fixed. |
 | F08 | P2 | P2 | `story:contracts-permission-budgets` | Accepted for remediation; assigned, not fixed. |
@@ -89,7 +89,7 @@ The first completed hardening story is `story:contracts-mutation-outcomes`, owni
 
 ## Completion accounting
 
-F01/F02/E01/E11 are **fixed at the semantic-contract/model level**; the remaining **44 source findings are assigned, not fixed**. Drafting or reviewing the plan is not evidence that a contract defect is fixed. Future closure records the revised normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without implementing the external reviewer's suggested architecture.
+F01/F02/F04/F05/E01/E11 are **fixed at the semantic-contract/model level**; the remaining **42 source findings are assigned, not fixed**. Drafting or reviewing the plan is not evidence that a contract defect is fixed. Future closure records the revised normative passages and scenario results against each owner's source IDs; a qualified item can close through an explicit supported disposition without implementing the external reviewer's suggested architecture.
 
 ## Acceptance
 

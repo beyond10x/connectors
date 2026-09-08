@@ -1,0 +1,3 @@
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --scenarios contracts/auth/acquisition/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/synthesized.json
+132 scenario(s) (12 authored), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/synthesized.json
+exit: 0

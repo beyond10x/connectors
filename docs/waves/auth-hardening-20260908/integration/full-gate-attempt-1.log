@@ -1,0 +1,23 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running `target/debug/connectors-build --ess /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.local/toolchains/ess/0.20.0/bin/ess gate --msrv`
+gate: ["fmt", "--all", "--", "--check"]
+gate: exit=exit status: 0 ["fmt", "--all", "--", "--check"]
+gate: gitlab descriptor matches; exit=0
+gate: kubernetes descriptor matches; exit=0
+gate: sql descriptor matches; exit=0
+gate: ["build", "--workspace", "--locked", "--offline"]
+   Compiling typenum v1.20.1
+   Compiling rand_core v0.10.1
+sccache: error: path must be shorter than SUN_LEN
+sccache: error: path must be shorter than SUN_LEN
+error: could not compile `typenum` (lib)
+
+Caused by:
+  process didn't exit successfully: `/usr/bin/sccache /home/timo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name typenum --edition=2018 /home/timo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/typenum-1.20.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=line-tables-only --cfg 'feature="const-generics"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("const-generics", "i128", "scale-info", "scale_info", "strict"))' -C metadata=7d888113f469b366 -C extra-filename=-0c1d87b91b9c6b6c --out-dir /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/target/debug/deps -L dependency=/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/target/debug/deps --cap-lints allow -C link-arg=-fuse-ld=lld` (exit status: 2)
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `rand_core` (lib)
+
+Caused by:
+  process didn't exit successfully: `/usr/bin/sccache /home/timo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name rand_core --edition=2024 /home/timo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rand_core-0.10.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=line-tables-only '--warn=clippy::undocumented_unsafe_blocks' --warn=missing_docs --warn=missing_debug_implementations --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=3a4920e18b5ea01d -C extra-filename=-e090368bee516598 --out-dir /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/target/debug/deps -L dependency=/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/target/debug/deps --cap-lints allow -C link-arg=-fuse-ld=lld` (exit status: 2)
+gate: exit=exit status: 101 ["build", "--workspace", "--locked", "--offline"]
+Error: "gate command \"cargo\" failed"

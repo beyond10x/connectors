@@ -1,0 +1,22 @@
+$ .local/toolchains/ess/0.20.0/bin/ess specify validate --path ess
+connectors v1 — 7 file(s), valid
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-ir.json
+connectors v1 — 7 file(s), 66 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-ir.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/auth/evidence/v1alpha1/scenarios --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-authored.json
+6 authored scenario(s) from 6 file(s), 0 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-authored.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --scenarios contracts/auth/evidence/v1alpha1/scenarios --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-synthesized.json
+73 scenario(s) (6 authored), 0 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-synthesized.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/operations/v1alpha1/scenarios --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-operations.json
+15 authored scenario(s) from 15 file(s), 0 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-operations.json
+exit: 0
+
+$ git diff --check
+exit: 0

@@ -1,0 +1,6 @@
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated.json
+refusal[ESS-AUTHOR-023]: `connectors.credential_evidence/authored/retained-lineage-expires-before-dispatch` in /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated/retained-lineage-expires-before-dispatch.yaml
+  `2026-09-08T09:00:29Z` does not come after `2026-09-08T09:00:29Z`
+  help: give each act an instant later than the one before it; the file's order is the scenario's order and `at:` is what states it
+0 authored scenario(s) from 1 file(s), 1 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated.json
+exit: 1

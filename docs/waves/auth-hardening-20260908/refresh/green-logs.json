@@ -1,0 +1,9 @@
+{
+  "baseline-operations": "$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path .local/waves/auth-hardening-20260908/refresh/baseline-ess --scenarios contracts/operations/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/baseline-operations.json\n15 authored scenario(s) from 15 file(s), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/baseline-operations.json\nexit: 0\n",
+  "validate": "$ .local/toolchains/ess/0.20.0/bin/ess specify validate --path ess\nconnectors v1 \u2014 7 file(s), valid\nexit: 0\n",
+  "compile": "$ .local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out .local/waves/auth-hardening-20260908/refresh/ir.json\nconnectors v1 \u2014 7 file(s), 76 declaration(s), compiled to .local/waves/auth-hardening-20260908/refresh/ir.json\nexit: 0\n",
+  "author": "$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/auth/acquisition/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/authored.json\n12 authored scenario(s) from 12 file(s), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/authored.json\nexit: 0\n",
+  "synthesize": "$ .local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --scenarios contracts/auth/acquisition/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/synthesized.json\n132 scenario(s) (12 authored), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/synthesized.json\nexit: 0\n",
+  "operations-regression": "$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/operations/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/operations-authored.json\n15 authored scenario(s) from 15 file(s), 0 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/operations-authored.json\nexit: 0\n",
+  "diff-check": "$ git diff --check\nexit: 0\n"
+}

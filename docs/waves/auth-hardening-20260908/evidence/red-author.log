@@ -1,0 +1,18 @@
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/auth/evidence/v1alpha1/scenarios --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/red-authored.json
+refusal[ESS-AUTHOR-005]: `connectors.credential_evidence/authored/configured-replacement-identity` in contracts/auth/evidence/v1alpha1/scenarios/configured-replacement-identity.yaml
+  `connectors.credential_evidence.DispatchAdmission` is not an entity this specification declares
+  help: name an entity the specification declares; an authored scenario acts on the model's own instances and invents none
+refusal[ESS-AUTHOR-006]: `connectors.credential_evidence/authored/configured-replacement-identity` in contracts/auth/evidence/v1alpha1/scenarios/configured-replacement-identity.yaml
+  `connectors.credential_evidence.InspectGeneration` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-006]: `connectors.credential_evidence/authored/configured-replacement-identity` in contracts/auth/evidence/v1alpha1/scenarios/configured-replacement-identity.yaml
+  `connectors.credential_evidence.RejectAdmission` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-006]: `connectors.credential_evidence/authored/configured-replacement-identity` in contracts/auth/evidence/v1alpha1/scenarios/configured-replacement-identity.yaml
+  `connectors.credential_evidence.DispatchGeneration` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-012]: `connectors.credential_evidence/authored/configured-replacement-identity` in contracts/auth/evidence/v1alpha1/scenarios/configured-replacement-identity.yaml
+  `connectors.credential_evidence.AdmissionStates` is not a view this specification declares
+  help: name a view the specification declares
+0 authored scenario(s) from 1 file(s), 5 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/red-authored.json
+exit: 1

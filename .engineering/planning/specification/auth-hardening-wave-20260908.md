@@ -6,7 +6,7 @@ status: draft
 title: F04 and F05 auth semantic hardening wave
 relations:
 - informed_by: specification:contract-driven-connectors-design
-revision: 1
+revision: 13
 ---
 # Auth semantic hardening wave — 2026-09-08
 
@@ -42,15 +42,15 @@ Worktree skill requires a managed integration checkout. It is created before the
 
 ## Units
 
-Wave registry root: `/home/timo/.local/state/worktree/trees/b10x/connectors_v2/`. Coordinator session `codex-auth-wave-20260908`. Every tree has target/ inside itself and .local/waves/auth-hardening-20260908/<unit> scratch. Every unit/adversary has its own explicit session lease in its assigned tree.
+Final source integration gate head: `2a4404958449b1b91c5d494c5e4473ab6725bd8f`. The closing store/evidence commit containing this page is the final integration tip; its id is obtained from Git, avoiding a self-referential hash. Local main will fast-forward to that commit after final cheap validation. No branch is published.
 
-| Unit | Managed id / branch | Head | Worktree | Build | Scratch | Stage |
+| Unit | Managed id | Branch / verified source head | Worktree | Build directory | Assigned scratch | Stage |
 |---|---|---|---|---|---|---|
-| integration | connectors-v2-auth-wave-20260908 / wave/auth-hardening-20260908 | 8903166 (opening pending) | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908 | same tree/target | same tree/.local/waves/auth-hardening-20260908/integration | preparation |
-| F04 | connectors-v2-auth-refresh-20260908 / impl/contracts-refresh-coordination | pending opening | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908 | same tree/target | same tree/.local/waves/auth-hardening-20260908/refresh | planned |
-| F05 | connectors-v2-auth-evidence-20260908 / impl/contracts-credential-evidence | pending opening | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908 | same tree/target | same tree/.local/waves/auth-hardening-20260908/evidence | planned |
+| integration | connectors-v2-auth-wave-20260908 | wave/auth-hardening-20260908 / 2a4404958449b1b91c5d494c5e4473ab6725bd8f (gate head; closing record follows) | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908 | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/target (removed or never created) | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.local/waves/auth-hardening-20260908/integration (evidence copied, disposable contents removed) | source integrated locally; checkout retained for recovery |
+| refresh | connectors-v2-auth-refresh-20260908 | impl/contracts-refresh-coordination / 9fa4ba0346552fd3c34acd25e974717fd4c8c61c | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908 | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908/target (removed or never created) | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908/.local/waves/auth-hardening-20260908/refresh (evidence copied, disposable contents removed) | source integrated locally; checkout retained for recovery |
+| evidence | connectors-v2-auth-evidence-20260908 | impl/contracts-credential-evidence / f55020ae799464ac09dfcc5a3ac54d02edc213b7 | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908 | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/target (removed or never created) | /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence (evidence copied, disposable contents removed) | source integrated locally; checkout retained for recovery |
 
-No branches are published. Next owner after local completion: operator; next action if cleanup desired: explicitly authorize publication/recovery supported by worktree, then review exact ids for GC. Old retained trees are not part of these triples.
+Owning coordinator session: `codex-auth-wave-20260908`; all implementor/adversary sessions returned and released their leases. Coordinator lease is released at final handoff after committing. Related work: story:contracts-refresh-coordination and story:contracts-credential-evidence, both implemented at semantic/model level. Next owner: operator. Next action for checkout retirement: explicitly authorize publication or another recovery workflow supported by worktree, then finish and review exact ids for GC. Existing design/Kubernetes trees were untouched.
 
 ## Store selection output
 
@@ -1985,3 +1985,62 @@ Command: `aep plan artifact waves --kind story --status draft --format json` (pr
   "cycles": []
 }
 ```
+
+## Dispatch state
+
+Both unit commits are integrated locally; both stories moved to implemented based on the full gate and recorded reviews. F04/F05 source findings are fixed at semantic/model level; six of48 source findings are now fixed,42 remain assigned. No review findings remained and no correction/second attack was needed. Runtime auth implementation is subsequent work. Closing step: commit these final records and fast-forward clean local main, then release coordinator leases and retain the three checkouts with this handoff.
+
+## Measured preparation
+
+Coordinator bootstrap: `TMPDIR=<integration>/.local/tmp CARGO_BUILD_JOBS=2 cargo build -p connectors-build --locked --offline` exited0; runner reported31.48s. Fresh integration target measured710M after that package build. This is a tooling compilation, not the whole integration gate. Pinned ESS shared model remains50 declarations and existing operations suite67compiled/15authored/0refusals. Unit work remains private; final gate will include `--msrv` per README.md:19–29.
+
+## Combined model precheck
+
+Coordinator copied the opening ESS plus the two returned private domains into owned integration scratch/combined-ess, and the15 existing operation +12F04 +5F05 authored files into combined-scenarios. This scratch check precedes reviews/merges and is not the final integration gate. Pinned ESS summaries: `connectors v1 — 7 file(s), valid`; `connectors v1 — 7 file(s), 92 declaration(s), compiled`; `167 scenario(s) (32 authored), 0 refusal(s)`. Every command exited0. Generated structural scenarios135; runtime auth execution0. Exact command logs are retained in integration scratch pending closing evidence preservation.
+
+## Gate incident
+
+First full-gate attempt exited1 at workspace build (cargo step101): `sccache: error: path must be shorter than SUN_LEN`. Formatting and three descriptor comparisons completed0; no later step ran. The managed worktree root is90characters and the generated gate TMPDIR113characters. Installed sccache0.16 documentation (`/usr/share/doc/sccache/README.md:171–180`, Configuration.md:172) describes automatic daemon startup/10-minute idle shutdown and startup notification sockets. Coordinator inference: the cache daemon expired while semantic agents worked, so startup from the long gate TMPDIR failed.
+
+Coordinator assigns a short auxiliary wave scratch root `/home/timo/.cache/connectors-waves/auth-hardening-20260908/cache-start` solely for sccache startup notification. It is outside worktrees and explicitly recorded here; build targets remain separate inside their own trees. Start the default shared cache server using this TMPDIR, preserve failed gate output as full-gate-attempt-1.log, then rerun the whole gate. No source/assertion is changed to bypass the failure, no existing server is stopped and no second server/cache namespace is introduced. Remove this exact disposable auxiliary directory after verification if unused.
+
+## Gate result
+
+Full gate on integration merge `2a4404958449b1b91c5d494c5e4473ab6725bd8f` exited0. Exact command: `TMPDIR=<integration>/.local/tmp CARGO_BUILD_JOBS=2 cargo run -p connectors-build --locked --offline -- --ess <integration>/.local/toolchains/ess/0.20.0/bin/ess gate --msrv`. Step results are retained verbatim below and in docs/waves/auth-hardening-20260908/integration/full-gate.log.39Rust tests passed,0failed/ignored; MSRV1.88.0 ran; ESS92declarations,169compiled scenarios (135generated+34authored:15operations+13F04+6F05),0refusals. Auth runtime scenarios executed0. No gate step was skipped. First attempt failed at workspace build due cache daemon startup socket path; that log is preserved separately. The successful rerun changed only cache startup environment, no source/assertion.
+
+```text
+gate: exit=exit status: 0 ["fmt", "--all", "--", "--check"]
+gate: gitlab descriptor matches; exit=0
+gate: kubernetes descriptor matches; exit=0
+gate: sql descriptor matches; exit=0
+gate: exit=exit status: 0 ["build", "--workspace", "--locked", "--offline"]
+gate: exit=exit status: 0 ["test", "--workspace", "--locked", "--offline"]
+gate: exit=exit status: 0 ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+gate: connectors-gitlab library boundary holds; exit=0
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+gate: connectors-kubernetes library boundary holds; exit=0
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+gate: connectors-sql library boundary holds; exit=0
+gate: generic CLI boundary holds; exit=0
+gate: exit=exit status: 0 ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+gate: exit=exit status: 0 ["specify", "validate", "--path", "ess"]
+gate: exit=exit status: 0 ["specify", "compile", "--path", "ess", "--out", "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.local/tmp/gate-mpCOj4/connectors-ir.json"]
+gate: collected 15 authored scenarios from contracts/operations/v1alpha1/scenarios; exit=0
+gate: collected 13 authored scenarios from contracts/auth/acquisition/v1alpha1/scenarios; exit=0
+gate: collected 6 authored scenarios from contracts/auth/evidence/v1alpha1/scenarios; exit=0
+gate: exit=exit status: 0 ["verify", "conform", "synthesize", "--path", "ess", "--target", "ir", "--scenarios", "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.local/tmp/gate-mpCOj4/authored-scenarios", "--out", "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.local/tmp/gate-mpCOj4/contract-conformance.json"]
+gate: exit=exit status: 0 ["plan", "artifact", "validate"]
+```
+
+AEP0.54 reports empty `findings: []` fences as “no findings block”; the two new immutable reports do contain literal empty fenced lists. Output is retained verbatim; no artificial finding was added to suppress this diagnostic.
+
+## Agent cost observability
+
+Six role dispatches completed: two read-only scopers, two implementors, two adversaries. Each adversary made one full attack, returned0findings and added one scenario; no correction or second attack was needed. This harness exposes completion messages/status but supplied no per-agent token counts, tool-use totals or wall-duration metrics. Those three values are unavailable for each of the six agents; no cost estimate is represented as measured usage. Operator budget: no limit. Tool-run counts/results and scoped compiler case counts are preserved in each report.
+
+## Storage and handoff
+
+After the gate process returned exit0 and all four author/review workers returned, a /proc scan found no compiler/test/ESS process using these trees. Read scratch inventories, copied small logs/reports/source-digest audits to docs/waves/auth-hardening-20260908, and preserved reviews as immutable AEP artifacts. Exact disposable removals are in integration/disposable-cleanup.json under that evidence directory. Removed8 exact directories (integration target,3assigned scratch roots,3private pinned-tool copies,1short cache-start directory), whose measured allocation was3,125,043,200bytes (~2.91GiB). No unit target existed. Actual full integration target measured2.8G before removal, vs5.6G preflight representative estimate. Free disk returned to82G, above20GiB floor. Primary target and shared sccache cache were untouched.
+
+Managed source trees remain, not silently abandoned: no remote exists, no publication is authorized, and local merges alone supply no recovery proof. Do not force-remove them or claim GC completion. Final exact-id GC assessment and current-head handoff are retained in primary .local/waves/auth-hardening-20260908/ after the closing commit; final transcript reports their result.
