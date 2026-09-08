@@ -22,7 +22,7 @@ None. Every row below is new.
 | Contract | Profile / use | Why |
 |---|---|---|
 | `operations/v1alpha1` | base | describe/invoke |
-| `datasource.records` | `docker-list` for containers, images, volumes, networks | provider-native inventory objects with a declared projection; Docker list endpoints are unpaged, so the adapter pages client-side with a snapshot cursor and reports `complete` truthfully |
+| `datasource.records` | `docker-list` for containers, images, volumes, networks | provider-native inventory objects with a declared projection; the pinned v1.56 declarations expose no continuation/page-offset parameter for these four endpoints (container list does have a result `limit`). This is API-shape evidence, not proof that a daemon result is exhaustive. Any client-side snapshot paging must specify bounded collection and truthful completeness before advertisement |
 | `datasource.logs` | `docker-container-logs` | container stdout/stderr lines with timestamps, tail, since, byte bound (`contracts/datasources/logs/v1alpha1/semantics.md`) |
 | `endpoint_discovery` (exists) | `docker-published-ports` | published container ports and network attachments as endpoint observations with candidate classification; `namespace` carries the Docker network name; no dial |
 | `operations` `mutation` | `container.start`, `container.stop`, `container.restart` | externally visible state changes; `natural` for start/stop desired-state semantics and `none` for restart (§4.1); all remain approval-bound |
@@ -68,6 +68,8 @@ Both rows are deployment-supplied static_config activation under [acquisition §
 A daemon socket grants root-equivalent control of the host; the adapter narrows it by allowlists and by advertising only enabled operations. This is containment by configuration, not a sandbox (`docs/design.md:967`).
 
 ## 6. Configuration outline
+
+Illustrative proposed configuration: socket, allowlist, enablement, signal and timeout values are examples, not implied defaults. The `logs.max_bytes: 131072` value is the selected default and ceiling in the [native log binding](contracts/logs/v1alpha1/semantics.md). Lifecycle timing remains bounded by the [native mutation contract](contracts/mutations/v1alpha1/semantics.md); this outline cannot enlarge those limits.
 
 ```json
 { "service": { "$ref": "urn:connectors:config:v1:service" },

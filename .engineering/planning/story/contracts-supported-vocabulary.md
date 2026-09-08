@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-supported-vocabulary
 kind: story
-status: draft
+status: active
 title: Record support and disposition for reserved vocabulary
 tags:
 - P3
@@ -11,6 +11,12 @@ relations:
 - decomposes: epic:contract-semantics-remediation
 - informed_by: specification:contract-review-intake-20260908
 scope:
+- confidence: cited
+  path: adapters/prometheus/contracts/series/v1alpha1/semantics.md
+- confidence: cited
+  path: adapters/sip/contracts/dial/v1alpha1/semantics.md
+- confidence: cited
+  path: adapters/sip/design.md
 - confidence: cited
   path: contracts/auth/capability/v1alpha1/semantics.md
 - confidence: cited
@@ -21,7 +27,7 @@ scope:
   path: contracts/discovery/resources/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/media/v1alpha1/semantics.md
-revision: 2
+revision: 7
 ---
 ## Context
 
@@ -49,13 +55,18 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 ## Scope
 
-- cited: `contracts/auth/profile/v1alpha1/semantics.md`
+- cited: `adapters/prometheus/contracts/series/v1alpha1/semantics.md`
+- cited: `adapters/sip/contracts/dial/v1alpha1/semantics.md`
+- cited: `adapters/sip/design.md`
 - cited: `contracts/auth/capability/v1alpha1/semantics.md`
-- cited: `contracts/media/v1alpha1/semantics.md`
+- cited: `contracts/auth/profile/v1alpha1/semantics.md`
 - cited: `contracts/datasources/series/v1alpha1/semantics.md`
 - cited: `contracts/discovery/resources/v1alpha1/semantics.md`
+- cited: `contracts/media/v1alpha1/semantics.md`
 
-Source locations: `contracts/auth/profile/v1alpha1/semantics.md:64`; `contracts/auth/profile/v1alpha1/semantics.md:65`; `contracts/auth/profile/v1alpha1/semantics.md:103`; `contracts/auth/capability/v1alpha1/semantics.md:12`; `contracts/media/v1alpha1/semantics.md:13`; `contracts/datasources/series/v1alpha1/semantics.md:12`; `contracts/discovery/resources/v1alpha1/semantics.md:62`; `docs/design.md:49`.
+Current scope follows the adapter-owned layout and specification:spec-completion-parallel-20260909. Shared files are coordinator-integrated or assigned to one worker; stories are serialized where required.
+
+Historical Source locations: `contracts/auth/profile/v1alpha1/semantics.md:64`; `contracts/auth/profile/v1alpha1/semantics.md:65`; `contracts/auth/profile/v1alpha1/semantics.md:103`; `contracts/auth/capability/v1alpha1/semantics.md:12`; `contracts/media/v1alpha1/semantics.md:13`; `contracts/datasources/series/v1alpha1/semantics.md:12`; `contracts/discovery/resources/v1alpha1/semantics.md:62`; `docs/design.md:49`.
 
 ## Dependencies and edit coordination
 
@@ -65,4 +76,6 @@ Shared edit surfaces with `story:contracts-credential-evidence`, `story:contract
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+This local-only story completes textual semantics, adapter-owned specifications, conformance scenarios and relevant ESS shape validation under the operator's current specification-completion authorization. No runtime/provider/codec implementation or adapter runtime expansion is authorized. Local coordinator commits and managed worktrees are authorized; external publication is not. New typed entities or relations must use the ESS workflow, preserving UNMAPPED implementation obligations explicitly. Existing review/source snapshots remain immutable.
+
+The approved parallel assignment is specification:spec-completion-parallel-20260909. Root alone writes planning records and integrates shared-file patches. Original file:line citations above retain their historical db1c329 baseline; current writable ownership follows the dispatch brief and current machine scope, including the adapter-owned layout checkpoint 8e1836c.

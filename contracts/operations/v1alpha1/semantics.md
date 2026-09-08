@@ -19,7 +19,7 @@ A mutation is an operation whose dispatch can change external state. The profile
 
 | Old surface | Source | Disposition |
 |---|---|---|
-| Operation metadata `direction`, `risk`, `idempotency`, `effects`, `semantic_effects` | `../connectors/providers/b10x.toml:741-752` (`sip-dial`), `providers/jira.toml:376` (`jira-issue-create`, `effects = ["write","network"]`) | preserve as typed descriptor fields (`effects`, `idempotency`, `risk`); drop `direction` (redundant with effects) |
+| Operation metadata `direction`, `risk`, `idempotency`, `effects`, `semantic_effects` | `../connectors/providers/b10x.toml:741-752` (`sip-dial`), `../connectors/providers/jira.toml:369-376` (`jira-issue-create`, `effects = ["write","network"]`) | preserve as typed descriptor fields (`effects`, `idempotency`, `risk`); drop `direction` (redundant with effects) |
 | Approval verification against issuer, subject, operation, Connection, canonical input digest, expiry; refusal names no axis | `../connectors/crates/domain/src/approval.rs:1-10` | preserve |
 | One-time redemption as a bounded append whose payload is the attempted-audit row; anchor before claim, claim before dispatch | `approval.rs:12-35` | preserve the ordering guarantee; the storage mechanism (keyed byte cells) is not preserved (`docs/design.md:961`) |
 | Recovery scan classifying anchored attempts as `indeterminate` or `aborted` | `approval.rs:37-44` | preserve |
@@ -232,7 +232,7 @@ Adversarial (`docs/design.md:982`):
 | Obligation | Where |
 |---|---|
 | `AuthenticatedHttp` gains `post`/`put`/`patch`/`delete` with bounded body | `crates/connectors-sdk/src/lib.rs:53-56` (GET only today) |
-| Separate extended `Operation`, `Invocation`, `Response` codecs implement the required/optional fields in the compatibility owner | `crates/connectors-core/src/lib.rs:59-104` |
+| Separate extended `Operation`, `Invocation`, `Response` codecs implement the required/optional fields in the compatibility owner | Current legacy structures: [Operation](../../../crates/connectors-core/src/lib.rs#L61) (lines 59–68), [Invocation](../../../crates/connectors-core/src/lib.rs#L92) (90–98), [Outcome](../../../crates/connectors-core/src/lib.rs#L102) (100–105), and [Response](../../../crates/connectors-core/src/lib.rs#L108) (107–113; strict custom reader follows); these do not implement the proposed extended codecs |
 | Host ledger port: `prepare`, atomic `open_dispatch`/`abort_prepared`, `record_outcome`, `recover`; separate one-time `spend` port | new host module; common conformance tests for in-memory and durable bindings, with crash/durability tests on the durable binding. No approval spend may substitute for the dispatch fence |
 | Service deadline/cancellation supervisor must coordinate with the ledger, fence pre-gate dispatch and preserve post-gate uncertainty; do not classify by whether a future returned | `crates/connectors-host/src/server.rs` (read-only timeout wrapper today); future mutation binding must settle the abort/open race and any terminal-record race atomically |
 | HTTP/transport timeout must consume the mutation observation, preserve `outcome_unknown`, and never overwrite it with a generic timeout after possible dispatch. If the connection closes, the client treats missing response as unknown | `crates/connectors-host/src/http.rs` and future mutation clients; an earlier transport deadline needs the same coordinated abort or conservative unknown response |
