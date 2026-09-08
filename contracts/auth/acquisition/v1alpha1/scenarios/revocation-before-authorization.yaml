@@ -1,0 +1,67 @@
+# Adversarial extension: revocation is a trusted coordinator decision, not
+# an ESS-derived external fact. Compilation checks command/outcome/state shape.
+type: ess-scenario/1
+domain: connectors.refresh
+scenario: revocation-before-authorization
+summary: 'F04: revocation after reservation refuses authorization and prevents a fenced source from reopening.'
+arrange:
+  - {instance: refresh, entity: connectors.refresh.RefreshAttempt}
+timeline:
+  - at: 2026-09-08T10:00:00Z
+    command: connectors.refresh.ReserveRefresh
+    input:
+      decision: allow
+      source_generation_id: 10000000-0000-4000-8000-000000000001
+      owner: replica-a
+      ownership_token: 20000000-0000-4000-8000-000000000001
+      expected_binding_revision: binding-1
+    outcome: reserved
+    events:
+      - {event: connectors.refresh.RefreshReserved}
+    capture: {instance: refresh, event: connectors.refresh.RefreshReserved, field: attempt_id}
+  - at: 2026-09-08T10:00:01Z
+    command: connectors.refresh.AuthorizeExchange
+    input:
+      decision: source_unavailable
+      attempt_id: {$instance: refresh}
+      owner: replica-a
+      ownership_token: 20000000-0000-4000-8000-000000000001
+    outcome: source-unavailable
+    error:
+      name: connectors.refresh.SourceUnavailable
+      fields: {reason: revoked}
+    no_events: [connectors.refresh.ExchangeAuthorized]
+  - at: 2026-09-08T10:00:02Z
+    command: connectors.refresh.FenceReserved
+    input: {attempt_id: {$instance: refresh}}
+    outcome: fenced
+    events:
+      - {event: connectors.refresh.ReservedOwnerFenced}
+  - at: 2026-09-08T10:00:03Z
+    command: connectors.refresh.AuthorizeExchange
+    input:
+      decision: allow
+      attempt_id: {$instance: refresh}
+      owner: replica-a
+      ownership_token: 20000000-0000-4000-8000-000000000001
+    outcome: wrong-state
+    error:
+      name: connectors.refresh.RefreshStateConflict
+      fields: {state: Fenced}
+    no_events: [connectors.refresh.ExchangeAuthorized]
+  - at: 2026-09-08T10:00:04Z
+    command: connectors.refresh.ReserveRefresh
+    input:
+      decision: source_unavailable
+      source_generation_id: 10000000-0000-4000-8000-000000000001
+      owner: replica-b
+      ownership_token: 20000000-0000-4000-8000-000000000002
+      expected_binding_revision: binding-1
+    outcome: source-unavailable
+    error:
+      name: connectors.refresh.SourceUnavailable
+      fields: {reason: revoked}
+    no_events: [connectors.refresh.RefreshReserved]
+assert:
+  - view: connectors.refresh.RefreshStates
+    contains: {attempt_id: {$instance: refresh}, state: Fenced}
