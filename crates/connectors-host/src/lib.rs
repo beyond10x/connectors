@@ -14,7 +14,7 @@ pub fn read_config<T: DeserializeOwned>(path: &Path) -> Result<T> {
         return Err(Error::invalid("configuration must be a bounded file"));
     }
     let data = std::fs::read(path).map_err(|_| Error::invalid("configuration is not readable"))?;
-    serde_yaml::from_slice(&data)
+    serde_yaml_ng::from_slice(&data)
         .map_err(|_| Error::invalid("configuration does not match the adapter schema"))
 }
 
@@ -26,3 +26,6 @@ pub fn logging() {
         )
         .try_init();
 }
+
+#[cfg(feature = "schema")]
+pub mod schema;

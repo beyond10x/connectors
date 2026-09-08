@@ -34,8 +34,10 @@ to implement them.
   requests cannot select arbitrary credentials, remote hosts, database paths,
   issuer, tenant or realm. Requests with unknown envelope fields are refused.
 - Limits: 64 KiB request body, 4 MiB upstream/result body, 32 concurrent operations,
-  15 s default provider deadline, 1–100 requested records, 1,000 SQL rows maximum,
-  8 KiB query text, bounded pages and cursors. Config may narrow these limits.
+  20 s service deadline, 15 s provider deadline (5 s connect), 10 s SQL statement
+  deadline and 2 s SQL lock deadline, 1–100 requested records, 1,000 SQL rows maximum,
+  8 KiB query text and 300 s cursor TTL. These bounds are fixed in this profile;
+  configuration does not expose overrides. Requests choose smaller page/row limits.
 - Every public failure is a structured error with a stable code and safe message.
   Provider response bodies and credentials are never copied into error messages.
   No automatic retry. Provider 401/403, 404, 410, 429, 5xx and malformed/oversized
@@ -93,6 +95,10 @@ JSON null. Numeric precision, arrays, timestamps and JSON are preserved as nativ
 text rather than coerced to JavaScript numbers. Parameters are text or null with
 server-side type resolution. This representation is explicit in the descriptor.
 Report truncation explicitly; no invented resumable cursor for a fresh SQL query.
+Each request uses a fresh connection and read-only transaction, with fixed
+`search_path = public, pg_catalog`; other schemas require qualified names.
+No connection pool is claimed in this local profile. A configured CA bundle
+replaces public trust roots for SQL and HTTP providers; empty bundles are refused.
 Do not advertise writes, transactions across requests, or dialect portability.
 Source facts: https://www.postgresql.org/docs/current/sql-set-transaction.html and
 https://www.postgresql.org/docs/current/runtime-config-client.html.
@@ -107,6 +113,14 @@ description revision, obtains the matching downstream revision, and never falls
 back to another source or retries silently. Downstream failure must not appear as
 an empty successful result. Configuration establishes trusted routes; discovery
 cannot create a new route. Initial topology is one hop; cycles are refused.
+
+On a leaf `stale_description`, the gateway fetches that configured leaf's descriptor
+and atomically replaces its projected snapshot before returning the stale error.
+It never replays the invocation. The caller fetches the gateway description,
+inspects the changed surface, and deliberately resubmits. Refresh failure returns
+the actual failure and preserves the previous complete snapshot. Credential
+references are resolved on each invocation and refresh; routes retain no token.
+The admitted revision also guards route selection if another call refreshes it.
 
 ## Specification and realization
 

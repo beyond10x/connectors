@@ -36,7 +36,7 @@ pub fn compile(bytes: &[u8]) -> Result<Descriptor> {
             "adapter document does not match connectors.adapter/v1",
         ));
     }
-    let spec: AdapterSpec = serde_json::from_value(value)
+    let mut spec: AdapterSpec = serde_json::from_value(value)
         .map_err(|_| Error::invalid("invalid adapter specification"))?;
     if spec.kind != "connectors.adapter/v1"
         || !valid_id(&spec.id)
@@ -65,6 +65,7 @@ pub fn compile(bytes: &[u8]) -> Result<Descriptor> {
             })?;
         }
     }
+    connectors_host::schema::expand(&mut spec.configuration_schema)?;
     jsonschema::validator_for(&spec.configuration_schema)
         .map_err(|_| Error::invalid("invalid configuration schema"))?;
     let revision = digest(&serde_json::to_value(&spec).map_err(|_| Error::internal())?);

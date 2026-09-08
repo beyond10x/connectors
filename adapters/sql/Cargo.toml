@@ -2,6 +2,7 @@
 name = "connectors-sql"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 
 [features]
@@ -28,9 +29,9 @@ futures-util.workspace = true
 bytes = "1"
 tokio-postgres-rustls = "0.14"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-rustls-pemfile = "2"
 webpki-roots = "1"
 
 [dev-dependencies]
+rcgen = "0.14"
 connectors-client.workspace = true
 tempfile.workspace = true

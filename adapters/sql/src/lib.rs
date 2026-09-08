@@ -3,6 +3,7 @@ use bytes::BytesMut;
 use connectors_contracts::{Column, QueryResult};
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_sdk::{Adapter, Credential, decode, encode, instance_descriptor, provenance};
+use rustls::pki_types::{CertificateDer, pem::PemObject};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc, time::Duration};
@@ -77,17 +78,7 @@ impl Sql {
             ))
         } else {
             config.ssl_mode(tokio_postgres::config::SslMode::Require);
-            let mut roots =
-                rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-            if let Some(path) = &self.config.ca_file {
-                let bytes = std::fs::read(path)
-                    .map_err(|_| Error::invalid("configured database CA unavailable"))?;
-                for cert in rustls_pemfile::certs(&mut bytes.as_slice()) {
-                    roots
-                        .add(cert.map_err(|_| Error::invalid("invalid database CA"))?)
-                        .map_err(|_| Error::invalid("invalid database CA"))?;
-                }
-            }
+            let roots = database_roots(self.config.ca_file.as_deref())?;
             let tls = rustls::ClientConfig::builder_with_provider(Arc::new(
                 rustls::crypto::ring::default_provider(),
             ))
@@ -275,6 +266,7 @@ impl Adapter for Sql {
         self.descriptor.clone()
     }
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
+        connectors_sdk::validate(&self.descriptor.operation(operation)?.input_schema, &input)?;
         let query = match operation {
             "query.read" => decode(input)?,
             "schema.list" => {
@@ -300,6 +292,28 @@ impl Adapter for Sql {
     }
 }
 
+fn database_roots(path: Option<&std::path::Path>) -> Result<rustls::RootCertStore> {
+    let Some(path) = path else {
+        return Ok(rustls::RootCertStore::from_iter(
+            webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
+        ));
+    };
+    let bytes =
+        std::fs::read(path).map_err(|_| Error::invalid("configured database CA unavailable"))?;
+    let mut roots = rustls::RootCertStore::empty();
+    for cert in CertificateDer::pem_slice_iter(&bytes) {
+        roots
+            .add(cert.map_err(|_| Error::invalid("invalid database CA"))?)
+            .map_err(|_| Error::invalid("invalid database CA"))?;
+    }
+    if roots.is_empty() {
+        return Err(Error::invalid(
+            "configured database CA contains no certificates",
+        ));
+    }
+    Ok(roots)
+}
+
 fn database_error(error: tokio_postgres::Error) -> Error {
     let code = match error.code().map(|c| c.code()) {
         Some("57014") => ErrorCode::Timeout,
@@ -310,4 +324,33 @@ fn database_error(error: tokio_postgres::Error) -> Error {
         _ => ErrorCode::Unavailable,
     };
     Error::new(code, "database could not complete the requested read")
+}
+
+#[cfg(test)]
+mod tls_tests {
+    use super::database_roots;
+    #[test]
+    fn configured_ca_replaces_public_roots_and_requires_certificates() {
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("ca");
+        assert!(database_roots(None).unwrap().len() > 1);
+        std::fs::write(&path, cert.cert.pem()).unwrap();
+        let roots = database_roots(Some(&path)).unwrap();
+        assert_eq!(roots.len(), 1);
+        assert!(
+            !roots
+                .roots
+                .iter()
+                .any(|root| webpki_roots::TLS_SERVER_ROOTS.contains(root))
+        );
+        std::fs::write(&path, "").unwrap();
+        assert!(database_roots(Some(&path)).is_err());
+        std::fs::write(
+            &path,
+            "-----BEGIN CERTIFICATE-----\ninvalid\n-----END CERTIFICATE-----",
+        )
+        .unwrap();
+        assert!(database_roots(Some(&path)).is_err());
+    }
 }

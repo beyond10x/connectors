@@ -7,16 +7,20 @@ use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct HttpConfig {
+    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 4096)))]
     pub base_url: String,
     pub credential: Option<CredentialRef>,
     #[serde(default = "default_header")]
+    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 512)))]
     pub credential_header: String,
     #[serde(default)]
     pub bearer: bool,
     #[serde(default)]
     pub allow_plaintext: bool,
+    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 4096)))]
     pub ca_file: Option<PathBuf>,
 }
 fn default_header() -> String {
@@ -84,10 +88,15 @@ impl ScopedHttp {
         if let Some(path) = &config.ca_file {
             let bytes =
                 std::fs::read(path).map_err(|_| Error::invalid("cannot read configured CA"))?;
-            builder = builder.add_root_certificate(
-                reqwest::Certificate::from_pem(&bytes)
-                    .map_err(|_| Error::invalid("invalid configured CA"))?,
-            );
+            let certificates = reqwest::Certificate::from_pem_bundle(&bytes)
+                .map_err(|_| Error::invalid("invalid configured CA"))?;
+            if certificates.is_empty() {
+                return Err(Error::invalid("configured CA contains no certificates"));
+            }
+            builder = builder.tls_built_in_root_certs(false);
+            for certificate in certificates {
+                builder = builder.add_root_certificate(certificate);
+            }
         }
         Ok(Self {
             client: builder.build().map_err(|_| Error::internal())?,

@@ -11,106 +11,10 @@
     "type": "object",
     "properties": {
       "service": {
-        "type": "object",
-        "properties": {
-          "instance": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128,
-            "pattern": "^[A-Za-z0-9_.-]+$"
-          },
-          "listen": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 512
-          },
-          "service_credential": {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "const": "environment"
-                  },
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 512
-                  }
-                },
-                "required": [
-                  "kind",
-                  "name"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "const": "file"
-                  },
-                  "path": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 4096
-                  }
-                },
-                "required": [
-                  "kind",
-                  "path"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "required": [
-          "instance",
-          "listen",
-          "service_credential"
-        ],
-        "additionalProperties": false
+        "$ref": "urn:connectors:config:v1:service"
       },
       "password": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "const": "environment"
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 512
-              }
-            },
-            "required": [
-              "kind",
-              "name"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "const": "file"
-              },
-              "path": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 4096
-              }
-            },
-            "required": [
-              "kind",
-              "path"
-            ],
-            "additionalProperties": false
-          }
-        ]
+        "$ref": "urn:connectors:config:v1:credential"
       },
       "adapter": {
         "type": "object",

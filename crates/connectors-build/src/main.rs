@@ -9,6 +9,8 @@ use std::{
     process::{Command, Output},
 };
 
+mod gate;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[derive(Parser)]
 #[command(about = "Check generation or build an independently runnable local adapter image")]
@@ -25,6 +27,12 @@ struct Args {
 #[derive(Subcommand)]
 enum Action {
     Check,
+    /// Run the local repository acceptance gates, without live provider credentials.
+    Gate {
+        /// Also check every target on the declared minimum Rust version.
+        #[arg(long)]
+        msrv: bool,
+    },
     Package {
         /// A new task-owned directory; existing paths are refused.
         #[arg(long)]
@@ -55,6 +63,9 @@ fn save_json(path: &Path, value: &Value) -> Result<()> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let root = args.root.canonicalize()?;
+    if let Action::Gate { msrv } = args.command {
+        return gate::run(&root, &args.ess, msrv);
+    }
     check_ess(&args.ess)?;
     let declaration: LocalService =
         serde_json::from_slice(&std::fs::read(inside(&root, &args.declaration)?)?)?;

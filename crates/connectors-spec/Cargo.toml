@@ -2,6 +2,7 @@
 name = "connectors-spec"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
@@ -10,10 +11,9 @@ serde.workspace = true
 serde_json.workspace = true
 jsonschema.workspace = true
 clap.workspace = true
-serde_yaml.workspace = true
+serde_yaml_ng.workspace = true
 sha2.workspace = true
 hex.workspace = true
 tempfile.workspace = true
 
-[dev-dependencies]
-tempfile.workspace = true
+connectors-host = { workspace = true, features = ["schema"] }

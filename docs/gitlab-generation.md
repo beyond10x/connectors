@@ -10,6 +10,12 @@ input and its separate license.
 ## Generate and check
 
 Use ESS **0.9.2** and the rustfmt version recorded in the generated manifest.
+This is a reproducibility pin, not a claim about the newest installed ESS. The
+review shell reported 0.18.0; the implementation/remediation shell reports 0.9.2.
+If `ess --version` differs, pass `--ess /path/to/pinned/ess` to the generator or
+build tool. The gate propagates this selection as `CONNECTORS_ESS` to tests;
+standalone generation tests accept that environment variable too. An upgrade
+requires regenerating and reviewing the bundle, import refusal and build evidence.
 On a machine with a small system temporary filesystem, set `TMPDIR` to an owned
 writable directory first:
 
