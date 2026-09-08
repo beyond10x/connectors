@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-read-refresh-retry
 kind: story
-status: active
+status: implemented
 title: Version and bound read redispatch after refresh
 tags:
 - P2
@@ -26,7 +26,7 @@ scope:
   path: contracts/service/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/service/v1alpha2/semantics.md
-revision: 7
+revision: 10
 ---
 ## Context
 
@@ -76,3 +76,11 @@ Shared edit surfaces with `story:contracts-federated-approval`, `story:contracts
 This local-only story completes textual semantics, adapter-owned specifications, conformance scenarios and relevant ESS shape validation under the operator's current specification-completion authorization. No runtime/provider/codec implementation or adapter runtime expansion is authorized. Local coordinator commits and managed worktrees are authorized; external publication is not. New typed entities or relations must use the ESS workflow, preserving UNMAPPED implementation obligations explicitly. Existing review/source snapshots remain immutable.
 
 The approved parallel assignment is specification:spec-completion-parallel-20260909. Root alone writes planning records and integrates shared-file patches. Original file:line citations above retain their historical db1c329 baseline; current writable ownership follows the dispatch brief and current machine scope, including the adapter-owned layout checkpoint 8e1836c.
+
+## Completion evidence — 2026-09-09
+
+F15/E05 are fixed by the explicitly selected native combined read-refresh-once profile: one definitive complete first 401, one coordinated refresh participation, the exact acknowledged current successor and at most one new dispatch under the original deadline and consumed permission budget. No current adapter selects it. Fourteen manual cases are recorded in docs/evidence/read-refresh-retry-20260909/baseline-cases.md.
+
+Both independent final reviews spec-completion-a-final-20260909 and spec-completion-b-final-20260909 approve the selected specification scope at d1dc83f5d600816c699db07dd843f079ded0e72b. The complete checkpoint, unchanged reports and exact source archive are retained in [checkpoint](../../../docs/evidence/spec-completion-20260909/checkpoint.md). The full repository gate including MSRV 1.88 passed with 58 Rust tests; ESS synthesis/compilation and textual scenarios do not execute runtime conformance. No runtime implementation or public codec change was added in this wave.
+
+The approved parallel plan supersedes earlier single-primary-writer dispatch wording: isolated workers changed only their assigned sources, coordinator alone wrote planning/shared joins. This story is complete for its enumerated specification findings; the overall goal remains active for the separately scoped persistent ESS model closure. Original immutable review bodies and historical source references remain unchanged.
