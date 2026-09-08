@@ -1,0 +1,30 @@
+[package]
+name = "connectors-gitlab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["service"]
+service = ["dep:connectors-host", "dep:clap", "dep:tokio"]
+
+[[bin]]
+name = "connectors-gitlab"
+path = "src/main.rs"
+required-features = ["service"]
+
+[dependencies]
+connectors-core.workspace = true
+connectors-contracts.workspace = true
+connectors-sdk.workspace = true
+connectors-host = { workspace = true, optional = true }
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+connectors-client.workspace = true
+axum.workspace = true
+tempfile.workspace = true

@@ -1,0 +1,17 @@
+service:
+  instance: engineering-gateway
+  listen: 127.0.0.1:7100
+  service_credential: {kind: file, path: gateway.secret}
+downstreams:
+  - name: gitlab
+    endpoint: http://127.0.0.1:7101/
+    credential: {kind: file, path: service.secret}
+    allow_plaintext: true
+  - name: kubernetes
+    endpoint: http://127.0.0.1:7102/
+    credential: {kind: file, path: service.secret}
+    allow_plaintext: true
+  - name: sql
+    endpoint: http://127.0.0.1:7103/
+    credential: {kind: file, path: service.secret}
+    allow_plaintext: true

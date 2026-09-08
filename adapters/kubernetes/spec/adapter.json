@@ -1,0 +1,598 @@
+{
+  "kind": "connectors.adapter/v1",
+  "id": "kubernetes",
+  "version": "0.1.0",
+  "sources": [
+    "https://kubernetes.io/docs/reference/using-api/api-concepts/",
+    "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
+    "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/node-v1/"
+  ],
+  "configuration_schema": {
+    "type": "object",
+    "properties": {
+      "service": {
+        "type": "object",
+        "properties": {
+          "instance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "listen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "service_credential": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "environment"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "kind",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "file"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "kind",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "instance",
+          "listen",
+          "service_credential"
+        ],
+        "additionalProperties": false
+      },
+      "http": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "environment"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "const": "file"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credential_header": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "bearer": {
+            "type": "boolean"
+          },
+          "allow_plaintext": {
+            "type": "boolean"
+          },
+          "ca_file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "base_url"
+        ],
+        "additionalProperties": false
+      },
+      "adapter": {
+        "type": "object",
+        "properties": {
+          "namespaces": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            }
+          },
+          "resource_kinds": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "pods",
+                "services",
+                "deployments",
+                "endpointslices"
+              ]
+            }
+          },
+          "discover_hosts": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "namespaces",
+          "resource_kinds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "service",
+      "http",
+      "adapter"
+    ],
+    "additionalProperties": false
+  },
+  "operations": [
+    {
+      "id": "resources.list",
+      "description": "Read a bounded page of configured Kubernetes resources.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-list",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "kind": {
+            "enum": [
+              "pods",
+              "services",
+              "deployments",
+              "endpointslices"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "namespace",
+          "kind",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "endpoints.discover",
+      "description": "Observe EndpointSlice addresses and ports without activating connections.",
+      "contract": "endpoint_discovery/v1alpha1",
+      "profile": "kubernetes-endpointslice",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "namespace",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "service": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "address": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "transport": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "application_protocol": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "ready": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "source_uid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "reachability": {
+                  "const": "source_cluster_network"
+                }
+              },
+              "required": [
+                "id",
+                "namespace",
+                "service",
+                "address",
+                "port",
+                "transport",
+                "application_protocol",
+                "ready",
+                "source_uid",
+                "reachability"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "hosts.discover",
+      "description": "Observe cluster nodes when host discovery is explicitly enabled.",
+      "contract": "host_discovery/v1alpha1",
+      "profile": "kubernetes-nodes",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

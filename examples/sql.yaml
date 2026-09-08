@@ -1,0 +1,10 @@
+service:
+  instance: sql-local
+  listen: 127.0.0.1:7103
+  service_credential: {kind: file, path: service.secret}
+adapter:
+  host: database.example.invalid
+  port: 5432
+  database: engineering
+  user: connector_reader
+password: {kind: file, path: postgres.secret}
