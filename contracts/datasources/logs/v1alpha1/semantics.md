@@ -1,139 +1,112 @@
 # datasource.logs/v1alpha1
 
-- **Status:** proposed, not implemented.
-- **Family:** datasources. Siblings: [records](../../records/v1alpha1/semantics.md), [series](../../series/v1alpha1/semantics.md), relational (in [service v1alpha1](../../../service/v1alpha1/semantics.md)).
-- **Recorded:** 2026-09-08.
+**Status:** proposed; public log codecs and provider behavior are not implemented.
 
-## 1. Identity
+## Shared contract and adapter ownership
 
-| Field | Value |
-|---|---|
-| Contract | `datasource.logs/v1alpha1` |
-| Profiles | `logql-range` (Loki), `kubernetes-pod-logs`, `docker-container-logs` |
-| Shared with records | provenance, completeness, cursor binding rules (`docs/design.md:434-446`); not the record page shape |
+A log read returns a bounded observation of available source logs, with explicit
+selection, order, truncation and provenance. It proves neither archival retention,
+absence of late arrivals, a global snapshot nor continuity across rotation/restart.
 
-A log read returns time-ordered lines from one or more streams, bounded by time window, line count and bytes, with explicit truncation. The design requires Loki's native query language and stream/label/timestamp identity to be preserved rather than flattened into records or called SQL (`docs/design.md:454`). Pod and container logs share the shape (lines, timestamps, bounds) but have no query language and select by resource rather than by label selector; they are profiles of the same contract so that a client can render all three the same way while the descriptor stays honest about which selection each supports.
+The adapter owns the versioned profile identifier, typed native input/selection,
+source protocol, stream metadata, ordering and source-exhaustion proof. Profile
+identifiers are open. The shared family does not impose a query language, absolute
+time window, provider catalog or universal continuation model.
 
-## 2. Old evidence and disposition
+Current proposed bindings are [Loki](../../../../adapters/loki/contracts/logs/v1alpha1/semantics.md),
+[Kubernetes](../../../../adapters/kubernetes/contracts/logs/v1alpha1/semantics.md)
+and [Docker](../../../../adapters/docker/contracts/logs/v1alpha1/semantics.md).
+These index links create no dependency on a concrete adapter. Each adapter carries
+its own profile schema and conformance obligations when extracted.
 
-| Old surface | Source | Disposition |
-|---|---|---|
-| `loki-query-range`: one operation from the pinned Loki HTTP API spec; direct origin or Grafana-mediated | `../connectors/providers/loki.toml` | preserve as `logql-range` |
-| Old Loki projection: ≤ 500 streams, ≤ 1,000 lines, line text cut at 8 KiB with `truncated` per line, deterministic pattern redaction with `redacted` flag, `result_type`, per-line `timestamp`, `labels`, `line`; overall `truncated` | `../connectors/crates/integration-monitoring/src/projection.rs`, `project_loki` | preserve the shape and bounds as first-profile defaults; redaction becomes a configurable host-side filter, not a contract promise (arbitrary text cannot be proven secret-free, old design 08 amendment) |
-| `kubernetes.pod.logs`: `namespace`, `pod`, optional `container`, `tail_lines` 1–1000 default 200, `since_seconds` 1–86400; output `text`, `truncated`; 128 KiB bound; namespace grant is the containment | `../connectors/crates/integration-kubernetes/src/workloads.rs:1120-1145` | preserve as `kubernetes-pod-logs`; change output from one `text` blob to lines with timestamps (Kubernetes `timestamps=true`) |
-| Loki tenant/header binding where applicable | `docs/design.md:500` | preserve as receiver-owned `http.extra_headers` configuration (§4.1), never caller input; the earlier `tenant_header` wording was a conceptual label, not a second supported key |
-| Docker container logs | no old source; Docker Engine API `GET /containers/{id}/logs` with `stdout`, `stderr`, `since`, `until`, `tail`, `timestamps` (to verify against the vendor reference at authoring) | new profile `docker-container-logs` |
+## Result obligations
 
-## 3. Types
+The result contains `lines`, `selection`, `order`, `complete`, `truncation`,
+`next_cursor` and `provenance`. The selected profile supplies a closed typed
+selection and stream schema; these are not arbitrary provider-object bags.
 
-Input, `logql-range`:
+Each line has `timestamp_unix_ns`, `stream`, `line`, `line_truncated`,
+`redacted` and `source`. A timestamp is a canonical decimal string at actual
+source precision; null is permitted only when explicitly selected by a profile
+that cannot establish a representable timestamp. Do not fabricate or round one.
+The profile defines stream/source identity and ordering. Returned metadata is a
+value, not evidence of scope or authority. Equal timestamp/text/labels do not
+prove identical occurrences and cannot alone justify deduplication.
 
-```json
-{ "query": "{app=\"api\"} |= \"error\"", "start_unix_ns": "…", "end_unix_ns": "…", "direction": "backward", "limit": 1000, "max_line_bytes": 8192 }
-```
+Redaction is an explicitly admitted optional host filter, independently flagged;
+it does not promise secret-free content. A profile defines its deterministic
+redaction and UTF-8-safe clipping order. Content clipping does not itself remove
+an occurrence. All byte bounds distinguish decoded content from serialized
+escaping/framing and encoded/decoded provider bytes.
 
-Input, `kubernetes-pod-logs`:
+Provenance identifies the admitted instance/source/resource and original
+observation time, with a nullable source revision. Reusing a retained observation
+preserves its provenance rather than presenting cache access time as freshness.
 
-```json
-{ "namespace": "x", "pod": "api-0", "container": "api", "since_seconds": 3600, "tail_lines": 200, "max_bytes": 131072 }
-```
+## Completeness and loss accounting
 
-Input, `docker-container-logs`:
+`complete = source_exhausted AND no_occurrences_omitted AND final_retained_page`.
+An unpaged result is its final page. Source exhaustion must be established by
+the adapter's supported native protocol and effective provider/proxy limits.
+A malformed response, unknown partial extension, cap or interrupted EOF cannot
+silently become complete empty logs. A terminal partial result may have no cursor.
+Line clipping is reported separately and may coexist with complete:true.
 
-```json
-{ "container": "id or name", "streams": ["stdout", "stderr"], "since_unix_s": 0, "tail_lines": 200, "max_bytes": 131072 }
-```
+Truncation causes are distinct and ordered:
+provider_limit, provider_partial, stream_limit, page_limit, response_bytes,
+source_bytes, line_bytes. The profile selects applicable causes and precisely
+defines their trigger. Provider_limit represents source saturation; provider_partial
+requires a supported indication; stream_limit represents omitted groups;
+page_limit/response_bytes describe an undelivered retained remainder; source_bytes
+describes an explicitly valid bounded streaming cutoff; line_bytes describes
+clipping on this page. Record every applicable cause.
 
-Output (all profiles):
+Occurrences_dropped and stream_groups_dropped are exact nonnegative totals only
+when fully observed evidence establishes each total, otherwise null for the
+affected total. A known local omission count is not a complete total when provider
+loss remains unknown. Retained remainders are not dropped occurrences. Clipping
+alone drops zero occurrences.
 
-```json
-{
-  "lines": [ { "timestamp_unix_ns": "…", "stream": { "app": "api" }, "line": "…", "line_truncated": false, "source": "stdout" } ],
-  "window": { "start_unix_ns": "…", "end_unix_ns": "…", "direction": "backward" },
-  "complete": false,
-  "truncation": { "by": "limit", "streams_dropped": 0 },
-  "next_cursor": null,
-  "provenance": { "instance": "…", "resource": "loki:…", "observed_at_unix_ms": 0, "source_revision": null }
-}
-```
+## Admission and continuation
 
-| Field | Rule |
-|---|---|
-| `timestamp_unix_ns` | string (nanoseconds exceed JSON-safe integers); Kubernetes and Docker timestamps are converted to ns without rounding claims beyond their precision |
-| `stream` | label set for Loki; `{namespace, pod, container}` for Kubernetes; `{container}` for Docker |
-| `source` | `stdout`/`stderr` where the provider distinguishes; null for Loki |
-| `complete` | true only when the provider returned fewer than `limit` lines and did not indicate more |
-| `truncation.by` | `limit`, `bytes`, `time`, `provider`; `streams_dropped` counts streams beyond the stream bound |
-| `next_cursor` | `logql-range` only: continuation by adjusting the window edge to the last timestamp (Loki semantics); bound to query, window, direction, connection, config revision |
+Current host principal, visible operation, source/connection, scope and applicable
+credential/route evidence are admitted before dispatch. Known revocation and
+current binding fences govern publication and disclosure. These host checks do
+not lock future provider permissions. No stale-on-error, cross-principal cache
+reuse, live follow or automatic redispatch is selected by this shared contract.
 
-Errors: base codes; `InvalidInput` for a query the provider rejects with 400 (message is the safe classification, not the provider body); `Timeout` before dispatch only; provider partial results are `complete: false` with `truncation.by: provider`.
+Continuation requires explicit adapter support. A token grants no authority;
+current admission precedes disclosure of cursor validity or retained content.
+Its private context binds instance, operation/profile/contract/projection,
+source/connection/authority, credential and parent/route fences, principal/tenant,
+scope/policy/configuration, exact selection, limits and redaction. A token exposes
+no credentials, origin or private route locator.
 
-## 4. Rules
+The profile must distinguish immutable retained paging from repeated provider
+queries, define monotonic progress and repeated-cursor behavior, and bound expiry
+and capacity without renewing observation age. Expired/lost/evicted/mismatched
+state is StaleCursor after admission; unavailable authority/cache infrastructure
+is Unavailable. No hidden requery or direct-route fallback may replace retained
+state. Timestamp/text hashes cannot invent missing native occurrence identity.
 
-- Native query preserved: `query` is passed to Loki unchanged; the contract does not parse LogQL. A configured query scope (allowed label selectors) is enforced by the adapter before dispatch (`docs/design.md:500`).
-- Time window mandatory and bounded: `end - start` ≤ configured maximum (first-profile default 24 h); `end` defaults to now.
-- Ordering: `direction` is honored; within one stream, lines are ordered by timestamp; across streams, order is by timestamp with ties unordered. The contract does not claim global order across streams beyond timestamp.
-- Bounds are enforced in this order: line bytes, line count, total bytes, stream count; each records itself in `truncation`.
-- Selection authority: `kubernetes-pod-logs` admits only configured namespaces (allowlist before dispatch, as `resources.list` today); `docker-container-logs` admits only configured containers or labels.
-- No live follow: `follow`/tail-streaming is a `sessions` profile, not this contract.
-- Cache: log reads are not cached by default; a cached read must carry the original observation time and is only served for an identical (connection, query, window, direction, limit).
+## Resource limits, errors and verification
 
-### 4.1 Monitoring tenant-header configuration (E30)
+Each profile declares finite input, metadata, encoded/decoded source, retained
+state, serialized-result, provider-call and deadline ceilings. Permission,
+metadata and mediated work consume the same original budget. Retention admission
+accounts backing allocations, context and indexes atomically across concurrent
+requests and declares bounded per-instance and per-principal/tenant capacities.
 
-For the proposed direct monitoring binding, the normative representation is a receiver-owned entry in `http.extra_headers`, for example `{"X-Scope-OrgID": "tenant-a"}` as shown in the [Grafana child configuration](../../../../docs/adapters/grafana.md#6-configuration-outline). `tenant_header` in the earlier evidence table meant this configured provider header; it is not an accepted alias or an additional configuration object. This is a proposed configuration extension: the current `HttpConfig` does not implement arbitrary extra headers, and no legacy file is claimed to have a working `tenant_header` key that can be migrated automatically.
+The selected service binding supplies safe errors and its maximum result/deadline.
+Deadline exhaustion is Timeout; it is neither clean EOF nor cutoff success.
+Malformed, oversized and interrupted observations are Unavailable unless an
+explicit profile rule establishes a valid streaming cutoff. No raw provider
+errors, query text, origins or credentials enter ordinary diagnostics.
 
-The operator binds the provider tenant to a connection during configuration admission. Query input, caller headers, provider response data and adapter-built request headers cannot choose, append or override it. The host installs exactly the admitted header value at dispatch; configuration validation rejects duplicate header names ignoring ASCII case and conflicts with credential placement or transport-owned headers. Unsupported headers/configuration are refused rather than ignored. Changes require a new admitted configuration revision; cached results and continuations must not cross that revision. A provider tenant header is distinct from the caller's verified SaaS tenant/realm and is never evidence of application authority.
-
-For a Grafana-mediated child, the parent route and its admitted Grafana datasource configuration own any downstream provider tenant binding. The child does not forward a caller-selectable or direct-binding `extra_headers` override through the proxy. A requested tenant binding that the admitted parent route cannot establish is refused, with no direct fallback.
-
-Textual verification: (1) direct Loki configuration and the monitoring example use the same `http.extra_headers` entry; (2) a request supplying `tenant_header`, `extra_headers` or a differently cased tenant header does not alter the connection and is refused where the closed request/binding rejects it; (3) a mediated child cannot override the parent's downstream tenant. These are binding obligations, not executed HTTP tests or a claim of an implemented configuration schema.
-
-## 5. Limits (first-profile defaults, to be measured)
-
-| Bound | Value | Source |
-|---|---|---|
-| Lines per read | 1,000 | old projection |
-| Streams per read | 500 | old projection |
-| Line bytes | 8 KiB | old projection |
-| Total bytes | 128 KiB for pod/container logs; response limit for Loki | `workloads.rs:1127` |
-| Window | 24 h | new |
-| Cursor TTL | 300 s | base |
-
-## 6. Conformance scenarios (`docs/design.md:988`)
-
-- Loki fixture returns 3 streams × 600 entries; `limit` 1000 → 1,000 lines, `truncation.by: limit`, `complete: false`, `next_cursor` present and re-readable.
-- Fixture line of 20 KiB → `line_truncated: true`, `line` is an 8 KiB UTF-8-safe prefix.
-- Window exceeding the maximum → `InvalidInput`, no dispatch.
-- Loki 400 (bad LogQL) → `InvalidInput`; the error message contains no provider body text.
-- Kubernetes fixture for namespace outside allowlist → `Forbidden`, zero requests.
-- Kubernetes fixture with `timestamps=true` lines → each line has a ns timestamp; a line without a timestamp is reported with `timestamp_unix_ns: null` rather than invented.
-- Tenant header configured → present on the fixture request; caller input cannot set or override it.
-
-## 7. Compatibility
-
-- New contract; no old wire contract for logs existed beyond operation results. The old `kubernetes.pod.logs` `text` blob is not preserved; a facade may join lines.
-- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. Log schemas can inhabit the ordinary result slot, but require explicit profile support; framing compatibility does not confer log or cursor semantics on existing typed consumers. Tenant headers remain receiver configuration.
-
-
-## 8. SDK and host obligations
-
-| Obligation | Where |
-|---|---|
-| `LogLine`, `LogRead` types | `crates/connectors-contracts/src/lib.rs` |
-| Cursor helper for window-edge continuation | `crates/connectors-sdk/src/lib.rs:161` |
-| Receiver-owned `http.extra_headers` placement and validation (§4.1) | future `HttpConfig` / `HttpCapability` binding; current host configuration does not implement this extension |
-
-## 9. ESS entities
-
-| Entity / value | Notes |
-|---|---|
-| `OperationDeclaration.profile` in `{logql-range, kubernetes-pod-logs, docker-container-logs}` | value |
-| Streams, lines | not entities; payload |
-
-## 10. Open decisions
-
-| Decision | Default taken |
-|---|---|
-| Redaction | host filter, opt-in, flagged per line; not a contract guarantee |
-| Window maximum | 24 h |
-| Docker `until` support | included if the vendor reference confirms it at authoring |
+[Service compatibility](../../../service/compatibility.md) governs the wire binding:
+an ordinary result slot does not confer log semantics on existing typed readers.
+[Shared ESS](../../../../ess/domains/datasource_reads.yaml) models generic
+collection/page facts and decisions; native selectors belong to adapter ESS.
+Parser, ordering, full context equality, byte accounting and current publication
+remain unimplemented binding obligations. Native profiles own their adversarial
+fixtures; schema acceptance alone does not execute those obligations.

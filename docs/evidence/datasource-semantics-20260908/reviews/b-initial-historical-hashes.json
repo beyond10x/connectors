@@ -1,0 +1,62 @@
+[
+  {
+    "path": "providers/loki.toml",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "7a936f77da06bd6e1aede789fec008754c52b69b957a5d5dc1cfe5bbc7b9e10e",
+    "bytes": 1433
+  },
+  {
+    "path": "providers/jira.toml",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "73908f8f10efd84e03f7c9ca091e73aac30869a7912fadc83c0354dc9ecc2e69",
+    "bytes": 53904
+  },
+  {
+    "path": "providers/confluence.toml",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "b138f4f54ba8d8df0205707a7e6af0beb308521e220aa075e9f05483a702f189",
+    "bytes": 54349
+  },
+  {
+    "path": "crates/integration-monitoring/src/projection.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "65e51180299364473b2dc4273357330281a8c3f9960af39b15eed8884809d344",
+    "bytes": 11854
+  },
+  {
+    "path": "crates/integration-kubernetes/src/workloads.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "b4d66b222e8e708b3cd19c762897f80991090ddf9e6c49908600067091bd4c3f",
+    "bytes": 47966
+  },
+  {
+    "path": "crates/integration-jira/src/backend.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "3dc8a4f5229371b3d68d7e79a62c4747ef46258dc3642f7414f9605b1c376c0a",
+    "bytes": 29646
+  },
+  {
+    "path": "crates/integration-jira/src/backend/datasource.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "1b23ba9fcbe2dbb2ba7ba64584a8456d2d6f85e46a2f346cc7c17ffb6427cdce",
+    "bytes": 30273
+  },
+  {
+    "path": "crates/integration-jira/src/backend/operations.rs",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "fab3b216079b87e8a8ec8f5cf0448f0e8ce274a41dfcb29abfcbeb4a016daa7b",
+    "bytes": 33419
+  },
+  {
+    "path": "specs/loki/http-api-2026-08-15.openapi.yaml",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "77e769512509c9b6d8d21c08a6d576bbafbde0e4cbfde8da33abc196bfc49ee7",
+    "bytes": 1715
+  },
+  {
+    "path": "contracts/connector-datasource/v0alpha1/README.md",
+    "revision": "81459ac42ddd518d3942f4b079841e9e0ed6efc8",
+    "sha256": "07e74142a9ad53719f46a19aca0f63ede2f6161525a9bef5fd58db5f949b1a88",
+    "bytes": 878
+  }
+]

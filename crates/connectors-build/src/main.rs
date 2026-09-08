@@ -9,6 +9,7 @@ use std::{
     process::{Command, Output},
 };
 
+mod ess_boundary;
 mod gate;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -27,6 +28,8 @@ struct Args {
 #[derive(Subcommand)]
 enum Action {
     Check,
+    /// Check shared ESS ownership and compile shared and adapter semantic models.
+    EssBoundary,
     /// Run the local repository acceptance gates, without live provider credentials.
     Gate {
         /// Also check every target on the declared minimum Rust version.
@@ -64,6 +67,15 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let root = args.root.canonicalize()?;
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
+    if let Action::EssBoundary = args.command {
+        check_ess(&ess)?;
+        let base = root.join(".local/tmp");
+        std::fs::create_dir_all(&base)?;
+        let temp = tempfile::Builder::new()
+            .prefix("ess-boundary-")
+            .tempdir_in(base)?;
+        return ess_boundary::run(&root, &ess, temp.path());
+    }
     if let Action::Gate { msrv } = args.command {
         return gate::run(&root, &ess, msrv);
     }

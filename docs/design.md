@@ -157,6 +157,7 @@ flowchart LR
 - A provider library depends on SDK contracts, not on sibling providers or a universal driver enum.
 - A host does not import every concrete adapter. It can operate through service contracts and launch separate executables.
 - Common orchestration and infrastructure are reusable. Provider-specific verification, mapping, parsing, and protocol state stay with the provider.
+- Root `ess/` contains shared semantics only. Typed provider vocabulary, native target tuples and operation preparation belong under each [adapter's spec/ess root](../adapters/README.md); native textual contracts live with the same adapter. The Rust gate checks the ESS boundary and compiles each root independently. Shared protocols are not a closed provider catalog.
 - The same outward contract works locally, remotely, or through federation, subject to explicitly advertised transport/profile support.
 - Discovery, readiness, authentication, authorization, and execution are separate facts.
 - A remote actor never gains authority from an unverified descriptor, configuration field, event, or discovered resource.
@@ -254,10 +255,34 @@ There is no dependency from runtime crates to `connectors-spec`. There is no hos
 
 ### 4.2 Adapter layout
 
+`adapters/<owner>/` is the ownership and extraction boundary. Native contract prose,
+authored ESS, adopted upstream sources/pins/licenses, generated artifacts, fixtures,
+design notes and implementation move together. Root `contracts/` and `ess/` own
+shared protocols and generic facts only. A provider update changes its own binding;
+it changes a shared package only when it changes a shared guarantee or codec.
+
+An extracted adapter consumes an exact reviewed shared-contract/SDK release or
+immutable commit and digest, with matching schemas/conformance inputs. Those shared
+artifacts may continue to be released from this repository; moving Loki does not
+require moving the shared contracts into Loki's repository. There is no published
+package or extraction release yet. Replacing Cargo workspace inheritance/path
+dependencies and proving an independent build remain packaging prerequisites.
+
+Specification-only directories need no placeholder crate or fake runtime
+declaration. Current Cargo membership explicitly selects the three implemented
+adapters. Parent/child pairings belong to composition; children consume shared
+capabilities without importing parent bindings. See [ownership and gate](../adapters/README.md).
+
 ```text
 adapters/atlassian/
 ├── Cargo.toml                        # Library and standalone binary
+├── design.md                         # Adapter-owned design and evidence notes
+├── contracts/                        # Versioned native profiles and fixtures
+│   └── documents/v1alpha1/
+│       ├── semantics.md
+│       └── cql.md
 ├── spec/
+│   ├── ess/                          # Authored native semantic models
 │   ├── adapter.yaml                  # Instance of custom adapter kind
 │   ├── configuration.yaml
 │   ├── authentication.yaml
@@ -304,7 +329,7 @@ A Rust trait alone is not a distributed contract. Each shared contract release c
 5. Positive and adversarial conformance scenarios, including original-wire-byte cases where needed.
 6. Compatibility and projection rules for supported older versions.
 
-`contracts/` is the semantic source and fixture home. `connectors-contracts` is its Rust binding. Generated schemas and DTOs do not become an independent authority. ESS may express some semantic rules; independent tests carry the obligations it cannot yet express. A syntax-valid schema does not prove behavioral completeness.
+`contracts/` is the shared semantic source and fixture home; native profiles live in `adapters/<owner>/contracts/` beside their authored `spec/ess/`. `connectors-contracts` binds the shared contracts in Rust. Generated schemas and DTOs do not become an independent authority. ESS may express some semantic rules; independent tests carry the obligations it cannot yet express. A syntax-valid schema does not prove behavioral completeness.
 
 Separate versions for the adapter specification kind, shared contract, provider API source, adapter implementation, configuration schema, and realization/build inputs. Installing a new adapter must not require a new core driver enum. A new contract family is introduced explicitly, not as an untyped extension bag hidden inside an old version.
 
@@ -1284,8 +1309,10 @@ contract: 5 implemented contract/profile rows share the section 27 service docum
 16 proposed semantic documents cover the remaining contracts, profiles and the
 proposed governed service binding; 4 families are deferred. The index distinguishes
 document counts from its 17 proposed rows because catalog appears twice. One design
-document per adapter under [docs/adapters/](adapters/) states which contracts it
-needs and why, with the old surface it rebuilds cited by path and line. Nothing in
+document per adapter now lives beside its [owned contracts](../adapters/README.md);
+monitoring and media comparisons live under docs/compositions. The original
+2026-09-08 inventory predates that ownership correction. The documents state each
+adapter's required contracts and cite the old surface. Nothing in
 these documents is implemented; descriptors advertise none of it. Docker has no
 predecessor in the old repository and is designed from the Kubernetes shape.
 
