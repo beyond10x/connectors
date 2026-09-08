@@ -64,6 +64,12 @@ Rebuild adds what the old integration had and the first slice did not: pod logs,
 | `kubernetes.mtls` | `mtls` | `static_config` (cert + key refs) | `mtls-client-identity` | same |
 | `kubernetes.exec_plugin` | `exec_plugin` | `exec_plugin`, disabled unless `auth.allow_exec_plugin = true` | `exec-credential-plugin` (runs only inside an admitted operation, bounded deadline) | same |
 
+Configured token, certificate/key and exec output replacement follows [auth.evidence §§4.1–4.3](../../contracts/auth/evidence/v1alpha1/semantics.md#41-credential-generation-and-identity). The host captures a coherent immutable credential generation and validates its identity in an explicitly admitted activation/revalidation step. Reusing a filename, cluster connection ref or configuration revision cannot reuse old identity evidence. The connection binds the observed stable Kubernetes user subject within the admitted cluster authority; a matching display name is insufficient. An unexpected identity change refuses ordinary replacement and requires a separately authorized reassignment flow if one exists.
+
+SelfSubjectReview for activation/replacement is an admitted auth-validation effect, with a declared budget; it is never a hidden identity call added to `resources.list`. Until that validation is available and admitted, a new candidate generation is not ready. SelfSubjectAccessReview for each operation/target and the resource request must use the same validated material. Exec runs once to capture the output used for identity validation and dispatch, rather than returning a different token on a second helper run. A client certificate and key must be captured as a coherent pair, never from independent mutable reads around admission.
+
+The capability pins this exact generation through the final dispatch check. Successful publication of a replacement invalidates old pending admissions, and known revocation, expiry or an unresolved rotating refresh refuses even a pin. A raw file change cannot substitute bytes into a pin before the host observes it. Permission evidence never transfers across generations; same-account replacement requires fresh SSAR for the exact target. No public describe/log field exposes generation IDs, secret versions or snapshot references. This is extension semantics; the implemented bearer adapter has not gained this runtime behavior yet.
+
 Ambient and kubeconfig HTTP proxies stay disabled (old rule, `docs/design/10-…:98-100`); the API server origin must be canonical HTTPS.
 
 ## 6. Configuration outline
@@ -98,5 +104,6 @@ Extends the implemented schema:
 ## 10. Evidence required
 
 - Fixture: log lines with timestamps and truncation; SSAR denial per namespace; exec plugin refused when disabled and never run during describe; proxy forward path discipline and refusal cases; rollout-restart approval, replay and unknown outcome.
+- Credential replacement fixtures: account A → B at the same token path refuses; same-account replacement waits for admitted validation; replacement between admission and dispatch cannot substitute bytes; exec validation and use share one output; certificate/key snapshots remain coherent; stale SSAR evidence is not reused for a new generation; revoked/expired pins refuse. [F05 authored scenario compilation](../../contracts/auth/evidence/v1alpha1/verification.md) is structural evidence only; these transport fixtures remain implementation obligations.
 - Live: existing `docs/live-e2e.md` extended with pod logs and a Service observation → mediated Prometheus read.
 - Decoupling: adapter builds without Loki/Prometheus crates; the child adapters build without Kubernetes.

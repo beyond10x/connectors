@@ -1,0 +1,210 @@
+# Compiled decision expectations for a fake rotating-token profile, not runtime
+# refresh or provider identity validation. See ../verification.md.
+type: ess-scenario/1
+domain: connectors.credential_evidence
+scenario: same-identity-refresh
+summary: 'F05: refresh can transfer only explicit identity lineage; newly narrowed
+  scopes refuse a write and new permission evidence gates a read.'
+arrange:
+- instance: narrowed-scope
+  entity: connectors.credential_evidence.DispatchAdmission
+- instance: fresh-read
+  entity: connectors.credential_evidence.DispatchAdmission
+timeline:
+- at: '2026-09-08T09:00:00Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: same-identity-refresh-narrowed-scope
+    operation_ref: test.item.update
+    generation_id: 00000000-0000-4000-8000-000000000002
+    binding:
+      instance_id: test-instance
+      connection_ref: account-a
+      profile_ref: test.rotating_oauth
+      provider_authority: test-provider
+    expected_external_identity:
+      kind: test-account
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000002
+      binding:
+        instance_id: test-instance
+        connection_ref: account-a
+        profile_ref: test.rotating_oauth
+        provider_authority: test-provider
+      observed_external_identity: &id001
+        kind: test-account
+        subject: account-a
+      checks:
+      - check: credential_present
+        result: ok
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - check: credential_valid
+        result: ok
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - &id002
+        check: identity_check
+        result: ok
+        source: refresh_lineage
+        source_generation_id: 00000000-0000-4000-8000-000000000001
+        subject_ref: null
+        collected_at: '2026-09-08T08:59:30Z'
+        valid_until: '2026-09-08T09:00:30Z'
+      - check: scope_check
+        result: insufficient
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - check: permission_check
+        result: not_run
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - check: verify_operation
+        result: not_run
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: narrowed-scope
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:01Z'
+  command: connectors.credential_evidence.RejectAdmission
+  input:
+    admission_id:
+      $instance: narrowed-scope
+    reason: insufficient_scope
+  outcome: refused
+  events:
+  - event: connectors.credential_evidence.AdmissionRefused
+    payload:
+      reason: insufficient_scope
+- at: '2026-09-08T09:00:02Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: narrowed-scope
+    generation_id: 00000000-0000-4000-8000-000000000002
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationDispatched
+- at: '2026-09-08T09:00:03Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: same-identity-refresh-fresh-read
+    operation_ref: test.item.read
+    generation_id: 00000000-0000-4000-8000-000000000002
+    binding:
+      instance_id: test-instance
+      connection_ref: account-a
+      profile_ref: test.rotating_oauth
+      provider_authority: test-provider
+    expected_external_identity:
+      kind: test-account
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000002
+      binding:
+        instance_id: test-instance
+        connection_ref: account-a
+        profile_ref: test.rotating_oauth
+        provider_authority: test-provider
+      observed_external_identity: *id001
+      checks:
+      - check: credential_present
+        result: ok
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - check: credential_valid
+        result: ok
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - *id002
+      - check: scope_check
+        result: ok
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - check: permission_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: test.item.read/item-one
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+      - check: verify_operation
+        result: not_run
+        source: local_metadata
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: fresh-read
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:04Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: fresh-read
+  outcome: admitted
+  events:
+  - event: connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:05Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: fresh-read
+    generation_id: 00000000-0000-4000-8000-000000000002
+  outcome: dispatched
+  events:
+  - event: connectors.credential_evidence.GenerationDispatched
+    payload:
+      generation_id: 00000000-0000-4000-8000-000000000002
+assert:
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: narrowed-scope
+    generation_id: 00000000-0000-4000-8000-000000000002
+    state: Refused
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: fresh-read
+    generation_id: 00000000-0000-4000-8000-000000000002
+    state: Dispatched
