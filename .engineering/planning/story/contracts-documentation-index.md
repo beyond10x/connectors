@@ -16,10 +16,12 @@ relations:
 - depends_on: story:contracts-anonymous-auth
 scope:
 - confidence: cited
+  path: adapters/README.md
+- confidence: cited
   path: contracts/README.md
 - confidence: cited
   path: docs/design.md
-revision: 3
+revision: 6
 ---
 ## Context
 
@@ -47,10 +49,13 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 ## Scope
 
+- cited: `adapters/README.md`
 - cited: `contracts/README.md`
 - cited: `docs/design.md`
 
-Source locations: `contracts/README.md:29`; `contracts/README.md:36`; `docs/design.md:180`; `docs/design.md:1284`.
+Current scope follows the adapter-owned layout and specification:spec-completion-parallel-20260909. Shared files are coordinator-integrated or assigned to one worker; stories are serialized where required.
+
+Historical Source locations: `contracts/README.md:29`; `contracts/README.md:36`; `docs/design.md:180`; `docs/design.md:1284`.
 
 ## Dependencies and edit coordination
 
@@ -60,7 +65,9 @@ Shared edit surfaces with `story:contracts-host-composition`, `story:contracts-m
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+This local-only story completes textual semantics, adapter-owned specifications, conformance scenarios and relevant ESS shape validation under the operator's current specification-completion authorization. No runtime/provider/codec implementation or adapter runtime expansion is authorized. Local coordinator commits and managed worktrees are authorized; external publication is not. New typed entities or relations must use the ESS workflow, preserving UNMAPPED implementation obligations explicitly. Existing review/source snapshots remain immutable.
+
+The approved parallel assignment is specification:spec-completion-parallel-20260909. Root alone writes planning records and integrates shared-file patches. Original file:line citations above retain their historical db1c329 baseline; current writable ownership follows the dispatch brief and current machine scope, including the adapter-owned layout checkpoint 8e1836c.
 
 ## Partial completion during independent review remediation — 2026-09-08
 

@@ -1,7 +1,8 @@
 domain: connectors.datasource_reads
 summary: Proposed bounded datasource selection and read-decision values; no runtime or persistent provider owner.
 
-# Normative owner: contracts/datasources/logs/v1alpha1/semantics.md §§3–5.
+# Shared owner: contracts/datasources/logs/v1alpha1/semantics.md,
+# Result obligations; Completeness and loss accounting; Admission and continuation.
 # These are private observations and decisions, not authority supplied by a caller.
 types:
   - name: connectors.datasource_reads.LogCollectionFacts
@@ -32,7 +33,8 @@ types:
     kind: enum
     variants: [provider_limit, provider_partial, stream_limit, page_limit, response_bytes, source_bytes, line_bytes]
 
-  # Normative owner: datasource.records document/search semantics §§2–7.
+  # Shared owner: contracts/datasources/records/v1alpha1/semantics.md.
+  # Each adapter owns its native document/search representation and selection.
   # These are private receiver selections and observations, not caller grants.
   - name: connectors.datasource_reads.DocumentContentForm
     kind: enum
