@@ -1,0 +1,6 @@
+{
+  "pre_existing_source_files_changed": [],
+  "added_source_files": [
+    "contracts/auth/evidence/v1alpha1/scenarios/retained-lineage-expires-before-dispatch.yaml"
+  ]
+}
