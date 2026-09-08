@@ -55,9 +55,11 @@ AdmittedInvocationContext {
   authenticated: AuthenticatedContext
   executor: Option<ExecutorRef> # established by credential/configuration/grant validation
   grant_ref: Option<opaque string>
-  connection: admitted connection
+  connection: admitted connection, or absent for an explicitly instance/acquisition-scoped management profile
 }
 ```
+
+Management target resolution follows [the host boundary](../../auth/management.md): create/list are instance-scoped and status resolves its owned acquisition, all omitting the wire connection member; describe/revoke/repair require one exact nonempty string selector. Explicit JSON null is invalid. Do not manufacture an implicit configured target for management, and reject contradictory selectors. Protected completion does not use this invocation context or become generic invoke input.
 
 These are host values, never caller-written authority. The authentication context exists before application decoding; the admitted invocation context follows strict decode, connection/policy checks and verification of any executor assertion. A body assertion cannot overwrite authentication coordinates. If a credential binds an executor, require exact match; otherwise the policy must independently establish the asserted binding or refuse it. Local static identity and tenant/realm absence are stable configuration facts, not credential bytes or token-rotation identities. No missing/unavailable governed policy falls back to local policy.
 

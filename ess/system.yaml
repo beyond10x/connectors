@@ -12,3 +12,4 @@ domains:
   - connectors.sessions
   - connectors.service_wire
   - connectors.delegation
+  - connectors.connection_admission
