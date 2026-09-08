@@ -1,0 +1,61 @@
+# Adversary-authored decision expectation, not runtime clock enforcement.
+# Retaining refresh lineage preserves the original evidence deadline.
+type: ess-scenario/1
+domain: connectors.credential_evidence
+scenario: retained-lineage-expires-before-dispatch
+summary: A new generation cannot extend retained identity evidence past its original deadline.
+arrange:
+  - {instance: pin, entity: connectors.credential_evidence.DispatchAdmission}
+timeline:
+  - at: '2026-09-08T09:00:28Z'
+    command: connectors.credential_evidence.InspectGeneration
+    input:
+      request_id: retained-lineage-deadline
+      operation_ref: test.item.read
+      generation_id: '00000000-0000-4000-8000-000000000002'
+      binding: {instance_id: test-instance, connection_ref: account-a, profile_ref: test.rotating_oauth, provider_authority: test-provider}
+      expected_external_identity: {kind: test-account, subject: account-a}
+      evidence:
+        generation_id: '00000000-0000-4000-8000-000000000002'
+        binding: {instance_id: test-instance, connection_ref: account-a, profile_ref: test.rotating_oauth, provider_authority: test-provider}
+        observed_external_identity: {kind: test-account, subject: account-a}
+        checks:
+          - {check: credential_present, result: ok, source: local_metadata, source_generation_id: null, subject_ref: null, collected_at: '2026-09-08T09:00:28Z', valid_until: '2026-09-08T09:01:00Z'}
+          - {check: credential_valid, result: ok, source: local_metadata, source_generation_id: null, subject_ref: null, collected_at: '2026-09-08T09:00:28Z', valid_until: '2026-09-08T09:01:00Z'}
+          - {check: identity_check, result: ok, source: refresh_lineage, source_generation_id: '00000000-0000-4000-8000-000000000001', subject_ref: null, collected_at: '2026-09-08T08:59:30Z', valid_until: '2026-09-08T09:00:30Z'}
+          - {check: scope_check, result: ok, source: local_metadata, source_generation_id: null, subject_ref: null, collected_at: '2026-09-08T09:00:28Z', valid_until: '2026-09-08T09:01:00Z'}
+          - {check: permission_check, result: ok, source: provider_read, source_generation_id: null, subject_ref: test.item.read/item-one, collected_at: '2026-09-08T09:00:28Z', valid_until: '2026-09-08T09:01:00Z'}
+    outcome: inspected
+    events: [{event: connectors.credential_evidence.GenerationInspected}]
+    capture: {instance: pin, event: connectors.credential_evidence.GenerationInspected, field: admission_id}
+  - at: '2026-09-08T09:00:29Z'
+    command: connectors.credential_evidence.AdmitGeneration
+    input: {admission_id: {$instance: pin}}
+    outcome: admitted
+    events: [{event: connectors.credential_evidence.GenerationAdmitted}]
+  - at: '2026-09-08T09:00:31Z'
+    command: connectors.credential_evidence.RejectAdmission
+    input: {admission_id: {$instance: pin}, reason: stale_evidence}
+    outcome: refused
+    events:
+      - event: connectors.credential_evidence.AdmissionRefused
+        payload: {reason: stale_evidence}
+  - at: '2026-09-08T09:00:32Z'
+    command: connectors.credential_evidence.DispatchGeneration
+    input: {admission_id: {$instance: pin}, generation_id: '00000000-0000-4000-8000-000000000002'}
+    outcome: wrong-state
+    error:
+      name: connectors.credential_evidence.AdmissionStateConflict
+      fields: {state: Refused}
+    no_events: [connectors.credential_evidence.GenerationDispatched]
+  - at: '2026-09-08T09:00:33Z'
+    command: connectors.credential_evidence.AdmitGeneration
+    input: {admission_id: {$instance: pin}}
+    outcome: wrong-state
+    error:
+      name: connectors.credential_evidence.AdmissionStateConflict
+      fields: {state: Refused}
+    no_events: [connectors.credential_evidence.GenerationAdmitted]
+assert:
+  - view: connectors.credential_evidence.AdmissionStates
+    contains: {admission_id: {$instance: pin}, generation_id: '00000000-0000-4000-8000-000000000002', state: Refused}

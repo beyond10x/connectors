@@ -1,0 +1,281 @@
+# Compiled decision expectations, not runtime injection of revocation, clock or
+# refresh uncertainty. See ../verification.md.
+type: ess-scenario/1
+domain: connectors.credential_evidence
+scenario: revocation-before-dispatch
+summary: 'F05: known revocation, expiry or unresolved rotating refresh makes even
+  a pinned admission unusable.'
+arrange:
+- instance: revoked-pin
+  entity: connectors.credential_evidence.DispatchAdmission
+- instance: expired-pin
+  entity: connectors.credential_evidence.DispatchAdmission
+- instance: refresh-pin
+  entity: connectors.credential_evidence.DispatchAdmission
+timeline:
+- at: '2026-09-08T09:00:00Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: revocation-before-dispatch-revoked-pin
+    operation_ref: kubernetes.resources.list
+    generation_id: 00000000-0000-4000-8000-000000000001
+    binding:
+      instance_id: test-instance
+      connection_ref: cluster-a
+      profile_ref: kubernetes.bearer
+      provider_authority: test-cluster
+    expected_external_identity:
+      kind: kubernetes-user
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000001
+      binding:
+        instance_id: test-instance
+        connection_ref: cluster-a
+        profile_ref: kubernetes.bearer
+        provider_authority: test-cluster
+      observed_external_identity: &id001
+        kind: kubernetes-user
+        subject: account-a
+      checks:
+      - check: identity_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: revoked-pin
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:01Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: revoked-pin
+  outcome: admitted
+  events:
+  - event: connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:02Z'
+  command: connectors.credential_evidence.RejectAdmission
+  input:
+    admission_id:
+      $instance: revoked-pin
+    reason: revoked
+  outcome: refused
+  events:
+  - event: connectors.credential_evidence.AdmissionRefused
+    payload:
+      reason: revoked
+- at: '2026-09-08T09:00:03Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: revoked-pin
+    generation_id: 00000000-0000-4000-8000-000000000001
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationDispatched
+- at: '2026-09-08T09:00:04Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: revoked-pin
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:05Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: revocation-before-dispatch-expired-pin
+    operation_ref: kubernetes.resources.list
+    generation_id: 00000000-0000-4000-8000-000000000001
+    binding:
+      instance_id: test-instance
+      connection_ref: cluster-a
+      profile_ref: kubernetes.bearer
+      provider_authority: test-cluster
+    expected_external_identity:
+      kind: kubernetes-user
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000001
+      binding:
+        instance_id: test-instance
+        connection_ref: cluster-a
+        profile_ref: kubernetes.bearer
+        provider_authority: test-cluster
+      observed_external_identity: *id001
+      checks:
+      - check: identity_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: expired-pin
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:06Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: expired-pin
+  outcome: admitted
+  events:
+  - event: connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:07Z'
+  command: connectors.credential_evidence.RejectAdmission
+  input:
+    admission_id:
+      $instance: expired-pin
+    reason: expired
+  outcome: refused
+  events:
+  - event: connectors.credential_evidence.AdmissionRefused
+    payload:
+      reason: expired
+- at: '2026-09-08T09:00:08Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: expired-pin
+    generation_id: 00000000-0000-4000-8000-000000000001
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationDispatched
+- at: '2026-09-08T09:00:09Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: expired-pin
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:10Z'
+  command: connectors.credential_evidence.InspectGeneration
+  input:
+    request_id: revocation-before-dispatch-refresh-pin
+    operation_ref: kubernetes.resources.list
+    generation_id: 00000000-0000-4000-8000-000000000001
+    binding:
+      instance_id: test-instance
+      connection_ref: cluster-a
+      profile_ref: kubernetes.bearer
+      provider_authority: test-cluster
+    expected_external_identity:
+      kind: kubernetes-user
+      subject: account-a
+    evidence:
+      generation_id: 00000000-0000-4000-8000-000000000001
+      binding:
+        instance_id: test-instance
+        connection_ref: cluster-a
+        profile_ref: kubernetes.bearer
+        provider_authority: test-cluster
+      observed_external_identity:
+        kind: kubernetes-user
+        subject: account-a
+      checks:
+      - check: identity_check
+        result: ok
+        source: provider_read
+        source_generation_id: null
+        subject_ref: null
+        collected_at: '2026-09-08T09:00:00Z'
+        valid_until: '2026-09-08T09:01:00Z'
+  outcome: inspected
+  events:
+  - event: connectors.credential_evidence.GenerationInspected
+  capture:
+    instance: refresh-pin
+    event: connectors.credential_evidence.GenerationInspected
+    field: admission_id
+- at: '2026-09-08T09:00:11Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: refresh-pin
+  outcome: admitted
+  events:
+  - event: connectors.credential_evidence.GenerationAdmitted
+- at: '2026-09-08T09:00:12Z'
+  command: connectors.credential_evidence.RejectAdmission
+  input:
+    admission_id:
+      $instance: refresh-pin
+    reason: refresh_uncertain
+  outcome: refused
+  events:
+  - event: connectors.credential_evidence.AdmissionRefused
+    payload:
+      reason: refresh_uncertain
+- at: '2026-09-08T09:00:13Z'
+  command: connectors.credential_evidence.DispatchGeneration
+  input:
+    admission_id:
+      $instance: refresh-pin
+    generation_id: 00000000-0000-4000-8000-000000000001
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationDispatched
+- at: '2026-09-08T09:00:14Z'
+  command: connectors.credential_evidence.AdmitGeneration
+  input:
+    admission_id:
+      $instance: refresh-pin
+  outcome: wrong-state
+  error:
+    name: connectors.credential_evidence.AdmissionStateConflict
+    fields:
+      state: Refused
+  no_events:
+  - connectors.credential_evidence.GenerationAdmitted
+assert:
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: revoked-pin
+    generation_id: 00000000-0000-4000-8000-000000000001
+    state: Refused
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: expired-pin
+    generation_id: 00000000-0000-4000-8000-000000000001
+    state: Refused
+- view: connectors.credential_evidence.AdmissionStates
+  contains:
+    admission_id:
+      $instance: refresh-pin
+    generation_id: 00000000-0000-4000-8000-000000000001
+    state: Refused
