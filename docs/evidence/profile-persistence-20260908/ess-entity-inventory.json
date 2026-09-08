@@ -1,0 +1,543 @@
+{
+  "entities": [
+    {
+      "source": "ess/domains/credential_evidence.yaml",
+      "name": "connectors.credential_evidence.DispatchAdmission",
+      "identity": {
+        "name": "admission_id",
+        "type": "connectors.credential_evidence.AdmissionId"
+      },
+      "relations": [
+        {
+          "name": "captured_generation",
+          "kind": "references",
+          "target": "connectors.credentials.CredentialGeneration",
+          "cardinality": "one",
+          "via": "generation_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Inspected",
+        "states": [
+          "Inspected",
+          "Admitted",
+          "Dispatched",
+          "Refused"
+        ],
+        "terminal": [
+          "Dispatched",
+          "Refused"
+        ],
+        "transitions": [
+          {
+            "name": "admit",
+            "from": [
+              "Inspected"
+            ],
+            "to": "Admitted"
+          },
+          {
+            "name": "refuse",
+            "from": [
+              "Inspected",
+              "Admitted"
+            ],
+            "to": "Refused"
+          },
+          {
+            "name": "dispatch",
+            "from": [
+              "Admitted"
+            ],
+            "to": "Dispatched"
+          }
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/credentials.yaml",
+      "name": "connectors.credentials.CredentialGeneration",
+      "identity": {
+        "name": "generation_id",
+        "type": "connectors.credentials.CredentialGenerationId"
+      },
+      "relations": [
+        {
+          "name": "instance",
+          "kind": "references",
+          "target": "connectors.declarations.ServiceConfiguration",
+          "cardinality": "one",
+          "via": "instance_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Captured",
+        "states": [
+          "Captured"
+        ],
+        "terminal": [
+          "Captured"
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/declarations.yaml",
+      "name": "connectors.declarations.AdapterSpecification",
+      "identity": {
+        "name": "adapter_id",
+        "type": "String"
+      },
+      "relations": [
+        {
+          "name": "operations",
+          "kind": "owns",
+          "target": "connectors.declarations.OperationDeclaration",
+          "cardinality": "many",
+          "via": "adapter_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Declared",
+        "states": [
+          "Declared"
+        ],
+        "terminal": [
+          "Declared"
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/declarations.yaml",
+      "name": "connectors.declarations.OperationDeclaration",
+      "identity": {
+        "name": "operation_id",
+        "type": "String"
+      },
+      "relations": [],
+      "lifecycle": {
+        "initial": "Declared",
+        "states": [
+          "Declared"
+        ],
+        "terminal": [
+          "Declared"
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/declarations.yaml",
+      "name": "connectors.declarations.ServiceConfiguration",
+      "identity": {
+        "name": "instance_id",
+        "type": "String"
+      },
+      "relations": [
+        {
+          "name": "adapter",
+          "kind": "references",
+          "target": "connectors.declarations.AdapterSpecification",
+          "cardinality": "one",
+          "via": "adapter_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Declared",
+        "states": [
+          "Declared"
+        ],
+        "terminal": [
+          "Declared"
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/delegation.yaml",
+      "name": "connectors.delegation.DeliveryReceipt",
+      "identity": {
+        "name": "receipt_id",
+        "type": "connectors.delegation.ReceiptId"
+      },
+      "relations": [
+        {
+          "name": "receiver",
+          "kind": "references",
+          "target": "connectors.declarations.ServiceConfiguration",
+          "cardinality": "one",
+          "via": "instance_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Consumed",
+        "states": [
+          "Consumed"
+        ],
+        "terminal": [
+          "Consumed"
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/delegation.yaml",
+      "name": "connectors.delegation.ApprovalRedemption",
+      "identity": {
+        "name": "receipt_id",
+        "type": "connectors.delegation.ReceiptId"
+      },
+      "relations": [
+        {
+          "name": "receiver",
+          "kind": "references",
+          "target": "connectors.declarations.ServiceConfiguration",
+          "cardinality": "one",
+          "via": "instance_id"
+        },
+        {
+          "name": "attempt",
+          "kind": "references",
+          "target": "connectors.mutations.AttemptRecord",
+          "cardinality": "one",
+          "via": "attempt_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Spent",
+        "states": [
+          "Spent"
+        ],
+        "terminal": [
+          "Spent"
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/idempotency.yaml",
+      "name": "connectors.idempotency.KeyReservation",
+      "identity": {
+        "name": "reservation_id",
+        "type": "connectors.idempotency.ReservationId"
+      },
+      "relations": [
+        {
+          "name": "attempt",
+          "kind": "references",
+          "target": "connectors.mutations.AttemptRecord",
+          "cardinality": "one",
+          "via": "attempt_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Pending",
+        "states": [
+          "Pending",
+          "Replayable",
+          "Quarantined",
+          "Expired"
+        ],
+        "terminal": [
+          "Quarantined",
+          "Expired"
+        ],
+        "transitions": [
+          {
+            "name": "retain_result",
+            "from": [
+              "Pending"
+            ],
+            "to": "Replayable"
+          },
+          {
+            "name": "quarantine",
+            "from": [
+              "Pending"
+            ],
+            "to": "Quarantined"
+          },
+          {
+            "name": "expire",
+            "from": [
+              "Replayable"
+            ],
+            "to": "Expired"
+          }
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/mutations.yaml",
+      "name": "connectors.mutations.AttemptRecord",
+      "identity": {
+        "name": "attempt_id",
+        "type": "connectors.mutations.AttemptId"
+      },
+      "relations": [
+        {
+          "name": "instance",
+          "kind": "references",
+          "target": "connectors.declarations.ServiceConfiguration",
+          "cardinality": "one",
+          "via": "instance_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Prepared",
+        "states": [
+          "Prepared",
+          "Dispatching",
+          "Aborted",
+          "Completed",
+          "Failed",
+          "Indeterminate"
+        ],
+        "terminal": [
+          "Aborted",
+          "Completed",
+          "Failed",
+          "Indeterminate"
+        ],
+        "transitions": [
+          {
+            "name": "open_dispatch",
+            "from": [
+              "Prepared"
+            ],
+            "to": "Dispatching"
+          },
+          {
+            "name": "abort",
+            "from": [
+              "Prepared"
+            ],
+            "to": "Aborted"
+          },
+          {
+            "name": "complete",
+            "from": [
+              "Dispatching"
+            ],
+            "to": "Completed"
+          },
+          {
+            "name": "refuse",
+            "from": [
+              "Dispatching"
+            ],
+            "to": "Failed"
+          },
+          {
+            "name": "lose_outcome",
+            "from": [
+              "Dispatching"
+            ],
+            "to": "Indeterminate"
+          }
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/refresh.yaml",
+      "name": "connectors.refresh.RefreshAttempt",
+      "identity": {
+        "name": "attempt_id",
+        "type": "connectors.refresh.RefreshAttemptId"
+      },
+      "relations": [
+        {
+          "name": "source_generation",
+          "kind": "references",
+          "target": "connectors.credentials.CredentialGeneration",
+          "cardinality": "one",
+          "via": "source_generation_id"
+        },
+        {
+          "name": "candidate_generation",
+          "kind": "references",
+          "target": "connectors.credentials.CredentialGeneration",
+          "cardinality": "one",
+          "via": "candidate_generation_id"
+        }
+      ],
+      "lifecycle": {
+        "initial": "Reserved",
+        "states": [
+          "Reserved",
+          "Authorized",
+          "ResponseStored",
+          "Recovering",
+          "Published",
+          "Fenced",
+          "Uncertain",
+          "Discarded"
+        ],
+        "terminal": [
+          "Published",
+          "Fenced",
+          "Uncertain",
+          "Discarded"
+        ],
+        "transitions": [
+          {
+            "name": "authorize",
+            "from": [
+              "Reserved"
+            ],
+            "to": "Authorized"
+          },
+          {
+            "name": "fence",
+            "from": [
+              "Reserved"
+            ],
+            "to": "Fenced"
+          },
+          {
+            "name": "store_response",
+            "from": [
+              "Authorized"
+            ],
+            "to": "ResponseStored"
+          },
+          {
+            "name": "quarantine",
+            "from": [
+              "Authorized"
+            ],
+            "to": "Uncertain"
+          },
+          {
+            "name": "recover_response",
+            "from": [
+              "ResponseStored"
+            ],
+            "to": "Recovering"
+          },
+          {
+            "name": "publish",
+            "from": [
+              "ResponseStored",
+              "Recovering"
+            ],
+            "to": "Published"
+          },
+          {
+            "name": "discard",
+            "from": [
+              "ResponseStored",
+              "Recovering"
+            ],
+            "to": "Discarded"
+          }
+        ]
+      }
+    },
+    {
+      "source": "ess/domains/sessions.yaml",
+      "name": "connectors.sessions.Session",
+      "identity": {
+        "name": "session_id",
+        "type": "connectors.sessions.SessionId"
+      },
+      "relations": [],
+      "lifecycle": {
+        "initial": "Offered",
+        "states": [
+          "Offered",
+          "Establishing",
+          "Ready",
+          "Closing",
+          "Closed",
+          "Lost"
+        ],
+        "terminal": [
+          "Closed",
+          "Lost"
+        ],
+        "transitions": [
+          {
+            "name": "accept",
+            "from": [
+              "Offered"
+            ],
+            "to": "Establishing"
+          },
+          {
+            "name": "ready",
+            "from": [
+              "Establishing"
+            ],
+            "to": "Ready"
+          },
+          {
+            "name": "permit_data",
+            "from": [
+              "Ready"
+            ],
+            "to": "Ready"
+          },
+          {
+            "name": "renew",
+            "from": [
+              "Ready"
+            ],
+            "to": "Ready"
+          },
+          {
+            "name": "deny_ready",
+            "from": [
+              "Establishing"
+            ],
+            "to": "Closing"
+          },
+          {
+            "name": "deny_data",
+            "from": [
+              "Ready"
+            ],
+            "to": "Closing"
+          },
+          {
+            "name": "deny_renewal",
+            "from": [
+              "Ready"
+            ],
+            "to": "Closing"
+          },
+          {
+            "name": "begin_close",
+            "from": [
+              "Offered",
+              "Establishing",
+              "Ready"
+            ],
+            "to": "Closing"
+          },
+          {
+            "name": "close",
+            "from": [
+              "Closing"
+            ],
+            "to": "Closed"
+          },
+          {
+            "name": "cleanup_lost",
+            "from": [
+              "Closing"
+            ],
+            "to": "Lost"
+          },
+          {
+            "name": "continuity_lost",
+            "from": [
+              "Offered",
+              "Establishing",
+              "Ready",
+              "Closing"
+            ],
+            "to": "Lost"
+          }
+        ]
+      }
+    }
+  ],
+  "entity_count": 11,
+  "limitation": "Declared ESS identities/relations only; no durable backend, source provenance, atomicity or live authority executed."
+}

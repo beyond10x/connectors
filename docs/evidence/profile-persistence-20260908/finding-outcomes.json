@@ -1,0 +1,110 @@
+[
+  {
+    "finding": "PP-A-01",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-discovery-profiles",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-A-02",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-discovery-profiles",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-A-03",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-discovery-profiles",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-A-04",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-A-05",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-A-06",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-A-07",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-A-08",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-01",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-discovery-profiles",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-02",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-discovery-profiles",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-03",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-discovery-profiles",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-04",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-05",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-06",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-07",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-08",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-09",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  },
+  {
+    "finding": "PP-B-10",
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "owner": "story:contracts-persistence-ownership",
+    "outcome": "fixed"
+  }
+]

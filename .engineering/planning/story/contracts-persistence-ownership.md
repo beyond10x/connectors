@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-persistence-ownership
 kind: story
-status: draft
+status: implemented
 title: Inventory host persistence ports and atomicity owners
 tags:
 - P2
@@ -25,15 +25,31 @@ scope:
   path: contracts/auth/custody/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/auth/evidence/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/auth/management.md
 - confidence: cited
   path: contracts/discovery/mediated_route/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/discovery/resources/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/operations/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/service/compatibility.md
+- confidence: inferred
+  path: contracts/service/delegation.md
+- confidence: inferred
+  path: contracts/sessions/v1alpha1/semantics.md
 - confidence: cited
   path: docs/design.md
-revision: 3
+- confidence: inferred
+  path: docs/evidence/profile-persistence-20260908
+- confidence: inferred
+  path: ess/domains/credentials.yaml
+- confidence: inferred
+  path: ess/domains/discovery.yaml
+- confidence: inferred
+  path: ess/domains/refresh.yaml
+revision: 17
 ---
 ## Context
 
@@ -61,16 +77,22 @@ Verification is a textual scenario audit: record the chosen rule and expected ob
 
 ## Scope
 
-- cited: `contracts/auth/custody/v1alpha1/semantics.md`
-- cited: `contracts/auth/connection/v1alpha1/semantics.md`
 - cited: `contracts/auth/acquisition/v1alpha1/semantics.md`
-- cited: `contracts/operations/v1alpha1/semantics.md`
-- cited: `contracts/discovery/resources/v1alpha1/semantics.md`
-- cited: `contracts/discovery/mediated_route/v1alpha1/semantics.md`
+- cited: `contracts/auth/connection/v1alpha1/semantics.md`
+- cited: `contracts/auth/custody/v1alpha1/semantics.md`
 - cited: `contracts/auth/evidence/v1alpha1/semantics.md`
+- inferred: `contracts/auth/management.md`
+- cited: `contracts/discovery/mediated_route/v1alpha1/semantics.md`
+- cited: `contracts/discovery/resources/v1alpha1/semantics.md`
+- cited: `contracts/operations/v1alpha1/semantics.md`
+- inferred: `contracts/service/compatibility.md`
+- inferred: `contracts/service/delegation.md`
+- inferred: `contracts/sessions/v1alpha1/semantics.md`
 - cited: `docs/design.md`
-
-Source locations: `contracts/auth/connection/v1alpha1/semantics.md:118`; `contracts/operations/v1alpha1/semantics.md:153`; `contracts/auth/acquisition/v1alpha1/semantics.md:116`; `contracts/discovery/resources/v1alpha1/semantics.md:110`; `contracts/discovery/mediated_route/v1alpha1/semantics.md:98`; `contracts/auth/evidence/v1alpha1/semantics.md:101`; `contracts/auth/custody/v1alpha1/semantics.md:94`; `docs/design.md:961`.
+- inferred: `docs/evidence/profile-persistence-20260908`
+- inferred: `ess/domains/credentials.yaml`
+- inferred: `ess/domains/discovery.yaml`
+- inferred: `ess/domains/refresh.yaml`
 
 ## Dependencies and edit coordination
 
@@ -80,4 +102,8 @@ Shared edit surfaces with `story:contracts-mutation-outcomes`, `story:contracts-
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+This approved local specification-hardening story revises normative contracts/design and settled ESS values using pinned ESS 0.20.0, retaining explicit UNMAPPED implementation and persistent relation requirements. It introduces no runtime code or current adapter-kind schema change. The existing source findings and stories authorize this work; their earlier text-only/no-commit boundary is superseded by the operator’s hardening instructions. Root is the sole tracked editor in primary main; two independent reviewers write ignored snapshots only. No concurrent implementation wave or external publication. Existing persistent ESS entities are reused; this inventory does not invent lifecycles, delete semantics or a universal storage abstraction. Local checkpoint commits and local recovery backup remain authorized.
+
+## Completion evidence
+
+E28 is fixed for the approved semantic specification scope. Normative revisions, 43 declared textual traces, 44 schema expectations, actual ESS entity inventory and validation limits are recorded in [verification](../../../docs/evidence/profile-persistence-20260908/verification.md) and [dispositions](../../../docs/evidence/profile-persistence-20260908/dispositions.md). Both immutable final independent reviews profile-persistence-a-recheck1-20260908 and profile-persistence-b-recheck1-20260908 approve with zero residual findings. ESS 0.20.0 validates 13 files/204 declarations; two 211-artifact projections match; the existing full gate/MSRV1.88 passes 50 Rust tests. E32 explicitly selects configured authority identity and defers physical-cluster attestation. E28 selects eighteen logical port owners/atomic groups/handoffs without claiming missing persistent entity models or a backend. No runtime/adapter-kind schema change or external publication; no recognizer, storage, authority or sequential conformance execution is claimed.

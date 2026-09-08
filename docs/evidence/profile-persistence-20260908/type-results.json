@@ -1,0 +1,228 @@
+{
+  "expected_decisions": 44,
+  "matched": 44,
+  "negative_shapes": 7,
+  "accepted_semantic_counterexamples": 3,
+  "results": [
+    {
+      "id": "source-a",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "source-other-instance",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "source-other-connection",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "kubernetes-binding",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "grafana-binding",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "profile-grafana-datasources",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "profile-kubernetes-service-targets",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "provider-grafana",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "inferred-grafana",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "provider-alertmanager",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "inferred-alertmanager",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "provider-loki",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "inferred-loki",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "provider-prometheus",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "inferred-prometheus",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "provider-argocd",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "inferred-argocd",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "confidence-declared",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "confidence-inferred",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "declared-alertmanager",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "declared-loki",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "declared-prometheus",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "api-name",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "api-label",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "metrics",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "repo",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "redis",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "alias-not-argo",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "folded",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "no-trimming",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "monitoring",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "monitoring-priority",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "argo-precedes-monitoring",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "unrecognized",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "unknown-profile",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "id": "unknown-provider",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "id": "unknown-confidence",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "id": "unknown-input-member",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "id": "missing-source-connection",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "id": "missing-service-name",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "id": "public-null-not-optional",
+      "accepted": false,
+      "expected": false
+    },
+    {
+      "id": "wrong-operation-profile-pair",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "non-https-origin",
+      "accepted": true,
+      "expected": true
+    },
+    {
+      "id": "argo-declared-in-kubernetes",
+      "accepted": true,
+      "expected": true
+    }
+  ]
+}

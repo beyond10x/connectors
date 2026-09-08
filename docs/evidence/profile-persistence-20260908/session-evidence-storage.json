@@ -1,0 +1,14 @@
+[
+  {
+    "original": ".local/profile-persistence-20260908/sessions-authored.json",
+    "storage": "sessions-authored.json.gz",
+    "original_sha256": "8deb50e622d2e4a5e4169c4ba219a3de5adb2ef680bcf97c5fd12e24ece0eba8",
+    "storage_sha256": "ce443d03004be9fe4660cc8c98dd9570ab1f16dcd0745ba6574d196f7b3c9211"
+  },
+  {
+    "original": ".local/profile-persistence-20260908/sessions-suite.json",
+    "storage": "sessions-suite.json.gz",
+    "original_sha256": "7fe155459db07f4077791f3750e2633c187b400a58b78f70bc846b13fcfad7e9",
+    "storage_sha256": "19bfe905ac1dd2fafcf8e721e85e2e7490d414c3f3a7a5811abd567115e00dd2"
+  }
+]

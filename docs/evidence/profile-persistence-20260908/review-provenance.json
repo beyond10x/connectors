@@ -1,0 +1,1207 @@
+[
+  {
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "report": "reviews/a-initial-report.md",
+    "report_sha256": "da50cccc637e4da21b95a49da56fd31d0ae545985eb59ca9b43d38310ffdc187",
+    "archive": "reviews/a-initial-packet.tar.gz",
+    "archive_sha256": "16800eec072f296a845017aad8ce6f9467ded901925c93ad9f119db223165229",
+    "frozen_inputs": [
+      {
+        "archive_path": "sources/.engineering/planning/story/contracts-discovery-profiles.md",
+        "sha256": "034e3e2574ef828c81bed4c2d891a1e792911bec25031a7abf259da9749fe795",
+        "source": ".engineering/planning/story/contracts-discovery-profiles.md"
+      },
+      {
+        "archive_path": "sources/.engineering/planning/story/contracts-persistence-ownership.md",
+        "sha256": "9eb6c908fb185b3b829ef5e12c8f0cb26a532f1e35436ea662d899dd367fa524",
+        "source": ".engineering/planning/story/contracts-persistence-ownership.md"
+      },
+      {
+        "archive_path": "sources/AGENTS.md",
+        "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+        "source": "AGENTS.md"
+      },
+      {
+        "archive_path": "sources/contracts/README.md",
+        "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+        "source": "contracts/README.md"
+      },
+      {
+        "archive_path": "sources/contracts/auth/acquisition/v1alpha1/semantics.md",
+        "sha256": "bf97c5fc296b060dc1b09b04eefdfd9f6903e0be1c960cffc8b0dcea926aeeec",
+        "source": "contracts/auth/acquisition/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/auth/capability/v1alpha1/semantics.md",
+        "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+        "source": "contracts/auth/capability/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/auth/connection/v1alpha1/semantics.md",
+        "sha256": "d4e0a81115a6fb4dff2aaa3c5378db08a3a5f6d9f49d8ae5dc5287e0569797f7",
+        "source": "contracts/auth/connection/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/auth/custody/v1alpha1/semantics.md",
+        "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+        "source": "contracts/auth/custody/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/auth/evidence/v1alpha1/semantics.md",
+        "sha256": "2ed63fc2bccc4552e525c7c69bffe602ec3ce679382923f97a1cea1793af2af7",
+        "source": "contracts/auth/evidence/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/auth/management.md",
+        "sha256": "4cfb58b1eaab7c468bbf43e0a76f901fe4b24978e48d0256cabee614d50c115f",
+        "source": "contracts/auth/management.md"
+      },
+      {
+        "archive_path": "sources/contracts/auth/profile/v1alpha1/semantics.md",
+        "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+        "source": "contracts/auth/profile/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/catalog/v1alpha1/semantics.md",
+        "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+        "source": "contracts/catalog/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/datasources/logs/v1alpha1/semantics.md",
+        "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+        "source": "contracts/datasources/logs/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/datasources/records/v1alpha1/semantics.md",
+        "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+        "source": "contracts/datasources/records/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/datasources/series/v1alpha1/semantics.md",
+        "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+        "source": "contracts/datasources/series/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/discovery/composition.md",
+        "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+        "source": "contracts/discovery/composition.md"
+      },
+      {
+        "archive_path": "sources/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+        "sha256": "47820abb3c1fa02c928aa7900aa15ded668ff8fcaee889c08644249449da13dc",
+        "source": "contracts/discovery/mediated_route/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/discovery/resources/v1alpha1/semantics.md",
+        "sha256": "a9455ca5090a96b23fc65be18a6a0b25a08c62593d460fa5b4f84450f20227ed",
+        "source": "contracts/discovery/resources/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/media/v1alpha1/semantics.md",
+        "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+        "source": "contracts/media/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/operations/v1alpha1/semantics.md",
+        "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+        "source": "contracts/operations/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/service/compatibility.md",
+        "sha256": "0f08c3d2ca50b6abfb43ebbe963891752d514e24d6006c3b15d3fcbc64a53af9",
+        "source": "contracts/service/compatibility.md"
+      },
+      {
+        "archive_path": "sources/contracts/service/delegation.md",
+        "sha256": "812ce5ff030c8a0e36c55d909abf0ee0dac9702424c57e714f19f86f8e240aeb",
+        "source": "contracts/service/delegation.md"
+      },
+      {
+        "archive_path": "sources/contracts/service/v1alpha1/semantics.md",
+        "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+        "source": "contracts/service/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/service/v1alpha2/semantics.md",
+        "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+        "source": "contracts/service/v1alpha2/semantics.md"
+      },
+      {
+        "archive_path": "sources/contracts/sessions/v1alpha1/semantics.md",
+        "sha256": "cc97dca14eadfdec912bc851bb87f9ff98704daa34e6319b769d6e7d68b8f722",
+        "source": "contracts/sessions/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "sources/docs/adapters/grafana.md",
+        "sha256": "64f080b29550d49015c95361f00b649154cc6073e5dcfed598d4a15efab08032",
+        "source": "docs/adapters/grafana.md"
+      },
+      {
+        "archive_path": "sources/docs/adapters/kubernetes.md",
+        "sha256": "6a8f38050319b22707234b7b966e626e168e548760d217e94f57aeba101e94cd",
+        "source": "docs/adapters/kubernetes.md"
+      },
+      {
+        "archive_path": "sources/docs/design.md",
+        "sha256": "b161ab04b696ec2f1be1ba70c8ae3e6e1245db54175e4aa0471d671915f3fa01",
+        "source": "docs/design.md"
+      },
+      {
+        "archive_path": "sources/ess/domains/auth_access.yaml",
+        "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+        "source": "ess/domains/auth_access.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/connection_admission.yaml",
+        "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+        "source": "ess/domains/connection_admission.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/credential_evidence.yaml",
+        "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+        "source": "ess/domains/credential_evidence.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/credentials.yaml",
+        "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+        "source": "ess/domains/credentials.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/declarations.yaml",
+        "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+        "source": "ess/domains/declarations.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/delegation.yaml",
+        "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+        "source": "ess/domains/delegation.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/discovery.yaml",
+        "sha256": "89a2ad21006b71af6356e56f6cd331efb3d9a44743991f286e29175186071618",
+        "source": "ess/domains/discovery.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/idempotency.yaml",
+        "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+        "source": "ess/domains/idempotency.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/mutations.yaml",
+        "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+        "source": "ess/domains/mutations.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/refresh.yaml",
+        "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+        "source": "ess/domains/refresh.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/service_wire.yaml",
+        "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+        "source": "ess/domains/service_wire.yaml"
+      },
+      {
+        "archive_path": "sources/ess/domains/sessions.yaml",
+        "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+        "source": "ess/domains/sessions.yaml"
+      },
+      {
+        "archive_path": "sources/ess/system.yaml",
+        "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+        "source": "ess/system.yaml"
+      },
+      {
+        "archive_path": "old-source/design10.md",
+        "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54",
+        "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:docs/design/10-local-kubernetes-context-and-resource-discovery.md"
+      },
+      {
+        "archive_path": "old-source/crates/integration-kubernetes/src/local.rs",
+        "sha256": "1fdb7c95fd27bf41d411055b50438e7043be6f8d0b092e458c7fe4c58c40f3ce",
+        "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/local.rs"
+      },
+      {
+        "archive_path": "old-source/crates/integration-kubernetes/src/local_tests.rs",
+        "sha256": "97ca3c46a20864885c4e496bdb18d70c3a205af51f5c3cca528b80f5b1db190b",
+        "source": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-kubernetes/src/local_tests.rs"
+      }
+    ]
+  },
+  {
+    "review": "review-result:profile-persistence-b-initial-20260908",
+    "report": "reviews/b-initial-report.md",
+    "report_sha256": "7e67a7039593068d15b6ab0a50c2f39affd567ee4908822aac06c53ad202b7a5",
+    "archive": "reviews/b-initial-packet.tar.gz",
+    "archive_sha256": "5721a606cc0f81b4fa5412a33249960f800018ae9e1921c5d9e4231a2b007d3b",
+    "frozen_inputs": [
+      {
+        "archive_path": "snapshot/.engineering/planning/story/contracts-discovery-profiles.md",
+        "sha256": "034e3e2574ef828c81bed4c2d891a1e792911bec25031a7abf259da9749fe795",
+        "source": ".engineering/planning/story/contracts-discovery-profiles.md"
+      },
+      {
+        "archive_path": "snapshot/.engineering/planning/story/contracts-persistence-ownership.md",
+        "sha256": "9eb6c908fb185b3b829ef5e12c8f0cb26a532f1e35436ea662d899dd367fa524",
+        "source": ".engineering/planning/story/contracts-persistence-ownership.md"
+      },
+      {
+        "archive_path": "snapshot/AGENTS.md",
+        "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+        "source": "AGENTS.md"
+      },
+      {
+        "archive_path": "snapshot/adapters/kubernetes/src/lib.rs",
+        "sha256": "9b97d3616f19f1dbaeab9d78b011f5265bd4b647de55fc5be3418c2bb82f2548",
+        "source": "adapters/kubernetes/src/lib.rs"
+      },
+      {
+        "archive_path": "snapshot/contracts/README.md",
+        "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+        "source": "contracts/README.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/acquisition/v1alpha1/semantics.md",
+        "sha256": "bf97c5fc296b060dc1b09b04eefdfd9f6903e0be1c960cffc8b0dcea926aeeec",
+        "source": "contracts/auth/acquisition/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/capability/v1alpha1/semantics.md",
+        "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+        "source": "contracts/auth/capability/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/connection/v1alpha1/semantics.md",
+        "sha256": "d4e0a81115a6fb4dff2aaa3c5378db08a3a5f6d9f49d8ae5dc5287e0569797f7",
+        "source": "contracts/auth/connection/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/custody/v1alpha1/semantics.md",
+        "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+        "source": "contracts/auth/custody/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/evidence/v1alpha1/semantics.md",
+        "sha256": "2ed63fc2bccc4552e525c7c69bffe602ec3ce679382923f97a1cea1793af2af7",
+        "source": "contracts/auth/evidence/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/management.md",
+        "sha256": "4cfb58b1eaab7c468bbf43e0a76f901fe4b24978e48d0256cabee614d50c115f",
+        "source": "contracts/auth/management.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/profile/v1alpha1/semantics.md",
+        "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+        "source": "contracts/auth/profile/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/catalog/v1alpha1/semantics.md",
+        "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+        "source": "contracts/catalog/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/datasources/logs/v1alpha1/semantics.md",
+        "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+        "source": "contracts/datasources/logs/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/datasources/records/v1alpha1/semantics.md",
+        "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+        "source": "contracts/datasources/records/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/datasources/series/v1alpha1/semantics.md",
+        "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+        "source": "contracts/datasources/series/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/discovery/composition.md",
+        "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+        "source": "contracts/discovery/composition.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+        "sha256": "47820abb3c1fa02c928aa7900aa15ded668ff8fcaee889c08644249449da13dc",
+        "source": "contracts/discovery/mediated_route/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/discovery/resources/v1alpha1/semantics.md",
+        "sha256": "a9455ca5090a96b23fc65be18a6a0b25a08c62593d460fa5b4f84450f20227ed",
+        "source": "contracts/discovery/resources/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/media/v1alpha1/semantics.md",
+        "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+        "source": "contracts/media/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/operations/v1alpha1/semantics.md",
+        "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+        "source": "contracts/operations/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/service/compatibility.md",
+        "sha256": "0f08c3d2ca50b6abfb43ebbe963891752d514e24d6006c3b15d3fcbc64a53af9",
+        "source": "contracts/service/compatibility.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/service/delegation.md",
+        "sha256": "812ce5ff030c8a0e36c55d909abf0ee0dac9702424c57e714f19f86f8e240aeb",
+        "source": "contracts/service/delegation.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/service/v1alpha1/semantics.md",
+        "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+        "source": "contracts/service/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/service/v1alpha2/semantics.md",
+        "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+        "source": "contracts/service/v1alpha2/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/contracts/sessions/v1alpha1/semantics.md",
+        "sha256": "cc97dca14eadfdec912bc851bb87f9ff98704daa34e6319b769d6e7d68b8f722",
+        "source": "contracts/sessions/v1alpha1/semantics.md"
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-contracts/src/lib.rs",
+        "sha256": "2f6ee686defde5c29a0e3749b5496fdcb54725f1346c7f4844508a36c37bde74",
+        "source": "crates/connectors-contracts/src/lib.rs"
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-core/src/lib.rs",
+        "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+        "source": "crates/connectors-core/src/lib.rs"
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-host/src/credentials.rs",
+        "sha256": "d033e1012a944ed81047bd1896d5217a87834bc28e1cf5cc013a576f2e2c04c0",
+        "source": "crates/connectors-host/src/credentials.rs"
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-host/src/federation.rs",
+        "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c",
+        "source": "crates/connectors-host/src/federation.rs"
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-sdk/src/lib.rs",
+        "sha256": "43ebb6e2f775755a6bebb24f0a4e5075cec7c2aaeda79fcb037c5ea07d134290",
+        "source": "crates/connectors-sdk/src/lib.rs"
+      },
+      {
+        "archive_path": "snapshot/docs/adapters/grafana.md",
+        "sha256": "64f080b29550d49015c95361f00b649154cc6073e5dcfed598d4a15efab08032",
+        "source": "docs/adapters/grafana.md"
+      },
+      {
+        "archive_path": "snapshot/docs/adapters/kubernetes.md",
+        "sha256": "6a8f38050319b22707234b7b966e626e168e548760d217e94f57aeba101e94cd",
+        "source": "docs/adapters/kubernetes.md"
+      },
+      {
+        "archive_path": "snapshot/docs/design.md",
+        "sha256": "b161ab04b696ec2f1be1ba70c8ae3e6e1245db54175e4aa0471d671915f3fa01",
+        "source": "docs/design.md"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/auth_access.yaml",
+        "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+        "source": "ess/domains/auth_access.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/connection_admission.yaml",
+        "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+        "source": "ess/domains/connection_admission.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/credential_evidence.yaml",
+        "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+        "source": "ess/domains/credential_evidence.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/credentials.yaml",
+        "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+        "source": "ess/domains/credentials.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/declarations.yaml",
+        "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+        "source": "ess/domains/declarations.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/delegation.yaml",
+        "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+        "source": "ess/domains/delegation.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/discovery.yaml",
+        "sha256": "89a2ad21006b71af6356e56f6cd331efb3d9a44743991f286e29175186071618",
+        "source": "ess/domains/discovery.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/idempotency.yaml",
+        "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+        "source": "ess/domains/idempotency.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/mutations.yaml",
+        "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+        "source": "ess/domains/mutations.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/refresh.yaml",
+        "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+        "source": "ess/domains/refresh.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/service_wire.yaml",
+        "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+        "source": "ess/domains/service_wire.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/domains/sessions.yaml",
+        "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+        "source": "ess/domains/sessions.yaml"
+      },
+      {
+        "archive_path": "snapshot/ess/system.yaml",
+        "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+        "source": "ess/system.yaml"
+      },
+      {
+        "archive_path": "historical/docs/design/10-local-kubernetes-context-and-resource-discovery.md",
+        "sha256": "7f65bcc0e101cea1da5854327af84bffacc72910abcb6ee669d36ce12e673c54",
+        "source": "docs/design/10-local-kubernetes-context-and-resource-discovery.md"
+      },
+      {
+        "archive_path": "historical/docs/design/08-discovery-observations-and-mediated-connections.md",
+        "sha256": "ee3e597a230afa061bb5bbf485cbb11bb60f785cb8999f3d891bafc4c01bba84",
+        "source": "docs/design/08-discovery-observations-and-mediated-connections.md"
+      }
+    ]
+  },
+  {
+    "review": "review-result:profile-persistence-a-recheck1-20260908",
+    "verdict": "approve",
+    "report": "reviews/a-recheck1-report.md",
+    "report_sha256": "a488e41fa7ec520d2f19c3da09c652d820fda6638ee32d10c382b0051b0c13df",
+    "archive": "reviews/a-recheck1-packet.tar.gz",
+    "archive_sha256": "1217f47a747614f684dc3a618898b554d6cf78efafcc299618374744a0a504b5",
+    "frozen_inputs": [
+      {
+        "archive_path": "sources/.local/profile-persistence-20260908/compiled.json",
+        "sha256": "9372f8e52d97fbb674fc9c90904dac62b738879946d6052f1c74828ae8d8b49b",
+        "source": ".local/profile-persistence-20260908/compiled.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/.local/profile-persistence-20260908/sessions-authored.json",
+        "sha256": "8deb50e622d2e4a5e4169c4ba219a3de5adb2ef680bcf97c5fd12e24ece0eba8",
+        "source": ".local/profile-persistence-20260908/sessions-authored.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/.local/profile-persistence-20260908/sessions-suite.json",
+        "sha256": "7fe155459db07f4077791f3750e2633c187b400a58b78f70bc846b13fcfad7e9",
+        "source": ".local/profile-persistence-20260908/sessions-suite.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/AGENTS.md",
+        "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+        "source": "AGENTS.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/README.md",
+        "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+        "source": "contracts/README.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/auth/acquisition/v1alpha1/semantics.md",
+        "sha256": "c69e52961194b65b8d305adfb00316afcfa5b2beded322d31fea8d77f548fa9d",
+        "source": "contracts/auth/acquisition/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/auth/capability/v1alpha1/semantics.md",
+        "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+        "source": "contracts/auth/capability/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/auth/connection/v1alpha1/semantics.md",
+        "sha256": "c23f0b0a09cc80281d248a61040f9d343bdd0806d060d2020be337fdd9b70119",
+        "source": "contracts/auth/connection/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/auth/custody/v1alpha1/semantics.md",
+        "sha256": "787b2b7aee0aa3871e82859bb0f0af7c1ba8db62a817ede9f0d94d22e7491d61",
+        "source": "contracts/auth/custody/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/auth/evidence/v1alpha1/semantics.md",
+        "sha256": "33ab1618ddabd77f8be425504fd9994111965344b3d03d7c607a129578ed0e40",
+        "source": "contracts/auth/evidence/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/auth/management.md",
+        "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649",
+        "source": "contracts/auth/management.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/auth/profile/v1alpha1/semantics.md",
+        "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+        "source": "contracts/auth/profile/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/catalog/v1alpha1/semantics.md",
+        "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+        "source": "contracts/catalog/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/datasources/logs/v1alpha1/semantics.md",
+        "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+        "source": "contracts/datasources/logs/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/datasources/records/v1alpha1/semantics.md",
+        "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+        "source": "contracts/datasources/records/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/datasources/series/v1alpha1/semantics.md",
+        "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+        "source": "contracts/datasources/series/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/discovery/composition.md",
+        "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+        "source": "contracts/discovery/composition.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+        "sha256": "0a1a0c7387f102101c28e72d471a88540e7ae245beb0496015632306fd6cefab",
+        "source": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/discovery/resources/v1alpha1/semantics.md",
+        "sha256": "e471a745e3bdb0667d20434d9dd23455c3de79123c766cb563bf7408a048aaaf",
+        "source": "contracts/discovery/resources/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/media/v1alpha1/semantics.md",
+        "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+        "source": "contracts/media/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/operations/v1alpha1/semantics.md",
+        "sha256": "8d03e7ef2e690397444784ca1501847ed9af714a76ade2c5c3ea72356fc35a96",
+        "source": "contracts/operations/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/service/compatibility.md",
+        "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537",
+        "source": "contracts/service/compatibility.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/service/delegation.md",
+        "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1",
+        "source": "contracts/service/delegation.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/service/v1alpha1/semantics.md",
+        "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+        "source": "contracts/service/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/service/v1alpha2/semantics.md",
+        "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+        "source": "contracts/service/v1alpha2/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/contracts/sessions/v1alpha1/semantics.md",
+        "sha256": "cf4d1f0f7ec1dc886822c5ceffcda0fd36d1f27ade1b34349f2ec3185da4821f",
+        "source": "contracts/sessions/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/adapters/grafana.md",
+        "sha256": "aee87ea211c97ddda65bd032be79fd40cde2bc34106a7e1925360532a863c602",
+        "source": "docs/adapters/grafana.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/adapters/kubernetes.md",
+        "sha256": "1aefdd83173c941acf126bb357a7b80ed3ad88262412f5e3d6cb7b9c3ea4725b",
+        "source": "docs/adapters/kubernetes.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/design.md",
+        "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a",
+        "source": "docs/design.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/ess-entity-inventory.json",
+        "sha256": "26d2a8c287b4bdfadab7d56c1c7ae7138bb73beaf5fd963f46f19e8b164e7bf0",
+        "source": "docs/evidence/profile-persistence-20260908/ess-entity-inventory.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/fixture-audit.md",
+        "sha256": "2cc5efa72f09a5f9aa6715868abc62cb39de8f2a1fb24a52d949fd3985e1804b",
+        "source": "docs/evidence/profile-persistence-20260908/fixture-audit.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/gate.log",
+        "sha256": "3ed95fd6eb1776799969873618fb426fc7d7253958772f1bb90c5e9718ad51c3",
+        "source": "docs/evidence/profile-persistence-20260908/gate.log",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/projection-manifest.json",
+        "sha256": "727d59ee02a5fb26cd7ab1c181332dd6501e7e9ab4fff1c2c053e9cc64e15c01",
+        "source": "docs/evidence/profile-persistence-20260908/projection-manifest.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ConfiguredSourceIdentity.schema.json",
+        "sha256": "b2d48a250a665dc9ac193c29d3547b784e640cdc34b7db23fe5a7ee182c582cb",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ConfiguredSourceIdentity.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.DeclaredObservationBinding.schema.json",
+        "sha256": "95223f559e5c8166a98540c1eef84be185c0494b377d81dfeef520c627f4d69d",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.DeclaredObservationBinding.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.KubernetesRecognitionInput.schema.json",
+        "sha256": "6a9997dafecc8dabfe129fdfd6d80dd9ab2ab80fe9cac360ab67644c22d2d002",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.KubernetesRecognitionInput.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ObservationProfile.schema.json",
+        "sha256": "31e5bc994be93940130da2ae7378d94efb5f044f82714b296f3758fe92ccaa5c",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ObservationProfile.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionConfidence.schema.json",
+        "sha256": "f17173b8e225e1e5e3eca79e982866d6950f71303ef90a13c65568bc5a33cad3",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionConfidence.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionProvider.schema.json",
+        "sha256": "1900e2ba5713da236e2a7f87c60d81b590c1c6ef07127c41cf5c98e2ceaf45ee",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionProvider.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ResourceRecognition.schema.json",
+        "sha256": "b9ea31d7d7918868a7a3efa7cf63ae1228a2932a00dc45a8f0b5ed19e686d968",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ResourceRecognition.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/traces.md",
+        "sha256": "3db7f6a2cf5fd890a12cf19c87192ac6b372cd7a10a8d796f884b54def3b0c30",
+        "source": "docs/evidence/profile-persistence-20260908/traces.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/type-results.json",
+        "sha256": "9828568a46685237b3db47ef7497641575720b5758647801a02fc02e887526bf",
+        "source": "docs/evidence/profile-persistence-20260908/type-results.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/typed-values.json",
+        "sha256": "58f2e052d5b3944a3ec98d001f6775c5278c0b8e70977c3ff821ec476620e629",
+        "source": "docs/evidence/profile-persistence-20260908/typed-values.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/docs/evidence/profile-persistence-20260908/verification.md",
+        "sha256": "194698bc703941d9b285a14ead32c87534c51085bba6e62e6f0dd106ddb0d164",
+        "source": "docs/evidence/profile-persistence-20260908/verification.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/auth_access.yaml",
+        "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+        "source": "ess/domains/auth_access.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/connection_admission.yaml",
+        "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+        "source": "ess/domains/connection_admission.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/credential_evidence.yaml",
+        "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+        "source": "ess/domains/credential_evidence.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/credentials.yaml",
+        "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240",
+        "source": "ess/domains/credentials.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/declarations.yaml",
+        "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+        "source": "ess/domains/declarations.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/delegation.yaml",
+        "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+        "source": "ess/domains/delegation.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/discovery.yaml",
+        "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0",
+        "source": "ess/domains/discovery.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/idempotency.yaml",
+        "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+        "source": "ess/domains/idempotency.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/mutations.yaml",
+        "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+        "source": "ess/domains/mutations.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/refresh.yaml",
+        "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38",
+        "source": "ess/domains/refresh.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/service_wire.yaml",
+        "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+        "source": "ess/domains/service_wire.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/domains/sessions.yaml",
+        "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+        "source": "ess/domains/sessions.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "sources/ess/system.yaml",
+        "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+        "source": "ess/system.yaml",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "review": "review-result:profile-persistence-b-recheck1-20260908",
+    "verdict": "approve",
+    "report": "reviews/b-recheck1-report.md",
+    "report_sha256": "dc13d8a549728b0c31cac2a05542feb92e1b00877ef6c335622a4e2640f1cb34",
+    "archive": "reviews/b-recheck1-packet.tar.gz",
+    "archive_sha256": "cb20faba52b165b7ba4a8cc21dee4639fa6b13f6452c071690b64974c5a65bab",
+    "frozen_inputs": [
+      {
+        "archive_path": "snapshot/AGENTS.md",
+        "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+        "source": "AGENTS.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/adapters/kubernetes/src/lib.rs",
+        "sha256": "9b97d3616f19f1dbaeab9d78b011f5265bd4b647de55fc5be3418c2bb82f2548",
+        "source": "adapters/kubernetes/src/lib.rs",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/README.md",
+        "sha256": "f5e4ef2433aae653d16f4700fcffa54b6f4a40951d0a33a6a0e08c6aaf7ba1e0",
+        "source": "contracts/README.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/acquisition/v1alpha1/semantics.md",
+        "sha256": "c69e52961194b65b8d305adfb00316afcfa5b2beded322d31fea8d77f548fa9d",
+        "source": "contracts/auth/acquisition/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/capability/v1alpha1/semantics.md",
+        "sha256": "425886c25f5c1f51aabb1b3670306440e26bd31a57ff417685b4a28c022161e9",
+        "source": "contracts/auth/capability/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/connection/v1alpha1/semantics.md",
+        "sha256": "c23f0b0a09cc80281d248a61040f9d343bdd0806d060d2020be337fdd9b70119",
+        "source": "contracts/auth/connection/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/custody/v1alpha1/semantics.md",
+        "sha256": "787b2b7aee0aa3871e82859bb0f0af7c1ba8db62a817ede9f0d94d22e7491d61",
+        "source": "contracts/auth/custody/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/evidence/v1alpha1/semantics.md",
+        "sha256": "33ab1618ddabd77f8be425504fd9994111965344b3d03d7c607a129578ed0e40",
+        "source": "contracts/auth/evidence/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/management.md",
+        "sha256": "c98d997f2e62303fe44c8bdda8ac1bb680a121d48e308e1e5d3e03521192f649",
+        "source": "contracts/auth/management.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/auth/profile/v1alpha1/semantics.md",
+        "sha256": "7024e4f2edc5247dd76aa5c6e78612fa3c95fa35a22afa0931fbadb2ba8a5cbd",
+        "source": "contracts/auth/profile/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/catalog/v1alpha1/semantics.md",
+        "sha256": "4ddf03f0f9333537997aff99db038068603442a044907f63de3ffbddd61ad484",
+        "source": "contracts/catalog/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/datasources/logs/v1alpha1/semantics.md",
+        "sha256": "ea25f21e0544301467f018f5ac4bddc4e5531c58e5b7ee644914906bab91cfaa",
+        "source": "contracts/datasources/logs/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/datasources/records/v1alpha1/semantics.md",
+        "sha256": "80c81434f3e13d8bd873a81e0e41378ee2d52f344f40e514513b5e1b3895ecba",
+        "source": "contracts/datasources/records/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/datasources/series/v1alpha1/semantics.md",
+        "sha256": "865f97ab0b175e067823a59028cef69fd0f148b288aa555821ad5f3ac6627c6d",
+        "source": "contracts/datasources/series/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/discovery/composition.md",
+        "sha256": "79ba8be9dd038f8206108bc5a81b8710d2cdcf82b4fab8969c3bb226194f67c6",
+        "source": "contracts/discovery/composition.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/discovery/mediated_route/v1alpha1/semantics.md",
+        "sha256": "0a1a0c7387f102101c28e72d471a88540e7ae245beb0496015632306fd6cefab",
+        "source": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/discovery/resources/v1alpha1/semantics.md",
+        "sha256": "e471a745e3bdb0667d20434d9dd23455c3de79123c766cb563bf7408a048aaaf",
+        "source": "contracts/discovery/resources/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/media/v1alpha1/semantics.md",
+        "sha256": "bb82dbaefbda589c214f5346d39b957515821bf11b69c4e51c6a329ea79adbd9",
+        "source": "contracts/media/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/operations/v1alpha1/semantics.md",
+        "sha256": "8d03e7ef2e690397444784ca1501847ed9af714a76ade2c5c3ea72356fc35a96",
+        "source": "contracts/operations/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/service/compatibility.md",
+        "sha256": "96d9284f32ee5fc77534dfc37141f45828236f4466c0991590b7807c2673a537",
+        "source": "contracts/service/compatibility.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/service/delegation.md",
+        "sha256": "bf8b9f570ee811af4f8df68c26bd2b1761469be9011e535967991be9396850f1",
+        "source": "contracts/service/delegation.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/service/v1alpha1/semantics.md",
+        "sha256": "3db4d5b071c810cf4160e6b495553e171babf3628e459f8bc06f1de1302f6358",
+        "source": "contracts/service/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/service/v1alpha2/semantics.md",
+        "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+        "source": "contracts/service/v1alpha2/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/contracts/sessions/v1alpha1/semantics.md",
+        "sha256": "cf4d1f0f7ec1dc886822c5ceffcda0fd36d1f27ade1b34349f2ec3185da4821f",
+        "source": "contracts/sessions/v1alpha1/semantics.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-contracts/src/lib.rs",
+        "sha256": "2f6ee686defde5c29a0e3749b5496fdcb54725f1346c7f4844508a36c37bde74",
+        "source": "crates/connectors-contracts/src/lib.rs",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-core/src/lib.rs",
+        "sha256": "be87aa2774f7cca979f1506a7254657ecf2207ed4cec5a61fe47ea9983fbe9c8",
+        "source": "crates/connectors-core/src/lib.rs",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-host/src/credentials.rs",
+        "sha256": "d033e1012a944ed81047bd1896d5217a87834bc28e1cf5cc013a576f2e2c04c0",
+        "source": "crates/connectors-host/src/credentials.rs",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-host/src/federation.rs",
+        "sha256": "07252b3c31a3479d4f443581ea42b03525be28d788be3a1c308ffcadbd6d1b0c",
+        "source": "crates/connectors-host/src/federation.rs",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/crates/connectors-sdk/src/lib.rs",
+        "sha256": "43ebb6e2f775755a6bebb24f0a4e5075cec7c2aaeda79fcb037c5ea07d134290",
+        "source": "crates/connectors-sdk/src/lib.rs",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/adapters/grafana.md",
+        "sha256": "aee87ea211c97ddda65bd032be79fd40cde2bc34106a7e1925360532a863c602",
+        "source": "docs/adapters/grafana.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/adapters/kubernetes.md",
+        "sha256": "1aefdd83173c941acf126bb357a7b80ed3ad88262412f5e3d6cb7b9c3ea4725b",
+        "source": "docs/adapters/kubernetes.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/design.md",
+        "sha256": "0785f6ca0d70fc975560f292c3b4886989e9e9301dc3ab9a3810e499081efd5a",
+        "source": "docs/design.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/ess-entity-inventory.json",
+        "sha256": "26d2a8c287b4bdfadab7d56c1c7ae7138bb73beaf5fd963f46f19e8b164e7bf0",
+        "source": "docs/evidence/profile-persistence-20260908/ess-entity-inventory.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/fixture-audit.md",
+        "sha256": "2cc5efa72f09a5f9aa6715868abc62cb39de8f2a1fb24a52d949fd3985e1804b",
+        "source": "docs/evidence/profile-persistence-20260908/fixture-audit.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/gate.log",
+        "sha256": "3ed95fd6eb1776799969873618fb426fc7d7253958772f1bb90c5e9718ad51c3",
+        "source": "docs/evidence/profile-persistence-20260908/gate.log",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/projection-manifest.json",
+        "sha256": "727d59ee02a5fb26cd7ab1c181332dd6501e7e9ab4fff1c2c053e9cc64e15c01",
+        "source": "docs/evidence/profile-persistence-20260908/projection-manifest.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ConfiguredSourceIdentity.schema.json",
+        "sha256": "b2d48a250a665dc9ac193c29d3547b784e640cdc34b7db23fe5a7ee182c582cb",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ConfiguredSourceIdentity.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.DeclaredObservationBinding.schema.json",
+        "sha256": "95223f559e5c8166a98540c1eef84be185c0494b377d81dfeef520c627f4d69d",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.DeclaredObservationBinding.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.KubernetesRecognitionInput.schema.json",
+        "sha256": "6a9997dafecc8dabfe129fdfd6d80dd9ab2ab80fe9cac360ab67644c22d2d002",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.KubernetesRecognitionInput.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ObservationProfile.schema.json",
+        "sha256": "31e5bc994be93940130da2ae7378d94efb5f044f82714b296f3758fe92ccaa5c",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ObservationProfile.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionConfidence.schema.json",
+        "sha256": "f17173b8e225e1e5e3eca79e982866d6950f71303ef90a13c65568bc5a33cad3",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionConfidence.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionProvider.schema.json",
+        "sha256": "1900e2ba5713da236e2a7f87c60d81b590c1c6ef07127c41cf5c98e2ceaf45ee",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.RecognitionProvider.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ResourceRecognition.schema.json",
+        "sha256": "b9ea31d7d7918868a7a3efa7cf63ae1228a2932a00dc45a8f0b5ed19e686d968",
+        "source": "docs/evidence/profile-persistence-20260908/schema/types/connectors.discovery.ResourceRecognition.schema.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/traces.md",
+        "sha256": "3db7f6a2cf5fd890a12cf19c87192ac6b372cd7a10a8d796f884b54def3b0c30",
+        "source": "docs/evidence/profile-persistence-20260908/traces.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/type-results.json",
+        "sha256": "9828568a46685237b3db47ef7497641575720b5758647801a02fc02e887526bf",
+        "source": "docs/evidence/profile-persistence-20260908/type-results.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/typed-values.json",
+        "sha256": "58f2e052d5b3944a3ec98d001f6775c5278c0b8e70977c3ff821ec476620e629",
+        "source": "docs/evidence/profile-persistence-20260908/typed-values.json",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/docs/evidence/profile-persistence-20260908/verification.md",
+        "sha256": "194698bc703941d9b285a14ead32c87534c51085bba6e62e6f0dd106ddb0d164",
+        "source": "docs/evidence/profile-persistence-20260908/verification.md",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/auth_access.yaml",
+        "sha256": "5b43096ce0364b8f637892a5b42cb4020a7b5d250b0de1ed7012dd845d602377",
+        "source": "ess/domains/auth_access.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/connection_admission.yaml",
+        "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+        "source": "ess/domains/connection_admission.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/credential_evidence.yaml",
+        "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+        "source": "ess/domains/credential_evidence.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/credentials.yaml",
+        "sha256": "fe1ea8a2f474db7c0ec6a7262afb7a5a610371ba1ca5de634c010b61e1d51240",
+        "source": "ess/domains/credentials.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/declarations.yaml",
+        "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+        "source": "ess/domains/declarations.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/delegation.yaml",
+        "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+        "source": "ess/domains/delegation.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/discovery.yaml",
+        "sha256": "5a5dca1143f55e8d196e9642131b558df16a89e9a44af95132d56853e9448df0",
+        "source": "ess/domains/discovery.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/idempotency.yaml",
+        "sha256": "e6dad54a7f07f184b85ce1377858525098a6da6d91d4f94d2847ab5afb7bb0f5",
+        "source": "ess/domains/idempotency.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/mutations.yaml",
+        "sha256": "ae41e7606a444f85a61eb230a3f1d960b2da950486cced68cfa84ebfe813066e",
+        "source": "ess/domains/mutations.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/refresh.yaml",
+        "sha256": "658866a02cb064faa2e6f37c4e0fb30483b76cf13a2d8f2a25380151bc6edb38",
+        "source": "ess/domains/refresh.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/service_wire.yaml",
+        "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+        "source": "ess/domains/service_wire.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/domains/sessions.yaml",
+        "sha256": "20f343e1cf13bc203febad0b42165c88fa64297bc61646c98b1744b01262e0c3",
+        "source": "ess/domains/sessions.yaml",
+        "matches_current": true
+      },
+      {
+        "archive_path": "snapshot/ess/system.yaml",
+        "sha256": "925404b7a3960f55c3315faeed9b875f264455772acc05a94cdefb8cf6c30dc0",
+        "source": "ess/system.yaml",
+        "matches_current": true
+      }
+    ]
+  }
+]

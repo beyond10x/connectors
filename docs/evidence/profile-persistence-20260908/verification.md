@@ -1,0 +1,23 @@
+# Discovery profiles and persistence ownership verification — 2026-09-08
+
+Baseline: local commit `175053fd2c951dc9564ff587a636775ab8027d2e`. This specification checkpoint addresses discovery-profiles E07/E14/E32 and persistence-ownership E28. Root alone edits tracked source in primary main; two independent reviewers preserve ignored snapshots. Runtime and current adapter-kind schemas are unchanged.
+
+Normative owners: [resource discovery §4.5](../../../contracts/discovery/resources/v1alpha1/semantics.md#45-fixed-declarations-recognition-and-configured-source-identity) and [design §31](../../design.md#31-host-persistence-ownership-and-atomicity), with linked adapter, auth, operations, delegation, session and service summaries. The first selects fixed receiver declarations, observable nullable recognition, Argo name OR stable label and configured authority identity with explicit physical-identity limits. The second consolidates 18 logical persistence responsibilities, atomic groups, ordered handoffs, conservative recovery/retention and revision identities.
+
+| Check | Observed result and limits |
+|---|---|
+| ESS 0.20.0 validate/compile | 13 files / 204 declarations; seven new discovery value types. Existing persistent entities/relations are not replaced with invented lifecycles |
+| JSON Schema projection | Two independent 211-artifact projections byte-identical; seven selected schemas copied unchanged; [manifest](projection-manifest.json) |
+| Value shape inspection | 44/44 expected decisions, including seven rejected shapes and three accepted semantic counterexamples; [values](typed-values.json), [results](type-results.json), [one-off transcript](fixture-audit.md) |
+| Existing entity inventory | [Eleven actual ESS entities and their declared identities/relations/lifecycles](ess-entity-inventory.json); presence does not prove durable implementation or authoritative fact provenance |
+| Textual audit | [43 declared traces](traces.md), not executed against a recognizer, storage, provider, clock or authority |
+| Existing full gate | [gate.log](gate.log): 50 existing Rust tests, format/lint/dependency checks, MSRV1.88, ESS validation and 222 compiled scenarios including 34 authored; all passed |
+| Separate session compilation | 13 authored / 201 synthesized expectations; the gate does not include sessions among its authored roots. This is structural compilation, not sequential or runtime execution |
+
+The intentionally accepted counterexamples are a wrong operation/profile pairing, a non-HTTPS configured origin and an Argo declared-confidence value used in the Kubernetes profile. Schema shapes cannot enforce those context predicates. Optional input labels project to omission, not public required-null JSON. ConfiguredSourceIdentity is a private semantic coordinate; it neither exposes source origins as public metadata nor attests physical cluster identity. DeclaredObservationBinding is not a new runtime registration API or a complete authored adapter schema.
+
+Argo preservation/changes were checked against old commit `81459ac42ddd518d3942f4b079841e9e0ed6efc8`, design10:173–186 and local.rs:1170–1225/local_tests.rs:112–167. Whole-token name OR stable app.kubernetes.io/name and ASCII lowercase normalization are explicit; the selected Argo profile does not inherit the old implementation's three broader label aliases. Monitoring retains its old four-label input set and priority. This is a documented profile change, not a claim of byte-for-byte old recognizer equivalence or live vendor verification. Unknown provider objects remain observations under the new resource contract; Argo never becomes a callable adapter or credential route.
+
+The persistence inventory assigns logical port responsibility without claiming that Connection/Acquisition/AuthProfile/custody version/AuditRecord/discovery or session-authority persistent models have been implemented. Their missing entity/lifecycle/ownership facts remain explicit and must be settled before affected entity-bearing implementation decomposition. Source-specific contracts still own their atomic predicates and failure semantics. The inventory does not select a universal store, cross-provider transaction, backend or migration protocol. Same-identity credential refresh and same-target evidence renewal remain distinct from F02/F03 semantic revision changes.
+
+Final completion depends on independent review of these exact normative/evidence bytes and recorded AEP outcomes. It does not close the remaining source stories or the broader specification goal, and does not authorize runtime implementation or external publication.

@@ -196,3 +196,5 @@ Kubernetes SelfSubjectAccessReview is an explicitly admitted auth-validation POS
 | Whether `credential_valid` may call provider introspection by default | no; metadata only |
 | Freshness bounds | 300 s reads, 60 s mutations |
 | Completion-time verification | only the explicitly selected/admitted validation plan runs it. Mandatory baseline failure prevents publication/completed; optional failure preserves baseline publication but blocks any operation requiring that check. Supported is not mandatory; see [profile §4.1](../../profile/v1alpha1/semantics.md#41-baseline-and-operation-requirements). |
+
+Persistence ownership is consolidated in [design §31](../../../../docs/design.md#31-host-persistence-ownership-and-atomicity). MaterialAdmissionPort owns capture/admission facts and PermissionEvidenceCachePort owns optional bounded cached checks; neither turns a value into independent current authority. This inventory does not supply a backend or execute its atomicity predicates.
