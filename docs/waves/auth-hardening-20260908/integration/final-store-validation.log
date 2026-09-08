@@ -1,0 +1,19 @@
+55 file(s) in /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.engineering/planning: 55 artifact(s)
+15 review(s) recorded no findings block:
+  - review-result:auth-evidence-adversary-p1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-refresh-adversary-p1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-docs-external-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-acceptance-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-design-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-parallel-safety-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-parallel-safety-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-scope-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-scope-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-semantics-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-model-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-model-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-semantics-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-outcomes-model-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-outcomes-semantics-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+valid
+exit: 0

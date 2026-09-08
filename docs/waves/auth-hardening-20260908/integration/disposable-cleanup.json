@@ -1,0 +1,42 @@
+[
+  {
+    "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/target",
+    "allocated_bytes_before": 2993135616,
+    "removed": true
+  },
+  {
+    "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.local/waves/auth-hardening-20260908/integration",
+    "allocated_bytes_before": 2797568,
+    "removed": true
+  },
+  {
+    "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-wave-20260908/.local/toolchains/ess/0.20.0",
+    "allocated_bytes_before": 40955904,
+    "removed": true
+  },
+  {
+    "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908/.local/waves/auth-hardening-20260908/refresh",
+    "allocated_bytes_before": 3551232,
+    "removed": true
+  },
+  {
+    "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-refresh-20260908/.local/toolchains/ess/0.20.0",
+    "allocated_bytes_before": 40955904,
+    "removed": true
+  },
+  {
+    "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence",
+    "allocated_bytes_before": 2686976,
+    "removed": true
+  },
+  {
+    "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/toolchains/ess/0.20.0",
+    "allocated_bytes_before": 40955904,
+    "removed": true
+  },
+  {
+    "path": "/home/timo/.cache/connectors-waves/auth-hardening-20260908/cache-start",
+    "allocated_bytes_before": 4096,
+    "removed": true
+  }
+]

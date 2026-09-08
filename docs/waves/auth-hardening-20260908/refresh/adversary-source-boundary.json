@@ -1,0 +1,8 @@
+{
+  "changed_or_deleted": [],
+  "added": [
+    "contracts/auth/acquisition/v1alpha1/scenarios/revocation-before-authorization.yaml"
+  ],
+  "source_count_before": 285,
+  "source_count_after": 286
+}

@@ -1,0 +1,3 @@
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated-fixed.json
+1 authored scenario(s) from 1 file(s), 0 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated-fixed.json
+exit: 0

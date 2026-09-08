@@ -1,0 +1,24 @@
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/auth/acquisition/v1alpha1/scenarios --out .local/waves/auth-hardening-20260908/refresh/red-authored.json
+refusal[ESS-AUTHOR-005]: `connectors.refresh/authored/authorized-owner-loss-no-second-exchange` in contracts/auth/acquisition/v1alpha1/scenarios/authorized-owner-loss-no-second-exchange.yaml
+  `connectors.refresh.RefreshAttempt` is not an entity this specification declares
+  help: name an entity the specification declares; an authored scenario acts on the model's own instances and invents none
+refusal[ESS-AUTHOR-006]: `connectors.refresh/authored/authorized-owner-loss-no-second-exchange` in contracts/auth/acquisition/v1alpha1/scenarios/authorized-owner-loss-no-second-exchange.yaml
+  `connectors.refresh.ReserveRefresh` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-006]: `connectors.refresh/authored/authorized-owner-loss-no-second-exchange` in contracts/auth/acquisition/v1alpha1/scenarios/authorized-owner-loss-no-second-exchange.yaml
+  `connectors.refresh.AuthorizeExchange` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-006]: `connectors.refresh/authored/authorized-owner-loss-no-second-exchange` in contracts/auth/acquisition/v1alpha1/scenarios/authorized-owner-loss-no-second-exchange.yaml
+  `connectors.refresh.QuarantineRefresh` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-006]: `connectors.refresh/authored/authorized-owner-loss-no-second-exchange` in contracts/auth/acquisition/v1alpha1/scenarios/authorized-owner-loss-no-second-exchange.yaml
+  `connectors.refresh.AuthorizeExchange` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-006]: `connectors.refresh/authored/authorized-owner-loss-no-second-exchange` in contracts/auth/acquisition/v1alpha1/scenarios/authorized-owner-loss-no-second-exchange.yaml
+  `connectors.refresh.ReserveRefresh` is not a command this specification declares
+  help: name a command the specification declares; a scenario that invokes anything else is checking a system this model does not describe
+refusal[ESS-AUTHOR-012]: `connectors.refresh/authored/authorized-owner-loss-no-second-exchange` in contracts/auth/acquisition/v1alpha1/scenarios/authorized-owner-loss-no-second-exchange.yaml
+  `connectors.refresh.RefreshStates` is not a view this specification declares
+  help: name a view the specification declares
+0 authored scenario(s) from 1 file(s), 7 refusal(s), written to .local/waves/auth-hardening-20260908/refresh/red-authored.json
+exit: 1

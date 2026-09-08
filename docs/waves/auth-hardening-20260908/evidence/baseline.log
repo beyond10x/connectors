@@ -1,0 +1,11 @@
+$ .local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/baseline-ir.json
+connectors v1 — 7 file(s), 50 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/baseline-ir.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/operations/v1alpha1/scenarios --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/baseline-operations.json
+15 authored scenario(s) from 15 file(s), 0 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/baseline-operations.json
+exit: 0
+
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --out /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/baseline-synthesized.json
+52 scenario(s) (0 authored), 0 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/baseline-synthesized.json
+exit: 0
