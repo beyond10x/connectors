@@ -1,0 +1,18 @@
+{
+  "image_id": "sha256:dd862af241d8020ac9b0360e78a43019b28375198fa96637c05401848c50c4a9",
+  "executable_sha256": "335264190b0035dbaf7b80873d8aa965aed11f04d2aac20981524208b219fb6e",
+  "readonly_rootfs": true,
+  "mounts": [
+    {
+      "destination": "/config",
+      "read_only": true
+    },
+    {
+      "destination": "/secrets",
+      "read_only": true
+    }
+  ],
+  "configured_provider": "public GitLab over verified HTTPS",
+  "provider_credentials": "private tokens covered by fixtures; no private live account",
+  "discovery_to_sql": "actual ready Kubernetes EndpointSlice selected and configured into the SQL adapter"
+}

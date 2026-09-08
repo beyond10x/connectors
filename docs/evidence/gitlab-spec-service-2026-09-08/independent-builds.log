@@ -1,0 +1,16 @@
+cargo build --locked --offline -p connectors-gitlab --lib --no-default-features --jobs 2
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+cargo build --locked --offline -p connectors-kubernetes --lib --no-default-features --jobs 2
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+cargo build --locked --offline -p connectors-sql --lib --no-default-features --jobs 2
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.71s
+connectors-gitlab: dependency boundary passed
+connectors-kubernetes: dependency boundary passed
+connectors-sql: dependency boundary passed
+connectors: dependency boundary passed

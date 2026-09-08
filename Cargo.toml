@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "adapters/*", "apps/connectors"]
+exclude = ["adapters/gitlab/generated/rust"]
 
 [workspace.package]
 version = "0.1.0"

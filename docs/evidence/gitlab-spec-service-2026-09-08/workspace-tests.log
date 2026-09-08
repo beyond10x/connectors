@@ -1,0 +1,233 @@
+   Compiling gitlab-types v1.0.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab/generated/rust/crates/gitlab-types)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `test` profile [unoptimized] target(s) in 1.96s
+     Running unittests src/main.rs (target/debug/deps/connectors-4d3331d00b6965df)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_build-dae4a135e549defa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_client-5a645bc10c2363e2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_conformance-3363b60642aea21d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_contracts-4cfbbf9b00bfe48b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_core-d05ba986e7035440)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire.rs (target/debug/deps/wire-d8e413bc554c17a1)
+
+running 4 tests
+test canonicalization_is_recursive_and_order_independent ... ok
+test contradictory_response_payloads_are_refused ... ok
+test duplicate_keys_are_refused_at_every_depth ... ok
+test response_roundtrips_success_and_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_gitlab-124122d657d02707)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_gitlab-dd026bfc041d272c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/obligations.rs (target/debug/deps/obligations-943564cea499842b)
+
+running 4 tests
+test generated_file_mapping_passes_unencoded_segments_to_the_scoped_transport ... ok
+test generated_dispatch_rejects_invalid_inputs_before_transport ... ok
+test empty_pages_with_continuation_and_full_pages_without_headers_are_partial ... ok
+test response_failures_and_nonadvancing_pagination_remain_explicit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/provider.rs (target/debug/deps/provider-f5d28b4c61f2c264)
+
+running 1 test
+test project_issue_pagination_and_file_reads_use_scoped_auth_over_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_host-05e0c9fe5d444ca2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/http.rs (target/debug/deps/http-73a12239cc886a69)
+
+running 2 tests
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/service.rs (target/debug/deps/service-7dc48f63155bfd8b)
+
+running 3 tests
+test credential_stores_are_substitutable_and_file_permissions_are_enforced ... ok
+test wire_admission_and_freshness_refuse_before_dispatch ... ok
+test federation_preserves_result_and_reports_downstream_failure ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_kubernetes-40d649620175247b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_kubernetes-08f21b26615d7f07)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/provider.rs (target/debug/deps/provider-b756a406cf74c5f0)
+
+running 1 test
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sdk-08abf153c439f4ff)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cursor.rs (target/debug/deps/cursor-fdbec2ca7463c404)
+
+running 1 test
+test cursors_cannot_be_rebound_forged_or_reused_after_restart ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_spec-62194155dcc9ab2b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_spec-511ea9c6a0e95e0e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compiler.rs (target/debug/deps/compiler-555b57cca8e22f24)
+
+running 2 tests
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+     Running tests/generation.rs (target/debug/deps/generation-8741f076d61e21c7)
+
+running 5 tests
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test checked_in_bundle_matches_its_pinned_sources_and_toolchain ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.03s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sql-6d05a4677f1af14d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_sql-b20a66e19607154d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_gitlab
+
+running 1 test
+test adapters/gitlab/src/lib.rs - (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests connectors_host
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

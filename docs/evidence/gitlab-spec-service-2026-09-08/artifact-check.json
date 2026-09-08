@@ -1,0 +1,18 @@
+{
+  "image_id": "sha256:220b27a8a4f91cd69618c0324dc7243cd446cd7f97454f8cd35bb4cfe8b9b247",
+  "executable_sha256": "382a3e1401941248d282fdff10a97b4ede957960c37c3b4ab90a3dd3b56032c6",
+  "readonly_rootfs": true,
+  "mounts": [
+    {
+      "destination": "/config",
+      "read_only": true
+    },
+    {
+      "destination": "/secrets",
+      "read_only": true
+    }
+  ],
+  "live_acceptance": "gitlab-final-acceptance.json",
+  "unchanged_provider_regressions": "live-acceptance.json",
+  "upstream": "public GitLab over verified HTTPS"
+}

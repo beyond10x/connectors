@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:gitlab-spec-service
 kind: story
-status: active
+status: implemented
 title: Generate the GitLab adapter from its specification and prove the local service artifact
 relations:
 - derived_from: specification:contract-driven-connectors-design
@@ -29,7 +29,7 @@ scope:
   path: examples
 - confidence: cited
   path: spec-kinds
-revision: 4
+revision: 8
 ---
 ## Context and decision
 
@@ -49,8 +49,16 @@ Cited: crates/connectors-spec, adapters/gitlab, spec-kinds/adapter, ess, Cargo.t
 
 ## Verification
 
-Run reproducibility/drift/refusal tests; fixture request, policy, paging, response and auth tests; Cargo formatting/build/test/Clippy and independent adapter/host dependency checks; ESS input/build/realization validation; a local Docker build and live GitLab direct/federated acceptance; Kubernetes/SQL regressions; artifact identity and clean shutdown checks. Record exact results and limitations in docs before marking implemented.
+Verification is recorded in docs/verification.md and docs/evidence/gitlab-spec-service-2026-09-08/. The full workspace suite passed 24 tests with no failures or ignored tests. After normalizing ESS-generated Rust through rustfmt, all 13 affected generation/GitLab tests and warning-denying workspace Clippy passed again. Formatting, offline workspace builds, three independent adapter library builds and normal dependency boundaries passed. Strict v1 remains supported.
+
+Generation pins official GitLab commit 2ff8d865e5016b14b724d1c2ce745f8300696192 and its original OpenAPI SHA-256; the bundle records ESS 0.9.2 and rustfmt. Reproducibility, committed-output drift, source/mapping refusals, missing binding implementations, unowned files and output symlinks are tested. ESS validates and synthesizes the typed local request inputs; the vendor OpenAPI import refusal remains intact in generated/ess-import.json. The v2 value declarations and existing entity relationships are in ess/domains/declarations.yaml; no external GitLab lifecycle was invented.
+
+The local Rust executor passed bundle checks, ESS build compilation, BuildKit projection, Docker build, and ESS realization validation/compilation. It preserves the original build IR and supplies only an explicit empty secrets list to the pinned ESS reader's separate projection input. Configuration and credentials are absent from the image and mounted separately. The final image connectors-v2-gitlab:spec-local is sha256:220b27a8a4f91cd69618c0324dc7243cd446cd7f97454f8cd35bb4cfe8b9b247; its runtime executable was read back and matched the build digest.
+
+The full live run passed all nine groups against public GitLab, fresh scoped Kubernetes, and PostgreSQL 17.11, including the explicit discovery-to-SQL configuration chain. After final generated-code formatting and repackaging, all three GitLab groups passed again against the exact final image. The original container evidence is retained under prior-build/. All four service roles exited 0 on SIGTERM; final container/gateway shutdown also exited 0. Owned containers and disposable rootfs copies were removed; the final image remains local. Private GitLab credentials use HTTP fixtures; the local PostgreSQL fixture uses explicit plaintext. The k3s fixture exited 2 on Docker stop after acceptance; that is recorded separately from adapter service exits.
 
 ## Progress
 
-Plan approved. Existing v1 implementation and live acceptance evidence are the baseline. Source/toolchain discovery is in progress.
+Implemented and verified locally. The operator-requested pre-implementation snapshot is commit 75f1c7275d7b227d5a2e4a3e95bfc5c9b2de262a, with both author and committer verified as b10x-bot[bot]. GitLab now executes ESS-generated request types and generated request/dispatch code, with explicit handwritten admission, pagination, response and provenance bindings. The local build executor produces an independently runnable image and exact ESS build/realization evidence. Reproduction and limitations are in docs/gitlab-generation.md and docs/verification.md.
+
+This was one integrated story in an interactive, single-agent session. No decomposition or critic panel was needed, no approval bypass records were created, and no new worktree was created under the project's direct-checkout rule. Atlas, the original Connectors repository, registries, consumers and remote state remain unchanged. Publication is outside this task; the final image and source changes remain local.

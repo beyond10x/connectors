@@ -30,6 +30,9 @@ struct Args {
     namespace: String,
     #[arg(long)]
     allow_plaintext: bool,
+    /// Run the GitLab direct/federated slice without Kubernetes or SQL fixtures.
+    #[arg(long)]
+    gitlab_only: bool,
 }
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -60,6 +63,9 @@ async fn main() -> Result<()> {
         ("kubernetes", &args.kubernetes),
         ("sql", &args.sql),
     ] {
+        if args.gitlab_only && name != "gitlab" {
+            continue;
+        }
         let direct = Client::new(url, token.clone(), args.allow_plaintext)?;
         let descriptor = direct.describe().await?;
         require(
@@ -104,7 +110,7 @@ async fn main() -> Result<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(
-            &json!({"status":"passed","wire":"v1alpha1","checks":checks,"evidence":"live configured upstreams; public GitLab reads, scoped Kubernetes service account, PostgreSQL reader role"})
+            &json!({"status":"passed","wire":"v1alpha1","checks":checks,"evidence":if args.gitlab_only { "live configured upstream; public GitLab reads" } else { "live configured upstreams; public GitLab reads, scoped Kubernetes service account, PostgreSQL reader role" }})
         )?
     );
     Ok(())

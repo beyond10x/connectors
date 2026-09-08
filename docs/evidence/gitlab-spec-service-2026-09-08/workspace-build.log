@@ -1,0 +1,20 @@
+   Compiling ring v0.17.14
+   Compiling tower-http v0.6.11
+   Compiling rustls-webpki v0.103.15
+   Compiling rustls v0.23.44
+   Compiling tempfile v3.27.0
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling gitlab-types v1.0.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab/generated/rust/crates/gitlab-types)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.84s

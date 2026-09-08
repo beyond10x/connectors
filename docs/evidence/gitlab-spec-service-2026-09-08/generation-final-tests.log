@@ -1,0 +1,76 @@
+   Compiling gitlab-types v1.0.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab/generated/rust/crates/gitlab-types)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Finished `test` profile [unoptimized] target(s) in 1.85s
+     Running unittests src/lib.rs (target/debug/deps/connectors_gitlab-02a49950de1775eb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_gitlab-f546d68e3a512b2d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/obligations.rs (target/debug/deps/obligations-f5b5300ce2b3401a)
+
+running 4 tests
+test generated_file_mapping_passes_unencoded_segments_to_the_scoped_transport ... ok
+test generated_dispatch_rejects_invalid_inputs_before_transport ... ok
+test empty_pages_with_continuation_and_full_pages_without_headers_are_partial ... ok
+test response_failures_and_nonadvancing_pagination_remain_explicit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/provider.rs (target/debug/deps/provider-c7135f72423d9c46)
+
+running 1 test
+test project_issue_pagination_and_file_reads_use_scoped_auth_over_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_spec-e6dd72ff4a80ece4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_spec-d83bd6ae69014288)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compiler.rs (target/debug/deps/compiler-997e627ad0c76f93)
+
+running 2 tests
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+     Running tests/generation.rs (target/debug/deps/generation-6b86fa6ff990de38)
+
+running 5 tests
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test checked_in_bundle_matches_its_pinned_sources_and_toolchain ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.37s
+
+   Doc-tests connectors_gitlab
+
+running 1 test
+test adapters/gitlab/src/lib.rs - (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

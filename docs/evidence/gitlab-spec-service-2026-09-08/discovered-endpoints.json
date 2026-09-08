@@ -1,0 +1,24 @@
+{
+  "complete": true,
+  "items": [
+    {
+      "address": "172.17.0.9",
+      "application_protocol": null,
+      "id": "ea2871a4-7e70-40a8-b4d2-747fc36ab82a/172.17.0.9/5432/TCP",
+      "namespace": "engineering",
+      "port": 5432,
+      "reachability": "source_cluster_network",
+      "ready": true,
+      "service": "postgres",
+      "source_uid": "ea2871a4-7e70-40a8-b4d2-747fc36ab82a",
+      "transport": "TCP"
+    }
+  ],
+  "next_cursor": null,
+  "provenance": {
+    "instance": "kubernetes-spec-live",
+    "observed_at_unix_ms": 1788852511306,
+    "resource": "engineering/endpointslices",
+    "source_revision": "447"
+  }
+}

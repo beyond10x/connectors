@@ -1,0 +1,21 @@
+{
+  "format": "connectors.local-service/1",
+  "adapter": "gitlab",
+  "package": "connectors-gitlab",
+  "binary": "connectors-gitlab",
+  "specification": "adapters/gitlab/spec/adapter.json",
+  "generated": "adapters/gitlab/generated",
+  "platform": {
+    "os": "linux",
+    "architecture": "amd64"
+  },
+  "entrypoint": [
+    "/usr/local/bin/connectors-gitlab"
+  ],
+  "command": [
+    "--config",
+    "/config/service.json"
+  ],
+  "user": "65532:65532",
+  "repository": "connectors-v2-gitlab"
+}

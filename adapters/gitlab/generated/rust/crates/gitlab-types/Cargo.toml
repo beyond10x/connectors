@@ -1,0 +1,12 @@
+# generated from gitlab v1
+# model digest 5464a959b36fe5673bd570eecf3f661540dd261b60c0fde2fd37f4a5bf2d97f3
+# contract digest c3d3a9b408c90c2a8b03daf08984379733603f2c84f483640772f01ea8aea190
+# do not edit: regenerate with `ess synthesize`
+
+[package]
+name = "gitlab-types"
+description = "Semantic types synthesised from the `gitlab` specification, v1."
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]

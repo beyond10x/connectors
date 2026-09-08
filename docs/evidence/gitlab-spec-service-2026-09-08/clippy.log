@@ -1,0 +1,18 @@
+    Checking ring v0.17.14
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking rustls-webpki v0.103.15
+    Checking rustls v0.23.44
+    Checking gitlab-types v1.0.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab/generated/rust/crates/gitlab-types)
+    Checking tokio-rustls v0.26.5
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking hyper-rustls v0.27.9
+    Checking reqwest v0.12.28
+    Checking tokio-postgres-rustls v0.14.0
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.62s
