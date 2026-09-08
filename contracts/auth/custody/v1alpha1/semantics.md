@@ -1,0 +1,112 @@
+# auth.custody/v1alpha1
+
+- **Status:** proposed, not implemented. Extends the existing `SecretStore` port (`crates/connectors-sdk/src/lib.rs:42-44`, `read` only).
+- **Family:** auth. Sibling documents: [connection](../../connection/v1alpha1/semantics.md), [profile](../../profile/v1alpha1/semantics.md), [acquisition](../../acquisition/v1alpha1/semantics.md), [capability](../../capability/v1alpha1/semantics.md), [evidence](../../evidence/v1alpha1/semantics.md).
+- **Recorded:** 2026-09-08.
+
+## 1. Identity
+
+| Field | Value |
+|---|---|
+| Contract | `auth.custody/v1alpha1` |
+| Profiles | `read_only` (today: env/file-backed references resolved at dispatch), `versioned` (write, read, delete immutable versions; compare-and-swap active reference held by the host metadata store) |
+| Parties | host (grants a scoped store capability), store binding (in-memory, owner-only file, later Vault or database), coordinator (writer), execution boundary (reader) |
+
+Design responsibility three of four: persist sensitive material through an injected secret-store binding (`docs/design.md:528`). The store knows nothing about provider identity, OAuth, expiry, or refresh (`docs/design.md:576`).
+
+## 2. Old evidence and disposition
+
+| Old surface | Source | Disposition |
+|---|---|---|
+| Four custody crates: `connector-secrets`, `hosted-secrets`, `hosted-vault`, `subscription-custody` | `../connectors/crates/` listing | change: one port, several bindings; subscription custody deferred |
+| "Never read" means no retrieval surface: no request can select a credential source, store, Vault address, mount, role, item, or fallback; no response reveals one | `../connectors/docs/design/07-credential-custody-topologies.md:101-120`; `contracts/connector-connection/v0alpha1/README.md:7-11` | preserve |
+| Prepared multi-key transaction protocol required of all backends | `docs/design.md:578` | remove: immutable version plus CAS active reference is the required minimum |
+| Current binding: `CredentialRef` env or file; files bounded, regular, owner-readable only, not symlinks; rotation by replacing the file | `crates/connectors-host/src/credentials.rs`; `contracts/service/v1alpha1/semantics.md`, Auth and configuration | preserve as `read_only` profile |
+| `Secret` type with no `Debug`/`Serialize` | `crates/connectors-sdk/src/lib.rs:33-34` | preserve |
+
+## 3. Types
+
+Port (specializes `docs/design.md:568-572`):
+
+```text
+write_new(scope, SensitiveMaterial) -> SecretVersionRef
+read(scope, SecretVersionRef)       -> SensitiveMaterial | Missing | Unavailable | Denied
+delete(scope, SecretVersionRef)     -> Deleted | Missing | Unavailable | Denied
+```
+
+Host metadata (not in the store):
+
+```json
+{ "connection": "conn_…", "active_credential": "ver_…", "revision": 12, "superseded": ["ver_…"] }
+```
+
+```text
+publish_active(connection, expected_revision, new_version) -> Published(revision) | Conflict(current_revision)
+```
+
+`SensitiveMaterial` is an opaque bounded byte string per version. A credential *set* (access plus refresh token, or user plus secret half) is one version, so the pair is written and read together (`docs/design.md:576`). Interpretation of the bytes belongs to the provider auth implementation.
+
+`scope` is host-assigned per adapter instance and connection; the store maps `(scope, version)` to its own layout. Public invocations never carry a scope or version reference (`docs/design.md:574`).
+
+Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (backend outage), `Denied` (scope mismatch). Callers map `Unavailable` to `custody_unavailable` in connection status; `Denied` is an internal invariant failure and is logged without the reference.
+
+## 4. Rules
+
+- Versions are immutable: a written version is never modified; rotation writes a new version and publishes it.
+- Write before publish: `write_new` completes durably before `publish_active`; a crash between the two leaves an unreferenced version that cleanup reclaims. Readers only ever read the published reference.
+- CAS publish: `publish_active` carries the expected revision; a concurrent publish loses with `Conflict` and re-reads. This is the only atomicity the profile requires.
+- Reclaim: superseded versions are deleted once no valid use requires them, after a declared retention (first-profile default 24 h; refresh-token grace behavior is provider-specific and declared in the profile).
+- Scoped access: a capability handed to an adapter reads only its own scope. There is no list operation over values.
+- Bounded values: a version is at most 64 KiB (first-profile default; certificates with chains may need more and set it per binding).
+- No value in diagnostics: `read` errors, logs, and metrics carry the scope id and version id only.
+- Durability claims per binding: in-memory claims none; file binding claims fsync-before-return on the owner-only file; a database or Vault binding declares its own. A binding declares the guarantees it does not provide instead of emulating them (`docs/design.md:578`).
+- Startup: the host refuses to start an adapter whose required custody binding is missing rather than falling back to another binding (`docs/design.md:816`).
+
+## 5. Limits
+
+| Concern | Rule |
+|---|---|
+| Value size | 64 KiB default |
+| Versions per connection | bounded (default 8 retained including active) |
+| Read latency budget | part of the provider deadline; a read exceeding it is `Unavailable` |
+| Retry | reads may be retried by the caller; writes are not retried after an unknown outcome without a new version id |
+
+## 6. Conformance scenarios (`docs/design.md:986`)
+
+- Write, publish, read: read returns the bytes; a second write creates a new version; the old version stays readable until deleted.
+- Scoped: a capability for scope A reading a version of scope B → `Denied`.
+- Missing versus outage: deleted version → `Missing`; binding fault injected → `Unavailable`; the caller-facing status differs.
+- Concurrent publish with the same expected revision → one `Published`, one `Conflict`.
+- Crash between write and publish (file binding): after restart the active reference is unchanged and the orphan is reclaimable.
+- Serialize every error and log line produced by the suite; grep for the fixture's secret bytes → no match.
+- Same suite runs against the in-memory and file bindings; provider code untouched (`docs/design.md:1014`).
+
+## 7. Compatibility
+
+- The `read_only` profile keeps today's env/file `CredentialRef` behavior; adapters using it change nothing.
+- Migration of old credential sets is a scoped custody migration or reauthorization, never a copy through a document or command line (`docs/design.md:1116`).
+
+## 8. SDK and host obligations
+
+| Obligation | Where |
+|---|---|
+| `SecretStore` gains `write_new`, `delete`, and a scope parameter | `crates/connectors-sdk/src/lib.rs:42-44` |
+| Host metadata store with `publish_active` CAS | new host module (with `auth.connection` metadata) |
+| File binding: one file per version, owner-only, fsync, atomic rename | `crates/connectors-host/src/credentials.rs` |
+| In-memory binding for tests | `crates/connectors-conformance` |
+
+## 9. ESS entities
+
+| Entity | Notes |
+|---|---|
+| `CredentialSet` (identity: version ref), lifecycle `written → active → superseded → deleted` | relation `belongs_to → Connection` (one); material itself is not modeled |
+| `Connection.active_credential` | reference field with revision |
+| External store layout, Vault paths | UNMAPPED, binding-private |
+
+## 10. Open decisions
+
+| Decision | Default taken |
+|---|---|
+| Second binding after file | SQLite through the same port tests (old repo had `state-sqlite`); Vault later |
+| Retention of superseded versions | 24 h |
+| Value bound | 64 KiB, per-binding override for certificate chains |
