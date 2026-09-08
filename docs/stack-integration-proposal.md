@@ -1,7 +1,7 @@
 # Proposal: extensions and adjustments for stack integration — 2026-09-08
 
 Baseline: local commit `57be07c` plus the uncommitted working tree of 2026-09-08. Source of the
-findings: `.local/review/2026-09-08-concept-and-stack-integration-review.md` (gaps G1–G10).
+findings: [preserved concept and stack integration review](../.engineering/planning/review-result/concept-stack-integration-20260908.md) (gaps G1–G10; originally `.local/review/2026-09-08-concept-and-stack-integration-review.md`).
 Organization authority read from `../atlas` (README/ROADMAP dated 2026-09-04; ADRs 0001–0031).
 This is a proposal. It creates no planning-store artifact, edits no existing contract, and does
 not register anything in Atlas. Atlas integration remains deferred by the operator (`AGENTS.md`).
@@ -50,7 +50,7 @@ so inserting lines shifts those citations. Those edits wait for the story that o
 | `docs/design.md` | § 2.4 consumer table | add rows: service-sdk `service-connectors` at `235558c…` (`protocol`, `service`); org-brain intended, no pin. Add a note that Atlas `docs/catalog.md:595` records devcenter-http at `v0.5.3` while `../devcenter/Cargo.toml:37` pins `e80b7ae…` `=0.7.0`. | accuracy | same |
 | `docs/design.md` | § 24 open decisions, row "Hosted read admission" | set the default: fail closed; policy `Unavailable` is `unavailable` with no dispatch. | G3 | same |
 | `docs/design.md` | § 25 | add the Atlas registration path of § 5 below as operational context, still deferred. | G10 | same |
-| `contracts/README.md` | index table | add row: `operations/v1alpha1` … `service/v1alpha2` binding — [service/v1alpha2](service/v1alpha2/semantics.md) — proposed — verified context, admission profiles, policy/audit, `not_granted`/`stale_authority`, curation fields on every operation. | P1 | cited by line from `story:contracts-documentation-index` (`:29, :36`), `story:contracts-acquisition-profiles` (`:47`), `story:contracts-media-controls` (`:52`); apply under the documentation-index story |
+| `contracts/README.md` | index table | add row: `operations/v1alpha1` … `service/v1alpha2` binding — [service/v1alpha2](../contracts/service/v1alpha2/semantics.md) — proposed — verified context, admission profiles, policy/audit, `not_granted`/`stale_authority`, curation fields on every operation. | P1 | cited by line from `story:contracts-documentation-index` (`:29, :36`), `story:contracts-acquisition-profiles` (`:47`), `story:contracts-media-controls` (`:52`); apply under the documentation-index story |
 | `contracts/README.md` | new section after "Which adapter needs which contract" | "Which consumer needs which contract" table (§ 6 below). | G5–G7 | same |
 | `contracts/operations/v1alpha1/semantics.md` | § 7 compatibility | reference `service/v1alpha2` as the owner of the envelope that carries the mutation fields; keep the projection rule. | consistency | file is uncommitted and in flight under `story:contracts-mutation-outcomes`; hand to that story |
 | `contracts/auth/connection/v1alpha1/semantics.md` | § 4 selection rule; § 9 UNMAPPED row | cite `service/v1alpha2` § 4 rule 4 as the scope rule; keep the entity relation UNMAPPED. | G1 | owned by `story:contracts-management-boundary` |
