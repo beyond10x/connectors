@@ -43,6 +43,7 @@ Rebuild adds what the old integration had and the first slice did not: pod logs,
 | `resource_discovery` | `kubernetes-service-targets` | Service observations with inferred markers; potential Loki/Prometheus/Alertmanager candidates, informational Grafana/Argo markers, opaque locator, no dial |
 | `route.mediated_http` | `kubernetes-service-proxy` (parent side) | reach an in-cluster Service from an adapter that cannot route to it, through the API server proxy, one hop, GET only |
 | `auth.profile` | `kubernetes.bearer`, `kubernetes.mtls`, `kubernetes.exec_plugin` | three credential mechanisms with different effects and gating |
+| `auth.acquisition` | `static_config` | selected bearer/mTLS deployment activation; no interactive acquisition flow. The exec-plugin acquisition binding remains reserved as stated in §5 |
 | `auth.capability` | `http-bearer`, `mtls-client-identity`, `exec-credential-plugin` | bearer placement; TLS client identity; helper execution only inside an admitted operation |
 | `auth.evidence` | `identity_check` (SelfSubjectReview at connect), `permission_check` (SelfSubjectAccessReview per verb, group, version, resource, namespace before each list and before each proxy forward) | provider-side authorization is queryable; denied namespaces are reported, not empty |
 | `auth.connection` | `configured` | one cluster binding per instance; `managed` not needed |
