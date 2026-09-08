@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 7
+revision: 8
 ---
 ## Context
 
@@ -55,7 +55,7 @@ After the child stories complete, the intake ledger maps every source finding to
 | P3 | `story:contracts-tenant-header` — Use one configuration name for the monitoring tenant header | E30 |
 | P2 | `story:contracts-mutation-visibility` — Distinguish implemented, enabled and discoverable mutations | E12 |
 
-No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. Mutation outcomes is implemented as semantic hardening with an ESS model; the other 26 children remain draft. The planning verification below records the earlier draft baseline.
+No P0 is supported by the reviewed evidence; the seven P1 stories establish the foundational rules. Priorities are not approval or evidence of implementation. Mutation outcomes and idempotency scope are implemented as semantic hardening with ESS models; the other 25 children remain draft. The planning verification below records the earlier draft baseline.
 
 ## Sequencing and shared files
 
@@ -85,4 +85,6 @@ Concurrent authoring was observed during the final check: `contracts/catalog/v1a
 
 ## Hardening progress — 2026-09-08
 
-`story:contracts-mutation-outcomes` is complete: F01/E01/E11 corrected in the contract and proposed ESS model, nine authored and 36 generated scenarios compiled, full gate passed, two independent readers approved. Runtime mutation behavior remains unimplemented. The intake records 3 semantic fixes and 45 outstanding source findings; the other 26 stories remain draft. The first story now has exact scenario-file scopes; future stories must refine shared ESS scope before activation. This does not authorize a parallel implementation wave.
+`story:contracts-mutation-outcomes` is complete: F01/E01/E11 corrected in the contract and proposed ESS model, nine authored and 36 generated scenarios compiled, full gate passed, two independent readers approved. Runtime mutation behavior remains unimplemented. The intake now records 4 semantic fixes and 44 outstanding source findings; the other 25 stories remain draft. The first story now has exact scenario-file scopes; future stories must refine shared ESS scope before activation. This does not authorize a parallel implementation wave.
+
+`story:contracts-idempotency-scope` is also complete: F02 corrected in the namespace/fingerprint/replay/retention rules and proposed ESS reservation model; full gate passed with 39 tests and 67 compiled ESS scenarios, and both final independent reviewers approved. A first-round cache-miss/claim-spend race was corrected through an authoritative winner recheck. Runtime authorization, atomicity and clock tests remain explicit obligations. The user is handling concurrent versioning documents separately; this story made no wire-version decision.

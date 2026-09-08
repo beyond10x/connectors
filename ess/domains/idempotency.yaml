@@ -1,0 +1,170 @@
+domain: connectors.idempotency
+
+summary: Proposed receiver-owned keyed mutation reservations and replay retention.
+
+# Normative owner: contracts/operations/v1alpha1/semantics.md §5.1. Values here
+# are resolved by trusted host admission, never authority taken from a request.
+types:
+  - name: connectors.idempotency.ReservationId
+    kind: newtype
+    of: Uuid
+  - name: connectors.idempotency.AuthorityScope
+    kind: struct
+    fields:
+      - {name: tenant, type: "Optional<String>"}
+      - {name: realm, type: "Optional<String>"}
+      - {name: caller, type: String}
+      - {name: executor, type: String}
+  - name: connectors.idempotency.OriginKind
+    kind: enum
+    variants: [direct, federated]
+  - name: connectors.idempotency.Origin
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.idempotency.OriginKind}
+      - {name: authority_ref, type: String}
+  - name: connectors.idempotency.KeyNamespace
+    kind: struct
+    fields:
+      - {name: receiver_instance, type: String}
+      - {name: authority, type: connectors.idempotency.AuthorityScope}
+      - {name: origin, type: connectors.idempotency.Origin}
+  - name: connectors.idempotency.RequestFingerprint
+    kind: struct
+    fields:
+      - {name: operation_ref, type: String}
+      - {name: connection_ref, type: String}
+      - {name: connection_revision, type: String}
+      - {name: contract_ref, type: String}
+      - {name: profile, type: String}
+      - {name: descriptor_revision, type: String}
+      - {name: configuration_revision, type: String}
+      - {name: canonicalization_version, type: String}
+      - {name: input_digest, type: String}
+
+entities:
+  - name: connectors.idempotency.KeyReservation
+    identity:
+      name: reservation_id
+      type: connectors.idempotency.ReservationId
+    fields:
+      - {name: namespace, type: connectors.idempotency.KeyNamespace}
+      - {name: caller_key, type: String}
+      - {name: fingerprint, type: connectors.idempotency.RequestFingerprint}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: settled_at, type: "Optional<Timestamp>"}
+      - {name: replay_expires_at, type: "Optional<Timestamp>"}
+    relations:
+      - name: attempt
+        kind: references
+        target: connectors.mutations.AttemptRecord
+        cardinality: one
+        via: attempt_id
+    # References, not owns: expiry of the replay reservation cannot delete audit
+    # evidence. Each key generation is bound to one immutable attempt identity.
+    # UNMAPPED: namespace-to-authority/issuer/tenant and fingerprint-to-Connection
+    # entity relations await their owning models. These typed values are not
+    # invented entity identities or an assertion about those cardinalities.
+    lifecycle:
+      initial: Pending
+      states: [Pending, Replayable, Quarantined, Expired]
+      terminal: [Quarantined, Expired]
+      transitions:
+        - {name: retain_result, from: [Pending], to: Replayable}
+        - {name: quarantine, from: [Pending], to: Quarantined}
+        - {name: expire, from: [Replayable], to: Expired}
+
+errors:
+  - name: connectors.idempotency.ReservationStateConflict
+    fields:
+      - {name: state, type: connectors.idempotency.KeyReservation.State}
+
+commands:
+  - name: connectors.idempotency.ReserveKey
+    # Ledger half of atomic reserve-and-prepare; not a public API. The caller has
+    # already been admitted and won the namespace/key index slot. ESS does not
+    # establish that uniqueness or the cross-entity transaction.
+    input:
+      - {name: namespace, type: connectors.idempotency.KeyNamespace}
+      - {name: caller_key, type: String}
+      - {name: fingerprint, type: connectors.idempotency.RequestFingerprint}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: reserved
+        creates: connectors.idempotency.KeyReservation
+        instance: reservation_id
+        emits: [connectors.idempotency.KeyReserved]
+  - name: connectors.idempotency.RetainResult
+    # Requires a durable Completed/Failed/Aborted attempt. The host atomically
+    # fixes settled_at and replay_expires_at = settled_at + 86400s. Input values
+    # below are host clock observations, not arbitrary caller retention choices.
+    input:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+      - {name: settled_at, type: Timestamp}
+      - {name: replay_expires_at, type: Timestamp}
+    outcomes:
+      - name: retained
+        moves: connectors.idempotency.KeyReservation.retain_result
+        instance: reservation_id
+        emits: [connectors.idempotency.ResultRetained]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.idempotency.ReservationStateConflict
+  - name: connectors.idempotency.QuarantineKey
+    # Requires a durable Indeterminate attempt. It has no expiry or automatic
+    # reconciliation transition in this first profile.
+    input:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+    outcomes:
+      - name: quarantined
+        moves: connectors.idempotency.KeyReservation.quarantine
+        instance: reservation_id
+        emits: [connectors.idempotency.KeyQuarantined]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.idempotency.ReservationStateConflict
+  - name: connectors.idempotency.ExpireResult
+    # Host must establish now >= replay_expires_at and CAS this generation. A
+    # state-correct command alone does not prove that time or ownership fact.
+    input:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+    outcomes:
+      - name: expired
+        moves: connectors.idempotency.KeyReservation.expire
+        instance: reservation_id
+        emits: [connectors.idempotency.ResultExpired]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.idempotency.ReservationStateConflict
+
+events:
+  - name: connectors.idempotency.KeyReserved
+    fields:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+  - name: connectors.idempotency.ResultRetained
+    fields:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+      - {name: settled_at, type: Timestamp}
+      - {name: replay_expires_at, type: Timestamp}
+  - name: connectors.idempotency.KeyQuarantined
+    fields:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+  - name: connectors.idempotency.ResultExpired
+    fields:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+
+views:
+  - name: connectors.idempotency.ReservationStates
+    source: connectors.idempotency.KeyReservation
+    consistency: read_your_writes
+    fields:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+      - {name: namespace, type: connectors.idempotency.KeyNamespace}
+      - {name: caller_key, type: String}
+      - {name: state, type: connectors.idempotency.KeyReservation.State}
+
+# UNMAPPED executable obligations: current admission and replay-result visibility;
+# namespace/fingerprint derivation and equality; atomic namespace/key uniqueness
+# with Prepared attempt creation; state coupling to that attempt; timestamp
+# assignment/expiry comparison; generation-safe eviction; actual result storage.
+# ESS validates shapes, references and lifecycle causation, not these algorithms.

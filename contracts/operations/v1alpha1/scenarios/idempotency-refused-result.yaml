@@ -1,0 +1,109 @@
+# Compiled ledger expectations only; clock, authority and atomic-index guarantees
+# require host tests in ../idempotency-verification.md.
+type: ess-scenario/1
+domain: connectors.idempotency
+scenario: idempotency-refused-result
+summary: 'F02: a definitive Failed attempt retains the known refusal, not a success response.'
+arrange:
+- instance: first-attempt
+  entity: connectors.mutations.AttemptRecord
+- instance: first-reservation
+  entity: connectors.idempotency.KeyReservation
+timeline:
+- at: '2026-09-08T09:00:00Z'
+  command: connectors.mutations.PrepareAttempt
+  input:
+    instance_id: test-instance
+    request_id: idempotency-refused-result-first
+    operation_id: jira.issue.create
+    connection_ref: test-connection
+    input_digest: test-digest
+    approval_mode: not_required
+    approval_ref: null
+    idempotency_key: create-1
+  outcome: prepared
+  events:
+  - event: connectors.mutations.AttemptPrepared
+  capture:
+    instance: first-attempt
+    event: connectors.mutations.AttemptPrepared
+    field: attempt_id
+- at: '2026-09-08T09:00:01Z'
+  command: connectors.idempotency.ReserveKey
+  input:
+    namespace:
+      receiver_instance: test-instance
+      authority:
+        tenant: tenant-a
+        realm: null
+        caller: alice
+        executor: alice
+      origin:
+        kind: direct
+        authority_ref: test-instance
+    caller_key: create-1
+    fingerprint:
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
+    attempt_id:
+      $instance: first-attempt
+  outcome: reserved
+  events:
+  - event: connectors.idempotency.KeyReserved
+  capture:
+    instance: first-reservation
+    event: connectors.idempotency.KeyReserved
+    field: reservation_id
+- at: '2026-09-08T09:00:02Z'
+  command: connectors.mutations.OpenDispatch
+  input: &id001
+    attempt_id:
+      $instance: first-attempt
+  outcome: opened
+  events:
+  - event: connectors.mutations.DispatchOpened
+- at: '2026-09-08T09:00:03Z'
+  command: connectors.mutations.RecordRefusal
+  input: *id001
+  outcome: refused
+  events:
+  - event: connectors.mutations.AttemptRefused
+- at: '2026-09-08T09:00:04Z'
+  command: connectors.idempotency.RetainResult
+  input:
+    reservation_id:
+      $instance: first-reservation
+    settled_at: '2026-09-08T09:00:03Z'
+    replay_expires_at: '2026-09-09T09:00:03Z'
+  outcome: retained
+  events:
+  - event: connectors.idempotency.ResultRetained
+assert:
+- view: connectors.idempotency.ReservationStates
+  contains:
+    reservation_id:
+      $instance: first-reservation
+    namespace:
+      receiver_instance: test-instance
+      authority:
+        tenant: tenant-a
+        realm: null
+        caller: alice
+        executor: alice
+      origin:
+        kind: direct
+        authority_ref: test-instance
+    caller_key: create-1
+    state: Replayable
+- view: connectors.mutations.AttemptStates
+  contains:
+    attempt_id:
+      $instance: first-attempt
+    state: Failed
