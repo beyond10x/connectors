@@ -1,0 +1,7 @@
+format: ess/1
+system: connectors_kubernetes
+version: v1
+domains:
+  - connectors_kubernetes.discovery
+  - connectors_kubernetes.mutations
+  - connectors_kubernetes.permissions

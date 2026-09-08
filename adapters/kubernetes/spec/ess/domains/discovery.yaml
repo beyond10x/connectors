@@ -1,0 +1,37 @@
+domain: connectors_kubernetes.discovery
+summary: Kubernetes-owned discovery profile, recognizer inputs and partition coordinates.
+
+# Normative owner: adapters/kubernetes/contracts/discovery/v1alpha1/semantics.md and
+# adapters/kubernetes/design.md. Recognition is observation, not callable support.
+types:
+  - name: connectors_kubernetes.discovery.ObservationProfile
+    kind: enum
+    variants: [kubernetes-service-targets]
+  - name: connectors_kubernetes.discovery.RecognitionProvider
+    kind: enum
+    variants: [grafana, alertmanager, loki, prometheus, argocd]
+  - name: connectors_kubernetes.discovery.KubernetesRecognitionInput
+    kind: struct
+    fields:
+      - {name: service_name, type: String}
+      - {name: app_name, type: "Optional<String>"}
+      - {name: legacy_app, type: "Optional<String>"}
+      - {name: legacy_k8s_app, type: "Optional<String>"}
+      - {name: legacy_name, type: "Optional<String>"}
+  - name: connectors_kubernetes.discovery.PartitionKind
+    kind: enum
+    variants: [namespace, cluster]
+  - name: connectors_kubernetes.discovery.PartitionCoordinates
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: kind, type: connectors_kubernetes.discovery.PartitionKind}
+      - {name: namespace, type: "Optional<String>"}
+
+# UNMAPPED: exact Argo name OR app_name recognition (legacy aliases do not select
+# Argo), monitoring priority/case folding, nullable public recognition/candidate,
+# current admission and candidate support. These values execute no recognizer.
+# The adapter projects these closed identifiers and coordinates into the shared
+# observation/coverage envelope. The shared model does not import this model.
+# UNMAPPED: required-null public partition codec, id/namespace correspondence,
+# partition completeness, and exact current binding/profile compatibility.

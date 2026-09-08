@@ -1,0 +1,50 @@
+[
+  {
+    "file": "confluence-v2.openapi.json",
+    "url": "https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json?_v=1.8516.103",
+    "sha256": "451377c5a598ee8155acc11b611404f309bed4a4292ea87f88ed3bfed38fa0a8",
+    "bytes": 611520
+  },
+  {
+    "file": "confluence-v1.openapi.json",
+    "url": "https://dac-static.atlassian.com/cloud/confluence/swagger.v3.json?_v=1.8516.103",
+    "sha256": "70088490f4069e0a5b082411ac5296b822041b2848256444f0dfca3f3d319e73",
+    "bytes": 413973
+  },
+  {
+    "file": "loki-http-api.html",
+    "url": "https://grafana.com/docs/loki/latest/reference/loki-http-api/",
+    "sha256": "cf73d42c5c87aa70f1850aa7f5a84de75a5684ef6937fa28d1686a5ce7db590f",
+    "bytes": 292885
+  },
+  {
+    "file": "jira-issue-search.html",
+    "url": "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/",
+    "sha256": "f8317236fb2033510322bdcd93c5f47c374ea45eea55705e124de5b9cb84e169",
+    "bytes": 3526222
+  },
+  {
+    "file": "jira.openapi.json",
+    "url": "https://dac-static.atlassian.com/cloud/jira/platform/swagger.v3.json?_v=1.8516.103",
+    "sha256": "c638f08111fc182ea1b376570109a38aecfa3888f73496436b22a62c6ef5ba86",
+    "bytes": 2397911
+  },
+  {
+    "file": "loki-v3.7.0-http-api.md",
+    "url": "https://raw.githubusercontent.com/grafana/loki/3361de24b692875d77bd7433cd6baa7c68dc0ef9/docs/sources/reference/loki-http-api.md",
+    "sha256": "b19b2eaa241c7a1984ec2bdfd4c253b1403cd9f4b0d3abbcadef720f455957a1",
+    "bytes": 58954
+  },
+  {
+    "file": "loki-v3.7.0-logcli-query.go",
+    "url": "https://raw.githubusercontent.com/grafana/loki/3361de24b692875d77bd7433cd6baa7c68dc0ef9/pkg/logcli/query/query.go",
+    "sha256": "9fa3ba34d9f9d22a34f69ede009b92a4d2664241c9c33a8e2ddba0d45cff8513",
+    "bytes": 16782
+  },
+  {
+    "file": "jira-search-reconcile.html",
+    "url": "https://developer.atlassian.com/cloud/jira/platform/search-and-reconcile/",
+    "sha256": "57f571be10673b7ec0f2a516ff031e0619e5a681b6f9cc984dfe864a2c4ce3a3",
+    "bytes": 212498
+  }
+]

@@ -1,0 +1,29 @@
+domain: connectors_loki.reads
+summary: Loki-owned LogQL range selection and mandatory selector equalities.
+
+# Normative owner: adapters/loki/contracts/logs/v1alpha1/semantics.md §§3–4.
+types:
+  - name: connectors_loki.reads.LogDirection
+    kind: enum
+    variants: [forward, backward]
+  - name: connectors_loki.reads.LogScopeEquality
+    kind: struct
+    fields:
+      - {name: label, type: String}
+      - {name: value, type: String}
+  - name: connectors_loki.reads.LogRangeSelection
+    kind: struct
+    fields:
+      - {name: query, type: String}
+      - {name: start_unix_ns, type: String}
+      - {name: end_unix_ns, type: String}
+      - {name: direction, type: connectors_loki.reads.LogDirection}
+      - {name: page_limit, type: Integer}
+      - {name: collection_limit, type: Integer}
+      - {name: max_line_bytes, type: Integer}
+
+# UNMAPPED: exact LogQL grammar/root recognition and every-selector equality
+# admission, original query bytes, canonical nanosecond timestamps/ranges,
+# effective provider limits and saturation/exhaustion interpretation.
+# This profile's native query selection is not a universal input for pod or
+# container streams. Shared collection/page facts do not execute this binding.

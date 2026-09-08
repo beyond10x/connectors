@@ -1,0 +1,106 @@
+[
+  {
+    "file": "confluence-v2.openapi.json",
+    "url": "https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json?_v=1.8516.103",
+    "sha256": "451377c5a598ee8155acc11b611404f309bed4a4292ea87f88ed3bfed38fa0a8",
+    "bytes": 611520,
+    "archive": "vendor/confluence-v2.openapi.json.gz",
+    "archive_sha256": "750ac7abae53e755395f476b8039973af951887af493419d061613ea652eb9ca"
+  },
+  {
+    "file": "confluence-v1.openapi.json",
+    "url": "https://dac-static.atlassian.com/cloud/confluence/swagger.v3.json?_v=1.8516.103",
+    "sha256": "70088490f4069e0a5b082411ac5296b822041b2848256444f0dfca3f3d319e73",
+    "bytes": 413973,
+    "archive": "vendor/confluence-v1.openapi.json.gz",
+    "archive_sha256": "d5a372dc91fbb579ae07a001356fa1029f55248ca968f65aa0b974306dfda4c7"
+  },
+  {
+    "file": "loki-http-api.html",
+    "url": "https://grafana.com/docs/loki/latest/reference/loki-http-api/",
+    "sha256": "cf73d42c5c87aa70f1850aa7f5a84de75a5684ef6937fa28d1686a5ce7db590f",
+    "bytes": 292885,
+    "archive": "vendor/loki-http-api.html.gz",
+    "archive_sha256": "460b89a86312c1663c40040dd2b4ec9e98151af64b82c54cee12ac5a10ca593b"
+  },
+  {
+    "file": "jira-issue-search.html",
+    "url": "https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/",
+    "sha256": "f8317236fb2033510322bdcd93c5f47c374ea45eea55705e124de5b9cb84e169",
+    "bytes": 3526222,
+    "archive": "vendor/jira-issue-search.html.gz",
+    "archive_sha256": "eebb09125f9f15523a822d6821d3fbbfa193781226733479e188927383ef862b"
+  },
+  {
+    "file": "jira.openapi.json",
+    "url": "https://dac-static.atlassian.com/cloud/jira/platform/swagger.v3.json?_v=1.8516.103",
+    "sha256": "c638f08111fc182ea1b376570109a38aecfa3888f73496436b22a62c6ef5ba86",
+    "bytes": 2397911,
+    "archive": "vendor/jira.openapi.json.gz",
+    "archive_sha256": "960b75c4f04d1944a7e4dde9fdf79a706d54b09e25b0bb0e9b06a1b73640c44e"
+  },
+  {
+    "file": "loki-v3.7.0-http-api.md",
+    "url": "https://raw.githubusercontent.com/grafana/loki/3361de24b692875d77bd7433cd6baa7c68dc0ef9/docs/sources/reference/loki-http-api.md",
+    "sha256": "b19b2eaa241c7a1984ec2bdfd4c253b1403cd9f4b0d3abbcadef720f455957a1",
+    "bytes": 58954,
+    "archive": "vendor/loki-v3.7.0-http-api.md.gz",
+    "archive_sha256": "0fd6ca685acd6719970c35e3e29e348ad7e8bd580e6f24fcd201d194434212d6"
+  },
+  {
+    "file": "loki-v3.7.0-logcli-query.go",
+    "url": "https://raw.githubusercontent.com/grafana/loki/3361de24b692875d77bd7433cd6baa7c68dc0ef9/pkg/logcli/query/query.go",
+    "sha256": "9fa3ba34d9f9d22a34f69ede009b92a4d2664241c9c33a8e2ddba0d45cff8513",
+    "bytes": 16782,
+    "archive": "vendor/loki-v3.7.0-logcli-query.go.gz",
+    "archive_sha256": "4a425de999a7d80fb61abd6c1cbafc73bd91df417532750baa257162d4eaa55f"
+  },
+  {
+    "file": "jira-search-reconcile.html",
+    "url": "https://developer.atlassian.com/cloud/jira/platform/search-and-reconcile/",
+    "sha256": "57f571be10673b7ec0f2a516ff031e0619e5a681b6f9cc984dfe864a2c4ce3a3",
+    "bytes": 212498,
+    "archive": "vendor/jira-search-reconcile.html.gz",
+    "archive_sha256": "415a5812b7ae1c45193eb71866de69afd31fc4d7e360da259082a50016b60eab"
+  },
+  {
+    "file": "old-providers--loki.toml",
+    "url": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:providers/loki.toml",
+    "sha256": "7a936f77da06bd6e1aede789fec008754c52b69b957a5d5dc1cfe5bbc7b9e10e",
+    "bytes": 1433,
+    "archive": "vendor/old-providers--loki.toml.gz",
+    "archive_sha256": "c9ffa694bbb5fc7240eda9d0c5f57a8100538477ad43b3fa3e9314a02707bcac"
+  },
+  {
+    "file": "old-providers--confluence.toml",
+    "url": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:providers/confluence.toml",
+    "sha256": "b138f4f54ba8d8df0205707a7e6af0beb308521e220aa075e9f05483a702f189",
+    "bytes": 54349,
+    "archive": "vendor/old-providers--confluence.toml.gz",
+    "archive_sha256": "81a49386adff0959cc67d62e54bc2bab698e67c9b09f8a1be5f912a3e16678ad"
+  },
+  {
+    "file": "old-providers--jira.toml",
+    "url": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:providers/jira.toml",
+    "sha256": "73908f8f10efd84e03f7c9ca091e73aac30869a7912fadc83c0354dc9ecc2e69",
+    "bytes": 53904,
+    "archive": "vendor/old-providers--jira.toml.gz",
+    "archive_sha256": "81beee32693ea1516865128bdbaf7e6d605c4e779b945d5623d43cd8b6890aa8"
+  },
+  {
+    "file": "old-crates--integration-monitoring--src--projection.rs",
+    "url": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:crates/integration-monitoring/src/projection.rs",
+    "sha256": "65e51180299364473b2dc4273357330281a8c3f9960af39b15eed8884809d344",
+    "bytes": 11854,
+    "archive": "vendor/old-crates--integration-monitoring--src--projection.rs.gz",
+    "archive_sha256": "97d5a7b87b55bcc41c8e437635b1b6105803b5e19bf48f8b23f7d55944ff6e13"
+  },
+  {
+    "file": "old-specs--loki--http-api-2026-08-15.openapi.yaml",
+    "url": "../connectors@81459ac42ddd518d3942f4b079841e9e0ed6efc8:specs/loki/http-api-2026-08-15.openapi.yaml",
+    "sha256": "77e769512509c9b6d8d21c08a6d576bbafbde0e4cbfde8da33abc196bfc49ee7",
+    "bytes": 1715,
+    "archive": "vendor/old-specs--loki--http-api-2026-08-15.openapi.yaml.gz",
+    "archive_sha256": "406cc1163e5571e4360842206d928466ad1526740ed51c3f2d84619b0e90cf04"
+  }
+]
