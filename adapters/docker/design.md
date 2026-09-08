@@ -27,6 +27,7 @@ None. Every row below is new.
 | `endpoint_discovery` (exists) | `docker-published-ports` | published container ports and network attachments as endpoint observations with candidate classification; `namespace` carries the Docker network name; no dial |
 | `operations` `mutation` | `container.start`, `container.stop`, `container.restart` | externally visible state changes; `natural` for start/stop desired-state semantics and `none` for restart (§4.1); all remain approval-bound |
 | `auth.profile` | `docker.socket`, `docker.mtls` | daemon access is either the unix socket (peer credentials) or TLS client certificate |
+| `auth.acquisition` | `static_config` | separately admitted deployment activation of the socket aperture or coherent TLS credential references; no interactive acquisition flow |
 | `auth.capability` | `socket-peer`, `mtls-client-identity` | the host HTTP client must speak HTTP over a unix socket or with a client certificate (`crates/connectors-host/src/http.rs`, URL-based reqwest today) |
 | `auth.evidence` | `verify_operation` = `_ping`/`version` | daemon reachability without effects |
 | `auth.connection` | `configured` | one daemon per instance |
