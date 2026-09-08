@@ -46,6 +46,13 @@ without transcoding at the seam. DTMF uses RFC 4733 telephone-events, refusing w
 negotiation declines it. The shared interruption/loss/overload and terminal rules
 remain obligations of this binding.
 
+`sip.dial` is the ordinary mutation. `close` is a session control message, while
+`signal { kind: dtmf, ... }` and `interrupt { track }` are media control messages;
+offer, accept, reject and cancel are session-establishment messages. None is an
+ordinary operation id unless a later profile specifies independent admission,
+effects and a terminal result. `hold` and `transfer` are reserved/refused and are
+absent from this binding's advertised and negotiated capability set.
+
 Loopback is the default aperture. Explicitly authorized non-loopback configuration
 must pre-admit every address and port that SDP can cause the stack to use; the old
 sipx binding may transmit to learned peers before validation. Socket ownership,

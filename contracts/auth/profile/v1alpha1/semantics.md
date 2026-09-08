@@ -67,6 +67,17 @@ Closed vocabularies:
 | `capabilities` | names from `auth.capability` |
 | `evidence` | names from `auth.evidence` |
 
+Reserved vocabulary has a closed support disposition:
+
+| Name | Disposition | Requirement/source rationale |
+|---|---|---|
+| `http_signing` | reserved/refused | Three historical providers (Twilio, Slack and Stripe) used signing, so the name is retained for source translation; none of the selected profiles supplies canonicalization, key use or conformance, so it cannot be selected or advertised. |
+| `oauth2_password` | reserved/refused | One historical Babelforce profile used the password grant; the selected acquisition contract does not define that flow, so preserving the source name grants no runtime support. |
+
+Reserved/refused values are accepted only as documented source inventory. A
+selectable profile, safe descriptor or runtime capability containing one is
+refused until its owning contract and adapter binding are separately reviewed.
+
 Operation reference:
 
 ```json
