@@ -6,7 +6,7 @@ status: draft
 title: Parallel completion of remaining semantic specifications
 relations:
 - informed_by: specification:contract-driven-connectors-design
-revision: 2
+revision: 3
 ---
 # Specification completion parallel plan, 2026-09-09
 
@@ -41,11 +41,20 @@ No remote deployment/publication is authorized. Existing retained design/Kuberne
 
 ## Current stage
 
-Dispatched from common checkpoint; seven original remediation stories remain open at dispatch, plus ownership closure and consolidated final consistency review. Root remains sole planning writer. Individual worker completion is not final specification readiness.
+The seven original remediation stories and extractable ownership story are implemented after two independent final approvals at d1dc83f5d600816c699db07dd843f079ded0e72b. All 48 original source findings are fixed. Root remains sole planning writer. The overall goal remains active only for the bounded persistent-model closure below; this reviewed semantic checkpoint is not runtime readiness.
 
 ## Independent review pipeline
 
 Reviewer A starts the stable shared core at immutable commit eb0815961e6ffee54c50f91f37eff2bbe11811c0 while native datasource and media/vocabulary edits finish. Managed id specs-review-a-20260909; tree /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-review-a-20260909; build target/ and scratch .local/spec-completion-20260909 inside that tree; session specs-review-a-20260909. Its original review-brief.md is on disk. Tracked sources are read-only. The final integrated commit will be supplied for its remaining coverage; this first pass cannot approve the whole specification set. A second fresh reviewer follows on the combined source. Human approval or mechanically independent runtime-verifier evidence is not claimed by an agent review.
 
 Read-retry unit head 7adcb2952ad18b86dcac4e824fdeb06e8ff1c480 is integrated by merge eb0815961e6ffee54c50f91f37eff2bbe11811c0, including coordinator-owned compatibility/v1alpha2 patches. Coordinator source/scenario review and dry merge passed; author and committer are the verified bot. The story remains active pending combined independent review. Unit and coordinator leases on the retry tree are released; it is retained, not cleanup-safe merely because its commit exists.
+
+
+## Final integration and next finite model stage
+
+[Checkpoint](../../../docs/evidence/spec-completion-20260909/checkpoint.md) records all three unit heads/merges, full gate including MSRV (exit 0, 58 Rust tests), 702-link audit and unchanged reviews. Initial review A's SCA-01 is fixed in 2360f1f and ACO-S-04 is confirmed closed. Final independent reviewers A and B approve exact d1dc83f5. Their managed trees are specs-review-a-20260909 and specs-review-b-20260909 under /home/timo/.local/state/worktree/trees/b10x/connectors_v2; each used its own target/ and .local/spec-completion-20260909, with tracked sources read-only and own leases released. Briefs and supplied unit handoffs are retained in the checkpoint packet.
+
+A read-only scoper reused the freed agent slot in specs-model-closure-20260909 at the same source, with target/ and .local/spec-completion-20260909 isolated inside that tree; session specs-model-closure-scope-20260909 is released. Its unchanged report is docs/evidence/spec-completion-20260909/model-closure-scope-original.md (SHA256 1e1de2902054531b380cade091d40be84e7c6fbe1168b68da89e25afee52236d). Relative links inside raw briefs/reports retain their original checkout context. The accepted finite next stage drafts shared auth/audit and Kubernetes discovery state plus immutable artifact values, records conservative ownership/retention decisions in prose before models, then independently reviews the integrated source. Configuration/composition/curation and fixed mediated bindings remain values unless a separate lifecycle is selected. Optional Prometheus scope, catalog publication and other deferred adapters cannot extend the Kubernetes/GitLab/SQL completion claim. No runtime decomposition precedes the required ESS declarations.
+
+Coordinator retains specs-integration-20260909 for the active goal and specs-model-closure-20260909 for model authoring. Completed worker/reviewer trees will be finished/GC only after local recovery publication and preservation of required evidence. This checkpoint makes no cleanup claim before the CLI verifies it.
 

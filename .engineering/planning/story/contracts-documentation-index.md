@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-documentation-index
 kind: story
-status: draft
+status: implemented
 title: Reconcile contract and adapter coverage indexes
 tags:
 - P3
@@ -21,7 +21,7 @@ scope:
   path: contracts/README.md
 - confidence: cited
   path: docs/design.md
-revision: 6
+revision: 11
 ---
 ## Context
 
@@ -72,3 +72,11 @@ The approved parallel assignment is specification:spec-completion-parallel-20260
 ## Partial completion during independent review remediation — 2026-09-08
 
 `story:independent-review-remediation` addresses overlapping A-M3/B-F05: the index now includes the proposed governed service document, distinguishes 22 table rows from 17 semantic documents, and lists all four deferred families including configuration. This also closes this story's original E13. The current index and design §30 agree (five implemented rows in one document; seventeen proposed rows in sixteen documents). E22's adapter dependency matrix and prerequisite-dependent reconciliations remain owned by this draft story; its lifecycle has not been advanced or declared fully complete. Evidence and final review dispositions are recorded by the remediation story.
+
+## Completion evidence — 2026-09-09
+
+E22 is fixed and E13 remains fixed. Root and native dependency tables consistently include static_config acquisition for Kubernetes/Docker, managed media custody/acquisition and the actual shared versus native owners. See docs/evidence/documentation-index-20260909/verification.md.
+
+Both independent final reviews spec-completion-a-final-20260909 and spec-completion-b-final-20260909 approve the selected specification scope at d1dc83f5d600816c699db07dd843f079ded0e72b. The complete checkpoint, unchanged reports and exact source archive are retained in [checkpoint](../../../docs/evidence/spec-completion-20260909/checkpoint.md). The full repository gate including MSRV 1.88 passed with 58 Rust tests; ESS synthesis/compilation and textual scenarios do not execute runtime conformance. No runtime implementation or public codec change was added in this wave.
+
+The approved parallel plan supersedes earlier single-primary-writer dispatch wording: isolated workers changed only their assigned sources, coordinator alone wrote planning/shared joins. This story is complete for its enumerated specification findings; the overall goal remains active for the separately scoped persistent ESS model closure. Original immutable review bodies and historical source references remain unchanged.
