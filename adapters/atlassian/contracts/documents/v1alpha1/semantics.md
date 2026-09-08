@@ -57,7 +57,7 @@ The byte count above illustrates the shape; it is not a byte-accurate test vecto
 
 | Field | Rule |
 |---|---|
-| Confluence `item` | Canonical `id`, `title`, `status: current`, canonical `space_id`, and nullable `version`; ordinary `subtype: page` is required from the source |
+| Confluence `item` | Canonical `id`, `title`, `status: current`, canonical `space_id`, and nullable `version`; ordinary-page selection is established under §4.1, including the source's nullable subtype |
 | Confluence `version` | Null when absent; otherwise the provider's positive integer `number` and nullable provider creation time as `when`; missing optional time stays null |
 | Jira `item` | Canonical numeric `id`, provider-returned canonical `key`, `project {id,key}`, and `version: null`; no Confluence title/status fields are invented |
 | `body.content` | Confluence: string, possibly shortened; Jira: complete native JSON object, or null only for explicitly reported whole-body omission |
@@ -74,9 +74,32 @@ Required identity, scope or selected body fields missing from a purported succes
 
 Use the fixed site's `GET /wiki/api/v2/pages`, with the one exact `id`, receiver-owned `space-id` set, explicit `status=current`, `subtype=page`, `limit=1` and, for a body read, `body-format=storage`. Neither the caller nor a response link supplies an unscoped `/pages/{id}` fallback. The v2 default includes archived pages, so omitting the status filter is not equivalent.
 
+Each id/space-id array is one comma-separated query value of canonical decimal
+IDs, as described by the captured endpoint, then percent-encoded once. No empty
+ID or scope list is sent as an omitted/unconstrained provider filter.
+
 A non-cached read needs one scoped body request. A possible cache hit first makes the same scoped request without `body-format`; this metadata observation may establish current membership and version for §5. A changed/absent version or unusable cache entry requires a fresh scoped body request, within the same two-call budget. The body request repeats every scope predicate rather than inheriting an earlier membership decision.
 
 The selected v2 source is `PageBulk`, not the detail Page shape. Accept exactly one returned current ordinary page with the requested canonical ID, a space ID in the configured set and the selected storage body. More than one object, duplicate/mismatched identity, inconsistent status/subtype or unexplained continuation for this one-ID read is `unavailable`. An empty scoped result is `not_found`: it does not distinguish missing, inaccessible or outside-scope pages. A returned conflicting scope is a provider-protocol failure, never content to release.
+
+PageBulk's `subtype` is optional and nullable in the captured official schema.
+The fixed `subtype=page` query predicate supplies ordinary-page selection when
+that returned property is absent or null; a returned string must be exactly `page`.
+Any other string or non-string value is a conflicting/malformed observation and
+refuses `unavailable`. This allowance does not relax required ID, current status,
+space, title or selected storage checks, and it does not apply to an unfiltered
+detail endpoint. A binding unable to establish the selected query filter's meaning
+cannot advertise this profile. Apply the same rule to scoped metadata revalidation
+and each body-bearing CQL bulk page. The
+[source supplement](evidence/20260909/provider-sources.md) records the exact
+PageBulk/query schema locations and the limits of that evidence.
+
+For a body observation, `body.storage` must be an object whose `value` is a
+string. The `storage` key plus fixed `body-format=storage` selects its native
+format; if the optional nested `representation` marker is present it must be the
+string `storage`. Null/wrong markers, an absent storage object/value or an ADF-only
+body refuse rather than manufacture a storage representation. Metadata-only
+cache revalidation consumes no body, even when incidental body fields appear.
 
 ### 4.2 Jira by ID or key
 
@@ -94,13 +117,27 @@ Every dispatch uses the fixed bound origin and profile-owned path/method/paramet
 
 For Confluence pagination, accept at most one unambiguous next position from the selected endpoint's `_links.next` or HTTP Link `rel=next`; when both are present they must identify the same cursor. Resolve a relative link only against the configured request URL, require the same HTTPS origin and exact endpoint path, and reject userinfo, fragments, duplicate query keys or unsupported parameters. The single nonempty decoded cursor is at most 4,096 UTF-8 bytes. Any other supplied query parameter must equal the receiver's already fixed value; omitted parameters are restored from private context, never from defaults. Dispatch a newly constructed request to the fixed endpoint with that extracted cursor and the original filters/expansions/limit. A next position equal to the current position or an ancestor in that cursor's immutable lineage is `unavailable`, not progress. Replaying a public cursor uses its original lineage; later or branched positions do not retroactively become its ancestors. No-next is established only after a complete valid response; a malformed next link is never exhaustion.
 
+Parameter comparison is over the endpoint's decoded typed values, not substring
+matches. Each cursor is decoded exactly once as a query value, then re-encoded
+once when constructing the fixed request. The CQL search lineage and an
+invocation's v2 body-enumeration lineage are distinct: only positions from the
+same fixed endpoint and original selection are compared as ancestors. A v2 body
+cursor is private to that invocation and can never become a public CQL cursor.
+
 Host denial is `forbidden`; invalid input is `invalid_input`; admitted scoped absence is `not_found`; expired execution is `timeout`; missing binding guarantees, invalid/oversized upstream content and unusable source observations are `unavailable`. Current auth failures follow the shared auth/error contract without leaking provider bodies. This profile grants no refresh or extra provider retry budget; the read-refresh owner must define any such composition separately.
 
 ## 5. Cache admission and moves
 
-Only Confluence results with an actual provider version may be body-cache candidates. The partition includes source/site, instance, connection and external identity, credential generation where applicable, allowed-scope identity, policy/configuration and auth/profile/projection revisions, canonical page ID and representation. The stored value retains body version, exact original bytes/count and original observation time. Store only a fully received native body observation, not a previously shortened public response.
+Only Confluence results with an actual provider version may be body-cache candidates. The partition includes source/site, instance, connection and external identity, credential generation where applicable, allowed-scope identity, policy/configuration and auth/profile/projection revisions, canonical page ID, representation, request max_body_bytes and the source/result-budget revision. The stored value retains body version, exact original bytes/count and original observation time. Store only a fully received native body observation, not a previously shortened public response.
 
 Maximum body-observation age is 300 seconds or the configured smaller TTL. No stale-on-error reuse is allowed. A cache hit still requires the fresh scoped metadata observation in §4.1, the same canonical ID/current allowed space and equal nonnull content version, plus current host/result admission. That check's time never replaces the original body observation time. A move into a different allowed space may be served only when the fresh metadata establishes it and the binding remains authorized; old membership alone is never used.
+
+For a reused body, item identity/title/status/space come from that fresh metadata
+observation; the equal version correlates it with the stored body. Body bytes and
+provenance retain the original body observation. An allowed-space move therefore
+cannot return the cached old space ID as current membership. This expressly
+permits two correlated observations on a cache hit; it does not claim one atomic
+metadata/body response or a membership lock.
 
 If membership/version cannot be established, fail or perform the admitted fresh scoped body read within the original budget; do not return a stale success. Source/policy/configuration/credential changes or known invalidation defeat a TTL-valid entry. Lost cache state is a miss; expiry and eviction do not invent a new observation. Metadata/body separation remains the observation contract of §2, not atomic provider membership locking.
 
@@ -108,11 +145,31 @@ If membership/version cannot be established, fail or perform the admitted fresh 
 
 Every upstream response is completely received and strictly parsed inside its byte/time ceiling before an exact `body.bytes` or successful result is claimed. Invalid UTF-8, malformed JSON, duplicate object keys or a selected native value that the lossless binding cannot preserve causes `unavailable`. In particular, JSON numbers must not silently round through binary floating point.
 
-For Confluence, `body.bytes` counts UTF-8 bytes of the decoded storage string, before public shortening. Select the longest Unicode-scalar-aligned prefix fitting both `max_body_bytes` and the full serialized service-result budget; serialization includes JSON escaping, metadata, provenance and envelope framing. This is a text prefix, not a claim that truncated XHTML is well-formed or safe to render. Preserve the complete stored provider version and original count.
+Source ceilings count the entire HTTP entity and decoded response envelope,
+including links, pagination metadata, whitespace, incidental fields, unrequested
+expansions and objects later filtered out. They never count only `results`,
+`fields` or the selected storage string. All response headers count against their
+separate header ceiling. A metadata-only request still uses its smaller ceiling
+if the provider returns an unexpected body field; that field is not consumed,
+cached or disclosed. An oversized envelope refuses even when the selected body
+would be tiny. Aggregate counters include every admitted lookup and body page,
+including a response that causes failure; nothing resets them between stages.
+
+For Confluence, `body.bytes` counts UTF-8 bytes of the decoded storage string, before public shortening. Select the longest Unicode-scalar-aligned prefix fitting both `max_body_bytes` and the reserved serialized-result allocation defined below; serialization includes JSON escaping, metadata, provenance and envelope framing. Unused reserved metadata bytes need not be reclaimed for content. This is a text prefix, not a claim that truncated XHTML is well-formed or safe to render. Preserve the complete stored provider version and original count.
 
 For Jira, `body.bytes` counts the UTF-8 source JSON token span of the complete `fields` object, including its internal whitespace/escapes. The selected lossless binding preserves that native object without numeric conversion. If the complete object does not fit the body bound or remaining serialized-result budget, emit `content: null`, `truncated: true` and the applicable cause(s); never prune custom fields, manufacture an empty object, or label a JSON-text prefix as an object. Null here means omitted content and does not claim a null provider `fields` value.
 
 A source cutoff gives no exact full-body count and no successful truncated object: refuse `unavailable`. A source Content-Length describes transport bytes, not decoded storage text or a nested fields object, and cannot supply the count. Output shortening does not relax upstream limits. If required metadata/envelope alone cannot fit, refuse rather than cut protocol fields.
+
+Cause selection is explicit and independent. `body_bytes` applies iff the full
+measured representation exceeds max_body_bytes. `result_bytes` applies iff the
+full faithful public body value would exceed its remaining serialized-result
+allocation, even when the body limit already requires shortening/omission. Reserve
+required item/envelope/cursor metadata and both possible cause names before making
+that comparison, so the decision cannot invalidate its own size budget. Emit
+causes in `body_bytes,result_bytes` order and set truncated iff that array is
+nonempty. Confluence chooses the longest scalar prefix satisfying both bounds;
+Jira emits its full native object only if both bounds allow it, otherwise null.
 
 | Budget | Selected ceiling |
 |---|---|
@@ -124,7 +181,7 @@ A source cutoff gives no exact full-body count and no successful truncated objec
 | Provider requests | Detail: at most two; body-bearing CQL page: at most five total, including its source-search call |
 | Time | One 20 s execution deadline and one shared 15 s provider-work budget across every call, including connects; each connect at most 5 s and all work within the remaining budgets |
 | Retained body cache | Optional; at most 8 MiB accounted storage per entry, 64 MiB / 256 entries per service instance, and 16 MiB / 64 entries per admitted principal/tenant partition; smaller configured ceilings allowed |
-| CQL continuation state | At most 64 KiB per chain, 1,024 live chains / 64 MiB per service instance, and 64 chains / 4 MiB per admitted principal/tenant partition; public token at most 4,096 UTF-8 bytes |
+| CQL continuation state | At most 64 KiB and 1,024 immutable position states per chain including all replay branches; 1,024 live chains / 64 MiB per service instance, and 64 chains / 4 MiB per admitted principal/tenant partition; public token at most 4,096 UTF-8 bytes |
 
 No per-item call, redirect, pagination or repair resets these budgets. Account retained allocations, indices and private context before admission; reservations and publication share the port's capacity fence across concurrent requests. Expiry and least-recently-used eviction may retire these ephemeral entries but cannot renew original age or erase another port's safety records. If optional body-cache insertion cannot fit, return the freshly admitted uncached result. CQL must reserve its continuation context before publishing a page that needs a cursor; capacity failure is `unavailable`, with no page/cursor advancement. An uncached detail binding may advertise without a body cache; a profile requiring continuation cannot advertise without these bounded state semantics. These are receiver-selected limits, not proof of a particular allocator or cache implementation.
 
@@ -132,19 +189,65 @@ No per-item call, redirect, pagination or repair resets these budgets. Account r
 
 Preserve native CQL and its provider continuation; this is neither a fixed query nor a metadata-only replacement for the old body-capable search. The selected input declares `cql`, `limit` (1–100, default 25), `max_body_bytes` and a separate closed `{cursor}` resume variant. CQL is at most 8 KiB UTF-8. The initial query, ordering, scope, bounds and projection are immutable across its cursor.
 
+Initial input is closed and requires cql. Max_body_bytes uses §3's integer bounds
+and default. Unknown/null members, non-integer/boolean limits and mixed initial/
+resume input are invalid_input before dispatch.
+
 A binding must parse the predicate and optional trailing ORDER BY using the selected [CQL admission grammar and rewriting rules](cql.md). It prefixes receiver-owned `type=page` and safely quoted space-key predicates, then the parenthesized original predicate; original ordering is reattached outside the conjunction. Unknown syntax or unsupported constructs refuse `invalid_input`; substring checks and concatenating an unparsed full query are not scope validation. The grammar is specified here; its parser/quoting implementation still needs binding evidence before advertisement.
 
 First call `GET /wiki/rest/api/content/search` for metadata, with `expand=space`, the fixed rewritten CQL and public limit; omit cqlcontext and every body-related expansion. Require a complete valid collection with no more than limit entries, canonical distinct candidate IDs, page type, current status and well-formed space ID/key metadata. Reject malformed/duplicate/non-page entries instead of skipping them. Candidate scope is still untrusted until the scoped body observation; no candidate body is disclosed or treated as trusted. Current configured space IDs remain authoritative if a key is stale or reassigned. Provider CQL/index consistency, provider-side date functions and ordering are preserved as candidate-selection semantics, not promoted to a snapshot or a fresh-content predicate evaluation.
 
-For at most 100 distinct candidate page IDs, use v2 `GET /wiki/api/v2/pages` with those IDs, the configured space IDs, `status=current`, `subtype=page`, `body-format=storage`, and bounded page size. Consume any v2 continuation only through the same fixed endpoint and immutable filters: extract an opaque cursor after validating the declared continuation form, never fetch an arbitrary link. There are at most four bulk-body calls within the five-call/8-MiB/original-deadline ceiling. Reject duplicate/unrequested IDs, inconsistent returned membership and malformed source pages.
+When the candidate page is empty, make no v2 body request: publish the valid empty
+source-page result with its CQL continuation/exhaustion decision. Otherwise, for
+1–100 distinct candidate IDs, use v2 `GET /wiki/api/v2/pages` with those IDs, the
+configured space IDs, `status=current`, `subtype=page`, `body-format=storage`, and
+`limit` equal to that fixed candidate count. Keep the candidate ID list in source
+order and serialize both ID arrays under §4.1. Consume any v2 continuation only
+through the same fixed endpoint and immutable filters: extract an opaque cursor
+after validating the declared continuation form, never fetch an arbitrary link.
+There are at most four bulk-body calls within the five-call/8-MiB/original-deadline
+ceiling. Reject duplicate/unrequested IDs, inconsistent returned membership and
+malformed source pages.
 
 Finish the bounded bulk enumeration before publishing the public source page. Reorder admitted bodies into the original CQL candidate order. An absent current scoped body is filtered out; it does not authorize unscoped detail lookup. If bulk enumeration cannot be exhausted within the limits, the whole public page fails `unavailable` with no public cursor advancement. There is no hidden lookup per candidate and no silent body-to-metadata downgrade. A caller may start a new search with a smaller page limit; that is not continuation of a failed page.
 
-Apply per-item body bounds, then the 4 MiB complete-result bound. For aggregate pressure, shorten storage strings in stable item order: each gets the longest prefix fitting its own body limit and the remaining budget after reserving every item's required metadata and the continuation/provenance envelope. Mark `result_bytes` on affected bodies. If that reserved metadata cannot fit, refuse the page without advancing continuation.
+Apply per-item body bounds and the 4 MiB complete-result bound. For aggregate pressure, shorten storage strings in stable item order: each gets the longest prefix fitting its own body limit and the remaining budget after reserving every item's required metadata, cause fields and the continuation/provenance envelope. Mark causes using §6's independent predicates. If that reserved metadata cannot fit, refuse the page without advancing continuation.
 
 The selected list result is closed `{items, complete, next_cursor, provenance}`. Each item is a complete document result from §3, including its own body observation provenance; body/title/version come from the same accepted v2 observation, not from stale CQL metadata. Root provenance names the configured Confluence page collection and the source-search observation time; it does not claim that all bodies were read simultaneously.
 
-The public cursor retains validated provider continuation, consumed-position digests and the complete source/query/scope/order/bounds/auth/projection context through the bounded host cursor port. A chain permits at most 1,024 source pages and expires at most 300 seconds after its original search observation; a later cursor does not renew that expiry. Reaching the page ceiling while the provider still has continuation refuses the page as `unavailable`, without a false terminal success. Resume is `{cursor}` only; current admission and every binding equality are required again, before disclosing token validity. Expired, lost, evicted or mismatched state is `stale_cursor`; unavailable authority/state infrastructure is `unavailable`. A cursor is never a grant.
+The public cursor identifies an immutable position state under the host cursor
+port. A chain fixes the complete source/query/scope/order/bounds/auth/projection
+context, original observation time and expiry. Its root represents the initial
+request (depth 1). Each child holds its validated CQL provider cursor, immutable
+parent reference, depth and consumed-position digest over the exact decoded cursor
+under the fixed endpoint/selection; following parent references
+defines exactly its ancestors. Hash equality may conservatively refuse a position,
+but must never permit a repeated ancestor. These are bounded ephemeral values,
+not a new durable provider entity or a source snapshot.
+
+Replaying a cursor never modifies its state or ancestor set. A different valid next
+position creates a child of that same state; an existing identical child may be
+reused. Later descendants and siblings are not ancestors of the replayed state.
+The 64 KiB/1,024-state chain ceilings account the root/context, every live branch,
+provider cursor bytes, parent/digest/index/backing allocations and reservations
+under one atomic capacity fence. They are not separate per-branch allowances.
+Eviction retires the whole chain; it cannot discard an ancestor needed by a live
+descendant while leaving that descendant usable. Repeated calls may still perform
+new bounded provider work, but cannot create unbounded retained branches.
+
+A lineage permits at most 1,024 source pages and expires at most 300 seconds after
+the original search observation. A later cursor or replay never renews that expiry.
+At depth 1,024, a further provider next position refuses the page as `unavailable`;
+an exhausted page at that depth may succeed. Node/byte capacity may refuse earlier.
+Reserve any child and publish its public cursor only after complete successful
+body enumeration and current result admission. On failure, release provisional
+state without advancing or invalidating the caller's existing cursor. A replayed
+page may have a different next position, but it never consumes the old cursor.
+
+Resume is `{cursor}` only; current admission and every binding equality are
+required again before disclosing token validity. Expired, lost, evicted or
+mismatched state is `stale_cursor`; unavailable authority/state infrastructure is
+`unavailable`. A cursor is never a grant.
 
 Each successful source page yields a new cursor only if the CQL source has continuation; an empty filtered page can therefore have `complete: false` and a cursor. An exhausted source page has `complete: true`, independent of per-body truncation. Repeating an admitted CQL cursor repeats the fixed provider request and may observe changed metadata/body results; unlike retained Loki paging, this profile does not promise byte-identical replay. No cross-page snapshot, current-query-membership guarantee, or absence of duplicates caused by live provider changes is asserted.
 
@@ -162,6 +265,10 @@ Each successful source page yields a new cursor only if the CQL source has conti
 - Cache metadata revalidation preserves the original observation time; absent version, provider outage and Jira updated fields do not manufacture reusable versioned content.
 
 These are authored obligations, not executed adapter conformance. Textual traces and ESS shape checks must name that limit; actual parser/provider/transport/cache implementations need their own later tests.
+
+The [F14 disposition and scenario record](evidence/20260909/scenarios.md) records
+the manual audit. The [model check record](evidence/20260909/model-checks.md) records
+the separate executed ESS commands and their unimplemented semantic boundary.
 
 ## 9. Binding and ESS ownership
 

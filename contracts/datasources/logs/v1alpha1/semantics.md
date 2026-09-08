@@ -57,7 +57,10 @@ provider_limit, provider_partial, stream_limit, page_limit, response_bytes,
 source_bytes, line_bytes. The profile selects applicable causes and precisely
 defines their trigger. Provider_limit represents source saturation; provider_partial
 requires a supported indication; stream_limit represents omitted groups;
-page_limit/response_bytes describe an undelivered retained remainder; source_bytes
+page_limit represents a public occurrence-count bound, with the profile declaring
+whether the remainder is retained or omitted. Terminal omission requires an
+explicit native profile rule; response_bytes describes an
+undelivered retained remainder under the serialized-result bound. Source_bytes
 describes an explicitly valid bounded streaming cutoff; line_bytes describes
 clipping on this page. Record every applicable cause.
 

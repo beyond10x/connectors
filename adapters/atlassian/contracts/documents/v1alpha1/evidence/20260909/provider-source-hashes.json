@@ -1,0 +1,44 @@
+[
+  {
+    "file": "confluence-cql-keywords.html",
+    "url": "https://developer.atlassian.com/cloud/confluence/cql-keywords/",
+    "sha256": "0c80a90409dbad617856f5cb1b5c82926dff1522bc565a0315364e5161c3a0ef",
+    "bytes": 184670,
+    "archive": "vendor/confluence-cql-keywords.html.gz"
+  },
+  {
+    "file": "confluence-cql-operators.html",
+    "url": "https://developer.atlassian.com/cloud/confluence/cql-operators/",
+    "sha256": "11a383a324e62b5221f83c1ca1eb64627e4ebfe9ce9e3f81c7d0371c6f689589",
+    "bytes": 234548,
+    "archive": "vendor/confluence-cql-operators.html.gz"
+  },
+  {
+    "file": "confluence-cql-fields.html",
+    "url": "https://developer.atlassian.com/cloud/confluence/cql-fields/",
+    "sha256": "a14eb01307d5212f594fa39af1d8c6c660e469cc3d59d4d060cfbe996abd84d9",
+    "bytes": 529238,
+    "archive": "vendor/confluence-cql-fields.html.gz"
+  },
+  {
+    "file": "confluence-cql-functions.html",
+    "url": "https://developer.atlassian.com/cloud/confluence/cql-functions/",
+    "sha256": "0bf01b5b6ee463e7abd0c9f49ea19d57d90211f5f420da4aec2820e38c0d6e2e",
+    "bytes": 362450,
+    "archive": "vendor/confluence-cql-functions.html.gz"
+  },
+  {
+    "file": "confluence-advanced-searching-using-cql.html",
+    "url": "https://developer.atlassian.com/cloud/confluence/advanced-searching-using-cql/",
+    "sha256": "fa50ecb80401a4bb400ea0c0d35e0e74157855f40903bbc385f82947370fbc04",
+    "bytes": 614397,
+    "archive": "vendor/confluence-advanced-searching-using-cql.html.gz"
+  },
+  {
+    "file": "confluence-performing-text-searches-using-cql.html",
+    "url": "https://developer.atlassian.com/cloud/confluence/performing-text-searches-using-cql/",
+    "sha256": "feb246f5b918ad9d60ac70ce9c6898b41d8fc19b71713d11515e78aa11cfb36f",
+    "bytes": 194758,
+    "archive": "vendor/confluence-performing-text-searches-using-cql.html.gz"
+  }
+]
