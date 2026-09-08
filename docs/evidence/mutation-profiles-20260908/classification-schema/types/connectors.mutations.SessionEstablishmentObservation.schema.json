@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.SessionEstablishmentObservation",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "4530e7c2f955c1012539d7c3b70742a41527bdb2331e236fd307ac4aa5bcb2a4",
+    "contract_digest": "slice-sha256/2:c165553d648c50bef5cb97367e4978fd4d1f2e807db021a85529ac991d83a82d",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.AttemptId": {
+      "title": "AttemptId",
+      "x-ess-name": "connectors.mutations.AttemptId",
+      "x-ess-kind": "newtype",
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "connectors.mutations.EffectKnowledge": {
+      "title": "EffectKnowledge",
+      "x-ess-name": "connectors.mutations.EffectKnowledge",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "not_attempted",
+        "refused",
+        "applied",
+        "unknown"
+      ]
+    },
+    "connectors.mutations.Observation": {
+      "title": "Observation",
+      "x-ess-name": "connectors.mutations.Observation",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "$ref": "#/$defs/connectors.mutations.AttemptId"
+        },
+        "classification": {
+          "$ref": "#/$defs/connectors.mutations.EffectKnowledge"
+        },
+        "cause": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "classification"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.mutations.SessionEstablishmentObservation": {
+      "title": "SessionEstablishmentObservation",
+      "x-ess-name": "connectors.mutations.SessionEstablishmentObservation",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "mutation": {
+          "$ref": "#/$defs/connectors.mutations.Observation"
+        },
+        "ready_session": {
+          "$ref": "#/$defs/connectors.sessions.SessionId"
+        }
+      },
+      "required": [
+        "mutation"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.sessions.SessionId": {
+      "title": "SessionId",
+      "x-ess-name": "connectors.sessions.SessionId",
+      "x-ess-kind": "newtype",
+      "type": "string"
+    }
+  }
+}

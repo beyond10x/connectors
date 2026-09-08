@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.mutations.EffectDeclaration",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "4530e7c2f955c1012539d7c3b70742a41527bdb2331e236fd307ac4aa5bcb2a4",
+    "contract_digest": "slice-sha256/2:b283da82b35c89bf27fac72d03986d2ac0a8ff723f7b2ad7c39d1f34f0a869f3",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.mutations.EffectDeclaration": {
+      "title": "EffectDeclaration",
+      "x-ess-name": "connectors.mutations.EffectDeclaration",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/connectors.mutations.ExecutableEffect"
+          }
+        },
+        "semantic_effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/connectors.mutations.SemanticEffect"
+          }
+        }
+      },
+      "required": [
+        "profile",
+        "effects",
+        "semantic_effects"
+      ],
+      "additionalProperties": false
+    },
+    "connectors.mutations.ExecutableEffect": {
+      "title": "ExecutableEffect",
+      "x-ess-name": "connectors.mutations.ExecutableEffect",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "external_write",
+        "network",
+        "process",
+        "local_system",
+        "send_external",
+        "session_establishment"
+      ]
+    },
+    "connectors.mutations.SemanticEffect": {
+      "title": "SemanticEffect",
+      "x-ess-name": "connectors.mutations.SemanticEffect",
+      "x-ess-kind": "enum",
+      "type": "string",
+      "enum": [
+        "human_visible",
+        "billable",
+        "irreversible"
+      ]
+    }
+  }
+}
