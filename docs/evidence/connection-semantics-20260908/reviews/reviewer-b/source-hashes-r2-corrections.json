@@ -1,0 +1,30 @@
+{
+  "captured_at_utc": "2026-09-08T16:13:56.614751+00:00",
+  "scope": "Verified during-review corrections RCBR-01 through RCBR-04. Supplemental to first draft snapshot.",
+  "files": [
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "72b9cb5db575a422005c7e29ea827966003e27c76bbb2b2fe1b4fe5847aed4a1",
+      "bytes": 21207,
+      "snapshot": "recheck-1-corrections-snapshot/contracts/auth/evidence/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "fcb1842728b298c79a8a2610ec54000b53f680dcdf81fa76332f408490d051ac",
+      "bytes": 20119,
+      "snapshot": "recheck-1-corrections-snapshot/contracts/auth/connection/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "62bd6617c811c4caec5e1e129d34208e38ab01706234aa8db69d90e77ad2b9b5",
+      "bytes": 22206,
+      "snapshot": "recheck-1-corrections-snapshot/contracts/auth/acquisition/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "21700d031c67496fa0ebba5c341f3685c44db8b996ed9081fbdb224c51b4cd4c",
+      "bytes": 13917,
+      "snapshot": "recheck-1-corrections-snapshot/contracts/auth/management.md"
+    }
+  ]
+}

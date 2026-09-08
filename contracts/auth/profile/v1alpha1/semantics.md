@@ -51,6 +51,7 @@ A profile declaration inside an adapter specification:
   "revocation": { "supported": true, "url": "…" },
   "capabilities": ["http-bearer"],
   "evidence": ["scope_check", "identity_check"],
+  "evidence_requirements": { "connection": ["scope_check", "identity_check"], "operations": [] },
   "sources": ["https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/"]
 }
 ```
@@ -81,6 +82,17 @@ Operation reference:
 - Profiles with `subject: none` (`inbound_verification`, `transport_identity`) attach to an instance or ingress, not to a per-user connection.
 - `oauth2_password` is refused unless configuration explicitly enables it; it exists only to document the one old provider that uses it.
 - A profile change is a specification change: it changes the descriptor revision and requires review of every connection that references it.
+
+
+### 4.1 Baseline and operation requirements
+
+`scopes.requestable` bounds requested access; `scopes.minimum` is the fixed baseline required before candidate publication, independent of which business operations are enabled. Every minimum grant must be requestable. An operation's `requires_auth` lists its additional per-request grants. Asking for a scope does not prove that it was granted or authorize host access. A provider response meeting minimum but omitting optional requested scopes may publish; store the actual granted set and refuse only operations that need the absent grants. Missing minimum is `insufficient_scope` and prevents candidate publication. Unknown or omitted grants require the provider profile's explicit proof of preservation, otherwise refusal; do not treat unknown as an empty or sufficient set.
+
+`evidence` lists supported hooks, not a demand that every hook succeed for every operation. The proposed authored profile adds the closed value `evidence_requirements: {connection: [check], operations: [{operation, checks: [check]}]}`. Entries name supported checks and existing source-qualified operation declarations without duplicates. Connection-wide checks may include custody, credential presence/validity, identity, baseline scope and an explicitly universal verify_operation; exact resource permission belongs to an operation, never the whole connection. Operation entries may require permission_check and/or verify_operation; scope requirements still come from requires_auth. These are independently versioned authored/payload fields, not additions accepted by the current strict adapter schema or public profile projection.
+
+For every credential-bearing profile, F05's current material/identity/validity requirements and minimum-scope rule are mandatory even if omitted from this list. Required custody follows the selected binding. The declaration cannot disable these safeguards. Additional universal verification must pass under separately admitted validation before activation/publication, and remain fresh for global viability. Operation-only verification is required solely for that operation. A supported but non-required hook may remain not_run. There is no blanket automatic verification call inferred from a hook name; any completion-time verification is selected and admitted in the profile's validation plan with its own effect/deadline budget.
+
+Completion means that custody and a validated baseline publication were definitely acknowledged at that point. It is not a perpetual ready state or a grant to invoke. Mandatory baseline verification failure prevents publication/completed; optional verification failure neither deletes valid material nor prevents baseline publication, though an operation requiring that verification remains ineligible. Private uncommitted candidates/orphan cleanup are custody/coordinator facts, never completed connections. Refresh may publish narrowed optional grants when baseline validation holds; failure after the rotating source was consumed cannot restore that source's authority. See [connection reduction](../../connection/v1alpha1/semantics.md#41-connection-viability-and-operation-eligibility) and [acquisition](../../acquisition/v1alpha1/semantics.md).
 
 ## 5. Limits
 
@@ -116,7 +128,7 @@ Operation reference:
 
 | Entity / value | Notes |
 |---|---|
-| `AuthProfile` (identity: adapter id + profile id), value fields as above, lifecycle `Declared` | owned by `AdapterSpecification` (`ess/domains/declarations.yaml`) |
+| Auth profile identity and declaration | Proposed entity, not yet declared in declarations.yaml; no implemented ownership relation is claimed here. Baseline/operation requirement values are modeled in [connection_admission.yaml](../../../../ess/domains/connection_admission.yaml). |
 | `OperationDeclaration.requires_auth` | list of `{profile, scopes}` values |
 | Registration (client id/secret) per deployment | belongs to `ServiceConfiguration`, secret material UNMAPPED into custody |
 

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/connectors.connection_admission.ViabilityFacts",
+  "x-ess-provenance": {
+    "system": "connectors",
+    "specification_version": "v1",
+    "source_digest": "e28dbe00e9748cfc7c52f31278b8b97e043ff88b87f67fb3bfe246cd0f64d5a0",
+    "contract_digest": "slice-sha256/2:a4ae57ed025c2dc6bb852afea0d9e0428410cb24af59529c029af96d71818d88",
+    "regenerate": "ess generate"
+  },
+  "$defs": {
+    "connectors.connection_admission.ViabilityFacts": {
+      "title": "ViabilityFacts",
+      "x-ess-name": "connectors.connection_admission.ViabilityFacts",
+      "x-ess-kind": "struct",
+      "type": "object",
+      "properties": {
+        "metadata_available": {
+          "type": "boolean"
+        },
+        "locally_revoked": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "established_credential_failure": {
+          "type": "boolean"
+        },
+        "required_custody_available": {
+          "type": "boolean"
+        },
+        "required_parent_available": {
+          "type": "boolean"
+        },
+        "validated_publication": {
+          "type": "boolean"
+        },
+        "baseline_current": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "metadata_available",
+        "locally_revoked",
+        "enabled",
+        "established_credential_failure",
+        "required_custody_available",
+        "required_parent_available",
+        "validated_publication",
+        "baseline_current"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

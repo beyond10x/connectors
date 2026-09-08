@@ -1,0 +1,267 @@
+{
+  "review": "Management/readiness reviewer B final confirmation",
+  "captured_at_utc": "2026-09-08T16:18:44.947673+00:00",
+  "baseline": "12c11f4b43cd6cf5ff67d3243017887b28788344",
+  "context": "The initial AEP story bodies remain in source-hashes-initial.json; subsequent workflow metadata is outside this semantic source freeze.",
+  "scope": "Final specification and evidence bytes only; no source or planning mutation and no runtime tests.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "586e5fb01523e5aa0b3d5f652487fd05c5b96fdf2111486f545de0f0b88d509b",
+      "bytes": 2278,
+      "snapshot": "recheck-2-snapshot/AGENTS.md"
+    },
+    {
+      "path": "docs/design.md",
+      "sha256": "678a5681264718c2a7b4c4d97eed30834dcf096fc6806ce6959c2a8dd702a791",
+      "bytes": 121905,
+      "snapshot": "recheck-2-snapshot/docs/design.md"
+    },
+    {
+      "path": "contracts/auth/connection/v1alpha1/semantics.md",
+      "sha256": "fcb1842728b298c79a8a2610ec54000b53f680dcdf81fa76332f408490d051ac",
+      "bytes": 20119,
+      "snapshot": "recheck-2-snapshot/contracts/auth/connection/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "sha256": "62bd6617c811c4caec5e1e129d34208e38ab01706234aa8db69d90e77ad2b9b5",
+      "bytes": 22206,
+      "snapshot": "recheck-2-snapshot/contracts/auth/acquisition/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "sha256": "72b9cb5db575a422005c7e29ea827966003e27c76bbb2b2fe1b4fe5847aed4a1",
+      "bytes": 21207,
+      "snapshot": "recheck-2-snapshot/contracts/auth/evidence/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/profile/v1alpha1/semantics.md",
+      "sha256": "274b6fdbe96c935214a76e4b38bd10286e22fb204551d62e512c5bbeb9f72170",
+      "bytes": 12748,
+      "snapshot": "recheck-2-snapshot/contracts/auth/profile/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/auth/custody/v1alpha1/semantics.md",
+      "sha256": "8c033f0019891b1905f64ccc052c8fe8a6e4361dfae5289503c026f323bbf82c",
+      "bytes": 10098,
+      "snapshot": "recheck-2-snapshot/contracts/auth/custody/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/service/v1alpha2/semantics.md",
+      "sha256": "98d83c7d6be185ff5f76736f26a7bf5b92857e339c957bc60a49fd64e0fdacd7",
+      "bytes": 23016,
+      "snapshot": "recheck-2-snapshot/contracts/service/v1alpha2/semantics.md"
+    },
+    {
+      "path": "contracts/service/compatibility.md",
+      "sha256": "d43298cc0b6d820494f348c79729ceb0fe5870c89cb8fae861a9ff32edb1c5f9",
+      "bytes": 35985,
+      "snapshot": "recheck-2-snapshot/contracts/service/compatibility.md"
+    },
+    {
+      "path": "contracts/service/delegation.md",
+      "sha256": "812ce5ff030c8a0e36c55d909abf0ee0dac9702424c57e714f19f86f8e240aeb",
+      "bytes": 34517,
+      "snapshot": "recheck-2-snapshot/contracts/service/delegation.md"
+    },
+    {
+      "path": "contracts/operations/v1alpha1/semantics.md",
+      "sha256": "75acaca4db10925199132dd0a69b73010a4065018869e148fec83b6b1e6af195",
+      "bytes": 38950,
+      "snapshot": "recheck-2-snapshot/contracts/operations/v1alpha1/semantics.md"
+    },
+    {
+      "path": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "sha256": "a730e0d9f7298be6338f87ec43e41117e30509f973e5b5bc93c52868f1df70cb",
+      "bytes": 9911,
+      "snapshot": "recheck-2-snapshot/contracts/discovery/mediated_route/v1alpha1/semantics.md"
+    },
+    {
+      "path": "ess/system.yaml",
+      "sha256": "0bcea71b5b68ed7df0f320d8223e0072b3cafaebec0666f104a7648a38e9cb0a",
+      "bytes": 428,
+      "snapshot": "recheck-2-snapshot/ess/system.yaml"
+    },
+    {
+      "path": "ess/domains/declarations.yaml",
+      "sha256": "fe9ace2a766fc620793c9b89d583bf8c3f5b7ca5e731aff63f6582913975bf68",
+      "bytes": 3335,
+      "snapshot": "recheck-2-snapshot/ess/domains/declarations.yaml"
+    },
+    {
+      "path": "ess/domains/credentials.yaml",
+      "sha256": "1bbbdccc3b6ad4cb8fb4fad3e7a42227874614b42d5937b6565fbf502cad5232",
+      "bytes": 2351,
+      "snapshot": "recheck-2-snapshot/ess/domains/credentials.yaml"
+    },
+    {
+      "path": "ess/domains/credential_evidence.yaml",
+      "sha256": "38893b17488baed2b0faac0fec4606e9ad811545ffe115041f083180de3d3292",
+      "bytes": 9006,
+      "snapshot": "recheck-2-snapshot/ess/domains/credential_evidence.yaml"
+    },
+    {
+      "path": "ess/domains/refresh.yaml",
+      "sha256": "623dbd5e15cde26724d5ef23e07aa0b4c7c937b10ff4168b968888799914a10e",
+      "bytes": 12943,
+      "snapshot": "recheck-2-snapshot/ess/domains/refresh.yaml"
+    },
+    {
+      "path": "ess/domains/service_wire.yaml",
+      "sha256": "0a96c38c42bcb3884f8305ed78392fb3bc77b30acacc810047bf7f819f46f55b",
+      "bytes": 4000,
+      "snapshot": "recheck-2-snapshot/ess/domains/service_wire.yaml"
+    },
+    {
+      "path": "ess/domains/delegation.yaml",
+      "sha256": "f9d5e343b500af2f762298b501ee380d069350a94d3e4f3d96b8a011b8f40dcd",
+      "bytes": 7408,
+      "snapshot": "recheck-2-snapshot/ess/domains/delegation.yaml"
+    },
+    {
+      "path": "contracts/auth/management.md",
+      "sha256": "21700d031c67496fa0ebba5c341f3685c44db8b996ed9081fbdb224c51b4cd4c",
+      "bytes": 13917,
+      "snapshot": "recheck-2-snapshot/contracts/auth/management.md"
+    },
+    {
+      "path": "ess/domains/connection_admission.yaml",
+      "sha256": "c84ea88068bbff32e810563675912b9122ba4f9e58f4c088705ee8afa407ecb7",
+      "bytes": 5085,
+      "snapshot": "recheck-2-snapshot/ess/domains/connection_admission.yaml"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/decision-vectors.json",
+      "sha256": "eea75dfbbc05087013ae14ac54d506066bd7bc1602a04adaf7b1ceaaf6d2b59b",
+      "bytes": 44426,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/decision-vectors.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/fixture-audit.md",
+      "sha256": "6ee3edb42719afe2f8a70186b879eaf3a64f6ec76e8c3e4cc395bce3ba162bec",
+      "bytes": 7953,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/fixture-audit.md"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/gate.log",
+      "sha256": "96a134f2a7878f9b60db8257398cc038c5d422b41ec5a2c9d2e1306a9052b155",
+      "bytes": 23824,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/gate.log"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/projection-manifest.json",
+      "sha256": "0f9cb84d230f351a07133cceb31a7e63d81eea004b1dc740af52629810b55075",
+      "bytes": 2048,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/projection-manifest.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ConnectionState.schema.json",
+      "sha256": "c18d7e33fb792acd697778324f30222099117f1878804ae3e09bb1fb46a9e30e",
+      "bytes": 883,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ConnectionState.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.EligibilityDecision.schema.json",
+      "sha256": "031d55f9f3501d2860fb832b7dc1c6321a42006c8a191d7ffe0da5e34e859e6b",
+      "bytes": 1947,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.EligibilityDecision.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.EligibilityFacts.schema.json",
+      "sha256": "487331d14c5741e3ea191606d950a1f56d9a5496959f780a0bfc328ce3be5e93",
+      "bytes": 3541,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.EligibilityFacts.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.EvidenceRequirements.schema.json",
+      "sha256": "482fe4361631349b493f627f2466b500c354aaa4babf029e2b120c3f4bdf6c68",
+      "bytes": 2229,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.EvidenceRequirements.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ManagementAction.schema.json",
+      "sha256": "3bee298eeb4a90a8dc8b6f6efe6725331b4932cd9df7773066ad2085a8c3700a",
+      "bytes": 868,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ManagementAction.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ManagementTarget.schema.json",
+      "sha256": "d3a0e8f06ce4816ea37c260ff05688fff07fa601a1d1c4cc9ec52fea7a770000",
+      "bytes": 1588,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ManagementTarget.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ManagementTargetKind.schema.json",
+      "sha256": "8b7e4bc6a1a4f3337eabaffb5a269e2822d2f142de9505fb9c5fe50f2f87b4d3",
+      "bytes": 799,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ManagementTargetKind.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.NextAction.schema.json",
+      "sha256": "aec04ddd754d3bb3e05cd0f519f042c50fb247eb08c01ce325190e54714f5a0e",
+      "bytes": 737,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.NextAction.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.OperationCheckRequirements.schema.json",
+      "sha256": "03b3474b4efef33089ddf550f625f9fb535ded453c35664fe6bf474450b8af00",
+      "bytes": 1509,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.OperationCheckRequirements.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.RequirementResult.schema.json",
+      "sha256": "540ae129e0b8c02dff6d60f94c19ddaeae266d71d4cb812e6309f60808bd3024",
+      "bytes": 868,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.RequirementResult.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.StatusObservation.schema.json",
+      "sha256": "b4ab32a0a92de70c62481eac670663383340d8bee5d00c87dd5966bfb40b7ace",
+      "bytes": 2055,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.StatusObservation.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ViabilityDecision.schema.json",
+      "sha256": "a9d6c5f4783c2ded84c33bd7c73ba074f46eb184b3b9d8d0a515f627e6b2a672",
+      "bytes": 1906,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ViabilityDecision.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ViabilityFacts.schema.json",
+      "sha256": "d1a9e4cbe43b3abd0d126bb7a4e38c83fbe0429b14fd19ba2e75da80a90ce1dd",
+      "bytes": 1619,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/schema/types/connectors.connection_admission.ViabilityFacts.schema.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/traces.md",
+      "sha256": "8ed9a50ec1874761f4f43dd04ba6674aa1169443141cb09ea109b5f517b68048",
+      "bytes": 5319,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/traces.md"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/type-results.json",
+      "sha256": "e0d6d3a2fbd7c87192f87e54df47b15468458d8cc91cabf8672281718ad66225",
+      "bytes": 9192,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/type-results.json"
+    },
+    {
+      "path": "docs/evidence/connection-semantics-20260908/verification.md",
+      "sha256": "41a9e0d76d982c28706aebefe73f17e40ea58b621680971ac40d0e12918f95c4",
+      "bytes": 5602,
+      "snapshot": "recheck-2-snapshot/docs/evidence/connection-semantics-20260908/verification.md"
+    },
+    {
+      "path": ".local/connection-semantics-20260908/sessions-authored.json",
+      "sha256": "a0a8ef7fa313850e1421ba716379619e378fe194100824079edb571108ee3848",
+      "bytes": 161145,
+      "snapshot": "recheck-2-snapshot/.local/connection-semantics-20260908/sessions-authored.json"
+    },
+    {
+      "path": ".local/connection-semantics-20260908/sessions-suite.json",
+      "sha256": "80f652f2b7c1067b1eca0255dabda979a45296572fdafe2c2f449441072dc32d",
+      "bytes": 2423518,
+      "snapshot": "recheck-2-snapshot/.local/connection-semantics-20260908/sessions-suite.json"
+    }
+  ]
+}
