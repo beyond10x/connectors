@@ -53,10 +53,14 @@ Auth (`providers/jira.toml:140-297`, `confluence.toml` auth block): `jira.api_to
 | `datasource.records` `document` | `jira-issue`, `confluence-page` | bodies with a named representation (`jira.fields.v2`, `confluence.storage`), version, byte bound (`contracts/datasources/records/v1alpha1/semantics.md`) |
 | `auth.profile` | 6 profiles above | four distinct Atlassian credential purposes; scopes attach to the credential (`contracts/auth/profile/v1alpha1/semantics.md`) |
 | `auth.acquisition` | `oauth2_authorization_code` (user), `oauth2_client_credentials` (service), `static_entry` (API tokens, two-field entry) | replaces the Jira-specific OAuth copy (`../connectors/crates/connector-oauth/src/lib.rs` header) |
-| `auth.custody` | `versioned` | refresh tokens rotate; access+refresh stored as one set |
+| `auth.custody` | `versioned` | access+refresh stored as one immutable set; rotating refresh also requires the host coordinator protocol below |
 | `auth.capability` | `http-basic`, `http-bearer` | API token is HTTP basic with the email as user half; OAuth is bearer; GET and POST/PUT needed |
 | `auth.connection` | `managed` | several users' OAuth identities per instance; stable refs across reauthorization; `cloud_id` as a connection attribute |
 | `auth.evidence` | `scope_check`, `identity_check` (accessible-resources / `me`), `verify_operation` = `project-list` | operations require `read:jira-work` or `write:jira-work`; verify without effects |
+
+Rotating-token profiles require [acquisition §4.1](../../contracts/auth/acquisition/v1alpha1/semantics.md): cross-replica source-generation reservation, a durable single exchange authorization before send, stale-owner fencing, and guarded publication serialized with revocation. The secret binding provides immutable durable versions, not a refresh lease. A lost owner may be replaced before authorization only after fencing. After authorization, a successor may recover a durably recorded validated response for publication; otherwise it requires repair/reauthorization without another exchange. Provider grace/reuse behavior is not a retry exception. No Atlassian endpoint or client-library retry may bypass this rule.
+
+Every successful refresh creates a new private credential generation for the same expected external identity; F05 evidence validates the candidate and publication invalidates old-generation dispatch admissions. A new account must not silently replace the bound account. While refresh is unresolved, affected old-generation dispatch is withheld; a pin does not override known invalidation. A metadata or custody binding that cannot provide the required guarantees refuses rotating refresh. These are design obligations; no Atlassian adapter or runtime refresh implementation is added here.
 
 Not needed: discovery (no observations), sessions/media, mediated routes.
 
@@ -128,5 +132,6 @@ None.
 
 - Fixture: auth header placement for basic and bearer; paging for `startAt`, `nextPageToken`, CQL cursor; document truncation; every mutation with approval, replay, and lost-response scenarios; scope refusal.
 - Keyed-write fixtures: reuse key/body across caller, origin, Jira/Confluence operation and connection boundaries; revoke project/space access before replay; rotate same-identity credentials; change connection/configuration revision; expire known-result retention; keep in-flight/unknown reservations and generation-bound waiters safe. These are host/adapter binding obligations, not implemented provider behavior.
+- Refresh fixtures: two replicas, loss before and after authorization (including before send), response loss, durable response recovery, stale publication, publication/revocation ordering and old-generation dispatch cutoff. Observe at most one provider exchange per source generation; retain consumed-source records after repair. See the [semantic verification matrix](../../contracts/auth/acquisition/v1alpha1/verification.md); ESS compilation does not execute these fixtures.
 - Live: Atlassian authentication chain (`docs/design.md:1000`): connect, bounded read, expire, refresh or repair, identity preserved; repeated with a second custody binding.
 - Decoupling: adapter builds without siblings; business tests run with fake authenticated transport and no OAuth server (`docs/design.md:1012`).

@@ -1,0 +1,88 @@
+# Ledger expectations only: trusted decisions stand for the atomic host checks.
+# ESS compiles these assertions; it does not execute concurrency, clock or I/O.
+type: ess-scenario/1
+domain: connectors.refresh
+scenario: durable-response-wins-owner-loss-race
+summary: 'F04: committed response storage wins against quarantine; recovery publishes without exchange.'
+arrange:
+- instance: refresh
+  entity: connectors.refresh.RefreshAttempt
+timeline:
+- command: connectors.refresh.ReserveRefresh
+  input:
+    decision: allow
+    source_generation_id: 10000000-0000-4000-8000-000000000001
+    owner: replica-a
+    ownership_token: 20000000-0000-4000-8000-000000000001
+    expected_binding_revision: binding-1
+  outcome: reserved
+  events:
+  - event: connectors.refresh.RefreshReserved
+  capture:
+    instance: refresh
+    event: connectors.refresh.RefreshReserved
+    field: attempt_id
+  at: '2026-09-08T10:00:00Z'
+- command: connectors.refresh.AuthorizeExchange
+  input:
+    decision: allow
+    attempt_id:
+      $instance: refresh
+    owner: replica-a
+    ownership_token: 20000000-0000-4000-8000-000000000001
+  outcome: authorized
+  events:
+  - event: connectors.refresh.ExchangeAuthorized
+  at: '2026-09-08T10:00:01Z'
+- command: connectors.refresh.StoreResponse
+  input:
+    decision: allow
+    attempt_id:
+      $instance: refresh
+    owner: replica-a
+    ownership_token: 20000000-0000-4000-8000-000000000001
+    candidate_generation_id: 10000000-0000-4000-8000-000000000002
+  outcome: stored
+  events:
+  - event: connectors.refresh.RefreshResponseStored
+  at: '2026-09-08T10:00:02Z'
+- command: connectors.refresh.QuarantineRefresh
+  input:
+    attempt_id:
+      $instance: refresh
+  outcome: wrong-state
+  error:
+    name: connectors.refresh.RefreshStateConflict
+    fields:
+      state: ResponseStored
+  no_events:
+  - connectors.refresh.RefreshUncertain
+  at: '2026-09-08T10:00:03Z'
+- command: connectors.refresh.RecoverStoredResponse
+  input:
+    attempt_id:
+      $instance: refresh
+    new_owner: replica-b
+    new_ownership_token: 20000000-0000-4000-8000-000000000002
+  outcome: recovered
+  events:
+  - event: connectors.refresh.StoredResponseRecovered
+  at: '2026-09-08T10:00:04Z'
+- command: connectors.refresh.PublishRefresh
+  input:
+    decision: allow
+    attempt_id:
+      $instance: refresh
+    owner: replica-b
+    ownership_token: 20000000-0000-4000-8000-000000000002
+    candidate_generation_id: 10000000-0000-4000-8000-000000000002
+  outcome: published
+  events:
+  - event: connectors.refresh.RefreshPublished
+  at: '2026-09-08T10:00:05Z'
+assert:
+- view: connectors.refresh.RefreshStates
+  contains:
+    attempt_id:
+      $instance: refresh
+    state: Published
