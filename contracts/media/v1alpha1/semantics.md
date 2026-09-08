@@ -101,6 +101,8 @@ Terminal reasons added to `sessions`: `media_overload`, `media_incompatible`.
 
 - The old VoiceSession vectors are characterization input for readiness, loss, overload and terminal rules; naming differs (`media_overload` preserved).
 - Bindings publish their own fixtures under their adapter (RTVBP `b10x.voice.v1`, SIP/RTP), not here (old README rule preserved).
+- [Service compatibility](../../service/compatibility.md) is authoritative for the binding. Frame descriptions here are semantic values, not a JSON frame codec. Selected binary/control bindings and negotiation must be complete before readiness. Media terminal reasons are not new unary ErrorCode members.
+
 
 ## 8. SDK and host obligations
 

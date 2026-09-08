@@ -1,0 +1,193 @@
+{
+  "scope": "Independent offline consistency audit of specified examples, not execution of a v1alpha2 runtime/decoder. Semantics were also read manually.",
+  "legacy_records_matched": 68,
+  "gate_test_totals": {
+    "passed": 50,
+    "failed": 0,
+    "ignored": 0
+  },
+  "http_mapping_unique_codes": 30,
+  "proposed_total": 27,
+  "proposed_positive": 20,
+  "results": [
+    {
+      "id": "describe-success-generic-read-mutation-page",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "describe-unauthorized",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "malformed-invoke-audit-unavailable",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "read-static-unaudited",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "fresh-applied",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "replayed-applied",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "fresh-refused",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "replayed-refused",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "fresh-not_attempted",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "replayed-not_attempted",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "fresh-unknown",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "replayed-unknown",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "lookup-uncertain-without-identity",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "pending-waiter-expired",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "denied-original-observation",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "admitted-candidate-audit-unavailable",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "applied-final-audit-failure",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "applied-terminal-store-failure",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "applied-undeliverable-result",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "gateway-source-audit",
+      "declared": true,
+      "independent_structural_audit": true,
+      "observations": []
+    },
+    {
+      "id": "bad-effect-replayed",
+      "declared": false,
+      "independent_structural_audit": false,
+      "observations": [
+        "classification",
+        "success effect"
+      ]
+    },
+    {
+      "id": "bad-success-unknown",
+      "declared": false,
+      "independent_structural_audit": false,
+      "observations": [
+        "success effect",
+        "unknown code"
+      ]
+    },
+    {
+      "id": "bad-missing-cause",
+      "declared": false,
+      "independent_structural_audit": false,
+      "observations": [
+        "mutation required/closed shape"
+      ]
+    },
+    {
+      "id": "bad-half-original",
+      "declared": false,
+      "independent_structural_audit": false,
+      "observations": [
+        "original co-presence"
+      ]
+    },
+    {
+      "id": "bad-unknown-timeout-code",
+      "declared": false,
+      "independent_structural_audit": false,
+      "observations": [
+        "unknown code"
+      ]
+    },
+    {
+      "id": "bad-unavailable-audit-ref",
+      "declared": false,
+      "independent_structural_audit": false,
+      "observations": [
+        "audit co-presence",
+        "audit absence"
+      ]
+    },
+    {
+      "id": "bad-http-success-status",
+      "declared": false,
+      "independent_structural_audit": false,
+      "observations": [
+        "success framing/status"
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:contracts-wire-compatibility
 kind: story
-status: draft
+status: implemented
 title: Define versioned compatibility for proposed contract extensions
 tags:
 - P1
@@ -13,15 +13,21 @@ relations:
 - depends_on: story:contracts-mutation-outcomes
 scope:
 - confidence: cited
+  path: contracts/README.md
+- confidence: cited
   path: contracts/auth/acquisition/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/auth/capability/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/auth/connection/v1alpha1/semantics.md
 - confidence: cited
+  path: contracts/auth/custody/v1alpha1/semantics.md
+- confidence: cited
   path: contracts/auth/evidence/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/auth/profile/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/catalog/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/datasources/logs/v1alpha1/semantics.md
 - confidence: cited
@@ -36,11 +42,25 @@ scope:
   path: contracts/media/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/operations/v1alpha1/semantics.md
+- confidence: inferred
+  path: contracts/service/compatibility.md
 - confidence: cited
   path: contracts/service/v1alpha1/semantics.md
 - confidence: cited
+  path: contracts/service/v1alpha2/semantics.md
+- confidence: cited
   path: contracts/sessions/v1alpha1/semantics.md
-revision: 2
+- confidence: cited
+  path: docs/cli-migration-v1-to-v2.md
+- confidence: inferred
+  path: docs/evidence/wire-compatibility-20260908/
+- confidence: cited
+  path: docs/stack-integration-proposal.md
+- confidence: inferred
+  path: ess/domains/service_wire.yaml
+- confidence: cited
+  path: ess/system.yaml
+revision: 9
 ---
 ## Context
 
@@ -93,4 +113,16 @@ Shared edit surfaces with `story:contracts-mutation-outcomes`, `story:contracts-
 
 ## Boundary and modeling
 
-This interactive, local-only story revises textual contracts, adapter design and their conformance scenarios; it does not implement runtime behavior, edit generated schemas, change ESS, commit/publish, or expand the implemented adapter set. Existing typed declarations are in `ess/system.yaml` and `ess/domains/declarations.yaml`; proposed runtime entities are not claimed to be modeled. Any later entity-bearing implementation decomposition must first use the ESS workflow for the settled semantics and retain unresolved relations as UNMAPPED. These documentation stories do not introduce a new typed entity or assert an unresolved cardinality.
+The active specification-hardening goal authorizes this local semantic/ESS revision. It adds no runtime code, codec, adapter handler, generated adapter schema, external publication or consumer rollout. Single-agent edits use primary main under the repository override; independent reviewers remain read-only.
+
+The compatibility owner is `contracts/service/compatibility.md`, with precise public observation values modeled in `ess/domains/service_wire.yaml` and registered in `ess/system.yaml`. This introduces values, not new persistent entities or guessed ownership. Existing effect knowledge comes from `ess/domains/mutations.yaml`; audit/grant persistence and exact delegated verification mechanics remain owned by their semantic dependencies, visibly unbound until settled.
+
+Additional reviewed surfaces: `contracts/service/v1alpha2/semantics.md`, `contracts/catalog/v1alpha1/semantics.md`, `contracts/auth/custody/v1alpha1/semantics.md`, `contracts/README.md`, `docs/stack-integration-proposal.md`, `docs/cli-migration-v1-to-v2.md`, and verification evidence under `docs/evidence/wire-compatibility-20260908/`. All existing family documents are cross-checked against the same matrix. Service-wire version selection is separate from semantic-family and adapter-specification versions; no adapter/v1 or adapter/v2 file is changed. Other stories still own profile behavior and runtime bindings. This is not a new decomposition or implementation wave.
+
+## Specification closure — E02
+
+The authoritative owner is [service compatibility](../../../contracts/service/compatibility.md), covering all 15 proposed v1alpha1 family documents and the proposed governed service binding. It selects local v1alpha2 paths and strict fields independently of semantic-family and adapter-kind versions; preserves exact legacy-reader diagnostics; requires an off-by-default, invoke-enforced read projection; defines complete describe/invoke/error/audit/mutation observations; and assigns every extension to a selected payload, extended envelope, private port, independent reader or explicitly unbound transport. Generic read/mutation/page limits and safe catalog error semantics are reconciled across the owners.
+
+Public values have a typed ESS home in `ess/domains/service_wire.yaml`, reusing the original mutation effect knowledge and AttemptId. No entity, persistence relation, decoder or provider runtime is invented. F03 delegation, protected callbacks, duplex/media codecs, real policy/audit persistence and dynamic enforcement remain explicit binding obligations with their own owners.
+
+Two independent reviewers examined the initial draft, the corrected draft and final sources. All first/recheck findings were addressed, with original report bodies preserved in immutable review-result artifacts. [Verification](../../../docs/evidence/wire-compatibility-20260908/verification.md) records 68 executed current-decoder byte vectors, 27 proposed textual response vectors, the full gate (50 Rust tests, MSRV 1.88, format/lint/drift), ESS 0.20.0 validation of nine files, and separate session author/synthesis. No v1alpha2 codec or sequential runtime scenario execution is claimed. The original E02 can close at specification scope; sibling findings and the broader goal remain open.

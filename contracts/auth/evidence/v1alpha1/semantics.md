@@ -143,8 +143,8 @@ A refresh response containing the expected identity label alone is not a lineage
 [Verification evidence and ESS limits](verification.md) distinguish compiled authored expectations from required runtime tests.
 
 ## 7. Compatibility
+- [Service compatibility](../../../service/compatibility.md) is authoritative for the binding. The evidence block belongs to the selected managed connection payload schema, whose reader must support it. Managed metadata and new error codes require the extended codec; optionality does not make a field acceptable to an existing strict payload reader.
 
-- Additive: the connection status in `auth.connection` is derived from this contract; no wire change beyond the optional `evidence` block in `connections.describe`.
 
 ## 8. SDK and host obligations
 

@@ -9,7 +9,7 @@ tags:
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 9
+revision: 10
 ---
 ## Context
 
@@ -94,3 +94,9 @@ Concurrent authoring was observed during the final check: `contracts/catalog/v1a
 The auth wave completed `story:contracts-refresh-coordination` and `story:contracts-credential-evidence` (F04/F05), with verification and adversarial evidence under `docs/waves/auth-hardening-20260908/`. The latest single-agent checkpoint completes `story:contracts-session-revocation` (F06/E20) and `story:contracts-tenant-header` (E30). Session hardening passed two independent final rechecks, 13 authored ESS scenarios plus a separate 77-act model/trace/deadline audit, and the full gate with 50 existing Rust tests. No runtime implementation changed in this specification checkpoint; session timing, queues/devices, real authority and teardown remain executable obligations for future bindings.
 
 Current ledger: 10/48 source findings fixed, 38 assigned and open; six contract stories implemented, 21 draft. E13 was fixed separately in the documentation inventory during independent-review remediation, but its documentation-index owner remains draft for E22 and prerequisite-dependent coverage. This supersedes the historical progress counts above. The active broad specification goal is not complete. Remaining work includes wire compatibility, federation approval, other auth/discovery/datasource semantics and the remaining adapter/index evidence. No wire-version decision or implementation wave was inferred from this checkpoint.
+
+## Current specification checkpoint — wire compatibility
+
+`story:contracts-wire-compatibility` closes E02 with one matrix covering all 15 proposed v1alpha1 families and the governed service binding. Explicit v1alpha2 paths, complete describe/invoke/audit/mutation shapes, exact error mapping, an invoke-enforced unchanged-read projection, safe catalog errors and consistent generic limits resolve the incompatible defaults. Public ESS values preserve existing effect/attempt semantics without introducing runtime code or guessed persistence. Both independent final reviewers approve with zero residual E02 findings. Evidence includes 68 existing-decoder vectors, 27 proposed textual vectors and the full gate with 50 Rust tests/MSRV 1.88; ESS 0.20.0 validates nine files. See [verification](../../../docs/evidence/wire-compatibility-20260908/verification.md).
+
+Current ledger: **11/48 original findings fixed, 37 open; seven owner stories implemented for specification scope, 20 draft**. This supersedes the earlier checkpoint counts. F03 federated approval is now the next foundational semantic dependency; delegation remains explicitly unbound until it is settled. The broader specification goal remains active. No runtime or adapter-kind/generated schema change, external publication or implementation wave is included.
