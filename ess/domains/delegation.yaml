@@ -164,6 +164,9 @@ entities:
 # Issuer, grant, principal, connection and route CONFIGURATION entities await
 # their owners; these structured correlation values do not guess their relations.
 # Known receipt->receiver and redemption->attempt links are modeled above;
+# gateway and execution-hop AuditRecords are separate records in
+# connectors.execution_audit. Neither receipt owns an audit record, and audit
+# completion proves neither nonce consumption nor approval redemption.
 # actual atomic uniqueness (issuer/receiver/nonce and issuer/reference), one
 # approval per prepared attempt, cross-record state checks/fencing, trusted clocks,
 # live-key revocation, durability/replicas and anti-rollback remain host obligations.
