@@ -96,6 +96,15 @@ Errors: base codes plus the selected auth connection_not_ready refusal; forbidde
 
 The logical collection key is `(owning instance, source connection, receiver-selected discovery declaration/profile and revision, admitted provider authority, normalized finite membership selection, interpretation/projection revision, host admission/disclosure scope)`. Configuration supplies these inputs; a caller-filtered result is never the global source inventory. The host retains their canonical equality form privately and exposes only safe scope_ref/selection_revision. The adapter profile defines configured source identity and any separately proven physical identity; a display/context label alone establishes neither.
 
+For the first persistent binding, one `DiscoveryCollection` record represents
+exactly that tuple in one non-reusable scope epoch. Its host-qualified
+`collection_ref` is the existing safe scope_ref, not an additional public field.
+The private epoch is allocated afresh when continuity is lost or the scope is
+recreated. Equal display labels, native object IDs or a recycled scope string
+cannot recover the old record. Each source Connection may be referenced by many
+independently admitted collections; the collection references its source,
+ServiceConfiguration and authored operation declaration without owning them.
+
 Membership selection includes every configured namespace/resource selector/filter that can exclude an object. Partitions divide this exact scope; a complete namespace a proves nothing about b. A changed source/profile/provider authority, narrower namespace set, mapping/allowlist/projection or disclosure scope creates a different coverage scope/selection revision. Its complete result cannot withdraw observations from the previous one. Locally excluded candidates cease eligibility immediately under current policy, but exclusion is not provider disappearance. Unchanged partitions may be compared only when their full membership/interpretation/admission coordinates are equal; label equality is insufficient. This first profile requires equality of the whole selection revision for absence comparison rather than attempting predicate subsumption across changed filters.
 
 Each scan also pins the current private parent credential generation, binding/configuration revision and current policy observation. These are publication/admission fences, not public scope or credential identifiers. Refreshing same-identity material does not prove inventory continuity by itself; every provider request uses the validated pinned material and current exact authorization.
@@ -120,7 +129,7 @@ Partial publication retains the original timestamps, last_seen_generation and va
 
 ### 4.3 Observation identity and fixed targets
 
-The host-issued observation id belongs to a qualified source and one observed resource incarnation: private provider identity, compatible observed type and the sealed route-relevant target evidence. Equality must cover fixed destination/resource/port and any route-owned tenant/authentication placement that changes the admitted target or authority boundary. These private comparisons are supplied by the reviewed parent profile; a UID, public digest, name or successful proxy response alone cannot prove them. Where the provider cannot furnish sufficient stable evidence, materialization/revalidation remains unavailable rather than claiming target equality. No secret value or secret-derived comparison token is exposed publicly. If eviction/restart loses verifiable incarnation continuity, a new observation id is required; a previously issued id cannot be recreated from provider UID alone.
+The host-issued observation id belongs to one collection_ref/scope epoch and one observed resource incarnation: private provider identity, compatible observed type and the sealed route-relevant target evidence. The owner allocates a non-reused, host-qualified observation_ref whose public spelling is the existing observation id. The same physical object in two differently admitted scopes has independent observation identities; withdrawal or retirement in one scope cannot terminalize the other. Equality must cover fixed destination/resource/port and any route-owned tenant/authentication placement that changes the admitted target or authority boundary. These private comparisons are supplied by the reviewed parent profile; a UID, public digest, name or successful proxy response alone cannot prove them. Where the provider cannot furnish sufficient stable evidence, materialization/revalidation remains unavailable rather than claiming target equality. No secret value or secret-derived comparison token is exposed publicly. If eviction/restart loses verifiable incarnation continuity, a new observation id is required; a previously issued id cannot be recreated from provider UID alone.
 
 A title-only rename preserves the id and fixed target; a new publication still needs fresh route revalidation before old pins advance. A type/semantic-target change or same native coordinate with a different provider identity creates a new observation id. The old record becomes stale/ineligible (binding changed), not “deleted” unless complete comparable coverage also establishes absence. Existing child connections never repoint to the new id. Candidate mapping/allowlist removal independently disables materialization/route eligibility without asserting disappearance. A positively withdrawn observation incarnation is terminal: later reappearance receives a new id and requires a newly admitted child connection. Re-observation after mere staleness can retain the id only on proved exact equality. Local child revocation/disablement remains authoritative in every case.
 
@@ -165,6 +174,78 @@ and [Grafana datasource discovery](../../../../adapters/grafana/contracts/discov
 They travel with their adapters. Shared ESS treats profile/provider/partition-kind
 identifiers as opaque; the shared contract has no closed installed-provider catalog.
 
+### 4.6 Selected persistent owner and retirement
+
+`DiscoveryPublicationPort` owns a `DiscoveryCollection` and its bounded
+`ResourceObservation` records. The collection owns its rows: a row has exactly
+one collection_ref, cannot migrate to another collection/epoch, and has no
+independent lifetime after its owner is retired and cleaned up. There is no
+physical provider Resource entity, inverse Connection ownership, durable
+ScanAttempt entity or separate snapshot publication owner.
+
+| Record/value | Selected state and authority |
+|---|---|
+| DiscoveryCollection | Administrative Open → Retired. Open may have no current view; Retired cannot publish or become Open again. It holds the private exact scope definition, non-reusable epoch, last generation, publication revision and optional current snapshot/commit receipt. |
+| ResourceObservation | Internal Observed ↔ Stale; either may become Withdrawn. Observed, Stale or Withdrawn may become Retired for bounded cleanup. Withdrawn can only retire, never reobserve. Retired is terminal and inaccessible; it is not another public evidence-state value. |
+| PublishedSnapshot | An embedded immutable value containing classified rows, coverage, original times, retirement deadline and the matching private binding index. Publication replaces the whole value and row classifications atomically; a reader cannot join pieces from different publications. |
+| PublicationReceipt | The latest committed attempt identity, predecessor publication revision and committed generation, retained with its current view. This bounded receipt supports acknowledgement recovery; it is not a second attempt ledger or a grant to publish again. |
+
+Collection allocation fixes the source/declaration/instance compatibility and
+canonical scope tuple. Definition handles in the model resolve to the host's
+immutable, bounded canonical configuration values; they are neither caller text
+nor lossy hashes used as equality proofs. Positive observation allocation and
+Observed/Stale/Withdrawn classification changes occur only within the successful
+whole-publication transaction. Separate ESS command names describe its row effects,
+not independently callable row writes. No command invents permission or provider
+exhaustion from a supplied Boolean.
+
+Publish compares the expected private publication revision and last generation
+alongside all §4.4 authority/deadline fences. The revision changes on publication,
+view retirement and collection retirement, so an expired/retired predecessor
+cannot be reused by a delayed publisher. The first generation in a new epoch is
+1; generations never repeat within that collection_ref/epoch. At exhaustion or
+lost continuity, retire the old scope and allocate a new collection_ref/epoch;
+starting at 1 there does not revive an old qualified generation or cursor.
+
+Read-back of unknown acknowledgement returns a committed receipt only for the
+same attempt in the still-current, accessible publication. Missing, superseded,
+retired or unavailable receipt state yields unavailable; it is not proof that an
+attempt never committed and cannot authorize rescan/republish. Current view,
+receipt, private index and observation records recover together or old handles
+are invalidated. Transient scan work creates no durable attempt owner.
+
+At the earliest retained-row expiry, view retirement atomically removes the
+current snapshot/index and its paging/receipt access, advances the publication
+revision and requires a fresh admitted scan/publication before serving another
+view. The same Open collection may publish again if its exact scope continuity
+and current authority remain established; view retirement alone does not retire
+that collection's epoch.
+Retained unexpired row records may supply incarnation continuity to that next
+publication; they provide no route authority without a current positive view.
+Row eviction or scope removal records retirement before cleanup and cannot be
+interpreted as provider absence. Collection retirement invalidates its view and
+all owned rows in the same owner transaction; rows cannot survive that owner as
+addressable observations.
+
+Retired rows remain inaccessible and are deleted within the existing 600-second
+history ceiling measured from their last positive observation; a retired empty
+collection may be removed immediately, and other retired collection metadata is
+removed no later than 600 seconds after retirement. All still-retained active or
+retired scopes count against 256, and all physical row records for one scope
+count against 500: cleanup occurs before replacement would exceed either bound,
+otherwise new work refuses capacity. An observation/child reference cannot delay
+cleanup. Safe historical child coordinates may outlive these records, but do not
+form a live foreign key or permit rematerialization. Non-reuse comes from fresh
+qualified identity/epoch allocation, not an unbounded per-object tombstone list.
+If the owner cannot establish that allocation/continuity guarantee, the affected
+profile refuses rather than rebuilding old IDs from provider data.
+
+The existing 300-second evidence/cursor and 600-second history rules remain
+distinct. Uncertain time never makes expired rows addressable. Clock provenance,
+atomic storage/recovery, canonical equality, capacity accounting and field
+assignment remain implementation predicates; their ownership and required
+outcomes are selected here rather than left as open lifecycle decisions.
+
 ## 5. Limits
 
 | Concern | Rule |
@@ -174,7 +255,7 @@ identifiers as opaque; the shared contract has no closed installed-provider cata
 | Refresh | on demand and on a configured interval; no watch |
 | Scan work | ≤64 resource-list requests plus the separately bounded F08 authorization calls; ≤4 simultaneous provider requests across both classes, shared original provider deadline and 4 MiB aggregate response bytes. Lower configured limits allowed; no automatic provider-page retry |
 | Scope/cursors | ≤64 partitions, ≤256 admitted coverage scopes per composition; ≤300 s cursor lifetime and positive evidence age, bounded further by provider/configuration/credential validity |
-| Retained history | At publication, keep observed rows first, then stale/withdrawn rows by descending original last-seen time and id. Retain history at most 600 s from last positive observation, without renewing it on failed scans. A view may be served only before its earliest retained row expires; thereafter retire that view and its cursors atomically, and require a fresh admitted collection before serving another view. This preserves immutable pages without extending history or silently filtering a page. Retired metadata is inaccessible and subject to the same finite cleanup bound; recovery never makes expired history addressable. Drop excess/expired history with retention_truncated:true, never as confirmed withdrawal. Missing private evidence makes dependent route admission unavailable; a child reference cannot pin unbounded history |
+| Retained history | At publication, keep observed rows first, then stale/withdrawn rows by descending original last-seen time and id. Retain history at most 600 s from last positive observation, without renewing it on failed scans. A view may be served only before its earliest retained row expires; thereafter retire that view and its cursors atomically, and require a fresh admitted scan/publication before serving another view. This preserves immutable pages without extending history or silently filtering a page. Retired metadata is inaccessible and subject to the same finite cleanup bound; recovery never makes expired history addressable. Drop excess/expired history with retention_truncated:true, never as confirmed withdrawal. Missing private evidence makes dependent route admission unavailable; a child reference cannot pin unbounded history |
 
 Observation ids, scope refs and selection/partition refs are bounded safe strings (≤256 UTF-8 bytes); native partition coordinates and target descriptions obey their smaller provider/F08 limits. Coverage plus rows must fit the selected 4 MiB result ceiling; if truthful metadata cannot fit, refuse unavailable rather than silently omitting requested partitions. Concurrent scan/provider work remains subject to the composition's aggregate resource limits. Public generation is an integer in 1..9007199254740991; before exhaustion the host creates a new non-reusable scope epoch and invalidates old handles rather than wrapping. Removed/inactive scopes share the finite scope bound and retire their history under the same retention rule; excess new scopes refuse capacity. A provider protocol requiring a larger/deeper scan cannot claim complete coverage under this first profile.
 
@@ -210,9 +291,9 @@ Observation ids, scope refs and selection/partition refs are bounded safe string
 
 | Entity | Notes |
 |---|---|
-| `ResourceObservation` persistent identity/relations | Proposed, not yet declared. Its logical source, incarnation, target interpretation and retained history belong to the host metadata boundary above; exact persistent ownership/cardinality remains UNMAPPED under the model/binding prerequisites recorded in design §31 |
+| `DiscoveryCollection` / `ResourceObservation` | [discovery_state.yaml](../../../../ess/domains/discovery_state.yaml) declares the §4.6 owner/owned-row identities, references and administrative/classification lifecycle. One scope epoch owns many bounded observation records; source/instance/declaration references confer no deletion ownership. |
 | `Materialization` | not an entity here; it is the creation of a `Connection` with a parent |
-| Multiplicity: one resource may have several source observations; one observation may back several child connections | Conceptual relationship only; no Connection.parent reverse relation is currently recorded in ESS. Ownership remains UNMAPPED (`docs/design.md:487`) |
+| Multiple scope observations / child bindings | The same physical object may have independent scope-qualified observations; no physical Resource entity is introduced. Many child Connections may retain historical coordinates for one observation without pinning it. The child's parent relation and embedded mediated-route value belong to Connection; no mandatory live observation foreign key is selected. |
 | Coverage/publication/revalidation values | [discovery.yaml](../../../../ess/domains/discovery.yaml) models shared states and facts. Profile/provider/partition-kind identifiers are opaque here; typed recognition inputs, provider vocabularies and partition coordinates live in [adapter-owned models](../../../../adapters/README.md). Provider completeness, scope equality, current time/authority, atomic publication, retention and route revalidation are not executed schema predicates |
 
 ## 10. Open decisions
