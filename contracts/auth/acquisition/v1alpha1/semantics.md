@@ -139,11 +139,51 @@ Static entry (`static_entry`): the protected entry page posts to the coordinator
 
 Client credentials (`oauth2_client_credentials`): no browser; `begin` performs the exchange with the configured registration and returns a `completed` status directly.
 
+### 4.3 Acquisition owner, consumption and terminal records
+
+Acquisition has a non-reusable opaque ref at its one coordinator, instance and
+immutable AuthProfile record references, admitted owner/origin/registration,
+original expiry and expected private Connection publication fence. It references
+one fixed `target_connection_ref` and optional repair/yielded Connections, owning
+none. On repair, target equals repair; on creation, target is the privately
+allocated binding, allocated before Begin/capture/custody. Completed's result equals
+that fixed target. Concurrent attempts
+cannot bypass current publication fencing. Initial creation privately allocates
+its fixed binding before custody; no public pending Connection is required.
+Static_config creates no Acquisition.
+
+Internally `Pending → Completing → Completed`; failure/expiry can terminate either
+nonterminal state. Pending→Completing durably consumes the protected one-use
+correlation under current owner/admission/expiry checks before exchange. Both states
+project as public pending. Only the definite live winner can perform the original
+admitted exchange; observing consumed state never grants another send. Unknown
+consumption acknowledgement permits owner observation or refusal, not exchange on
+guessed success. Unknown exchange becomes Failed with an uncertainty reason and
+no resend. A known protected result may be finalized under the original publication
+protocol without another exchange.
+
+Completing→Completed requires definitely acknowledged custody and guarded baseline
+Connection publication before original expiry. The yielded reference is present
+exactly on Completed. Failure/expiry preserves an established repair target and
+cannot overwrite a winner or reverse revoke. At `now >= expires_at`, known expiry
+permits Expired and prevents further exchange/publication. Expired projects as
+the existing public failed result with reason `expired`, not a new public status.
+Unknown time/acknowledgement refuses progress, not guessed validity or expiry.
+
+Terminal refs, consumption and publication outcome facts have no automatic deletion
+in this first binding. Protected callback/entry payload remains only while required
+by admitted completion/recovery and is erased when terminal with no remaining use.
+It is never a replay credential. Finite capacity refuses new acquisitions rather
+than evicting consumed/terminal safety facts. Protected-ingress codecs remain a
+separate binding obligation. [auth_bindings.yaml](../../../../ess/domains/auth_bindings.yaml)
+models causal lifecycle/references; [verification](../../../../docs/evidence/model-auth-closure-20260909/verification.md)
+separates model checks from actual atomic correlation/publication execution.
+
 ## 5. Ordering, limits
 
 | Concern | Rule |
 |---|---|
-| Acquisition expiry | first-profile default 600 s for browser flows, 300 s for entry pages; to be confirmed |
+| Acquisition expiry | first-profile ceilings 600 s browser / 300 s entry; lower admitted values permitted, original deadline never slides |
 | Concurrent begins for the same connection repair | allowed; the first completion wins; later completions are `expired` |
 | Refresh skew | refresh before expiry by a declared margin (old Jira used a skew; value to be measured, `connector-oauth` header) |
 | Retry | provider exchange is not retried on unknown outcome |
@@ -183,7 +223,7 @@ Client credentials (`oauth2_client_credentials`): no browser; `begin` performs t
 
 | Entity | Notes |
 |---|---|
-| `Acquisition` (identity: acquisition ref), proposed lifecycle pending → completed / failed / expired | Not yet declared in ESS; its owner, optional repair target and yielded connection are coordinator facts whose persistent model remains an explicit obligation. No implemented entity/relations are claimed here. |
+| `Acquisition` | `connectors.auth_bindings.Acquisition`: Pending/Completing/Completed/Failed/Expired and instance/profile/fixed target/optional repair/result references under §4.3. Completing is internal consumption, not a new public status. |
 | `CredentialSet` | defined in custody; custody version is not refresh identity |
 | `RefreshAttempt` | [ESS](../../../../ess/domains/refresh.yaml): `Reserved → Authorized → ResponseStored → Published`, pre-authorization fencing, stored-response recovery, terminal uncertainty/discard; exactly one source-generation reference |
 | `CredentialGeneration` | [shared ESS](../../../../ess/domains/credentials.yaml): host-private immutable capture; expected identity, not verified evidence |
