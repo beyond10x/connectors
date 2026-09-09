@@ -92,6 +92,7 @@ entities:
       - {name: enabled, type: Boolean}
       - {name: external_identity, type: "Optional<connectors.credentials.ExternalIdentity>"}
       - {name: parent_connection_ref, type: "Optional<String>"}
+      - {name: mediated_route, type: "Optional<connectors.discovery.MediatedRouteBinding>"}
       - {name: active_generation_id, type: "Optional<connectors.credentials.CredentialGenerationId>"}
       - {name: active_custody_version_ref, type: "Optional<String>"}
       - {name: superseded_custody_version_refs, type: "List<String>"}
@@ -111,8 +112,9 @@ entities:
         - {name: revoke, from: [Live], to: Revoked}
     # Live is administrative non-revocation, not readiness/publication/permission.
     # Optional via carriers mean zero-or-one, as in RefreshAttempt's candidate.
-    # Fixed mediated route value is integrated by the coordinator from its owner;
-    # parent identity is this field, not duplicated route authority.
+    # Fixed mediated route and parent are present together only for a via binding;
+    # parent identity is this field, not duplicated route authority. Historical
+    # observation coordinates impose no live observation FK or retention pin.
 
   - name: connectors.auth_bindings.Acquisition
     identity: {name: acquisition_ref, type: String}
