@@ -1,0 +1,176 @@
+domain: connectors.execution_audit
+summary: Proposed per-hop durable execution-audit anchor and one final observation; no runtime or exporter.
+
+# Normative owner: contracts/service/audit.md. Values are safe internal audit
+# facts. The public projection remains connectors.service_wire.SourceAudit.
+types:
+  # Private injective tagged/length-prefixed qualification of the exact
+  # (instance_id, public audit_ref) pair; never a public/global audit id.
+  - name: connectors.execution_audit.AuditRecordRef
+    kind: newtype
+    of: String
+  - name: connectors.execution_audit.AuditRef
+    kind: newtype
+    of: String
+  - name: connectors.execution_audit.ObservationId
+    kind: newtype
+    of: Uuid
+  - name: connectors.execution_audit.AnchorKind
+    kind: enum
+    variants: [admitted_execution, early_refusal]
+  - name: connectors.execution_audit.Activity
+    kind: enum
+    variants: [describe, invoke]
+  - name: connectors.execution_audit.HopRole
+    kind: enum
+    variants: [gateway, execution]
+  - name: connectors.execution_audit.AnchorStage
+    kind: enum
+    variants: [authentication, decoding, admission]
+  - name: connectors.execution_audit.FinalOutcome
+    kind: enum
+    variants: [success, refused, error, unknown]
+  - name: connectors.execution_audit.FinalObservation
+    kind: struct
+    fields:
+      - {name: observation_id, type: connectors.execution_audit.ObservationId}
+      - {name: outcome, type: connectors.execution_audit.FinalOutcome}
+      - {name: code, type: "Optional<String>"}
+      - {name: recorded_at, type: Timestamp}
+  - name: connectors.execution_audit.AnchorDecision
+    kind: enum
+    variants: [allow, capacity]
+  - name: connectors.execution_audit.AppendDecision
+    kind: enum
+    variants: [allow, unavailable]
+
+entities:
+  - name: connectors.execution_audit.AuditRecord
+    identity:
+      name: audit_record_ref
+      type: connectors.execution_audit.AuditRecordRef
+    fields:
+      - {name: instance_id, type: String}
+      - {name: audit_ref, type: connectors.execution_audit.AuditRef}
+      - {name: anchor_kind, type: connectors.execution_audit.AnchorKind}
+      - {name: activity, type: "Optional<connectors.execution_audit.Activity>"}
+      - {name: hop_role, type: connectors.execution_audit.HopRole}
+      - {name: stage, type: connectors.execution_audit.AnchorStage}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: principal_ref, type: "Optional<String>"}
+      - {name: operation_id, type: "Optional<String>"}
+      - {name: connection_ref, type: "Optional<String>"}
+      - {name: descriptor_revision, type: "Optional<String>"}
+      - {name: recorded_at, type: Timestamp}
+      - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
+      - {name: final_observation, type: "Optional<connectors.execution_audit.FinalObservation>"}
+    relations:
+      - name: instance
+        kind: references
+        target: connectors.declarations.ServiceConfiguration
+        cardinality: one
+        via: instance_id
+      - name: mutation_attempt
+        kind: references
+        target: connectors.mutations.AttemptRecord
+        cardinality: one
+        via: attempt_id
+    lifecycle:
+      initial: Anchored
+      states: [Anchored, FinalObserved]
+      terminal: [FinalObserved]
+      transitions:
+        - {name: append_final, from: [Anchored], to: FinalObserved}
+
+errors:
+  - name: connectors.execution_audit.AuditCapacity
+    fields:
+      - {name: reason, type: String}
+  - name: connectors.execution_audit.AppendUnavailable
+    fields:
+      - {name: reason, type: String}
+  - name: connectors.execution_audit.AuditStateConflict
+    fields:
+      - {name: state, type: connectors.execution_audit.AuditRecord.State}
+
+commands:
+  - name: connectors.execution_audit.AcknowledgeAnchor
+    # Decision is produced by the trusted audit owner. Only acknowledged allow
+    # creates a record; capacity creates no placeholder and grants no dispatch.
+    input:
+      - {name: decision, type: connectors.execution_audit.AnchorDecision}
+      - {name: instance_id, type: String}
+      - {name: audit_ref, type: connectors.execution_audit.AuditRef}
+      - {name: anchor_kind, type: connectors.execution_audit.AnchorKind}
+      - {name: activity, type: "Optional<connectors.execution_audit.Activity>"}
+      - {name: hop_role, type: connectors.execution_audit.HopRole}
+      - {name: stage, type: connectors.execution_audit.AnchorStage}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: principal_ref, type: "Optional<String>"}
+      - {name: operation_id, type: "Optional<String>"}
+      - {name: connection_ref, type: "Optional<String>"}
+      - {name: descriptor_revision, type: "Optional<String>"}
+      - {name: recorded_at, type: Timestamp}
+      - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
+    outcomes:
+      - name: anchored
+        when: decision == allow
+        creates: connectors.execution_audit.AuditRecord
+        instance: audit_record_ref
+        emits: [connectors.execution_audit.AuditAnchored]
+      - name: capacity
+        error: connectors.execution_audit.AuditCapacity
+
+  - name: connectors.execution_audit.AppendFinalObservation
+    # The owner allocates observation_id before append. Same-id/same-content
+    # retry acknowledgement and conflicting-id refusal are binding obligations;
+    # neither this transition nor recovery grants redispatch.
+    input:
+      - {name: decision, type: connectors.execution_audit.AppendDecision}
+      - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
+      - {name: final_observation, type: connectors.execution_audit.FinalObservation}
+    outcomes:
+      - name: recorded
+        when: decision == allow
+        moves: connectors.execution_audit.AuditRecord.append_final
+        instance: audit_record_ref
+        emits: [connectors.execution_audit.FinalObservationRecorded]
+      - name: unavailable
+        error: connectors.execution_audit.AppendUnavailable
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.execution_audit.AuditStateConflict
+
+events:
+  - name: connectors.execution_audit.AuditAnchored
+    fields:
+      - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
+      - {name: instance_id, type: String}
+      - {name: audit_ref, type: connectors.execution_audit.AuditRef}
+  - name: connectors.execution_audit.FinalObservationRecorded
+    fields:
+      - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
+      - {name: observation_id, type: connectors.execution_audit.ObservationId}
+
+views:
+  - name: connectors.execution_audit.AuditStates
+    # Internal owner recovery only; this is not a public audit lookup service.
+    source: connectors.execution_audit.AuditRecord
+    consistency: read_your_writes
+    fields:
+      - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
+      - {name: instance_id, type: String}
+      - {name: audit_ref, type: connectors.execution_audit.AuditRef}
+      - {name: state, type: connectors.execution_audit.AuditRecord.State}
+      - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
+      - {name: final_observation, type: "Optional<connectors.execution_audit.FinalObservation>"}
+
+# ESS checks the declaration graph, known instance/attempt references and
+# lifecycle causation. Optional-field co-presence, trusted fact derivation,
+# UUID/string/aggregate/count bounds, durable acknowledgements, atomic append,
+# injective `(instance_id,audit_ref)` qualification/resolution, same-id/content
+# recovery, capacity, clocks, retention and dispatch order
+# are UNMAPPED persistence/conformance obligations. An early_refusal cannot
+# satisfy the execution gate; an admitted anchor alone still cannot dispatch.
+# No delete transition is selected. Audit outlives replay/index payload cleanup,
+# approval/nonce compaction and any other owner that merely references it.
