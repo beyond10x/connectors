@@ -143,6 +143,52 @@ Connection, logical profile and scope. Anonymous/parent-authenticated children h
 no active generation or active/superseded child custody, and null external identity.
 ExternalIdentity remains an embedded value, not an account entity.
 
+`baseline_evidence` is zero or one existing material-bearing EvidenceSnapshot
+embedded on Connection. It holds one aggregate baseline for the active generation,
+not an array of generations or an operation-permission cache. Its generation must
+equal `active_generation_id`; its binding must equal the Connection's instance,
+ref, logical profile and provider authority. Collection/installation also belongs
+to the current reviewed profile record and admitted semantic binding. Candidate
+evidence stays in the already selected transient acquisition/validation protocol
+before publication; this carrier is absent before initial publication, whenever
+no active generation exists, and on anonymous/parent-authenticated children.
+Absence establishes no successful baseline check; the existing viability and
+admission requirements still apply.
+
+The carrier has at most six check rows, one per applicable baseline kind:
+custody_reachable, credential_present, credential_valid, identity_check, scope_check
+and the profile's explicitly universal verify_operation. Baseline scope_check uses
+only the profile minimum. A designated universal verification has its exact declared
+subject; duplicate kinds, operation-specific subjects and permission_check are not
+installed here. Exact operation scopes/permissions/verification continue to use the
+existing transient DispatchAdmission evidence and, where selected, bounded permission
+cache rules in [evidence §4.4](../../evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08).
+An unrelated operation's failure cannot replace a successful global baseline.
+
+Install or replace the value under the same current binding/generation publication
+fence. Replacement/refresh constructs evidence for the new generation; only the
+explicit [transfer rules](../../evidence/v1alpha1/semantics.md#43-which-evidence-can-cross-a-generation-change)
+may preserve individual checks, with original source generation and deadlines.
+Revocation, consumed refresh, replacement detection, policy/profile/configuration
+change and check expiry invalidate affected authority immediately. Same-generation
+recollection replaces the value; it neither accumulates history nor extends an old
+check's deadline. Invalidated positive checks cannot remain usable, and invalidation
+or eviction cannot erase known invalidity/revocation/consumption cutoffs. Retained
+stale or negative checks describe the current generation's history and grant no use.
+
+Retain at most this one bounded baseline until replacement or removal of active
+material; clear it on terminal local revocation. Material-free bindings never gain
+this carrier. Changing the fixed access mode still requires a new Connection;
+clearing evidence does not authorize that change. Required evidence freshness
+remains at most 300 s for cached reads,
+60 s for mutation use, or the smaller profile/provider bound; this is a reuse
+deadline, not permission to resurrect expired checks or a new archival retention
+promise. The value must fit the host's declared finite Connection-metadata byte
+bound; overflow refuses installation without truncating required checks. No new
+evidence entity or independent persisted evidence owner is introduced. The existing
+EvidenceSnapshot type supplies shape; subset, counts, equality, field assignment,
+freshness and invalidation remain explicit owner predicates.
+
 Mediated route state is an embedded `connectors.discovery.MediatedRouteBinding`
 value on the child. Its parent/child authority comes from the Connection fields;
 historical observation coordinates do not impose a live foreign key that pins
@@ -212,7 +258,7 @@ Adversarial (`docs/design.md:985`, repair without identity drift):
 | Connection viability and operation eligibility values | Modeled in [connection_admission.yaml](../../../../ess/domains/connection_admission.yaml); the seven-state status is the §4.1 reduction, not an ESS entity lifecycle. Local revocation is terminal and enablement is orthogonal. |
 | Persistent `Connection` | `connectors.auth_bindings.Connection`: §4.2's Live/Revoked lifecycle and instance/profile/optional parent/material references, without deletion ownership over their targets. |
 | `ExternalIdentity` | value embedded in `Connection`; shared typed kind/subject in [credentials.yaml](../../../../ess/domains/credentials.yaml), scoped by provider authority |
-| `EvidenceSnapshot` | generation-bound value embedded in `Connection`, modeled in [credential_evidence.yaml](../../../../ess/domains/credential_evidence.yaml); no independent evidence-store ownership |
+| `EvidenceSnapshot` | Existing [credential_evidence.yaml](../../../../ess/domains/credential_evidence.yaml) value in optional `Connection.baseline_evidence`: one active-generation baseline with at most six distinct applicable checks under §4.2; exact operation evidence remains request-scoped, with no new persisted evidence owner. |
 | Tenant / principal ownership of a connection | UNMAPPED, consistent with `ess/domains/declarations.yaml` |
 
 ## 10. Open decisions

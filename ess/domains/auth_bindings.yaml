@@ -94,6 +94,7 @@ entities:
       - {name: parent_connection_ref, type: "Optional<String>"}
       - {name: mediated_route, type: "Optional<connectors.discovery.MediatedRouteBinding>"}
       - {name: active_generation_id, type: "Optional<connectors.credentials.CredentialGenerationId>"}
+      - {name: baseline_evidence, type: "Optional<connectors.credential_evidence.EvidenceSnapshot>"}
       - {name: active_custody_version_ref, type: "Optional<String>"}
       - {name: superseded_custody_version_refs, type: "List<String>"}
       - {name: created_at, type: Timestamp}
@@ -112,6 +113,11 @@ entities:
         - {name: revoke, from: [Live], to: Revoked}
     # Live is administrative non-revocation, not readiness/publication/permission.
     # Optional via carriers mean zero-or-one, as in RefreshAttempt's candidate.
+    # baseline_evidence is one current-generation material baseline value, not a
+    # history or operation-permission cache: at most six distinct baseline checks
+    # under connection §4.2. No value before publication or for non-material modes.
+    # Generation/binding equality, check subset/uniqueness, byte/freshness bounds,
+    # invalidation and retention are owner predicates, not enforced by Optional.
     # Fixed mediated route and parent are present together only for a via binding;
     # parent identity is this field, not duplicated route authority. Historical
     # observation coordinates impose no live observation FK or retention pin.
