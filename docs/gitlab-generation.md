@@ -9,23 +9,64 @@ input and its separate license.
 
 ## Generate and check
 
-The single editable ESS version is
+The single editable ESS toolchain pin is
 [`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json).
-Use that release and the rustfmt version recorded in the generated manifest.
+It records the exact ESS Git commit and its reported release version. A release
+tag is not required: a reviewed current-main commit, including an explicitly
+selected local development commit, can supply the generator. Use the rustfmt
+version recorded in the generated manifest too.
+
 The generator, build tool and standalone generation tests share one resolver:
 `--ess` overrides `CONNECTORS_ESS`; otherwise it checks the checkout-local
-`.local/toolchains/ess/<version>/bin/ess` and then every `ess` on PATH in order.
+`.local/toolchains/ess/<commit>/bin/ess` and then every `ess` on PATH in order.
 Explicit paths must match the pin and never fall back; a bare executable name
-searches PATH for the matching version. Resolution returns an absolute path,
-skips other versions during default lookup, and reports the pin file and searched
-locations if none matches. The gate passes its resolved path to tests.
+searches PATH for the matching identity. An exact-source selection requires an
+adjacent `ess.receipt.json`: its source repository, commit and version must match
+the pin, and its SHA-256 must match the executable. The resolver checks this
+receipt **before executing** the tool, then checks `--version`. A binary from an
+older commit cannot pass merely because it prints the same release version.
+Resolution returns an absolute path, skips mismatched candidates during default
+lookup, and reports the pin file and searched locations if none matches. The gate
+passes its resolved path to tests.
 
-Install a checksum-verified official release at the checkout-local path above or
-in a directory on PATH. Resolution does not download anything or change global
-tools. A pin change requires regenerating and reviewing the complete bundle,
-import refusal and build evidence; a test checks the manifest against the pin.
-On a machine with a small system temporary filesystem, set `TMPDIR` to an owned
-writable directory first:
+To build the selected source, first obtain and review a local ESS checkout at the
+exact pinned HEAD. Commit or preserve tracked changes and nonignored untracked
+files before building. Then run:
+
+```sh
+mkdir -p .local/tmp/ess-build
+export TMPDIR="$PWD/.local/tmp/ess-build"
+cargo run --locked -p connectors-build -- toolchain --source /path/to/ess
+```
+
+This explicit Rust command checks the clean source and exact HEAD, creates an
+independent temporary local Git clone, and builds only its committed content with
+`cargo build --locked --package ess-cli --bin ess --jobs 2 --profile dev --target-dir target`.
+Ignored scratch in the original checkout cannot become source input. Submodules
+are refused until a recursive source policy is specified. The build uses a private
+target inside its snapshot, disables incremental compilation and debug information,
+and retains the command's log beside the installed cache. A failed Cargo build
+retains its workspace and reports the path for inspection.
+
+The command installs the executable together with a receipt recording its digest,
+source identity, lockfile digest, Rust/Cargo versions and build arguments. It
+reuses only a verified existing cache; it refuses to overwrite an incomplete or
+mismatched installation. The receipt is a local build observation, not a signed
+upstream attestation or a claim that different build hosts produce identical
+binaries. Build scripts and dependencies execute under the caller's authority;
+reviewing the selected source remains part of choosing a toolchain.
+
+Resolution itself does not download, build or change global tools. Historical
+release-only pins of the form `{"ess":"x.y.z"}` remain readable and use
+`.local/toolchains/ess/<version>/bin/ess`; only those records use version-only
+matching and accept a separately checksum-verified official release without a
+source receipt. The current pin selects exact source.
+
+A pin change requires revalidating registered ESS roots and regenerating and
+reviewing affected bundles, schemas, reference/example output, import refusals and
+build evidence. Generated manifests record the portable source identity; the
+host-specific binary digest stays in the local receipt. A test checks the GitLab
+manifest against the source pin. To generate and verify:
 
 ```sh
 mkdir -p .local/tmp

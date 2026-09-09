@@ -7,6 +7,7 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
     std::fs::create_dir_all(&base)?;
     let temp = tempfile::Builder::new().prefix("gate-").tempdir_in(base)?;
     super::ess_boundary::run(root, ess, temp.path())?;
+    super::cli::run(root, ess, true)?;
     let command = |program: &str| {
         let mut cmd = Command::new(program);
         cmd.current_dir(root)
@@ -27,7 +28,41 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
         }
         Ok(())
     };
-    execute(command("cargo").args(["fmt", "--all", "--", "--check"]))?;
+    // `fmt --all` follows excluded path dependencies too. Only authored workspace
+    // members belong to rustfmt; generated dependencies retain their pinned bytes.
+    let metadata: serde_json::Value = serde_json::from_slice(
+        &super::run(command("cargo").args([
+            "metadata",
+            "--no-deps",
+            "--format-version",
+            "1",
+            "--locked",
+            "--offline",
+        ]))?
+        .stdout,
+    )?;
+    let members = metadata["workspace_members"]
+        .as_array()
+        .ok_or("missing Cargo workspace members")?;
+    let packages = metadata["packages"]
+        .as_array()
+        .ok_or("missing Cargo packages")?;
+    let mut format = command("cargo");
+    format.arg("fmt");
+    let mut selected = 0;
+    for package in packages.iter().filter(|p| members.contains(&p["id"])) {
+        format.args([
+            "--package",
+            package["name"]
+                .as_str()
+                .ok_or("missing Cargo package name")?,
+        ]);
+        selected += 1;
+    }
+    if selected == 0 || selected != members.len() {
+        return Err("incomplete Cargo formatting selection".into());
+    }
+    execute(format.args(["--", "--check"]))?;
     for adapter in ["gitlab", "kubernetes", "sql"] {
         let source = root.join(format!("adapters/{adapter}/spec/adapter.json"));
         let descriptor = connectors_spec::compile(&std::fs::read(source)?)?;

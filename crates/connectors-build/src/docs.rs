@@ -342,7 +342,9 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
             pages.push(json!({"kind":"model","route":page_route,"title":title,"source":model.source,"owner":model.owner,"status":"Typed specification; runtime obligations remain","document":page,"modelRoutes":model_routes}));
         }
     }
-    let output = json_bytes(&json!({"pages":pages,"ess":connectors_spec::toolchain::pin()?.ess}))?;
+    let output = json_bytes(
+        &json!({"pages":pages,"ess":connectors_spec::toolchain::pin()?.ess,"ess_source":connectors_spec::toolchain::source()?}),
+    )?;
     let text = std::str::from_utf8(&output)?;
     if ["/home/", ".local/", ".engineering/"]
         .iter()
@@ -474,7 +476,7 @@ pub fn examples(root: &Path, ess: &Path) -> Result<()> {
     let catalog = fs::read(dest.join("generated/web/connectors/catalog.json"))?;
     fs::write(published.join("catalog.json"), catalog)?;
     let sources = super::tree(&root.join("ess"))?;
-    let manifest = json!({"ess":connectors_spec::toolchain::pin()?.ess,"wasm_digest":hash(&fs::read(wasm)?),"source_files":sources.iter().map(|(name,bytes)|(name.clone(),hash(bytes))).collect::<BTreeMap<_,_>>(),"composition_digest":hash(&fs::read(root.join("website/examples/components.yaml"))?),"scope":"In-memory example behavior; no provider I/O or production persistence"});
+    let manifest = json!({"ess":connectors_spec::toolchain::pin()?.ess,"ess_source":connectors_spec::toolchain::source()?,"wasm_digest":hash(&fs::read(wasm)?),"source_files":sources.iter().map(|(name,bytes)|(name.clone(),hash(bytes))).collect::<BTreeMap<_,_>>(),"composition_digest":hash(&fs::read(root.join("website/examples/components.yaml"))?),"scope":"In-memory example behavior; no provider I/O or production persistence"});
     fs::write(published.join("manifest.json"), json_bytes(&manifest)?)?;
     audit(&published)?;
     println!("website: Rust/WASM contract examples built");

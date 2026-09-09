@@ -1391,3 +1391,33 @@ profiles and lifecycle behavior through the existing contract/ESS workflow befor
 implementation decomposition. The analysis proposes that order; it does not
 advertise additional runtime capabilities or silently select the still-open local
 storage backend, protected entry codec, write-admission binding or execution protocol.
+
+## 33. Selected local CLI binding, 2026-09-09
+
+The operator subsequently selected a Linux local CLI with `setup`, `adapters`,
+`connections` and `operations` command groups. The [CLI contract](../contracts/cli/v1alpha1/semantics.md)
+owns its exact command inventory, process results, protected entry and startup
+rules; [authored ESS values](../ess/domains/cli.yaml) give those inputs and
+observations their shared typed home. These choices resolve the corresponding
+open selections in §32 without changing that section's historical evidence.
+
+Non-secret configuration uses TOML with one entry per adapter. `startup` selects
+`on-demand` by default or `automatic` at local host startup. Read-only listing and
+status start nothing. An admitted connect, repair or invocation can start the
+host and the selected adapter under the lifecycle contract. Explicit stop remains
+suppressed until an admitted request explicitly resumes that entry.
+
+Credential custody selects the user's local OS keyring, with protected terminal,
+file or stdin entry and private non-secret metadata. Durable acknowledgement,
+Linux ownership checks, repair/revoke races and launch isolation remain explicit
+runtime conformance obligations. Cloud identity, hosted secrets, federation and
+MCP are not prerequisites for this stage.
+
+The [CLI presentation input](../apps/connectors/spec/cli.yaml) uses additive
+`ess-cli/1` bindings. Its generated Rust parser and process fixture can validate
+typed dispatch and framing with recording handlers. It does not implement the
+keyring, supervisor or provider handlers. Existing `describe`, `invoke` and
+`serve` remain the production runtime surface, with their compatibility inventory
+in [the CLI source guide](../apps/connectors/spec/README.md). The exact reviewed
+ESS Git source is selected through the single toolchain pin; regenerate all
+affected outputs and retain current-source evidence before accepting this wave.

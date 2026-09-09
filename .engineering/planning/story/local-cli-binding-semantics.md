@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:local-cli-binding-semantics
 kind: story
-status: active
+status: implemented
 title: Specify local configuration credential and adapter lifecycle behavior
 relations:
 - decomposes: epic:local-cli-contracts
@@ -12,7 +12,7 @@ scope:
   path: contracts/cli/v1alpha1/
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 7
+revision: 8
 ---
 ## Context
 The observed journeys C01-C05 in docs/recent-adapter-usage-20260909.md require a usable local CLI. docs/design.md sections 17 and 32 require local infrastructure independence. contracts/auth/management.md keeps management with host coordinators; ess/domains/auth_bindings.yaml already models connection/acquisition/custody ownership.

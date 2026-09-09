@@ -1,5 +1,42 @@
 # Connectors CLI: from 0.7.x to v2
 
+## Current local direction, 2026-09-09
+
+The [local CLI contract](../contracts/cli/v1alpha1/semantics.md) now owns the
+selected next interface. The compact groups are `setup`, `adapters`, `connections`
+and `operations`; global options select a TOML configuration, private state
+directory and human/JSON output. Each configured adapter has `startup = "on-demand"`
+(the default) or `startup = "automatic"` when the local host starts. Ordinary
+listing never implicitly starts that host or an adapter.
+
+Credentials use a local OS keyring, with separate private non-secret metadata.
+Protected terminal, file and stdin entry are application-local acquisition paths;
+ordinary management requests and diagnostic output contain no credential bytes.
+Durable credential reuse, same-identity repair and terminal revoke are specified.
+Linux is the first selected platform. Cloud Identity, hosted Secrets and federation
+are separate later bindings; none is a prerequisite for this local stage. MCP is
+deferred.
+
+The generated CLI package verifies parsing, type/source selection and process
+behavior using recording handlers. It does not replace the executable's current
+`describe`, `invoke` or `serve` implementation. Those compatibility paths retain
+their current wire codecs and output; the new grouped commands have their own
+explicit process contract. Production local custody and adapter supervision still
+require runtime work.
+
+The planning owners are `story:local-cli-binding-semantics` and
+`story:local-cli-ess-surface`. They supersede the undecided local-surface items
+below. The installed 0.7.x binary remains separate; no state or secret is migrated
+automatically.
+
+## Historical comparison, 2026-09-08
+
+The remainder preserves the earlier runtime comparison and proposed hosted scope.
+Its references to "today" mean that date. In particular, its exclusions of a
+personal configuration/state directory, undecided output/entry options and
+Secrets-only custody are superseded for the local stage above. They are not
+current restrictions on the local CLI design.
+
 - **Status:** forward-looking. The v2 CLI has three verbs today. Most rows below describe a
   planned area or a deliberate non-equivalent. Every "planned" item names the contract it waits
   for; every "not carried" item names the boundary that forbids it.
