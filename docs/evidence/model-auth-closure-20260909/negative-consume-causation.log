@@ -1,0 +1,12 @@
+.local/model-closure-20260909/negative-consume-causation was refused:
+  - [missing_causation] entity connectors.auth_bindings.Acquisition.transitions[0]: `consume` moves `connectors.auth_bindings.Acquisition` to `Completing`, and no command outcome takes it, so nothing in this specification can make that state change happen (hint: give some outcome `moves: connectors.auth_bindings.Acquisition.consume`, or delete the transition)
+  - [unreachable_branch] command.connectors.auth_bindings.ConsumeAcquisition.outcomes.wrong-state: outcome `wrong-state` is taken when the subject is in a state no move starts from, and no outcome of `connectors.auth_bindings.ConsumeAcquisition` moves an entity at all, so there is no subject and no state for it to be about (hint: drop the branch, or give the command a `moves:` whose transitions leave some declared state out)
+  - error[ESS-ENTITY-005]: `consume` moves `connectors.auth_bindings.Acquisition` to `Completing`, and no command outcome takes it, so nothing in this specification can make that state change happen
+  `ess-domain` refuses this as `missing_causation`
+  help: give some outcome `moves: connectors.auth_bindings.Acquisition.consume`, or delete the transition
+  --> <document> (entity connectors.auth_bindings.Acquisition.transitions[0])
+  - error[ESS-COMMAND-012]: outcome `wrong-state` is taken when the subject is in a state no move starts from, and no outcome of `connectors.auth_bindings.ConsumeAcquisition` moves an entity at all, so there is no subject and no state for it to be about
+  `ess-domain` refuses this as `unreachable_branch`
+  help: drop the branch, or give the command a `moves:` whose transitions leave some declared state out
+  --> domains/auth_bindings.yaml:237:5
+exit_code=1

@@ -120,6 +120,29 @@ No synthetic credential generation, custody reference or external identity is cr
 
 Selection fixes direct versus mediated access before admission. A missing bearer/basic credential, provider 401, parent outage or unsupported route refuses the selected profile; none may select an anonymous profile, borrow another connection, or dial directly. Changing access mode, route kind, parent, fixed target or host ownership requires a new independently admitted connection; no reassignment flow for those changes is selected here. A configuration revision only revalidates the same fixed connection binding under admitted policy and invalidates its old evidence, admissions, cursors and sessions where affected. It is not authority to repurpose a ref or perform credential repair. Business datasource contracts remain the same across routes; auth-profile ids and placement differ deliberately. Reserved and unimplemented capabilities still cannot be advertised through a safe descriptor.
 
+### 4.3 Immutable declaration records
+
+The host records each reviewed declaration as an immutable `AuthProfile`, keyed by
+a private `profile_record_ref` for the exact tuple `(adapter_id, profile_id,
+declaration_revision)`. It stores the tuple or an injective mapping; display labels
+and ambiguous concatenation do not establish equality. `profile_id` is the authored
+public id. Existing `profile_ref` coordinates keep that meaning. Adapter id references
+the existing AdapterSpecification; declaration revision pins the reviewed meaning.
+
+Many Connections and operation requirements may reference a declaration, without
+deletion ownership. A compatible reviewed replacement creates a new declaration
+record and may advance a Connection's reference while preserving its fixed logical
+adapter/profile. Existing semantic-revision, evidence invalidation and publication
+checks still apply. Different logical profiles cannot be disguised as revision
+updates. The first binding retains declaration records without automatic deletion
+and refuses new records at its declared finite storage capacity. No profile deletion
+cascades into Connections or credentials.
+
+AuthProfile has one `Declared` lifecycle state. Registration/material remain
+deployment-owned; declaring a profile creates neither Acquisition nor credential.
+[auth_bindings.yaml](../../../../ess/domains/auth_bindings.yaml) models these
+identities/references, without changing existing strict adapter/public readers.
+
 ## 5. Limits
 
 | Concern | Rule |
@@ -156,7 +179,7 @@ Selection fixes direct versus mediated access before admission. A missing bearer
 
 | Entity / value | Notes |
 |---|---|
-| Auth profile identity and declaration | Proposed entity, not yet declared in declarations.yaml; no implemented ownership relation is claimed here. Baseline/operation requirement values are modeled in [connection_admission.yaml](../../../../ess/domains/connection_admission.yaml). |
+| Auth profile identity and declaration | `connectors.auth_bindings.AuthProfile`: immutable revision-qualified declaration referencing AdapterSpecification under §4.3. Baseline/operation requirements reuse [connection_admission.yaml](../../../../ess/domains/connection_admission.yaml). |
 | `OperationDeclaration.requires_auth` | list of `{profile, scopes}` values |
 | Registration (client id/secret) per deployment | belongs to `ServiceConfiguration`, secret material UNMAPPED into custody |
 | Access and acquisition declaration values | [auth_access.yaml](../../../../ess/domains/auth_access.yaml) models the new closed selection vocabulary and declaration shapes; cross-field combinations, live authority and no-secret placement remain normative predicates, not executed ESS checks. |
