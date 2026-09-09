@@ -23,6 +23,15 @@ index-publication state, and no CatalogIndex entity is declared.
 
 ## Manual semantic cases
 
+After the unit checkpoint `efb8c2fbb934e5918c2023396cd67e60220fb79f`, the
+repository boundary gate refused the optional adapter name in the new shared
+model's summary/comment and normative path. The model now uses generic
+distribution wording and cites design §31.2, which links the owning artifact
+rules. No policy exception was added. Running the existing CLI's `ess-boundary`
+command with pinned ESS then exited 0 for the shared root and all five native
+authored roots. The retained unit hash manifest describes the initial unit
+checkpoint; final integrated evidence will pin the later comment/design changes.
+
 These are textual scenario analyses, not executed runtime or model reducers.
 
 | Case | Required selected result |
