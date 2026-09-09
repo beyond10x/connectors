@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "id": "adversary-cached-operation-list-fixture-is-stale",
+      "fixture_id": "valid-OperationListResult-24",
+      "expected_source": "cached",
+      "expected_stale": true
+    },
+    {
+      "id": "adversary-cached-operation-describe-fixture-is-stale",
+      "fixture_id": "valid-OperationDescribeResult-26",
+      "expected_source": "cached",
+      "expected_stale": true
+    }
+  ]
+}
