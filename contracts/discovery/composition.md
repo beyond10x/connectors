@@ -38,4 +38,29 @@ Loss of the composition process or required port removes callable readiness; res
 
 Required future verification includes separate adapter library/standalone builds without sibling dependencies, static dependency inspection of the generic host, one composed process using fake injected ports, missing/incompatible/cross-process/nested-route refusals, metadata-only remote discovery, and ordinary direct/federated child calls under the same business contract. Current read-only dependency evidence proves only today's boundary; it does not implement or execute those future scenarios.
 
-[Discovery ESS values](../../ess/domains/discovery.yaml) describe selected scope/publication/route/placement facts without introducing a Composition entity, concrete registry, provider loader or new ownership relation. Live port installation, physical process identity, current authority, startup ordering and persistence remain explicit UNMAPPED implementation predicates and advertisement gates.
+The first model selects an immutable `CompositionDeclaration` value in admitted
+deployment configuration. It contains the exact declaration revision, participating
+instance/configuration references, installed implementation/binding revisions and
+aggregate scope/row/provider-work limits used for admission. Instance coordinates
+resolve to the existing ServiceConfiguration.instance_id (String); no second
+Instance entity, Composition database entity or deletion ownership is introduced.
+Each participant must resolve to the declared configuration revision, with no
+duplicate/conflicting instance identities. Configuration replacement is a new
+reviewed value and invalidates incompatible placement/route admission; it is not
+a Created/Running/Stopped persistence lifecycle.
+
+The value supplies finite limits, not permission to exceed the existing 256-scope,
+500-row-per-scope, four-concurrent-provider-request and selected deadline/byte
+ceilings. A composition may narrow them. Installed binding references fix exactly
+which reviewed route/implementation revision may be injected; names alone do not
+establish a live port, installed bytes or compatible behavior. Source/Connection
+admission remains separate and no discovered provider installs itself.
+
+[Discovery ESS values](../../ess/domains/discovery.yaml) type that immutable
+configuration and selected scope/publication/route/placement facts. ESS does not
+declare relations on value fields: resolving each typed instance coordinate to
+the existing ServiceConfiguration and comparing revisions remains an explicit
+binding check. This is not an unresolved ownership/lifecycle choice or a reason
+to invent duplicate participant entities. Live port installation, physical
+process identity, current authority and startup ordering remain UNMAPPED
+implementation predicates and advertisement gates.
