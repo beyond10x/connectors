@@ -1,0 +1,74 @@
+{
+  "baseline_entities": 11,
+  "current_entities": 20,
+  "original_entities_preserved": true,
+  "per_original_entity": [
+    {
+      "name": "connectors.credential_evidence.DispatchAdmission",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.credentials.CredentialGeneration",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.declarations.AdapterSpecification",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.declarations.OperationDeclaration",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.declarations.ServiceConfiguration",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.delegation.ApprovalRedemption",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.delegation.DeliveryReceipt",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.idempotency.KeyReservation",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.mutations.AttemptRecord",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.refresh.RefreshAttempt",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    },
+    {
+      "name": "connectors.sessions.Session",
+      "identity_equal": true,
+      "lifecycle_equal": true,
+      "old_fields_preserved": true
+    }
+  ],
+  "original_named_types_preserved": true
+}
