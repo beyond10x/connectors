@@ -66,7 +66,9 @@ types:
 # replay admission; actual schema/profile support and legacy projection admission.
 # No ESS relation is implied by these public correlation VALUES. AttemptReference
 # names an existing private attempt but neither owns it nor creates a lookup API.
-# AuditRecord, grant and delegated assertion persistence/ownership remain UNMAPPED
-# under their owner stories; strings here do not invent an entity/cardinality.
+# AuditRecord persistence is declared by connectors.execution_audit. SourceAudit
+# deliberately retains the selected public opaque-string projection: it is a safe
+# host-qualified correlation value, not an entity relation or lookup capability.
+# Grant and delegated assertion persistence/ownership remain with their owners.
 # ESS validates declarations/references/types. It does not execute a wire decoder,
 # HTTP request, authority check, audit write or sequential conformance trace.
