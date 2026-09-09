@@ -1,0 +1,103 @@
+domain: connectors.artifact_provenance
+summary: Immutable shared source and bundle declarations; optional catalog publication is separate.
+
+# Normative owner: contracts/catalog/v1alpha1/semantics.md §9.
+# These records are neither provider resources nor mutable distribution state.
+types:
+  - name: connectors.artifact_provenance.SourceOrigin
+    kind: enum
+    variants: [vendor, repository-authored, vendor-derived, mixed]
+  - name: connectors.artifact_provenance.SourceKind
+    kind: enum
+    variants: [openapi, swagger2, authored, asyncapi]
+  - name: connectors.artifact_provenance.Risk
+    kind: enum
+    variants: [low, medium, high]
+  - name: connectors.artifact_provenance.Realization
+    kind: enum
+    variants: [generic, implemented, unresolved]
+  - name: connectors.artifact_provenance.ArtifactFile
+    kind: struct
+    fields:
+      - {name: path, type: String}
+      - {name: sha256, type: String}
+  - name: connectors.artifact_provenance.LicenseEvidence
+    kind: struct
+    fields:
+      - {name: declared_license, type: "Optional<String>"}
+      - {name: retained_files, type: "List<connectors.artifact_provenance.ArtifactFile>"}
+    # Absence/empty evidence is not permission or verified license absence.
+  - name: connectors.artifact_provenance.SourceTransform
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: input_sha256, type: String}
+      - {name: output_sha256, type: String}
+  - name: connectors.artifact_provenance.Curation
+    kind: struct
+    fields:
+      - {name: expose, type: Boolean}
+      - {name: effects, type: "List<connectors.mutations.ExecutableEffect>"}
+      - {name: semantic_effects, type: "List<connectors.mutations.SemanticEffect>"}
+      - {name: risk, type: connectors.artifact_provenance.Risk}
+      - {name: idempotency, type: connectors.mutations.IdempotencyKind}
+      - {name: realization, type: connectors.artifact_provenance.Realization}
+
+entities:
+  - name: connectors.artifact_provenance.Source
+    identity:
+      name: source_ref
+      type: String
+    fields:
+      - {name: url, type: String}
+      - {name: revision, type: String}
+      - {name: origin, type: connectors.artifact_provenance.SourceOrigin}
+      - {name: kind, type: connectors.artifact_provenance.SourceKind}
+      - {name: sha256, type: String}
+      - {name: license_evidence, type: "Optional<connectors.artifact_provenance.LicenseEvidence>"}
+      - {name: transforms, type: "List<connectors.artifact_provenance.SourceTransform>"}
+    # source_ref injectively names (url, revision). Conflicting pins refuse;
+    # no owner is inferred from a consumer's reference or file location.
+    lifecycle:
+      initial: Recorded
+      states: [Recorded]
+      terminal: [Recorded]
+
+  - name: connectors.artifact_provenance.Bundle
+    identity:
+      name: digest
+      type: String
+    fields:
+      - {name: adapter_id, type: String}
+      - {name: format, type: String}
+      - {name: specification_sha256, type: String}
+      - {name: upstream_sha256, type: "Optional<String>"}
+      - {name: ess, type: String}
+      - {name: rustfmt, type: String}
+      - {name: files, type: "List<connectors.artifact_provenance.ArtifactFile>"}
+      - {name: source_refs, type: "List<String>"}
+    relations:
+      - name: realizes
+        kind: references
+        target: connectors.declarations.AdapterSpecification
+        cardinality: one
+        via: adapter_id
+      - name: sources
+        kind: references
+        target: connectors.artifact_provenance.Source
+        cardinality: many
+        via: source_refs
+    # Logical adapter reference and exact specification digest are distinct.
+    # Independent consumers/index generations may retain the same digest.
+    lifecycle:
+      initial: Generated
+      states: [Generated]
+      terminal: [Generated]
+
+# UNMAPPED: injective key allocation, immutable record conflict checks, digest and
+# exact retained-byte verification, original/transformed source distinction,
+# license truth, path safety, unique file/source sets, curation completeness and
+# profile/realization compatibility, deterministic toolchain output and retention.
+# These are declared binding predicates, not executed by schema compilation.
+# No CatalogIndex, publication/installation lifecycle, deletion cascade, tenant,
+# generator change or new public/adapter/manifest reader support is selected.

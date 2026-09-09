@@ -1,0 +1,11 @@
+{
+  "baseline_entity_count": 11,
+  "current_entity_count": 13,
+  "old_identities_and_lifecycles_unchanged": true,
+  "old_field_types_unchanged": true,
+  "old_named_types_unchanged": true,
+  "adapter_operation_ownership_preserved": true,
+  "source_lifetime_not_owned": true,
+  "bundle_has_no_publication_lifecycle": true,
+  "catalog_index_not_declared": true
+}
