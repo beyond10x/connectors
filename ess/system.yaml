@@ -17,3 +17,4 @@ domains:
   - connectors.discovery
   - connectors.datasource_reads
   - connectors.artifact_provenance
+  - connectors.auth_bindings
