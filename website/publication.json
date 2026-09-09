@@ -1,0 +1,316 @@
+{
+  "pages": [
+    {
+      "route": "/contracts/service",
+      "title": "Service: describe and invoke",
+      "source": "contracts/service/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Implemented first slice"
+    },
+    {
+      "route": "/contracts/governed-service",
+      "title": "Governed service",
+      "source": "contracts/service/v1alpha2/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/compatibility",
+      "title": "Service compatibility",
+      "source": "contracts/service/compatibility.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/delegation",
+      "title": "Delegated approval",
+      "source": "contracts/service/delegation.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/audit",
+      "title": "Execution audit",
+      "source": "contracts/service/audit.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/mutations",
+      "title": "Mutations and idempotency",
+      "source": "contracts/operations/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/connection",
+      "title": "Connections",
+      "source": "contracts/auth/connection/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/profile",
+      "title": "Authentication profiles",
+      "source": "contracts/auth/profile/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/acquisition",
+      "title": "Credential acquisition",
+      "source": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/custody",
+      "title": "Credential custody",
+      "source": "contracts/auth/custody/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/capability",
+      "title": "Authenticated capabilities",
+      "source": "contracts/auth/capability/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/evidence",
+      "title": "Readiness and permission evidence",
+      "source": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/management",
+      "title": "Connection management",
+      "source": "contracts/auth/management.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/auth/read-refresh",
+      "title": "One admitted read refresh",
+      "source": "contracts/auth/capability/v1alpha1/read-refresh-once.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/data/records",
+      "title": "Document records",
+      "source": "contracts/datasources/records/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/data/logs",
+      "title": "Bounded logs",
+      "source": "contracts/datasources/logs/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/data/series",
+      "title": "Time series",
+      "source": "contracts/datasources/series/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/discovery/resources",
+      "title": "Resource discovery",
+      "source": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/discovery/routes",
+      "title": "Mediated HTTP routes",
+      "source": "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/discovery/composition",
+      "title": "Adapter composition",
+      "source": "contracts/discovery/composition.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/contracts/sessions",
+      "title": "Bidirectional sessions",
+      "source": "contracts/sessions/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; outside current runtime scope"
+    },
+    {
+      "route": "/contracts/media",
+      "title": "Media sessions",
+      "source": "contracts/media/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; outside current runtime scope"
+    },
+    {
+      "route": "/contracts/catalog",
+      "title": "Optional catalog",
+      "source": "contracts/catalog/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/gitlab/contracts/reads",
+      "title": "GitLab bounded reads",
+      "source": "adapters/gitlab/contracts/reads/v1alpha1/semantics.md",
+      "owner": "gitlab",
+      "status": "First-slice reads implemented; extensions specified"
+    },
+    {
+      "route": "/adapters/sql/contracts/reads",
+      "title": "PostgreSQL bounded reads",
+      "source": "adapters/sql/contracts/reads/v1alpha1/semantics.md",
+      "owner": "sql",
+      "status": "First-slice reads implemented; extensions specified"
+    },
+    {
+      "route": "/adapters/kubernetes/contracts/reads",
+      "title": "Kubernetes reads",
+      "source": "adapters/kubernetes/contracts/reads/v1alpha1/semantics.md",
+      "owner": "kubernetes",
+      "status": "First-slice reads implemented; extensions specified"
+    },
+    {
+      "route": "/adapters/kubernetes/contracts/auth",
+      "title": "Kubernetes authentication",
+      "source": "adapters/kubernetes/contracts/auth/v1alpha1/semantics.md",
+      "owner": "kubernetes",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/kubernetes/contracts/discovery",
+      "title": "Kubernetes discovery",
+      "source": "adapters/kubernetes/contracts/discovery/v1alpha1/semantics.md",
+      "owner": "kubernetes",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/kubernetes/contracts/logs",
+      "title": "Kubernetes logs",
+      "source": "adapters/kubernetes/contracts/logs/v1alpha1/semantics.md",
+      "owner": "kubernetes",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/kubernetes/contracts/mutations",
+      "title": "Kubernetes mutations",
+      "source": "adapters/kubernetes/contracts/mutations/v1alpha1/semantics.md",
+      "owner": "kubernetes",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/kubernetes/contracts/routes",
+      "title": "Kubernetes mediated routes",
+      "source": "adapters/kubernetes/contracts/routes/v1alpha1/semantics.md",
+      "owner": "kubernetes",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/atlassian/contracts/documents",
+      "title": "Atlassian documents",
+      "source": "adapters/atlassian/contracts/documents/v1alpha1/semantics.md",
+      "owner": "atlassian",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/docker/contracts/logs",
+      "title": "Docker logs",
+      "source": "adapters/docker/contracts/logs/v1alpha1/semantics.md",
+      "owner": "docker",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/docker/contracts/mutations",
+      "title": "Docker mutations",
+      "source": "adapters/docker/contracts/mutations/v1alpha1/semantics.md",
+      "owner": "docker",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/grafana/contracts/discovery",
+      "title": "Grafana datasource discovery",
+      "source": "adapters/grafana/contracts/discovery/v1alpha1/semantics.md",
+      "owner": "grafana",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/grafana/contracts/routes",
+      "title": "Grafana mediated routes",
+      "source": "adapters/grafana/contracts/routes/v1alpha1/semantics.md",
+      "owner": "grafana",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/loki/contracts/logs",
+      "title": "Loki LogQL",
+      "source": "adapters/loki/contracts/logs/v1alpha1/semantics.md",
+      "owner": "loki",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/prometheus/contracts/series",
+      "title": "Prometheus PromQL",
+      "source": "adapters/prometheus/contracts/series/v1alpha1/semantics.md",
+      "owner": "prometheus",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/sip/contracts/dial",
+      "title": "SIP dial",
+      "source": "adapters/sip/contracts/dial/v1alpha1/semantics.md",
+      "owner": "sip",
+      "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/rtvbp/contracts/session",
+      "title": "RTVBP sessions",
+      "source": "adapters/rtvbp/contracts/session/v1alpha1/semantics.md",
+      "owner": "rtvbp",
+      "status": "Specified; runtime pending"
+    }
+  ],
+  "models": [
+    {
+      "source": "ess",
+      "route": "/contracts/model",
+      "owner": "shared"
+    },
+    {
+      "source": "adapters/atlassian/spec/ess",
+      "route": "/adapters/atlassian/model",
+      "owner": "atlassian"
+    },
+    {
+      "source": "adapters/docker/spec/ess",
+      "route": "/adapters/docker/model",
+      "owner": "docker"
+    },
+    {
+      "source": "adapters/grafana/spec/ess",
+      "route": "/adapters/grafana/model",
+      "owner": "grafana"
+    },
+    {
+      "source": "adapters/kubernetes/spec/ess",
+      "route": "/adapters/kubernetes/model",
+      "owner": "kubernetes"
+    },
+    {
+      "source": "adapters/loki/spec/ess",
+      "route": "/adapters/loki/model",
+      "owner": "loki"
+    }
+  ]
+}

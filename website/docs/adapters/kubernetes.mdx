@@ -1,0 +1,32 @@
+---
+title: Kubernetes
+slug: /adapters/kubernetes
+---
+
+import ReferenceCards from '@site/src/components/ReferenceCards';
+
+# Kubernetes
+
+Inventory resources and discover candidate endpoints.
+
+## Current capabilities
+
+The current service implements `resources.list`, `endpoints.discover` and optionally `hosts.discover`. Configuration selects namespaces and resource kinds.
+
+## Access and limits
+
+Bind the intended Kubernetes API endpoint, bearer credential and certificate authority explicitly. Discovery returns observations with provenance and reachability context; it does not connect to discovered addresses.
+
+Resource discovery state, richer authentication, logs, mutations and mediation are described in native specifications. These newer profiles are not automatically supported by the current binary.
+
+## Run the first slice
+
+Build the workspace from source, choose this adapter’s example configuration and bind private credentials separately from operation input. The [getting-started guide](/introduction/getting-started) explains the common service workflow.
+
+## Native contract reference
+
+<ReferenceCards owner="kubernetes" />
+
+## Typed native model
+
+[Inspect this adapter’s ESS model](/adapters/kubernetes/model/index).

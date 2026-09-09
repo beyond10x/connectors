@@ -1,0 +1,22 @@
+---
+title: Adapters
+slug: /adapters
+sidebar_position: 1
+hide_table_of_contents: true
+---
+
+import AdapterCatalog from '@site/src/components/AdapterCatalog';
+
+# Choose an integration
+
+Each adapter owns its provider behavior, native contracts, specification and fixtures. Shared guarantees let applications use independent services through a common boundary.
+
+The three working services implement bounded reads and discovery. Broader native specifications describe additional capabilities that still need implementation.
+
+<AdapterCatalog />
+
+Slack and WebRTC remain architecture candidates without dedicated adapter documentation in this repository. A contract entry or design page is not an installed capability.
+
+## Where an adapter belongs
+
+Native profiles stay with their adapter. If an adapter moves to another repository, its contracts, model, fixtures and implementation move together. Shared contracts continue to have a separate owner and are consumed at an exact reviewed version. Independent extraction and packaging still require their own verification.

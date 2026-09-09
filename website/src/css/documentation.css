@@ -1,0 +1,571 @@
+/* The same navigation, article and contents frame wraps guides and references. */
+
+.documentation-frame {
+  display: grid;
+  grid-template-columns: 264px minmax(0,1fr);
+  max-width: 1680px;
+  margin: auto;
+  min-height: 75vh;
+}
+
+.documentation-sidebar {
+  border-right: 1px solid var(--site-line);
+  position: sticky;
+  top: var(--ifm-navbar-height);
+  height: calc(100vh - var(--ifm-navbar-height));
+  overflow: auto;
+  padding: 1.4rem 1rem 3rem;
+}
+
+.documentation-nav {
+  font-size: .875rem;
+  line-height: 1.5;
+}
+
+.documentation-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.documentation-nav a {
+  display: block;
+  padding: .65rem .75rem;
+  border-radius: .35rem;
+  color: var(--site-muted);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.documentation-nav a:hover {
+  background: var(--site-soft);
+  color: var(--ifm-heading-color);
+}
+
+.documentation-nav a[aria-current='page'] {
+  background: var(--site-soft);
+  color: var(--ifm-color-primary);
+  font-weight: 650;
+  box-shadow: inset 2px 0 var(--ifm-color-primary);
+}
+
+.documentation-nav summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+  padding: .75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.documentation-nav summary::-webkit-details-marker {
+  display: none;
+}
+
+.documentation-nav details:not([open])>summary>span {
+  transform: rotate(-90deg);
+}
+
+.documentation-nav .nav-section {
+  margin-top: 1rem;
+}
+
+.nav-section>summary {
+  font-weight: 700;
+  color: var(--ifm-heading-color);
+}
+
+.nav-group>summary {
+  color: var(--site-muted);
+  font-weight: 600;
+}
+
+.nav-group ul {
+  margin-left: .75rem;
+  border-left: 1px solid var(--site-line);
+}
+
+.documentation-nav .documentation-search {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  font-size: .875rem;
+  border: 1px solid var(--site-control-line);
+  padding: .65rem;
+  color: var(--ifm-font-color-base);
+  background: var(--site-card);
+}
+
+.documentation-search>span:last-child {
+  margin-left: auto;
+}
+
+.documentation-main {
+  min-width: 0;
+}
+
+.documentation-page {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 195px;
+  gap: 2.75rem;
+  padding: 2.5rem clamp(1.5rem,3vw,3.5rem) 5rem;
+}
+
+.documentation-page>article {
+  min-width: 0;
+  max-width: 850px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.documentation-toc {
+  position: sticky;
+  top: calc(var(--ifm-navbar-height) + 2rem);
+  align-self: start;
+  max-height: calc(100vh - var(--ifm-navbar-height) - 4rem);
+  overflow-y: auto;
+}
+
+.page-contents {
+  font-size: .875rem;
+  line-height: 1.5;
+  border-left: 1px solid var(--site-line);
+  padding-left: 1rem;
+}
+
+.page-contents>span {
+  display: block;
+  font-weight: 650;
+  margin-bottom: .8rem;
+}
+
+.page-contents ul {
+  list-style: none;
+  padding: 0;
+}
+
+.page-contents a {
+  display: block;
+  padding: .4rem 0;
+  color: var(--site-muted);
+  overflow-wrap: anywhere;
+}
+
+.page-contents a[aria-current] {
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+
+.page-contents .contents-nested {
+  padding-left: .75rem;
+}
+
+.documentation-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  flex-wrap: wrap;
+  font-size: .875rem;
+  margin-bottom: 1rem;
+}
+
+.documentation-breadcrumbs>a {
+  color: var(--site-muted);
+}
+
+.document-context {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.75rem;
+  border-bottom: 1px solid var(--site-line);
+  font-size: .875rem;
+}
+
+.document-context>span:first-child {
+  font: 650 .75rem ui-monospace;
+  font-family: var(--b10x-font-mono);
+  text-transform: uppercase;
+  color: var(--site-muted);
+  letter-spacing: .08em;
+}
+
+.document-context>a {
+  margin-left: auto;
+  font-size: .875rem;
+}
+
+.documentation-mobile-nav, .mobile-contents {
+  display: none;
+}
+
+.documentation-mobile-nav>summary::after {
+  content: '⌄';
+  margin-left: auto;
+}
+
+.documentation-mobile-nav[open]>summary::after {
+  transform: rotate(180deg);
+}
+
+.documentation-wide .documentation-page {
+  display: block;
+}
+
+.documentation-wide .documentation-page>article {
+  max-width: none;
+}
+
+.documentation-wide .markdown>p {
+  max-width: 76ch;
+}
+
+.documentation-wide .markdown>h1 {
+  max-width: 30ch;
+}
+
+.documentation-article .pagination-nav {
+  margin-top: 3rem;
+}
+
+.pagination-nav__sublabel {
+  font-size: .875rem;
+}
+
+.pagination-nav__label {
+  font-size: 1rem;
+}
+
+.provenance {
+  border: 1px solid var(--site-line);
+  border-radius: .5rem;
+  padding: .8rem 1rem;
+  margin: 1.25rem 0 2rem;
+  background: var(--site-soft);
+  font-size: .875rem;
+  color: var(--site-muted);
+}
+
+.provenance summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.provenance p {
+  margin: 1rem 0 .5rem;
+}
+
+.reference-status {
+  color: var(--site-muted);
+  font-size: 1rem;
+}
+
+.reference-source, .provenance code {
+  overflow-wrap: anywhere;
+  font-size: .875rem;
+}
+
+.reference-table {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.reference-table table, .canonical-contract table, .markdown table {
+  font-size: .9375rem;
+  line-height: 1.65;
+}
+
+.reference-table td, .reference-table th {
+  min-width: 8rem;
+}
+
+.markdown table th {
+  background: var(--site-soft);
+}
+
+.markdown table td, .markdown table th {
+  padding: .75rem 1rem;
+}
+
+.canonical-contract table {
+  display: block;
+  overflow-x: auto;
+}
+
+.model-diagram {
+  border: 1px solid var(--site-line);
+  padding: 1rem;
+  border-radius: .5rem;
+  margin: 1.5rem 0;
+  min-width: 0;
+}
+
+.model-diagram>summary {
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.model-diagram-figure {
+  margin: 1rem 0;
+}
+
+.model-diagram-viewport {
+  padding: 1rem;
+  border: 1px solid var(--site-line);
+  border-radius: .5rem;
+  background: var(--b10x-color-canvas);
+}
+
+.model-diagram-viewport .docusaurus-mermaid-container {
+  display: flex;
+  justify-content: center;
+}
+
+/* Preserve Mermaid's intrinsic max-width: small lifecycles must never be
+   enlarged to fill the frame. Larger diagrams fit both the column and screen. */
+.model-diagram-viewport svg {
+  display: block;
+  height: auto;
+  max-height: min(60vh, 32rem);
+}
+
+.model-diagram-figure figcaption {
+  margin-top: .75rem;
+  color: var(--site-muted);
+  font-size: .875rem;
+}
+
+.model-diagram details {
+  font-size: .875rem;
+}
+
+.model-diagram pre {
+  font-size: .875rem;
+}
+
+.source-note {
+  color: var(--site-muted);
+  text-decoration: underline dotted;
+  text-underline-offset: .2em;
+}
+
+.reference-cards {
+  margin-block: 1.5rem 2rem;
+}
+
+.reference-cards>section {
+  margin-bottom: 2rem;
+}
+
+.reference-cards .b10x-card-grid {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+}
+
+.reference-cards .b10x-content-card {
+  padding: 1.2rem;
+}
+
+.reference-cards .b10x-content-card :is(h3,h4) {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.reference-cards .b10x-content-card p {
+  font-size: .9375rem;
+}
+
+.adapter-catalog {
+  margin: 2rem 0 3rem;
+}
+
+.catalog-controls {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  border: 1px solid var(--site-line);
+  border-radius: .5rem;
+  background: var(--site-soft);
+}
+
+.catalog-count {
+  color: var(--site-muted);
+  font-size: .875rem;
+  margin-top: 1rem;
+}
+
+.catalog-controls small {
+  font-size: .75rem;
+}
+
+.adapter-catalog .b10x-card-grid {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+}
+
+.search-page {
+  max-width: 1100px;
+  padding: 3rem 1.5rem 5rem;
+  margin: auto;
+}
+
+.search-controls {
+  display: grid;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.search-filters {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 1rem;
+}
+
+.search-filters label {
+  display: grid;
+  gap: .4rem;
+  color: var(--site-muted);
+  font-size: .875rem;
+}
+
+.search-filters select {
+  padding: .5rem .75rem;
+  background: var(--site-card);
+  color: var(--ifm-font-color-base);
+  border: 1px solid var(--site-control-line);
+  border-radius: .4rem;
+  max-width: 100%;
+}
+
+.search-status {
+  font-size: .9375rem;
+  color: var(--site-muted);
+}
+
+.search-results {
+  list-style: none;
+  padding: 0;
+}
+
+.search-results>li {
+  border-top: 1px solid var(--site-line);
+  padding: 1.5rem 0;
+}
+
+.search-results h2 {
+  font-size: 1.35rem;
+  margin: .6rem 0;
+}
+
+.search-results p {
+  font-size: 1rem;
+  max-width: 85ch;
+}
+
+.search-result-meta {
+  display: flex;
+  gap: .7rem;
+  color: var(--site-muted);
+  font: .75rem ui-monospace;
+  font-family: var(--b10x-font-mono);
+}
+
+.search-results mark {
+  background: color-mix(in srgb,var(--ifm-color-primary) 20%,transparent);
+  color: var(--ifm-heading-color);
+  padding-inline: .15rem;
+}
+
+@media(max-width:1250px) {
+  .documentation-page {
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .documentation-toc {
+    display: none;
+  }
+
+  .mobile-contents {
+    display: block;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--site-line);
+    border-radius: .4rem;
+    padding: .65rem 1rem;
+    font-size: .875rem;
+  }
+
+  .mobile-contents summary {
+    cursor: pointer;
+  }
+
+  .mobile-contents .page-contents {
+    margin-top: 1rem;
+  }
+}
+
+@media(max-width:996px) {
+  .documentation-frame {
+    display: block;
+  }
+
+  .documentation-sidebar {
+    display: none;
+  }
+
+  .documentation-mobile-nav {
+    display: block;
+    padding: .75rem 1.5rem;
+    border-bottom: 1px solid var(--site-line);
+    background: var(--site-card);
+  }
+
+  .documentation-mobile-nav>summary {
+    cursor: pointer;
+    font-size: .875rem;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .documentation-mobile-nav .documentation-nav {
+    padding-block: 1rem;
+    max-height: 65vh;
+    overflow: auto;
+  }
+
+  .documentation-page {
+    padding: 2rem 1.5rem 4rem;
+  }
+}
+
+@media(max-width:600px) {
+  .documentation-page {
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .documentation-mobile-nav {
+    padding-inline: 1rem;
+  }
+
+  .reference-cards .b10x-card-grid, .adapter-catalog .b10x-card-grid, .search-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .document-context {
+    gap: .6rem;
+  }
+
+  .document-context>a {
+    margin-left: 0;
+  }
+
+  .markdown table td {
+    min-width: 8rem;
+  }
+
+  .journey-result td {
+    min-width: 0 !important;
+  }
+}

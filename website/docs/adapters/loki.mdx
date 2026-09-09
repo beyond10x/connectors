@@ -1,0 +1,22 @@
+---
+title: Loki
+slug: /adapters/loki
+---
+
+import ReferenceCards from '@site/src/components/ReferenceCards';
+
+# Loki
+
+Bounded LogQL reads with explicit stream and cursor semantics.
+
+The native log profile preserves Loki query semantics, stream identity and declared time, count and byte bounds. It specializes the shared log datasource contract.
+
+Authentication and tenant selection require an explicitly admitted binding. Native contracts and an authored ESS model exist; no Loki runtime is implemented in this repository.
+
+## Native contract reference
+
+<ReferenceCards owner="loki" />
+
+## Typed native model
+
+[Inspect this adapter’s ESS model](/adapters/loki/model/index).

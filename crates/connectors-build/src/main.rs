@@ -9,6 +9,7 @@ use std::{
     process::{Command, Output},
 };
 
+mod docs;
 mod ess_boundary;
 mod gate;
 
@@ -28,6 +29,20 @@ struct Args {
 #[derive(Subcommand)]
 enum Action {
     Check,
+    /// Generate and build the bounded Rust/WASM contract examples.
+    Examples,
+    /// Check generated public files for local/private source paths.
+    DocsAudit {
+        /// Explicit output directory for isolated website preview builds.
+        #[arg(long)]
+        directory: Option<PathBuf>,
+    },
+    /// Assemble selected public contract and ESS documentation for the website.
+    Docs {
+        /// Compare the current projection without overwriting it.
+        #[arg(long)]
+        check: bool,
+    },
     /// Check shared ESS ownership and compile shared and adapter semantic models.
     EssBoundary,
     /// Run the local repository acceptance gates, without live provider credentials.
@@ -66,7 +81,19 @@ fn save_json(path: &Path, value: &Value) -> Result<()> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let root = args.root.canonicalize()?;
+    if let Action::DocsAudit { directory } = args.command {
+        return docs::audit(&directory.unwrap_or_else(|| root.join("website/build")));
+    }
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
+    if let Action::Examples = args.command {
+        check_ess(&ess)?;
+        return docs::examples(&root, &ess);
+    }
+    if let Action::Docs { check } = args.command {
+        check_ess(&ess)?;
+        std::fs::create_dir_all(root.join(".local/tmp"))?;
+        return docs::run(&root, &ess, check);
+    }
     if let Action::EssBoundary = args.command {
         check_ess(&ess)?;
         let base = root.join(".local/tmp");
