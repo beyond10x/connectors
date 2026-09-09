@@ -1,0 +1,12 @@
+{
+  "baseline": "8a5cf563fc717fd4b23e4dd7d470d0c967f39461",
+  "stage": "artifact provenance unit before auth/audit/discovery integration",
+  "sha256": {
+    "ess/domains/artifact_provenance.yaml": "300b24973edfd477c96d49ed05d4c005517882a36bad7b208cf132c6df803508",
+    "ess/domains/declarations.yaml": "e007aeb6dcf7d918dd1792d8b5eeea1dc3c146d2133f5f4f6e191094f7df0de2",
+    "ess/system.yaml": "5f91603d70119072a472c9416cbf17ef629e02bdda0bb8de4f3d07edca136366",
+    "contracts/catalog/v1alpha1/semantics.md": "4aa7382a1d19522b4754c431f6aa62dddc1ec666f4a156188d74850f5ee2229c",
+    ".local/model-closure-20260909/baseline-ir.json": "48ada7ee575f6f69f3ac979f18adb3c4dec90cd7decf127de1dc521aa6e99f6a",
+    ".local/model-closure-20260909/artifact-ir.json": "3ffe15408f56f4f2564feeb2807754732d6ebd673a3499a0220f31eace0b4576"
+  }
+}

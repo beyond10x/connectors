@@ -73,7 +73,15 @@ entities:
         type: String
       - name: upstream
         type: Optional<connectors.declarations.UpstreamSource>
+      # Proposed immutable provenance joins; current strict readers are unchanged.
+      - name: source_refs
+        type: List<String>
     relations:
+      - name: sources
+        kind: references
+        target: connectors.artifact_provenance.Source
+        cardinality: many
+        via: source_refs
       - name: operations
         kind: owns
         target: connectors.declarations.OperationDeclaration
@@ -101,6 +109,9 @@ entities:
         type: String
       - name: request_mapping
         type: Optional<connectors.declarations.RequestMapping>
+      # Authored decision value; absent remains unresolved where required.
+      - name: curation
+        type: Optional<connectors.artifact_provenance.Curation>
     lifecycle:
       initial: Declared
       states: [Declared]
