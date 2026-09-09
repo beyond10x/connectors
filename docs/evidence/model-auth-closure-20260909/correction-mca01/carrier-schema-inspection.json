@@ -1,0 +1,7 @@
+{
+  "carrier_present": true,
+  "optional_by_omission": true,
+  "baseline_type": {
+    "$ref": "#/$defs/connectors.credential_evidence.EvidenceSnapshot"
+  }
+}
