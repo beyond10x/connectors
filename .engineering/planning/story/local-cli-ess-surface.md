@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:local-cli-ess-surface
 kind: story
-status: active
+status: implemented
 title: Generate and verify the declared local CLI surface through ESS
 refs:
 - provider: local
@@ -64,7 +64,7 @@ scope:
   path: ess/system.yaml
 - confidence: inferred
   path: website/publication.json
-revision: 30
+revision: 32
 ---
 ## Context
 ESS release 0.20.0 currently cannot place service-forwarding CLI calls while preserving component ownership; parameterized view projection and process contracts are incomplete. The approved sibling ESS story cli-presentation-binding supplies an additive, versioned presentation binding. Existing apps/connectors/src/main.rs remains the runtime baseline until a separately scoped runtime story.
@@ -150,3 +150,44 @@ local production preview on port 3101. No external deployment is involved.
 An additional integration reviewer could not start because its account usage limit
 was exhausted. Earlier independent semantic/toolchain and ESS adversarial reviews
 remain preserved; the coordinator reviews these downstream deltas directly.
+
+## Completed wave validation
+
+The selected CLI contract fixture and both wave stories are implemented. ESS
+implementation source 6f7ef46163e758f3401945d1a946e0fc80ebc003 passes its full
+required task check, including all 152 freshly qualified consumer cases and the
+six-row metadata guard. The separately required ESS website check also passed.
+Historical partial attempts remain evidence of those attempts only.
+
+Connectors implementation tree b6573f9a3c7936f7f7b3dde93e600bc27d17d03a selects
+that exact clean source through a verified local build receipt. The final
+connectors-full-gate-04.log records exit zero with Rust 1.88 compatibility,
+all workspace tests and strict Clippy, shared plus five independent native ESS
+roots, deterministic generation, adapter boundaries, the 15-command fixture,
+64 structural CLI fixtures and 315 scenarios including 34 authored traces.
+GitLab regeneration changes only ESS source provenance; generated API/schema
+bytes remain unchanged.
+
+website-build-final-03.log and website-reference-check-final-04.log pass on
+the same pin. Earlier typecheck, 15 Rust example tests, browser walkthroughs and
+UI checks passed; the final upstream follow-up changes only a test expectation
+and planning evidence. No presentation or browser-example implementation changed
+after those checks.
+
+The 152 ESS cases comprise 130 new fine-grained CLI consumer checks, 20 existing
+change-detection checks and two existing relation projections. They are separate
+from Connectors' 315 scenarios. The accepted ESS unknown baseline remains
+157,677 unproven cells; metadata bookkeeping is not runtime behavioral coverage.
+
+Durable evidence is in the primary checkout under
+.local/cli-contract-wave-20260909/integration-evidence/: connectors contains the
+gate, build and website logs; ess contains the upstream gate, qualified summary
+and qualified-cases.md. The ESS primary checkout retains the complete compressed
+qualification and earlier checkpoints under its corresponding local evidence
+directory. Final integration heads and managed retirement are recorded in the
+local integration receipt.
+
+This completes the approved contracts/ESS fixture milestone. Production OS keyring
+custody, metadata persistence, adapter supervision and provider handlers remain
+future implementation; MCP, cloud/federation expansion and external publication
+remain deferred. Local integration and retirement follow the completed checks.
