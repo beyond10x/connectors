@@ -1,0 +1,399 @@
+domain: connectors.cli
+summary: Selected local CLI presentation values; protected inputs are ephemeral, and no production runtime or new persistent owner is declared.
+
+# Owner: contracts/cli/v1alpha1/semantics.md. Process globals live in ess-cli/1
+# Context, not these payloads. Existing auth/declaration identities retain their
+# String representations; these value references establish no entity relations.
+types:
+  - name: connectors.cli.StartupMode
+    kind: enum
+    variants: [on-demand, automatic]
+  - name: connectors.cli.RestartPolicy
+    kind: enum
+    variants: [never]
+  - name: connectors.cli.OperatingSystem
+    kind: enum
+    variants: [linux]
+  - name: connectors.cli.KeyringState
+    kind: enum
+    variants: [available, locked, unavailable]
+  - name: connectors.cli.PrerequisiteState
+    kind: enum
+    variants: [ready, failed, unknown]
+  - name: connectors.cli.LifecycleState
+    kind: enum
+    variants: [not_running, starting, ready, stopping, stopped, failed, owner_unavailable, suppressed]
+  - name: connectors.cli.MetadataSource
+    kind: enum
+    variants: [configuration, cached, authority]
+  - name: connectors.cli.FailureKind
+    kind: enum
+    variants: [usage, operational, interrupted]
+  - name: connectors.cli.FailureCode
+    kind: enum
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure]
+  - name: connectors.cli.FailureStage
+    kind: enum
+    variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
+  - name: connectors.cli.NextAction
+    kind: enum
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, create_connection, refresh_description, request_permission, retry_explicitly, none]
+  - name: connectors.cli.InitDisposition
+    kind: enum
+    variants: [created]
+  - name: connectors.cli.AcquisitionState
+    kind: enum
+    variants: [pending, completed, failed]
+  - name: connectors.cli.RevocationState
+    kind: enum
+    variants: [revoked]
+  - name: connectors.cli.ProviderRevocationOutcome
+    kind: enum
+    variants: [not_requested]
+  # Safe error data inside the ess-cli/1 process error envelope. No freeform exception or protected reference.
+  - name: connectors.cli.Failure
+    kind: struct
+    fields:
+      - {name: kind, type: "connectors.cli.FailureKind"}
+      - {name: code, type: "connectors.cli.FailureCode"}
+      - {name: stage, type: "connectors.cli.FailureStage"}
+      - {name: next_action, type: "connectors.cli.NextAction"}
+      - {name: service_code, type: "Optional<connectors.service_wire.ErrorCode>"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: acquisition, type: "Optional<String>"}
+  - name: connectors.cli.Prerequisite
+    kind: struct
+    fields:
+      - {name: name, type: "String"}
+      - {name: state, type: "connectors.cli.PrerequisiteState"}
+      - {name: next_action, type: "connectors.cli.NextAction"}
+  - name: connectors.cli.AdapterSummary
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: instance_id, type: "String"}
+      - {name: adapter_id, type: "String"}
+      - {name: startup, type: "connectors.cli.StartupMode"}
+      - {name: restart, type: "connectors.cli.RestartPolicy"}
+  - name: connectors.cli.ConfiguredExecutable
+    kind: struct
+    fields:
+      - {name: path, type: "String"}
+      - {name: sha256, type: "String"}
+      - {name: args, type: "List<String>"}
+  - name: connectors.cli.AdapterConfiguration
+    kind: struct
+    fields:
+      - {name: summary, type: "connectors.cli.AdapterSummary"}
+      - {name: configuration_revision, type: "String"}
+      - {name: protocol, type: "String"}
+      - {name: executable, type: "connectors.cli.ConfiguredExecutable"}
+  # Incarnation coordinates are observations of the existing supervisor, never PID authority or a persisted CLI entity.
+  - name: connectors.cli.AdapterObservation
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: configuration_revision, type: "String"}
+      - {name: state, type: "connectors.cli.LifecycleState"}
+      - {name: host_incarnation, type: "Optional<String>"}
+      - {name: child_incarnation, type: "Optional<String>"}
+      - {name: observed_at_ms, type: "Integer"}
+      - {name: failure, type: "Optional<connectors.cli.Failure>"}
+  # References existing qualified Connection and AuthProfile coordinates. revision is public semantic revision, never private generation/publication fence. State is an observation, not a second lifecycle.
+  - name: connectors.cli.ConnectionSummary
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: instance_id, type: "String"}
+      - {name: connection, type: "String"}
+      - {name: profile, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: state, type: "connectors.connection_admission.ConnectionState"}
+  - name: connectors.cli.ConnectionDescription
+    kind: struct
+    fields:
+      - {name: summary, type: "connectors.cli.ConnectionSummary"}
+      - {name: external_identity, type: "Optional<connectors.credentials.ExternalIdentity>"}
+      - {name: observed_at_ms, type: "Integer"}
+      - {name: valid_until_ms, type: "Integer"}
+      - {name: source, type: "connectors.cli.MetadataSource"}
+      - {name: stale, type: "Boolean"}
+  # Public projection of the existing acquisition owner: Pending/Completing -> pending,
+  # Completed -> completed, Failed/Expired -> failed. The safe reason is present
+  # exactly when failed; a yielded connection is present exactly when completed.
+  # Those cross-field requirements remain runtime obligations, not Optional semantics.
+  - name: connectors.cli.AcquisitionObservation
+    kind: struct
+    fields:
+      - {name: instance_id, type: "String"}
+      - {name: acquisition, type: "String"}
+      - {name: state, type: "connectors.cli.AcquisitionState"}
+      - {name: reason, type: "Optional<connectors.auth_bindings.AcquisitionFailure>"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: expires_at_ms, type: "Integer"}
+      - {name: observed_at_ms, type: "Integer"}
+      - {name: next_action, type: "connectors.cli.NextAction"}
+  - name: connectors.cli.OperationSummary
+    kind: struct
+    fields:
+      - {name: id, type: "String"}
+      - {name: description, type: "String"}
+      - {name: contract, type: "String"}
+      - {name: profile, type: "String"}
+  # Schema fields are bounded UTF-8 JSON document carriers, decoded into JSON schema values by the wire codec.
+  - name: connectors.cli.OperationDescription
+    kind: struct
+    fields:
+      - {name: id, type: "String"}
+      - {name: description, type: "String"}
+      - {name: contract, type: "String"}
+      - {name: profile, type: "String"}
+      - {name: input_schema, type: "String"}
+      - {name: output_schema, type: "String"}
+  # Complete legacy service descriptor value, with explicit JSON text carriers for dynamic schema documents.
+  - name: connectors.cli.ServiceDescriptor
+    kind: struct
+    fields:
+      - {name: version, type: "String"}
+      - {name: instance, type: "String"}
+      - {name: adapter, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: operations, type: "List<connectors.cli.OperationDescription>"}
+      - {name: configuration_schema, type: "String"}
+  - name: connectors.cli.SetupInitResult
+    kind: struct
+    fields:
+      - {name: disposition, type: "connectors.cli.InitDisposition"}
+      - {name: config_path, type: "String"}
+      - {name: state_path, type: "String"}
+      - {name: os, type: "connectors.cli.OperatingSystem"}
+  - name: connectors.cli.SetupCheckResult
+    kind: struct
+    fields:
+      - {name: config_path, type: "String"}
+      - {name: state_path, type: "String"}
+      - {name: os, type: "connectors.cli.OperatingSystem"}
+      - {name: keyring, type: "connectors.cli.KeyringState"}
+      - {name: prerequisites, type: "List<connectors.cli.Prerequisite>"}
+  - name: connectors.cli.AdapterListInput
+    kind: struct
+    fields:
+      - {name: limit, type: "Optional<Integer>"}
+      - {name: cursor, type: "Optional<String>"}
+  - name: connectors.cli.AdapterListResult
+    kind: struct
+    fields:
+      - {name: adapters, type: "List<connectors.cli.AdapterSummary>"}
+      - {name: next_cursor, type: "Optional<String>"}
+      - {name: source, type: "connectors.cli.MetadataSource"}
+  - name: connectors.cli.AdapterDescribeInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+  - name: connectors.cli.AdapterDescribeResult
+    kind: struct
+    fields:
+      - {name: configuration, type: "connectors.cli.AdapterConfiguration"}
+      - {name: descriptor, type: "Optional<connectors.cli.ServiceDescriptor>"}
+      - {name: source, type: "connectors.cli.MetadataSource"}
+      - {name: stale, type: "Boolean"}
+  - name: connectors.cli.AdapterStatusInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+  - name: connectors.cli.AdapterStatusResult
+    kind: struct
+    fields:
+      - {name: observation, type: "connectors.cli.AdapterObservation"}
+  - name: connectors.cli.AdapterStopInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: expected_revision, type: "String"}
+      - {name: host_incarnation, type: "String"}
+      - {name: child_incarnation, type: "String"}
+  - name: connectors.cli.AdapterStopResult
+    kind: struct
+    fields:
+      - {name: observation, type: "connectors.cli.AdapterObservation"}
+  - name: connectors.cli.ConnectionListInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: limit, type: "Optional<Integer>"}
+      - {name: cursor, type: "Optional<String>"}
+  # Page metadata covers every member; cached facts are always stale. A missing
+  # or expired page validity deadline cannot claim freshness. A known deadline
+  # is no later than the earliest member deadline; these are runtime obligations.
+  - name: connectors.cli.ConnectionListResult
+    kind: struct
+    fields:
+      - {name: connections, type: "List<connectors.cli.ConnectionSummary>"}
+      - {name: next_cursor, type: "Optional<String>"}
+      - {name: observed_at_ms, type: "Integer"}
+      - {name: valid_until_ms, type: "Optional<Integer>"}
+      - {name: source, type: "connectors.cli.MetadataSource"}
+      - {name: stale, type: "Boolean"}
+  - name: connectors.cli.ConnectionDescribeInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "String"}
+  - name: connectors.cli.ConnectionDescribeResult
+    kind: struct
+    fields:
+      - {name: connection, type: "connectors.cli.ConnectionDescription"}
+  # Safe management request projection. No credential payload or source path is an ordinary host management field.
+  - name: connectors.cli.ConnectionCreateRequest
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: profile, type: "String"}
+  # expected_revision is public semantic revision. The existing coordinator reconstructs its own private publication fence; caller revision never substitutes for it.
+  - name: connectors.cli.ConnectionRepairRequest
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "String"}
+      - {name: expected_revision, type: "String"}
+  # EPHEMERAL LOCAL ACTION ONLY: protected source fills credential_document; never persist/log/serialize into public management, results or recording evidence.
+  - name: connectors.cli.ConnectionConnectInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: profile, type: "String"}
+      - {name: credential_document, type: "String"}
+  - name: connectors.cli.ConnectionConnectResult
+    kind: struct
+    fields:
+      - {name: connection, type: "connectors.cli.ConnectionDescription"}
+      - {name: acquisition, type: "Optional<String>"}
+  # EPHEMERAL LOCAL ACTION ONLY: credential_document bypasses ordinary management projection and reaches separately bound trusted completion.
+  - name: connectors.cli.ConnectionRepairInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "String"}
+      - {name: expected_revision, type: "String"}
+      - {name: credential_document, type: "String"}
+  - name: connectors.cli.ConnectionRepairResult
+    kind: struct
+    fields:
+      - {name: connection, type: "connectors.cli.ConnectionDescription"}
+      - {name: acquisition, type: "Optional<String>"}
+  # Exactly one selector required by the binding; Optional alone does not enforce exclusivity.
+  - name: connectors.cli.ConnectionStatusInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: acquisition, type: "Optional<String>"}
+  # Exactly one branch matching the selected target. This is safe observation, not a protected continuation.
+  - name: connectors.cli.ConnectionStatusResult
+    kind: struct
+    fields:
+      - {name: connection, type: "Optional<connectors.cli.ConnectionDescription>"}
+      - {name: acquisition, type: "Optional<connectors.cli.AcquisitionObservation>"}
+  - name: connectors.cli.ConnectionRevokeInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "String"}
+      - {name: expected_revision, type: "String"}
+  - name: connectors.cli.ConnectionRevokeResult
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: local_state, type: "connectors.cli.RevocationState"}
+      - {name: provider_outcome, type: "connectors.cli.ProviderRevocationOutcome"}
+  - name: connectors.cli.OperationListInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: limit, type: "Optional<Integer>"}
+      - {name: cursor, type: "Optional<String>"}
+  - name: connectors.cli.OperationListResult
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: operations, type: "List<connectors.cli.OperationSummary>"}
+      - {name: next_cursor, type: "Optional<String>"}
+      - {name: source, type: "connectors.cli.MetadataSource"}
+      - {name: stale, type: "Boolean"}
+  - name: connectors.cli.OperationDescribeInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: operation, type: "String"}
+  - name: connectors.cli.OperationDescribeResult
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: schema, type: "String"}
+      - {name: operation, type: "connectors.cli.OperationDescription"}
+      - {name: source, type: "connectors.cli.MetadataSource"}
+      - {name: stale, type: "Boolean"}
+  # Dynamic schema identity and descriptor revision are distinct. input is bounded UTF-8 JSON TEXT; a provider schema validates its once-decoded JSON VALUE. Never treat the String schema as provider validation.
+  - name: connectors.cli.OperationInvokeInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "Optional<String>"}
+      - {name: operation, type: "String"}
+      - {name: schema, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: input, type: "String"}
+  # result is the bounded JSON text carrier for selected provider output; it must pass that operation's output schema.
+  - name: connectors.cli.OperationInvokeResult
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: operation, type: "String"}
+      - {name: revision, type: "String"}
+      - {name: result, type: "String"}
+  # Compatibility value only. Existing runtime arguments and codecs remain unchanged; token file metadata is sensitive.
+  - name: connectors.cli.LegacyDescribeInput
+    kind: struct
+    fields:
+      - {name: endpoint, type: "String"}
+      - {name: token_file, type: "String"}
+      - {name: allow_plaintext, type: "Optional<Boolean>"}
+  # The legacy renderer unwraps and decodes descriptor schema carriers into the complete original wire object.
+  - name: connectors.cli.LegacyDescribeResult
+    kind: struct
+    fields:
+      - {name: descriptor, type: "connectors.cli.ServiceDescriptor"}
+  # input retains the legacy file-path argument, not the new dynamic carrier source binding.
+  - name: connectors.cli.LegacyInvokeInput
+    kind: struct
+    fields:
+      - {name: endpoint, type: "String"}
+      - {name: token_file, type: "String"}
+      - {name: allow_plaintext, type: "Optional<Boolean>"}
+      - {name: operation, type: "String"}
+      - {name: input, type: "String"}
+  # The legacy renderer prints the once-decoded JSON carrier directly, preserving raw successful provider output.
+  - name: connectors.cli.LegacyInvokeResult
+    kind: struct
+    fields:
+      - {name: result, type: "String"}
+
+# UNMAPPED executable obligations: context/path and selector resolution, bounds,
+# closed TOML decoding/defaults, JSON carrier parsing/duplicate-key/depth checks,
+# dynamic input/result schema resolution, status one-of, acquisition state/reason
+# and yielded-connection projection, cached/stale and page validity reduction,
+# and error/code/exit
+# combinations, current owner/management/business admission, private source
+# permission and no-symlink checks, terminal echo restoration, secret redaction,
+# immutable durable keyring versions, publication/revoke/final-dispatch fences,
+# same-identity repair and restart recovery, launch coalescing, exact owned
+# incarnation stop and durable suppression, readiness/deadlines/autostart isolation.
+# All are required by the contract; this model does not claim to execute them.
+# Safe management request values omit credential_document. Only the separately
+# bound local protected action receives that ephemeral document, and it must
+# never reach logs, persistent state, ordinary provider invocation or outputs.
+# ESS structural schema projection proves none of the Linux/process/custody rules.
