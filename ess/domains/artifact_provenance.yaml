@@ -1,7 +1,7 @@
 domain: connectors.artifact_provenance
-summary: Immutable shared source and bundle declarations; optional catalog publication is separate.
+summary: Immutable shared source and bundle declarations; optional distribution publication is separate.
 
-# Normative owner: contracts/catalog/v1alpha1/semantics.md §9.
+# Normative owner and linked artifact rules: docs/design.md §31.2.
 # These records are neither provider resources nor mutable distribution state.
 types:
   - name: connectors.artifact_provenance.SourceOrigin
@@ -99,5 +99,5 @@ entities:
 # license truth, path safety, unique file/source sets, curation completeness and
 # profile/realization compatibility, deterministic toolchain output and retention.
 # These are declared binding predicates, not executed by schema compilation.
-# No CatalogIndex, publication/installation lifecycle, deletion cascade, tenant,
+# No distribution publication/installation lifecycle, deletion cascade, tenant,
 # generator change or new public/adapter/manifest reader support is selected.
