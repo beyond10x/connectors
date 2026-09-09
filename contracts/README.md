@@ -13,6 +13,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for the baseline's implementation boundary.
 
 | Contract id | Document | Status | Defines |
 |---|---|---|---|
+| local CLI presentation `cli/v1alpha1` | [cli/v1alpha1](cli/v1alpha1/semantics.md) | proposed; parser fixtures only | local TOML configuration, adapter startup selection, protected credential entry, keyring custody, safe management and process behavior; separate from service wire versions |
 | `operations/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | describe/invoke wire boundary, error envelope, limits |
 | proposed governed service binding | [service/v1alpha2](service/v1alpha2/semantics.md) | proposed | verified caller context, admission, policy, audit and [one-hop delegated approval](service/delegation.md); proposed v1alpha2 routes and codecs per the [compatibility owner](service/compatibility.md), not implemented |
 | `operations/v1alpha1` `mutation` profile | [operations/v1alpha1](operations/v1alpha1/semantics.md) | proposed | effects, idempotency, approval binding, durable attempt record, outcome-unknown |

@@ -1,0 +1,13 @@
+{
+  "format": "connectors.cli-compatibility/v1",
+  "runtime": "apps/connectors/src/main.rs",
+  "generated_binding": "apps/connectors/spec/cli.yaml",
+  "generated_package_role": "Contract fixture for grouped commands; not a replacement runtime",
+  "routes": [
+    {"path": ["describe"], "flags": ["endpoint", "token-file", "allow-plaintext"], "wire": "operations/v1alpha1", "success": "complete service descriptor as raw JSON", "alias_of_grouped_command": false},
+    {"path": ["invoke"], "flags": ["endpoint", "token-file", "allow-plaintext", "operation", "input"], "wire": "operations/v1alpha1", "success": "raw provider result JSON", "alias_of_grouped_command": false},
+    {"path": ["serve"], "flags": ["config"], "wire": "operations/v1alpha1", "success": "existing federation host lifetime", "alias_of_grouped_command": false}
+  ],
+  "regression_test": "apps/connectors/tests/compatibility.rs",
+  "mcp": "deferred"
+}

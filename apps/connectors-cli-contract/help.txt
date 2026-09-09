@@ -1,0 +1,25 @@
+Local integration access through explicitly configured adapters
+
+Usage: connectors [OPTIONS] <COMMAND>
+
+Commands:
+  adapters     
+  connections  
+  operations   
+  setup        
+  completions  Emit shell completions
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+      --config <global_config>
+          
+
+      --state-dir <global_state>
+          
+
+      --output <global_output>
+          [default: human]
+          [possible values: human, json]
+
+  -h, --help
+          Print help

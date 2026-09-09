@@ -7,7 +7,7 @@ title: Local CLI contract and ESS binding wave
 relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:core-model-closure-20260909
-revision: 2
+revision: 5
 ---
 ## Approved scope
 
@@ -54,3 +54,23 @@ The operator subsequently instructed us to inspect latest Atlas, use latest ESS 
 Latest ESS remote main observed 19de6406f97dca339136d7c9075ecc9b8fdb7af7, superseding initial local 9845922d. Preserve preparation commit/branch before moving our isolated lane onto current source; rebuild and record exact commit/binary identity. Regenerate and review every affected shared/native/schema/bundle/docs/example output and run appropriate conformance; do not change pinned vendor inputs to conceal incompatibility.
 Scope critic r1 findings are assigned explicitly to story:local-cli-binding-semantics: Linux binding/portability boundary and restart credential reuse plus same-identity repair. Parent acceptance carries both and no other story silently owns them.
 The ESS active lane branch becomes work/cli-binding-main-20260909 at the same managed path. work/cli-binding-20260909 preserves initial planning preparation only. Current source is an explicit operator correction, not a discarded review. Stage: plan review complete except final corrected-scope recheck; no production code dispatched yet.
+
+## Resumed implementation
+
+Implementation resumed in the same session after an interruption. Both initial implementor processes had stopped before any source edits; replacement agents own the same bounded unit surfaces. All four final plan critics approved in round 2. No further plan approval is pending.
+
+Current ESS source base is 19de6406f97dca339136d7c9075ecc9b8fdb7af7 on work/cli-binding-main-20260909, planning checkpoint a7e2316. The old work/cli-binding-20260909 branch preserves preparation only. Connectors semantic unit is cli-semantics-20260909, branch work/cli-semantics-20260909, base 88c0365. Coordinator branch integrate/cli-contracts-20260909 remains the sole planning writer.
+
+One additional isolated unit implements the already-assigned exact-source toolchain portion of story:local-cli-ess-surface: id cli-toolchain-20260909, branch work/cli-toolchain-20260909, base 88c0365, path /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cli-toolchain-20260909. It owns crates/connectors-spec/toolchain.json, crates/connectors-spec/src/toolchain.rs, the toolchain provenance portion of crates/connectors-spec/src/v2.rs and docs/gitlab-generation.md. Coordinator owns all other integration surfaces; it remains a subtask of the surface story, whose final CLI binding depends on the semantic and upstream units. No dependency is declared complete prematurely.
+
+Coordinator lease cli-coordinator-20260909 covers all five managed trees; each implementor acquires its own lease. Builds are serialized across units and bounded to two Cargo jobs, separate task targets, no incremental/debug data, at least 8 GiB free reserve. Free disk before builds: 23 GB.
+
+## Current-main refresh and integration checkpoint
+
+Remote ESS main advanced again to 113f5925ebb6a0a57a73e661687d9fa5deddb0b8 while this task was active. The current branch is work/cli-binding-latest-20260909 at the existing ESS managed path. Bot checkpoint 76fd70cac3911413b0cd1abe705963deaf67d8a1 preserves the pre-refresh implementation on work/cli-binding-main-20260909. The story was recreated through AEP on the latest base; source was applied separately, preserving journal history. Pre-refresh checks remain historical.
+
+An OS process-resource failure interrupted agents and tool hosts. The operator resumed this session. Replacement turns finished the preserved units, without starting a replacement wave. Available disk recovered to 51 GB at resume and measured 46 GB at this checkpoint; retain the two-job serialized build policy and 8 GiB reserve.
+
+Semantic source commit 30426f6342f4585656509b4e428ecdc2fb696af9 was integrated into the coordinator branch after two attacks. Round 1 found public acquisition-state drift, unlabeled cached connection pages, and cached operation fixtures with stale:false. All were corrected; round 2 executed 79 fixture checks plus five unchanged isolated regressions with zero failures. Both reports are immutable review-result records. These checks used the explicitly provisional older authoring binary; final exact-source regeneration remains pending and the semantic story is not terminal.
+
+The toolchain reader/build unit passed four added adversarial cases with no finding. Its actual clean-source build and final source pin await reviewed ESS integration. The refreshed ESS author reported 27 focused checks and strict Clippy/formatting green. A separate adversary and finite consumer/support gate integration are underway. Full upstream gates, the final source commit/build receipt, Connectors generation/conformance, public reference/example regeneration, final gates, local recovery and exact-id cleanup remain outstanding. No production custody, launch or provider implementation is claimed.
