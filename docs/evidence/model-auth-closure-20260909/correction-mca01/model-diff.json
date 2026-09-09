@@ -1,0 +1,14 @@
+{
+  "only_change_is_connection_carrier": true,
+  "carrier": {
+    "name": "baseline_evidence",
+    "type_ref": {
+      "kind": "optional",
+      "of": {
+        "kind": "declared",
+        "name": "connectors.credential_evidence.EvidenceSnapshot"
+      }
+    },
+    "naming": {}
+  }
+}
