@@ -1,0 +1,14 @@
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 18 file(s), valid
+connectors v1 — 18 file(s), 314 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-integration-20260909/.local/tmp/ess-boundary-AtkK2n/ess-boundary-0.json
+connectors_atlassian v1 — 2 file(s), valid
+connectors_atlassian v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-integration-20260909/.local/tmp/ess-boundary-AtkK2n/ess-boundary-1.json
+connectors_docker v1 — 2 file(s), valid
+connectors_docker v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-integration-20260909/.local/tmp/ess-boundary-AtkK2n/ess-boundary-2.json
+connectors_grafana v1 — 2 file(s), valid
+connectors_grafana v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-integration-20260909/.local/tmp/ess-boundary-AtkK2n/ess-boundary-3.json
+connectors_kubernetes v1 — 4 file(s), valid
+connectors_kubernetes v1 — 4 file(s), 11 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-integration-20260909/.local/tmp/ess-boundary-AtkK2n/ess-boundary-4.json
+connectors_loki v1 — 2 file(s), valid
+connectors_loki v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-integration-20260909/.local/tmp/ess-boundary-AtkK2n/ess-boundary-5.json
+gate: shared and 5 adapter ESS models validated and compiled independently; exit=0

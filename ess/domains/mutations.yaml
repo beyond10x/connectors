@@ -77,6 +77,11 @@ entities:
         target: connectors.declarations.ServiceConfiguration
         cardinality: one
         via: instance_id
+      - name: connection
+        kind: references
+        target: connectors.auth_bindings.Connection
+        cardinality: one
+        via: connection_ref
     # UNMAPPED: the operation reference needs instance/adapter qualification;
     # OperationDeclaration.operation_id alone is not a runtime operation identity.
     # KeyReservation in connectors.idempotency explicitly references this attempt;
@@ -85,8 +90,9 @@ entities:
     # it is a spend receipt, not the dispatch fence.
     # AuditRecord in connectors.execution_audit may reference this attempt;
     # neither owner cascades deletion or lifecycle changes into the other.
-    # UNMAPPED: Connection and admission principal/tenant entity relations
-    # remain unmodeled. Opaque fields assert no cardinalities.
+    # The selected Connection is retained independently after local revocation;
+    # the reference neither grants current use nor owns binding deletion.
+    # UNMAPPED: admission principal/tenant entities remain outside this binding.
     lifecycle:
       initial: Prepared
       states: [Prepared, Dispatching, Aborted, Completed, Failed, Indeterminate]

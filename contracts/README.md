@@ -4,6 +4,13 @@
 
 ## Index
 
+The local `v0.1.0` specification milestone covers Kubernetes (including discovery),
+GitLab and SQL. The [model inventory](../docs/design.md#312-revisions-retention-and-modeled-scope)
+distinguishes declared records, embedded values and deferred capabilities.
+The [execution audit owner](service/audit.md) supplies the governed service's
+anchor, final-observation and retention semantics without adding an advertised family.
+See [CHANGELOG.md](../CHANGELOG.md) for the baseline's implementation boundary.
+
 | Contract id | Document | Status | Defines |
 |---|---|---|---|
 | `operations/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | describe/invoke wire boundary, error envelope, limits |
