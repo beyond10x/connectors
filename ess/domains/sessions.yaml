@@ -84,9 +84,11 @@ types:
 # Normative owner: contracts/sessions/v1alpha1/semantics.md §4.1.
 # One supervising owner, not a distributed endpoint state replicated by ESS.
 # Binding/lease/terminal are values; SessionId is opaque, not a wire-format mandate.
-# UNMAPPED relations: Connection and SessionAuthority are not yet declared.
-# The known one-connection/one-establishment-authority references retain opaque
-# coordinates until their owning models exist. No guessed stub entity or edge.
+# Connection now exists in connectors.auth_bindings. This supervisor keeps its
+# existing embedded Binding coordinates; it declares no flat reference carrier.
+# UNMAPPED: a future selected session binding must join its one Connection and
+# establishment authority, whose persistence model remains unselected. Sessions
+# are outside the current three-adapter model milestone; no stub edge is implied.
 # Stream and endpoint enforcement records are transient binding data; this model
 # does not invent persistence ownership or a guessed endpoint cardinality.
 entities:

@@ -23,7 +23,9 @@ own instances; neither record owns, aliases or substitutes for the other.
 
 The selected private encoding is unpadded base64url of a tagged, length-prefixed
 byte sequence: the fixed `connectors.execution-audit-record/v1` tag, then a
-32-bit length and UTF-8 bytes for `instance_id`, then the same for `audit_ref`.
+unsigned 32-bit big-endian byte length and UTF-8 bytes for `instance_id`, then
+the same for `audit_ref`. The fixed tag is its literal ASCII bytes, without a
+terminator; no normalization, padding or trailing bytes are permitted.
 Hashing or delimiter-only concatenation is insufficient. Decoding must recover
 the exact pair and reject a noncanonical representation.
 
@@ -41,6 +43,13 @@ verified principal but no operation. An early authentication/decoding refusal
 records only the stage and facts independently verified at that point. Caller
 text never fills a trusted field. An `early_refusal` record cannot satisfy the
 pre-dispatch audit gate.
+
+When the admitting owner has resolved a selected Connection, `connection_ref`
+references that existing host-qualified record. Otherwise it is absent; caller
+text cannot create the reference. The link grants no current use and implies no
+deletion ownership. The independently retained Connection identity survives
+local revocation. Optional attempt and connection references must agree with
+the anchor's instance and, when both are present, with the attempt's connection.
 
 The lifecycle is `Anchored -> FinalObserved`. `Anchored` means the anchor write
 has a definite durable acknowledgement. It does not grant dispatch by itself;
@@ -142,9 +151,10 @@ export, search, retention-management or backend-selection API.
 ## 6. ESS and implementation boundary
 
 `connectors.execution_audit.AuditRecord` models the private qualified identity,
-separate public ref, optional attempt reference, one-way lifecycle and bounded
+separate public ref, optional attempt/connection references, one-way lifecycle and bounded
 semantic values. ESS validates declared types, the instance/attempt references
-and state-transition causation.
+and state-transition causation. Cross-record instance/connection equality remains
+an owner predicate.
 It does not enforce optional-field co-presence, byte/count bounds, trusted fact
 provenance, durable acknowledgement, atomic uniqueness, exact-once append,
 byte-identical retry comparison, actual clocks, capacity refusal, retention or

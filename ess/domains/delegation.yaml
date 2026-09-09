@@ -161,8 +161,10 @@ entities:
 # UNMAPPED: proof constants, integer/string bounds, mandatory-null emission,
 # canonical JSON/base64url, signature/key provenance, purpose/correlation and
 # co-presence predicates, approved authority/target reconstruction and disclosure.
-# Issuer, grant, principal, connection and route CONFIGURATION entities await
-# their owners; these structured correlation values do not guess their relations.
+# Issuer, grant and principal CONFIGURATION entities remain with their owners.
+# Connection is declared in connectors.auth_bindings; fixed mediated and gateway
+# route bindings are values. Proof subjects here retain historical coordinates,
+# not ownership or live foreign keys that grant current use.
 # Known receipt->receiver and redemption->attempt links are modeled above;
 # gateway and execution-hop AuditRecords are separate records in
 # connectors.execution_audit. Neither receipt owns an audit record, and audit
