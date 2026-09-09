@@ -1,0 +1,138 @@
+{
+  "source_digest_algorithm": "SHA-256 of each nonempty raw JSONL line followed by LF; record-stream digest, not byte-for-byte snapshot hash",
+  "clients": [
+    {
+      "client": "aws",
+      "command_sites": 14,
+      "session_ids": 3,
+      "tool_calls": 12
+    },
+    {
+      "client": "connectors",
+      "command_sites": 1777,
+      "session_ids": 71,
+      "tool_calls": 1142
+    },
+    {
+      "client": "curl",
+      "command_sites": 266,
+      "session_ids": 39,
+      "tool_calls": 205
+    },
+    {
+      "client": "docker",
+      "command_sites": 956,
+      "session_ids": 32,
+      "tool_calls": 555
+    },
+    {
+      "client": "fluxplane-plugin",
+      "command_sites": 600,
+      "session_ids": 11,
+      "tool_calls": 481
+    },
+    {
+      "client": "gh",
+      "command_sites": 2639,
+      "session_ids": 48,
+      "tool_calls": 1819
+    },
+    {
+      "client": "glab",
+      "command_sites": 429,
+      "session_ids": 11,
+      "tool_calls": 326
+    },
+    {
+      "client": "grafana-query-wrapper",
+      "command_sites": 5,
+      "session_ids": 1,
+      "tool_calls": 5
+    },
+    {
+      "client": "helm",
+      "command_sites": 132,
+      "session_ids": 11,
+      "tool_calls": 114
+    },
+    {
+      "client": "kubectl",
+      "command_sites": 899,
+      "session_ids": 20,
+      "tool_calls": 574
+    },
+    {
+      "client": "podman",
+      "command_sites": 2,
+      "session_ids": 2,
+      "tool_calls": 2
+    },
+    {
+      "client": "psql",
+      "command_sites": 9,
+      "session_ids": 3,
+      "tool_calls": 8
+    },
+    {
+      "client": "slack-channel-wrapper",
+      "command_sites": 1,
+      "session_ids": 1,
+      "tool_calls": 1
+    },
+    {
+      "client": "sql-query-wrapper",
+      "command_sites": 33,
+      "session_ids": 1,
+      "tool_calls": 13
+    }
+  ],
+  "count_unit": "syntactically requested command sites, including help and development",
+  "malformed_in_active_files": {
+    "timestamp_before_window": 14,
+    "timestamp_in_window": 27,
+    "timestamp_unknown": 11,
+    "total": 52
+  },
+  "redaction": "Argument values, commands, source paths, session IDs, results and user text excluded. Actions use a fixed vocabulary or operation identifiers; full private locators retained outside tracked files.",
+  "shell_scan": {
+    "binary:aws": 14,
+    "binary:connectors": 1777,
+    "binary:curl": 266,
+    "binary:docker": 956,
+    "binary:fluxplane-plugin": 600,
+    "binary:gh": 2639,
+    "binary:glab": 429,
+    "binary:helm": 132,
+    "binary:kubectl": 899,
+    "binary:podman": 2,
+    "binary:psql": 9,
+    "dynamic-command": 607,
+    "executable-lookup": 80,
+    "function-definition": 366,
+    "integration-command-site": 7723,
+    "non-shell-or-unresolved-envelopes": 16493,
+    "script-wrapper": 24614,
+    "shell-envelopes": 70180
+  },
+  "site_total_including_selected_wrappers": 7762,
+  "source_records": "local Claude and Codex tool histories",
+  "source_scan": {
+    "claude:bytes": 2555258221,
+    "claude:call_occurrences": 204715,
+    "claude:candidate_calls": 9558,
+    "claude:files": 2103,
+    "claude:files_with_window_events": 169,
+    "claude:parse_errors": 97,
+    "claude:unique_tool_calls_in_window": 17912,
+    "codex:bytes": 12181941779,
+    "codex:call_occurrences": 554110,
+    "codex:candidate_calls": 34323,
+    "codex:files": 4165,
+    "codex:files_with_window_events": 317,
+    "codex:parse_errors": 379,
+    "codex:unique_tool_calls_in_window": 68761
+  },
+  "timestamp_resolution": "seconds",
+  "window_end": "2026-09-09T10:37:24Z",
+  "window_start": "2026-09-04T10:37:24Z"
+}
