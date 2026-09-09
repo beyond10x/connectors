@@ -1,0 +1,33 @@
+---
+title: Contracts
+slug: /contracts
+sidebar_position: 1
+---
+
+import ReferenceCards from '@site/src/components/ReferenceCards';
+
+# Understand the guarantees
+
+A contract describes the shared meaning of an interaction: its types, access requirements, lifecycle, limits and failure behavior. An adapter binds those guarantees to a provider.
+
+Start with the [implemented service contract](/contracts/service) for describe and invoke, bounded data reads and endpoint discovery. Follow the [governed service](/contracts/governed-service) for the proposed admission and audit boundary. [Current status](/introduction/status) separates specification coverage from runtime support.
+
+## Follow an interaction
+
+**Discover → select access → invoke → interpret the result.** Discovery reports observations. A connection binds a selected target and access. Admission decides whether this particular request may proceed. The operation and its data profile define the result, including incomplete or uncertain outcomes.
+
+Contract-family versions, service wire bindings and adapter specification versions are independent. [Compatibility](/contracts/compatibility) explains the selected boundaries.
+
+## Shared contract reference
+
+These pages render the owning contract sources. Provider-specific mappings live with their [adapters](/adapters).
+
+<ReferenceCards />
+
+## Inspect the executable specification
+
+The [ESS model reference](/contracts/model/index) exposes the types, entities, commands and lifecycle diagrams from the same authored models. Structural validation establishes consistency; behavior, storage and cross-record predicates remain explicit implementation obligations.
+
+## Try a contract interaction
+
+[Follow a request to GitLab](/introduction/examples) for the practical overview. The [advanced contract exercises](/contracts/examples) explore discovery, operation readiness and uncertain mutation outcomes individually.

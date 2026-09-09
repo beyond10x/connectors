@@ -1,0 +1,337 @@
+@import '@beyond10x/docs-system/tokens.css';
+
+@import './documentation.css';
+
+@import './home.css';
+
+@import './examples.css';
+
+/* Shell palette follows beyond10x/website; components consume the same semantic tokens. */
+
+html:root,
+html[data-theme='light'] {
+  --ifm-font-family-base: var(--b10x-font-sans);
+  --ifm-font-family-monospace: var(--b10x-font-mono);
+  --ifm-heading-font-family: var(--b10x-font-sans);
+  --ifm-heading-font-weight: 680;
+  --ifm-navbar-height: 4rem;
+  --ifm-global-radius: .5rem;
+  --ifm-button-border-radius: .375rem;
+  --ifm-font-size-base: 16px;
+  --ifm-line-height-base: 1.75;
+  --ifm-code-font-size: 90%;
+  --ifm-color-primary: #147a50;
+  --ifm-color-primary-dark: #126e48;
+  --ifm-color-primary-darker: #116844;
+  --ifm-color-primary-darkest: #0e5638;
+  --ifm-color-primary-light: #168658;
+  --ifm-color-primary-lighter: #178c5c;
+  --ifm-color-primary-lightest: #1aa069;
+  --ifm-background-color: #f7f8f7;
+  --ifm-background-surface-color: #fff;
+  --ifm-font-color-base: #29343e;
+  --ifm-heading-color: #101820;
+  --b10x-color-canvas: #f7f8f7;
+  --b10x-color-surface: #fff;
+  --b10x-color-surface-muted: #edf1ef;
+  --b10x-color-heading: #101820;
+  --b10x-color-text: #29343e;
+  --b10x-color-muted: #53636c;
+  --b10x-color-link: #126e48;
+  --b10x-color-focus: #126e48;
+  --site-line: #d2dcd7;
+  --site-control-line: #7b8982;
+  --site-on-primary: #fff;
+  --site-muted: var(--b10x-color-muted);
+  --site-card: var(--b10x-color-surface);
+  --site-soft: var(--b10x-color-surface-muted);
+  --ifm-toc-border-color: var(--site-line);
+  --ifm-hr-border-color: var(--site-line);
+  --ifm-table-border-color: var(--site-line);
+  --ifm-color-emphasis-200: var(--site-line);
+  --ifm-color-emphasis-300: var(--site-line);
+}
+
+html[data-theme='dark'] {
+  --ifm-color-primary: #59d89d;
+  --ifm-color-primary-dark: #41d18d;
+  --ifm-color-primary-darker: #35ce86;
+  --ifm-color-primary-darkest: #29ad6f;
+  --ifm-color-primary-light: #71dfad;
+  --ifm-color-primary-lighter: #7de2b4;
+  --ifm-color-primary-lightest: #a1ebc8;
+  --ifm-background-color: #0b1118;
+  --ifm-background-surface-color: #121b25;
+  --ifm-font-color-base: #c9d2db;
+  --ifm-heading-color: #f2f5f7;
+  --b10x-color-canvas: #0b1118;
+  --b10x-color-surface: #121b25;
+  --b10x-color-surface-muted: #16222e;
+  --b10x-color-heading: #f2f5f7;
+  --b10x-color-text: #c9d2db;
+  --b10x-color-muted: #aab9c5;
+  --b10x-color-link: #59d89d;
+  --b10x-color-focus: #5ad7ff;
+  --site-line: #2e404c;
+  --site-control-line: #718891;
+  --site-on-primary: #07110d;
+}
+
+html {
+  scroll-padding-top: calc(var(--ifm-navbar-height) + 1.5rem);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  letter-spacing: -.005em;
+}
+
+::selection {
+  color: #07110d;
+  background: #73e3b1;
+}
+
+h1, h2, h3, h4 {
+  text-wrap: balance;
+  letter-spacing: -.035em;
+}
+
+.markdown h1 {
+  font-size: clamp(2.1rem, 4vw, 3.25rem);
+  line-height: 1.12;
+  margin-bottom: 1.5rem;
+}
+
+.markdown h2 {
+  font-size: 1.75rem;
+  line-height: 1.25;
+  margin-top: 2.75rem;
+}
+
+.markdown h3 {
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  text-underline-offset: .2em;
+}
+
+.markdown p > a, .markdown li > a {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb,currentColor 35%,transparent);
+}
+
+code {
+  overflow-wrap: anywhere;
+}
+
+pre code {
+  overflow-wrap: normal;
+}
+
+:focus-visible {
+  outline: 2px solid var(--b10x-color-focus);
+  outline-offset: 3px;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+button:not(.clean-btn), select, input[type='search'], .button {
+  min-height: 44px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .7rem;
+  font-size: .9375rem;
+  font-weight: 650;
+  padding: .65rem 1rem;
+}
+
+.button--primary {
+  color: var(--site-on-primary);
+}
+
+.button--outline {
+  color: var(--ifm-color-primary);
+}
+
+.navbar {
+  border-bottom: 1px solid var(--site-line);
+  box-shadow: none;
+  background: color-mix(in srgb,var(--ifm-background-color) 95%,transparent);
+  backdrop-filter: blur(15px);
+}
+
+.navbar__brand {
+  margin-right: 2rem;
+  gap: .5rem;
+}
+
+.navbar__title {
+  font: 700 .875rem ui-monospace;
+  font-family: var(--b10x-font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.navbar__link {
+  font-size: .875rem;
+  font-weight: 600;
+}
+
+.navbar__toggle, .navbar-sidebar__close {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.navbar-sidebar {
+  background: var(--site-card);
+}
+
+.footer--dark {
+  background: #070b10;
+  border-top: 1px solid #26323e;
+  padding: 3.5rem max(1.5rem, 4vw);
+}
+
+.footer__title {
+  color: #b3c0ca;
+  font: 700 .75rem ui-monospace;
+  font-family: var(--b10x-font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.footer__link-item {
+  color: #c1cad2;
+  font-size: .9375rem;
+}
+
+.footer__copyright {
+  color: #b3c0ca;
+  font: .75rem ui-monospace;
+  font-family: var(--b10x-font-mono);
+}
+
+.eyebrow, .b10x-eyebrow {
+  font: 700 .75rem/1.5 ui-monospace;
+  font-family: var(--b10x-font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.b10x-content-card {
+  border-color: var(--site-line);
+  box-shadow: none;
+}
+
+.b10x-content-card :is(h2,h3,h4) {
+  font-size: 1.25rem;
+}
+
+.b10x-content-card p, .b10x-section-header__description {
+  font-size: 1rem;
+}
+
+.b10x-content-card__meta, .b10x-content-card__footer {
+  font-size: .875rem;
+}
+
+.b10x-content-card a {
+  text-decoration: none;
+}
+
+.b10x-section-header {
+  border-color: var(--site-line);
+}
+
+.b10x-page-header :is(h1,h2) {
+  font-size: clamp(2.1rem,4vw,3.25rem);
+  line-height: 1.12;
+}
+
+.b10x-search-field label, .b10x-filter-chips legend, .b10x-filter-chips button {
+  font-size: .875rem;
+}
+
+.b10x-search-field>div:focus-within {
+  outline: 2px solid var(--b10x-color-focus);
+  outline-offset: 2px;
+}
+
+.b10x-filter-chips button small {
+  font-size: .75rem;
+}
+
+.b10x-diagram {
+  max-width: 100%;
+}
+
+.support-working {
+  color: var(--ifm-color-primary);
+}
+
+.support-planned {
+  color: var(--b10x-color-warning);
+}
+
+.support-working, .support-planned {
+  font-size: .875rem;
+  font-weight: 600;
+}
+
+@media(prefers-reduced-motion:reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Example controls share shell sizes and semantic states. */
+
+.journey-playback>button, .lab-controls button {
+  border-color: var(--site-control-line);
+  min-height: 44px;
+}
+
+.journey-tabs>button, .lab-tabs button {
+  font-size: 1rem;
+}
+
+.journey-explanation h2, .lab-heading h2 {
+  letter-spacing: -.025em;
+}
+
+.journey-toolbar {
+  box-shadow: 0 4px 12px color-mix(in srgb,var(--ifm-background-color) 65%,transparent);
+}
+
+.journey-details, .journey-prerequisites, .lab-technical {
+  font-size: .875rem;
+}
+
+.journey-status:before {
+  background: var(--ifm-color-primary);
+}
+
+.lab-state.good {
+  border-color: var(--b10x-color-success);
+}
+
+.lab-state.blocked {
+  border-color: var(--b10x-color-warning);
+}

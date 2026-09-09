@@ -1,0 +1,28 @@
+---
+title: SQL / PostgreSQL
+slug: /adapters/sql
+---
+
+import ReferenceCards from '@site/src/components/ReferenceCards';
+
+# SQL / PostgreSQL
+
+Read relational data with explicit bounds.
+
+## Current capabilities
+
+The current PostgreSQL service implements `schema.list` and `query.read`. Every request uses a fresh connection and a read-only transaction, with an execution deadline.
+
+Results preserve column names, native type names and values as text or JSON null. PostgreSQL resolves text parameters; use explicit SQL casts where needed.
+
+## Access and limits
+
+Configure a restricted database role. Queries begin with `search_path = public, pg_catalog`; qualify relations in other schemas. Read-only transactions and deadlines are explicit boundaries, not a SQL sandbox for unrestricted credentials.
+
+## Run the first slice
+
+Build the workspace from source, choose this adapter’s example configuration and bind private credentials separately from operation input. The [getting-started guide](/introduction/getting-started) explains the common service workflow.
+
+## Native contract reference
+
+<ReferenceCards owner="sql" />

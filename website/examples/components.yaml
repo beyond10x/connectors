@@ -1,0 +1,24 @@
+# Example-only component: canonical mutation commands, no new product entities.
+# Discovery and readiness examples inject fictional host facts and evaluate the
+# owning contract's reductions using the generated shared value/state types.
+components:
+  - component: contract-examples
+    summary: In-memory example of the canonical mutation attempt lifecycle.
+    owns:
+      domains: [connectors.mutations]
+    accepts:
+      commands:
+        - connectors.mutations.PrepareAttempt
+        - connectors.mutations.OpenDispatch
+        - connectors.mutations.AbortPrepared
+        - connectors.mutations.RecordCompletion
+        - connectors.mutations.RecordRefusal
+        - connectors.mutations.RecordUncertainty
+    publishes:
+      events:
+        - connectors.mutations.AttemptPrepared
+        - connectors.mutations.DispatchOpened
+        - connectors.mutations.AttemptAborted
+        - connectors.mutations.AttemptCompleted
+        - connectors.mutations.AttemptRefused
+        - connectors.mutations.AttemptIndeterminate
