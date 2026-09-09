@@ -1,5 +1,13 @@
 # Proposal: extensions and adjustments for stack integration — 2026-09-08
 
+**Local-stage update, 2026-09-09:** this dated proposal retains its hosted stack
+dependencies. The selected [local CLI contract](../contracts/cli/v1alpha1/semantics.md)
+uses local OS-keyring custody and private metadata without Identity, hosted Secrets
+or federation. Its planning owners are `story:local-cli-binding-semantics` and
+`story:local-cli-ess-surface`; the historical S8 proposal below does not block them.
+MCP and Atlas enrollment remain deferred. Hosted admission and custody retain
+their own contracts when that deployment binding is selected.
+
 Baseline: local commit `57be07c` plus the uncommitted working tree of 2026-09-08. Source of the
 findings: [preserved concept and stack integration review](../.engineering/planning/review-result/concept-stack-integration-20260908.md) (gaps G1–G10; originally `.local/review/2026-09-08-concept-and-stack-integration-review.md`).
 Organization authority read from `../atlas` (README/ROADMAP dated 2026-09-04; ADRs 0001–0031).
