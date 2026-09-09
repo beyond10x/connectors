@@ -5,6 +5,7 @@ version: v1
 domains:
   - connectors.declarations
   - connectors.mutations
+  - connectors.execution_audit
   - connectors.idempotency
   - connectors.credentials
   - connectors.refresh
