@@ -1366,3 +1366,28 @@ Connection retains one optional bounded baseline EvidenceSnapshot for its active
 This is the specification baseline for Kubernetes including discovery, GitLab and SQL. It is ready for implementation decomposition after the combined gate and independent review, not a claim of runtime conformance. SaaS assignments, event subscriptions, optional scoped monitoring bindings, optional distribution publication and other deferred capabilities remain outside this milestone. New entity-bearing work must use the same ESS-first process; no missing selected ownership/lifecycle decision is hidden as a storage detail. Public codecs, strict adapter readers, backends, clocks, cryptography and cross-record predicates still require their explicit implementation and conformance work.
 
 Deferred obligations remain named, with no selected protocol: AssignmentProvisioningPort for product assignments/provisioning (§§12–14); EventCheckpointPort for durable intake/acknowledgement/delivery/subscription cursors (§15); ExecutionJobPort for process/job output/restart state (§10); DeploymentArtifactPort for pinned installed artifacts/build identity (§17); TelemetryRetentionPort for admitted logs/metrics export (§20). These do not substitute for selected execution audit, event claims or live session authority. Backend selection, storage migration and cross-service atomicity proofs remain prerequisites for the profiles that need them; they are not silently supplied by a local file or SQLite proposal.
+
+## 32. Local CLI acceptance direction and recent usage, 2026-09-09
+
+The operator clarified the next product baseline: a local CLI with credentials
+persisted locally, usable without cloud Connectors orchestration or federation.
+Remote provider APIs remain integration targets. Credential custody and execution
+retain replaceable infrastructure bindings so later remote delivery can preserve
+the workflows; that future binding is not a prerequisite for this local milestone.
+
+The [five-day Claude/Codex usage analysis](recent-adapter-usage-20260909.md) records
+recoverable tool calls, reviewed failures, specification gaps and twenty-two proposed
+acceptance scenarios. It covers local setup/repair, MySQL incident queries, GitLab
+CI/MRs and incremental collection, Jira JQL and mutations, Confluence CQL/documents,
+Slack conversations/replies, Loki discovery and
+derived metrics, Prometheus/Grafana queries, Kubernetes/Docker execution, and
+observed GitHub/AWS workflows. It distinguishes provider use from help, fixtures,
+quoted commands and incomplete executions; private session payloads are excluded.
+
+The existing three-adapter specification milestone remains its bounded baseline.
+It does not establish parity with this broader observed usage. Specify the local
+configuration/management/custody journey first, then select the required native
+profiles and lifecycle behavior through the existing contract/ESS workflow before
+implementation decomposition. The analysis proposes that order; it does not
+advertise additional runtime capabilities or silently select the still-open local
+storage backend, protected entry codec, write-admission binding or execution protocol.
