@@ -659,8 +659,12 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
     if !rustfmt.status.success() {
         return Err(refuse("cannot identify rustfmt"));
     }
-    let files = tree(root).map_err(|e| refuse(format!("output tree: {e}")))?;
-    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(&std::fs::read(spec_path).map_err(|_|Error::internal())?),"upstream_sha256":spec.upstream.sha256,"ess":crate::toolchain::version()?,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
+    let mut files = tree(root).map_err(|e| refuse(format!("output tree: {e}")))?;
+    // ESS owns this temporary anchor's recovery state. It contains native anchor
+    // identity, not projection artifacts, and must never enter the portable bundle.
+    // Keep `tree` complete for public-output audits and all other callers.
+    files.retain(|path, _| !path.starts_with("rust/.ess-output/"));
+    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(&std::fs::read(spec_path).map_err(|_|Error::internal())?),"upstream_sha256":spec.upstream.sha256,"ess":crate::toolchain::version()?,"ess_source":crate::toolchain::source()?,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
     install(out, &files, &manifest, &spec, check)?;
     Ok(())
 }

@@ -1,0 +1,3939 @@
+{
+  "format": "ess-cli-plan/1",
+  "binary": "connectors",
+  "about": "Local integration access through explicitly configured adapters",
+  "globals": {
+    "config": "config",
+    "state": "state-dir",
+    "output": "output"
+  },
+  "callables": {
+    "adapters-describe": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "adapters-describe"
+      },
+      "input": {
+        "type_ref": "connectors.cli.AdapterDescribeInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.AdapterDescribeResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "configuration": {
+              "kind": "struct",
+              "fields": {
+                "configuration_revision": {
+                  "kind": "string"
+                },
+                "executable": {
+                  "kind": "struct",
+                  "fields": {
+                    "args": {
+                      "kind": "list",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "path": {
+                      "kind": "string"
+                    },
+                    "sha256": {
+                      "kind": "string"
+                    }
+                  }
+                },
+                "protocol": {
+                  "kind": "string"
+                },
+                "summary": {
+                  "kind": "struct",
+                  "fields": {
+                    "adapter": {
+                      "kind": "string"
+                    },
+                    "adapter_id": {
+                      "kind": "string"
+                    },
+                    "instance_id": {
+                      "kind": "string"
+                    },
+                    "restart": {
+                      "kind": "enum",
+                      "variants": [
+                        "never"
+                      ]
+                    },
+                    "startup": {
+                      "kind": "enum",
+                      "variants": [
+                        "on-demand",
+                        "automatic"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "descriptor": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "adapter": {
+                    "kind": "string"
+                  },
+                  "configuration_schema": {
+                    "kind": "string"
+                  },
+                  "instance": {
+                    "kind": "string"
+                  },
+                  "operations": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "contract": {
+                          "kind": "string"
+                        },
+                        "description": {
+                          "kind": "string"
+                        },
+                        "id": {
+                          "kind": "string"
+                        },
+                        "input_schema": {
+                          "kind": "string"
+                        },
+                        "output_schema": {
+                          "kind": "string"
+                        },
+                        "profile": {
+                          "kind": "string"
+                        }
+                      }
+                    }
+                  },
+                  "revision": {
+                    "kind": "string"
+                  },
+                  "version": {
+                    "kind": "string"
+                  }
+                }
+              }
+            },
+            "source": {
+              "kind": "enum",
+              "variants": [
+                "configuration",
+                "cached",
+                "authority"
+              ]
+            },
+            "stale": {
+              "kind": "boolean"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "adapters-list": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "adapters-list"
+      },
+      "input": {
+        "type_ref": "connectors.cli.AdapterListInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "limit": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.AdapterListResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapters": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "adapter": {
+                    "kind": "string"
+                  },
+                  "adapter_id": {
+                    "kind": "string"
+                  },
+                  "instance_id": {
+                    "kind": "string"
+                  },
+                  "restart": {
+                    "kind": "enum",
+                    "variants": [
+                      "never"
+                    ]
+                  },
+                  "startup": {
+                    "kind": "enum",
+                    "variants": [
+                      "on-demand",
+                      "automatic"
+                    ]
+                  }
+                }
+              }
+            },
+            "next_cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "source": {
+              "kind": "enum",
+              "variants": [
+                "configuration",
+                "cached",
+                "authority"
+              ]
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "adapters-status": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "adapters-status"
+      },
+      "input": {
+        "type_ref": "connectors.cli.AdapterStatusInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.AdapterStatusResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "observation": {
+              "kind": "struct",
+              "fields": {
+                "adapter": {
+                  "kind": "string"
+                },
+                "child_incarnation": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
+                "configuration_revision": {
+                  "kind": "string"
+                },
+                "failure": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "acquisition": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "code": {
+                        "kind": "enum",
+                        "variants": [
+                          "invalid_input",
+                          "invalid_configuration",
+                          "configuration_exists",
+                          "protected_entry_unavailable",
+                          "custody_unavailable",
+                          "metadata_unavailable",
+                          "outcome_unknown",
+                          "identity_mismatch",
+                          "lifecycle_conflict",
+                          "incarnation_mismatch",
+                          "readiness_mismatch",
+                          "description_unavailable",
+                          "stale_description",
+                          "not_found",
+                          "revoked",
+                          "forbidden",
+                          "not_granted",
+                          "unavailable",
+                          "timeout",
+                          "capacity",
+                          "stale_cursor",
+                          "unsupported",
+                          "interrupted",
+                          "service_failure"
+                        ]
+                      },
+                      "connection": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "kind": {
+                        "kind": "enum",
+                        "variants": [
+                          "usage",
+                          "operational",
+                          "interrupted"
+                        ]
+                      },
+                      "next_action": {
+                        "kind": "enum",
+                        "variants": [
+                          "check_configuration",
+                          "select_protected_source",
+                          "unlock_keyring",
+                          "retry_status",
+                          "repair_connection",
+                          "create_connection",
+                          "refresh_description",
+                          "request_permission",
+                          "retry_explicitly",
+                          "none"
+                        ]
+                      },
+                      "service_code": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "invalid_input",
+                            "unsupported",
+                            "unauthorized",
+                            "forbidden",
+                            "not_found",
+                            "stale_description",
+                            "stale_cursor",
+                            "rate_limited",
+                            "unavailable",
+                            "capacity",
+                            "timeout",
+                            "upstream_protocol",
+                            "internal",
+                            "approval_required",
+                            "approval_refused",
+                            "approval_replayed",
+                            "idempotency_conflict",
+                            "outcome_unknown",
+                            "not_granted",
+                            "stale_authority",
+                            "connection_not_ready",
+                            "route_unavailable",
+                            "route_refused",
+                            "insufficient_scope",
+                            "session_not_ready",
+                            "session_lost",
+                            "offer_expired",
+                            "offer_rejected",
+                            "lease_expired",
+                            "revoked"
+                          ]
+                        }
+                      },
+                      "stage": {
+                        "kind": "enum",
+                        "variants": [
+                          "arguments",
+                          "configuration",
+                          "protected_entry",
+                          "admission",
+                          "launch",
+                          "readiness",
+                          "custody",
+                          "publication",
+                          "dispatch",
+                          "observation",
+                          "stop"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "host_incarnation": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
+                "observed_at_ms": {
+                  "kind": "integer"
+                },
+                "state": {
+                  "kind": "enum",
+                  "variants": [
+                    "not_running",
+                    "starting",
+                    "ready",
+                    "stopping",
+                    "stopped",
+                    "failed",
+                    "owner_unavailable",
+                    "suppressed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "adapters-stop": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "adapters-stop"
+      },
+      "input": {
+        "type_ref": "connectors.cli.AdapterStopInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "child_incarnation": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            },
+            "host_incarnation": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.AdapterStopResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "observation": {
+              "kind": "struct",
+              "fields": {
+                "adapter": {
+                  "kind": "string"
+                },
+                "child_incarnation": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
+                "configuration_revision": {
+                  "kind": "string"
+                },
+                "failure": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "acquisition": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "code": {
+                        "kind": "enum",
+                        "variants": [
+                          "invalid_input",
+                          "invalid_configuration",
+                          "configuration_exists",
+                          "protected_entry_unavailable",
+                          "custody_unavailable",
+                          "metadata_unavailable",
+                          "outcome_unknown",
+                          "identity_mismatch",
+                          "lifecycle_conflict",
+                          "incarnation_mismatch",
+                          "readiness_mismatch",
+                          "description_unavailable",
+                          "stale_description",
+                          "not_found",
+                          "revoked",
+                          "forbidden",
+                          "not_granted",
+                          "unavailable",
+                          "timeout",
+                          "capacity",
+                          "stale_cursor",
+                          "unsupported",
+                          "interrupted",
+                          "service_failure"
+                        ]
+                      },
+                      "connection": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "kind": {
+                        "kind": "enum",
+                        "variants": [
+                          "usage",
+                          "operational",
+                          "interrupted"
+                        ]
+                      },
+                      "next_action": {
+                        "kind": "enum",
+                        "variants": [
+                          "check_configuration",
+                          "select_protected_source",
+                          "unlock_keyring",
+                          "retry_status",
+                          "repair_connection",
+                          "create_connection",
+                          "refresh_description",
+                          "request_permission",
+                          "retry_explicitly",
+                          "none"
+                        ]
+                      },
+                      "service_code": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "invalid_input",
+                            "unsupported",
+                            "unauthorized",
+                            "forbidden",
+                            "not_found",
+                            "stale_description",
+                            "stale_cursor",
+                            "rate_limited",
+                            "unavailable",
+                            "capacity",
+                            "timeout",
+                            "upstream_protocol",
+                            "internal",
+                            "approval_required",
+                            "approval_refused",
+                            "approval_replayed",
+                            "idempotency_conflict",
+                            "outcome_unknown",
+                            "not_granted",
+                            "stale_authority",
+                            "connection_not_ready",
+                            "route_unavailable",
+                            "route_refused",
+                            "insufficient_scope",
+                            "session_not_ready",
+                            "session_lost",
+                            "offer_expired",
+                            "offer_rejected",
+                            "lease_expired",
+                            "revoked"
+                          ]
+                        }
+                      },
+                      "stage": {
+                        "kind": "enum",
+                        "variants": [
+                          "arguments",
+                          "configuration",
+                          "protected_entry",
+                          "admission",
+                          "launch",
+                          "readiness",
+                          "custody",
+                          "publication",
+                          "dispatch",
+                          "observation",
+                          "stop"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "host_incarnation": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "string"
+                  }
+                },
+                "observed_at_ms": {
+                  "kind": "integer"
+                },
+                "state": {
+                  "kind": "enum",
+                  "variants": [
+                    "not_running",
+                    "starting",
+                    "ready",
+                    "stopping",
+                    "stopped",
+                    "failed",
+                    "owner_unavailable",
+                    "suppressed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections-connect": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-connect"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionConnectInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "credential_document": {
+              "kind": "string"
+            },
+            "profile": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionConnectResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "acquisition": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connection": {
+              "kind": "struct",
+              "fields": {
+                "external_identity": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "kind": {
+                        "kind": "string"
+                      },
+                      "subject": {
+                        "kind": "string"
+                      }
+                    }
+                  }
+                },
+                "observed_at_ms": {
+                  "kind": "integer"
+                },
+                "source": {
+                  "kind": "enum",
+                  "variants": [
+                    "configuration",
+                    "cached",
+                    "authority"
+                  ]
+                },
+                "stale": {
+                  "kind": "boolean"
+                },
+                "summary": {
+                  "kind": "struct",
+                  "fields": {
+                    "adapter": {
+                      "kind": "string"
+                    },
+                    "connection": {
+                      "kind": "string"
+                    },
+                    "instance_id": {
+                      "kind": "string"
+                    },
+                    "profile": {
+                      "kind": "string"
+                    },
+                    "revision": {
+                      "kind": "string"
+                    },
+                    "state": {
+                      "kind": "enum",
+                      "variants": [
+                        "pending",
+                        "ready",
+                        "reauthorization_required",
+                        "custody_unavailable",
+                        "parent_degraded",
+                        "disabled",
+                        "revoked"
+                      ]
+                    }
+                  }
+                },
+                "valid_until_ms": {
+                  "kind": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections-describe": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-describe"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionDescribeInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "connection": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionDescribeResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "connection": {
+              "kind": "struct",
+              "fields": {
+                "external_identity": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "kind": {
+                        "kind": "string"
+                      },
+                      "subject": {
+                        "kind": "string"
+                      }
+                    }
+                  }
+                },
+                "observed_at_ms": {
+                  "kind": "integer"
+                },
+                "source": {
+                  "kind": "enum",
+                  "variants": [
+                    "configuration",
+                    "cached",
+                    "authority"
+                  ]
+                },
+                "stale": {
+                  "kind": "boolean"
+                },
+                "summary": {
+                  "kind": "struct",
+                  "fields": {
+                    "adapter": {
+                      "kind": "string"
+                    },
+                    "connection": {
+                      "kind": "string"
+                    },
+                    "instance_id": {
+                      "kind": "string"
+                    },
+                    "profile": {
+                      "kind": "string"
+                    },
+                    "revision": {
+                      "kind": "string"
+                    },
+                    "state": {
+                      "kind": "enum",
+                      "variants": [
+                        "pending",
+                        "ready",
+                        "reauthorization_required",
+                        "custody_unavailable",
+                        "parent_degraded",
+                        "disabled",
+                        "revoked"
+                      ]
+                    }
+                  }
+                },
+                "valid_until_ms": {
+                  "kind": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections-list": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-list"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionListInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "limit": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionListResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "connections": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "adapter": {
+                    "kind": "string"
+                  },
+                  "connection": {
+                    "kind": "string"
+                  },
+                  "instance_id": {
+                    "kind": "string"
+                  },
+                  "profile": {
+                    "kind": "string"
+                  },
+                  "revision": {
+                    "kind": "string"
+                  },
+                  "state": {
+                    "kind": "enum",
+                    "variants": [
+                      "pending",
+                      "ready",
+                      "reauthorization_required",
+                      "custody_unavailable",
+                      "parent_degraded",
+                      "disabled",
+                      "revoked"
+                    ]
+                  }
+                }
+              }
+            },
+            "next_cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "observed_at_ms": {
+              "kind": "integer"
+            },
+            "source": {
+              "kind": "enum",
+              "variants": [
+                "configuration",
+                "cached",
+                "authority"
+              ]
+            },
+            "stale": {
+              "kind": "boolean"
+            },
+            "valid_until_ms": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer"
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections-repair": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-repair"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionRepairInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "connection": {
+              "kind": "string"
+            },
+            "credential_document": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionRepairResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "acquisition": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connection": {
+              "kind": "struct",
+              "fields": {
+                "external_identity": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "kind": {
+                        "kind": "string"
+                      },
+                      "subject": {
+                        "kind": "string"
+                      }
+                    }
+                  }
+                },
+                "observed_at_ms": {
+                  "kind": "integer"
+                },
+                "source": {
+                  "kind": "enum",
+                  "variants": [
+                    "configuration",
+                    "cached",
+                    "authority"
+                  ]
+                },
+                "stale": {
+                  "kind": "boolean"
+                },
+                "summary": {
+                  "kind": "struct",
+                  "fields": {
+                    "adapter": {
+                      "kind": "string"
+                    },
+                    "connection": {
+                      "kind": "string"
+                    },
+                    "instance_id": {
+                      "kind": "string"
+                    },
+                    "profile": {
+                      "kind": "string"
+                    },
+                    "revision": {
+                      "kind": "string"
+                    },
+                    "state": {
+                      "kind": "enum",
+                      "variants": [
+                        "pending",
+                        "ready",
+                        "reauthorization_required",
+                        "custody_unavailable",
+                        "parent_degraded",
+                        "disabled",
+                        "revoked"
+                      ]
+                    }
+                  }
+                },
+                "valid_until_ms": {
+                  "kind": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections-revoke": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-revoke"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionRevokeInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "connection": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionRevokeResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "connection": {
+              "kind": "string"
+            },
+            "local_state": {
+              "kind": "enum",
+              "variants": [
+                "revoked"
+              ]
+            },
+            "provider_outcome": {
+              "kind": "enum",
+              "variants": [
+                "not_requested"
+              ]
+            },
+            "revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections-status": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-status"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionStatusInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "acquisition": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "adapter": {
+              "kind": "string"
+            },
+            "connection": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionStatusResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "acquisition": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "acquisition": {
+                    "kind": "string"
+                  },
+                  "connection": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "string"
+                    }
+                  },
+                  "expires_at_ms": {
+                    "kind": "integer"
+                  },
+                  "instance_id": {
+                    "kind": "string"
+                  },
+                  "next_action": {
+                    "kind": "enum",
+                    "variants": [
+                      "check_configuration",
+                      "select_protected_source",
+                      "unlock_keyring",
+                      "retry_status",
+                      "repair_connection",
+                      "create_connection",
+                      "refresh_description",
+                      "request_permission",
+                      "retry_explicitly",
+                      "none"
+                    ]
+                  },
+                  "observed_at_ms": {
+                    "kind": "integer"
+                  },
+                  "reason": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "rejected",
+                        "exchange_unknown",
+                        "expired"
+                      ]
+                    }
+                  },
+                  "state": {
+                    "kind": "enum",
+                    "variants": [
+                      "pending",
+                      "completed",
+                      "failed"
+                    ]
+                  }
+                }
+              }
+            },
+            "connection": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "external_identity": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "kind": {
+                          "kind": "string"
+                        },
+                        "subject": {
+                          "kind": "string"
+                        }
+                      }
+                    }
+                  },
+                  "observed_at_ms": {
+                    "kind": "integer"
+                  },
+                  "source": {
+                    "kind": "enum",
+                    "variants": [
+                      "configuration",
+                      "cached",
+                      "authority"
+                    ]
+                  },
+                  "stale": {
+                    "kind": "boolean"
+                  },
+                  "summary": {
+                    "kind": "struct",
+                    "fields": {
+                      "adapter": {
+                        "kind": "string"
+                      },
+                      "connection": {
+                        "kind": "string"
+                      },
+                      "instance_id": {
+                        "kind": "string"
+                      },
+                      "profile": {
+                        "kind": "string"
+                      },
+                      "revision": {
+                        "kind": "string"
+                      },
+                      "state": {
+                        "kind": "enum",
+                        "variants": [
+                          "pending",
+                          "ready",
+                          "reauthorization_required",
+                          "custody_unavailable",
+                          "parent_degraded",
+                          "disabled",
+                          "revoked"
+                        ]
+                      }
+                    }
+                  },
+                  "valid_until_ms": {
+                    "kind": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "operations-describe": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "operations-describe"
+      },
+      "input": {
+        "type_ref": "connectors.cli.OperationDescribeInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "operation": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.OperationDescribeResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "operation": {
+              "kind": "struct",
+              "fields": {
+                "contract": {
+                  "kind": "string"
+                },
+                "description": {
+                  "kind": "string"
+                },
+                "id": {
+                  "kind": "string"
+                },
+                "input_schema": {
+                  "kind": "string"
+                },
+                "output_schema": {
+                  "kind": "string"
+                },
+                "profile": {
+                  "kind": "string"
+                }
+              }
+            },
+            "revision": {
+              "kind": "string"
+            },
+            "schema": {
+              "kind": "string"
+            },
+            "source": {
+              "kind": "enum",
+              "variants": [
+                "configuration",
+                "cached",
+                "authority"
+              ]
+            },
+            "stale": {
+              "kind": "boolean"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "operations-invoke": {
+      "target": {
+        "kind": "dynamic",
+        "owner": "connectors.cli",
+        "operation_field": "operation",
+        "schema_field": "schema",
+        "payload_field": "input"
+      },
+      "input": {
+        "type_ref": "connectors.cli.OperationInvokeInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "connection": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "input": {
+              "kind": "string"
+            },
+            "operation": {
+              "kind": "string"
+            },
+            "revision": {
+              "kind": "string"
+            },
+            "schema": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.OperationInvokeResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "operation": {
+              "kind": "string"
+            },
+            "result": {
+              "kind": "string"
+            },
+            "revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "operations-list": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "operations-list"
+      },
+      "input": {
+        "type_ref": "connectors.cli.OperationListInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "limit": {
+              "kind": "optional",
+              "of": {
+                "kind": "integer"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.OperationListResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "next_cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "operations": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "contract": {
+                    "kind": "string"
+                  },
+                  "description": {
+                    "kind": "string"
+                  },
+                  "id": {
+                    "kind": "string"
+                  },
+                  "profile": {
+                    "kind": "string"
+                  }
+                }
+              }
+            },
+            "revision": {
+              "kind": "string"
+            },
+            "source": {
+              "kind": "enum",
+              "variants": [
+                "configuration",
+                "cached",
+                "authority"
+              ]
+            },
+            "stale": {
+              "kind": "boolean"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "setup-check": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "setup-check"
+      },
+      "input": null,
+      "result": {
+        "type_ref": "connectors.cli.SetupCheckResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "config_path": {
+              "kind": "string"
+            },
+            "keyring": {
+              "kind": "enum",
+              "variants": [
+                "available",
+                "locked",
+                "unavailable"
+              ]
+            },
+            "os": {
+              "kind": "enum",
+              "variants": [
+                "linux"
+              ]
+            },
+            "prerequisites": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "name": {
+                    "kind": "string"
+                  },
+                  "next_action": {
+                    "kind": "enum",
+                    "variants": [
+                      "check_configuration",
+                      "select_protected_source",
+                      "unlock_keyring",
+                      "retry_status",
+                      "repair_connection",
+                      "create_connection",
+                      "refresh_description",
+                      "request_permission",
+                      "retry_explicitly",
+                      "none"
+                    ]
+                  },
+                  "state": {
+                    "kind": "enum",
+                    "variants": [
+                      "ready",
+                      "failed",
+                      "unknown"
+                    ]
+                  }
+                }
+              }
+            },
+            "state_path": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "setup-init": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "setup-init"
+      },
+      "input": null,
+      "result": {
+        "type_ref": "connectors.cli.SetupInitResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "config_path": {
+              "kind": "string"
+            },
+            "disposition": {
+              "kind": "enum",
+              "variants": [
+                "created"
+              ]
+            },
+            "os": {
+              "kind": "enum",
+              "variants": [
+                "linux"
+              ]
+            },
+            "state_path": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "commands": [
+    {
+      "path": [
+        "adapters",
+        "describe"
+      ],
+      "aliases": [],
+      "callable": "adapters-describe",
+      "about": "Inspect one configured adapter and cached descriptor",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "adapters",
+        "list"
+      ],
+      "aliases": [],
+      "callable": "adapters-list",
+      "about": "List configured adapter entries",
+      "arguments": [
+        {
+          "field": "limit",
+          "source": {
+            "kind": "option",
+            "long": "limit"
+          }
+        },
+        {
+          "field": "cursor",
+          "source": {
+            "kind": "option",
+            "long": "cursor"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "adapters",
+        "status"
+      ],
+      "aliases": [],
+      "callable": "adapters-status",
+      "about": "Observe the existing adapter lifecycle owner",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "adapters",
+        "stop"
+      ],
+      "aliases": [],
+      "callable": "adapters-stop",
+      "about": "Stop only the exact owned adapter incarnation",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "host_incarnation",
+          "source": {
+            "kind": "option",
+            "long": "host-incarnation"
+          }
+        },
+        {
+          "field": "child_incarnation",
+          "source": {
+            "kind": "option",
+            "long": "child-incarnation"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
+        "connect"
+      ],
+      "aliases": [],
+      "callable": "connections-connect",
+      "about": "Begin admitted local protected credential acquisition",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "profile",
+          "source": {
+            "kind": "option",
+            "long": "profile"
+          }
+        },
+        {
+          "field": "credential_document",
+          "source": {
+            "kind": "protected",
+            "file": "credential-file",
+            "stdin": "credential-stdin",
+            "hidden_tty": "credential-prompt"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
+        "describe"
+      ],
+      "aliases": [],
+      "callable": "connections-describe",
+      "about": "Inspect safe metadata for one connection",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
+        "list"
+      ],
+      "aliases": [],
+      "callable": "connections-list",
+      "about": "List safe connection metadata",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "limit",
+          "source": {
+            "kind": "option",
+            "long": "limit"
+          }
+        },
+        {
+          "field": "cursor",
+          "source": {
+            "kind": "option",
+            "long": "cursor"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
+        "repair"
+      ],
+      "aliases": [],
+      "callable": "connections-repair",
+      "about": "Repair the exact connection without changing its identity",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "credential_document",
+          "source": {
+            "kind": "protected",
+            "file": "credential-file",
+            "stdin": "credential-stdin",
+            "hidden_tty": "credential-prompt"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
+        "revoke"
+      ],
+      "aliases": [],
+      "callable": "connections-revoke",
+      "about": "Commit terminal local revocation under the current fence",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
+        "status"
+      ],
+      "aliases": [],
+      "callable": "connections-status",
+      "about": "Observe exactly one connection or acquisition",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        },
+        {
+          "field": "acquisition",
+          "source": {
+            "kind": "option",
+            "long": "acquisition"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "operations",
+        "describe"
+      ],
+      "aliases": [],
+      "callable": "operations-describe",
+      "about": "Inspect an operation and its exact schema identity",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "operation",
+          "source": {
+            "kind": "option",
+            "long": "operation"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "operations",
+        "invoke"
+      ],
+      "aliases": [],
+      "callable": "operations-invoke",
+      "about": "Invoke once under selected schema, revision and current admission",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        },
+        {
+          "field": "operation",
+          "source": {
+            "kind": "option",
+            "long": "operation"
+          }
+        },
+        {
+          "field": "schema",
+          "source": {
+            "kind": "option",
+            "long": "schema"
+          }
+        },
+        {
+          "field": "revision",
+          "source": {
+            "kind": "option",
+            "long": "revision"
+          }
+        },
+        {
+          "field": "input",
+          "source": {
+            "kind": "document",
+            "inline": "input-json",
+            "file": "input-file",
+            "stdin": "input-stdin"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "operations",
+        "list"
+      ],
+      "aliases": [],
+      "callable": "operations-list",
+      "about": "List operations from selected cached metadata",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "limit",
+          "source": {
+            "kind": "option",
+            "long": "limit"
+          }
+        },
+        {
+          "field": "cursor",
+          "source": {
+            "kind": "option",
+            "long": "cursor"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "setup",
+        "check"
+      ],
+      "aliases": [],
+      "callable": "setup-check",
+      "about": "Check local configuration and prerequisites without authentication",
+      "arguments": []
+    },
+    {
+      "path": [
+        "setup",
+        "init"
+      ],
+      "aliases": [],
+      "callable": "setup-init",
+      "about": "Create private local configuration without starting services",
+      "arguments": []
+    }
+  ],
+  "obligations": [
+    "handler:adapters-describe: implement the owner-qualified callable and its declared result/error contract",
+    "handler:adapters-list: implement the owner-qualified callable and its declared result/error contract",
+    "handler:adapters-status: implement the owner-qualified callable and its declared result/error contract",
+    "handler:adapters-stop: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-connect: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-describe: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-list: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-repair: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-status: implement the owner-qualified callable and its declared result/error contract",
+    "handler:operations-describe: implement the owner-qualified callable and its declared result/error contract",
+    "handler:operations-invoke: implement the owner-qualified callable and its declared result/error contract",
+    "dynamic-validator:operations-invoke: resolve operation/schema identity and validate native input, result and errors; absent validator refuses",
+    "handler:operations-list: implement the owner-qualified callable and its declared result/error contract",
+    "handler:setup-check: implement the owner-qualified callable and its declared result/error contract",
+    "handler:setup-init: implement the owner-qualified callable and its declared result/error contract"
+  ]
+}

@@ -13,3 +13,7 @@ connectors-client.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+connectors_cli_contract.workspace = true
+jsonschema.workspace = true
