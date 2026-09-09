@@ -3,3 +3,8 @@
 *.secret
 *.pem
 *.key
+/website/node_modules/
+/website/.docusaurus/
+/website/build/
+/website/.cache/
+/website/static/examples/
