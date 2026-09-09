@@ -1,5 +1,5 @@
 domain: connectors.discovery
-summary: Proposed discovery scope, coverage, publication, same-target revalidation and composition values; no runtime or persistent owner.
+summary: Discovery scope, publication, fixed route and immutable composition values; persistent collection ownership is in discovery_state.
 
 # Normative owners: contracts/discovery/resources/v1alpha1/semantics.md §§4–5,
 # mediated_route/v1alpha1/semantics.md §4.1 and discovery/composition.md.
@@ -110,6 +110,63 @@ types:
       - {name: parent_is_direct, type: Boolean}
       - {name: independently_admitted, type: Boolean}
 
+  - name: connectors.discovery.HistoricalObservationCoordinate
+    kind: struct
+    fields:
+      - {name: collection_ref, type: String}
+      - {name: scope_epoch, type: Uuid}
+      - {name: observation_ref, type: String}
+    # Historical coordinates deliberately have no live observation FK. A child
+    # cannot pin rows/scopes after retirement or regain authority from these IDs.
+  - name: connectors.discovery.MediatedRouteEvidence
+    kind: struct
+    fields:
+      - {name: route_revision, type: String}
+      - {name: observation_generation, type: Integer}
+      - {name: parent_generation_id, type: "Optional<connectors.credentials.CredentialGenerationId>"}
+      - {name: observed_at, type: Timestamp}
+      - {name: valid_until, type: Timestamp}
+  - name: connectors.discovery.MediatedRouteBinding
+    kind: struct
+    fields:
+      - {name: observation, type: connectors.discovery.HistoricalObservationCoordinate}
+      - {name: profile, type: String}
+      - {name: target_adapter, type: String}
+      - {name: private_fixed_target_ref, type: String}
+      - {name: access_mode, type: connectors.auth_access.AccessMode}
+      - {name: owner_scope_ref, type: String}
+      - {name: evidence, type: "Optional<connectors.discovery.MediatedRouteEvidence>"}
+    # Child identity and canonical parent reference are supplied by Connection.
+    # Only evidence may advance in place under admitted same-target CAS.
+  - name: connectors.discovery.CompositionInstance
+    kind: struct
+    fields:
+      - {name: instance_id, type: String}
+      - {name: configuration_revision, type: String}
+      - {name: implementation_ref, type: String}
+      - {name: implementation_revision, type: String}
+  - name: connectors.discovery.InstalledRouteBinding
+    kind: struct
+    fields:
+      - {name: parent_instance_id, type: String}
+      - {name: child_instance_id, type: String}
+      - {name: profile, type: String}
+      - {name: binding_revision, type: String}
+  - name: connectors.discovery.CompositionLimits
+    kind: struct
+    fields:
+      - {name: max_scopes, type: Integer}
+      - {name: max_rows_per_scope, type: Integer}
+      - {name: max_concurrent_provider_requests, type: Integer}
+      - {name: max_provider_response_bytes, type: Integer}
+  - name: connectors.discovery.CompositionDeclaration
+    kind: struct
+    fields:
+      - {name: declaration_revision, type: String}
+      - {name: instances, type: "List<connectors.discovery.CompositionInstance>"}
+      - {name: route_bindings, type: "List<connectors.discovery.InstalledRouteBinding>"}
+      - {name: limits, type: connectors.discovery.CompositionLimits}
+
 # UNMAPPED: canonical private scope/membership/authority equality, source and
 # physical cluster identity, provider exhaustion/coherent-list evidence, numeric
 # caps, whole-view merge/retention/order, original clocks/expiry, no false absence,
@@ -124,9 +181,15 @@ types:
 # trust, adapter-specific recognition inputs/priority/case folding,
 # nullable public recognition/candidate and partition-coordinate codecs,
 # current admission and candidate support. These new values execute no recognizer.
-# Persistent ResourceObservation/Collection/RouteBinding/Connection/Composition
-# ownership, cardinality and lifecycle remain explicitly unmodeled under their
-# dedicated persistence owner; no invented owns edge or synthetic lifecycle.
+# Collection/ResourceObservation ownership and lifecycle are selected and modeled
+# in connectors.discovery_state. Fixed mediated routing is a value on Connection;
+# CompositionDeclaration is immutable admitted configuration, not a database
+# entity. Root joins the route value to the real auth Connection domain.
 # This is distinct from the gateway idempotency.RouteBinding fingerprint value.
 # Optional projects to omission, not required-null public JSON; Timestamp and
 # SnapshotSummary are semantic shapes, not complete discovery payload codecs.
+# UNMAPPED implementation predicates: resolve composition instance_id values to
+# existing ServiceConfiguration records and compare exact revisions; unique
+# participants/installed bindings, aggregate positive ceilings, current live-port
+# compatibility; direct/via/parent/route option agreement and same-target evidence
+# replacement. ESS value fields are not executable foreign-key or grant checks.

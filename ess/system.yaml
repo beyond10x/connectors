@@ -15,6 +15,7 @@ domains:
   - connectors.connection_admission
   - connectors.auth_access
   - connectors.discovery
+  - connectors.discovery_state
   - connectors.datasource_reads
   - connectors.artifact_provenance
   - connectors.auth_bindings

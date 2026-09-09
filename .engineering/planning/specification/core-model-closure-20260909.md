@@ -7,7 +7,7 @@ title: Finite ESS model closure for the selected three-adapter specifications
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:spec-completion-parallel-20260909
-revision: 2
+revision: 3
 ---
 # Finite ESS model closure, 2026-09-09
 
@@ -51,3 +51,9 @@ error: `scope` is a field of `story`, and `specification:core-model-closure-2026
 This stage drafts the missing ESS models before entity-bearing story decomposition, as required by the planning/ESS workflow. It is not an AEP story wave or engine-governed drive run. The coordinator records exact disjoint worker allocations in docs/evidence/core-model-closure-20260909/work-units.json and checked all three pairs for file/directory-prefix overlaps (zero). That file is coordination evidence, not an AEP-validated scope field or a new executable helper. Root owns all shared joins and planning. Once the real models validate, any later implementation story may cite their typed homes and use AEP story scopes; no placeholder entity or story was invented to evade the refusal.
 
 Auth reference agreement is retained from specs-model-closure-20260909/.local/spec-completion-20260909/auth-join-proposal.md: Connection.connection_ref:String; immutable profile_record_ref qualifies adapter/local profile/declaration revision while existing profile_ref stays logical; active generation uses the existing CredentialGenerationId; current custody references remain on the binding owner and do not make captures pin bytes forever. Discovery supplies Optional<connectors.discovery.MediatedRouteBinding> as a coordinator-only child field with no live observation FK. Audit uses only existing ServiceConfiguration and optional AttemptRecord references.
+
+## Integration and independent review pipeline
+
+Auth unit 6cee258b34ae0c9e0b0a5de5a5ed7fd04e336e4e is integrated by b5abe434fbb34dfd889303f19933a9bff9e2e23a with coordinator registration/reference joins and preserved artifact additions. Unit/coordinator leases on the auth tree are released; it is retained for evidence/recovery, not finished merely because committed. The actual combined root validates/compiles as 16 files and 263 declarations. No full gate or whole-stage approval is claimed yet.
+
+Independent reviewer A starts the frozen auth/artifact source at b5abe434 in managed tree specs-model-review-a-20260909 under the same external worktree root; target/ and .local/model-closure-20260909 remain tree-local. Its initial-brief.md fixes exact scope and read-only rules; session specs-model-review-a-20260909. The real discovery/route field, audit domain and final design inventory are acknowledged pending joins, not silently considered complete. A final exact commit will be supplied for remaining whole-stage coverage and any correction recheck; a second independent reviewer receives the combined source. Root remains sole planning writer.
