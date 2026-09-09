@@ -188,16 +188,67 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 | Client: typed `catalog.*` calls and bundle locate-and-verify | `crates/connectors-client` |
 | Wire `v1alpha2` descriptor fields | `crates/connectors-core/src/lib.rs:70-78` |
 
-## 9. ESS entities
+## 9. ESS declarations and optional catalog state
 
-| Entity | Notes |
+The shared typed home for immutable artifact provenance is
+[artifact_provenance.yaml](../../../ess/domains/artifact_provenance.yaml).
+These records describe pinned declarations and bytes independently of any catalog
+service. Existing `AdapterSpecification.adapter_id`, operation identities,
+`UpstreamSource` and current strict readers retain their meanings. This model
+does not make the proposed curation/source fields accepted by a current reader.
+
+| Declaration | Selected identity and relation |
 |---|---|
-| `AdapterSpecification` (exists, `ess/domains/declarations.yaml:43-60`; `upstream: Optional<UpstreamSource>`, owns `OperationDeclaration` many) | gains `sources` (many `Source`) and the curation value on each owned operation |
-| `Source` (identity: url + revision) | fields origin, kind, sha256, license, transforms; relation `feeds → AdapterSpecification` many-to-many |
-| `Bundle` (identity: digest) | fields format, specification_sha256, upstream_sha256, ess, rustfmt, files; relation `realizes → AdapterSpecification` one; lifecycle `generated → indexed → superseded` |
-| `CatalogIndex` (identity: digest) | owns many `Bundle`; lifecycle `built → published → replaced` |
-| `Curation` | embedded value on `OperationDeclaration`: expose, effects, risk, idempotency, realization; not an entity |
-| Tenancy and who may publish an index | UNMAPPED |
+| Existing `AdapterSpecification` | Existing logical adapter id; references zero or more reusable Source records through `source_refs`; its operation ownership is unchanged |
+| `Source` | Immutable record identified by an opaque `source_ref` for the exact `(url, revision)` tuple; origin, kind, original-byte SHA-256, retained license evidence and ordered transforms |
+| `Bundle` | Immutable `digest` of the exact manifest bytes; references one logical AdapterSpecification plus its separately pinned specification SHA-256, and zero or more Source records |
+| `Curation` | Optional embedded authored value on OperationDeclaration: expose, executable/semantic effects, risk, idempotency and realization. Absence remains unresolved for profiles requiring curation |
+| `CatalogIndex` | Deferred adapter-owned publication selection. Its digest identifies one index generation; membership references reusable immutable Bundles and does not own their deletion |
+| Tenancy, index publication authority and runtime retention/capacity | Deferred; no selected catalog service or publishing lifecycle is implemented or declared in shared ESS |
+
+A Source key is an injective owner-maintained association with the exact URL and
+revision, not an ambiguous concatenation or display label. A second observation
+of that tuple with different pinned bytes or provenance is a conflicting source
+record and refuses replacement; it requires an explicit reviewed source revision.
+References never silently follow a moving source. Repository-authored inputs use
+their recorded repository source and revision and do not invent vendor provenance.
+The original-byte digest and each transform's ordered input/output digest remain
+distinct. A transformed document cannot relabel its output as the original vendor
+bytes. License evidence records retained source/license files where available;
+an absent record is not a license grant or proof that no license exists.
+
+Source reuse is many-to-many through the explicit AdapterSpecification/Bundle
+reference lists: no adapter or bundle owns a Source's lifetime. The lists identify
+a particular immutable declaration, not every historical revision under the same
+logical adapter id. A Bundle's logical adapter reference alone cannot establish
+its exact specification revision; its pinned specification digest and retained
+bytes do. No existing identity is silently redefined to mean a revision key.
+
+The Source lifecycle is the single immutable `Recorded` state and Bundle the
+single immutable `Generated` state. These states classify retained declarations,
+not whether a deployment installed them or an index currently selects them.
+Multiple indexes or consumers may select the same Bundle digest. Replacing one
+index retires that selection and does not mutate or delete the shared Bundle or
+Source. The earlier proposed `generated → indexed → superseded` Bundle lifecycle
+and `CatalogIndex owns Bundle` edge are superseded by this reuse rule. No
+automatic deletion or cascade is selected by this model; later packaging/catalog
+retirement must prove no remaining retained consumer or safety obligation.
+
+Curation records author decisions; it does not discharge implementation
+obligations or make unresolved work callable. Generic execution and new curation
+or manifest syntax require their separately reviewed reader/schema binding.
+Unknown/reserved realization, effect, risk or idempotency meanings refuse under
+that binding; an optional ESS field is not an extension to a strict public
+reader. The existing native operation profile/discriminator still selects
+mutation versus read behavior.
+
+ESS validates declared field types and explicit references. It does not enforce
+tuple uniqueness, digest computation, source/license truth, manifest path safety,
+cross-field curation completeness, current publication authority, file retention
+or deterministic generation. Those remain named binding predicates; no storage,
+catalog service, generator or public codec was implemented for this model. The
+optional CatalogIndex publication lifecycle belongs under the catalog adapter
+when selected, not in the shared provider-independent domain.
 
 ## 10. Open decisions
 
