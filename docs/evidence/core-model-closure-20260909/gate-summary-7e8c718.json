@@ -1,0 +1,14 @@
+{
+  "source": "7e8c718303a43bc7ec4a02d6a76581d92802bf6b",
+  "command": "CARGO_BUILD_JOBS=2 cargo run -p connectors-build --locked --offline -- gate --msrv",
+  "exit": 0,
+  "rust_runners": 38,
+  "rust_tests_passed": 58,
+  "rust_tests_failed": 0,
+  "msrv": "1.88.0",
+  "ess_synthesized_scenarios": 315,
+  "ess_authored_scenarios": 34,
+  "ess_refusals": 0,
+  "ess_scenario_meaning": "Structural synthesis, not executed persistent/provider conformance",
+  "all_checks_passed": true
+}
