@@ -1,0 +1,41 @@
+{
+  "schema": "connectors.spec-authoring-allocation/1",
+  "base": "8a5cf563fc717fd4b23e4dd7d470d0c967f39461",
+  "scope_record": "specification:core-model-closure-20260909",
+  "mode": "pre-story ESS model authoring; exact allocation checked by coordinator, not AEP story scheduler",
+  "units": [
+    {
+      "owner": "auth",
+      "tree": "specs-model-closure-20260909",
+      "writes": [
+        "ess/domains/auth_bindings.yaml",
+        "contracts/auth/profile/v1alpha1/semantics.md",
+        "contracts/auth/connection/v1alpha1/semantics.md",
+        "contracts/auth/acquisition/v1alpha1/semantics.md",
+        "contracts/auth/custody/v1alpha1/semantics.md",
+        "docs/evidence/model-auth-closure-20260909/"
+      ]
+    },
+    {
+      "owner": "discovery",
+      "tree": "specs-model-discovery-20260909",
+      "writes": [
+        "ess/domains/discovery_state.yaml",
+        "ess/domains/discovery.yaml",
+        "contracts/discovery/resources/v1alpha1/semantics.md",
+        "contracts/discovery/mediated_route/v1alpha1/semantics.md",
+        "contracts/discovery/composition.md",
+        "docs/evidence/model-discovery-closure-20260909/"
+      ]
+    },
+    {
+      "owner": "audit",
+      "tree": "specs-model-audit-20260909",
+      "writes": [
+        "ess/domains/execution_audit.yaml",
+        "contracts/service/audit.md",
+        "docs/evidence/model-audit-closure-20260909/"
+      ]
+    }
+  ]
+}
