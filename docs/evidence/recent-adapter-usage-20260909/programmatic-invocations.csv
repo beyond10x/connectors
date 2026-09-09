@@ -1,0 +1,14 @@
+client,operation,call_evidence_id,outcome_evidence_id,reviewed_observation
+connectors,jira-issue-search,E-4079606d4f59eab4,E-6ea947707959e271,successful empty incremental result with explicit page fields
+connectors,confluence-space-list,E-4079606d4f59eab4,E-6ea947707959e271,successful bounded space enumeration
+connectors,gitlab-project-activity-list,E-4079606d4f59eab4,E-6ea947707959e271,successful project collection with next-page field
+connectors,jira-issue-search,E-c75be4cc6b48330b,E-d5df47cd68220570,successful nonempty incremental result
+connectors,jira-issue-comments-read,E-c75be4cc6b48330b,E-d5df47cd68220570,successful comment collection
+connectors,confluence-page-search,E-c75be4cc6b48330b,E-d5df47cd68220570,successful empty search under a narrow predicate
+connectors,gitlab-issue-search,E-c75be4cc6b48330b,E-d5df47cd68220570,successful empty incremental read
+connectors,gitlab-merge-request-search,E-c75be4cc6b48330b,E-d5df47cd68220570,successful empty incremental read
+connectors,gitlab-pipeline-list,E-c75be4cc6b48330b,E-d5df47cd68220570,successful nonempty incremental read
+connectors,gitlab-deployment-list,E-c75be4cc6b48330b,E-d5df47cd68220570,invalid_input with upstream HTTP 400
+connectors,gitlab-repository-commit-list,E-c75be4cc6b48330b,E-d5df47cd68220570,successful nonempty incremental read
+connectors,confluence-page-search,E-91966d319a5fedaa,E-b32c3fa959c19b35,successful multi-space body search with further results
+connectors,confluence-space-list,E-3eb55d88d9de2383,E-3eb55d88d9de2383,successful single-result helper probe

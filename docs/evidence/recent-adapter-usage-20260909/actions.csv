@@ -1,0 +1,309 @@
+client,action,command_sites,tool_calls,session_ids,example_evidence_id
+aws,configure list-profiles,2,2,2,E-098a4227276b033a
+aws,ec2 describe-volumes,1,1,1,E-8b0b14f8999a25d1
+aws,ecr batch-get-image,1,1,1,E-38df729d3bcfc2a5
+aws,ecr describe-images,1,1,1,E-d7894a55ce2425ea
+aws,sso login,1,1,1,E-f7740a672335d650
+aws,sts get-caller-identity,8,7,1,E-107daa8c1d7958bd
+connectors,admin,1,1,1,E-5057fc69f72acb96
+connectors,admin credentials,2,2,1,E-13090d8fb31eec6f
+connectors,admin integrations,2,2,2,E-5a7d498dbb542565
+connectors,auth,2,2,1,E-169d049ff8a96104
+connectors,auth help,3,2,2,E-190ef60b0c8ee693
+connectors,auth status,5,5,3,E-6165cd128085d3dc
+connectors,completions,11,4,1,E-5057fc69f72acb96
+connectors,connect,1,1,1,E-bf9280be1654667f
+connectors,connection activate,1,1,1,E-370e750049e0b0e2
+connectors,connection candidates,8,8,5,E-0d335314890532e1
+connectors,connection list,31,31,12,E-11b87e42fd15f437
+connectors,connection search,1,1,1,E-2f6c1bd877ed554c
+connectors,describe,1,1,1,E-fa0181d92791d11c
+connectors,describe confluence-page-search,1,1,1,E-383b29a5e32523f3
+connectors,describe confluence-space-list,1,1,1,E-9d625822661824f9
+connectors,describe gitlab-branch-list,18,18,5,E-3e81bd3e70609072
+connectors,describe gitlab-branches-list,1,1,1,E-7ac39011fd48dfa5
+connectors,describe gitlab-group-get,3,3,2,E-598e73023e6ccc2e
+connectors,describe gitlab-group-list,3,3,2,E-218e56bdf2e40edb
+connectors,describe gitlab-merge-request-get,4,4,4,E-0d26b3b22c7998be
+connectors,describe gitlab-merge-request-list,4,4,2,E-687001c69ea8abc4
+connectors,describe gitlab-pipeline-get,13,13,3,E-31f9d73bda03a82b
+connectors,describe gitlab-pipeline-schedule-list,1,1,1,E-8468aaa157f8f4b3
+connectors,describe gitlab-project-get,14,14,8,E-0f3964011a82852c
+connectors,describe gitlab-project-list,20,20,9,E-05de42f7342a32e7
+connectors,describe gitlab-repository-file-get,13,13,6,E-0048b8c50293b67f
+connectors,describe gitlab-repository-tree-list,4,4,3,E-04cb9ae54b196e2b
+connectors,describe gitlab-user-get,1,1,1,E-329a5a2563f38fad
+connectors,describe grafana-datasource-query,6,6,3,E-794f8054d998e69e
+connectors,describe grafana-datasources-list,6,6,4,E-08c33a7e736419a6
+connectors,describe jira-issue-comment-list,1,1,1,E-31caca5c8be6df52
+connectors,describe jira-issue-get,13,13,3,E-07efd8a7d95589d4
+connectors,describe jira-issue-search,2,2,1,E-1f218f3d58ab541e
+connectors,describe jira-project-list,2,2,1,E-59048f58c43131a3
+connectors,describe kubernetes,1,1,1,E-56f12bf737939830
+connectors,describe kubernetes.deployment.status,1,1,1,E-f60c087fd7d427e4
+connectors,describe loki-query-range,1,1,1,E-388a0593a4edf417
+connectors,describe slack-admin-conversations-search,1,1,1,E-54bc1272fcf48e5e
+connectors,describe slack-chat-post-message,82,82,7,E-04d38cb00a05d41b
+connectors,describe slack-conversations-history,8,8,3,E-042fd6f51a39bdbc
+connectors,describe slack-conversations-info,5,5,3,E-18a4d2d497264a91
+connectors,describe slack-conversations-list,1,1,1,E-22cc5e1a9aefc94a
+connectors,describe slack-conversations-replies,10,10,6,E-04e5f35a8992530e
+connectors,describe slack-users-info,2,2,2,E-8165949d8139878d
+connectors,describe slack-users-list,3,3,2,E-559fc1dbcae22f96
+connectors,doctor,14,13,5,E-169d049ff8a96104
+connectors,endpoint list,1,1,1,E-e780f751d134adf4
+connectors,endpoint refresh,1,1,1,E-e780f751d134adf4
+connectors,event search,4,4,1,E-7fc1e03ff640dc53
+connectors,help,422,294,65,E-01918a2acba316c7
+connectors,help doctor,2,2,1,E-01918a2acba316c7
+connectors,help serve,3,3,2,E-495c0f79ddf26389
+connectors,inspect auth,6,6,4,E-6b6a56214f10391a
+connectors,inspect doctor,112,112,49,E-05f4174be626c036
+connectors,inspect providers,6,6,4,E-39adc1520444bbc7
+connectors,inspect upgrade,1,1,1,E-3b71c5ff8be1e991
+connectors,invoke endpoints.discover,1,1,1,E-0f9932d91e16b6e2
+connectors,invoke gitlab-branch-list,12,12,3,E-005f5cbdcd9bb798
+connectors,invoke gitlab-group-get,2,2,2,E-31f9d73bda03a82b
+connectors,invoke gitlab-group-list,2,2,2,E-8dbe73ef38359e71
+connectors,invoke gitlab-merge-request-get,3,3,3,E-966585d5174cea9a
+connectors,invoke gitlab-merge-request-list,6,6,2,E-55ea9ecb81662da4
+connectors,invoke gitlab-pipeline-get,13,12,3,E-133e9b82a5201022
+connectors,invoke gitlab-pipeline-schedule-list,1,1,1,E-faae7f6fdb54d635
+connectors,invoke gitlab-project-get,14,12,7,E-1019c0ddb1143754
+connectors,invoke gitlab-project-list,30,30,9,E-056dc1d95542fcbc
+connectors,invoke gitlab-repository-file-get,13,13,3,E-0048b8c50293b67f
+connectors,invoke gitlab-repository-tree-list,4,4,2,E-04cb9ae54b196e2b
+connectors,invoke gitlab-user-get,2,2,1,E-1019c0ddb1143754
+connectors,invoke grafana-datasource-query,12,12,2,E-12db37aaa274b06f
+connectors,invoke grafana-datasources-list,4,4,2,E-4051d9ef922b4e6f
+connectors,invoke jira-issue-comment-list,1,1,1,E-10b06bb84d475b3a
+connectors,invoke jira-issue-get,4,4,2,E-4e3888426ecafa09
+connectors,invoke project.get,1,1,1,E-0f9932d91e16b6e2
+connectors,invoke query.read,1,1,1,E-855ab6fd95fd01ee
+connectors,invoke slack-admin-conversations-search,1,1,1,E-5a615d6999455051
+connectors,invoke slack-chat-post-message,14,14,3,E-04b0e34fe28fe511
+connectors,invoke slack-conversations-history,9,9,2,E-2018266b87af0b35
+connectors,invoke slack-conversations-info,6,6,2,E-22ca32be3c34c16d
+connectors,invoke slack-conversations-list,3,3,1,E-218e348ad289afc6
+connectors,invoke slack-conversations-replies,5,5,3,E-32cd8ad622096e24
+connectors,invoke slack-users-info,2,2,2,E-5dad2d859b8df74b
+connectors,invoke slack-users-list,1,1,1,E-4ee6de8081959f3e
+connectors,invoke sql__query.read,1,1,1,E-a095dd7be747527c
+connectors,operation describe,4,4,2,E-4996fd0f48a94d56
+connectors,operation invoke,1,1,1,E-f0ef0715bbb2757f
+connectors,operation search,474,419,50,E-00d304f9e39deaeb
+connectors,providers,11,5,3,E-0b6f6a4bbb302fc6
+connectors,search,2,2,2,E-288d59cc68dd3794
+connectors,serve,46,28,5,E-03a6ad90e1cbe8b2
+connectors,serve local,10,10,5,E-28077bf6abe9158f
+connectors,session login,1,1,1,E-dbe6f8bef34cffa6
+connectors,setup,4,3,1,E-5b7fab4f9b3059a0
+connectors,setup completions,1,1,1,E-8da9b4df31143a1f
+connectors,setup connect,3,3,2,E-0f0d1b5510805285
+connectors,setup init,2,2,2,E-12e78aafc1d8ee2e
+connectors,unresolved,6,6,2,E-155282f3729d2913
+connectors,version,157,157,59,E-0022040abfe3c5b6
+curl,unresolved,266,205,39,E-002fd4d6598d978c
+docker,build,33,28,6,E-0069145fe402ac3f
+docker,buildx,11,11,2,E-17c028e297e4f094
+docker,buildx build,11,11,3,E-19f3c1f7b3639daa
+docker,buildx du,12,9,1,E-043947f525239eff
+docker,buildx imagetools,9,9,3,E-1960f009168e7898
+docker,buildx inspect,4,4,2,E-5662531bd51c7ddc
+docker,buildx ls,7,7,3,E-31f0cff645b4c824
+docker,buildx prune,8,5,1,E-043947f525239eff
+docker,container inspect,1,1,1,E-480a9edf581deb88
+docker,container ls,2,2,1,E-6e944cf596ba47f5
+docker,context inspect,2,2,2,E-0b2b7fc621059e77
+docker,context show,2,2,2,E-0b2b7fc621059e77
+docker,cp,38,19,7,E-05640ead68acbcc3
+docker,create,10,10,2,E-07a408d9000fb0b6
+docker,exec,199,151,15,E-02d7fe580f4cc2f2
+docker,help,5,5,4,E-27a263224db5a158
+docker,image inspect,51,49,16,E-04c0a897701b73cc
+docker,image ls,24,24,13,E-020a5254e9b6fa28
+docker,image rm,7,7,3,E-6b4cd9a2d3224c72
+docker,images,8,8,4,E-109d1292a42d287b
+docker,info,14,14,9,E-0025b6b1c6d19cf9
+docker,inspect,65,59,14,E-05640ead68acbcc3
+docker,login,4,4,2,E-1d3b9207db28b3aa
+docker,logs,23,23,6,E-10a2acefa0ffcb34
+docker,manifest inspect,1,1,1,E-907f0b112fb43673
+docker,ps,76,72,19,E-0025b6b1c6d19cf9
+docker,pull,13,12,4,E-3a6b9d9443939df5
+docker,push,26,23,3,E-015b092934116b1a
+docker,restart,4,4,3,E-086604a178d297b2
+docker,rm,46,43,9,E-05b5a4edf969a4b8
+docker,run,119,103,13,E-0020f05d3279a2d0
+docker,start,2,2,2,E-272d7b9a72deac93
+docker,stop,35,33,11,E-07a408d9000fb0b6
+docker,system,8,8,4,E-2aedf61cbeccef0a
+docker,tag,1,1,1,E-1d3b9207db28b3aa
+docker,unresolved,57,55,13,E-0495153b97525ccd
+docker,update,2,2,1,E-0f9860f76c797874
+docker,version,8,8,8,E-0ed3bf6c7e5a17c8
+docker,volume create,2,2,2,E-0992a30fc168ade1
+docker,volume inspect,2,2,2,E-480a9edf581deb88
+docker,volume ls,2,2,2,E-2a217b617be44016
+docker,volume rm,2,2,2,E-4bf9a2c835afce35
+fluxplane-plugin,auth list,1,1,1,E-6679efb58f672f40
+fluxplane-plugin,auth status,3,3,2,E-787e4891aae3e50f
+fluxplane-plugin,datasource list,3,2,1,E-1d4e8c15fa575ef8
+fluxplane-plugin,endpoint list,21,20,7,E-0499723896215157
+fluxplane-plugin,help,13,12,4,E-09764d0d710167fd
+fluxplane-plugin,invoke gitlab.job.list,24,24,3,E-13d8659de3b78352
+fluxplane-plugin,invoke gitlab.mr.create,8,7,1,E-08e333f91e59e6b9
+fluxplane-plugin,invoke gitlab.mr.list,4,4,4,E-179b52196497e447
+fluxplane-plugin,invoke gitlab.mr.merge,8,4,1,E-0791d0162936e6a3
+fluxplane-plugin,invoke gitlab.mr.show,2,2,1,E-c43a2d723cc1e971
+fluxplane-plugin,invoke gitlab.mr.update,1,1,1,E-352b259a96de5bb1
+fluxplane-plugin,invoke gitlab.pipeline.list,31,30,3,E-0863c4793a6428e9
+fluxplane-plugin,invoke gitlab.project.show,4,4,2,E-1623348c6c15e491
+fluxplane-plugin,invoke gitlab.repository.file.show,12,11,3,E-08452f2738eff6a1
+fluxplane-plugin,invoke gitlab.repository.tag.list,3,3,1,E-923451511ab467cc
+fluxplane-plugin,invoke gitlab.repository.tree,3,3,1,E-1a8506922b5b6eef
+fluxplane-plugin,invoke gitlab.search.blobs,3,2,1,E-0fd2907b73cb25b8
+fluxplane-plugin,invoke grafana.datasource.list,7,6,2,E-31929f5d46149e79
+fluxplane-plugin,invoke grafana.loki.labels,4,4,1,E-21e993d783a8f909
+fluxplane-plugin,invoke grafana.loki.query,48,45,2,E-0352bb9d842183cb
+fluxplane-plugin,invoke grafana.prometheus.query,23,18,3,E-00fb879719e09bad
+fluxplane-plugin,invoke grafana.prometheus.range,3,3,2,E-7dff8d336a75622f
+fluxplane-plugin,invoke jira.issue.comment.add,4,4,1,E-0e7f201cfe3c21d3
+fluxplane-plugin,invoke jira.issue.comment.list,10,5,3,E-344b059ba285a89d
+fluxplane-plugin,invoke jira.issue.create,7,7,1,E-24c6ce0de3c3fe47
+fluxplane-plugin,invoke jira.issue.create_meta,1,1,1,E-8e01ca3438bb456d
+fluxplane-plugin,invoke jira.issue.edit,5,4,2,E-166b4a7295d2074f
+fluxplane-plugin,invoke jira.issue.get,3,3,2,E-142db333bff32097
+fluxplane-plugin,invoke jira.issue.link.add,5,5,1,E-0d0f876f39c37c81
+fluxplane-plugin,invoke jira.issue.search,22,18,3,E-0176e0c1e7882f40
+fluxplane-plugin,invoke jira.issue.show,31,24,4,E-1e482d0875fcb594
+fluxplane-plugin,invoke jira.issue.transition.list,3,3,1,E-07d8d281a23c168c
+fluxplane-plugin,invoke jira.issue.transition.run,2,1,1,E-7a9f1a6337d377d7
+fluxplane-plugin,invoke kubernetes.cluster.list,3,3,3,E-1d2464d4e0529e86
+fluxplane-plugin,invoke kubernetes.endpoint.discover,1,1,1,E-7632b58f48f4b016
+fluxplane-plugin,invoke kubernetes.pod.list,7,7,3,E-048beb6657d467d6
+fluxplane-plugin,invoke kubernetes.pod.logs,7,7,2,E-3b6e0296cb25009e
+fluxplane-plugin,invoke list_pipelines,1,1,1,E-51ed557d4b7c36a0
+fluxplane-plugin,invoke loki.endpoint.list,1,1,1,E-6d01aa693935f1d7
+fluxplane-plugin,invoke loki.labels,5,5,1,E-6b244a84e1475691
+fluxplane-plugin,invoke loki.metric,2,2,1,E-43fb476614b3b07e
+fluxplane-plugin,invoke loki.query,7,6,1,E-1a2146f1a1e7085e
+fluxplane-plugin,invoke loki.test,2,2,1,E-13258891c9f8ca07
+fluxplane-plugin,invoke pipeline.list,2,2,1,E-9a069bede43fddac
+fluxplane-plugin,invoke slack.thread,8,8,1,E-287b4fd1d1992902
+fluxplane-plugin,invoke sql.query,45,41,2,E-01434538a2ea1c43
+fluxplane-plugin,invoke sql.test,1,1,1,E-eb5f7164bac9f671
+fluxplane-plugin,list,21,21,8,E-0c667a563aec886d
+fluxplane-plugin,operation describe,42,20,6,E-16562442ac387d07
+fluxplane-plugin,operation list,99,90,8,E-01438d20d2fe1577
+fluxplane-plugin,operation search,13,12,5,E-08049f9012cbbe94
+fluxplane-plugin,plugin list,1,1,1,E-bacfcce490075336
+fluxplane-plugin,plugins list,1,1,1,E-d37ed88362be6b77
+fluxplane-plugin,skill,1,1,1,E-fa64b2b5bd57a01b
+fluxplane-plugin,status,6,6,3,E-559b17f25bcedf34
+fluxplane-plugin,unresolved,2,1,1,E-72d19e897fb1d99f
+gh,api,662,460,40,E-007e2912b215674b
+gh,auth,8,8,2,E-1d3b9207db28b3aa
+gh,auth status,7,7,6,E-0fdf9ed4e2114672
+gh,help,8,6,6,E-0b15a5f2335e25b8
+gh,issue list,1,1,1,E-45d2e5c00bd2b53c
+gh,list,3,2,1,E-0d87bc6e69017137
+gh,pr,2,2,2,E-6d9b0cbb2fe130c2
+gh,pr checks,87,86,9,E-03c71a367cb1df72
+gh,pr create,131,128,17,E-0187f7cb3ac54d06
+gh,pr edit,47,47,10,E-0877b552e389d2b4
+gh,pr list,29,29,11,E-080e293a89906292
+gh,pr merge,66,64,13,E-03b4961bed788917
+gh,pr ready,16,15,9,E-27f5740048f4c7ca
+gh,pr view,313,288,17,E-0029d1c3be1796e2
+gh,release create,11,11,7,E-0bfe61ccf45ca24c
+gh,release download,46,45,13,E-09d08dfa8f16284a
+gh,release edit,2,2,2,E-9c22d7881f766678
+gh,release list,33,30,13,E-00491756fe6292f6
+gh,release view,64,61,16,E-050a6dc8b5804bad
+gh,repo create,2,2,2,E-a1388da37d6ecfb5
+gh,repo edit,1,1,1,E-1d1e92b9fb0526ef
+gh,repo list,1,1,1,E-ee524071a2391a5e
+gh,repo view,20,16,6,E-0c612391719f4cbe
+gh,run cancel,12,10,5,E-2e694f7533679216
+gh,run download,20,19,9,E-0792d74bbd4a15a8
+gh,run list,276,257,25,E-00d5d0fc63f992ca
+gh,run rerun,5,5,5,E-02f223846b24bdec
+gh,run view,678,565,27,E-00491756fe6292f6
+gh,run watch,14,14,5,E-0ebb7c98ee2d1ad8
+gh,search,2,2,1,E-45d2e5c00bd2b53c
+gh,variable delete,1,1,1,E-322b398351850693
+gh,variable get,1,1,1,E-ac37fd6868ffc539
+gh,variable list,2,2,1,E-0d87bc6e69017137
+gh,variable set,3,3,1,E-7e75bfc6ed60e8a6
+gh,verify,1,1,1,E-3935b8d7b415ebfe
+gh,version,2,2,2,E-28077bf6abe9158f
+gh,workflow list,2,2,2,E-2941a52f3a063cb1
+gh,workflow run,60,59,16,E-01b79a976e79ec6b
+glab,api,320,245,8,E-0291a765bcb1394b
+glab,api version,1,1,1,E-9cf9e06b59a4d985
+glab,auth status,8,8,3,E-3ba29d27c7656d74
+glab,ci get,8,8,1,E-159a1968ec23bb26
+glab,ci lint,4,3,1,E-4ce119ec61f939d2
+glab,ci list,2,2,1,E-5f3c9dbab3a69861
+glab,ci run,1,1,1,E-d086cb08ab384532
+glab,ci status,3,3,1,E-201860241a8ca100
+glab,ci view,1,1,1,E-6cb1408250fb0d97
+glab,config get,1,1,1,E-58b61a4a1bf9ef3e
+glab,help,35,33,10,E-0291a765bcb1394b
+glab,mr create,11,11,2,E-0184013f0bad58f4
+glab,mr list,2,2,2,E-26a6cec6e14ac1e2
+glab,mr merge,6,6,2,E-0eee70c75aa94184
+glab,mr update,1,1,1,E-0eee70c75aa94184
+glab,mr view,4,4,1,E-26f4ec73eb70acaf
+glab,pipeline list,5,5,1,E-1f743cc711e86771
+glab,pipeline view,2,2,1,E-028430867fb3d768
+glab,release create,2,2,1,E-d64fa62e129599a7
+glab,release list,2,2,1,E-cb54ec9cbe8082de
+glab,repo view,2,2,1,E-81b96175d0f23bd7
+glab,version,8,8,6,E-1b034126f76ee4c5
+grafana-query-wrapper,wrapper invocation; expansion not counted,5,5,1,E-02825f21c4ab24d6
+helm,get manifest,1,1,1,E-a56f275abaff5fe7
+helm,get values,3,3,2,E-5d78618f721db221
+helm,history,19,19,3,E-004ec445a5ee7630
+helm,lint,50,50,9,E-02200264a6e82ad1
+helm,list,1,1,1,E-bb8b45849520d2b9
+helm,pull,9,9,2,E-2ecdb7be82b9d4aa
+helm,registry login,1,1,1,E-9d91d4a6cdd592da
+helm,rollback,1,1,1,E-bebba3b14998c83e
+helm,show,5,5,2,E-27cd9590170d47f5
+helm,status,1,1,1,E-e8f4cb2bf97d163e
+helm,template,24,21,5,E-1906de4faa373a5a
+helm,template test,2,2,1,E-62fab05d1301159c
+helm,unresolved,1,1,1,E-1fd9536a58d47eb6
+helm,version,14,14,7,E-1d5764775dfb5778
+kubectl,api-resources,1,1,1,E-443a841bdc936961
+kubectl,apply,38,33,7,E-07562beac1b0b6db
+kubectl,auth can-i,2,2,2,E-79d98e506685d215
+kubectl,config,5,4,3,E-4960ec1a7daa380d
+kubectl,config current-context,6,6,6,E-330c961f9234a1da
+kubectl,config get-contexts,14,14,9,E-0025b6b1c6d19cf9
+kubectl,config view,5,5,4,E-2f9e625dd920c281
+kubectl,cp,1,1,1,E-17b7f1d61c293ac7
+kubectl,create,26,23,5,E-07562beac1b0b6db
+kubectl,delete,33,30,2,E-076718715c6086b2
+kubectl,exec,88,80,10,E-07eca73e74832150
+kubectl,get,453,361,15,E-00174bd6730c9373
+kubectl,get endpoints,2,2,2,E-3169ddfb357383f5
+kubectl,get events,14,14,5,E-1454612f3400d332
+kubectl,get sts,1,1,1,E-75a017d7323becf8
+kubectl,help,1,1,1,E-73c8aa4ccfb75a9e
+kubectl,logs,127,94,9,E-084531aa86e1cfeb
+kubectl,patch,1,1,1,E-5d5500fca19de561
+kubectl,port-forward,11,10,3,E-0145ac8bdad51a5c
+kubectl,rollout restart,9,9,2,E-0560a06cef774dc2
+kubectl,rollout status,29,20,6,E-0560a06cef774dc2
+kubectl,scale,4,2,2,E-45d0cd6bcfc1dc02
+kubectl,unresolved,1,1,1,E-5d78618f721db221
+kubectl,version,2,2,2,E-81a7bc6acdc3caa6
+kubectl,wait,25,24,3,E-07eca73e74832150
+podman,info,1,1,1,E-dff23b86252c8531
+podman,system,1,1,1,E-2aedf61cbeccef0a
+psql,unresolved,9,8,3,E-1fab6c645a95b2e5
+slack-channel-wrapper,wrapper invocation; expansion not counted,1,1,1,E-2b7c1472805fd354
+sql-query-wrapper,wrapper invocation; expansion not counted,33,13,1,E-0352bb9d842183cb
