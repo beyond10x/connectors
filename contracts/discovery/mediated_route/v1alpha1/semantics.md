@@ -81,6 +81,37 @@ At one host metadata publication point, compare the expected route revision, cur
 
 Retained history after denied/capped/failed discovery is not deletion and cannot authorize a route. An enumeration denial is not proof that forwarding is denied; the separate exact forwarding permission decides it. A current definite proxy denial is route_refused even when history contains an old successful list. Missing fresh observation/equality or a degraded parent remains route_unavailable, and unavailable required proxy evidence uses unavailable; no direct fallback. Local child revoked/disabled precedence remains the auth.connection reduction. A changed type, provider object incarnation, hidden fixed target, port, parent, route mode or owner cannot use this revalidation path: a new independently admitted connection is required. Title-only rename may revalidate the same fixed target. Confirmed withdrawal terminates the old observation incarnation; reappearance gets a new id and never revives its old child.
 
+### 4.2 Embedded configuration and historical association
+
+The first persistent binding stores zero or one
+`connectors.discovery.MediatedRouteBinding` value on its existing child Connection.
+There is no route entity, independent route ID or route lifecycle. Child identity
+is Connection.connection_ref; its sole canonical parent is
+Connection.parent_connection_ref, a reference to the existing parent Connection.
+The route value does not duplicate either as another authority. Via bindings
+require both parent and route value; direct bindings have neither, and a parent
+cannot itself be mediated. Many children may independently reference one direct
+parent and the same historical observation.
+
+The fixed value names the original collection_ref, scope epoch and observation_ref,
+route profile, target adapter, sealed private fixed-target handle and access/owner
+configuration. These fields cannot change through revalidation. They are historical
+coordinates, not a mandatory live relation to ResourceObservation: retiring or
+cleaning a collection/row cannot be blocked by a child. Current resolution may
+find no row; that yields route_unavailable and grants no provider access. A newly
+allocated scope epoch, even for the same native object, cannot match this old
+coordinate or repoint the child.
+
+Only the embedded route-evidence value may advance by §4.1 same-target CAS. It
+records a private route revision, the successfully revalidated observation
+generation, parent credential-generation coordinate where applicable, and its
+original observation/validity times. A credentialless admitted direct parent has
+no invented material-generation ID; the selected parent profile must explicitly
+support that absence. Missing required material/evidence still refuses. Route
+evidence loss/expiry removes current usability without deleting the fixed child
+binding, creating child credentials or resetting original time. These internal
+values add no fields to the public Connection or capability codec.
+
 ## 5. Limits
 
 | Concern | Rule |
@@ -119,7 +150,7 @@ Retained history after denied/capped/failed discovery is not deletion and cannot
 
 | Entity | Notes |
 |---|---|
-| Persistent mediated route binding | Proposed, not declared in ESS. Fixed child/parent/observation and logical host ownership are requirements; persistent relations/lifecycle/cardinality remain UNMAPPED under the model/binding prerequisites recorded in design §31. This is not the unrelated gateway RouteBinding value in idempotency.yaml |
+| Fixed mediated route and evidence | `connectors.discovery.MediatedRouteBinding` and `MediatedRouteEvidence` are embedded values, joined to the child Connection by its owner. Parent is a Connection reference; historical observation coordinates have no live observation FK. This is not the unrelated gateway RouteBinding value in idempotency.yaml. |
 | `Connection.route` | value `direct` or `via` (connection document) |
 | Revalidation and placement facts | [discovery.yaml](../../../../ess/domains/discovery.yaml) types selected values, not a running validator, installed port or persistent composition owner |
 
