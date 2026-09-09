@@ -1,0 +1,344 @@
+domain: connectors.discovery_state
+summary: Host-owned scope epochs, bounded observation records and atomic publication selections; no provider Resource entity.
+
+# Normative owner: contracts/discovery/resources/v1alpha1/semantics.md §4.6.
+# These are private port records/decisions, not public request payloads.
+types:
+  - name: connectors.discovery_state.CollectionDefinition
+    kind: struct
+    fields:
+      - {name: declaration_revision, type: String}
+      - {name: profile, type: String}
+      - {name: provider_authority_ref, type: String}
+      - {name: membership_ref, type: String}
+      - {name: interpretation_revision, type: String}
+      - {name: admission_scope_ref, type: String}
+      - {name: selection_revision, type: String}
+    # Private handles resolve exact immutable canonical values, not lossy hashes
+    # or caller assertions. The adapter owns native membership/target codecs.
+  - name: connectors.discovery_state.PublishedRow
+    kind: struct
+    fields:
+      - {name: observation_ref, type: String}
+      - {name: public_projection_ref, type: String}
+      - {name: evidence, type: connectors.discovery.ObservationEvidence}
+  - name: connectors.discovery_state.PrivateBindingEntry
+    kind: struct
+    fields:
+      - {name: observation_ref, type: String}
+      - {name: private_binding_ref, type: String}
+  - name: connectors.discovery_state.CandidateView
+    kind: struct
+    fields:
+      - {name: rows, type: "List<connectors.discovery_state.PublishedRow>"}
+      - {name: private_index, type: "List<connectors.discovery_state.PrivateBindingEntry>"}
+      - {name: coverage, type: connectors.discovery.CollectionCoverage}
+      - {name: retention_truncated, type: Boolean}
+      - {name: observed_at, type: Timestamp}
+      - {name: retire_at, type: Timestamp}
+  - name: connectors.discovery_state.PublishedSnapshot
+    kind: struct
+    fields:
+      - {name: generation, type: Integer}
+      - {name: view, type: connectors.discovery_state.CandidateView}
+  - name: connectors.discovery_state.PublicationReceipt
+    kind: struct
+    fields:
+      - {name: attempt_ref, type: String}
+      - {name: predecessor_revision, type: String}
+      - {name: committed_generation, type: Integer}
+  - name: connectors.discovery_state.DecisionRefusal
+    kind: enum
+    variants: [stale_predecessor, scope_changed, authority_unavailable, deadline_elapsed, capacity_unavailable, missing_private_bindings, receipt_unavailable]
+  - name: connectors.discovery_state.OwnerDecision
+    kind: enum
+    variants: [allow, refuse]
+
+entities:
+  - name: connectors.discovery_state.DiscoveryCollection
+    identity:
+      name: collection_ref
+      type: String
+    fields:
+      - {name: instance_id, type: String}
+      - {name: source_connection_ref, type: String}
+      - {name: operation_id, type: String}
+      - {name: scope_epoch, type: Uuid}
+      - {name: definition, type: connectors.discovery_state.CollectionDefinition}
+      # Private counter starts at 0; public generations are 1..9007199254740991.
+      - {name: last_generation, type: Integer}
+      - {name: publication_revision, type: String}
+      - {name: current_snapshot, type: "Optional<connectors.discovery_state.PublishedSnapshot>"}
+      - {name: latest_commit, type: "Optional<connectors.discovery_state.PublicationReceipt>"}
+      - {name: retired_at, type: "Optional<Timestamp>"}
+    relations:
+      - name: instance
+        kind: references
+        target: connectors.declarations.ServiceConfiguration
+        cardinality: one
+        via: instance_id
+      - name: operation
+        kind: references
+        target: connectors.declarations.OperationDeclaration
+        cardinality: one
+        via: operation_id
+      - name: observations
+        kind: owns
+        target: connectors.discovery_state.ResourceObservation
+        cardinality: many
+        via: collection_ref
+      - name: source_connection
+        kind: references
+        target: connectors.auth_bindings.Connection
+        cardinality: one
+        via: source_connection_ref
+    lifecycle:
+      initial: Open
+      states: [Open, Retired]
+      terminal: [Retired]
+      transitions:
+        - {name: publish, from: [Open], to: Open}
+        - {name: retire_view, from: [Open], to: Open}
+        - {name: retire_collection, from: [Open], to: Retired}
+
+  - name: connectors.discovery_state.ResourceObservation
+    identity:
+      name: observation_ref
+      type: String
+    fields:
+      # The owner's scope epoch qualifies identity; this field never changes.
+      - {name: collection_ref, type: String}
+      - {name: private_identity_ref, type: String}
+      - {name: private_target_ref, type: String}
+      - {name: observed_type, type: String}
+      - {name: partition_ref, type: String}
+      - {name: public_projection_ref, type: String}
+      - {name: last_seen_generation, type: Integer}
+      - {name: observed_at, type: Timestamp}
+      - {name: valid_until, type: Timestamp}
+      - {name: retire_at, type: Timestamp}
+    lifecycle:
+      initial: Observed
+      states: [Observed, Stale, Withdrawn, Retired]
+      terminal: [Retired]
+      transitions:
+        - {name: observe_equal, from: [Observed, Stale], to: Observed}
+        - {name: retain_stale, from: [Observed, Stale], to: Stale}
+        - {name: withdraw, from: [Observed, Stale], to: Withdrawn}
+        - {name: retire, from: [Observed, Stale, Withdrawn], to: Retired}
+    # Withdrawn has only an administrative retirement edge, never positive
+    # reuse. Retired is not added to the public ObservationState enum.
+
+errors:
+  - name: connectors.discovery_state.CollectionStateConflict
+    fields:
+      - {name: state, type: connectors.discovery_state.DiscoveryCollection.State}
+  - name: connectors.discovery_state.ObservationStateConflict
+    fields:
+      - {name: state, type: connectors.discovery_state.ResourceObservation.State}
+  - name: connectors.discovery_state.DecisionUnavailable
+    fields:
+      - {name: reason, type: connectors.discovery_state.DecisionRefusal}
+
+commands:
+  - name: connectors.discovery_state.AllocateCollection
+    input:
+      - {name: decision, type: connectors.discovery_state.OwnerDecision}
+      - {name: instance_id, type: String}
+      - {name: source_connection_ref, type: String}
+      - {name: operation_id, type: String}
+      - {name: definition, type: connectors.discovery_state.CollectionDefinition}
+    outcomes:
+      - name: allocated
+        when: decision == allow
+        creates: connectors.discovery_state.DiscoveryCollection
+        instance: collection_ref
+        emits: [connectors.discovery_state.CollectionAllocated]
+      - name: refused
+        error: connectors.discovery_state.DecisionUnavailable
+
+  - name: connectors.discovery_state.PublishView
+    input:
+      - {name: decision, type: connectors.discovery.PublicationDecision}
+      - {name: collection_ref, type: String}
+      - {name: attempt_ref, type: String}
+      - {name: expected_revision, type: String}
+      - {name: expected_generation, type: Integer}
+      - {name: facts, type: connectors.discovery.PublicationFacts}
+      - {name: candidate, type: connectors.discovery_state.CandidateView}
+    outcomes:
+      - name: published
+        when: decision == published
+        moves: connectors.discovery_state.DiscoveryCollection.publish
+        instance: collection_ref
+        emits: [connectors.discovery_state.ViewPublished]
+      - name: refused
+        error: connectors.discovery_state.DecisionUnavailable
+      - name: acknowledgement-unknown
+        when: decision == unknown
+        error: connectors.discovery_state.DecisionUnavailable
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.discovery_state.CollectionStateConflict
+    # Unknown acknowledgement is knowledge, not proof that no commit happened.
+    # Observe that same attempt; never rescan/republish to manufacture certainty.
+
+  - name: connectors.discovery_state.ObservePublication
+    input:
+      - {name: decision, type: connectors.discovery_state.OwnerDecision}
+      - {name: collection_ref, type: String}
+      - {name: attempt_ref, type: String}
+    outcomes:
+      - name: current-commit-observed
+        when: decision == allow
+        emits: [connectors.discovery_state.PublicationObserved]
+      - name: unavailable
+        error: connectors.discovery_state.DecisionUnavailable
+    # Read-only owner observation; no authoritative not-committed inference from
+    # absent/superseded/retired state and no new dispatch/publication authority.
+
+  - name: connectors.discovery_state.RetireView
+    input:
+      - {name: decision, type: connectors.discovery_state.OwnerDecision}
+      - {name: collection_ref, type: String}
+      - {name: expected_revision, type: String}
+    outcomes:
+      - name: retired
+        when: decision == allow
+        moves: connectors.discovery_state.DiscoveryCollection.retire_view
+        instance: collection_ref
+        emits: [connectors.discovery_state.ViewRetired]
+      - name: refused
+        error: connectors.discovery_state.DecisionUnavailable
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.discovery_state.CollectionStateConflict
+
+  - name: connectors.discovery_state.RetireCollection
+    input:
+      - {name: decision, type: connectors.discovery_state.OwnerDecision}
+      - {name: collection_ref, type: String}
+      - {name: expected_revision, type: String}
+    outcomes:
+      - name: retired
+        when: decision == allow
+        moves: connectors.discovery_state.DiscoveryCollection.retire_collection
+        instance: collection_ref
+        emits: [connectors.discovery_state.CollectionRetired]
+      - name: refused
+        error: connectors.discovery_state.DecisionUnavailable
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.discovery_state.CollectionStateConflict
+    # Retires the view and every owned row in the same host transaction.
+
+  # Row effects below occur only inside the enclosing successful publication or
+  # retirement transaction. These are not independently exposed write APIs.
+  - name: connectors.discovery_state.AllocateObservation
+    input:
+      - {name: decision, type: connectors.discovery_state.OwnerDecision}
+      - {name: collection_ref, type: String}
+      - {name: publication_attempt_ref, type: String}
+      - {name: private_identity_ref, type: String}
+      - {name: private_target_ref, type: String}
+      - {name: observed_type, type: String}
+      - {name: partition_ref, type: String}
+    outcomes:
+      - name: allocated
+        when: decision == allow
+        creates: connectors.discovery_state.ResourceObservation
+        instance: observation_ref
+        emits: [connectors.discovery_state.ObservationChanged]
+      - name: refused
+        error: connectors.discovery_state.DecisionUnavailable
+
+  - name: connectors.discovery_state.ObserveEqualIncarnation
+    input:
+      - {name: observation_ref, type: String}
+      - {name: publication_attempt_ref, type: String}
+    outcomes:
+      - name: observed
+        moves: connectors.discovery_state.ResourceObservation.observe_equal
+        instance: observation_ref
+        emits: [connectors.discovery_state.ObservationChanged]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.discovery_state.ObservationStateConflict
+
+  - name: connectors.discovery_state.RetainStaleObservation
+    input:
+      - {name: observation_ref, type: String}
+      - {name: publication_attempt_ref, type: String}
+    outcomes:
+      - name: stale
+        moves: connectors.discovery_state.ResourceObservation.retain_stale
+        instance: observation_ref
+        emits: [connectors.discovery_state.ObservationChanged]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.discovery_state.ObservationStateConflict
+
+  - name: connectors.discovery_state.WithdrawObservation
+    input:
+      - {name: observation_ref, type: String}
+      - {name: publication_attempt_ref, type: String}
+    outcomes:
+      - name: withdrawn
+        moves: connectors.discovery_state.ResourceObservation.withdraw
+        instance: observation_ref
+        emits: [connectors.discovery_state.ObservationChanged]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.discovery_state.ObservationStateConflict
+
+  - name: connectors.discovery_state.RetireObservation
+    input:
+      - {name: observation_ref, type: String}
+      - {name: owner_revision, type: String}
+    outcomes:
+      - name: retired
+        moves: connectors.discovery_state.ResourceObservation.retire
+        instance: observation_ref
+        emits: [connectors.discovery_state.ObservationChanged]
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.discovery_state.ObservationStateConflict
+
+events:
+  - name: connectors.discovery_state.CollectionAllocated
+    fields:
+      - {name: collection_ref, type: String}
+  - name: connectors.discovery_state.ViewPublished
+    fields:
+      - {name: collection_ref, type: String}
+      - {name: attempt_ref, type: String}
+      - {name: generation, type: Integer}
+  - name: connectors.discovery_state.PublicationObserved
+    fields:
+      - {name: collection_ref, type: String}
+      - {name: attempt_ref, type: String}
+      - {name: generation, type: Integer}
+  - name: connectors.discovery_state.ViewRetired
+    fields:
+      - {name: collection_ref, type: String}
+  - name: connectors.discovery_state.CollectionRetired
+    fields:
+      - {name: collection_ref, type: String}
+  - name: connectors.discovery_state.ObservationChanged
+    fields:
+      - {name: observation_ref, type: String}
+      - {name: state, type: connectors.discovery_state.ResourceObservation.State}
+
+# UNMAPPED implementation predicates: injective host-qualified identity/epoch
+# allocation; exact canonical scope, instance/operation/source compatibility;
+# trusted fact provenance and native exhaustion/fixed-target equality; no repeat
+# withdrawn incarnation; state-to-public-evidence projection; original clock and
+# generation bounds; row/index/snapshot equality and atomic field assignment;
+# CAS/current authority/credential/deadline fencing, unknown acknowledgement and
+# whole-owner crash recovery; bounded cleanup/capacity and publication visibility.
+# Command outcomes type causation, not automatic field updates, cross-record
+# transactions, reference resolution or executable evidence reducers.
+# OwnerDecision/PublicationDecision are trusted port observations selected only
+# after the owning prose predicates hold; these guards do not derive those facts.
+# The source Connection relation conveys no deletion ownership. Existing eleven
+# identities are unchanged.
