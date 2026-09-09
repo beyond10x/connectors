@@ -7,7 +7,7 @@ title: Finite ESS model closure for the selected three-adapter specifications
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:spec-completion-parallel-20260909
-revision: 5
+revision: 6
 ---
 # Finite ESS model closure, 2026-09-09
 
@@ -71,3 +71,11 @@ Discovery 84be6ef is integrated by 0a20e43. Corrected audit 28c4e666 is integrat
 Root's final joins explicitly reference retained Connection records from AttemptRecord and optionally AuditRecord, specify the audit key's byte order/canonical decoding, reconcile the twenty-entity inventory and stale model comments, and add historical-context notes without changing earlier execution claims. Coordinator scope therefore includes these small service/operations/audit joins, idempotency/session comments and historical auth/idempotency verification addenda. No worker writes these paths concurrently. Source audits show no runtime, adapter, strict-schema or Cargo changes in this model stage and zero tracked Python files.
 
 The actual shared root validates as 18 files / 314 declarations. Repeated canonical compilation is byte-identical. All eleven earlier entity identities/lifecycles/field types and original named types are preserved; new relations are additive. The shared ownership boundary and all five authored adapter roots validate and compile independently. Results are retained in docs/evidence/core-model-closure-20260909. The full gate and whole-stage final reviewer A/B approvals remain pending at this source freeze; the milestone is not complete merely because unit compiles pass.
+
+## Final reviewed specification closure
+
+Both independent reviewers approve exact 7e8c718303a43bc7ec4a02d6a76581d92802bf6b with no remaining findings. Review-result:core-model-a-final-20260909 explicitly closes MCA-01; review-result:core-model-b-final-20260909 independently approves the whole delta. Their immutable reports and initial A report are retained with fixed/no-op outcomes. The full gate passed on that exact source: 58 Rust tests, MSRV1.88, shared/native ownership and ESS checks, 315 synthesized structural scenarios including 34 authored, zero refusals. Two schema projections produced 336 byte-identical files; all 26 new links/five anchors resolve. Compiler/scenario synthesis is not persistent/provider execution.
+
+The selected specification hardening is complete. Final local release packaging adds only evidence/planning to the reviewed source and uses the already reviewed CHANGELOG.md. The clean local main commit is to receive annotated v0.1.0; root verifies exact peeled commit and bot tagger, publishes recovery only to the local bare repository, and completes own reviewer/integration cleanup. No further runtime work is part of this goal. The prior 48-finding/27-story closure is unchanged. Optional bindings and future runtime conformance cannot expand this finite milestone.
+
+docs/evidence/core-model-closure-20260909/checkpoint.md links source archive, validation, reviews and recovery. The three model authoring trees were finished and GC-removed only after local recovery proof; exact dry-run/apply outputs are retained. All raw scratch remains under /home/timo/.local/state/worktree/recovery/connectors_v2-model-closure-20260909/. Remaining final cleanup is operational verification after the release commit, not an unresolved semantic decision.

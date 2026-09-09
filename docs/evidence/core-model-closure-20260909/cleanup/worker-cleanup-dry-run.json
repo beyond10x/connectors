@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "ok": true,
+  "assessments": [
+    {
+      "record": {
+        "id": "specs-model-closure-20260909",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-model-closure-20260909",
+        "purpose": "Scope explicit persistent ESS gaps before implementation planning",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788910544,
+        "last_seen_at": 1788914424,
+        "finished_at": 1788914424,
+        "head": "95b1ebdd9b10355a944d5a681a83a9b3dc073e8a"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": null
+    },
+    {
+      "record": {
+        "id": "specs-model-audit-20260909",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-model-audit-20260909",
+        "purpose": "specs-model-audit-20260909 finite specification model closure",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788911481,
+        "last_seen_at": 1788914424,
+        "finished_at": 1788914424,
+        "head": "28c4e666cf651bb40831918d6bdbfe1e022260c5"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": null
+    },
+    {
+      "record": {
+        "id": "specs-model-discovery-20260909",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-model-discovery-20260909",
+        "purpose": "specs-model-discovery-20260909 finite specification model closure",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788911481,
+        "last_seen_at": 1788914424,
+        "finished_at": 1788914424,
+        "head": "84be6ef55fbcc37e5838660ec02336b8c45cc9b8"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": null
+    }
+  ]
+}

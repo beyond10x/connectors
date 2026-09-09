@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "ok": true,
+  "assessments": [
+    {
+      "record": {
+        "id": "specs-model-review-a-20260909",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-model-review-a-20260909",
+        "purpose": "Independent review of auth and artifact models, then combined model closure",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788912834,
+        "last_seen_at": 1788914961,
+        "finished_at": 1788914961,
+        "head": "7e8c718303a43bc7ec4a02d6a76581d92802bf6b"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": null
+    },
+    {
+      "record": {
+        "id": "specs-model-review-b-20260909",
+        "repository_root": "/home/timo/beyond10x/connectors_v2",
+        "path": "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-model-review-b-20260909",
+        "purpose": "Independent final model review B for local v0.1.0 specification baseline",
+        "owner": "agent",
+        "lifecycle": "finished",
+        "created_at": 1788914255,
+        "last_seen_at": 1788914961,
+        "finished_at": 1788914961,
+        "head": "7e8c718303a43bc7ec4a02d6a76581d92802bf6b"
+      },
+      "eligible": true,
+      "refusal": null,
+      "evidence": null
+    }
+  ]
+}
