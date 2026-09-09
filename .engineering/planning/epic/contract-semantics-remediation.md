@@ -2,14 +2,14 @@
 format: aep.planning-md/1
 id: epic:contract-semantics-remediation
 kind: epic
-status: active
+status: implemented
 title: Resolve the contract and adapter design review findings
 tags:
 - contract-review
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
-revision: 20
+revision: 22
 ---
 ## Context
 
@@ -154,3 +154,9 @@ The checkpoint completes contracts-restart-idempotency (F11/E08) and contracts-m
 Both final independent reviews approve, zero residuals; twelve individual findings have fixed outcomes. ESS 0.20.0 validates 13 files/215 declarations; two 222-artifact projections match. Forty-six shapes (9 negatives, 19 accepted semantic counterexamples), 48 textual cases, eight exact provider archives and the existing gate50/MSRV1.88 with separate sessions13/201 state precise verification limits. The narrow correction compiled byte-identical IR; no runtime, public codec or adapter-kind schema implementation was added. See docs/evidence/restart-visibility-20260908/verification.md, dispositions.md and checkpoint.md.
 
 Current ledger: **32/48 original findings fixed, 16 open; 20 owner stories implemented, 7 draft.** Remaining logs/document/read-retry/media/evidence/index/vocabulary work and broader catalog/stack/open-decision/model review keep the full goal active. Provider/policy/storage enforcement remains a later binding prerequisite; closing this packet is not approval of implementation or rollout. All work remains local.
+
+## Original review intake completed — 2026-09-09
+
+All 48 enumerated original source findings have reviewed fixed specification outcomes; all 27 original story owners are implemented. The final seven owners and extractable-adapter ownership correction are closed at local checkpoint 8a5cf563fc717fd4b23e4dd7d470d0c967f39461, with both independent final semantic approvals at exact source d1dc83f5d600816c699db07dd843f079ded0e72b. The [checkpoint](../../../docs/evidence/spec-completion-20260909/checkpoint.md) retains source bytes, reports, full repository/MSRV gate (58 tests), link audit and honest manual/ESS verification limits. A direct ledger audit found exactly 48 rows, 27 distinct owners and zero non-implemented owners.
+
+This epic's declared 48-item outcome is complete. The broader operator goal remains active under specification:core-model-closure-20260909 for the finite shared auth/audit and Kubernetes discovery ESS model closure. That separate modeling stage does not reopen original findings, authorize runtime implementation or silently select optional adapters. All historical reviews and earlier checkpoint evidence remain unchanged.
