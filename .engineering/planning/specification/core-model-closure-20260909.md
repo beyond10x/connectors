@@ -7,7 +7,7 @@ title: Finite ESS model closure for the selected three-adapter specifications
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:spec-completion-parallel-20260909
-revision: 3
+revision: 4
 ---
 # Finite ESS model closure, 2026-09-09
 
@@ -57,3 +57,9 @@ Auth reference agreement is retained from specs-model-closure-20260909/.local/sp
 Auth unit 6cee258b34ae0c9e0b0a5de5a5ed7fd04e336e4e is integrated by b5abe434fbb34dfd889303f19933a9bff9e2e23a with coordinator registration/reference joins and preserved artifact additions. Unit/coordinator leases on the auth tree are released; it is retained for evidence/recovery, not finished merely because committed. The actual combined root validates/compiles as 16 files and 263 declarations. No full gate or whole-stage approval is claimed yet.
 
 Independent reviewer A starts the frozen auth/artifact source at b5abe434 in managed tree specs-model-review-a-20260909 under the same external worktree root; target/ and .local/model-closure-20260909 remain tree-local. Its initial-brief.md fixes exact scope and read-only rules; session specs-model-review-a-20260909. The real discovery/route field, audit domain and final design inventory are acknowledged pending joins, not silently considered complete. A final exact commit will be supplied for remaining whole-stage coverage and any correction recheck; a second independent reviewer receives the combined source. Root remains sole planning writer.
+
+## Updated operator finish criteria
+
+The operator extended the active goal to: All specs reviewed and stabilized - no impl code written yet - a local clean commit + CHANGELOG.md file and v0.1.0 tagged.
+
+The final source must pass the combined gate and two independent reviews, contain CHANGELOG.md for the specification baseline, and be committed cleanly on local main with an annotated local v0.1.0 tag. No existing tag or changelog was found at this update. Tag only the final verified commit, after all known findings are resolved; preserve local recovery before managed cleanup. The existing first-slice runtime predates the hardening goal and is not erased or represented as newly implemented. No external publication, runtime work or Cargo version change is implied. Root owns changelog/tag/clean-main verification after review.
