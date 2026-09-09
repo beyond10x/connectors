@@ -75,6 +75,11 @@ entities:
         target: connectors.mutations.AttemptRecord
         cardinality: one
         via: attempt_id
+      - name: selected_connection
+        kind: references
+        target: connectors.auth_bindings.Connection
+        cardinality: one
+        via: connection_ref
     lifecycle:
       initial: Anchored
       states: [Anchored, FinalObserved]
@@ -165,7 +170,7 @@ views:
       - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
       - {name: final_observation, type: "Optional<connectors.execution_audit.FinalObservation>"}
 
-# ESS checks the declaration graph, known instance/attempt references and
+# ESS checks the declaration graph, known instance/attempt/connection references and
 # lifecycle causation. Optional-field co-presence, trusted fact derivation,
 # UUID/string/aggregate/count bounds, durable acknowledgements, atomic append,
 # injective `(instance_id,audit_ref)` qualification/resolution, same-id/content

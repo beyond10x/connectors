@@ -21,6 +21,14 @@ The acceptance statement is: every credential-replacement scenario uses evidence
 
 ## What compilation proves and does not prove
 
+Current model addendum (2026-09-09): the unit evidence below predates the selected
+auth graph. Connection and AuthProfile now exist in `ess/domains/auth_bindings.yaml`;
+CredentialGeneration references Connection, and Connection embeds one optional
+bounded baseline EvidenceSnapshot. Exact operation evidence remains transient.
+The original unit's relation caveat describes its historical source, not an
+unresolved selected ownership decision in the current model. Its runtime limits
+and recorded executions remain unchanged.
+
 The authored traces select trusted decision commands and expected outcomes. They are useful for type, event, view, enum and lifecycle consistency, including terminal refusal and one generation reference per admission. They do **not** cause file replacement, verify an external identity, compare nested evidence generations, invoke provider permission checks, calculate freshness or implement atomic publication. In particular, a well-typed trace selecting `AdmitGeneration` for mismatched observations is not rejected by this model's structural compiler. The host must enforce the documented predicate; claiming otherwise would convert an authored expectation into invented execution evidence.
 
 `UNMAPPED` obligations are: trustworthy identity and grant observations; exact request/permission target binding; immutable snapshot allocation/pinning (including process recovery, exec and coherent certificate/key capture); generation/binding/identity equality; check-source retention and timestamp freshness; final host policy; shared publication, refresh and revocation ordering; transport placement; and public projection redaction. Connection, AuthProfile, request and permission-target entity relations await their owner models rather than guessing ownership/cardinality. The shared generation relation is explicit and references exactly one immutable capture; capture's expected identity is not validated identity.

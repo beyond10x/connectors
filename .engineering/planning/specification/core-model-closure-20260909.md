@@ -7,7 +7,7 @@ title: Finite ESS model closure for the selected three-adapter specifications
 relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:spec-completion-parallel-20260909
-revision: 4
+revision: 5
 ---
 # Finite ESS model closure, 2026-09-09
 
@@ -63,3 +63,11 @@ Independent reviewer A starts the frozen auth/artifact source at b5abe434 in man
 The operator extended the active goal to: All specs reviewed and stabilized - no impl code written yet - a local clean commit + CHANGELOG.md file and v0.1.0 tagged.
 
 The final source must pass the combined gate and two independent reviews, contain CHANGELOG.md for the specification baseline, and be committed cleanly on local main with an annotated local v0.1.0 tag. No existing tag or changelog was found at this update. Tag only the final verified commit, after all known findings are resolved; preserve local recovery before managed cleanup. The existing first-slice runtime predates the hardening goal and is not erased or represented as newly implemented. No external publication, runtime work or Cargo version change is implied. Root owns changelog/tag/clean-main verification after review.
+
+## Combined source ready for final review
+
+Discovery 84be6ef is integrated by 0a20e43. Corrected audit 28c4e666 is integrated by adb15715; public host-qualified refs remain separate from injective private record keys. Initial reviewer A's immutable MCA-01 report is recorded as review-result:core-model-a-initial-20260909; correction 95b1ebdd is integrated by f2e4a429, preserving the child route carrier alongside one bounded baseline evidence snapshot. The outcome is recorded fixed, pending independent recheck.
+
+Root's final joins explicitly reference retained Connection records from AttemptRecord and optionally AuditRecord, specify the audit key's byte order/canonical decoding, reconcile the twenty-entity inventory and stale model comments, and add historical-context notes without changing earlier execution claims. Coordinator scope therefore includes these small service/operations/audit joins, idempotency/session comments and historical auth/idempotency verification addenda. No worker writes these paths concurrently. Source audits show no runtime, adapter, strict-schema or Cargo changes in this model stage and zero tracked Python files.
+
+The actual shared root validates as 18 files / 314 declarations. Repeated canonical compilation is byte-identical. All eleven earlier entity identities/lifecycles/field types and original named types are preserved; new relations are additive. The shared ownership boundary and all five authored adapter roots validate and compile independently. Results are retained in docs/evidence/core-model-closure-20260909. The full gate and whole-stage final reviewer A/B approvals remain pending at this source freeze; the milestone is not complete merely because unit compiles pass.
