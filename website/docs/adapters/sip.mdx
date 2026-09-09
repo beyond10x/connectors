@@ -1,0 +1,18 @@
+---
+title: SIP
+slug: /adapters/sip
+---
+
+import ReferenceCards from '@site/src/components/ReferenceCards';
+
+# SIP
+
+Protocol-specific dial behavior behind shared session and media contracts.
+
+The native dial profile separates the external effect of placing a call from its later session and media lifetime. Negotiation, cancellation and uncertain outcomes need explicit semantics.
+
+SIP protocol code should remain independent of other media adapter implementations. The dial contract is documented; the current three-adapter runtime scope does not include SIP.
+
+## Native contract reference
+
+<ReferenceCards owner="sip" />

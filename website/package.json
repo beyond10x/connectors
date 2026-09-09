@@ -1,0 +1,45 @@
+{
+  "name": "connectors-website",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "docusaurus start --host 127.0.0.1 --port 3100 --no-open",
+    "build": "DOCUSAURUS_GENERATED_FILES_DIR_NAME=.cache/build-docusaurus docusaurus build",
+    "serve": "docusaurus serve --host 127.0.0.1 --port 3100 --no-open",
+    "typecheck": "tsc --noEmit",
+    "reference": "cd .. && cargo run --locked -p connectors-build -- docs",
+    "reference:check": "cd .. && cargo run --locked -p connectors-build -- docs --check",
+    "prestart": "npm run reference && npm run examples && npm run search:refresh",
+    "prebuild": "npm run reference && npm run examples",
+    "examples": "cd .. && cargo run --locked -p connectors-build -- examples",
+    "test:examples": "cd .. && cargo test --locked --offline --manifest-path website/examples/realization/Cargo.toml --target-dir website/.cache/demo/target",
+    "test:browser": "node tests/smoke.mjs",
+    "audit:public": "cd .. && cargo run --locked -p connectors-build -- docs-audit",
+    "search:refresh": "DOCUSAURUS_GENERATED_FILES_DIR_NAME=.cache/search-docusaurus docusaurus build --out-dir .cache/search-build",
+    "test:ui": "node tests/overhaul.mjs"
+  },
+  "dependencies": {
+    "@beyond10x/docs-system": "git+https://github.com/beyond10x/docs-system.git#1ef1890272ce308eb6fec5446091f93afd14046f",
+    "@docusaurus/core": "3.10.2",
+    "@docusaurus/preset-classic": "3.10.2",
+    "@docusaurus/theme-mermaid": "3.10.2",
+    "@mdx-js/react": "3.1.1",
+    "@mermaid-js/layout-elk": "0.1.9",
+    "clsx": "2.1.1",
+    "prism-react-renderer": "2.4.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.10.2",
+    "@docusaurus/tsconfig": "3.10.2",
+    "@docusaurus/types": "3.10.2",
+    "@types/react": "19.2.14",
+    "pagefind": "1.5.2",
+    "playwright": "1.62.1",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

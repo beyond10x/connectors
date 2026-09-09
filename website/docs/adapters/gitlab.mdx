@@ -1,0 +1,30 @@
+---
+title: GitLab
+slug: /adapters/gitlab
+---
+
+import ReferenceCards from '@site/src/components/ReferenceCards';
+
+# GitLab
+
+Repository data through bounded reads.
+
+[Follow a request from your laptop to GitLab](/introduction/examples) to see federation, the separate authentication boundaries and the issue response.
+
+## Current capabilities
+
+Use `project.get` to inspect an allowed project, `issues.list` for a bounded issue page, and `file.get` for repository content.
+
+## Access and limits
+
+Configure the GitLab endpoint and an explicit project allowlist. Public reads can use no provider credential; private reads use a separately bound token. Caller authentication to the adapter service is a different boundary.
+
+File content follows its declared representation and byte limits. Read the native contract for pagination, provenance and refusal behavior.
+
+## Run the first slice
+
+Build the workspace from source, choose this adapter’s example configuration and bind private credentials separately from operation input. The [getting-started guide](/introduction/getting-started) explains the common service workflow.
+
+## Native contract reference
+
+<ReferenceCards owner="gitlab" />

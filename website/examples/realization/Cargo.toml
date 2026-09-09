@@ -1,0 +1,28 @@
+[package]
+name = "connectors-contract-examples"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+connectors-types = { path = "../../.cache/demo/generated/rust/connectors/crates/connectors-types" }
+contract-examples = { path = "../../.cache/demo/generated/rust/connectors/crates/contract-examples" }
+connectors-system = { path = "../../.cache/demo/generated/rust/connectors/crates/connectors-system" }
+connectors-web = { path = "../../.cache/demo/generated/web/connectors/crates/connectors-web", optional = true }
+serde_json = "1"
+
+[features]
+browser = ["dep:connectors-web"]
+
+[profile.release]
+opt-level = "s"
+strip = true
+lto = true
+codegen-units = 1
