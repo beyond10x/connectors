@@ -1,6 +1,13 @@
 {
   "pages": [
     {
+      "route": "/contracts/cli",
+      "title": "Local CLI",
+      "source": "contracts/cli/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Specified; parser fixtures; runtime pending"
+    },
+    {
       "route": "/contracts/service",
       "title": "Service: describe and invoke",
       "source": "contracts/service/v1alpha1/semantics.md",

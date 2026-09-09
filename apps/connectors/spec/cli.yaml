@@ -1,0 +1,233 @@
+# Authored presentation over the shared CLI value model.
+# Generated package is a contract fixture; production handlers remain separate.
+format: ess-cli/1
+binary: connectors
+about: Local integration access through explicitly configured adapters
+globals: {config: config, state: state-dir, output: output}
+callables:
+  setup-init:
+    target: {kind: local, owner: connectors.cli, action: setup-init}
+    input: null
+    result: connectors.cli.SetupInitResult
+    errors: {failure: connectors.cli.Failure}
+  setup-check:
+    target: {kind: local, owner: connectors.cli, action: setup-check}
+    input: null
+    result: connectors.cli.SetupCheckResult
+    errors: {failure: connectors.cli.Failure}
+  adapters-list:
+    target: {kind: local, owner: connectors.cli, action: adapters-list}
+    input: connectors.cli.AdapterListInput
+    result: connectors.cli.AdapterListResult
+    errors: {failure: connectors.cli.Failure}
+  adapters-describe:
+    target: {kind: local, owner: connectors.cli, action: adapters-describe}
+    input: connectors.cli.AdapterDescribeInput
+    result: connectors.cli.AdapterDescribeResult
+    errors: {failure: connectors.cli.Failure}
+  adapters-status:
+    target: {kind: local, owner: connectors.cli, action: adapters-status}
+    input: connectors.cli.AdapterStatusInput
+    result: connectors.cli.AdapterStatusResult
+    errors: {failure: connectors.cli.Failure}
+  adapters-stop:
+    target: {kind: local, owner: connectors.cli, action: adapters-stop}
+    input: connectors.cli.AdapterStopInput
+    result: connectors.cli.AdapterStopResult
+    errors: {failure: connectors.cli.Failure}
+  connections-list:
+    target: {kind: local, owner: connectors.cli, action: connections-list}
+    input: connectors.cli.ConnectionListInput
+    result: connectors.cli.ConnectionListResult
+    errors: {failure: connectors.cli.Failure}
+  connections-describe:
+    target: {kind: local, owner: connectors.cli, action: connections-describe}
+    input: connectors.cli.ConnectionDescribeInput
+    result: connectors.cli.ConnectionDescribeResult
+    errors: {failure: connectors.cli.Failure}
+  connections-connect:
+    target: {kind: local, owner: connectors.cli, action: connections-connect}
+    input: connectors.cli.ConnectionConnectInput
+    result: connectors.cli.ConnectionConnectResult
+    errors: {failure: connectors.cli.Failure}
+  connections-repair:
+    target: {kind: local, owner: connectors.cli, action: connections-repair}
+    input: connectors.cli.ConnectionRepairInput
+    result: connectors.cli.ConnectionRepairResult
+    errors: {failure: connectors.cli.Failure}
+  connections-status:
+    target: {kind: local, owner: connectors.cli, action: connections-status}
+    input: connectors.cli.ConnectionStatusInput
+    result: connectors.cli.ConnectionStatusResult
+    errors: {failure: connectors.cli.Failure}
+  connections-revoke:
+    target: {kind: local, owner: connectors.cli, action: connections-revoke}
+    input: connectors.cli.ConnectionRevokeInput
+    result: connectors.cli.ConnectionRevokeResult
+    errors: {failure: connectors.cli.Failure}
+  operations-list:
+    target: {kind: local, owner: connectors.cli, action: operations-list}
+    input: connectors.cli.OperationListInput
+    result: connectors.cli.OperationListResult
+    errors: {failure: connectors.cli.Failure}
+  operations-describe:
+    target: {kind: local, owner: connectors.cli, action: operations-describe}
+    input: connectors.cli.OperationDescribeInput
+    result: connectors.cli.OperationDescribeResult
+    errors: {failure: connectors.cli.Failure}
+  operations-invoke:
+    target: {kind: dynamic, owner: connectors.cli, operation_field: operation, schema_field: schema, payload_field: input}
+    input: connectors.cli.OperationInvokeInput
+    result: connectors.cli.OperationInvokeResult
+    errors: {failure: connectors.cli.Failure}
+commands:
+  - path: [setup, init]
+    aliases: []
+    callable: setup-init
+    about: Create private local configuration without starting services
+    arguments: []
+  - path: [setup, check]
+    aliases: []
+    callable: setup-check
+    about: Check local configuration and prerequisites without authentication
+    arguments: []
+  - path: [adapters, list]
+    aliases: []
+    callable: adapters-list
+    about: List configured adapter entries
+    arguments:
+      - field: limit
+        source: {kind: option, long: limit}
+      - field: cursor
+        source: {kind: option, long: cursor}
+  - path: [adapters, describe]
+    aliases: []
+    callable: adapters-describe
+    about: Inspect one configured adapter and cached descriptor
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+  - path: [adapters, status]
+    aliases: []
+    callable: adapters-status
+    about: Observe the existing adapter lifecycle owner
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+  - path: [adapters, stop]
+    aliases: []
+    callable: adapters-stop
+    about: Stop only the exact owned adapter incarnation
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+      - field: host_incarnation
+        source: {kind: option, long: host-incarnation}
+      - field: child_incarnation
+        source: {kind: option, long: child-incarnation}
+  - path: [connections, list]
+    aliases: []
+    callable: connections-list
+    about: List safe connection metadata
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: limit
+        source: {kind: option, long: limit}
+      - field: cursor
+        source: {kind: option, long: cursor}
+  - path: [connections, describe]
+    aliases: []
+    callable: connections-describe
+    about: Inspect safe metadata for one connection
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+  - path: [connections, connect]
+    aliases: []
+    callable: connections-connect
+    about: Begin admitted local protected credential acquisition
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: profile
+        source: {kind: option, long: profile}
+      - field: credential_document
+        source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
+  - path: [connections, repair]
+    aliases: []
+    callable: connections-repair
+    about: Repair the exact connection without changing its identity
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+      - field: credential_document
+        source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
+  - path: [connections, status]
+    aliases: []
+    callable: connections-status
+    about: Observe exactly one connection or acquisition
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: acquisition
+        source: {kind: option, long: acquisition}
+  - path: [connections, revoke]
+    aliases: []
+    callable: connections-revoke
+    about: Commit terminal local revocation under the current fence
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+  - path: [operations, list]
+    aliases: []
+    callable: operations-list
+    about: List operations from selected cached metadata
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: limit
+        source: {kind: option, long: limit}
+      - field: cursor
+        source: {kind: option, long: cursor}
+  - path: [operations, describe]
+    aliases: []
+    callable: operations-describe
+    about: Inspect an operation and its exact schema identity
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: operation
+        source: {kind: option, long: operation}
+  - path: [operations, invoke]
+    aliases: []
+    callable: operations-invoke
+    about: Invoke once under selected schema, revision and current admission
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: operation
+        source: {kind: option, long: operation}
+      - field: schema
+        source: {kind: option, long: schema}
+      - field: revision
+        source: {kind: option, long: revision}
+      - field: input
+        source: {kind: document, inline: input-json, file: input-file, stdin: input-stdin}
+

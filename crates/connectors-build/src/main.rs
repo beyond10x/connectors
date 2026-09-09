@@ -9,6 +9,7 @@ use std::{
     process::{Command, Output},
 };
 
+mod cli;
 mod docs;
 mod ess_boundary;
 mod gate;
@@ -29,6 +30,17 @@ struct Args {
 #[derive(Subcommand)]
 enum Action {
     Check,
+    /// Generate or compare the selected local CLI contract fixture.
+    Cli {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Build the exact pinned ESS commit into the local toolchain cache.
+    Toolchain {
+        /// Clean local ESS checkout at the pinned source commit.
+        #[arg(long)]
+        source: PathBuf,
+    },
     /// Generate and build the bounded Rust/WASM contract examples.
     Examples,
     /// Check generated public files for local/private source paths.
@@ -81,10 +93,18 @@ fn save_json(path: &Path, value: &Value) -> Result<()> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let root = args.root.canonicalize()?;
+    if let Action::Toolchain { source } = &args.command {
+        let executable = connectors_spec::toolchain::build_from_source(source)?;
+        println!("{}", executable.display());
+        return Ok(());
+    }
     if let Action::DocsAudit { directory } = args.command {
         return docs::audit(&directory.unwrap_or_else(|| root.join("website/build")));
     }
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
+    if let Action::Cli { check } = args.command {
+        return cli::run(&root, &ess, check);
+    }
     if let Action::Examples = args.command {
         check_ess(&ess)?;
         return docs::examples(&root, &ess);
@@ -284,7 +304,7 @@ fn main() -> Result<()> {
         let git = run(Command::new("git")
             .current_dir(&root)
             .args(["rev-parse", "HEAD"]))?;
-        let evidence = json!({"format":"connectors.local-build/v1","image":image,"image_id":image_id,"binary_sha256":hash(&std::fs::read(&binary)?),"source_head":String::from_utf8(git.stdout)?.trim(),"source_manifest_sha256":hash(&std::fs::read(output.join("source.sha256.json"))?),"rootfs_manifest_sha256":hash(&std::fs::read(output.join("rootfs.sha256.json"))?),"generation_manifest_sha256":hash(&std::fs::read(generated.join("manifest.json"))?),"rustc":String::from_utf8(rustc.stdout)?.trim(),"ess":connectors_spec::toolchain::pin()?.ess,"profile":"dev","platform":json!({"os":declaration.platform.os,"architecture":declaration.platform.architecture}),"validation":["generation drift check","ESS declarations","ESS build compile","ESS BuildKit projection","Docker build","ESS realization validate and compile"],"publication":"local only","runtime_acceptance":"separate conformance evidence required"});
+        let evidence = json!({"format":"connectors.local-build/v1","image":image,"image_id":image_id,"binary_sha256":hash(&std::fs::read(&binary)?),"source_head":String::from_utf8(git.stdout)?.trim(),"source_manifest_sha256":hash(&std::fs::read(output.join("source.sha256.json"))?),"rootfs_manifest_sha256":hash(&std::fs::read(output.join("rootfs.sha256.json"))?),"generation_manifest_sha256":hash(&std::fs::read(generated.join("manifest.json"))?),"rustc":String::from_utf8(rustc.stdout)?.trim(),"ess":connectors_spec::toolchain::pin()?.ess,"ess_source":connectors_spec::toolchain::source()?,"profile":"dev","platform":json!({"os":declaration.platform.os,"architecture":declaration.platform.architecture}),"validation":["generation drift check","ESS declarations","ESS build compile","ESS BuildKit projection","Docker build","ESS realization validate and compile"],"publication":"local only","runtime_acceptance":"separate conformance evidence required"});
         save_json(&output.join("build-evidence.json"), &evidence)?;
         println!("{}", serde_json::to_string_pretty(&evidence)?);
     } else {
