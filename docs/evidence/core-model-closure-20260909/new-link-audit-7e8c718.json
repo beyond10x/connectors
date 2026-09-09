@@ -1,0 +1,219 @@
+{
+  "baseline": "8a5cf563fc717fd4b23e4dd7d470d0c967f39461",
+  "source": "7e8c718303a43bc7ec4a02d6a76581d92802bf6b",
+  "scope": "Markdown links on added normative/design/changelog lines since baseline; unchanged links retain prior 702-link checkpoint audit",
+  "links": 26,
+  "missing": [],
+  "anchors_checked": 5,
+  "bad_anchors": [],
+  "details": [
+    {
+      "file": "contracts/README.md",
+      "line": 8,
+      "destination": "../docs/design.md#312-revisions-retention-and-modeled-scope",
+      "target": "docs/design.md",
+      "anchor": "312-revisions-retention-and-modeled-scope",
+      "exists": true
+    },
+    {
+      "file": "contracts/README.md",
+      "line": 10,
+      "destination": "service/audit.md",
+      "target": "contracts/service/audit.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/README.md",
+      "line": 12,
+      "destination": "../CHANGELOG.md",
+      "target": "CHANGELOG.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "line": 178,
+      "destination": "../../../../ess/domains/auth_bindings.yaml",
+      "target": "ess/domains/auth_bindings.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/acquisition/v1alpha1/semantics.md",
+      "line": 179,
+      "destination": "../../../../docs/evidence/model-auth-closure-20260909/verification.md",
+      "target": "docs/evidence/model-auth-closure-20260909/verification.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/connection/v1alpha1/semantics.md",
+      "line": 165,
+      "destination": "../../evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08",
+      "target": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "anchor": "44-exact-authorization-targets-and-fan-out-budget-f08",
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/connection/v1alpha1/semantics.md",
+      "line": 170,
+      "destination": "../../evidence/v1alpha1/semantics.md#43-which-evidence-can-cross-a-generation-change",
+      "target": "contracts/auth/evidence/v1alpha1/semantics.md",
+      "anchor": "43-which-evidence-can-cross-a-generation-change",
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/connection/v1alpha1/semantics.md",
+      "line": 209,
+      "destination": "../../../../ess/domains/auth_bindings.yaml",
+      "target": "ess/domains/auth_bindings.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/connection/v1alpha1/semantics.md",
+      "line": 261,
+      "destination": "../../../../ess/domains/credential_evidence.yaml",
+      "target": "ess/domains/credential_evidence.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/custody/v1alpha1/semantics.md",
+      "line": 104,
+      "destination": "../../../../ess/domains/auth_bindings.yaml",
+      "target": "ess/domains/auth_bindings.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/profile/v1alpha1/semantics.md",
+      "line": 143,
+      "destination": "../../../../ess/domains/auth_bindings.yaml",
+      "target": "ess/domains/auth_bindings.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/auth/profile/v1alpha1/semantics.md",
+      "line": 182,
+      "destination": "../../../../ess/domains/connection_admission.yaml",
+      "target": "ess/domains/connection_admission.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/catalog/v1alpha1/semantics.md",
+      "line": 194,
+      "destination": "../../../ess/domains/artifact_provenance.yaml",
+      "target": "ess/domains/artifact_provenance.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/discovery/composition.md",
+      "line": 59,
+      "destination": "../../ess/domains/discovery.yaml",
+      "target": "ess/domains/discovery.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/discovery/resources/v1alpha1/semantics.md",
+      "line": 294,
+      "destination": "../../../../ess/domains/discovery_state.yaml",
+      "target": "ess/domains/discovery_state.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/operations/v1alpha1/idempotency-verification.md",
+      "line": 10,
+      "destination": "../../service/delegation.md",
+      "target": "contracts/service/delegation.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/operations/v1alpha1/semantics.md",
+      "line": 187,
+      "destination": "../../service/audit.md",
+      "target": "contracts/service/audit.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/operations/v1alpha1/semantics.md",
+      "line": 249,
+      "destination": "../../../ess/domains/mutations.yaml",
+      "target": "ess/domains/mutations.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/operations/v1alpha1/semantics.md",
+      "line": 258,
+      "destination": "../../../ess/domains/auth_bindings.yaml",
+      "target": "ess/domains/auth_bindings.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/service/audit.md",
+      "line": 8,
+      "destination": "compatibility.md#5-extended-responses-audit-and-mutation-observation",
+      "target": "contracts/service/compatibility.md",
+      "anchor": "5-extended-responses-audit-and-mutation-observation",
+      "exists": true
+    },
+    {
+      "file": "contracts/service/audit.md",
+      "line": 10,
+      "destination": "../operations/v1alpha1/semantics.md",
+      "target": "contracts/operations/v1alpha1/semantics.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/service/compatibility.md",
+      "line": 78,
+      "destination": "audit.md",
+      "target": "contracts/service/audit.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/service/delegation.md",
+      "line": 161,
+      "destination": "audit.md",
+      "target": "contracts/service/audit.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/service/v1alpha2/semantics.md",
+      "line": 183,
+      "destination": "../audit.md",
+      "target": "contracts/service/audit.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "contracts/service/v1alpha2/semantics.md",
+      "line": 183,
+      "destination": "../../../ess/domains/execution_audit.yaml",
+      "target": "ess/domains/execution_audit.yaml",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "file": "docs/design.md",
+      "line": 1356,
+      "destination": "../contracts/catalog/v1alpha1/semantics.md#9-ess-declarations-and-optional-catalog-state",
+      "target": "contracts/catalog/v1alpha1/semantics.md",
+      "anchor": "9-ess-declarations-and-optional-catalog-state",
+      "exists": true
+    }
+  ]
+}
