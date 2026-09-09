@@ -1,0 +1,942 @@
+{
+  "format": "connectors-cli-values/1",
+  "cases": [
+    {
+      "id": "valid-SetupInitResult-1",
+      "type": "connectors.cli.SetupInitResult",
+      "valid": true,
+      "value": {
+        "disposition": "created",
+        "config_path": "/home/fixture/.config/connectors/config.toml",
+        "state_path": "/home/fixture/.local/state/connectors",
+        "os": "linux"
+      }
+    },
+    {
+      "id": "valid-SetupCheckResult-2",
+      "type": "connectors.cli.SetupCheckResult",
+      "valid": true,
+      "value": {
+        "config_path": "/home/fixture/.config/connectors/config.toml",
+        "state_path": "/home/fixture/.local/state/connectors",
+        "os": "linux",
+        "keyring": "locked",
+        "prerequisites": [
+          {
+            "name": "os-keyring",
+            "state": "failed",
+            "next_action": "unlock_keyring"
+          }
+        ]
+      }
+    },
+    {
+      "id": "valid-AdapterListInput-3",
+      "type": "connectors.cli.AdapterListInput",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "id": "valid-AdapterListResult-4",
+      "type": "connectors.cli.AdapterListResult",
+      "valid": true,
+      "value": {
+        "adapters": [
+          {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "adapter_id": "fixture-forge",
+            "startup": "on-demand",
+            "restart": "never"
+          }
+        ],
+        "source": "configuration"
+      }
+    },
+    {
+      "id": "valid-AdapterDescribeInput-5",
+      "type": "connectors.cli.AdapterDescribeInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge"
+      }
+    },
+    {
+      "id": "valid-AdapterDescribeResult-6",
+      "type": "connectors.cli.AdapterDescribeResult",
+      "valid": true,
+      "value": {
+        "configuration": {
+          "summary": {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "adapter_id": "fixture-forge",
+            "startup": "on-demand",
+            "restart": "never"
+          },
+          "configuration_revision": "cfg-1",
+          "protocol": "v1alpha1",
+          "executable": {
+            "path": "/opt/connectors/fixture-forge",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "args": []
+          }
+        },
+        "descriptor": {
+          "version": "v1alpha1",
+          "instance": "forge-local",
+          "adapter": "fixture-forge",
+          "revision": "descriptor-r1",
+          "operations": [
+            {
+              "id": "project.get",
+              "description": "Read an admitted project",
+              "contract": "operations/v1alpha1",
+              "profile": "read",
+              "input_schema": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
+              "output_schema": "{\"type\":\"object\"}"
+            }
+          ],
+          "configuration_schema": "{\"type\":\"object\"}"
+        },
+        "source": "cached",
+        "stale": true
+      }
+    },
+    {
+      "id": "valid-AdapterStatusInput-7",
+      "type": "connectors.cli.AdapterStatusInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge"
+      }
+    },
+    {
+      "id": "valid-AdapterStatusResult-8",
+      "type": "connectors.cli.AdapterStatusResult",
+      "valid": true,
+      "value": {
+        "observation": {
+          "adapter": "forge",
+          "configuration_revision": "cfg-1",
+          "state": "ready",
+          "host_incarnation": "host-1",
+          "child_incarnation": "child-1",
+          "observed_at_ms": 1788951600000
+        }
+      }
+    },
+    {
+      "id": "valid-AdapterStopInput-9",
+      "type": "connectors.cli.AdapterStopInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "expected_revision": "cfg-1",
+        "host_incarnation": "host-1",
+        "child_incarnation": "child-1"
+      }
+    },
+    {
+      "id": "valid-AdapterStopResult-10",
+      "type": "connectors.cli.AdapterStopResult",
+      "valid": true,
+      "value": {
+        "observation": {
+          "adapter": "forge",
+          "configuration_revision": "cfg-1",
+          "state": "stopped",
+          "host_incarnation": "host-1",
+          "child_incarnation": "child-1",
+          "observed_at_ms": 1788951600000
+        }
+      }
+    },
+    {
+      "id": "valid-ConnectionListInput-11",
+      "type": "connectors.cli.ConnectionListInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge"
+      }
+    },
+    {
+      "id": "valid-ConnectionListResult-12",
+      "type": "connectors.cli.ConnectionListResult",
+      "valid": true,
+      "value": {
+        "connections": [
+          {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          }
+        ],
+        "observed_at_ms": 1788951600000,
+        "source": "authority",
+        "stale": false,
+        "valid_until_ms": 1788951630000
+      }
+    },
+    {
+      "id": "valid-ConnectionDescribeInput-13",
+      "type": "connectors.cli.ConnectionDescribeInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1"
+      }
+    },
+    {
+      "id": "valid-ConnectionDescribeResult-14",
+      "type": "connectors.cli.ConnectionDescribeResult",
+      "valid": true,
+      "value": {
+        "connection": {
+          "summary": {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          },
+          "external_identity": {
+            "kind": "user",
+            "subject": "fixture-user"
+          },
+          "observed_at_ms": 1788951600000,
+          "valid_until_ms": 1788951630000,
+          "source": "authority",
+          "stale": false
+        }
+      }
+    },
+    {
+      "id": "valid-ConnectionConnectInput-15",
+      "type": "connectors.cli.ConnectionConnectInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "profile": "token",
+        "credential_document": "{\"token\":\"FICTIONAL-SECRET-SENTINEL\"}"
+      }
+    },
+    {
+      "id": "valid-ConnectionConnectResult-16",
+      "type": "connectors.cli.ConnectionConnectResult",
+      "valid": true,
+      "value": {
+        "connection": {
+          "summary": {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          },
+          "external_identity": {
+            "kind": "user",
+            "subject": "fixture-user"
+          },
+          "observed_at_ms": 1788951600000,
+          "valid_until_ms": 1788951630000,
+          "source": "authority",
+          "stale": false
+        },
+        "acquisition": "forge-local/acquisition-1"
+      }
+    },
+    {
+      "id": "valid-ConnectionRepairInput-17",
+      "type": "connectors.cli.ConnectionRepairInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "expected_revision": "connection-r1",
+        "credential_document": "{\"token\":\"FICTIONAL-REPAIR-SENTINEL\"}"
+      }
+    },
+    {
+      "id": "valid-ConnectionRepairResult-18",
+      "type": "connectors.cli.ConnectionRepairResult",
+      "valid": true,
+      "value": {
+        "connection": {
+          "summary": {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          },
+          "external_identity": {
+            "kind": "user",
+            "subject": "fixture-user"
+          },
+          "observed_at_ms": 1788951600000,
+          "valid_until_ms": 1788951630000,
+          "source": "authority",
+          "stale": false
+        }
+      }
+    },
+    {
+      "id": "valid-ConnectionStatusInput-19",
+      "type": "connectors.cli.ConnectionStatusInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1"
+      }
+    },
+    {
+      "id": "valid-ConnectionStatusResult-20",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": true,
+      "value": {
+        "connection": {
+          "summary": {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          },
+          "external_identity": {
+            "kind": "user",
+            "subject": "fixture-user"
+          },
+          "observed_at_ms": 1788951600000,
+          "valid_until_ms": 1788951630000,
+          "source": "authority",
+          "stale": false
+        }
+      }
+    },
+    {
+      "id": "valid-ConnectionRevokeInput-21",
+      "type": "connectors.cli.ConnectionRevokeInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "expected_revision": "connection-r1"
+      }
+    },
+    {
+      "id": "valid-ConnectionRevokeResult-22",
+      "type": "connectors.cli.ConnectionRevokeResult",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "revision": "connection-r2",
+        "local_state": "revoked",
+        "provider_outcome": "not_requested"
+      }
+    },
+    {
+      "id": "valid-OperationListInput-23",
+      "type": "connectors.cli.OperationListInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "limit": 100
+      }
+    },
+    {
+      "id": "valid-OperationListResult-24",
+      "type": "connectors.cli.OperationListResult",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "revision": "descriptor-r1",
+        "operations": [
+          {
+            "id": "project.get",
+            "description": "Read an admitted project",
+            "contract": "operations/v1alpha1",
+            "profile": "read"
+          }
+        ],
+        "source": "cached",
+        "stale": true
+      }
+    },
+    {
+      "id": "valid-OperationDescribeInput-25",
+      "type": "connectors.cli.OperationDescribeInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "operation": "project.get"
+      }
+    },
+    {
+      "id": "valid-OperationDescribeResult-26",
+      "type": "connectors.cli.OperationDescribeResult",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "revision": "descriptor-r1",
+        "schema": "forge-local/project.get/input/descriptor-r1",
+        "operation": {
+          "id": "project.get",
+          "description": "Read an admitted project",
+          "contract": "operations/v1alpha1",
+          "profile": "read",
+          "input_schema": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
+          "output_schema": "{\"type\":\"object\"}"
+        },
+        "source": "cached",
+        "stale": true
+      }
+    },
+    {
+      "id": "valid-OperationInvokeInput-27",
+      "type": "connectors.cli.OperationInvokeInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "operation": "project.get",
+        "schema": "forge-local/project.get/input/descriptor-r1",
+        "revision": "descriptor-r1",
+        "input": "{\"id\":7}"
+      }
+    },
+    {
+      "id": "valid-OperationInvokeResult-28",
+      "type": "connectors.cli.OperationInvokeResult",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "operation": "project.get",
+        "revision": "descriptor-r1",
+        "result": "{\"id\":7,\"name\":\"fixture\"}"
+      }
+    },
+    {
+      "id": "valid-LegacyDescribeInput-29",
+      "type": "connectors.cli.LegacyDescribeInput",
+      "valid": true,
+      "value": {
+        "endpoint": "https://fixture.invalid",
+        "token_file": "/run/private/service-token.json",
+        "allow_plaintext": false
+      }
+    },
+    {
+      "id": "valid-LegacyDescribeResult-30",
+      "type": "connectors.cli.LegacyDescribeResult",
+      "valid": true,
+      "value": {
+        "descriptor": {
+          "version": "v1alpha1",
+          "instance": "forge-local",
+          "adapter": "fixture-forge",
+          "revision": "descriptor-r1",
+          "operations": [
+            {
+              "id": "project.get",
+              "description": "Read an admitted project",
+              "contract": "operations/v1alpha1",
+              "profile": "read",
+              "input_schema": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
+              "output_schema": "{\"type\":\"object\"}"
+            }
+          ],
+          "configuration_schema": "{\"type\":\"object\"}"
+        }
+      }
+    },
+    {
+      "id": "valid-LegacyInvokeInput-31",
+      "type": "connectors.cli.LegacyInvokeInput",
+      "valid": true,
+      "value": {
+        "endpoint": "https://fixture.invalid",
+        "token_file": "/run/private/service-token.json",
+        "operation": "project.get",
+        "input": "/home/fixture/business.json"
+      }
+    },
+    {
+      "id": "valid-LegacyInvokeResult-32",
+      "type": "connectors.cli.LegacyInvokeResult",
+      "valid": true,
+      "value": {
+        "result": "{\"id\":7}"
+      }
+    },
+    {
+      "id": "valid-ConnectionCreateRequest-33",
+      "type": "connectors.cli.ConnectionCreateRequest",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "profile": "token"
+      }
+    },
+    {
+      "id": "valid-ConnectionRepairRequest-34",
+      "type": "connectors.cli.ConnectionRepairRequest",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "expected_revision": "connection-r1"
+      }
+    },
+    {
+      "id": "valid-Failure-35",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "custody_unavailable",
+        "stage": "custody",
+        "next_action": "unlock_keyring"
+      }
+    },
+    {
+      "id": "valid-ConnectionStatusInput-36",
+      "type": "connectors.cli.ConnectionStatusInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "acquisition": "forge-local/acquisition-1"
+      }
+    },
+    {
+      "id": "valid-ConnectionStatusResult-37",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": true,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "completed",
+          "connection": "forge-local/connection-1",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951600000,
+          "next_action": "none"
+        }
+      }
+    },
+    {
+      "id": "valid-AdapterObservation-38",
+      "type": "connectors.cli.AdapterObservation",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "configuration_revision": "cfg-1",
+        "state": "failed",
+        "host_incarnation": "host-1",
+        "child_incarnation": "child-1",
+        "observed_at_ms": 1788951600000,
+        "failure": {
+          "kind": "operational",
+          "code": "readiness_mismatch",
+          "stage": "readiness",
+          "next_action": "check_configuration"
+        }
+      }
+    },
+    {
+      "id": "C03-no-secret-in-management-request",
+      "type": "connectors.cli.ConnectionCreateRequest",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "profile": "token",
+        "credential_document": "FICTIONAL-SECRET-SENTINEL"
+      }
+    },
+    {
+      "id": "C03-no-custody-reference-in-result",
+      "type": "connectors.cli.ConnectionConnectResult",
+      "valid": false,
+      "value": {
+        "connection": {
+          "summary": {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          },
+          "external_identity": {
+            "kind": "user",
+            "subject": "fixture-user"
+          },
+          "observed_at_ms": 1788951600000,
+          "valid_until_ms": 1788951630000,
+          "source": "authority",
+          "stale": false
+        },
+        "custody_version_ref": "private-version"
+      }
+    },
+    {
+      "id": "C03-no-secret-in-failure",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "operational",
+        "code": "custody_unavailable",
+        "stage": "custody",
+        "next_action": "unlock_keyring",
+        "secret": "FICTIONAL-SECRET-SENTINEL"
+      }
+    },
+    {
+      "id": "stop-requires-exact-child-incarnation",
+      "type": "connectors.cli.AdapterStopInput",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "expected_revision": "cfg-1",
+        "host_incarnation": "host-1"
+      }
+    },
+    {
+      "id": "stop-rejects-caller-pid",
+      "type": "connectors.cli.AdapterStopInput",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "expected_revision": "cfg-1",
+        "host_incarnation": "host-1",
+        "child_incarnation": "child-1",
+        "pid": 4321
+      }
+    },
+    {
+      "id": "startup-rejects-unknown-mode",
+      "type": "connectors.cli.AdapterSummary",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "instance_id": "forge-local",
+        "adapter_id": "fixture-forge",
+        "startup": "always",
+        "restart": "never"
+      }
+    },
+    {
+      "id": "restart-rejects-background-retry",
+      "type": "connectors.cli.AdapterSummary",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "instance_id": "forge-local",
+        "adapter_id": "fixture-forge",
+        "startup": "on-demand",
+        "restart": "on-failure"
+      }
+    },
+    {
+      "id": "repair-requires-revision",
+      "type": "connectors.cli.ConnectionRepairInput",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "credential_document": "FICTIONAL-REPAIR-SENTINEL"
+      }
+    },
+    {
+      "id": "C05-carrier-is-text-not-wire-object",
+      "type": "connectors.cli.OperationInvokeInput",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "operation": "project.get",
+        "schema": "forge-local/project.get/input/descriptor-r1",
+        "revision": "descriptor-r1",
+        "input": {
+          "id": 7
+        }
+      }
+    },
+    {
+      "id": "C05-revision-required",
+      "type": "connectors.cli.OperationInvokeInput",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "operation": "project.get",
+        "schema": "schema-r1",
+        "input": "{\"id\":7}"
+      }
+    },
+    {
+      "id": "list-rejects-string-limit",
+      "type": "connectors.cli.ConnectionListInput",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "limit": "100"
+      }
+    },
+    {
+      "id": "globals-stay-in-context",
+      "type": "connectors.cli.AdapterDescribeInput",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "config": "/home/fixture/config.toml"
+      }
+    },
+    {
+      "id": "revoke-does-not-claim-provider-success",
+      "type": "connectors.cli.ConnectionRevokeResult",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "connection": "forge-local/connection-1",
+        "revision": "connection-r2",
+        "local_state": "revoked",
+        "provider_outcome": "revoked"
+      }
+    },
+    {
+      "id": "adversary-public-status-rejects-internal-completing",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": false,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "completing",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951600000,
+          "next_action": "retry_status"
+        }
+      }
+    },
+    {
+      "id": "adversary-public-status-rejects-internal-expired",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": false,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "expired",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951900000,
+          "next_action": "retry_explicitly"
+        }
+      }
+    },
+    {
+      "id": "adversary-cached-connection-list-can-carry-stale-label",
+      "type": "connectors.cli.ConnectionListResult",
+      "valid": true,
+      "value": {
+        "connections": [
+          {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          }
+        ],
+        "observed_at_ms": 1788951600000,
+        "source": "cached",
+        "stale": true
+      }
+    },
+    {
+      "id": "public-acquisition-pending-projection",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": true,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "pending",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951600000,
+          "next_action": "retry_status"
+        }
+      }
+    },
+    {
+      "id": "public-acquisition-failed-reason-rejected",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": true,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "failed",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951900000,
+          "next_action": "create_connection",
+          "reason": "rejected"
+        }
+      }
+    },
+    {
+      "id": "public-acquisition-failed-reason-exchange_unknown",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": true,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "failed",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951900000,
+          "next_action": "create_connection",
+          "reason": "exchange_unknown"
+        }
+      }
+    },
+    {
+      "id": "public-acquisition-failed-reason-expired",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": true,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "failed",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951900000,
+          "next_action": "create_connection",
+          "reason": "expired"
+        }
+      }
+    },
+    {
+      "id": "public-acquisition-rejects-unknown-reason",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": false,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "failed",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951600000,
+          "next_action": "none",
+          "reason": "provider_failure"
+        }
+      }
+    },
+    {
+      "id": "public-acquisition-rejects-protected-reason",
+      "type": "connectors.cli.ConnectionStatusResult",
+      "valid": false,
+      "value": {
+        "acquisition": {
+          "instance_id": "forge-local",
+          "acquisition": "forge-local/acquisition-1",
+          "state": "failed",
+          "expires_at_ms": 1788951900000,
+          "observed_at_ms": 1788951600000,
+          "next_action": "none",
+          "reason": {
+            "message": "FICTIONAL_SECRET_SENTINEL"
+          }
+        }
+      }
+    },
+    {
+      "id": "connection-list-requires-source",
+      "type": "connectors.cli.ConnectionListResult",
+      "valid": false,
+      "value": {
+        "connections": [
+          {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          }
+        ],
+        "observed_at_ms": 1788951600000,
+        "stale": true
+      }
+    },
+    {
+      "id": "connection-list-requires-stale",
+      "type": "connectors.cli.ConnectionListResult",
+      "valid": false,
+      "value": {
+        "connections": [
+          {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          }
+        ],
+        "observed_at_ms": 1788951600000,
+        "source": "cached"
+      }
+    },
+    {
+      "id": "connection-list-rejects-string-validity-deadline",
+      "type": "connectors.cli.ConnectionListResult",
+      "valid": false,
+      "value": {
+        "connections": [
+          {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          }
+        ],
+        "observed_at_ms": 1788951600000,
+        "source": "cached",
+        "stale": true,
+        "valid_until_ms": "1788951630000"
+      }
+    },
+    {
+      "id": "cached-connection-list-with-known-validity-deadline",
+      "type": "connectors.cli.ConnectionListResult",
+      "valid": true,
+      "value": {
+        "connections": [
+          {
+            "adapter": "forge",
+            "instance_id": "forge-local",
+            "connection": "forge-local/connection-1",
+            "profile": "token",
+            "revision": "connection-r1",
+            "state": "ready"
+          }
+        ],
+        "observed_at_ms": 1788951600000,
+        "source": "cached",
+        "stale": true,
+        "valid_until_ms": 1788951630000
+      }
+    }
+  ]
+}
