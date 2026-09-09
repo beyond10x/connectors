@@ -67,6 +67,44 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 - Durability claims per binding: in-memory claims none; file binding claims fsync-before-return on the owner-only file; a database or Vault binding declares its own. A binding declares the guarantees it does not provide instead of emulating them (`docs/design.md:578`).
 - Startup: the host refuses to start an adapter whose required custody binding is missing rather than falling back to another binding (`docs/design.md:816`).
 
+### 4.1 Scoped version identity and guarded reclamation
+
+CustodyVersion names exact `(scope_ref, store_version)` through private non-reusable
+`version_ref`; store the tuple or an injective mapping, never a store-local name
+alone. It references ServiceConfiguration. Its coherent CredentialSet is an embedded
+private descriptor/handle, not separate token entities. Binding allocation may
+precede Connection publication and orphans may outlive abandoned allocation, so
+scope is not a required live Connection foreign key. Host publication proves the
+current admitted binding equality; the opaque store knows no provider identity.
+
+`Stored → Deleted` records acknowledged durable write and physical deletion.
+Stored is a historical acknowledgement, not current availability or dispatch
+authority. Unknown deletion leaves that last acknowledgement unchanged and grants
+no publication, reuse or claim of absent bytes. Observe the exact owner/version or
+refuse. Active/superseded remain Connection reference facts, not custody states.
+
+Before deletion, the host acknowledges a retirement fence against future publication
+and new valid use of that exact version, proves no existing valid use or admitted
+completion/refresh recovery needs it, and checks retention with trustworthy time.
+For superseded material, the default 24-hour interval starts at acknowledged
+supersession. For never-published material it starts at a definitive abandoned-candidate
+retirement decision; unknown publication or possible response recovery cannot start
+the clock. A possibly active version first needs acknowledged deactivation/replacement.
+Capacity refuses new versions instead of evicting required or retained material.
+
+The retirement fence precedes physical deletion and survives uncertain deletion.
+Remove active/superseded resolver links only under that guarded host decision;
+never delete immutable capture identities, consumed refresh history or audit evidence
+as a custody cascade. Retain private version identity and retirement/deletion fence
+without automatic expiry in this first binding, but drop the material handle after
+acknowledged deletion. This does not retain credential bytes indefinitely. Finite
+metadata capacity refuses new writes. This is ordered acknowledgement, not a new
+distributed custody/metadata transaction.
+
+[auth_bindings.yaml](../../../../ess/domains/auth_bindings.yaml) models these
+identities/references/lifecycle. Actual storage, handle erasure, retirement comparisons
+and trusted clocks remain binding predicates, not executed schema guarantees.
+
 ## 5. Limits
 
 | Concern | Rule |
@@ -107,8 +145,8 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 
 | Entity | Notes |
 |---|---|
-| Immutable custody version / credential set | Proposed opaque material version, not an ESS entity. Active/superseded are host reference facts, not a declared custody lifecycle; Connection relation/cardinality/delete semantics remain UNMAPPED |
-| Active credential reference | Proposed ConnectionAuthorityPort field with private publication fence, not a declared ESS Connection relation; publication couples generation, refresh ownership and revocation |
+| Immutable custody version / credential set | `connectors.auth_bindings.CustodyVersion`: scoped identity and Stored/Deleted acknowledgement lifecycle; CredentialSet is embedded. §4.1 selects retention/retirement without deletion ownership over Connection or generation. |
+| Active credential reference | Optional Connection reference to CustodyVersion alongside distinct active generation/publication fence; publication couples generation, refresh ownership and revocation. |
 | Refresh coordination | [RefreshAttempt ESS](../../../../ess/domains/refresh.yaml), owned by acquisition/coordinator; not a custody entity or port |
 | External store layout, Vault paths | UNMAPPED, binding-private |
 

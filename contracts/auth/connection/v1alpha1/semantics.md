@@ -115,6 +115,55 @@ For one business request, current host admission and operation enablement come f
 
 Inspection, status, repair orchestration and local revocation use [management admission](../../management.md) independently of business viability. F03 approval preparation remains an admitted metadata read and does not promise that a currently unready connection can execute the proposed mutation.
 
+### 4.2 Persistent binding identity and retention
+
+`Connection.connection_ref` is the existing stable host-qualified opaque string;
+the owner prevents reuse/collision and independently checks `instance_id` against
+the existing ServiceConfiguration. Connection references one instance and current
+immutable AuthProfile record, preserving its separate logical `profile_ref`. It
+references zero or one parent, never itself or a mediated parent. These references
+imply no deletion ownership. Admitted owner/actor, provider authority, fixed logical
+profile/route, semantic revision and private publication fence remain distinct.
+The administrative lifecycle is `Live → Revoked`; Live does not mean enabled,
+published, ready or authorized. Local revocation is irreversible.
+
+Initial managed creation allocates its stable binding privately before scoped
+custody publication. A pending public Connection is not required. Private allocation
+has the same identity/owner fences and grants no dispatch. Failed initial acquisition
+may leave an inactive private binding whose identity cannot be reassigned. Configured
+activation may expose pending under management admission; repair preserves its
+established target.
+
+Connection holds optional active CredentialGeneration/CustodyVersion references and
+a bounded superseded-custody set. Credential-bearing configuration can pin a generation
+without managed custody only under that separately selected binding, never as fallback.
+Managed custody publication installs matching generation/version together under the
+private fence. Active custody requires active generation and matching instance,
+Connection, logical profile and scope. Anonymous/parent-authenticated children have
+no active generation or active/superseded child custody, and null external identity.
+ExternalIdentity remains an embedded value, not an account entity.
+
+Mediated route state is an embedded `connectors.discovery.MediatedRouteBinding`
+value on the child. Its parent/child authority comes from the Connection fields;
+historical observation coordinates do not impose a live foreign key that pins
+discovery history. Parent generation evidence is optional for an explicitly
+credentialless direct parent. Neither absence grants fallback nor does route
+evidence become current merely because its coordinates are retained.
+
+Superseded references are a current bounded retention set. Guarded cleanup removes
+resolver links without deleting capture identities, refresh consumption or audit
+safety facts. A captured snapshot is not a custody foreign key pinning bytes forever.
+Revocation cuts off use/publication immediately without destroying still-required
+material or claiming provider revocation succeeded.
+
+The first binding retains Connection identity, fixed binding and terminal fence
+without automatic expiry/hard deletion. Finite metadata capacity refuses new
+allocations rather than recycling abandoned/revoked refs. Compaction removes only
+payload outside all remaining safety obligations. Tenant/assignment/reassignment
+remain unselected. [auth_bindings.yaml](../../../../ess/domains/auth_bindings.yaml)
+models these references/lifecycle; field assignment and atomic current-authority
+checks remain binding predicates, not executed schema guarantees.
+
 ## 5. Ordering, limits
 
 | Concern | Rule |
@@ -161,7 +210,7 @@ Adversarial (`docs/design.md:985`, repair without identity drift):
 | Entity | Notes |
 |---|---|
 | Connection viability and operation eligibility values | Modeled in [connection_admission.yaml](../../../../ess/domains/connection_admission.yaml); the seven-state status is the §4.1 reduction, not an ESS entity lifecycle. Local revocation is terminal and enablement is orthogonal. |
-| Persistent `Connection` | Proposed, not yet declared in ESS. Instance/profile/optional parent/active material relations require its persistence model; no table here asserts an implemented lifecycle or custody ownership. |
+| Persistent `Connection` | `connectors.auth_bindings.Connection`: §4.2's Live/Revoked lifecycle and instance/profile/optional parent/material references, without deletion ownership over their targets. |
 | `ExternalIdentity` | value embedded in `Connection`; shared typed kind/subject in [credentials.yaml](../../../../ess/domains/credentials.yaml), scoped by provider authority |
 | `EvidenceSnapshot` | generation-bound value embedded in `Connection`, modeled in [credential_evidence.yaml](../../../../ess/domains/credential_evidence.yaml); no independent evidence-store ownership |
 | Tenant / principal ownership of a connection | UNMAPPED, consistent with `ess/domains/declarations.yaml` |

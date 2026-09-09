@@ -112,6 +112,10 @@ entities:
       # Authored decision value; absent remains unresolved where required.
       - name: curation
         type: Optional<connectors.artifact_provenance.Curation>
+      - name: requires_auth
+        type: Optional<List<connectors.auth_bindings.AuthRequirement>>
+    # Proposed authored alternatives; absent on existing declarations. This model
+    # adds no field support to a current strict adapter or public reader.
     lifecycle:
       initial: Declared
       states: [Declared]
