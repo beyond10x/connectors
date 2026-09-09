@@ -133,6 +133,19 @@ fn regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift() 
     let out = temp.path().join("generated");
     generate(&spec, &out, &ess(), false).unwrap();
     let original = tree(&out).unwrap();
+    assert!(
+        !original
+            .keys()
+            .any(|path| path.starts_with("rust/.ess-output/"))
+    );
+    let manifest: Value = serde_json::from_slice(&original["manifest.json"]).unwrap();
+    assert!(
+        !manifest["files"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .any(|path| path.starts_with("rust/.ess-output/"))
+    );
     let other = temp.path().join("other");
     generate(&spec, &other, &ess(), false).unwrap();
     assert_eq!(original, tree(&other).unwrap());

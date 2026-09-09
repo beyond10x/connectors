@@ -44,6 +44,13 @@ This slice does not advertise writes, managed OAuth acquisition, durable events,
 process execution or media sessions. Other adapters have designs and, in some
 cases, authored native models; their presence does not mean they can run.
 
+The next local CLI is specified under [CLI contracts](contracts/cli/v1alpha1/semantics.md):
+`setup`, `adapters`, `connections` and `operations`, with per-adapter TOML startup
+configuration and protected credential entry into local keyring custody. Its ESS
+binding and generated parser are contract fixtures. Production keyring storage,
+adapter supervision and management handlers remain implementation work; the
+current executable still provides `describe`, `invoke` and `serve`.
+
 There is no public release distribution or configured deployment. Historical
 [runtime verification](docs/verification.md) and the
 [specification checkpoint](docs/evidence/core-model-closure-20260909/checkpoint.md)
