@@ -4,6 +4,13 @@ Owner: `story:contracts-idempotency-scope`; source **F02** in `specification:con
 
 ## Contract and model coverage
 
+Current model addendum (2026-09-09): the historical F02 verification below predates
+the selected Connection and delegation models. Connection now has a typed home
+in `ess/domains/auth_bindings.yaml`, and AttemptRecord references it; fingerprints
+retain historical coordinates as values. [Delegation](../../service/delegation.md)
+now owns the selected proof/receipt semantics. The original verification claims
+and runtime limitations below are retained as evidence of that earlier unit.
+
 [Mutation §5.1](semantics.md#51-key-namespace-fingerprint-and-replay-admission) defines namespace, fingerprint, current replay admission, reservation ownership and retention. The [Atlassian adapter plan](../../../adapters/atlassian/design.md) applies these rules to its keyed writes. These remain proposed semantics; no mutation runtime, public wire schema or adapter has been added.
 
 [ESS idempotency](../../../ess/domains/idempotency.yaml) gives AuthorityScope, Origin, KeyNamespace and RequestFingerprint typed homes. KeyReservation references exactly one immutable [AttemptRecord](../../../ess/domains/mutations.yaml), and its lifecycle separates Pending, Replayable, Quarantined and Expired. The attempt records the durable terminal settlement instant used by replay retention. Audit evidence outlives eviction of replay data.

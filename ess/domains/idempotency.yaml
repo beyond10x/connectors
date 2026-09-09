@@ -69,9 +69,10 @@ entities:
         via: attempt_id
     # References, not owns: expiry of the replay reservation cannot delete audit
     # evidence. Each key generation is bound to one immutable attempt identity.
-    # UNMAPPED: namespace-to-authority/issuer/tenant and fingerprint-to-Connection
-    # entity relations await their owning models. These typed values are not
-    # invented entity identities or an assertion about those cardinalities.
+    # UNMAPPED: namespace authority/issuer/tenant configuration remains outside
+    # this selected binding. Fingerprints preserve historical Connection/route
+    # coordinates as values; the attempt has the actual Connection reference.
+    # Value equality is an owner predicate and grants no current use.
     lifecycle:
       initial: Pending
       states: [Pending, Replayable, Quarantined, Expired]
