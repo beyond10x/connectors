@@ -1,0 +1,4 @@
+PASS: 7762 unique sanitized sites; all evidence IDs resolve in the fixed window; client counts reconcile.
+PASS: 332 distinct cited evidence IDs; 29 relative links resolve.
+PASS: 16 workflow rows, 15 failure rows, 22 acceptance rows; no missing or duplicate IDs.
+PASS: machine inventory contains only its declared metadata fields; no command arguments, source paths or result bodies.
