@@ -1,0 +1,29 @@
+# Fictional local specification example; no installed artifact or runtime success.
+format = "connectors-local/1"
+owner_uid = 1000
+default_adapter = "forge"
+
+[adapters.forge]
+instance_id = "forge-local"
+adapter_id = "fixture-forge"
+configuration_revision = "cfg-1"
+protocol = "v1alpha1"
+# startup omitted: on-demand. restart omitted: never.
+
+[adapters.forge.executable]
+path = "/opt/connectors/fixture-forge"
+sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+args = []
+
+[adapters.database]
+instance_id = "database-local"
+adapter_id = "fixture-database"
+configuration_revision = "cfg-1"
+protocol = "v1alpha1"
+startup = "automatic"
+restart = "never"
+
+[adapters.database.executable]
+path = "/opt/connectors/fixture-database"
+sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+args = []

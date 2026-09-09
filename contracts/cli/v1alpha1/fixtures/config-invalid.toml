@@ -1,0 +1,19 @@
+# Intentionally invalid fixture: a reader must refuse, not launch or fix it.
+# Expected: invalid_configuration, exit 2, host/adapter launches 0.
+format = "connectors-local/1"
+owner_uid = 1000
+default_adapter = "missing-entry"
+
+[adapters.forge]
+instance_id = "forge-local"
+adapter_id = "fixture-forge"
+configuration_revision = "cfg-1"
+protocol = "v1alpha1"
+startup = "always"
+restart = "on-failure"
+credential = "FICTIONAL-CONFIG-SECRET-SENTINEL"
+
+[adapters.forge.executable]
+path = "fixture-forge-from-path"
+sha256 = "not-a-digest"
+args = []
