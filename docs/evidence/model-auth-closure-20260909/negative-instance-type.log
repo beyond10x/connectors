@@ -1,0 +1,17 @@
+.local/model-closure-20260909/negative-instance-type was refused:
+  - [type_mismatch] entity connectors.auth_bindings.Acquisition.relations.instance: relation `instance` of `connectors.auth_bindings.Acquisition` is carried by `connectors.auth_bindings.Acquisition.instance_id`, which is typed `Uuid` (hint: `connectors.auth_bindings.Acquisition.instance_id` must be typed `String`, `Optional<String>`)
+  - [type_mismatch] entity connectors.auth_bindings.Connection.relations.instance: relation `instance` of `connectors.auth_bindings.Connection` is carried by `connectors.auth_bindings.Connection.instance_id`, which is typed `Uuid` (hint: `connectors.auth_bindings.Connection.instance_id` must be typed `String`, `Optional<String>`)
+  - [type_mismatch] entity connectors.auth_bindings.CustodyVersion.relations.instance: relation `instance` of `connectors.auth_bindings.CustodyVersion` is carried by `connectors.auth_bindings.CustodyVersion.instance_id`, which is typed `Uuid` (hint: `connectors.auth_bindings.CustodyVersion.instance_id` must be typed `String`, `Optional<String>`)
+  - error[ESS-ENTITY-002]: relation `instance` of `connectors.auth_bindings.Acquisition` is carried by `connectors.auth_bindings.Acquisition.instance_id`, which is typed `Uuid`
+  `ess-domain` refuses this as `type_mismatch`
+  help: `connectors.auth_bindings.Acquisition.instance_id` must be typed `String`, `Optional<String>`
+  --> <document> (entity connectors.auth_bindings.Acquisition.relations.instance)
+  - error[ESS-ENTITY-002]: relation `instance` of `connectors.auth_bindings.Connection` is carried by `connectors.auth_bindings.Connection.instance_id`, which is typed `Uuid`
+  `ess-domain` refuses this as `type_mismatch`
+  help: `connectors.auth_bindings.Connection.instance_id` must be typed `String`, `Optional<String>`
+  --> <document> (entity connectors.auth_bindings.Connection.relations.instance)
+  - error[ESS-ENTITY-002]: relation `instance` of `connectors.auth_bindings.CustodyVersion` is carried by `connectors.auth_bindings.CustodyVersion.instance_id`, which is typed `Uuid`
+  `ess-domain` refuses this as `type_mismatch`
+  help: `connectors.auth_bindings.CustodyVersion.instance_id` must be typed `String`, `Optional<String>`
+  --> <document> (entity connectors.auth_bindings.CustodyVersion.relations.instance)
+exit_code=1
