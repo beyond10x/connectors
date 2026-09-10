@@ -1,0 +1,22 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling rcgen v0.14.10
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Finished `test` profile [unoptimized] target(s) in 11.25s
+     Running tests/local_runtime.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_runtime-727d25d7b811ac0a)
+
+running 5 tests
+test cli_journey::ci::gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces ... ok
+test cli_journey::gitlab_cli_explicit_revalidation_after_real_expiry_without_reentry ... ok
+test cli_journey::gitlab_cli_failed_repair_and_busy_stop_preserve_authority ... ok
+test cli_journey::merge_requests::gitlab_cli_mr_window_exhaustion_saved_connection_and_current_policy ... ok
+test cli_journey::persistent_gitlab_cli_owner_and_keyring_restart ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 85.17s
+

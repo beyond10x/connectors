@@ -1,0 +1,34 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 3.30s
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-03ec8893ecafe4cf)
+
+running 18 tests
+test local::approvals::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+test local::approvals::tests::rfc8032_vector_and_exact_fixed_algorithm_round_trip ... ok
+test local::approvals::tests::canonical_framing_rejects_omission_duplicates_unknown_fields_and_alternate_spellings ... ok
+test local::approvals::tests::issuer_audience_time_key_and_clock_refusals_are_current ... ok
+test local::approvals::tests::all_subject_coordinates_and_unicode_identity_are_bound ... ok
+
+running 1 test
+test local::approvals::tests::unavailable_live_binding_is_storage_failure_without_receipt_or_retry ... ok
+test local::approvals::tests::unavailable_redemption_evidence_cannot_open_dispatch ... ok
+test local::approvals::tests::concurrent_substituted_reference_cannot_rebind_one_attempt ... ok
+test local::approvals::tests::policy_guard_survives_commit_and_clock_is_rechecked_after_storage ... ok
+test local::approvals::tests::expiry_during_acknowledgement_retains_spend_without_granting_receipt ... ok
+test local::approvals::tests::tombstone_capacity_and_migrations_survive_restart_without_secret_storage ... ok
+test local::approvals::tests::unkeyed_preparation_retains_authority_and_old_records_cannot_gain_it ... ok
+
+running 1 test
+test local::approvals::tests::approved_gate_requires_original_spend_and_abort_never_refunds ... ok
+test local::approvals::tests::mismatched_receipt_missing_subject_and_existing_key_never_open_new_gate ... ok
+test local::approvals::tests::rollback_or_lost_ack_never_reconstructs_receipt ... ok
+
+running 1 test
+
+running 1 test
+test local::approvals::tests::fresh_spend_rechecks_policy_key_time_and_exact_initial_proof ... ok
+test local::approvals::tests::concurrent_reference_and_attempt_spend_produce_one_receipt ... ok
+test local::approvals::tests::abrupt_process_exits_recover_without_refunding_or_resending ... ok
+
+test result: ok. 17 passed; 0 failed; 1 ignored; 0 measured; 63 filtered out; finished in 0.89s
+

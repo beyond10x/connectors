@@ -1,0 +1,24 @@
+npm notice run connectors-website@0.1.0 prebuild
+npm notice run npm run reference && npm run examples
+npm notice run connectors-website@0.1.0 reference
+npm notice run cd .. && cargo run --locked -p connectors-build -- docs
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.63s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build docs`
+website: 43 contract pages, 93 total reference pages; generated
+npm notice run connectors-website@0.1.0 examples
+npm notice run cd .. && cargo run --locked -p connectors-build -- examples
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build examples`
+website: walkthrough input/result match the GitLab descriptor
+connectors v1 — 21 file(s), valid
+Error: "command \"cargo\" failed:    Compiling connectors-types v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/connectors-types)\n   Compiling contract-examples v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/contract-examples)\n   Compiling connectors-system v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/connectors-system)\n   Compiling connectors-web v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/web/connectors/crates/connectors-web)\n   Compiling connectors-contract-examples v0.1.0 (/home/timo/beyond10x/connectors_v2/website/examples/realization)\nerror[E0063]: missing field `approval_subject` in initializer of `AttemptRecordData`\n  --> src/lib.rs:40:44\n   |\n40 |         let record = m::AttemptRecord::new(m::AttemptRecordData {\n   |                                            ^^^^^^^^^^^^^^^^^^^^ missing `approval_subject`\n\nerror[E0063]: missing field `approval_subject` in initializer of `PrepareAttempt`\n   --> src/lib.rs:537:21\n    |\n537 |         let input = m::PrepareAttempt {\n    |                     ^^^^^^^^^^^^^^^^^ missing `approval_subject`\n\nFor more information about this error, try `rustc --explain E0063`.\nerror: could not compile `connectors-contract-examples` (lib) due to 2 previous errors\n"
