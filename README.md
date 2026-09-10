@@ -26,15 +26,16 @@ separate steps.
 ## Where the project stands
 
 The local CLI implements setup, configured adapter management, protected
-connect/repair, connection inspection/revoke, cached operation discovery and
+connect/repair, saved-credential revalidation, connection inspection/revoke, cached operation discovery and
 supervised GitLab reads through its generated parser. A local owner manages exact
 child processes; SQLite records metadata and a qualified Secret Service keyring
 stores credentials. See the [GitLab CLI guide](docs/local-gitlab-cli.md) and
 [runtime binding](docs/local-runtime-foundation.md).
 
 Disposable GitLab HTTPS and keyring fixtures prove saved-credential reuse after
-CLI, owner and keyring restarts. Dedicated GitLab sandbox acceptance and explicit
-renewal of the current 60-second validation evidence remain open. Kubernetes and
+CLI, owner and keyring restarts. Explicit revalidation renews the 60-second
+validation evidence without credential re-entry. Dedicated GitLab sandbox
+acceptance remains open. Kubernetes and
 PostgreSQL still need this local lifecycle binding; MCP and the remaining providers
 follow them. The explicit network commands below remain compatible.
 

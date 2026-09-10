@@ -2,6 +2,35 @@
   "format": "connectors-cli-values/1",
   "cases": [
     {
+      "id": "valid-retained-revalidation-result",
+      "type": "connectors.cli.ConnectionRevalidateResult",
+      "valid": true,
+      "value": {
+        "connection": {
+          "summary": {
+            "adapter": "forge", "instance_id": "forge-local",
+            "connection": "connection-1", "profile": "token",
+            "revision": "revision-1", "state": "ready"
+          },
+          "observed_at_ms": 1788951600000,
+          "valid_until_ms": 1788951630000,
+          "source": "authority", "stale": false
+        }
+      }
+    },
+    {
+      "id": "valid-retained-revalidation-selectors",
+      "type": "connectors.cli.ConnectionRevalidateInput",
+      "valid": true,
+      "value": {"adapter": "forge", "connection": "connection-1", "expected_revision": "revision-1"}
+    },
+    {
+      "id": "invalid-revalidation-missing-revision",
+      "type": "connectors.cli.ConnectionRevalidateInput",
+      "valid": false,
+      "value": {"adapter": "forge", "connection": "connection-1"}
+    },
+    {
       "id": "valid-SetupInitResult-1",
       "type": "connectors.cli.SetupInitResult",
       "valid": true,

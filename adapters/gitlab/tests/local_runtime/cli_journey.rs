@@ -379,6 +379,119 @@ fn configure(cli: &Cli, provider: &Provider, custody: &Custody) {
 }
 
 #[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn gitlab_cli_explicit_revalidation_after_real_expiry_without_reentry() {
+    let provider = Provider::new();
+    let custody = Custody::new(provider.root.path());
+    let cli = Cli::new(provider.root.path());
+    configure(&cli, &provider, &custody);
+    let credential = provider.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let connected = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "forge",
+        "--profile",
+        "gitlab.pat",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]
+        .clone();
+    let reference = connected["summary"]["connection"].as_str().unwrap();
+    let revision = connected["summary"]["revision"].as_str().unwrap();
+    let revalidate = [
+        "connections",
+        "revalidate",
+        "--adapter",
+        "forge",
+        "--connection",
+        reference,
+        "--expected-revision",
+        revision,
+    ];
+    let status = [
+        "connections",
+        "status",
+        "--adapter",
+        "forge",
+        "--connection",
+        reference,
+    ];
+    let descriptor = success(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "forge",
+        "--operation",
+        "project.get",
+    ]));
+    let invoke = [
+        "operations",
+        "invoke",
+        "--adapter",
+        "forge",
+        "--connection",
+        reference,
+        "--operation",
+        "project.get",
+        "--schema",
+        descriptor["schema"].as_str().unwrap(),
+        "--revision",
+        descriptor["revision"].as_str().unwrap(),
+        "--input-json",
+        r#"{"project":"org/project"}"#,
+    ];
+    fs::remove_file(&credential).unwrap();
+    cli.shutdown();
+    let until = connected["valid_until_ms"].as_u64().unwrap();
+    while connectors_sdk::now_ms() <= until {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let before = provider.count();
+    assert_eq!(
+        success(cli.run(&status))["connection"]["summary"]["state"],
+        "pending"
+    );
+    refusal(cli.run(&invoke), "not_granted");
+    assert_eq!(provider.count(), before);
+    assert!(!cli.paths.state.join("owner.sock").exists());
+    let refreshed = success(cli.run(&revalidate))["connection"].clone();
+    assert_eq!(refreshed["summary"], connected["summary"]);
+    assert!(refreshed["valid_until_ms"].as_u64().unwrap() > until);
+    assert_eq!(provider.count(), before + 2);
+    let result = success(cli.run(&invoke));
+    let result: Value = serde_json::from_str(result["result"].as_str().unwrap()).unwrap();
+    assert_eq!(result["item"]["name"], "fixture-project");
+    // Upstream unavailability is not positive invalidity of the retained token.
+    provider
+        .response_status
+        .store(503, std::sync::atomic::Ordering::SeqCst);
+    assert!(!cli.run(&revalidate).status.success());
+    assert_eq!(
+        success(cli.run(&status))["connection"]["summary"]["state"],
+        "ready"
+    );
+    provider
+        .response_status
+        .store(0, std::sync::atomic::Ordering::SeqCst);
+    success(cli.run(&invoke));
+    provider
+        .response_status
+        .store(401, std::sync::atomic::Ordering::SeqCst);
+    refusal(cli.run(&revalidate), "service_failure");
+    assert_eq!(
+        success(cli.run(&status))["connection"]["summary"]["state"],
+        "reauthorization_required"
+    );
+    cli.shutdown();
+    let before = provider.count();
+    refusal(cli.run(&revalidate), "not_granted");
+    assert_eq!(provider.count(), before);
+    assert!(!cli.paths.state.join("owner.sock").exists());
+}
+
+#[test]
 #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
 fn persistent_gitlab_cli_owner_and_keyring_restart() {
     let provider = Provider::new();
