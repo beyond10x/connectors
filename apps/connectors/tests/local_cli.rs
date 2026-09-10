@@ -155,7 +155,7 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
 }
 
 #[test]
-fn protected_sources_are_not_consumed_without_a_coordinator() {
+fn protected_sources_are_not_consumed_before_configuration_admission() {
     let root = tempfile::tempdir().unwrap();
     let output = command(
         &root,
@@ -178,5 +178,6 @@ fn protected_sources_are_not_consumed_without_a_coordinator() {
     );
     assert!(!text.contains("sentinel"));
     let refusal: Value = serde_json::from_slice(&output.stderr).unwrap();
-    assert_eq!(refusal["error"]["code"], "cli_source");
+    assert_eq!(refusal["error"]["code"], "failure");
+    assert_eq!(refusal["error"]["data"]["code"], "invalid_configuration");
 }

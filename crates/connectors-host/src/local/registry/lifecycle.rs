@@ -16,7 +16,7 @@ struct AcquisitionRow {
 impl Registry {
     pub fn begin(&self, binding: &Binding, now: u64) -> Result<Acquisition> {
         binding.validate()?;
-        self.transaction(now, true, |tx, authority| {
+        self.transaction(now, true, |tx, authority, now| {
             register(tx, binding)?;
             let per_instance: i64 = tx.query_row("SELECT count(*) FROM registry_connections WHERE instance_id=?1", [&binding.instance_id], |r| r.get(0)).map_err(db)?;
             let total: i64 = tx.query_row("SELECT count(*) FROM registry_connections", [], |r| r.get(0)).map_err(db)?;
@@ -37,7 +37,7 @@ impl Registry {
         now: u64,
     ) -> Result<Acquisition> {
         binding.validate()?;
-        self.transaction(now, true, |tx, authority| {
+        self.transaction(now, true, |tx, authority, now| {
             let row = Self::connection(tx, reference)?;
             if !row.public
                 || row.binding.instance_id != binding.instance_id
@@ -59,7 +59,7 @@ impl Registry {
     /// Durable one-use consumption precedes protected completion/validation.
     /// An uncertain commit returns no claim and grants no continuation authority.
     pub fn consume(&self, acquisition: Acquisition, now: u64) -> Result<Claim> {
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             let acquired = acquired(tx, &acquisition.id, &acquisition.owner)?;
             if acquired.state!="pending" { return Err(Failure::Conflict); }
             if now>=acquired.expires { return Err(Failure::Expired); }
@@ -85,7 +85,7 @@ impl Registry {
         if !(1..=65536).contains(&byte_size) {
             return Err(Failure::InvalidInput);
         }
-        self.transaction(now, false, |tx, authority| {
+        self.transaction(now, false, |tx, authority, now| {
             let acquired = completing(tx, &claim.acquisition.id, &claim.acquisition.owner, now)?;
             if acquired.candidate.is_some() { return Err(Failure::Conflict); }
             let row = Self::connection(tx, &acquired.connection)?;
@@ -109,7 +109,7 @@ impl Registry {
     /// Called while the custody binding holds its physical writer lock. A stale
     /// paused writer cannot create a version after acknowledged retirement.
     pub(crate) fn write_allowed(&self, prepared: &PreparedCandidate, now: u64) -> Result<()> {
-        self.transaction(now, false, |tx, authority| {
+        self.transaction(now, false, |tx, authority, now| {
             let acquired = completing(tx, &prepared.acquisition, &prepared.owner, now)?;
             let row = Self::connection(tx, &prepared.connection)?;
             live(&row)?;
@@ -134,7 +134,7 @@ impl Registry {
         if !receipt.matches(prepared.version) {
             return Err(Failure::Conflict);
         }
-        let acknowledged_at = self.transaction(now, false, |tx, _| {
+        let acknowledged_at = self.transaction(now, false, |tx, _, now| {
             let acquired = acquired(tx, &prepared.acquisition, &prepared.owner)?;
             if acquired.candidate.as_deref()!=Some(&prepared.version_id) { return Err(Failure::Conflict); }
             let (deleted, at): (bool,Option<u64>) = tx.query_row("SELECT deleted,acknowledged_at_ms FROM registry_materials WHERE version_id=?1 AND acquisition_ref=?2 AND generation_id=?3",
@@ -154,7 +154,7 @@ impl Registry {
     /// private fence and the acquisition result. Repair preserves public revision.
     pub fn publish(&self, stored: StoredCandidate, now: u64) -> Result<String> {
         let prepared = stored.prepared;
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             let acquired = completing(tx, &prepared.acquisition, &prepared.owner, now)?;
             let row = Self::connection(tx, &prepared.connection)?;
             live(&row)?;
@@ -208,7 +208,7 @@ impl Registry {
     }
 
     pub fn fail(&self, claim: &Claim, now: u64) -> Result<()> {
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             let acquired = acquired(tx, &claim.acquisition.id, &claim.acquisition.owner)?;
             if acquired.state == "completed" {
                 return Err(Failure::Conflict);
@@ -236,7 +236,7 @@ impl Registry {
     /// Passive observation does not sweep expiry. An admitted local owner calls
     /// this bounded sweep; retirement starts at this acknowledged decision.
     pub fn expire(&self, now: u64) -> Result<usize> {
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             let mut stmt = tx.prepare("SELECT acquisition_ref,candidate_id FROM registry_acquisitions WHERE state IN ('pending','completing') AND expires_at_ms<=?1 ORDER BY expires_at_ms LIMIT 1000").map_err(db)?;
             let rows = stmt.query_map([timestamp(now)?], |r| Ok((r.get::<_,String>(0)?,r.get::<_,Option<String>>(1)?))).map_err(db)?.collect::<std::result::Result<Vec<_>,_>>().map_err(db)?;
             for (id, candidate) in &rows {
@@ -255,7 +255,7 @@ impl Registry {
         expected_revision: &str,
         now: u64,
     ) -> Result<String> {
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             let row = Self::connection(tx, reference)?;
             if !row.public || row.binding.instance_id!=instance || row.binding.adapter_id!=adapter_id { return Err(Failure::NotFound); }
             if row.state=="revoked" { return Ok(row.revision); }

@@ -41,7 +41,10 @@ only nonsecret metadata. Public results exclude private scope, version, fence,
 generation, capture and completion-owner coordinates.
 
 Each operation holds an immediate transaction and bounded metadata handle.
-A durable clock floor rejects wall-clock regression. It records time even when
+A durable clock floor rejects wall-clock regression. The production binding
+samples that clock after acquiring the transaction; a caller timestamp sampled
+before lock contention cannot establish regression. Request and capture deadlines
+remain their original absolute values. It records time even when
 a semantic action refuses, using a savepoint to roll back that action. Passive
 observations may update this floor and cursor records; they do not start owners,
 read credentials, migrate schema or perform provider authentication.

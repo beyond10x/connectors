@@ -9,8 +9,9 @@ pub(super) fn execute(
     paths: &Paths,
     alias: &str,
     adapter: &Adapter,
+    socket: Option<&std::path::Path>,
 ) -> Result<Value, HandlerReply> {
-    let registry = Registry::new(&paths.state);
+    let registry = Registry::with_system_clock(&paths.state);
     let text = |field| {
         call.input[field]
             .as_str()
@@ -29,7 +30,7 @@ pub(super) fn execute(
             if !(1..=500).contains(&limit) {
                 return Err(failure("invalid_input", "arguments", "none", true));
             }
-            let custody = keyring::custody::available();
+            let custody = keyring::custody::available_at(socket);
             let page = registry
                 .list(
                     &adapter.instance_id,
@@ -55,7 +56,7 @@ pub(super) fn execute(
             let acquisition = call.input.get("acquisition").and_then(Value::as_str);
             match (reference, acquisition) {
                 (Some(reference), None) => {
-                    let custody = keyring::custody::available();
+                    let custody = keyring::custody::available_at(socket);
                     let observed = registry
                         .describe(
                             &adapter.instance_id,

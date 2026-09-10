@@ -25,7 +25,13 @@ pub struct Child {
 }
 impl Child {
     pub fn spawn(config: &super::super::config::Adapter) -> Result<Self> {
-        let until = Instant::now() + Duration::from_secs(10);
+        Self::spawn_until(config, Instant::now() + Duration::from_secs(10))
+    }
+    pub(crate) fn spawn_until(
+        config: &super::super::config::Adapter,
+        deadline: Instant,
+    ) -> Result<Self> {
+        let until = deadline.min(Instant::now() + Duration::from_secs(10));
         let executable = config
             .executable
             .open()
@@ -142,6 +148,22 @@ impl Child {
     }
     pub fn incarnation(&self) -> &str {
         &self.incarnation
+    }
+    /// Duplicate this owned kernel handle for the owner's independent stop path.
+    pub(crate) fn termination_handle(&self) -> Result<File> {
+        self.pidfd.try_clone().map_err(|_| Failure::Unavailable)
+    }
+    pub fn running(&mut self) -> Result<bool> {
+        if self.live
+            && self
+                .process
+                .try_wait()
+                .map_err(|_| Failure::Unavailable)?
+                .is_some()
+        {
+            self.live = false;
+        }
+        Ok(self.live)
     }
     pub fn validate(
         &mut self,
@@ -420,6 +442,7 @@ mod tests {
         let hash = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
         for mode in ["json", "schema", "identity"] {
             let config = Adapter {
+                permissions: Default::default(),
                 instance_id: "fixture".into(),
                 adapter_id: "fixture".into(),
                 configuration_revision: "fixture-config".into(),

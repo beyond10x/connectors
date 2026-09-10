@@ -5,6 +5,39 @@ summary: Selected local CLI presentation values; protected inputs are ephemeral,
 # Context, not these payloads. Existing auth/declaration identities retain their
 # String representations; these value references establish no entity relations.
 types:
+  # Local configuration-owner bindings, not independent identities or grants.
+  - name: connectors.cli.LocalOperationPolicy
+    kind: struct
+    fields:
+      - {name: profiles, type: "List<String>"}
+      - {name: operations, type: "List<String>"}
+  - name: connectors.cli.LocalCustodyBinding
+    kind: struct
+    fields:
+      - {name: secret_service_socket, type: "Optional<String>"}
+  - name: connectors.cli.LocalOwnerGreeting
+    kind: struct
+    fields:
+      - {name: version, type: String}
+      - {name: challenge, type: String}
+      - {name: host_incarnation, type: String}
+      - {name: authority, type: String}
+  - name: connectors.cli.LocalCaptureAdmission
+    kind: struct
+    fields:
+      - {name: acquisition, type: String}
+      - {name: expires_at_ms, type: Timestamp}
+      - {name: profile, type: connectors.cli.PrivateStaticProfile}
+  - name: connectors.cli.LocalRuntimeRecord
+    kind: struct
+    fields:
+      - {name: instance_id, type: String}
+      - {name: suppressed, type: Boolean}
+      - {name: selection, type: "Optional<String>"}
+      - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
+      - {name: observed_at_ms, type: "Optional<Timestamp>"}
+    # Configuration owner's durable suppression and cached descriptor projection.
+    # A cached bootstrap never establishes live readiness or dispatch authority.
   # Private local transport values, owned by contracts/cli/v1alpha1/private-adapter.md.
   # They bind existing owners and are not public CLI results or persisted entities.
   - name: connectors.cli.PrivateEntryField
