@@ -98,6 +98,12 @@ acknowledgement contract for every implementation. Backend qualification therefo
 remains necessary under the selected
 [CLI contract](../contracts/cli/v1alpha1/semantics.md).
 
+The host now has an initial [Secret Service custody implementation](local-secret-service.md)
+for a pinned GNOME Keyring binary: scoped immutable writes, exact reads and explicit
+filesystem synchronization. Its disposable daemon tests exercise crash/restart and
+failure handling. Metadata publication and guarded retirement are still unbound,
+so this does not change the CLI prerequisite or make connection commands usable.
+
 Protected connect/repair sources refuse with `cli_source` before reading any file,
 stdin or terminal. No generated demonstration capture is used in production.
 Connection registry commands return unavailable metadata; cached operation
