@@ -2,8 +2,8 @@ import type { PageMeta } from './reference-types';
 export const adapters = [{
   id: 'gitlab',
   title: 'GitLab',
-  summary: 'Projects, issues and repository files through bounded reads.',
-  status: 'Working first slice',
+  summary: 'Saved credentials, repository and CI reads, and pinned-head MR validation.',
+  status: 'Local CLI and eleven reads',
   runtime: true
 }, {
   id: 'kubernetes',
