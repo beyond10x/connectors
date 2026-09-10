@@ -1,0 +1,21 @@
+domain: connectors.clock
+summary: Explicitly trusted local clock configuration and bounded observations; no persistent clock identity.
+# Normative owner: contracts/service/clock.md. Values convey no caller or approval authority.
+types:
+  - name: connectors.clock.Configuration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: address, type: String}
+      - {name: public_key, type: String}
+      - {name: max_rate_error_ppm, type: Integer}
+    # UNMAPPED: source correctness and the local timer's physical frequency bound
+    # are explicit deployment trust assumptions, never schema/runtime-proven facts.
+  - name: connectors.clock.Observation
+    kind: struct
+    fields:
+      - {name: configuration_sha256, type: String}
+      - {name: lower_unix_ms, type: Integer}
+      - {name: upper_unix_ms, type: Integer}
+    # UNMAPPED: raw signature/nonce validation, process continuity, elapsed-time
+    # bounds, suspend rejection, TTL and outward rounding require runtime evidence.

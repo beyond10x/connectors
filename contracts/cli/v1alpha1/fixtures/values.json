@@ -2,6 +2,43 @@
   "format": "connectors-cli-values/1",
   "cases": [
     {
+      "id": "approval-clock-check-input",
+      "type": "connectors.cli.ApprovalClockCheckInput",
+      "valid": true,
+      "value": { "adapter": "forge" }
+    },
+    {
+      "id": "approval-clock-check-result",
+      "type": "connectors.cli.ApprovalClockCheckResult",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "observation": {
+          "configuration_sha256": "9075017ceec92b29c7ec5d5b4e98364d39dd767ed602dadd2aca6797e5496df9",
+          "lower_unix_ms": 1789077509997,
+          "upper_unix_ms": 1789077512071
+        }
+      }
+    },
+    {
+      "id": "approval-clock-check-requires-adapter",
+      "type": "connectors.cli.ApprovalClockCheckInput",
+      "valid": false,
+      "value": {}
+    },
+    {
+      "id": "approval-clock-check-rejects-unbound-observation",
+      "type": "connectors.cli.ApprovalClockCheckResult",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "observation": {
+          "lower_unix_ms": 1789077509997,
+          "upper_unix_ms": 1789077512071
+        }
+      }
+    },
+    {
       "id": "approval-keys-uninitialized",
       "type": "connectors.cli.ApprovalKeysResult",
       "valid": true,

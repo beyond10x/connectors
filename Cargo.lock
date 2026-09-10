@@ -525,12 +525,14 @@ dependencies = [
 name = "connectors"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "clap",
  "connectors-cli-contract",
  "connectors-client",
  "connectors-core",
  "connectors-host",
  "connectors-sdk",
+ "ring",
  "serde_json",
  "tempfile",
  "tokio",
