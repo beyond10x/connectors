@@ -5,6 +5,11 @@ binary: connectors
 about: Local integration access through explicitly configured adapters
 globals: {config: config, state: state-dir, output: output}
 callables:
+  approval-clock-check:
+    target: {kind: local, owner: connectors.cli, action: approval-clock-check}
+    input: connectors.cli.ApprovalClockCheckInput
+    result: connectors.cli.ApprovalClockCheckResult
+    errors: {failure: connectors.cli.Failure}
   approval-keys-status:
     target: {kind: local, owner: connectors.cli, action: approval-keys-status}
     input: connectors.cli.ApprovalKeyStatusInput
@@ -116,6 +121,13 @@ callables:
     result: connectors.cli.OperationInvokeResult
     errors: {failure: connectors.cli.Failure}
 commands:
+  - path: [approvals, clock-check]
+    aliases: []
+    callable: approval-clock-check
+    about: Check the configured authenticated clock without starting services
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
   - path: [approvals, key-status]
     aliases: []
     callable: approval-keys-status

@@ -1,4 +1,6 @@
 use serde_json::Value;
+#[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
+mod clock_fixture;
 use std::{
     fs,
     os::unix::fs::PermissionsExt,
@@ -26,6 +28,79 @@ fn success(output: &Output) -> Value {
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["ok"], true);
     value["result"].clone()
+}
+
+#[test]
+fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use std::{net::UdpSocket, time::Duration};
+    let root = tempfile::tempdir().unwrap();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let original = fs::read_to_string(&config_path).unwrap();
+    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let address = socket.local_addr().unwrap();
+    let config = |key: String| {
+        format!(
+            "{original}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{address}'\npublic_key='{key}'\nmax_rate_error_ppm=10000\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='gitlab'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.forge.executable]\npath='/not-installed/connectors-gitlab'\nsha256='{}'\nargs=[]\n",
+            "a".repeat(64)
+        )
+    };
+    fs::write(
+        &config_path,
+        config(STANDARD.encode(clock_fixture::root_key())),
+    )
+    .unwrap();
+    success(&command(&root, &["adapters", "list"]));
+    // The command needs configuration only, and cannot accidentally open SQLite.
+    let state = root.path().join("state");
+    let retired_state = root.path().join("unused-state");
+    fs::rename(&state, &retired_state).unwrap();
+    socket.set_nonblocking(true).unwrap();
+    let mut packet = [0; 1024];
+    assert_eq!(
+        socket.recv_from(&mut packet).unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    socket.set_nonblocking(false).unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let fixture = std::thread::spawn(move || {
+        for _ in 0..2 {
+            let mut b = [0; 1024];
+            let (n, caller) = socket.recv_from(&mut b).unwrap();
+            assert_eq!(n, 1024);
+            socket
+                .send_to(&clock_fixture::Fixture::default().reply(&b[..n]), caller)
+                .unwrap();
+        }
+    });
+    let view = success(&command(
+        &root,
+        &["approvals", "clock-check", "--adapter", "forge"],
+    ));
+    assert_eq!(view["adapter"], "forge");
+    let observation = &view["observation"];
+    assert_eq!(
+        observation["configuration_sha256"].as_str().unwrap().len(),
+        64
+    );
+    assert!(
+        observation["upper_unix_ms"].as_i64().unwrap()
+            - observation["lower_unix_ms"].as_i64().unwrap()
+            <= 4000
+    );
+    assert!(!state.exists());
+    fs::write(&config_path, config(STANDARD.encode([17; 32]))).unwrap();
+    let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(refused.stdout.is_empty());
+    let error = String::from_utf8(refused.stderr).unwrap();
+    assert!(error.contains("unavailable"));
+    assert!(!error.contains("lower_unix_ms"));
+    assert!(!state.exists());
+    fixture.join().unwrap();
 }
 
 #[test]
