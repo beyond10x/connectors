@@ -36,7 +36,8 @@ pub struct GitLab(generated::GeneratedAdapter<GitLabBindings>);
 struct GitLabBindings {
     config: Config,
     descriptor: Descriptor,
-    cursors: Cursors,
+    cursors: Arc<Cursors>,
+    partition: Option<String>,
 }
 impl GitLab {
     pub fn new(
@@ -65,7 +66,30 @@ impl GitLab {
             bindings: GitLabBindings {
                 config,
                 descriptor,
-                cursors: Cursors::default(),
+                cursors: Arc::new(Cursors::default()),
+                partition: None,
+            },
+        }))
+    }
+    /// A new immutable HTTP capability for one host-admitted use. Cursor state
+    /// stays adapter-owned and is partitioned by an opaque authenticated binding.
+    /// This value grants no credential lookup, publication or dispatch authority.
+    pub fn with_authenticated_http(
+        &self,
+        http: Arc<dyn AuthenticatedHttp>,
+        partition: &str,
+    ) -> Result<Self> {
+        if !connectors_core::valid_id(partition) {
+            return Err(Error::invalid("invalid cursor partition"));
+        }
+        Ok(Self(generated::GeneratedAdapter {
+            http,
+            descriptor: self.0.descriptor.clone(),
+            bindings: GitLabBindings {
+                config: self.0.bindings.config.clone(),
+                descriptor: self.0.bindings.descriptor.clone(),
+                cursors: self.0.bindings.cursors.clone(),
+                partition: Some(partition.to_owned()),
             },
         }))
     }
@@ -81,8 +105,12 @@ impl GitLabBindings {
         Ok(())
     }
     fn cursor_context(&self, input: &IssuesListRequest) -> Value {
-        json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,
-            "operation":"issues.list","project":input.project,"limit":input.limit})
+        let mut context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,
+            "operation":"issues.list","project":input.project,"limit":input.limit});
+        if let Some(partition) = &self.partition {
+            context["partition"] = json!(partition);
+        }
+        context
     }
 }
 

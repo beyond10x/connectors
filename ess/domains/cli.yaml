@@ -5,6 +5,56 @@ summary: Selected local CLI presentation values; protected inputs are ephemeral,
 # Context, not these payloads. Existing auth/declaration identities retain their
 # String representations; these value references establish no entity relations.
 types:
+  # Private local transport values, owned by contracts/cli/v1alpha1/private-adapter.md.
+  # They bind existing owners and are not public CLI results or persisted entities.
+  - name: connectors.cli.PrivateEntryField
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: label, type: String}
+      - {name: max_bytes, type: Integer}
+  - name: connectors.cli.PrivateStaticProfile
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: revision, type: String}
+      - {name: purpose, type: connectors.auth_access.Purpose}
+      - {name: subject, type: connectors.auth_access.Subject}
+      - {name: scheme, type: connectors.auth_access.Scheme}
+      - {name: capability, type: connectors.auth_access.CapabilityName}
+      - {name: minimum_scopes, type: "List<String>"}
+      - {name: evidence_lifetime_ms, type: Integer}
+      - {name: fields, type: "List<connectors.cli.PrivateEntryField>"}
+  - name: connectors.cli.PrivateOperationEffect
+    kind: enum
+    variants: [read, write, unknown]
+  - name: connectors.cli.PrivateOperationRequirement
+    kind: struct
+    fields:
+      - {name: operation, type: String}
+      - {name: profile, type: String}
+      - {name: scopes, type: "List<String>"}
+      - {name: effect, type: connectors.cli.PrivateOperationEffect}
+  - name: connectors.cli.PrivateAdapterBootstrap
+    kind: struct
+    fields:
+      - {name: instance, type: String}
+      - {name: adapter, type: String}
+      - {name: protocol, type: String}
+      - {name: configuration_revision, type: String}
+      - {name: provider_authority, type: String}
+      - {name: descriptor, type: String}
+      - {name: profiles, type: "List<connectors.cli.PrivateStaticProfile>"}
+      - {name: requirements, type: "List<connectors.cli.PrivateOperationRequirement>"}
+    # descriptor is one bounded JSON document, decoded as the existing Descriptor.
+  - name: connectors.cli.PrivateBaseline
+    kind: struct
+    fields:
+      - {name: identity, type: connectors.credentials.ExternalIdentity}
+      - {name: granted_scopes, type: "Optional<List<String>>"}
+      - {name: credential_expires_at_ms, type: "Optional<Timestamp>"}
+      - {name: collected_at_ms, type: Timestamp}
+      - {name: valid_until_ms, type: Timestamp}
   - name: connectors.cli.StartupMode
     kind: enum
     variants: [on-demand, automatic]

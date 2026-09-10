@@ -198,6 +198,12 @@ impl Executable {
     /// Inspect the admitted artifact without executing it. Launch must repeat
     /// admission and retain the exact descriptor for exec; this is no readiness.
     pub fn check(&self) -> Result<()> {
+        self.open().map(|_| ())
+    }
+
+    /// Return the admitted source file at EOF. Launch additionally captures and
+    /// verifies a sealed snapshot: an inode can still be written in place.
+    pub fn open(&self) -> Result<std::fs::File> {
         use std::os::{
             fd::{AsRawFd, FromRawFd},
             unix::ffi::OsStrExt,
@@ -254,6 +260,6 @@ impl Executable {
         if hex::encode(digest.finalize()) != self.sha256 {
             return Err(Failure::InvalidConfiguration);
         }
-        Ok(())
+        Ok(file)
     }
 }
