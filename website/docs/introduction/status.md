@@ -4,25 +4,44 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Specifications and implementation
+# Source release v0.2.0
 
-The local **v0.1.0 milestone** records reviewed specifications for Kubernetes including discovery, GitLab and SQL. It is a specification baseline, with explicit implementation obligations.
+Version **0.2.0** delivers the persistent Linux GitLab CLI and eleven native read
+operations. The earlier **v0.1.0 milestone** remains a reviewed specification
+baseline for Kubernetes including discovery, GitLab and SQL.
 
-## Implemented first slice
+## Available runtime
 
-Independent Rust services support GitLab project, issue, file, exact-commit CI and MR update-window reads; Kubernetes resource inventory and endpoint/host discovery; and PostgreSQL schema and read-only query operations. A generic client and one-hop federation host can reach these services.
+The [GitLab adapter](/adapters/gitlab) reads projects, issues, files, exact-commit
+pipelines/jobs, bounded traces and merge requests. Pinned-head validation checks
+the selected MR SHA and successful head pipeline and reports blockers; it never
+performs or authorizes a merge.
 
-The local CLI also manages saved GitLab PAT connections through SQLite metadata,
-qualified Secret Service custody and supervised adapter processes. Dedicated
-GitLab sandbox acceptance remains open; Kubernetes and PostgreSQL still need
-this local connection lifecycle.
+Local setup, adapter supervision and connection management use SQLite metadata
+and qualified Secret Service custody. Saved PATs can be reused after restarts,
+repaired, revalidated and locally revoked. Approval-signing keys can be initialized,
+rotated, recovered, revoked and retired through the CLI.
 
-## Reviewed semantics awaiting implementation
+Kubernetes resource inventory and endpoint/host discovery, and PostgreSQL schema
+and read-only query operations, remain available through standalone services.
+The generic client and one-hop federation host retain their existing interfaces.
 
-The newer governed service, managed authentication, durable attempts, approval, audit, discovery-state and retention models define behavior that the first-slice runtime does not yet implement. A generated type or a reviewed lifecycle does not make that behavior available in a running adapter.
+## Verification and remaining work
 
-## Further direction
+The GitLab increment has six production CLI journeys using disposable HTTPS and
+keyring fixtures, native MR tests, local packaging checks, and the repository
+gate including Rust 1.88. Dedicated GitLab sandbox acceptance is still open.
 
-Other adapters have designs and, in some cases, authored native ESS models. Their pages distinguish design coverage from runtime support. Sessions, media and other future profiles remain outside the selected three-adapter implementation scope.
+Private mutation-ledger, audit and approval proof/spend ports have executable
+failure and restart tests. Public approval issuance, qualified production approval
+time and the complete write-dispatch binding remain unfinished. These private
+ports do not make governed GitLab writes available.
 
-This is a local documentation preview. Public distribution and deployment are not configured.
+Kubernetes and PostgreSQL still need the persistent local connection lifecycle.
+Their remaining selected workflows precede MCP and the remaining providers.
+Other adapter pages distinguish designs and typed specifications from running
+implementations; a release does not imply completion of the full provider plan.
+
+This is a source release for Linux x86_64, built with Rust 1.88 or later. Existing
+installed configuration and credentials are not automatically migrated.
+Binary/package distribution and website/cloud deployment are separate.
