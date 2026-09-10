@@ -65,7 +65,17 @@ impl<C: Clock> Store<C> {
         migrate: bool,
         action: impl FnOnce(&Transaction<'_>, Uuid) -> Result<T>,
     ) -> Result<T> {
-        let mut metadata = if migrate {
+        self.transaction_schema(if migrate { 4 } else { 0 }, action)
+    }
+
+    fn transaction_schema<T>(
+        &self,
+        migrate: u8,
+        action: impl FnOnce(&Transaction<'_>, Uuid) -> Result<T>,
+    ) -> Result<T> {
+        let mut metadata = if migrate == 6 {
+            Metadata::update_approvals(&self.path)
+        } else if migrate == 4 {
             Metadata::update_mutations(&self.path)
         } else {
             Metadata::update(&self.path, false)
@@ -93,8 +103,29 @@ impl<C: Clock> Store<C> {
     /// Atomic reserve-and-prepare. The host has already admitted this candidate.
     /// An existing reservation wins before a new preparation can be created.
     pub fn prepare(&self, candidate: &Candidate) -> Result<Preparation> {
+        self.prepare_inner(candidate, None)
+    }
+
+    /// Initial verification is bound to this preparation, then rechecked by the
+    /// spend owner. Existing-key observations do not recreate approval authority.
+    pub fn prepare_approved(
+        &self,
+        candidate: &Candidate,
+        verified: &super::approvals::VerifiedApproval,
+    ) -> Result<Preparation> {
+        let approval = verified
+            .for_candidate(candidate)
+            .map_err(|_| Failure::InvalidInput)?;
+        self.prepare_inner(candidate, Some(Box::new(approval)))
+    }
+
+    fn prepare_inner(
+        &self,
+        candidate: &Candidate,
+        approval: Option<Box<super::approvals::ProofBinding>>,
+    ) -> Result<Preparation> {
         let (key, fingerprint) = candidate.encode()?;
-        self.transaction(true, |tx, authority| {
+        self.transaction_schema(if approval.is_some() { 6 } else { 4 }, |tx, authority| {
             if let Some(key) = &key
                 && let Some(existing) = lookup(tx, authority, key, &fingerprint)?
             { return Ok(Preparation::Existing(existing)); }
@@ -107,13 +138,17 @@ impl<C: Clock> Store<C> {
             let (approval_mode, approval_ref) = candidate.approval.coordinates();
             tx.execute("INSERT INTO mutation_attempts(attempt_id,instance_id,connection_ref,request_id,fingerprint,approval_mode,approval_ref,owner_nonce,publication_fence,state) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'prepared')",
                 params![reference.attempt_id.to_string(), f.operation.instance, f.connection_ref, candidate.request_id, fingerprint, approval_mode, approval_ref, nonce.to_string(), binding.fence]).map_err(db)?;
+            if let Some(approved) = &approval {
+                let subject = String::from_utf8(approved.subject.canonical_bytes().map_err(|_| Failure::InvalidInput)?).map_err(|_| Failure::InvalidInput)?;
+                tx.execute("UPDATE mutation_attempts SET approval_subject=?2 WHERE attempt_id=?1", params![reference.attempt_id.to_string(), subject]).map_err(db)?;
+            }
             #[cfg(test)]
             if self.take_fault(3) { return Err(Failure::MetadataUnavailable); }
             if let Some(key) = key {
                 tx.execute("INSERT INTO mutation_keys(reservation_id,namespace_key,attempt_id,fingerprint,state) VALUES (?1,?2,?3,?4,'pending')",
                     params![Uuid::new_v4().to_string(), key, reference.attempt_id.to_string(), fingerprint]).map_err(db)?;
             }
-            Ok(Preparation::Prepared(Prepared { reference, nonce, process: std::process::id(), binding }))
+            Ok(Preparation::Prepared(Prepared { reference, nonce, process: std::process::id(), binding, approval, spend_started: std::sync::atomic::AtomicBool::new(false) }))
         })
     }
 
@@ -142,12 +177,40 @@ impl<C: Clock> Store<C> {
     /// Separately acknowledged one-shot CAS. This receipt proves only the
     /// metadata gate; it is not sufficient authority for a provider call.
     pub fn open_dispatch(&self, prepared: Prepared) -> Result<GateWinner> {
+        self.dispatch(prepared, None)
+    }
+
+    /// Only the original acknowledged spend receipt opens an approved gate.
+    /// Other required/event-claim preparations cannot use ordinary dispatch.
+    pub fn open_approved_dispatch(
+        &self,
+        prepared: Prepared,
+        spent: super::approvals::SpendReceipt,
+    ) -> Result<GateWinner> {
+        self.dispatch(prepared, Some(spent))
+    }
+
+    fn dispatch(
+        &self,
+        prepared: Prepared,
+        spent: Option<super::approvals::SpendReceipt>,
+    ) -> Result<GateWinner> {
         if prepared.process != std::process::id() {
             return Err(Failure::Conflict);
         }
         self.transaction(false, |tx, authority| {
             check_authority(prepared.reference, authority)?;
             check_binding(tx, &prepared.binding)?;
+            if let Some(spent) = spent {
+                prepared.check_live_approval(tx, authority)?;
+                spent.check(tx, &prepared).map_err(|failure| match failure {
+                    super::approvals::Failure::MetadataUnavailable => Failure::MetadataUnavailable,
+                    _ => Failure::Conflict,
+                })?;
+            } else {
+                let unapproved: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM mutation_attempts WHERE attempt_id=?1 AND approval_mode='not_required')", [prepared.reference.attempt_id.to_string()], |r| r.get(0)).map_err(db)?;
+                if !unapproved { return Err(Failure::Conflict); }
+            }
             let changed = tx.execute("UPDATE mutation_attempts SET state='dispatching' WHERE attempt_id=?1 AND owner_nonce=?2 AND state='prepared' AND publication_fence=?3",
                 params![prepared.reference.attempt_id.to_string(), prepared.nonce.to_string(), prepared.binding.fence]).map_err(db)?;
             if changed != 1 { return Err(Failure::Conflict); }
@@ -332,10 +395,52 @@ fn require_schema(connection: &Connection) -> Result<()> {
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .map_err(db)?;
-    if !(4..=5).contains(&version) {
+    if !(4..=6).contains(&version) {
         return Err(Failure::MetadataUnavailable);
     }
     Ok(())
+}
+impl Prepared {
+    pub(in crate::local) fn claim_spend(&self) -> Result<()> {
+        if self.process != std::process::id()
+            || self.approval.is_none()
+            || self
+                .spend_started
+                .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(Failure::Conflict);
+        }
+        Ok(())
+    }
+    pub(in crate::local) fn approval_binding(&self) -> Option<&super::approvals::ProofBinding> {
+        self.approval.as_deref()
+    }
+
+    pub(in crate::local) fn check_live_approval(
+        &self,
+        tx: &Transaction<'_>,
+        authority: Uuid,
+    ) -> Result<()> {
+        if self.process != std::process::id() {
+            return Err(Failure::Conflict);
+        }
+        check_authority(self.reference, authority)?;
+        check_binding(tx, &self.binding)?;
+        let approval = self.approval.as_ref().ok_or(Failure::Conflict)?;
+        let subject = String::from_utf8(
+            approval
+                .subject
+                .canonical_bytes()
+                .map_err(|_| Failure::Conflict)?,
+        )
+        .map_err(|_| Failure::Conflict)?;
+        let live: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM mutation_attempts WHERE attempt_id=?1 AND owner_nonce=?2 AND state='prepared' AND publication_fence=?3 AND approval_mode='required' AND approval_ref=?4 AND approval_subject=?5)",
+            params![self.reference.attempt_id.to_string(), self.nonce.to_string(), self.binding.fence, approval.reference, subject], |r| r.get(0)).map_err(db)?;
+        if !live {
+            return Err(Failure::Conflict);
+        }
+        Ok(())
+    }
 }
 fn check_authority(reference: AttemptRef, authority: Uuid) -> Result<()> {
     if reference.authority != authority || reference.attempt_id.is_nil() {

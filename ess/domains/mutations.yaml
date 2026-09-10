@@ -1,6 +1,6 @@
 domain: connectors.mutations
 
-summary: Proposed host-owned mutation attempt ledger; not a public API or a runtime binding.
+summary: Host-owned mutation attempt ledger with a private local binding; not a public mutation API.
 
 # These commands describe trusted ledger decisions. They grant no caller authority,
 # perform no provider I/O, and do not model approval redemption. See the normative
@@ -77,6 +77,10 @@ entities:
       - {name: input_digest, type: String}
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
       - {name: approval_ref, type: "Optional<String>"}
+      # Immutable full subject captured by an approval-aware preparation. Old
+      # attempts can lack it and remain observable/recoverable, but cannot gain
+      # a new approval-spend receipt by reconstructing missing authority facts.
+      - {name: approval_subject, type: "Optional<connectors.delegation.CanonicalApprovalSubject>"}
       - {name: idempotency_key, type: "Optional<String>"}
       # Host fixes this with the first durable terminal outcome. Keyed retention
       # uses that instant even if reservation settlement is recovered later.
@@ -132,6 +136,7 @@ commands:
       - {name: input_digest, type: String}
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
       - {name: approval_ref, type: "Optional<String>"}
+      - {name: approval_subject, type: "Optional<connectors.delegation.CanonicalApprovalSubject>"}
       - {name: idempotency_key, type: "Optional<String>"}
     outcomes:
       - name: prepared

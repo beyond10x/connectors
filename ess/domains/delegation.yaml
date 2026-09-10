@@ -1,5 +1,5 @@
 domain: connectors.delegation
-summary: Proposed one-hop approval subjects, request authority and immutable receiver receipts; no runtime verifier.
+summary: One-hop approval subjects and immutable receiver receipts; private host approval binding, no delegated ingress runtime.
 
 # Owner: contracts/service/delegation.md. These are canonical/admitted values,
 # never trust derived from matching a caller-written string. Codec and policy
@@ -74,6 +74,22 @@ types:
       - {name: alg, type: String}
       - {name: kid, type: String}
       - {name: typ, type: String}
+  # Current trusted approval-key configuration value, not a discovered key or
+  # a new issuer entity. The host's guarded policy binding supplies this value;
+  # public_key is the canonical unpadded base64url encoding of 32 Ed25519 bytes.
+  # Validity bounds are Unix milliseconds; current clock containment, revocation
+  # serialization, issuer authority and protected signing custody remain owner
+  # predicates. No key/issuer is admitted by deserializing this value.
+  - name: connectors.delegation.ConfiguredApprovalKey
+    kind: struct
+    fields:
+      - {name: issuer, type: String}
+      - {name: audience, type: String}
+      - {name: kid, type: String}
+      - {name: public_key, type: String}
+      - {name: not_before_unix_ms, type: Integer}
+      - {name: not_after_unix_ms, type: Integer}
+      - {name: revoked, type: Boolean}
   - name: connectors.delegation.Purpose
     kind: enum
     variants: [describe, prepare, invoke]

@@ -28,6 +28,7 @@ tracing-subscriber.workspace = true
 url.workspace = true
 libc = "0.2"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
+ring = "=0.17.14"
 toml = "0.8"
 uuid.workspace = true
 sha2.workspace = true

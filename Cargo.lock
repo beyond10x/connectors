@@ -648,6 +648,7 @@ dependencies = [
  "libc",
  "rcgen",
  "reqwest",
+ "ring",
  "rusqlite",
  "schemars",
  "serde",
