@@ -14,6 +14,7 @@ const APPLICATION_ID: i64 = 0x434e4354;
 const MIGRATION: &str = "CREATE TABLE local_authority (singleton INTEGER PRIMARY KEY CHECK(singleton=1), authority_id TEXT NOT NULL UNIQUE, owner_uid INTEGER NOT NULL); CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, digest TEXT NOT NULL);";
 const REGISTRY_MIGRATION: &str = include_str!("metadata/registry.sql");
 const RUNTIME_MIGRATION: &str = include_str!("metadata/runtime.sql");
+const MUTATION_MIGRATION: &str = include_str!("metadata/mutations.sql");
 const NAME: &str = "metadata.sqlite3";
 const LOCK: &str = "metadata.lock";
 
@@ -51,7 +52,7 @@ impl Metadata {
             .map_err(unavailable)?;
         if version != 0 || app != 0 {
             metadata.validate()?;
-            metadata.migrate_registry()?;
+            metadata.migrate(3)?;
             return Ok(metadata);
         }
         let count: i64 = metadata
@@ -114,7 +115,7 @@ impl Metadata {
             .sync_all()
             .map_err(|_| Failure::OutcomeUnknown)?;
         metadata.validate()?;
-        metadata.migrate_registry()?;
+        metadata.migrate(3)?;
         Ok(metadata)
     }
 
@@ -136,9 +137,17 @@ impl Metadata {
         let mut metadata = Self::open_connection(path, dir, lock, false)?;
         metadata.validate()?;
         if migrate {
-            metadata.migrate_registry()?;
+            metadata.migrate(3)?;
         }
         metadata.require_registry()?;
+        Ok(metadata)
+    }
+
+    /// Only the admitted mutation port installs its schema. Existing setup and
+    /// read owners must not upgrade storage for an unused business-write port.
+    pub(super) fn update_mutations(path: &Path) -> Result<Self> {
+        let mut metadata = Self::update(path, true)?;
+        metadata.migrate(4)?;
         Ok(metadata)
     }
 
@@ -147,7 +156,7 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(unavailable)?;
-        if !(2..=3).contains(&version) {
+        if !(2..=4).contains(&version) {
             return Err(Failure::MetadataUnavailable);
         }
         Ok(())
@@ -165,13 +174,17 @@ impl Metadata {
         uuid::Uuid::parse_str(&text).map_err(|_| Failure::MetadataUnavailable)
     }
 
-    fn migrate_registry(&mut self) -> Result<()> {
+    fn migrate(&mut self, target: i64) -> Result<()> {
         let version: i64 = self
             .connection
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(unavailable)?;
-        for (next, sql) in [(2, REGISTRY_MIGRATION), (3, RUNTIME_MIGRATION)] {
-            if version >= next {
+        for (next, sql) in [
+            (2, REGISTRY_MIGRATION),
+            (3, RUNTIME_MIGRATION),
+            (4, MUTATION_MIGRATION),
+        ] {
+            if version >= next || next > target {
                 continue;
             }
             let tx = self
@@ -263,7 +276,7 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
             .map_err(unavailable)?;
-        if app != APPLICATION_ID || !(1..=3).contains(&version) || mode != "wal" {
+        if app != APPLICATION_ID || !(1..=4).contains(&version) || mode != "wal" {
             return Err(Failure::MetadataUnavailable);
         }
         let (authority, owner): (String, u32) = self
@@ -296,6 +309,12 @@ impl Metadata {
         }
         if version >= 3 {
             expected.push((3, hex::encode(Sha256::digest(RUNTIME_MIGRATION.as_bytes()))));
+        }
+        if version >= 4 {
+            expected.push((
+                4,
+                hex::encode(Sha256::digest(MUTATION_MIGRATION.as_bytes())),
+            ));
         }
         if migrations != expected {
             return Err(Failure::MetadataUnavailable);

@@ -6,6 +6,17 @@ summary: Proposed host-owned mutation attempt ledger; not a public API or a runt
 # perform no provider I/O, and do not model approval redemption. See the normative
 # dispatch fence and evidence rules in contracts/operations/v1alpha1/semantics.md.
 types:
+  - name: connectors.mutations.SettlementClockInterval
+    kind: struct
+    fields:
+      - {name: lower_unix_ms, type: Integer}
+      - {name: upper_unix_ms, type: Integer}
+    # Trusted host clock evidence sampled inside the ledger transaction, never
+    # caller input or an unqualified wall-clock sample. Both bounds contain
+    # actual current time; upper fixes settlement conservatively, and lower
+    # proves retention expiry. Unavailable/invalid evidence permits no expiry.
+    # UNMAPPED: a deployment must qualify its clock source; ESS does not prove
+    # the interval's provenance or containment of actual time.
   - name: connectors.mutations.AttemptId
     kind: newtype
     of: Uuid
