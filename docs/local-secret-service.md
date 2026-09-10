@@ -2,10 +2,11 @@
 
 The host's `local::keyring::custody` module implements immutable scoped writes and
 exact-version reads against one qualified Linux Secret Service implementation.
-It is infrastructure for the persistent GitLab journey. Connection publication,
-protected CLI entry and guarded retirement are still unfinished. The CLI's
-`persistent_custody_qualification` prerequisite remains failed; this module does
-not yet establish a usable saved connection.
+It is infrastructure for the persistent GitLab journey. The
+[SQLite coordinator](local-connection-registry.md) now binds connection publication
+and guarded retirement. Protected CLI entry and supervised invocation remain
+unfinished. `setup check` qualifies the current daemon/storage against this exact
+binding; that prerequisite alone does not establish a usable saved connection.
 
 ## Selected implementation
 
@@ -61,7 +62,7 @@ records the tuple before a write. These are opaque store coordinates, not new
 provider identities, public selectors or dispatch grants. Values and references
 have no Debug or Serialize implementation. Secret byte buffers clear on drop.
 
-`write_new` refuses an existing exact version and always calls `CreateItem` with
+The guarded writer refuses an existing exact version and always calls `CreateItem` with
 replacement disabled. A process-local mutex and directory flock serialize the
 lookup/create gap among cooperating Connectors instances. There is no listing of
 credential values; searches are confined to the admitted collection and exact
@@ -94,10 +95,14 @@ shows. That label is accepted only under this qualified implementation; it never
 selects a decoder, changes bytes, or grants authority. Each D-Bus method has a
 two-second timeout, and backend errors expose only closed safe categories.
 
-Physical item deletion exists only in the isolated qualification tests. Production
-must first bind the metadata retirement fence, 24-hour retention, and no-valid-use
-or recovery checks specified by custody section 4.1. Tests of deletion persistence
-are not evidence that those coordinator guards have been implemented.
+The registry checks the candidate's current acquisition/publication fence while
+the backend holds its physical writer lock. The deletion path checks the durable
+retirement fence, full 24-hour retention, terminal acquisition and absence of a
+live use under the same lock. A paused writer cannot recreate an acknowledged
+retired version. Unknown deletion retains its fence and cleanup obligation; a
+subsequent exact guarded deletion may confirm absence and acknowledge completion.
+These guards run in short metadata transactions before physical I/O; no SQLite
+handle is retained over a Secret Service method call.
 
 ## Disposable qualification
 
@@ -109,6 +114,8 @@ after the children exit. The test is opt-in because it needs the exact qualified
 OS binary. Run it explicitly in addition to the repository gate:
 
 ```sh
+CARGO_BUILD_JOBS=2 cargo build --locked --offline -p connectors
+export CONNECTORS_TEST_CLI="$CARGO_TARGET_DIR/debug/connectors"
 CARGO_BUILD_JOBS=2 cargo test --locked --offline -p connectors-host --lib \
   local::keyring -- --include-ignored --nocapture
 ```

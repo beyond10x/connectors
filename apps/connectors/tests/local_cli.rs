@@ -54,7 +54,8 @@ fn production_parser_initializes_and_inspects_across_processes() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|p| p["name"] == "persistent_custody_qualification" && p["state"] == "failed")
+            .any(|p| p["name"] == "persistent_custody_qualification"
+                && matches!(p["state"].as_str(), Some("ready" | "failed")))
     );
 }
 
@@ -82,6 +83,71 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     ));
     assert_eq!(describe["source"], "configuration");
     assert!(describe.get("descriptor").is_none());
+    let connections = success(&command(
+        &root,
+        &["connections", "list", "--adapter", "forge"],
+    ));
+    assert_eq!(connections["connections"], serde_json::json!([]));
+    assert_eq!(connections["source"], "authority");
+    assert_eq!(connections["stale"], false);
+    assert!(
+        connections["valid_until_ms"].as_u64().unwrap()
+            > connections["observed_at_ms"].as_u64().unwrap()
+    );
+    for args in [
+        vec![
+            "connections",
+            "describe",
+            "--adapter",
+            "forge",
+            "--connection",
+            "missing",
+        ],
+        vec![
+            "connections",
+            "status",
+            "--adapter",
+            "forge",
+            "--acquisition",
+            "missing",
+        ],
+        vec![
+            "connections",
+            "revoke",
+            "--adapter",
+            "forge",
+            "--connection",
+            "missing",
+            "--expected-revision",
+            "private-sentinel",
+        ],
+    ] {
+        let output = command(&root, &args);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+        assert_eq!(error["error"]["data"]["code"], "not_found");
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("sentinel"));
+    }
+    let stale = command(
+        &root,
+        &[
+            "connections",
+            "list",
+            "--adapter",
+            "forge",
+            "--cursor",
+            "unknown",
+        ],
+    );
+    let error: Value = serde_json::from_slice(&stale.stderr).unwrap();
+    assert_eq!(error["error"]["data"]["code"], "stale_cursor");
+    // Authority loss must not become a successful empty list or recreate state.
+    fs::remove_file(root.path().join("state/metadata.sqlite3")).unwrap();
+    let unavailable = command(&root, &["connections", "list", "--adapter", "forge"]);
+    let error: Value = serde_json::from_slice(&unavailable.stderr).unwrap();
+    assert_eq!(error["error"]["data"]["code"], "metadata_unavailable");
+    assert!(!root.path().join("state/metadata.sqlite3").exists());
     fs::set_permissions(&config_path, fs::Permissions::from_mode(0o644)).unwrap();
     let output = command(&root, &["adapters", "list"]);
     assert_eq!(output.status.code(), Some(2));

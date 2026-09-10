@@ -191,6 +191,32 @@ evaluation counts as provider work; it grants no arbitrary business mutation.
 Exact native request/response interpretation and a supporting implementation are
 advertisement prerequisites.
 
+### 4.5 Retained scope and expiry observations
+
+`EvidenceSnapshot` may retain `granted_scopes` and `credential_expires_at` for its
+exact captured generation. They supply the already-required scope and expiry
+checks after owner restart; neither introduces a credential, a separate evidence
+owner, nor another publication boundary. Native validation interprets provider
+responses and any scope implications. The host retains that bounded observation
+under the same binding, profile and generation fences as the snapshot.
+
+Absent scopes mean unknown; an explicitly present empty set means a known empty
+set. At most 64 distinct nonempty strings of at most 256 UTF-8 bytes are retained.
+They are exact native-profile values, never a host-wide provider vocabulary or
+permission grant. A scope membership check can use them only while the applicable
+generation-bound `scope_check` remains current and successful. Operation-specific
+permission and receiver policy remain separately required. Scope observation
+cannot extend its check's deadline, cross a generation change implicitly, or
+turn a missing/failed check into positive evidence.
+
+Known credential expiry is an immediate cutoff at `now >= credential_expires_at`,
+including when a cached positive check would otherwise remain fresh. Absence
+does not establish that material never expires. The native profile must have
+positively validated its expiry semantics before publication. The snapshot still
+expires at its ordinary check deadlines. These optional private carriers are
+additive; older snapshots with no scope observation cannot infer grants, and no
+new public service or diagnostic field is selected by their ESS presence.
+
 ## 5. Limits
 
 | Concern | Rule |
