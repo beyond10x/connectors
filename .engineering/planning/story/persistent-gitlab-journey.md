@@ -37,7 +37,7 @@ scope:
   path: docs
 - confidence: cited
   path: ess/domains
-revision: 9
+revision: 10
 ---
 ## Acceptance
 
@@ -94,3 +94,11 @@ The new adapter-owned auth contract/model and adapters/gitlab/src/auth.rs implem
 The full repository gate with Rust 1.88, generation, conformance, tests/Clippy and boundaries passes on these inputs. Documentation drift checks pass. Exact commands, hashes and limits are retained in docs/evidence/gitlab-auth-20260910/README.md. This evidence covers a native helper and its boundaries, not CLI acquisition or the persistent restart journey.
 
 GNOME Keyring 50.0 source inspection finds file fsync followed by rename in its save path; the complete durability barrier and exact storage/service binding still need qualification before an acknowledged write can publish a connection. No existing keyring secret was accessed or changed. The private bootstrap binding, source admission, custody coordinator, metadata publication and supervised CLI invocation remain required. The dedicated sandbox request is still unanswered. This story and the three-provider goal remain active; no runtime milestone is marked complete.
+
+## 2026-09-10 Secret Service custody checkpoint
+
+The host now implements scoped immutable Secret Service writes and exact-version reads, with explicit file/directory synchronization for the audited GNOME Keyring 50.0 daemon artifact on the admitted ext filesystem family. docs/local-secret-service.md records the private layout, process/executable binding, encryption checks, acknowledgement boundary and limits. Existing auth_bindings.CustodyVersion semantics own the scoped tuple; this adds no provider entity or new planning decomposition.
+
+Four tests passed in an explicit native qualification run, including two disposable DBus/GNOME daemon fixtures. Evidence covers exact-version reuse after SIGKILL and unlocked restart, locked restart refusal, dead-owner capability refusal, failed native writes, uncertain synchronization, immutable concurrent writes, scope and metadata denial, unsafe/changed backing files, and physical deletion surviving restart. The repository gate passed, including Rust 1.88, ESS, generation, conformance, workspace tests, Clippy and boundaries. Website reference drift check passed. Exact inputs and results are retained in docs/evidence/gitlab-custody-20260910/README.md.
+
+Physical deletion is test-only until the host's retirement fence, 24-hour retention and no-valid-use/recovery checks are implemented. Metadata publication and protected input/adapter bootstrap/supervision remain unfinished; setup's persistent custody prerequisite remains failed. This story stays active and has not passed its CLI/sandbox acceptance. Next bind the SQLite acquisition/publication/retirement records and the private adapter runtime so the validated GitLab credential can actually be saved and reused through the generated CLI. The existing sandbox and AEP driver blockers remain unchanged. The initiative still has one decomposing child, so no new critic panel is required for this implementation checkpoint.

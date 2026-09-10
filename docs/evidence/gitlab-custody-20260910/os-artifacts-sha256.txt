@@ -1,0 +1,2 @@
+b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02f5f2ca53958b  /usr/bin/gnome-keyring-daemon
+e9ffeaea83965fa53077f716e352d3038794200bacb8eee043fe55117ce2c7d7  /usr/bin/dbus-daemon
