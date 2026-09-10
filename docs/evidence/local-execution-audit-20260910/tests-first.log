@@ -1,0 +1,58 @@
+   Compiling tokio-rustls v0.26.5
+   Compiling rcgen v0.14.10
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 5.79s
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-71cbfc80b4e39cb6)
+
+running 13 tests
+
+running 1 test
+test local::audit::tests::anchor_failure_or_lost_ack_never_returns_an_admission_receipt ... ok
+
+running 1 test
+test local::audit::tests::byte_bounds_safe_shapes_and_aggregate_budget_are_enforced ... ok
+
+running 1 test
+
+running 1 test
+test local::audit::tests::abrupt_process_exits_preserve_acknowledgement_boundaries_without_resend ... ok
+test local::audit::tests::capacity_is_atomic_per_instance_without_eviction_or_append_restriction ... ok
+test local::audit::tests::concurrent_finalization_has_one_immutable_winner_and_exact_retry ... ok
+test local::audit::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+test local::audit::tests::corrupted_or_unavailable_metadata_is_not_absence_or_recovered_acknowledgement ... ok
+test local::audit::tests::exact_private_identity_is_injective_bounded_and_strictly_decoded ... ok
+test local::audit::tests::failed_final_append_preserves_live_answer_and_unknown_ack_recovers_exactly ... ok
+test local::audit::tests::early_refusal_and_malformed_or_mismatched_facts_cannot_satisfy_the_gate ... ok
+test local::audit::tests::passive_old_schema_inspection_never_installs_audit_and_migration_preserves_history ... ok
+test local::audit::tests::same_public_ref_is_independent_per_instance_and_gateway_and_leaf ... ok
+test local::audit::tests::retained_cross_owner_references_are_checked_and_never_cascade_deleted ... ok
+
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 50 filtered out; finished in 1.45s
+
+     Running tests/http.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http-a95f676376068531)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/http_prefix.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http_prefix-945291f228694631)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/local_foundation.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_foundation-7df578f1d01e9df2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/service.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/service-7c6fb6c8b90b537e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+

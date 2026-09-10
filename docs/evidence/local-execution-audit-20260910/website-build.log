@@ -1,0 +1,72 @@
+npm notice run connectors-website@0.1.0 prebuild
+npm notice run npm run reference && npm run examples
+npm notice run connectors-website@0.1.0 reference
+npm notice run cd .. && cargo run --locked -p connectors-build -- docs
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.83s
+     Running `website/../.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build docs`
+website: 43 contract pages, 93 total reference pages; generated
+npm notice run connectors-website@0.1.0 examples
+npm notice run cd .. && cargo run --locked -p connectors-build -- examples
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `website/../.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build examples`
+website: walkthrough input/result match the GitLab descriptor
+connectors v1 — 21 file(s), valid
+   Compiling connectors-types v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/connectors-types)
+   Compiling contract-examples v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/contract-examples)
+   Compiling connectors-system v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/connectors-system)
+   Compiling connectors-web v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/web/connectors/crates/connectors-web)
+   Compiling connectors-contract-examples v0.1.0 (/home/timo/beyond10x/connectors_v2/website/examples/realization)
+    Finished `release` profile [optimized] target(s) in 4.85s
+website: 3 public files checked; no private path markers
+website: Rust/WASM contract examples built
+npm notice run connectors-website@0.1.0 build
+npm notice run DOCUSAURUS_GENERATED_FILES_DIR_NAME=.cache/build-docusaurus docusaurus build
+[INFO] [en] Creating an optimized production build...
+[webpackbar] ℹ Compiling Client
+[webpackbar] ℹ Compiling Server
+[webpackbar] ✔ Server: Compiled successfully in 2.37s
+[webpackbar] ✔ Client: Compiled successfully in 4.73s
+[WARNING] {"message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:43534. Ignoring.","compilerPath":"client"}
+[WARNING] {"message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:45259. Ignoring.","compilerPath":"client"}
+[WARNING] {"message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:74889. Ignoring.","compilerPath":"client"}
+[WARNING] {"message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:80835. Ignoring.","compilerPath":"client"}
+website: 327 public files checked; no private path markers
+
+Running Pagefind v1.5.2 (Extended)
+Running from: "/home/timo/beyond10x/connectors_v2/website"
+Source:       "build"
+Output:       "build/pagefind"
+
+[Walking source directory]
+Found 116 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 114 pages
+  Indexed 7380 words
+  Indexed 3 filters
+  Indexed 0 sorts
+
+Finished in 0.147 seconds
+website: 468 public files checked; no private path markers
+website: local full-text search indexed and preview refreshed
+[SUCCESS] Generated static files in "build".
+[INFO] Use `npm run serve` command to test your build locally.

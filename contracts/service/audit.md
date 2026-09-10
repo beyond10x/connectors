@@ -1,7 +1,8 @@
 # Execution audit contract
 
-**Status:** proposed specification; no persistence binding, exporter, query
-service or runtime dispatch integration is implemented.
+**Status:** specified, with a private local SQLite persistence binding and
+executable failure fixtures. Public dispatch integration, query service and
+exporter remain unimplemented. See the [local binding](../../docs/local-execution-audit.md).
 
 This contract owns the durable execution-audit record required by the governed
 service binding. Public response projection remains owned by
@@ -159,4 +160,5 @@ It does not enforce optional-field co-presence, byte/count bounds, trusted fact
 provenance, durable acknowledgement, atomic uniqueness, exact-once append,
 byte-identical retry comparison, actual clocks, capacity refusal, retention or
 dispatch ordering. Those remain explicit persistence-port and conformance
-obligations. No runtime implementation is supplied by this contract.
+obligations. The local SQLite port implements the selected record and append
+semantics; complete governed dispatch remains a separate integration obligation.
