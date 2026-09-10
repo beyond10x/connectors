@@ -189,7 +189,7 @@ fn require_schema(connection: &Connection) -> Result<()> {
     let version: i64 = connection
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .map_err(db)?;
-    if version != 5 {
+    if !(5..=6).contains(&version) {
         return Err(Failure::MetadataUnavailable);
     }
     Ok(())

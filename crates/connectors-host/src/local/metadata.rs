@@ -12,6 +12,7 @@ use std::{
 
 const APPLICATION_ID: i64 = 0x434e4354;
 const MIGRATION: &str = "CREATE TABLE local_authority (singleton INTEGER PRIMARY KEY CHECK(singleton=1), authority_id TEXT NOT NULL UNIQUE, owner_uid INTEGER NOT NULL); CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, digest TEXT NOT NULL);";
+const APPROVAL_MIGRATION: &str = include_str!("metadata/approvals.sql");
 const REGISTRY_MIGRATION: &str = include_str!("metadata/registry.sql");
 const RUNTIME_MIGRATION: &str = include_str!("metadata/runtime.sql");
 const MUTATION_MIGRATION: &str = include_str!("metadata/mutations.sql");
@@ -160,12 +161,18 @@ impl Metadata {
         Ok(metadata)
     }
 
+    pub(super) fn update_approvals(path: &Path) -> Result<Self> {
+        let mut metadata = Self::update(path, true)?;
+        metadata.migrate(6)?;
+        Ok(metadata)
+    }
+
     pub(super) fn require_registry(&self) -> Result<()> {
         let version: i64 = self
             .connection
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(unavailable)?;
-        if !(2..=5).contains(&version) {
+        if !(2..=6).contains(&version) {
             return Err(Failure::MetadataUnavailable);
         }
         Ok(())
@@ -193,6 +200,7 @@ impl Metadata {
             (3, RUNTIME_MIGRATION),
             (4, MUTATION_MIGRATION),
             (5, AUDIT_MIGRATION),
+            (6, APPROVAL_MIGRATION),
         ] {
             if version >= next || next > target {
                 continue;
@@ -286,7 +294,7 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
             .map_err(unavailable)?;
-        if app != APPLICATION_ID || !(1..=5).contains(&version) || mode != "wal" {
+        if app != APPLICATION_ID || !(1..=6).contains(&version) || mode != "wal" {
             return Err(Failure::MetadataUnavailable);
         }
         let (authority, owner): (String, u32) = self
@@ -328,6 +336,12 @@ impl Metadata {
         }
         if version >= 5 {
             expected.push((5, hex::encode(Sha256::digest(AUDIT_MIGRATION.as_bytes()))));
+        }
+        if version >= 6 {
+            expected.push((
+                6,
+                hex::encode(Sha256::digest(APPROVAL_MIGRATION.as_bytes())),
+            ));
         }
         if migrations != expected {
             return Err(Failure::MetadataUnavailable);
