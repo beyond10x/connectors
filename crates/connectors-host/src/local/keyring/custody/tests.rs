@@ -316,8 +316,8 @@ fn disposable_secret_service_restart_and_failures() {
     attrs.insert("unexpected.attribute", "fictional".to_owned());
     proxy.set_property("Attributes", attrs).unwrap();
     assert!(matches!(final_store.read(changed), Err(Failure::Denied)));
-    // No caller metadata was published by this backend fixture. Guarded
-    // retirement/publication and the CLI journey still need coordinator tests.
+    // This fixture covers the backend alone. Registry publication/retirement and
+    // CLI status/revoke are exercised by the composition fixture below.
 }
 
 #[test]
@@ -343,4 +343,244 @@ fn disposable_changed_keyring_format_is_refused_before_transfer() {
         store.write_new(version(own_scope), &Secret(b"fictional".to_vec())),
         Err(Failure::Unavailable)
     );
+}
+
+#[test]
+#[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
+fn disposable_registry_publication_cli_and_retirement_restart() {
+    use crate::local::{
+        config::{Config, Paths},
+        registry::{self, Registry},
+    };
+    use std::collections::BTreeSet;
+    let binary = std::env::var_os("CONNECTORS_TEST_CLI").expect("built production CLI required");
+    let mut fixture = Fixture::new();
+    let paths = Paths::resolve(
+        Some(&fixture.root.path().join("config/config.toml")),
+        Some(&fixture.root.path().join("state")),
+    )
+    .unwrap();
+    Config::initialize(&paths).unwrap();
+    let config = std::fs::read_to_string(&paths.config).unwrap()
+        + &format!(
+            "\n[adapters.fixture]\ninstance_id='fixture-instance'\nadapter_id='fixture-adapter'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.fixture.executable]\npath='/not-installed/must-not-start'\nsha256='{}'\nargs=[]\n",
+            "a".repeat(64)
+        );
+    std::fs::write(&paths.config, config).unwrap();
+    let cli = |args: &[&str]| {
+        // Only acquisition status and revoke: neither accesses any keyring bus.
+        let output = Command::new(&binary)
+            .args(["--output", "json", "--config"])
+            .arg(&paths.config)
+            .arg("--state-dir")
+            .arg(&paths.state)
+            .args(["connections"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "production CLI refused fixture metadata"
+        );
+        assert!(output.stderr.is_empty());
+        let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(value["ok"], true);
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("fictional-material"));
+        value["result"].clone()
+    };
+    let binding = registry::Binding {
+        instance_id: "fixture-instance".into(),
+        adapter_id: "fixture-adapter".into(),
+        configuration_revision: "cfg-1".into(),
+        provider_authority: "https://fixture.invalid".into(),
+        profile: registry::StaticProfile {
+            id: "fixture-token".into(),
+            revision: "profile-1".into(),
+            purpose: registry::Purpose::DelegatedUser,
+            subject: registry::Subject::User,
+            minimum_scopes: BTreeSet::new(),
+            evidence_lifetime_ms: 60_000,
+        },
+    };
+    let baseline = |now| registry::ValidatedBaseline {
+        identity: registry::ExternalIdentity {
+            kind: "fixture".into(),
+            subject: "one".into(),
+        },
+        granted_scopes: Some(BTreeSet::new()),
+        credential_expires_at_ms: None,
+        collected_at_ms: now,
+        valid_until_ms: now + 60_000,
+    };
+    let clock = connectors_sdk::now_ms;
+    let registry = Registry::new(&paths.state);
+    let acquisition = registry.begin(&binding, clock()).unwrap();
+    let acquisition_ref = acquisition.reference().to_owned();
+    let claim = registry.consume(acquisition, clock()).unwrap();
+    let material = Secret(b"fictional-material".to_vec());
+    let now = clock();
+    let prepared = registry
+        .prepare(&claim, baseline(now), material.0.len(), now)
+        .unwrap();
+    let exact = prepared.version();
+    let store = fixture.store(exact.scope()).unwrap();
+    let connection = registry
+        .store_and_publish(prepared, &material, &store, clock)
+        .unwrap();
+    drop(store);
+    drop(registry);
+    fixture.stop();
+    fixture.start(false);
+    assert!(matches!(
+        fixture.store(exact.scope()),
+        Err(Failure::Unavailable)
+    ));
+    fixture.stop();
+    fixture.start(true);
+    let registry = Registry::new(&paths.state);
+    let captured = registry
+        .capture_read(
+            &binding,
+            &connection,
+            &BTreeSet::new(),
+            clock(),
+            clock() + 30_000,
+        )
+        .unwrap();
+    assert!(captured.version() == exact);
+    let store = fixture.store(captured.version().scope()).unwrap();
+    assert_eq!(store.read(captured.version()).unwrap().0, material.0);
+    let dispatched = registry.dispatch_read(captured, clock()).unwrap();
+    registry.release_read(dispatched, clock()).unwrap();
+    let status = cli(&[
+        "status",
+        "--adapter",
+        "fixture",
+        "--acquisition",
+        &acquisition_ref,
+    ]);
+    assert_eq!(status["acquisition"]["state"], "completed");
+    assert_eq!(status["acquisition"]["connection"], connection);
+    let observed = registry
+        .describe(
+            "fixture-instance",
+            "fixture-adapter",
+            "cfg-1",
+            &connection,
+            clock(),
+            true,
+        )
+        .unwrap();
+    let revoked = cli(&[
+        "revoke",
+        "--adapter",
+        "fixture",
+        "--connection",
+        &connection,
+        "--expected-revision",
+        &observed.revision,
+    ]);
+    assert_eq!(revoked["local_state"], "revoked");
+    assert_eq!(revoked["provider_outcome"], "not_requested");
+    let repeated = cli(&[
+        "revoke",
+        "--adapter",
+        "fixture",
+        "--connection",
+        &connection,
+        "--expected-revision",
+        &observed.revision,
+    ]);
+    assert_eq!(repeated["revision"], revoked["revision"]);
+
+    // A failed physical acknowledgement leaves a private candidate, never a
+    // fabricated connection. Its exact material can still exist after restart.
+    let acquisition = registry.begin(&binding, clock()).unwrap();
+    let failed_ref = acquisition.reference().to_owned();
+    let claim = registry.consume(acquisition, clock()).unwrap();
+    let now = clock();
+    let prepared = registry
+        .prepare(&claim, baseline(now), material.0.len(), now)
+        .unwrap();
+    let unknown = prepared.version();
+    let unknown_store = fixture.store(unknown.scope()).unwrap();
+    unknown_store
+        .persistence
+        .fail_sync
+        .store(true, Ordering::SeqCst);
+    assert_eq!(
+        registry.store_and_publish(prepared, &material, &unknown_store, clock),
+        Err(registry::Failure::OutcomeUnknown)
+    );
+    unknown_store
+        .persistence
+        .fail_sync
+        .store(false, Ordering::SeqCst);
+    assert_eq!(
+        cli(&[
+            "status",
+            "--adapter",
+            "fixture",
+            "--acquisition",
+            &failed_ref
+        ])["acquisition"]["state"],
+        "pending"
+    );
+    registry.fail(&claim, clock()).unwrap();
+    assert_eq!(
+        cli(&[
+            "status",
+            "--adapter",
+            "fixture",
+            "--acquisition",
+            &failed_ref
+        ])["acquisition"]["reason"],
+        "rejected"
+    );
+    let acquisition = registry.begin(&binding, clock()).unwrap();
+    let claim = registry.consume(acquisition, clock()).unwrap();
+    let now = clock();
+    let paused = registry
+        .prepare(&claim, baseline(now), material.0.len(), now)
+        .unwrap();
+    let absent = paused.version();
+    registry.fail(&claim, clock()).unwrap();
+    let target = fixture.store(absent.scope()).unwrap();
+    assert_eq!(
+        registry.store_and_publish(paused, &material, &target, clock),
+        Err(registry::Failure::Conflict)
+    );
+    assert!(matches!(target.read(absent), Err(Failure::Missing)));
+    let later = clock() + 86_400_001;
+    let mut retirements = registry.retirements(later).unwrap();
+    assert_eq!(retirements.len(), 3);
+    let retirement = retirements.remove(0);
+    let target = fixture.store(retirement.version().scope()).unwrap();
+    target.persistence.fail_sync.store(true, Ordering::SeqCst);
+    assert_eq!(
+        registry.delete_retired(retirement, &target, || later),
+        Err(registry::Failure::OutcomeUnknown)
+    );
+    target.persistence.fail_sync.store(false, Ordering::SeqCst);
+    // The unknown delete response retains the fence and cleanup obligation.
+    // Recovery repeats guarded deletion only, never a provider effect or write.
+    let registry = Registry::new(&paths.state);
+    assert_eq!(registry.retirements(later).unwrap().len(), 3);
+    for retirement in registry.retirements(later).unwrap() {
+        let target = fixture.store(retirement.version().scope()).unwrap();
+        registry
+            .delete_retired(retirement, &target, || later)
+            .unwrap();
+    }
+    fixture.stop();
+    fixture.start(true);
+    assert!(matches!(
+        fixture.store(exact.scope()).unwrap().read(exact),
+        Err(Failure::Missing)
+    ));
+    assert!(matches!(
+        fixture.store(unknown.scope()).unwrap().read(unknown),
+        Err(Failure::Missing)
+    ));
+    assert!(registry.retirements(later).unwrap().is_empty());
 }

@@ -1,7 +1,8 @@
 # Local CLI foundation
 
 The production `connectors` binary consumes the generated local CLI parser for
-setup and passive configured inventory. This is initial work under
+setup, passive configured inventory and connection list/describe/status/revoke.
+This is incremental work under
 `initiative:complete-local-connectors` and `story:persistent-gitlab-journey`.
 It does not complete the persistent GitLab journey or the broader runtime plan.
 
@@ -50,9 +51,10 @@ private state directory. The lock serializes the bounded setup/inspection handle
 whole lifetime, including schema installation and SQLite's last-close sidecar
 retirement; OS process exit releases it. These handles must not be held across
 provider work. SQLite owns the durable authority.
-Its first migration records only the local authority identity, UID and migration
-digest. It does not yet contain a connection registry, custody publications,
-approval spending or dispatch records.
+Its first migration records the local authority identity, UID and migration
+digest. Migration two adds the [connection registry](local-connection-registry.md),
+acquisition/custody publication, retirement and bounded read-use guards. Approval
+spending and business write dispatch remain unfinished.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
 temporary storage, with two-second lock/busy bounds. Versioned migrations commit
@@ -90,8 +92,9 @@ wrong owner reports `unavailable`; a locked collection reports `locked`.
 This initial profile does not use a caller-supplied D-Bus address or a remote bus.
 
 An available collection is not qualified persistent custody. The additional
-`persistent_custody_qualification` prerequisite remains failed until the selected
-backend has durable write, restart recovery and guarded deletion evidence. The
+`persistent_custody_qualification` prerequisite checks the exact qualified daemon
+artifact and admitted encrypted storage. It reports ready only for that binding;
+an available service from another implementation remains unqualified. The
 [Secret Service API](https://specifications.freedesktop.org/secret-service/latest-single/)
 defines service operations and secret transport, but supplies no generic fsync
 acknowledgement contract for every implementation. Backend qualification therefore
@@ -101,12 +104,18 @@ remains necessary under the selected
 The host now has an initial [Secret Service custody implementation](local-secret-service.md)
 for a pinned GNOME Keyring binary: scoped immutable writes, exact reads and explicit
 filesystem synchronization. Its disposable daemon tests exercise crash/restart and
-failure handling. Metadata publication and guarded retirement are still unbound,
-so this does not change the CLI prerequisite or make connection commands usable.
+failure handling. The registry binds publication and guarded retirement, with
+separate native tests covering both and CLI acquisition status/revoke after restart.
 
 Protected connect/repair sources refuse with `cli_source` before reading any file,
 stdin or terminal. No generated demonstration capture is used in production.
-Connection registry commands return unavailable metadata; cached operation
+`connections list --adapter ALIAS` returns safe authoritative summaries and bounded
+opaque cursors. `describe --connection REF`, `status --connection REF` or
+`status --acquisition REF` observe the selected owner records. `revoke --connection
+REF --expected-revision REV` commits terminal local revocation, even without a
+keyring or provider. These subcommands also require `--adapter ALIAS`. They never
+launch an adapter. Missing or unrecognized registry state returns
+`metadata_unavailable`; missing references return `not_found`. Cached operation
 inspection returns `description_unavailable`. Local operation invocation has no
 admitted source/schema/dispatch binding yet. These refusals are unfinished
 capabilities, not acceptance evidence for connection handling.
@@ -121,7 +130,8 @@ The production-process tests cover fresh setup and metadata reuse across CLI
 processes, exclusive initialization, configured inventory and passive status,
 permission errors and safe source refusal. Host tests cover concurrent
 initialization, stable authority identity, unsafe paths/private files/sidecars,
-future schema refusal and owner/migration tampering. These tests do not claim
-keyring durability, provider authentication, process supervision or the GitLab
+future schema refusal and owner/migration tampering. The registry and native
+custody tests have separate scope described in their linked binding documents.
+These tests do not claim provider authentication, process supervision or the GitLab
 restart journey. Actual commands and results belong in the retained evidence
 record for this delivery.
