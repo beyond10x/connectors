@@ -140,7 +140,8 @@ impl Local {
                         | "job.get"
                         | "job.trace"
                         | "merge_request.get"
-                        | "merge_requests.list" => Effect::Read,
+                        | "merge_requests.list"
+                        | "merge_request.validate" => Effect::Read,
                         _ => Effect::Unknown,
                     },
                 })
