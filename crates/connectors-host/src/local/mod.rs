@@ -2,6 +2,7 @@
 //!
 //! These owners do not grant provider access. Custody qualification and the
 //! connection/supervisor coordinators must be bound before credential acquisition.
+pub mod audit;
 pub mod config;
 pub mod filesystem;
 pub mod keyring;
