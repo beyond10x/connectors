@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 14
+revision: 16
 ---
 ## Outcome and authority
 
@@ -122,3 +122,15 @@ Next is protected persistent local issuer-key custody/publication/rotation and a
 story:local-approval-keys completes local `approvals key-init`, `key-status`, `key-rotate`, `key-recover`, `key-revoke` and `key-retire`. Migration seven and qualified purpose-separated Secret Service custody retain immutable key identities and exact publication/revocation/retirement fences. Current-key leases exclude management through protected use; they supply no caller or subject authority. docs/evidence/local-approval-keys-20260910/README.md retains the Rust 1.88 gate, eleven key tests with three actual child exits and all six production commands, five optimized GitLab CLI journeys, website/reference checks, fifteen example tests and exact source/tool/executable identities. All four final planning critics approve after three recorded fixes.
 
 Next implement actual local approval preparation/issuance with authenticated caller/subject policy and qualified time, then generated mutation ingress and complete connection-bound provider dispatch. Native GitLab validation/writes, the unanswered C14 create/update head-guard choice and dedicated GitLab sandbox acceptance remain open. The key-management CLI is not an approval-proof or provider-write interface. The initiative remains active and retains the complete GitLab → Kubernetes → PostgreSQL → MCP → remaining-provider order and all original acceptance, compatibility, publication-boundary and reproducible-delivery requirements.
+
+## Pinned MR validation increment — 2026-09-10
+
+story:gitlab-mr-validation adds a native read that compares an exact requested MR SHA and selected head pipeline with bounded current observations through the existing CLI. It does not issue approval proofs, admit mutations or claim exhaustive project-rule validation. Dedicated GitLab sandbox evidence is still required; the existing credential blocker also names this story. Native ESS value validation precedes its decomposition, and all four independent planning critics review its boundaries against the existing children.
+
+Time-source qualification is still unresolved: the researched Roughenough 2.0.0 default radius is five seconds, wider than the selected approval proof's maximum four-second full interval; documentation/authentic signatures alone establish no qualified production clock. No clock dependency or trust configuration was added. Independent native validation proceeds while actual issuance/caller policy, qualified time and full mutation dispatch remain parent-owned next work. The create/update head-guard decision remains unanswered. GitLab stays first, followed by Kubernetes, PostgreSQL, MCP and remaining providers. The initial cleanup is verified: local main contains 4aa3354788172616202b0d7dacea65bd5b9a35b0 and only the primary Connectors checkout exists; no Connectors publication is performed.
+
+## Verified native MR validation checkpoint — 2026-09-10
+
+The local CLI now invokes eleven GitLab read operations, including merge_request.validate. The new read checks an exact requested MR source SHA and selected successful head pipeline with opened/non-draft/mergeable predicates, reports ordered blockers and always reports merge_performed=false. It grants no future write. Twelve native MR tests, the complete Rust 1.88 gate, six production CLI/private HTTPS/qualified-keyring journeys, local GitLab image packaging and website/reference/fifteen example checks pass. docs/evidence/gitlab-mr-validation-20260910/README.md retains exact inputs, artifact identities, failed-test corrections and eight independent critic records; both acceptance findings are fixed and all final critics approve.
+
+story:gitlab-mr-validation stays active pending dedicated GitLab sandbox evidence, alongside the earlier read stories. Next implementation remains actual approval preparation/issuance with authenticated subject policy and a qualified clock, then complete connection-bound mutation ingress/dispatch and native GitLab writes. Clock qualification and the C14 create/update head-guard choice remain unresolved; the validation read does not substitute for those controls. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers, with all original acceptance, reproducible-delivery and publication boundaries retained. This checkpoint is local main integration only; no Connectors publication or Atlas registration is performed.

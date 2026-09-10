@@ -83,6 +83,61 @@ fn window(input: &MergeRequestsListRequest) -> Result<(OffsetDateTime, OffsetDat
 }
 
 impl GitLabBindings {
+    pub(super) fn mr_finish_validation(
+        &self,
+        input: MergeRequestValidateRequest,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        let raw = upstream_json(&response)?;
+        let mr = observation(&raw, &input.project, Some(input.iid))?;
+        let pipeline = if raw["head_pipeline"].is_null() {
+            Value::Null
+        } else {
+            let p = &raw["head_pipeline"];
+            let id = positive(&p["id"])?;
+            let project = positive(&p["project_id"])?;
+            if (mr["source_project_id"] != project && mr["target_project_id"] != project)
+                || p["sha"].is_null()
+            {
+                return Err(protocol());
+            }
+            json!({"id":id,"project_id":project,"sha":optional_sha(&p["sha"])?,
+                "status":text(&p["status"],64,false)?})
+        };
+        let mut blockers = Vec::new();
+        if mr["sha"].is_null() {
+            blockers.push("head_unavailable");
+        } else if mr["sha"] != input.sha {
+            blockers.push("head_changed");
+        }
+        if mr["state"] != "opened" {
+            blockers.push("not_open");
+        }
+        if mr["draft"] == true {
+            blockers.push("draft");
+        }
+        if mr["detailed_merge_status"] != "mergeable" {
+            blockers.push("merge_checks_pending");
+        }
+        if pipeline.is_null() {
+            blockers.push("pipeline_unavailable");
+        } else {
+            if pipeline["id"] != input.pipeline_id {
+                blockers.push("pipeline_changed");
+            }
+            if pipeline["sha"] != input.sha {
+                blockers.push("pipeline_head_mismatch");
+            }
+            if pipeline["status"] != "success" {
+                blockers.push("pipeline_not_successful");
+            }
+        }
+        Ok(json!({"item":{"merge_request":mr,"expected_sha":input.sha,
+            "expected_pipeline_id":input.pipeline_id,"head_pipeline":pipeline,
+            "checks_passed":blockers.is_empty(),"blockers":blockers,"merge_performed":false},
+            "provenance":provenance(&self.descriptor.instance,
+                format!("{}/merge_requests/{}",input.project,input.iid),None)}))
+    }
     fn mr_cursor_context(&self, input: &MergeRequestsListRequest) -> Value {
         json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,
             "partition":self.partition,"operation":"merge_requests.list",
