@@ -366,11 +366,17 @@ pub fn import(spec: &Spec, spec_path: &Path) -> Result<(Value, Value)> {
                             "minLength",
                             "maxLength",
                             "pattern",
+                            "format",
                         ]
                         .contains(&k.as_str())
                     })
                 }) {
                     return Err(refuse("unsupported mapped source schema semantics"));
+                }
+                if schema.get("format").is_some()
+                    && (schema["type"] != "string" || schema["format"] != "date-time")
+                {
+                    return Err(refuse("unsupported mapped source format"));
                 }
                 let admits = |ty: &str| {
                     schema["type"] == ty
@@ -407,6 +413,7 @@ pub fn import(spec: &Spec, spec_path: &Path) -> Result<(Value, Value)> {
                             "maxLength",
                             "pattern",
                             "enum",
+                            "format",
                         ] {
                             if schema.get(key).is_some() && schema[key] != input[key] {
                                 return Err(refuse(format!(
@@ -417,7 +424,9 @@ pub fn import(spec: &Spec, spec_path: &Path) -> Result<(Value, Value)> {
                     }
                     Parameter::Constant { value } => {
                         if !admits("string")
-                            || !jsonschema::validator_for(schema)
+                            || !jsonschema::options()
+                                .should_validate_formats(true)
+                                .build(schema)
                                 .map_err(|_| refuse("invalid constant schema"))?
                                 .is_valid(&json!(value))
                             || schema["enum"]
@@ -440,6 +449,7 @@ pub fn import(spec: &Spec, spec_path: &Path) -> Result<(Value, Value)> {
                             "maxLength",
                             "pattern",
                             "enum",
+                            "format",
                         ]
                         .iter()
                         .any(|key| schema.get(key).is_some())

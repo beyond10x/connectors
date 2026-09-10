@@ -8,39 +8,6 @@ fn service_refusal(output: Output, code: &str) {
     assert_eq!(error["stage"], "dispatch");
 }
 
-impl Cli {
-    fn ci_invoke(&self, connection: &str, operation: &str, input: Value) -> Output {
-        let description = success(self.run(&[
-            "operations",
-            "describe",
-            "--adapter",
-            "forge",
-            "--operation",
-            operation,
-        ]));
-        self.run(&[
-            "operations",
-            "invoke",
-            "--adapter",
-            "forge",
-            "--connection",
-            connection,
-            "--operation",
-            operation,
-            "--schema",
-            description["schema"].as_str().unwrap(),
-            "--revision",
-            description["revision"].as_str().unwrap(),
-            "--input-json",
-            &input.to_string(),
-        ])
-    }
-    fn ci_result(&self, connection: &str, operation: &str, input: Value) -> Value {
-        let result = success(self.ci_invoke(connection, operation, input));
-        serde_json::from_str(result["result"].as_str().unwrap()).unwrap()
-    }
-}
-
 #[test]
 #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
 fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
@@ -87,7 +54,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
 
     let before = provider.count();
     refusal(
-        cli.ci_invoke(
+        cli.operation_invoke(
             connection,
             "pipelines.list",
             json!({"project":"org/project","sha":"main","limit":10}),
@@ -95,7 +62,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
         "invalid_input",
     );
     assert_eq!(provider.count(), before);
-    let listed = cli.ci_result(
+    let listed = cli.operation_result(
         connection,
         "pipelines.list",
         json!({"project":"org/project","sha":SHA,"limit":10}),
@@ -103,7 +70,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
     assert_eq!(listed["items"][0]["id"], 11);
     assert_eq!(listed["provenance"]["source_revision"], SHA);
     for state in ["pending", "running", "failed"] {
-        let p = cli.ci_result(
+        let p = cli.operation_result(
             connection,
             "pipeline.get",
             json!({"project":"org/project","pipeline_id":11,"sha":SHA}),
@@ -111,7 +78,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
         assert_eq!(p["item"]["status"], state);
     }
     service_refusal(
-        cli.ci_invoke(
+        cli.operation_invoke(
             connection,
             "pipeline.get",
             json!({"project":"org/project","pipeline_id":12,"sha":SHA}),
@@ -120,7 +87,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
     );
     renew(); // Explicit workflow action; business reads never revalidate implicitly.
     let mut input = json!({"project":"org/project","pipeline_id":11,"sha":SHA,"limit":1});
-    let page = cli.ci_result(connection, "pipeline.jobs", input.clone());
+    let page = cli.operation_result(connection, "pipeline.jobs", input.clone());
     assert_eq!(page["complete"], false);
     assert_eq!(page["items"][0]["id"], 42);
     assert_eq!(page["items"][0]["status"], "failed");
@@ -129,35 +96,35 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
     let mut wrong = input.clone();
     wrong["sha"] = json!("f".repeat(40));
     service_refusal(
-        cli.ci_invoke(connection, "pipeline.jobs", wrong),
+        cli.operation_invoke(connection, "pipeline.jobs", wrong),
         "stale_cursor",
     );
     assert_eq!(provider.count(), before);
-    let page = cli.ci_result(connection, "pipeline.jobs", input);
+    let page = cli.operation_result(connection, "pipeline.jobs", input);
     assert_eq!(page["items"][0]["id"], 41);
     assert_eq!(page["complete"], true);
-    let j = cli.ci_result(
+    let j = cli.operation_result(
         connection,
         "job.get",
         json!({"project":"org/project","job_id":42,"pipeline_id":11,"sha":SHA}),
     );
     assert_eq!(j["item"]["status"], "failed");
     renew();
-    let trace = cli.ci_result(
+    let trace = cli.operation_result(
         connection,
         "job.trace",
         json!({"project":"org/project","job_id":42,"max_bytes":100}),
     );
     assert_eq!(trace["item"]["content"], "test failed: €\n");
     assert_eq!(trace["item"]["complete"], true);
-    let trace = cli.ci_result(
+    let trace = cli.operation_result(
         connection,
         "job.trace",
         json!({"project":"org/project","job_id":42,"max_bytes":8}),
     );
     assert_eq!(trace["item"]["content"], "test fai");
     assert_eq!(trace["item"]["complete"], false);
-    let trace = cli.ci_result(
+    let trace = cli.operation_result(
         connection,
         "job.trace",
         json!({"project":"org/project","job_id":41,"max_bytes":512000}),
@@ -165,7 +132,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
     assert_eq!(trace["item"]["bytes"], 511999);
     assert_eq!(trace["item"]["complete"], false);
     service_refusal(
-        cli.ci_invoke(
+        cli.operation_invoke(
             connection,
             "job.trace",
             json!({"project":"org/project","job_id":999,"max_bytes":100}),
@@ -178,7 +145,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
         .response_status
         .store(503, std::sync::atomic::Ordering::SeqCst);
     refusal(
-        cli.ci_invoke(
+        cli.operation_invoke(
             connection,
             "pipeline.get",
             json!({"project":"org/project","pipeline_id":11,"sha":SHA}),
@@ -189,7 +156,7 @@ fn gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces() {
         .response_status
         .store(429, std::sync::atomic::Ordering::SeqCst);
     service_refusal(
-        cli.ci_invoke(
+        cli.operation_invoke(
             connection,
             "pipeline.get",
             json!({"project":"org/project","pipeline_id":11,"sha":SHA}),

@@ -10,7 +10,7 @@ The local **v0.1.0 milestone** records reviewed specifications for Kubernetes in
 
 ## Implemented first slice
 
-Independent Rust services support GitLab project, issue, file and exact-commit CI reads; Kubernetes resource inventory and endpoint/host discovery; and PostgreSQL schema and read-only query operations. A generic client and one-hop federation host can reach these services.
+Independent Rust services support GitLab project, issue, file, exact-commit CI and MR update-window reads; Kubernetes resource inventory and endpoint/host discovery; and PostgreSQL schema and read-only query operations. A generic client and one-hop federation host can reach these services.
 
 The local CLI also manages saved GitLab PAT connections through SQLite metadata,
 qualified Secret Service custody and supervised adapter processes. Dedicated

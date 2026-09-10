@@ -8,6 +8,7 @@ use std::{
     fs,
     os::unix::fs::{PermissionsExt, symlink},
     sync::{Arc, Barrier},
+    time::{Duration, Instant},
 };
 
 fn root() -> tempfile::TempDir {
@@ -111,7 +112,11 @@ fn concurrent_initialization_round() {
             let state = paths.state.clone();
             std::thread::spawn(move || {
                 barrier.wait();
-                Config::initialize(&Paths { config, state })
+                let started = Instant::now();
+                (
+                    Config::initialize(&Paths { config, state }),
+                    started.elapsed(),
+                )
             })
         })
         .collect();
@@ -120,17 +125,52 @@ fn concurrent_initialization_round() {
         .map(|thread| thread.join().unwrap())
         .collect();
     assert_eq!(
-        results.iter().filter(|r| r.is_ok()).count(),
+        results.iter().filter(|(r, _)| r.is_ok()).count(),
         1,
         "{results:?}"
     );
     assert!(
-        results
-            .iter()
-            .all(|r| r.is_ok() || *r == Err(Failure::ConfigurationExists)),
+        results.iter().all(|(r, elapsed)| r.is_ok()
+            || *r == Err(Failure::ConfigurationExists)
+            || (*r == Err(Failure::MetadataUnavailable) && *elapsed >= Duration::from_secs(2))),
         "{results:?}"
     );
     Metadata::inspect(&paths.state).unwrap();
+    // Setup's bounded lock can expire under storage/scheduling contention.
+    // Once the winner is done, every explicit retry must observe its config;
+    // an early unavailable response remains a failure above.
+    for (result, _) in results {
+        if result.is_err() {
+            assert_eq!(
+                Config::initialize(&paths),
+                Err(Failure::ConfigurationExists)
+            );
+        }
+    }
+}
+
+#[test]
+fn contending_metadata_open_refuses_at_its_bound_and_recovers_after_release() {
+    let root = root();
+    let paths = paths(&root);
+    Config::initialize(&paths).unwrap();
+    let configuration = fs::read(&paths.config).unwrap();
+    let held = Metadata::inspect(&paths.state).unwrap();
+    let state = paths.state.clone();
+    let (send, receive) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let started = Instant::now();
+        send.send((Metadata::initialize(&state).map(|_| ()), started.elapsed()))
+            .unwrap();
+    });
+    let (result, elapsed) = receive.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(result, Err(Failure::MetadataUnavailable));
+    assert!(elapsed >= Duration::from_secs(2));
+    worker.join().unwrap();
+    drop(held);
+    Metadata::initialize(&paths.state).unwrap();
+    Metadata::inspect(&paths.state).unwrap();
+    assert_eq!(fs::read(&paths.config).unwrap(), configuration);
 }
 
 #[test]

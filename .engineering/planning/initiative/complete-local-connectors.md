@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 6
+revision: 7
 ---
 ## Outcome and authority
 
@@ -65,3 +65,13 @@ The earlier current-evidence paragraph records the initiative's initial runtime 
 The initiative now has two decomposing stories. Unlike the earlier one-child scheduling update, this CI decomposition ran all four planning critics independently in two bounded rounds, with the acceptance finding fixed and all second-round verdicts approved. Existing completed specification milestones, the related MCP epic and Kubernetes story remain unchanged.
 
 Neither GitLab story is complete without its dedicated sandbox evidence. Missing GitLab access remains an explicit credential blocker. The next independent implementation is GitLab MR/changed-record reads and admitted MR create/update/merge with the required shared write controls; Kubernetes and PostgreSQL follow the full selected GitLab work. MCP and the remaining providers retain their required order and scope. The paid AEP driver blocker, full cross-provider acceptance and reproducible distribution obligations remain open. Connectors stays local on main with no task-owned linked trees; MCP's pre-existing primary documentation-workflow edit is preserved.
+
+## MR read checkpoint — 2026-09-10
+
+The initiative now has three decomposing runtime stories. story:gitlab-mr-reads adds merge_request.get and fixed-window merge_requests.list, bringing GitLab to ten generated read operations. Four planning critics reviewed the partial decomposition in two bounded rounds; both acceptance findings were fixed and all final verdicts approve. The exact critic records and outcomes remain in the store.
+
+The full required gate, five production CLI journeys, website/reference checks and local image build pass. docs/evidence/gitlab-mr-20260910/README.md preserves source/artifact identities and the initial setup-contention test failure with its bounded-wait verification follow-up. Dedicated sandbox evidence remains required for all three GitLab stories; none is complete from local fixtures.
+
+Next is native MR validation and guarded create/update/merge with shared approval, audit, durable attempts, dispatch and idempotency. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers. Missing write semantics must be modeled and reviewed before their implementation decomposition. Other GitLab collection, cross-provider acceptance, complete three-adapter management and reproducible distribution remain parent-owned ordered work.
+
+Worktree inspection finds no Connectors linked trees; the local main integration checkpoint retains verified artifacts and active-goal caches. MCP's primary checkout was separately observed clean at bf7f9415fbd8a28abff789d7d39d2584a8f6d2b2; the earlier workflow edit is no longer a local diff, and this increment made no MCP change or publication claim. Re-read that updated baseline when the MCP phase begins. The distinct AEP driver protocol-loading blocker remains unchanged, with paid governed runs outside this implementation requirement.

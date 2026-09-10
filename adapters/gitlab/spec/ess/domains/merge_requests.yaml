@@ -1,0 +1,31 @@
+domain: connectors_gitlab.merge_requests
+summary: Bounded GitLab MR read projections; no local persistent entity or ownership of provider resources.
+types:
+  - name: connectors_gitlab.merge_requests.Observation
+    kind: struct
+    fields:
+      - {name: id, type: Integer}
+      - {name: iid, type: Integer}
+      - {name: project_id, type: Integer}
+      - {name: source_project_id, type: Optional<Integer>}
+      - {name: target_project_id, type: Integer}
+      - {name: title, type: String}
+      - {name: description, type: Optional<String>}
+      - {name: source_branch, type: String}
+      - {name: target_branch, type: String}
+      - {name: state, type: String}
+      - {name: draft, type: Boolean}
+      - {name: detailed_merge_status, type: String}
+      - {name: sha, type: Optional<String>}
+      - {name: merge_commit_sha, type: Optional<String>}
+      - {name: squash_commit_sha, type: Optional<String>}
+      - {name: updated_at, type: Timestamp}
+
+# Projection selected from the AEP OpenAPI reverse draft for the unchanged pinned
+# APIEntitiesMergeRequestBasic/APIEntitiesMergeRequest source schemas. Imported
+# user/project graph ownership and provider lifecycles are not part of this value.
+# IDs are observed native coordinates, not local foreign keys or entity relations.
+# Runtime owner: adapters/gitlab/contracts/merge-requests/v1alpha1/semantics.md.
+# Requiredness, nullable missing observations, identity equality, bounds, SHA and
+# timestamp predicates are explicit native codec obligations, not inferred from
+# the upstream schema's optional fields. No merge validation receipt is modeled.
