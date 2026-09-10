@@ -40,7 +40,7 @@
       "title": "Execution audit",
       "source": "contracts/service/audit.md",
       "owner": "shared",
-      "status": "Specified; runtime pending"
+      "status": "Specified; SQLite audit fixtures; dispatch integration pending"
     },
     {
       "route": "/contracts/mutations",

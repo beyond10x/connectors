@@ -15,6 +15,7 @@ connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
 async-trait.workspace = true
+base64.workspace = true
 axum.workspace = true
 reqwest.workspace = true
 serde.workspace = true
