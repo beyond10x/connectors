@@ -21,6 +21,31 @@ types:
       - {name: squash_commit_sha, type: Optional<String>}
       - {name: updated_at, type: Timestamp}
 
+  - name: connectors_gitlab.merge_requests.ValidationInput
+    kind: struct
+    fields:
+      - {name: project, type: String}
+      - {name: iid, type: Integer}
+      - {name: sha, type: String}
+      - {name: pipeline_id, type: Integer}
+  - name: connectors_gitlab.merge_requests.PipelineCheck
+    kind: struct
+    fields:
+      - {name: id, type: Integer}
+      - {name: project_id, type: Integer}
+      - {name: sha, type: String}
+      - {name: status, type: String}
+  - name: connectors_gitlab.merge_requests.Validation
+    kind: struct
+    fields:
+      - {name: merge_request, type: connectors_gitlab.merge_requests.Observation}
+      - {name: expected_sha, type: String}
+      - {name: expected_pipeline_id, type: Integer}
+      - {name: head_pipeline, type: Optional<connectors_gitlab.merge_requests.PipelineCheck>}
+      - {name: checks_passed, type: Boolean}
+      - {name: blockers, type: List<String>}
+      - {name: merge_performed, type: Boolean}
+
 # Projection selected from the AEP OpenAPI reverse draft for the unchanged pinned
 # APIEntitiesMergeRequestBasic/APIEntitiesMergeRequest source schemas. Imported
 # user/project graph ownership and provider lifecycles are not part of this value.
@@ -28,4 +53,6 @@ types:
 # Runtime owner: adapters/gitlab/contracts/merge-requests/v1alpha1/semantics.md.
 # Requiredness, nullable missing observations, identity equality, bounds, SHA and
 # timestamp predicates are explicit native codec obligations, not inferred from
-# the upstream schema's optional fields. No merge validation receipt is modeled.
+# the upstream schema's optional fields. Validation is a transient read value,
+# never a persistent receipt, authority grant or guarantee of a future write.
+# Its predicates and fixed blocker order are owned by validation.md.

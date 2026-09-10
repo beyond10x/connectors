@@ -197,6 +197,13 @@
       "status": "Local implementation; dedicated sandbox acceptance open"
     },
     {
+      "route": "/adapters/gitlab/contracts/merge-validation",
+      "title": "GitLab pinned-head validation",
+      "source": "adapters/gitlab/contracts/merge-requests/v1alpha1/validation.md",
+      "owner": "gitlab",
+      "status": "Read-only observation; dedicated sandbox acceptance open"
+    },
+    {
       "route": "/adapters/sql/contracts/reads",
       "title": "PostgreSQL bounded reads",
       "source": "adapters/sql/contracts/reads/v1alpha1/semantics.md",

@@ -13,6 +13,7 @@
         "gitlab.requests.JobGetRequest",
         "gitlab.requests.JobTraceRequest",
         "gitlab.requests.MergeRequestGetRequest",
+        "gitlab.requests.MergeRequestValidateRequest",
         "gitlab.requests.MergeRequestsListRequest",
         "gitlab.requests.PipelineGetRequest",
         "gitlab.requests.PipelineJobsRequest",
@@ -190,6 +191,48 @@
           },
           {
             "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.MergeRequestValidateRequest": {
+      "name": "gitlab.requests.MergeRequestValidateRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "iid",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "pipeline_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "sha",
             "type_ref": {
               "kind": "primitive",
               "name": "string"

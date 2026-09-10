@@ -8,6 +8,7 @@ relations:
 - blocks: story:persistent-gitlab-journey
 - blocks: story:gitlab-ci-runtime
 - blocks: story:gitlab-mr-reads
+- blocks: story:gitlab-mr-validation
 withholds: test_result
 revision: 1
 ---
