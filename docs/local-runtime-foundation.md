@@ -59,7 +59,10 @@ digest. Migration two adds the [connection registry](local-connection-registry.m
 acquisition/custody publication, retirement and bounded read-use guards. Migration
 three adds cached bootstraps and durable stop suppression. Migration four adds
 the private [mutation attempt and keyed-reservation store](local-mutation-ledger.md).
-Approval spending, audit and complete business write dispatch remain unfinished.
+Migration five adds the separately acknowledged [execution audit store](local-execution-audit.md).
+Only their admitted private owners install these two migrations; ordinary setup
+retains version three. Approval spending and complete business write dispatch
+remain unfinished.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
 temporary storage, with two-second lock/busy bounds. Versioned migrations commit
