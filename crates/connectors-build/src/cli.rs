@@ -28,7 +28,7 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
     }
     validate_values(root, ess)?;
     println!(
-        "CLI contract fixture {}; production handlers remain deferred",
+        "CLI contract fixture {}; custody and lifecycle runtime conformance remain obligations",
         if check { "matches" } else { "generated" }
     );
     Ok(())

@@ -25,6 +25,14 @@ separate steps.
 
 ## Where the project stands
 
+The local CLI now implements private `setup init`, passive `setup check`, and
+configured adapter list/describe/status through the generated parser. Setup
+initializes a versioned SQLite metadata authority. Persistent credential custody,
+connection management and supervised invocation are still unfinished; the
+persistent GitLab restart journey has **not** passed acceptance. See the
+[local runtime foundation](docs/local-runtime-foundation.md) for commands and
+current refusals. The explicit network commands below remain compatible.
+
 This repository contains a working local data/discovery slice and a broader,
 reviewed specification baseline. The local **v0.1.0 milestone is a specification
 milestone**: it stabilizes the selected Kubernetes, GitLab and SQL contracts and

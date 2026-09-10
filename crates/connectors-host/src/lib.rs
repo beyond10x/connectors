@@ -1,6 +1,7 @@
 pub mod credentials;
 pub mod federation;
 pub mod http;
+pub mod local;
 pub mod server;
 
 use connectors_core::{Error, Result};
