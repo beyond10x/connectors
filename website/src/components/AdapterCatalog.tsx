@@ -12,7 +12,7 @@ export default function AdapterCatalog() {
         count: adapters.length
       }, {
         value: 'working',
-        label: 'Working first slice',
+        label: 'Available runtime',
         count: 3
       }, {
         value: 'documented',

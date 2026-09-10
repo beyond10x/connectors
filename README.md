@@ -25,6 +25,9 @@ separate steps.
 
 ## Where the project stands
 
+Source release **v0.2.0** packages the persistent GitLab CLI and eleven native read
+operations. The [changelog](CHANGELOG.md) records its scope and remaining work.
+
 The local CLI implements setup, configured adapter management, protected
 connect/repair, saved-credential revalidation, connection inspection/revoke, cached operation discovery and
 supervised GitLab reads through its generated parser. A local owner manages exact
@@ -69,7 +72,8 @@ protected key initialization, rotation, recovery, revocation and retirement.
 Approval issuance, writes, MCP binding and complete multi-provider acceptance remain
 implementation work; the executable also provides `describe`, `invoke` and `serve`.
 
-There is no public release distribution or configured deployment. Historical
+Build this source release locally; binary/package distribution and deployment
+are not configured. Historical
 [runtime verification](docs/verification.md) and the
 [specification checkpoint](docs/evidence/core-model-closure-20260909/checkpoint.md)
 describe what was checked and its limits.

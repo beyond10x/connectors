@@ -7,7 +7,7 @@ import ReferenceCards from '@site/src/components/ReferenceCards';
 
 # GitLab
 
-Repository data through bounded reads.
+Eleven bounded reads and persistent local credentials in source release v0.2.0.
 
 [Follow a request from your laptop to GitLab](/introduction/examples) to see federation, the separate authentication boundaries and the issue response.
 
@@ -27,7 +27,101 @@ a fixed inclusive update window with bounded pages and explicit completeness.
 Unknown statuses and missing heads remain observations; they do not validate a
 merge. Read the [MR contract](/adapters/gitlab/contracts/merge-requests) for window,
 cursor and projection rules. Mutable pages are not a snapshot or lossless feed;
-the consumer owns its checkpoint. Governed MR writes remain unimplemented.
+the consumer owns its checkpoint.
+
+`merge_request.validate` checks an exact requested MR source SHA and selected
+successful head pipeline, together with opened, non-draft and mergeable status.
+The result contains `checks_passed`, ordered `blockers` and
+`merge_performed: false`. A negative validation is a successful read: inspect
+`checks_passed` even when the CLI exits successfully. A passing observation
+does not reserve the head or authorize a later write. See the
+[validation contract](/adapters/gitlab/contracts/merge-validation).
+Governed MR writes remain unimplemented.
+
+## Use saved credentials
+
+The local CLI requires Linux x86_64 and the qualified GNOME Keyring Secret Service
+binding described in the source guide `docs/local-secret-service.md`: the pinned
+Arch Linux GNOME Keyring 50.0 daemon on ext4, with an already-unlocked encrypted
+login collection. Other daemon builds and filesystems require qualification.
+SQLite stores connection metadata; credentials stay in the keyring.
+Existing installed configuration and credentials are not automatically imported.
+Build the optimized CLI and adapter so supervised startup fits its bounded budget:
+
+```sh
+CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-gitlab
+target/release/connectors --output json setup init
+target/release/connectors --output json setup check
+```
+
+Create a private native configuration file with your endpoint and permitted projects:
+
+```json
+{
+  "format": "connectors-gitlab-local/1",
+  "instance": "gitlab-local",
+  "api_base": "https://gitlab.example/api/v4",
+  "allowed_projects": ["group/project"]
+}
+```
+
+Keep it owner-only in a directory without symlinks. Read the native bootstrap and
+hash the executable:
+
+```sh
+target/release/connectors-gitlab --local-config /absolute/path/gitlab.json --print-local-bootstrap
+sha256sum target/release/connectors-gitlab
+```
+
+Add this entry to the TOML configuration created by setup, substituting the exact
+bootstrap revision, executable hash and absolute paths:
+
+```toml
+[adapters.forge]
+instance_id = "gitlab-local"
+adapter_id = "gitlab"
+configuration_revision = "REPLACE_FROM_BOOTSTRAP"
+protocol = "v1alpha1"
+startup = "on-demand"
+restart = "never"
+
+[adapters.forge.permissions]
+profiles = ["gitlab.pat"]
+operations = ["project.get", "issues.list", "file.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.get", "merge_requests.list", "merge_request.validate"]
+
+[adapters.forge.executable]
+path = "/absolute/path/connectors-gitlab"
+sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
+args = ["--local-config", "/absolute/path/gitlab.json"]
+```
+
+Connect using the hidden PAT prompt, then describe the operation:
+
+```sh
+target/release/connectors --output json connections connect --adapter forge --profile gitlab.pat --credential-prompt
+target/release/connectors --output json operations describe --adapter forge --operation project.get
+```
+
+Use the returned connection reference and the operation's current schema and
+descriptor revision:
+
+```sh
+target/release/connectors --output json operations invoke --adapter forge --connection CONNECTION --operation project.get --schema SCHEMA --revision REVISION --input-json '{"project":"group/project"}'
+```
+
+Later invocations reuse the saved credential, including after owner restart.
+Validation evidence lasts at most 60 seconds. When it expires, explicitly
+revalidate the saved credential using the current connection revision:
+
+```sh
+target/release/connectors --output json connections revalidate --adapter forge --connection CONNECTION --expected-revision CONNECTION_REVISION
+```
+
+Revalidation requires no credential re-entry. Invalid or missing credentials need
+`connections repair`; `connections revoke` is terminal local revocation and does
+not revoke the PAT at GitLab. Listing, status and cached descriptions start nothing.
+Protected file and stdin entry, exact stop selectors, CI/MR input shapes and
+keyring qualification are detailed in `docs/local-gitlab-cli.md` in this source release.
 
 ## Access and limits
 
@@ -35,9 +129,12 @@ Configure the GitLab endpoint and an explicit project allowlist. Public reads ca
 
 File content follows its declared representation and byte limits. Read the native contract for pagination, provenance and refusal behavior.
 
-## Run the first slice
+## Run a standalone service
 
-Build the workspace from source, choose this adapter’s example configuration and bind private credentials separately from operation input. The [getting-started guide](/introduction/getting-started) explains the common service workflow.
+The existing explicit service interface remains available. Build the workspace,
+choose this adapter's example configuration and bind private credentials separately
+from operation input. The [getting-started guide](/introduction/getting-started)
+explains that workflow.
 
 ## Native contract reference
 
