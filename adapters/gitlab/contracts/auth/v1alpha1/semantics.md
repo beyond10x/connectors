@@ -2,8 +2,10 @@
 
 The native decoder and validation helper are implemented in
 [auth.rs](../../../src/auth.rs) and exercised by
-[provider interpretation tests](../../../tests/auth.rs). They are not yet wired
-to CLI acquisition, durable custody or supervised invocation.
+[provider interpretation tests](../../../tests/auth.rs). The executable's private
+host binding calls them and the three existing reads through immutable authenticated
+HTTP capabilities; [process/TLS fixtures](../../../tests/local_runtime.rs) exercise
+that binding. Production CLI acquisition and owner supervision remain unwired.
 
 This adapter-owned `gitlab.pat` profile uses `static_entry`, purpose
 `delegated_user`, subject `user`, and the existing `http-bearer` capability with
@@ -29,6 +31,39 @@ implementation receives the same scoped HTTP capability pinned to the candidate
 that would be installed for business reads. Redirects, proxies, ambient credentials
 and mutable credential rereads cannot replace that capability. Generic host and
 business input cannot select an identity URL or authentication header.
+
+## Local executable configuration
+
+`connectors-gitlab --local-config /absolute/private/gitlab.json
+--print-local-bootstrap` reads only nonsecret configuration and prints its computed
+bootstrap. It performs no provider calls and captures no credential. The configured
+host selection must pin the resulting configuration revision and executable digest;
+the private launch computes and checks that revision again.
+
+The strict JSON configuration has `format: "connectors-gitlab-local/1"`, `instance`,
+`api_base`, optional `ca_file` and `allowed_projects`. Configuration and explicit
+CA files must be owner-only regular files reached without symlink traversal.
+The API base must be HTTPS, end in `/api/v4` (with optional final slash), and have
+no embedded credentials, query or fragment. The allowlist contains 1–1000 distinct
+nonempty project selectors, each at most 512 bytes with no control characters.
+There is no credential field or environment fallback.
+
+The effective configuration uses the canonical trailing-slash API URL, sorted
+allowlist and `ca_digest` instead of the CA path. That digest is the existing core
+SHA-256 digest of the canonical JSON byte array containing the captured PEM;
+null selects the pinned HTTP client's built-in WebPKI roots. Configuration revision is the core digest of
+this effective object. Explicit CA bytes are read once before bootstrap and reused
+for the child's lifetime. Replacing that file cannot change an existing HTTP
+capability; a new launch detects the changed configuration revision.
+
+The generated descriptor accepts this effective form and the existing service
+configuration as disjoint alternatives. Existing `--config` service mode retains
+its native file format and public service transport. The three authored private
+requirements classify `project.get`, `issues.list` and `file.get` as reads requiring
+`gitlab.pat` and `read_api`; future operations default to unknown effect until
+explicitly bound. The host supplies an opaque connection/generation partition for
+issue cursors. A cursor from another partition refuses before provider work, and
+process restart invalidates the adapter's ephemeral cursor signature key.
 
 ## Baseline validation
 

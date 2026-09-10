@@ -26,6 +26,25 @@ fn default_header() -> String {
     "authorization".into()
 }
 
+/// Canonical nonsecret HTTP authority used by native configuration bindings.
+pub fn canonical_base(value: &str) -> Result<String> {
+    let mut base =
+        Url::parse(value).map_err(|_| Error::invalid("invalid configured HTTP endpoint"))?;
+    if !matches!(base.scheme(), "http" | "https")
+        || base.host_str().is_none()
+        || !base.username().is_empty()
+        || base.password().is_some()
+        || base.query().is_some()
+        || base.fragment().is_some()
+    {
+        return Err(Error::invalid("invalid configured HTTP endpoint"));
+    }
+    if !base.path().ends_with('/') {
+        base.set_path(&format!("{}/", base.path()));
+    }
+    Ok(base.to_string())
+}
+
 pub struct ScopedHttp {
     client: Client,
     base: Url,
@@ -45,6 +64,22 @@ impl ScopedHttp {
         )
     }
     pub fn new(config: &HttpConfig, credential: Option<Arc<dyn Credential>>) -> Result<Self> {
+        let certificates = config
+            .ca_file
+            .as_ref()
+            .map(|path| {
+                std::fs::read(path).map_err(|_| Error::invalid("cannot read configured CA"))
+            })
+            .transpose()?;
+        Self::new_with_ca_bytes(config, credential, certificates.as_deref())
+    }
+    /// The trusted composition has already captured/admitted its CA bytes. This
+    /// constructor never reopens the configuration's CA path after bootstrap.
+    pub fn new_with_ca_bytes(
+        config: &HttpConfig,
+        credential: Option<Arc<dyn Credential>>,
+        ca: Option<&[u8]>,
+    ) -> Result<Self> {
         let mut base = Url::parse(&config.base_url)
             .map_err(|_| Error::invalid("invalid configured HTTP endpoint"))?;
         if !matches!(base.scheme(), "http" | "https")
@@ -84,10 +119,8 @@ impl ScopedHttp {
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(15));
-        if let Some(path) = &config.ca_file {
-            let bytes =
-                std::fs::read(path).map_err(|_| Error::invalid("cannot read configured CA"))?;
-            let certificates = reqwest::Certificate::from_pem_bundle(&bytes)
+        if let Some(bytes) = ca {
+            let certificates = reqwest::Certificate::from_pem_bundle(bytes)
                 .map_err(|_| Error::invalid("invalid configured CA"))?;
             if certificates.is_empty() {
                 return Err(Error::invalid("configured CA contains no certificates"));
@@ -104,6 +137,17 @@ impl ScopedHttp {
             header,
             bearer: config.bearer,
         })
+    }
+    /// Immutable per-command credential capability over the captured target/TLS
+    /// configuration. It changes no existing capability or credential source.
+    pub fn with_credential(&self, credential: Arc<dyn Credential>) -> Self {
+        Self {
+            client: self.client.clone(),
+            base: self.base.clone(),
+            credential: Some(credential),
+            header: self.header.clone(),
+            bearer: self.bearer,
+        }
     }
 }
 
