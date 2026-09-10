@@ -49,9 +49,10 @@ checking/unchecked statuses and a null SHA remain observations, never success.
 head SHA is an observed head, not a pinned read of immutable MR metadata; provenance
 source_revision is null. Null merge commit fields do not prove no business effect.
 Neither read checks all required CI/approval rules, produces an approval proof,
-validates a future write, merges or authorizes retry. Native validation and guarded
-create/update/merge semantics must be modeled and reviewed separately before their
-runtime decomposition. Existing shared mutation contracts continue to own approval,
+validates a future write, merges or authorizes retry. The separate
+[pinned-head validation](validation.md) operation reports selected checks without
+granting a write. Guarded create/update/merge semantics must be modeled and
+reviewed separately before their runtime decomposition. Existing shared mutation contracts continue to own approval,
 audit, durable attempts, dispatch fences, replay and lost-response uncertainty.
 
 ## Source and verification

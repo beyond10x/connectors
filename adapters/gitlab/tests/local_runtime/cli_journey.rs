@@ -3,6 +3,8 @@
 mod ci;
 #[path = "merge_requests.rs"]
 mod merge_requests;
+#[path = "mr_validation.rs"]
+mod mr_validation;
 use super::*;
 use connectors_host::local::{config::Paths, keyring, owner};
 use std::{

@@ -38,6 +38,7 @@ struct Provider {
     pem: String,
     config: PathBuf,
     calls: Arc<Mutex<Vec<String>>>,
+    methods: Arc<Mutex<Vec<String>>>,
     pause: Arc<std::sync::atomic::AtomicBool>,
     response_status: Arc<std::sync::atomic::AtomicU16>,
 }
@@ -65,6 +66,8 @@ impl Provider {
         let (stop, mut stopped) = oneshot::channel();
         let calls = Arc::new(Mutex::new(Vec::new()));
         let observed = calls.clone();
+        let methods = Arc::new(Mutex::new(Vec::new()));
+        let observed_methods = methods.clone();
         let pause = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let paused = pause.clone();
         let response_status = Arc::new(std::sync::atomic::AtomicU16::new(0));
@@ -88,6 +91,7 @@ impl Provider {
                         match stream.read_u8().await {Ok(byte)=>header.push(byte),Err(_)=>break}
                     }
                     let request=String::from_utf8(header).unwrap();
+                    observed_methods.lock().unwrap().push(request.split_whitespace().next().unwrap_or_default().to_owned());
                     let path=request.split_whitespace().nth(1).unwrap_or_default().to_owned();
                     let route=path.split('?').next().unwrap();
                     let credential=request.lines().find_map(|line|line.split_once(':').filter(|(name,_)|name.eq_ignore_ascii_case("private-token")).map(|(_,value)|value.trim()));
@@ -110,7 +114,8 @@ impl Provider {
                         else {(200,json!({"id":7,"name":"fixture-project"}),"")};
                     let body=serde_json::to_vec(&body).unwrap();
                     let (status,body,extra)=if valid && forced==0 {
-                        mr_provider::reply(route,&path).or_else(||ci_provider::reply(route,&path,&observed.lock().unwrap())).unwrap_or((status,body,extra))
+                        let calls=observed.lock().unwrap();
+                        mr_provider::reply(route,&path,&calls).or_else(||ci_provider::reply(route,&path,&calls)).unwrap_or((status,body,extra))
                     } else { (status,body,extra) };
                     let header=format!("HTTP/1.1 {status} fixture\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n",body.len());
                     let _=stream.write_all(header.as_bytes()).await;
@@ -129,6 +134,7 @@ impl Provider {
             pem,
             config,
             calls,
+            methods,
             pause,
             response_status,
         }

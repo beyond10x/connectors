@@ -54,7 +54,7 @@ restart = "never"
 
 [adapters.forge.permissions]
 profiles = ["gitlab.pat"]
-operations = ["project.get", "issues.list", "file.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.get", "merge_requests.list"]
+operations = ["project.get", "issues.list", "file.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.get", "merge_requests.list", "merge_request.validate"]
 
 [adapters.forge.executable]
 path = "/absolute/path/connectors-gitlab"
@@ -167,6 +167,28 @@ Unknown merge status stays visible. An observed head or merge status does not
 validate a future merge, supply an approval or prove the outcome of a lost write.
 Read the [MR contract](../adapters/gitlab/contracts/merge-requests/v1alpha1/semantics.md)
 for exact projection and refusal rules. Governed MR writes remain unimplemented.
+
+## Validate a pinned MR head
+
+Discover `merge_request.validate` and invoke it with the same saved connection:
+
+```json
+{"project":"group/project","iid":42,"sha":"0123456789abcdef0123456789abcdef01234567","pipeline_id":17}
+```
+
+The returned `item.checks_passed` is true only for an opened, non-draft MR with
+the exact requested head, `mergeable` status and the selected successful head
+pipeline for that SHA. Otherwise `item.blockers` explains the negative result,
+including changed head, missing checks or a different pipeline. Inspect this
+field even when the CLI exits successfully: a negative validation is a completed
+read. Unknown statuses cannot pass, and malformed or inaccessible responses
+produce normal typed errors.
+
+`item.merge_performed` is always false. A passing observation neither reserves
+the head nor authorizes a later write; asynchronous provider checks and mutable
+MR state still require current checks at dispatch. See the
+[validation contract](../adapters/gitlab/contracts/merge-requests/v1alpha1/validation.md)
+for the exact predicates and supported pipeline semantics.
 
 ## Current limits
 
