@@ -1,0 +1,20 @@
+--- docs/evidence/local-clock-20260910/gate-source-inputs.sha256	2026-09-11 00:16:34.495664998 +0200
++++ docs/evidence/local-clock-20260910/source-inputs.sha256	2026-09-11 00:16:34.570503316 +0200
+@@ -462,7 +462,7 @@
+ 6861c8c4ba90998daf5c0a7fed323a941beabd7e2e014a079112b22efb8334dc  website/docs/contracts/index.mdx
+ 5aee5d3a2c548d3a6a0b8967fc98f7fa7f618aa9e49bd775d128113d7bcc27c8  website/docs/contracts/models.mdx
+ 80cc72d778cb2150b2407318d27ab7a9ed9a4944fc86efa145009f79081000ea  website/docs/introduction/examples.mdx
+-2e4ddbbe6f8dc30f628db313f3199eab7a99f93f81674d77c05ee4c8dbac013b  website/docs/introduction/getting-started.md
++95de59ead9654d03f0ae9b1c725bf3c4768846db7b49ecfe0b74d416be1fd409  website/docs/introduction/getting-started.md
+ 127b1e4013d321c31fe1f5abd311dc8bcac356abab1d61f3ec1a5fd9e27ae109  website/docs/introduction/index.md
+ 8f6a66b617aba8443d4e7e47125baf56e386521e52f5c9eb4943d23aedee375a  website/docs/introduction/status.md
+ 644a1397c133256737c923c6a38b6f059157570e2e14a794e64e0360d57ab04f  website/docusaurus.config.ts
+@@ -476,7 +476,7 @@
+ 4c96bfe9f2e2c32d56e7dde8e718dc67400257c5379b657bc2ad408da01707cb  website/package-lock.json
+ 1b7384c70a75135a45c0012ac1fac3dcb5d1f5ec646babe3eb7f19c11622a7fb  website/plugins/reference.ts
+ c7eefc87e7b51a74d5e0bc6571a785adeffad36a229ea4664885263257796182  website/plugins/search.ts
+-93e03968a1ee9d7ec99dc160bf3e22b211413694485b76ec4af36af9d40fd316  website/publication.json
++afbaa3920b4885d84704bad1fa970c61f9d812e41d73002127f14fc6ed9ac2b8  website/publication.json
+ 0eb8729a4a429c0e875646c62c93820d102cdd0b5e516f5473bef606fdb2e702  website/README.md
+ 2616eacf2ad9f7d919d880e975fc7db87f87659edbed6c6d53db080253412b7d  website/sidebars.ts
+ 0680c0f8b94753350e8f89de68030102ad4a57a0fbd31bdb18c805cc3a475294  website/src/components/AdapterCatalog.tsx

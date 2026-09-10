@@ -58,3 +58,35 @@ target/debug/connectors invoke \
 The client discovers the current descriptor before invoking. Through the example federation host the operation is `gitlab__project.get`; the prefix distinguishes its source.
 
 Read the [service contract](/contracts/service) for exact limits and result semantics. Choose an [adapter](/adapters) for provider-specific boundaries. Local reproduction and full-gate instructions remain in the source checkout’s development guides.
+
+## Check the local approval clock
+
+For an existing local CLI configuration with adapter alias `forge`, the optional
+clock check verifies an explicitly selected authenticated time source:
+
+```sh
+connectors approvals clock-check --adapter forge --output json
+```
+
+The private local TOML configuration needs a top-level `approval_clock` table.
+The operator must admit the source's UTC assertions and a bound on the local
+Linux timer's frequency error. This example uses the roughtime.se address and
+key checked on September 10, 2026; recheck its current identity before use.
+The 10,000 ppm value is an explicit 1% assumption, not a calibration or default.
+
+```toml
+[approval_clock]
+format = "roughtime-clock/1"
+address = "192.36.143.134:2002"
+public_key = "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI="
+max_rate_error_ppm = 10000
+```
+
+Success returns the adapter alias and an observation containing
+`configuration_sha256`, `lower_unix_ms` and `upper_unix_ms`, at most four seconds
+apart. The command starts no owner or adapter and reads no credential or metadata.
+An unavailable source, wrong key or uncertain time bound refuses safely.
+The output is historical observation, not reusable approval evidence. Approval
+issuance and provider writes remain pending. Ordinary reads need no approval
+clock. See the [clock contract](/contracts/clock) for the trust assumptions,
+process lifetime, suspend detection and conservative UTC-midnight refusal window.

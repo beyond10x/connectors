@@ -1,0 +1,10 @@
+[package]
+name = "connectors-clock-qualification-probe"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+[workspace]
+[dependencies]
+roughenough-client = "=2.0.0"
+roughenough-protocol = "=2.0.0"
+base64 = "=0.22.1"
