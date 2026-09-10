@@ -8,6 +8,200 @@ use std::{
 const NOW: u64 = 1_788_998_400_000;
 
 #[test]
+fn revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledgement() {
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let version = candidate.version();
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let expired = NOW + 60_001;
+    assert_eq!(
+        describe(&registry, &reference, expired).state,
+        State::Pending
+    );
+    assert_eq!(
+        registry.admit_read(&binding(), &reference, &BTreeSet::new(), expired),
+        Err(Failure::NotReady)
+    );
+    let capture = registry
+        .capture_revalidation(&binding(), &reference, &revision, expired, expired + 30_000)
+        .unwrap();
+    assert!(capture.version() == version);
+    let dispatched = registry.dispatch_revalidation(capture, expired).unwrap();
+    registry
+        .lose_next_commit
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(
+        registry.finish_revalidation(dispatched, Ok(baseline("one", expired)), expired),
+        Err(Failure::OutcomeUnknown)
+    );
+    drop(registry);
+    let registry = Registry::new(root.path());
+    let observed = describe(&registry, &reference, expired);
+    assert_eq!(observed.state, State::Ready);
+    assert_eq!(observed.revision, revision);
+    let read = registry
+        .capture_read(
+            &binding(),
+            &reference,
+            &BTreeSet::new(),
+            expired,
+            expired + 1000,
+        )
+        .unwrap();
+    assert!(read.version() == version);
+    registry.dispatch_read(read, expired).unwrap();
+    assert_eq!(
+        describe(&registry, &reference, NOW + 3_600_000).state,
+        State::ReauthorizationRequired
+    );
+}
+
+#[test]
+fn revalidation_orders_competing_recollection_repair_revoke_and_pending_reads() {
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let capture = || {
+        registry
+            .capture_revalidation(&binding(), &reference, &revision, NOW, NOW + 1000)
+            .unwrap()
+    };
+    let first = registry.dispatch_revalidation(capture(), NOW).unwrap();
+    let second = registry.dispatch_revalidation(capture(), NOW).unwrap();
+    let read = registry
+        .capture_read(&binding(), &reference, &BTreeSet::new(), NOW, NOW + 1000)
+        .unwrap();
+    let repair = registry
+        .begin_repair(&binding(), &reference, &revision, NOW)
+        .unwrap();
+    registry
+        .finish_revalidation(first, Ok(baseline("one", NOW)), NOW)
+        .unwrap();
+    assert_eq!(
+        registry.finish_revalidation(second, Ok(baseline("one", NOW)), NOW),
+        Err(Failure::Conflict)
+    );
+    assert!(matches!(
+        registry.dispatch_read(read, NOW),
+        Err(Failure::Conflict)
+    ));
+    assert!(matches!(
+        registry.consume(repair, NOW),
+        Err(Failure::Conflict)
+    ));
+    let pending = registry.dispatch_revalidation(capture(), NOW).unwrap();
+    let repair = registry
+        .begin_repair(&binding(), &reference, &revision, NOW)
+        .unwrap();
+    let claim = registry.consume(repair, NOW).unwrap();
+    let replacement = registry
+        .prepare(&claim, baseline("one", NOW), 12, NOW)
+        .unwrap();
+    publish_fixture(&registry, replacement, NOW);
+    assert_eq!(
+        registry.finish_revalidation(pending, Ok(baseline("one", NOW)), NOW),
+        Err(Failure::Conflict)
+    );
+    let pending = registry.dispatch_revalidation(capture(), NOW).unwrap();
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &revision,
+            NOW,
+        )
+        .unwrap();
+    assert_eq!(
+        registry.finish_revalidation(pending, Ok(baseline("one", NOW)), NOW),
+        Err(Failure::Revoked)
+    );
+}
+
+#[test]
+fn revalidation_preserves_transient_failures_but_cannot_resurrect_known_invalidity() {
+    for identity_change in [false, true] {
+        let (_root, registry) = fixture();
+        let (_, candidate) = prepared(&registry, "one", NOW);
+        let reference = publish_fixture(&registry, candidate, NOW);
+        let revision = describe(&registry, &reference, NOW).revision;
+        let capture = || {
+            registry
+                .capture_revalidation(&binding(), &reference, &revision, NOW, NOW + 1000)
+                .unwrap()
+        };
+        let attempt = registry.dispatch_revalidation(capture(), NOW).unwrap();
+        registry
+            .finish_revalidation(attempt, Err(None), NOW)
+            .unwrap();
+        assert_eq!(describe(&registry, &reference, NOW).state, State::Ready);
+        let late_success = registry.dispatch_revalidation(capture(), NOW).unwrap();
+        let attempt = registry.dispatch_revalidation(capture(), NOW).unwrap();
+        if identity_change {
+            assert_eq!(
+                registry.finish_revalidation(attempt, Ok(baseline("different", NOW)), NOW),
+                Err(Failure::IdentityMismatch)
+            );
+        } else {
+            registry
+                .finish_revalidation(attempt, Err(Some(InvalidCredential::Invalid)), NOW)
+                .unwrap();
+        }
+        assert_eq!(
+            describe(&registry, &reference, NOW).state,
+            State::ReauthorizationRequired
+        );
+        assert_eq!(
+            registry.finish_revalidation(late_success, Ok(baseline("one", NOW)), NOW),
+            Err(Failure::NotReady)
+        );
+        assert!(matches!(
+            registry.capture_revalidation(&binding(), &reference, &revision, NOW, NOW + 1000),
+            Err(Failure::NotReady)
+        ));
+    }
+}
+
+#[test]
+fn revalidation_capture_and_completion_are_one_use_and_keep_original_deadline() {
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let capture = registry
+        .capture_revalidation(&binding(), &reference, &revision, NOW, NOW + 1000)
+        .unwrap();
+    let replay = capture.clone();
+    let dispatched = registry.dispatch_revalidation(capture, NOW).unwrap();
+    assert!(matches!(
+        registry.dispatch_revalidation(replay, NOW),
+        Err(Failure::Conflict)
+    ));
+    let replay = dispatched.clone();
+    registry
+        .finish_revalidation(dispatched, Err(None), NOW)
+        .unwrap();
+    assert_eq!(
+        registry.finish_revalidation(replay, Ok(baseline("one", NOW)), NOW),
+        Err(Failure::Conflict)
+    );
+    let capture = registry
+        .capture_revalidation(&binding(), &reference, &revision, NOW, NOW + 1000)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(capture, NOW).unwrap();
+    assert_eq!(
+        registry.finish_revalidation(dispatched, Ok(baseline("one", NOW + 1000)), NOW + 1000),
+        Err(Failure::Expired)
+    );
+    assert_eq!(
+        describe(&registry, &reference, NOW + 1000).state,
+        State::Ready
+    );
+}
+
+#[test]
 fn production_clock_samples_after_locking_and_still_rejects_regression() {
     let (root, _) = fixture();
     let registry = Registry::with_system_clock(root.path());

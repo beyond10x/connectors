@@ -70,6 +70,14 @@ Callable: `connections-repair`. Input: `connectors.cli.ConnectionRepairInput`. R
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `connections revalidate`
+
+Revalidate the saved credential without re-entry
+
+Callable: `connections-revalidate`. Input: `connectors.cli.ConnectionRevalidateInput`. Result: `connectors.cli.ConnectionRevalidateResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `connections revoke`
 
 Commit terminal local revocation under the current fence
@@ -136,6 +144,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:connections-describe: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-list: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-repair: implement the owner-qualified callable and its declared result/error contract
+- handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-status: implement the owner-qualified callable and its declared result/error contract
 - handler:operations-describe: implement the owner-qualified callable and its declared result/error contract

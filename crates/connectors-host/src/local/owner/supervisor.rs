@@ -25,6 +25,11 @@ pub(super) enum Task {
         revision: String,
         document: Vec<u8>,
     },
+    Revalidate {
+        connection: String,
+        revision: String,
+        profile: String,
+    },
 }
 pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
@@ -303,10 +308,10 @@ fn worker(
             }
             let resume = matches!(
                 job.task,
-                Task::Ensure { resume: true } | Task::Invoke { .. }
+                Task::Ensure { resume: true } | Task::Invoke { .. } | Task::Revalidate { .. }
             );
             match &job.task {
-                Task::Validate { profile, .. }
+                Task::Validate { profile, .. } | Task::Revalidate { profile, .. }
                     if !current.permissions.profiles.contains(profile) =>
                 {
                     return Err(Code::Forbidden.into());
@@ -363,6 +368,109 @@ fn worker(
                     &secret,
                     job.deadline.min(connectors_sdk::now_ms() + 30_000),
                 )?)),
+                Task::Revalidate {
+                    connection,
+                    revision,
+                    profile,
+                } => {
+                    let registry = registry::Registry::with_system_clock(&paths.state);
+                    let binding = active.bootstrap().binding(&profile)?;
+                    let captured = registry.capture_revalidation(
+                        &binding,
+                        &connection,
+                        &revision,
+                        connectors_sdk::now_ms(),
+                        job.deadline,
+                    )?;
+                    let version = captured.version();
+                    let material = custody::Store::open_at(
+                        version.scope(),
+                        config.secret_service_socket.as_deref(),
+                    )
+                    .and_then(|store| store.read(version));
+                    let material = match material {
+                        Ok(value) => value,
+                        Err(error) => {
+                            if matches!(error, custody::Failure::Missing) {
+                                registry
+                                    .missing_revalidation(captured, connectors_sdk::now_ms())?;
+                            } else {
+                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+                            }
+                            return Err(Code::CustodyUnavailable.into());
+                        }
+                    };
+                    let check = || -> Result<()> {
+                        let (latest_config, latest) = selected(&paths, &job.alias)?;
+                        if latest.selection() != current.selection()
+                            || latest_config.secret_service_socket != config.secret_service_socket
+                        {
+                            return Err(Code::LifecycleConflict.into());
+                        }
+                        if !latest.permissions.profiles.contains(&profile) {
+                            return Err(Code::Forbidden.into());
+                        }
+                        if stopped.load(Ordering::SeqCst) {
+                            return Err(Code::Unavailable.into());
+                        }
+                        Ok(())
+                    };
+                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
+                        registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+                        return Err(error);
+                    }
+                    let dispatched =
+                        registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
+                    drop(guard);
+                    let result = active.validate(&profile, &material, job.deadline);
+                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+                    if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
+                        registry.finish_revalidation(
+                            dispatched,
+                            Err(None),
+                            connectors_sdk::now_ms(),
+                        )?;
+                        return Err(error);
+                    }
+                    match result {
+                        Ok(baseline) => registry.finish_revalidation(
+                            dispatched,
+                            Ok(baseline.into_registry()),
+                            connectors_sdk::now_ms(),
+                        )?,
+                        Err(error) => {
+                            let reason = match error {
+                                runtime::Failure::InvalidCredential
+                                | runtime::Failure::IdentityMismatch => {
+                                    Some(registry::InvalidCredential::Invalid)
+                                }
+                                runtime::Failure::InsufficientScope => {
+                                    Some(registry::InvalidCredential::Insufficient)
+                                }
+                                _ => None,
+                            };
+                            registry.finish_revalidation(
+                                dispatched,
+                                Err(reason),
+                                connectors_sdk::now_ms(),
+                            )?;
+                            return Err(error.into());
+                        }
+                    }
+                    drop(guard);
+                    let observed = registry.describe(
+                        &current.instance_id,
+                        &current.adapter_id,
+                        &current.configuration_revision,
+                        &connection,
+                        connectors_sdk::now_ms(),
+                        true,
+                    )?;
+                    Ok(Output::Value(
+                        json!({"connection":connection_value(&job.alias,observed)}),
+                    ))
+                }
                 Task::Invoke {
                     connection,
                     operation,
