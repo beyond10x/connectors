@@ -37,7 +37,7 @@ scope:
   path: docs
 - confidence: cited
   path: ess/domains
-revision: 15
+revision: 16
 ---
 ## Acceptance
 
@@ -156,3 +156,7 @@ The initial full gate found the outdated fifteen-command conformance inventory; 
 This is a usable persistent GitLab CLI fixture checkpoint, not dedicated sandbox acceptance. credential-blocker:gitlab-runtime-sandbox and the unrequalified paid-driver protocol-loading blocker remain open. Keep the story, initiative and three-provider goal active. Next bind Kubernetes to the local CLI, then PostgreSQL, before MCP and remaining providers. Complete the still-recorded shared management cases across those adapters: failed-startup cohort propagation, positive invalidity after business reads, full paging and bounded expiry/retirement scheduling. Reproducible distributable/image digests and the full selected provider workflows remain outstanding.
 
 Connectors stays local on main under the single-agent rule. Worktree inspection finds no linked trees; the 47-record profile GC dry-run finds no task-owned record to remove. The active goal's task-owned build cache is retained. MCP's pre-existing documentation-workflow edit and behind-main checkout are preserved separately; Harness is unchanged. No external Connectors publication or new recovery repository is introduced.
+
+## 2026-09-10 phase-order correction after authoritative re-read
+
+The preceding checkpoint's next-provider sentence was too early. initiative:complete-local-connectors delivery sequence item 2 explicitly requires the complete GitLab CI/MR workflows, including C09/C14 and their shared write controls, before Kubernetes. Follow that authoritative order; the persistence/revalidation fixture does not complete the GitLab phase. story:gitlab-ci-runtime now owns the next C09 runtime delivery, informed by this committed foundation. The new native CI values and generic bounded-prefix observation/mapping were modeled and passed pinned ESS validation before its decomposition. GitLab MR reads/writes remain required next work under the initiative, to be modeled/reviewed before decomposition. This correction preserves all existing runtime evidence and sandbox blockers and makes no lifecycle completion claim.

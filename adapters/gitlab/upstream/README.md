@@ -13,17 +13,22 @@ Copyright GitLab Inc. The repository license explicitly places content under `do
 under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). That license
 applies to this source and its selected/normalized derivative
 `../generated/upstream.openapi.json`; it does not inherit the workspace's Rust
-package license. The derivative selects three GET operations and their local
+package license. The derivative selects eight GET operations and their local
 schema references, normalizes YAML into JSON, and preserves upstream descriptions.
 GitLab does not endorse this adapter.
 
 The selected operation IDs are `getApiV4ProjectsId`, `getApiV4ProjectsIdIssues`,
-and `getApiV4ProjectsIdRepositoryFilesFilePath`. Connectors-authored mappings and
-runtime obligations are in `../spec/adapter.json` and `../src/lib.rs`.
+`getApiV4ProjectsIdRepositoryFilesFilePath`, `getApiV4ProjectsIdPipelines`,
+`getApiV4ProjectsIdPipelinesPipelineId`, `getApiV4ProjectsIdPipelinesPipelineIdJobs`,
+`getApiV4ProjectsIdJobsJobId` and `getApiV4ProjectsIdJobsJobIdTrace`.
+Connectors-authored mappings and runtime obligations are in `../spec/adapter.json`,
+`../src/lib.rs` and `../src/ci.rs`.
 
-Source inspection found two response limitations: the issues response references
-one issue instead of an array, and file retrieval declares no response body schema.
-Handwritten response checks preserve the previously verified service contract.
+Source inspection found response limitations: the issue, pipeline and pipeline-job
+lists reference single entities instead of arrays; file retrieval declares no
+response body schema; job trace declares JSON job data despite returning raw text.
+Handwritten response checks preserve the service and native CI contracts. The trace
+binding does not depend on the source's optional byte-offset/limit parameters.
 `../generated/coverage.json` records source coverage; `ess-import.json` retains the
 complete ESS 0.20.0 refusal of the original OpenAPI subset. Source refresh requires
 updating this pin, its attribution and the reviewed mappings together.

@@ -176,6 +176,13 @@
       "status": "First-slice reads implemented; extensions specified"
     },
     {
+      "route": "/adapters/gitlab/contracts/ci",
+      "title": "GitLab CI reads",
+      "source": "adapters/gitlab/contracts/ci/v1alpha1/semantics.md",
+      "owner": "gitlab",
+      "status": "Local implementation; dedicated sandbox acceptance open"
+    },
+    {
       "route": "/adapters/sql/contracts/reads",
       "title": "PostgreSQL bounded reads",
       "source": "adapters/sql/contracts/reads/v1alpha1/semantics.md",

@@ -2,7 +2,13 @@
 
 The active implementation is driven by
 [the v2 adapter document](../adapters/gitlab/spec/adapter.json). It preserves
-`project.get`, `issues.list`, and `file.get` from the configured service contract.
+`project.get`, `issues.list`, and `file.get` from the configured service contract,
+and adds `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` and `job.trace`.
+The [native CI profile](../adapters/gitlab/contracts/ci/v1alpha1/semantics.md)
+owns exact-commit matching, job projection, paging and trace interpretation. The
+trace mapping explicitly selects a 512000-byte HTTP prefix; its generated finish
+obligation receives completeness with the retained bytes. Other mappings retain
+the complete-response transport signature.
 See [v2 semantics](../spec-kinds/adapter/v2/semantics.md) for generation boundaries
 and [source provenance](../adapters/gitlab/upstream/README.md) for the exact vendor
 input and its separate license.

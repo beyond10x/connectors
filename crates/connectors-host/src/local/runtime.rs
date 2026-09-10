@@ -38,10 +38,53 @@ pub enum Failure {
     NotFound,
     StaleDescription,
     StaleCursor,
+    /// Native invocation failures distinct from host admission; no raw data.
+    ProviderNotFound,
+    ProviderRateLimited,
+    ProviderInternal,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
+#[cfg(test)]
+mod failure_tests {
+    use super::*;
+
+    #[test]
+    fn provider_codes_survive_the_private_boundary_without_raw_error_data() {
+        for code in [
+            ErrorCode::NotFound,
+            ErrorCode::RateLimited,
+            ErrorCode::Internal,
+        ] {
+            let failure = Failure::from_provider(connectors_core::Error::new(
+                code.clone(),
+                "private-provider-message",
+            ));
+            let bytes = serde_json::to_vec(&failure).unwrap();
+            assert!(!String::from_utf8_lossy(&bytes).contains("private-provider-message"));
+            let failure: Failure = serde_json::from_slice(&bytes).unwrap();
+            let error: crate::local::owner::Error = failure.into();
+            assert_eq!(error.code, crate::local::owner::Code::ServiceFailure);
+            assert_eq!(error.service_code, Some(code));
+        }
+        let local = Failure::from_service(connectors_core::Error::new(
+            ErrorCode::NotFound,
+            "missing selection",
+        ));
+        assert_eq!(local, Failure::NotFound);
+        assert!(serde_json::from_str::<Failure>(r#"{"provider":"unreviewed_code"}"#).is_err());
+    }
+}
+
 impl Failure {
+    pub fn from_provider(error: connectors_core::Error) -> Self {
+        match error.code {
+            ErrorCode::NotFound => Self::ProviderNotFound,
+            ErrorCode::RateLimited => Self::ProviderRateLimited,
+            ErrorCode::Internal => Self::ProviderInternal,
+            _ => Self::from_service(error),
+        }
+    }
     pub fn from_service(error: connectors_core::Error) -> Self {
         match error.code {
             ErrorCode::InvalidInput => Self::InvalidInput,

@@ -49,7 +49,7 @@ The current services provide:
 
 | Adapter | Implemented operations | Binding |
 |---|---|---|
-| GitLab | `project.get`, `issues.list`, `file.get` | GitLab API v4, with a configured project allowlist |
+| GitLab | `project.get`, `issues.list`, `file.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace` | GitLab API v4, with a configured project allowlist; exact-commit CI observations and bounded traces |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover` | Kubernetes API, with namespace and resource-kind restrictions |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines |
 

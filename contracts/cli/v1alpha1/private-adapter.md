@@ -65,6 +65,16 @@ an opaque cursor partition; that partition grants no credential lookup authority
 Responses contain one safe result or closed failure; raw exceptions and child
 stdout/stderr are never forwarded.
 
+Native invocation distinguishes a missing provider resource from an absent local
+selection. Its closed failure includes `provider_not_found`,
+`provider_rate_limited` and `provider_internal`; the host projects their existing
+`connectors.service_wire.ErrorCode` values into
+`connectors.cli.Failure.service_code`, with `code=service_failure`. In particular,
+provider `not_found`, `rate_limited` and `internal` must not become local selection
+`not_found` or generic unavailability. Admission failures keep their existing
+codes. No provider message, body or retry instruction enters the private control
+value. Unknown shared codes still refuse decoding; this adds no replay authority.
+
 Control objects have a required `kind` discriminator and no unknown fields. The
 request/response identity is one fresh opaque id per exchange; it is not an
 idempotency key or authority to repeat provider work.
@@ -89,7 +99,7 @@ timeout/interruption also terminates the owned channel. If the peer closes at it
 deadline before the caller's socket timeout, the caller observes unavailability;
 neither observation permits transport replay.
 
-The required CLI capture integration remains unwired. It uses the generated parser's Sources hook after host admission. The
+The production CLI capture integration uses the generated parser's Sources hook after host admission. The
 production hook retains protected bytes in its own clearing buffer and returns a
 fixed nonsecret marker through the generated String carrier. The paired production
 handler consumes the private buffer for that one call, checking the marker and
