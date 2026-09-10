@@ -9,7 +9,7 @@ use std::{
             net::UnixStream,
         },
     },
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::Duration,
 };
 
@@ -21,23 +21,29 @@ pub enum State {
 }
 
 pub fn inspect() -> State {
-    inspect_inner().unwrap_or(State::Unavailable)
+    inspect_at(None)
+}
+pub fn inspect_at(socket: Option<&Path>) -> State {
+    local_stream_at(socket)
+        .and_then(Service::connect)
+        .and_then(|service| service.state())
+        .unwrap_or(State::Unavailable)
 }
 
-fn inspect_inner() -> zbus::Result<State> {
-    let service = Service::connect(local_stream()?)?;
-    service.state()
-}
-
-fn local_stream() -> zbus::Result<UnixStream> {
+fn local_stream_at(socket: Option<&Path>) -> zbus::Result<UnixStream> {
     // The initial Linux profile binds the owner's runtime bus. Do not accept a
     // caller-controlled TCP DBUS_SESSION_BUS_ADDRESS as local owner authority.
-    let parent = PathBuf::from(format!("/run/user/{}", super::filesystem::uid()));
-    if super::filesystem::directory(&parent, false, true).is_err() {
+    let default = PathBuf::from(format!("/run/user/{}/bus", super::filesystem::uid()));
+    let path = socket.unwrap_or(&default);
+    super::filesystem::validate_path(path)
+        .map_err(|_| zbus::Error::Failure("local transport unavailable".into()))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| zbus::Error::Failure("local transport unavailable".into()))?;
+    if super::filesystem::directory(parent, false, true).is_err() {
         return Err(zbus::Error::Failure("local transport unavailable".into()));
     }
-    let path = parent.join("bus");
-    let metadata = std::fs::symlink_metadata(&path)?;
+    let metadata = std::fs::symlink_metadata(path)?;
     if !metadata.file_type().is_socket() || metadata.uid() != super::filesystem::uid() {
         return Err(zbus::Error::Failure("local transport unavailable".into()));
     }

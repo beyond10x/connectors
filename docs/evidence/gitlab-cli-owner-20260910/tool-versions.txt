@@ -1,0 +1,35 @@
+[rustc]
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: x86_64-unknown-linux-gnu
+release: 1.98.1
+LLVM version: 22.1.8
+
+[cargo]
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+
+[msrv]
+rustc 1.88.0 (6b00bc388 2025-06-23)
+binary: rustc
+commit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc
+commit-date: 2025-06-23
+host: x86_64-unknown-linux-gnu
+release: 1.88.0
+LLVM version: 20.1.5
+
+[ess]
+ess 0.20.0
+
+[aep]
+protocol 0.55.0
+
+[node]
+v22.23.2
+
+[npm]
+12.0.2
+
+[platform]
+Linux 6.18.49-1-MANJARO x86_64

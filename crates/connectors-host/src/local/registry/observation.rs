@@ -52,7 +52,7 @@ impl Registry {
         now: u64,
         custody_available: bool,
     ) -> Result<ObservedConnection> {
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             let row = Self::connection(tx, reference)?;
             visible(&row, instance, adapter)?;
             observe(tx, row, configuration_revision, now, custody_available)
@@ -69,7 +69,7 @@ impl Registry {
         if !connectors_core::valid_id(reference) {
             return Err(Failure::InvalidInput);
         }
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             let (connection, state, failure, expires): (String,String,Option<String>,u64) = tx.query_row(
                 "SELECT connection_ref,state,failure,expires_at_ms FROM registry_acquisitions WHERE acquisition_ref=?1", [reference],
                 |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,read_time(r,3)?))).optional().map_err(db)?.ok_or(Failure::NotFound)?;
@@ -101,7 +101,7 @@ impl Registry {
         if !(1..=500).contains(&limit) {
             return Err(Failure::InvalidInput);
         }
-        self.transaction(now, false, |tx, _| {
+        self.transaction(now, false, |tx, _, now| {
             tx.execute("DELETE FROM registry_cursors WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
             let selection: Option<(String,i64)> = tx.query_row("SELECT adapter_id,epoch FROM registry_instances WHERE instance_id=?1", [instance], |r| Ok((r.get(0)?,r.get(1)?))).optional().map_err(db)?;
             let epoch = match selection { Some((id,epoch)) if id==adapter => epoch, Some(_) => return Err(Failure::Conflict), None => 0 };
