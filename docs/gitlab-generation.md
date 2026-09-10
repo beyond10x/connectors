@@ -3,12 +3,17 @@
 The active implementation is driven by
 [the v2 adapter document](../adapters/gitlab/spec/adapter.json). It preserves
 `project.get`, `issues.list`, and `file.get` from the configured service contract,
-and adds `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` and `job.trace`.
+and adds `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`,
+`merge_request.get` and `merge_requests.list`.
 The [native CI profile](../adapters/gitlab/contracts/ci/v1alpha1/semantics.md)
 owns exact-commit matching, job projection, paging and trace interpretation. The
 trace mapping explicitly selects a 512000-byte HTTP prefix; its generated finish
 obligation receives completeness with the retained bytes. Other mappings retain
 the complete-response transport signature.
+The [native MR profile](../adapters/gitlab/contracts/merge-requests/v1alpha1/semantics.md)
+owns bounded observations and update-window traversal. Its date-time input
+annotations preserve the pinned source constraints; native preparation checks
+calendar validity and window order before transport.
 See [v2 semantics](../spec-kinds/adapter/v2/semantics.md) for generation boundaries
 and [source provenance](../adapters/gitlab/upstream/README.md) for the exact vendor
 input and its separate license.

@@ -1,6 +1,6 @@
 // generated from gitlab v1
-// model digest ede8787ae4303e8248e5bd6de3675b12866d725713b94852f37db003d4982392
-// contract digest 9020464eeb141c4af3f7cd1c704975f1a25aa17da6a44f4b61ff3a5c25400334
+// model digest b7b2cb3c4d5e331acc466cbffc8cb5f0365f08bc1fa22c9b39b3dd9e02fa5202
+// contract digest e998b4b4fd35be0dc69280a8a0eec358930cb7071586963ad07fe9edfc0b828c
 // do not edit: regenerate with `ess synthesize`
 
 //! requests — `gitlab.requests`.
@@ -51,6 +51,32 @@ pub struct JobTraceRequest {
     pub max_bytes: i64,
     /// `project` — `String`.
     pub project: String,
+}
+
+/// MergeRequestGetRequest — `gitlab.requests.MergeRequestGetRequest`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeRequestGetRequest {
+    /// `iid` — `Integer`.
+    pub iid: i64,
+    /// `project` — `String`.
+    pub project: String,
+}
+
+/// MergeRequestsListRequest — `gitlab.requests.MergeRequestsListRequest`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeRequestsListRequest {
+    /// `cursor` — `Optional<String>`.
+    pub cursor: Option<String>,
+    /// `limit` — `Integer`.
+    pub limit: i64,
+    /// `project` — `String`.
+    pub project: String,
+    /// `state` — `String`.
+    pub state: String,
+    /// `updated_after` — `String`.
+    pub updated_after: String,
+    /// `updated_before` — `String`.
+    pub updated_before: String,
 }
 
 /// PipelineGetRequest — `gitlab.requests.PipelineGetRequest`.

@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 pub mod auth;
 mod ci;
+mod merge_requests;
 
 #[path = "../generated/runtime.rs"]
 #[doc(hidden)]
@@ -114,6 +115,35 @@ impl GitLabBindings {
 }
 
 impl Bindings for GitLabBindings {
+    fn prepare_merge_request_get(
+        &self,
+        input: &MergeRequestGetRequest,
+    ) -> Result<MergeRequestGetRequestContext> {
+        self.admit_project(&input.project)?;
+        Ok(MergeRequestGetRequestContext {})
+    }
+    fn finish_merge_request_get(
+        &self,
+        input: MergeRequestGetRequest,
+        _: MergeRequestGetRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        self.mr_finish_get(input, response)
+    }
+    fn prepare_merge_requests_list(
+        &self,
+        input: &MergeRequestsListRequest,
+    ) -> Result<MergeRequestsListRequestContext> {
+        self.mr_prepare_list(input)
+    }
+    fn finish_merge_requests_list(
+        &self,
+        input: MergeRequestsListRequest,
+        context: MergeRequestsListRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        self.mr_finish_list(input, context, response)
+    }
     fn prepare_pipelines_list(
         &self,
         input: &PipelinesListRequest,

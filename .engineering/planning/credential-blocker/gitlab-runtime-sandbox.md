@@ -7,6 +7,7 @@ title: Dedicated GitLab sandbox target and protected credential source are missi
 relations:
 - blocks: story:persistent-gitlab-journey
 - blocks: story:gitlab-ci-runtime
+- blocks: story:gitlab-mr-reads
 withholds: test_result
 revision: 1
 ---

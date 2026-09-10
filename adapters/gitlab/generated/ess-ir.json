@@ -12,6 +12,8 @@
         "gitlab.requests.IssuesListRequest",
         "gitlab.requests.JobGetRequest",
         "gitlab.requests.JobTraceRequest",
+        "gitlab.requests.MergeRequestGetRequest",
+        "gitlab.requests.MergeRequestsListRequest",
         "gitlab.requests.PipelineGetRequest",
         "gitlab.requests.PipelineJobsRequest",
         "gitlab.requests.PipelinesListRequest",
@@ -162,6 +164,93 @@
           },
           {
             "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.MergeRequestGetRequest": {
+      "name": "gitlab.requests.MergeRequestGetRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "iid",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.MergeRequestsListRequest": {
+      "name": "gitlab.requests.MergeRequestsListRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cursor",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "limit",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "state",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "updated_after",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "updated_before",
             "type_ref": {
               "kind": "primitive",
               "name": "string"
