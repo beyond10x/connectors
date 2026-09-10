@@ -4,3 +4,4 @@ version: v1
 domains:
   - connectors_gitlab.auth
   - connectors_gitlab.ci
+  - connectors_gitlab.merge_requests

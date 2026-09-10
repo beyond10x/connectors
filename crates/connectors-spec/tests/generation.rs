@@ -140,7 +140,7 @@ fn pinned_source_and_required_source_semantics_are_enforced() {
         let mut params = vec![];
         for place in ["path", "query"] {
             for (name, _) in m[format!("{place}_parameters")].as_object().unwrap() {
-                params.push(json!({"in":place,"name":name,"required":place=="path","schema":{"type":if ["page","per_page","pipeline_id","job_id"].contains(&name.as_str()) {"integer"} else {"string"}}}));
+                params.push(json!({"in":place,"name":name,"required":place=="path","schema":{"type":if ["page","per_page","pipeline_id","job_id","merge_request_iid"].contains(&name.as_str()) {"integer"} else {"string"}}}));
             }
         }
         upstream["paths"][m["path"].as_str().unwrap()] = json!({"get":{"operationId":m["upstream_operation"],"parameters":params,"responses":{"200":{"description":"test response"}}}});
@@ -226,5 +226,85 @@ fn regeneration_refuses_unowned_files_and_output_symlinks() {
         let linked = temp.path().join("linked");
         std::os::unix::fs::symlink(&out, &linked).unwrap();
         assert!(generate(&spec, &linked, &ess(), false).is_err());
+    }
+}
+
+#[test]
+fn mapped_date_time_is_preserved_and_other_format_semantics_refuse() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut base = source();
+    let operation = base["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|o| o["id"] == "merge_requests.list")
+        .unwrap()
+        .clone();
+    let mapping = base["mappings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["operation"] == "merge_requests.list")
+        .unwrap()
+        .clone();
+    base["operations"] = json!([operation]);
+    base["mappings"] = json!([mapping.clone()]);
+    base["upstream"]["path"] = json!("upstream.json");
+    let mut params = vec![];
+    for place in ["path", "query"] {
+        for (name, _) in mapping[format!("{place}_parameters")].as_object().unwrap() {
+            let mut schema = json!({"type":if ["page","per_page"].contains(&name.as_str()) {"integer"} else {"string"}});
+            if name == "updated_after" {
+                schema["format"] = json!("date-time");
+            }
+            params.push(json!({"in":place,"name":name,"required":place=="path","schema":schema}));
+        }
+    }
+    let date_index = params
+        .iter()
+        .position(|p| p["name"] == "updated_after")
+        .unwrap();
+    for case in 0..8 {
+        let mut spec = base.clone();
+        let mut params = params.clone();
+        match case {
+            0 => {}
+            1 => {
+                spec["operations"][0]["input_schema"]["properties"]["updated_after"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("format");
+            }
+            2 => {
+                spec["operations"][0]["input_schema"]["properties"]["updated_after"]["format"] =
+                    json!("date")
+            }
+            3 => params[date_index]["schema"]["format"] = json!("unknown-format"),
+            4 => params[date_index]["schema"]["type"] = json!("integer"),
+            5 => {
+                spec["mappings"][0]["query_parameters"]["updated_after"] =
+                    json!({"kind":"binding","name":"after"})
+            }
+            6 => {
+                spec["mappings"][0]["query_parameters"]["updated_after"] =
+                    json!({"kind":"constant","value":"2026-02-30T00:00:00Z"})
+            }
+            _ => {
+                spec["mappings"][0]["query_parameters"]["updated_after"] =
+                    json!({"kind":"constant","value":"2026-09-01T00:00:00Z"})
+            }
+        }
+        let mut upstream =
+            json!({"openapi":"3.0.0","info":{"title":"format fixture","version":"1"},"paths":{}});
+        upstream["paths"][mapping["path"].as_str().unwrap()] = json!({"get":{"operationId":mapping["upstream_operation"],"parameters":params,"responses":{"200":{"description":"bounded native fixture"}}}});
+        let bytes = serde_json::to_vec(&upstream).unwrap();
+        std::fs::write(temp.path().join("upstream.json"), &bytes).unwrap();
+        spec["upstream"]["sha256"] = json!(hash(&bytes));
+        let result = import(&parse(&spec).unwrap(), &temp.path().join("adapter.json"));
+        assert_eq!(
+            result.is_ok(),
+            matches!(case, 0 | 7),
+            "case {case}: {result:?}"
+        );
     }
 }

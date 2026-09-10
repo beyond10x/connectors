@@ -1,0 +1,110 @@
+{
+  "type": "ess-realization-ir/1",
+  "id": "gitlab-local",
+  "realization_digest": "sha256:a08918695a1bdbb01937cd1c7ee043756644a9e75b392ff7a42cb8bbf8ae7b85",
+  "specification": {
+    "system": "gitlab",
+    "version": 1,
+    "source_digest": "sha256:b7b2cb3c4d5e331acc466cbffc8cb5f0365f08bc1fa22c9b39b3dd9e02fa5202"
+  },
+  "synthesis": {
+    "target": "rust-linux-x86_64/1",
+    "generator": "ess/0.20.0"
+  },
+  "components": [
+    "gitlab-adapter"
+  ],
+  "actors": [],
+  "implementations": {
+    "adapter-image": {
+      "components": [
+        "gitlab-adapter"
+      ],
+      "artifact": {
+        "kind": "container",
+        "locator": "docker-daemon:connectors-v2-gitlab:mr-20260910",
+        "identity": "sha256:f10a2929e039bcf72ae215a9d96c9bf95c2780beb66dfd1c8eddf41446cf7ea8"
+      }
+    }
+  },
+  "entrypoints": {
+    "http-service": {
+      "title": "Configured gitlab HTTP service",
+      "summary": "Generated typed requests and explicit provider bindings served by the asynchronous host.",
+      "primary": true,
+      "interaction": "invoke",
+      "attachment": "network",
+      "availability": "internal",
+      "support": "preview",
+      "implementation": "adapter-image",
+      "actors": [],
+      "surfaces": [
+        {
+          "kind": "type",
+          "name": "gitlab.requests.FileGetRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.IssuesListRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.JobGetRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.JobTraceRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.MergeRequestGetRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.MergeRequestsListRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.PipelineGetRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.PipelineJobsRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.PipelinesListRequest"
+        },
+        {
+          "kind": "type",
+          "name": "gitlab.requests.ProjectGetRequest"
+        }
+      ],
+      "invocation": {
+        "kind": "argv",
+        "argv": [
+          "/usr/local/bin/connectors-gitlab",
+          "--config",
+          "/config/service.json"
+        ]
+      },
+      "requires": [
+        {
+          "kind": "filesystem",
+          "name": "configuration",
+          "summary": "Read-only configuration mounted at /config/service.json."
+        },
+        {
+          "kind": "network",
+          "name": "provider-api",
+          "summary": "Reachability to the explicitly configured provider HTTPS endpoint."
+        },
+        {
+          "kind": "credential",
+          "name": "service-token",
+          "summary": "Owner-only caller credential mounted separately under /secrets."
+        }
+      ]
+    }
+  }
+}

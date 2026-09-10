@@ -131,10 +131,16 @@ impl Local {
                     profile: auth::PROFILE_ID.into(),
                     scopes: BTreeSet::from(["read_api".into()]),
                     effect: match o.id.as_str() {
-                        "project.get" | "issues.list" | "file.get" | "pipelines.list"
-                        | "pipeline.get" | "pipeline.jobs" | "job.get" | "job.trace" => {
-                            Effect::Read
-                        }
+                        "project.get"
+                        | "issues.list"
+                        | "file.get"
+                        | "pipelines.list"
+                        | "pipeline.get"
+                        | "pipeline.jobs"
+                        | "job.get"
+                        | "job.trace"
+                        | "merge_request.get"
+                        | "merge_requests.list" => Effect::Read,
                         _ => Effect::Unknown,
                     },
                 })

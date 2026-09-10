@@ -27,6 +27,14 @@ profile does not attempt general JSON Schema subset inference. Binding parameter
 are limited to unconstrained string/integer source scalars; their preparation and
 value validity remain explicit handwritten obligations.
 
+The scalar profile additionally preserves source `type:string, format:date-time`
+with an identical caller format annotation. Generated types remain strings; native
+`prepare` validates the actual calendar and operation-specific bounds before I/O.
+Formatted constants are checked with format assertions enabled. Unknown formats,
+formats on non-string source scalars, missing/mismatched caller annotations and
+formatted binding parameters refuse. No general format or date arithmetic
+projection is claimed.
+
 The frontend retains the exact selected operations, referenced response schemas,
 source pointers, excluded optional parameters, and implementation obligations in
 `upstream.openapi.json` and `coverage.json`. Unselected operations create no runtime
