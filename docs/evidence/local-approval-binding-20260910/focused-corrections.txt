@@ -1,0 +1,19 @@
+Initial cargo fmt / focused test compilation refused an extra closing parenthesis
+in the newly authored TestClock fixture:
+
+error: unexpected closing delimiter: `}`
+  --> crates/connectors-host/src/local/approvals/tests.rs:21:1
+
+After correcting that syntax, the first executed focused test run reported:
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 63 filtered out; finished in 0.79s
+
+The failure was canonical_framing_rejects_omission_duplicates_unknown_fields_and_alternate_spellings.
+Its tenant-member removal expected a trailing comma, but tenant was the last
+canonical scope member, so the replacement left the original valid proof intact.
+The fixture now removes the actual comma/member spelling. Subsequent focused
+runs passed 13 tests, then 15 after additional acknowledgement and race coverage.
+
+This is a correction record summarizing the retained session output, not a full
+test-run transcript. The final focused transcript is approval-tests.log; the full
+first repository gate and its Clippy refusal are preserved in gate-first.log.

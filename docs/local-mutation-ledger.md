@@ -16,7 +16,7 @@ validation does not qualify a clock or establish durable dispatch behavior.
 Version 4 extends the existing private SQLite authority, preserving the bytes and
 digests of migrations 1–3. Reads do not create or upgrade missing state.
 Only admitted mutation preparation installs version 4; ordinary setup and read
-management retain version 3 and can inspect recognized version 4. WAL, FULL
+management retain version 3 and can inspect recognized versions 4–6. WAL, FULL
 synchronization, owner-only files and bounded lifecycle locking remain the
 [existing metadata binding](local-runtime-foundation.md).
 
@@ -38,6 +38,12 @@ they cannot be reconstructed from persisted identifiers or used after fork.
 The local connection revision, configuration and publication fence must still
 match at the gate. None of this substitutes for caller policy, credential-use
 admission, approval spend or acknowledged audit admission.
+
+The [approval binding](local-approval-binding.md) adds migration six and
+`prepare_approved` to retain the complete verified subject with a new attempt.
+`open_dispatch` refuses required and event-claim modes. `open_approved_dispatch`
+requires the original live approval spend receipt as well as the preparation;
+old records with no subject capture cannot acquire either approval receipt.
 
 The store neither calls providers nor gives them metadata or credentials. A
 future coordinator must combine its receipt with those other admitted
@@ -91,8 +97,9 @@ credentials, approval evidence and raw input have no storage field.
 
 The SQLite tests exercise durable faults and races using a deterministic trusted
 clock fixture. A test counter can demonstrate receipt use, but is not a native
-GitLab write. Local approval issuance/verification/spending, audit persistence,
-production clock qualification, generated mutation CLI/wire surfaces and their
-fully admitted dispatch composition remain the next GitLab foundation work.
+GitLab write. Private proof/spend and audit persistence are now available;
+protected persistent issuer custody, local approval CLI issuance, production
+clock qualification, generated mutation CLI/wire surfaces and their fully
+admitted dispatch composition remain the next GitLab foundation work.
 Dedicated GitLab sandbox acceptance and the C14 native create/update head guard
 are still open. GitLab precedes Kubernetes, PostgreSQL, MCP and remaining providers.

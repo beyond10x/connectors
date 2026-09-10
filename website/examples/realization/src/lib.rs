@@ -46,6 +46,7 @@ impl m::obligations::PrepareAttemptBehavior for Behaviors {
             input_digest: input.input_digest,
             approval_mode,
             approval_ref: input.approval_ref,
+            approval_subject: input.approval_subject,
             idempotency_key: input.idempotency_key,
             settled_at: None,
         });
@@ -547,6 +548,8 @@ impl Lab {
             .into(),
             approval_mode: m::ApprovalMode::Required,
             approval_ref: Some("fictional-approval-1".into()),
+            // The fictional approval counter supplies no verified host subject.
+            approval_subject: None,
             idempotency_key: Some("example-key".into()),
         };
         self.system

@@ -1,0 +1,10 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+    Checking rustls-webpki v0.103.15
+    Checking rcgen v0.14.10
+    Checking tokio-rustls v0.26.5
+    Checking hyper-rustls v0.27.9
+    Checking reqwest v0.12.28
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.69s

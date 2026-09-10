@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 11
+revision: 13
 ---
 ## Outcome and authority
 
@@ -103,3 +103,16 @@ Single implementation and planning-store writer on primary main serializes the s
 story:local-execution-audit completes its private host persistence boundary, with the full Rust 1.88 gate, 12 audit tests including four abrupt process exits, website/reference checks and all five optimized production CLI journeys passing. docs/evidence/local-execution-audit-20260910/README.md retains exact source and executable identities and the corrected ESS-summary/Clippy failures. The audit port acknowledges anchors and final observations separately and cannot reconstruct execution authority during recovery.
 
 The next GitLab implementation is local approval issuance/verification/spending, followed by qualified clock and complete connection-bound dispatch composition, authored mutation ingress and native MR validation/writes. Public audited operations and business effects remain pending those controls. The operator has been asked to resolve C14 create/update head-guard semantics; no answer or weaker guarantee is assumed. Dedicated GitLab sandbox acceptance remains open. All original acceptance, compatibility, packaging and reproducible-delivery obligations remain required, in the unchanged GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider order.
+
+## Approval proof and spend increment — 2026-09-10
+
+The sixth partial runtime child, story:local-approval-binding, implements the selected canonical proof/signature and durable one-use approval spend boundary over the existing mutation ledger. The prepared attempt gains an optional complete historical approval subject, closing missing authority/origin binding for unkeyed attempts; old records cannot invent it during migration. ConfiguredApprovalKey is a trusted current configuration value, with consumer-owned policy guards and qualified clock evidence required at spend.
+
+This is an independently tested internal proof/spend increment, not public local approval onboarding or a provider write. Protected persistent local issuer-key custody/publication, CLI preparation/approval issuance, concrete caller policy, production clock qualification, generated mutation ingress and complete connection-bound dispatch remain required next GitLab work before native validation/writes and dedicated sandbox acceptance. C14 head-guard clarification remains pending. Shared source/planning/build changes are serialized on primary main; four independent planning critics review this six-child partial decomposition. Full GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider scope and order are unchanged.
+
+
+## Approval binding checkpoint — 2026-09-10
+
+story:local-approval-binding completes its private proof/spend and approved ledger-gate boundary. docs/evidence/local-approval-binding-20260910/README.md retains 17 approval tests with four actual process exits, the passing Rust 1.88 repository gate, website/reference and 15 example tests, and all five optimized GitLab CLI journeys. Exact source and executable digests, failed checks and eight planning critic records are retained. One missing audit dependency was fixed; all four final critics approve.
+
+Next is protected persistent local issuer-key custody/publication/rotation and actual approval preparation/issuance CLI, with authenticated caller policy and qualified time, followed by generated mutation ingress and complete connection-bound provider dispatch. Native GitLab validation/writes and dedicated sandbox acceptance remain required. The C14 create/update head-guard question is unanswered; no weaker semantics or approval are inferred. GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider scope and order remain unchanged, and this initiative stays active.

@@ -1,0 +1,37 @@
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling connectors-types v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/connectors-types)
+   Compiling serde_json v1.0.151
+   Compiling contract-examples v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/contract-examples)
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling connectors-system v1.0.0 (/home/timo/beyond10x/connectors_v2/website/.cache/demo/generated/rust/connectors/crates/connectors-system)
+   Compiling connectors-contract-examples v0.1.0 (/home/timo/beyond10x/connectors_v2/website/examples/realization)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.44s
+     Running unittests src/lib.rs (website/.cache/demo/target/debug/deps/connectors_contract_examples-a9aae0aa95f9111b)
+
+running 15 tests
+test tests::discovery_alone_grants_nothing ... ok
+test tests::invalid_requests_do_not_change_the_example ... ok
+test tests::operation_permission_is_separate_from_readiness ... ok
+test tests::missing_or_expired_authority_cannot_prepare_or_dispatch ... ok
+test tests::conflicting_request_and_abort_do_not_dispatch ... ok
+test tests::revocation_wins_and_validation_is_admitted ... ok
+test tests::known_replay_requires_current_admission ... ok
+test tests::refreshed_evidence_uses_its_own_collection_time ... ok
+test tests::withdrawal_does_not_retarget_an_existing_binding ... ok
+test tests::unknown_effect_never_resends ... ok
+test walkthrough::tests::credential_routes_never_carry_provider_material_to_the_gateway_or_client ... ok
+test walkthrough::tests::navigation_and_invalid_requests_preserve_deterministic_state ... ok
+test walkthrough::tests::connecting_never_automatically_runs_a_read ... ok
+test walkthrough::tests::successful_journeys_return_the_same_bounded_issue_page ... ok
+test walkthrough::tests::failures_stop_at_the_responsible_boundary_without_empty_success ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contract_examples
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
