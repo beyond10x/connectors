@@ -9,6 +9,7 @@ relations:
 - blocks: story:gitlab-ci-runtime
 - blocks: story:gitlab-mr-reads
 - blocks: story:gitlab-mr-validation
+- blocks: story:guarded-gitlab-merge
 withholds: test_result
 revision: 1
 ---

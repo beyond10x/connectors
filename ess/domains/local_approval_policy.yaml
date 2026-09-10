@@ -1,0 +1,51 @@
+domain: connectors.local_approval_policy
+summary: Proposed serialized local owner policy for approval issuance and write admission.
+# Owner: contracts/service/local-mutations.md. Metadata alone grants no use;
+# the authenticated owner, current policy/key leases and target checks are required.
+types:
+  - name: connectors.local_approval_policy.Selection
+    kind: struct
+    fields:
+      - {name: configuration_revision, type: String}
+      - {name: descriptor_revision, type: String}
+      - {name: executable_selection, type: String}
+      - {name: clock_configuration_sha256, type: String}
+  - name: connectors.local_approval_policy.SetInput
+    kind: struct
+    fields:
+      - {name: operations, type: List<String>}
+  - name: connectors.local_approval_policy.NativePreparation
+    kind: struct
+    fields:
+      - {name: preparation_id, type: Uuid}
+      - {name: request_id, type: String}
+      - {name: child_incarnation, type: Uuid}
+      - {name: input_sha256, type: String}
+      - {name: deadline_unix_ms, type: Integer}
+    # A private control value, never a serializable write capability. Immutable
+    # provider request/credential state remains in the same owned child process.
+entities:
+  - name: connectors.local_approval_policy.LocalApprovalPolicy
+    identity: {name: policy_id, type: Uuid}
+    fields:
+      - {name: instance_id, type: String}
+      - {name: issuer_id, type: Uuid}
+      - {name: revision, type: Integer}
+      - {name: owner_uid, type: Integer}
+      - {name: selection, type: connectors.local_approval_policy.Selection}
+      - {name: operations, type: List<String>}
+    relations:
+      - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
+      - {name: issuer, kind: references, target: connectors.approval_issuers.ApprovalIssuer, cardinality: one, via: issuer_id}
+    lifecycle:
+      initial: Configured
+      states: [Configured]
+      terminal: [Configured]
+    # Stable retained identity; mutable revisioned policy contents. Configured
+    # does not assert admission: an empty operation set revokes every new use.
+    # No record or reference cascades deletion of issuer/configuration/history.
+# UNMAPPED executable predicates: one policy per instance, issuer-instance equality,
+# monotonic non-reused bounded revision/CAS and durable acknowledgement, current
+# peer UID, shared/exclusive process leases, strict canonical snapshots, sorted
+# distinct supported write operations, current descriptor/clock/connection checks,
+# and protected proof publication. These need the host runtime, not fake ESS moves.
