@@ -1,0 +1,54 @@
+# Draft retained in main; review the owning story and current preflight before launch.
+id: connectors-kubernetes-spec-service
+kind: feature
+objective: kubernetes-spec-service
+protocol: adp/1
+profile: development.standard
+
+derived_from:
+  - story:kubernetes-spec-service
+
+constraints:
+  facts:
+    change.public_contract: true
+    change.architectural: true
+    change.code: true
+  notes:
+    - >-
+      The Acceptance and Work sequence and evidence sections of
+      .engineering/planning/story/kubernetes-spec-service.md own the outcome.
+      Select and record the current main baseline before implementation. Historical
+      801b8d5 checks remain evidence of that revision; do not reset the source to it.
+      Reuse verified checks only for unchanged exact inputs and obtain any missing
+      baseline/image proof before extending Kubernetes generation and packaging.
+    - >-
+      Resolve the current crates/connectors-spec/toolchain.json through the
+      repository's exact-source receipt checks. At integration the pin is
+      6f7ef46163e758f3401945d1a946e0fc80ebc003. Do not restore the old release pin,
+      downgrade global tools or repeat the already-completed GitLab migration.
+    - >-
+      Preserve resources.list for pods, services, deployments and EndpointSlices,
+      endpoints.discover and configuration-gated hosts.discover. Pin upstream
+      bytes and retain namespace/kind admission, cursor binding, completeness,
+      provenance and explicit missing-semantics refusals. Resolve the existing
+      generation mapping limitation before implementing selection.
+    - >-
+      Follow current shared and adapter-owned ESS declarations. Model and validate
+      any necessary typed extension first. Keep provider semantics in the adapter
+      and preserve GitLab generation plus SQL behavior. Reuse the Rust executor
+      for exact-image packaging and direct/federated three-adapter acceptance.
+    - >-
+      Follow AGENTS.md for bot-authored commits, verified authority, managed
+      checkouts and leases, two Cargo jobs and task-owned TMPDIR. Keep credentials
+      out of source and evidence. Use connectors for integrations and report gaps
+      before alternative clients. Retain evidence and clean only owned fixtures.
+    - >-
+      This draft authorizes no paid launch by itself. Recheck current protocol
+      loading and let the driver select its map. A selected run needs operator
+      budget-usd and assume-usd-per-run plus pause-on-approval. Relay refusals.
+      Run applicable local gates for changed implementation; do not duplicate
+      already-passing unchanged gates remotely.
+    - >-
+      Keep this outcome local: no external publication, Atlas enrollment,
+      consumer rollout, other providers, writes, watches, automatic discovery
+      activation or changes to sibling AEP, ESS or original Connectors repositories.
