@@ -406,7 +406,24 @@ fn snapshot(
     consumed: u64,
     acknowledged: u64,
 ) -> Result<EvidenceSnapshot> {
-    let native = &prepared.baseline;
+    recollected_snapshot(
+        &prepared.binding,
+        &prepared.connection,
+        &prepared.generation,
+        &prepared.baseline,
+        consumed,
+        acknowledged,
+    )
+}
+
+pub(super) fn recollected_snapshot(
+    binding: &Binding,
+    connection: &str,
+    generation: &str,
+    native: &ValidatedBaseline,
+    consumed: u64,
+    acknowledged: u64,
+) -> Result<EvidenceSnapshot> {
     let until = native
         .valid_until_ms
         .min(deadline(consumed, ENTRY_MS)?)
@@ -446,12 +463,12 @@ fn snapshot(
         });
     }
     Ok(EvidenceSnapshot {
-        generation_id: prepared.generation.clone(),
+        generation_id: generation.to_owned(),
         binding: EvidenceBinding {
-            instance_id: prepared.binding.instance_id.clone(),
-            connection_ref: prepared.connection.clone(),
-            profile_ref: prepared.binding.profile.id.clone(),
-            provider_authority: prepared.binding.provider_authority.clone(),
+            instance_id: binding.instance_id.clone(),
+            connection_ref: connection.to_owned(),
+            profile_ref: binding.profile.id.clone(),
+            provider_authority: binding.provider_authority.clone(),
         },
         observed_external_identity: native.identity.clone(),
         granted_scopes: native.granted_scopes.clone(),

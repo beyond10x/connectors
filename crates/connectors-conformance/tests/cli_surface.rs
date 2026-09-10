@@ -86,7 +86,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_fifteen_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_sixteen_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -104,6 +104,7 @@ fn the_selected_inventory_has_fifteen_grouped_commands_and_explicit_runtime_obli
         "connections describe",
         "connections connect",
         "connections repair",
+        "connections revalidate",
         "connections status",
         "connections revoke",
         "operations list",
@@ -242,6 +243,19 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         (
             &[
                 "connections",
+                "revalidate",
+                "--adapter",
+                "forge",
+                "--connection",
+                "c1",
+                "--expected-revision",
+                "r1",
+            ],
+            "ConnectionRevalidateResult",
+        ),
+        (
+            &[
+                "connections",
                 "status",
                 "--adapter",
                 "forge",
@@ -294,6 +308,9 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         );
         assert_eq!(output.exit_code, 0, "{args:?}: {output:?}");
         assert_eq!(handler.calls, 1);
+        if *result_type == "ConnectionRevalidateResult" {
+            assert!(sources.calls.is_empty());
+        }
         assert_eq!(
             serde_json::from_str::<Value>(&output.stdout).unwrap()["result"],
             result

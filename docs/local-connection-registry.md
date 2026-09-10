@@ -6,17 +6,17 @@ supports static-entry profiles. Provider work and keyring I/O happen outside
 metadata transactions. Adapter libraries receive authenticated capabilities;
 they never open this database or select arbitrary keyring items.
 
-The production CLI uses this authority for connection list, describe, status and
-terminal local revoke. Protected connect/repair, explicit evidence revalidation
-and the CLI owner's integration with the private adapter transport remain unfinished. A native
-fixture publishes a fictional connection through the coordinator and qualified
-Secret Service, restarts both, and exercises separate production CLI status/revoke
-processes. It does not prove the persistent GitLab acceptance journey.
+The production CLI uses this authority for connection list, describe, status,
+terminal local revoke, protected connect/repair and explicit saved-material
+revalidation. Its persistent owner binds the private adapter transport. Disposable
+GitLab HTTPS and qualified Secret Service fixtures cover saved reads after restart
+and real evidence expiry; dedicated GitLab sandbox acceptance remains open.
 
 ## Metadata and migration
 
 Migration two retains the original local authority UUID and records its exact SQL
-digest. Fresh setup installs both migrations. Passive inspection accepts recognized
+digest. Fresh setup installs all three migrations, including the later runtime
+cache/suppression binding. Passive inspection accepts recognized
 headers but cannot migrate version one or interpret it as an empty connection
 registry. An admitted acquisition may migrate an existing recognized database;
 missing, changed or future authority refuses. SQLite uses WAL and FULL
@@ -30,7 +30,7 @@ The tables bind existing semantic owners:
 | Connections | Public reference/revision/identity and private publication fence, selected generation, custody version and evidence |
 | Acquisitions | One-use completion owner, fixed original deadline, captured generation and allocated candidate |
 | Generations and materials | Immutable capture identity and exact version coordinates; acknowledgement and retirement facts |
-| Uses | Bounded read retention/admission guards; no business write approval or audit claim |
+| Uses | Bounded read and explicit revalidation retention/admission guards; distinct private one-use handles, no business write approval or audit claim |
 | Cursors | Opaque bounded list continuation tied to the exact selection and metadata epoch |
 
 Before custody acknowledgement, a material row records only the acquisition's

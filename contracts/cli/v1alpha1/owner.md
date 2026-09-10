@@ -7,7 +7,7 @@ kernel file lock in the selected private state directory. It is bound to one
 admitted absolute configuration path and the database authority UUID.
 
 Passive commands contact only an existing socket or read recognized metadata.
-Admitted connect, repair and invoke may start the owner. Competing startups acquire
+Admitted connect, repair, revalidate and invoke may start the owner. Competing startups acquire
 the same lifetime lock before spawning; failure to acquire it never authorizes a
 replacement process. A startup socket carries a fresh challenge, owner incarnation
 and metadata authority before the parent releases startup ownership. The daemon
@@ -36,7 +36,7 @@ SQLite migration three adds the configuration owner's cached bootstrap and durab
 stop suppression, keyed by the existing configured instance identity. A cache is
 always stale information. Updating a snapshot never clears suppression. Exact stop
 commits suppression before signalling the owned incarnation; explicit admitted
-connect/repair/invoke is the only resume action. No PID in a cache grants process
+connect/repair/revalidate/invoke is the only resume action. No PID in a cache grants process
 ownership. Old/future or incomplete migrations remain explicit refusals.
 
 Configuration is reloaded for admission and immediately before protected completion
@@ -54,3 +54,23 @@ after protected completion may leave publication unresolved to that client; its
 acquisition reference remains the recovery route. Already dispatched read work may
 finish within its original deadline after the CLI disconnects. No business write
 or automatic repeat is admitted by this binding.
+
+Explicit `connections revalidate` admits the selected public connection and its
+semantic revision under the configured profile policy before startup. It captures
+the exact retained generation/version and private publication fence for at most
+30 seconds, independent of stale baseline evidence, then resolves that version
+through qualified custody. The existing bounded transient-use records retain the
+version during validation; they create no new generation or custody owner. The
+capture is consumed once before the declared native identity/grant read. The
+original deadline includes queueing, startup, custody and provider work.
+
+Successful same-identity evidence replaces the one baseline under the unchanged
+generation and current binding/fence. Publication advances the private fence,
+cutting pending reads, repairs and competing recollections; the public semantic
+revision and custody version stay unchanged. Known invalidity, expiry, retirement
+or revocation cannot be cleared by recollection. Positive invalidity or a proved
+identity mismatch in this retained material cuts off that material; transient
+provider/custody failures preserve any still-valid baseline. No credential is
+written, no new acquisition is created, and business invocation never performs
+implicit revalidation. A lost publication acknowledgement is outcome_unknown;
+connection status observes the resulting baseline and no request is replayed.
