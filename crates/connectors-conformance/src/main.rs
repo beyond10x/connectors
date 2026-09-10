@@ -47,14 +47,15 @@ fn require(condition: bool, message: &'static str) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let token = String::from_utf8(
-        CredentialRef::File {
-            path: args.token_file,
-        }
-        .resolve()
-        .await?
-        .0,
-    )?;
+    let secret = CredentialRef::File {
+        path: args.token_file,
+    }
+    .resolve()
+    .await?;
+    let token = std::str::from_utf8(&secret.0)
+        .map_err(|_| "invalid service token")?
+        .to_owned();
+    drop(secret);
     let gateway = Client::new(&args.gateway, token.clone(), args.allow_plaintext)?;
     let gateway_desc = gateway.describe().await?;
     let mut checks = Vec::new();

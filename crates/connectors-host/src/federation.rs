@@ -113,7 +113,8 @@ impl Federation {
     }
 }
 async fn token(credential: &CredentialRef) -> Result<String> {
-    String::from_utf8(credential.resolve().await?.0)
+    std::str::from_utf8(&credential.resolve().await?.0)
+        .map(str::to_owned)
         .map_err(|_| Error::invalid("invalid downstream credential"))
 }
 fn snapshot(config: &FederationConfig, leaves: BTreeMap<String, Arc<Leaf>>) -> Result<Snapshot> {

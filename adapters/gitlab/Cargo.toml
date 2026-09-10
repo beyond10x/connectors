@@ -23,6 +23,8 @@ connectors-host = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+zeroize.workspace = true
+time = { version = "0.3", features = ["parsing", "macros"] }
 clap = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
