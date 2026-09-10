@@ -127,6 +127,7 @@ struct EvidenceSnapshot {
 /// Holds only a path; each operation closes its SQLite handle before returning.
 pub struct Registry {
     path: PathBuf,
+    system_clock: bool,
     #[cfg(test)]
     lose_next_commit: std::sync::atomic::AtomicBool,
 }
@@ -194,8 +195,18 @@ impl Registry {
     pub fn new(path: &Path) -> Self {
         Self {
             path: path.to_owned(),
+            system_clock: false,
             #[cfg(test)]
             lose_next_commit: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+    /// Production binding: sample the physical clock after acquiring the
+    /// transaction. A timestamp taken before lock contention is not evidence of
+    /// clock regression. Absolute request/capture deadlines remain unchanged.
+    pub fn with_system_clock(path: &Path) -> Self {
+        Self {
+            system_clock: true,
+            ..Self::new(path)
         }
     }
 
@@ -203,7 +214,7 @@ impl Registry {
         &self,
         now: u64,
         migrate: bool,
-        action: impl FnOnce(&Transaction<'_>, Uuid) -> Result<T>,
+        action: impl FnOnce(&Transaction<'_>, Uuid, u64) -> Result<T>,
     ) -> Result<T> {
         let mut metadata = Metadata::update(&self.path, migrate).map_err(host_failure)?;
         let authority = metadata.authority().map_err(host_failure)?;
@@ -211,6 +222,11 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db)?;
+        let now = if self.system_clock {
+            connectors_sdk::now_ms()
+        } else {
+            now
+        };
         let now_sql = timestamp(now)?;
         let previous: i64 = tx
             .query_row(
@@ -230,7 +246,7 @@ impl Registry {
         // Time observations persist even when the requested semantic action
         // refuses. A savepoint rolls back its work without forgetting the clock.
         tx.execute_batch("SAVEPOINT action").map_err(db)?;
-        let result = action(&tx, authority);
+        let result = action(&tx, authority, now);
         if result.is_err() {
             tx.execute_batch("ROLLBACK TO action").map_err(db)?;
         }

@@ -1,9 +1,10 @@
 //! Private configured adapter composition. No database or credential resolver is
 //! exported to business adapters. See contracts/cli/v1alpha1/private-adapter.md.
-mod artifact;
-mod channel;
+pub(crate) mod artifact;
+pub(crate) mod channel;
 mod process;
 mod server;
+pub mod state;
 pub use process::Child;
 pub use server::{Adapter, serve};
 

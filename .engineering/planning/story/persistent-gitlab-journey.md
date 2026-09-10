@@ -37,7 +37,7 @@ scope:
   path: docs
 - confidence: cited
   path: ess/domains
-revision: 12
+revision: 13
 ---
 ## Acceptance
 
@@ -124,3 +124,15 @@ The final cargo run --locked --offline -p connectors-build -- gate --msrv passes
 This is an executable transport/composition increment, not the persistent CLI journey. Production protected Sources admission, reviewed operation/profile policy, owner socket and stable supervision, startup coalescing, durable stop suppression, explicit evidence revalidation and connect/read/restart reuse remain required. The current generated-parser connect/repair routes still refuse before capture. Dedicated GitLab sandbox access remains missing under credential-blocker:gitlab-runtime-sandbox. The paid-driver protocol-loading record was not requalified by these runtime tests; interactive implementation remains independent of it.
 
 The story, initiative and three-provider goal remain active. Next bind the CLI owner and protected entry to this private transport and existing SQLite/custody coordinator. Keep GitLab before Kubernetes and PostgreSQL, then MCP and the remaining providers. No runtime acceptance or specification milestone is closed by this checkpoint. There is still only one decomposing child of the initiative, so planning skill section 7 requires no new critic panel for this implementation evidence update.
+
+## 2026-09-10 protected CLI and persistent GitLab owner checkpoint
+
+Production generated-parser handlers now bind protected connect/repair, cached operation discovery and supervised read invocation to a persistent local owner. The Sources seam retains a clearing buffer and live admitted capture, transferring only a nonsecret marker through the generated String/JSON carrier. Exact configured profile/operation allowlists default to deny. A private local Secret Service socket can be selected explicitly with the same qualified daemon/storage checks; credentials remain exclusively in custody.
+
+SQLite migration three stores cached bootstraps and stop suppression under the existing configuration owner. The process holds an inherited lifetime lock with CLOEXEC, authenticates same-UID sockets and fresh greetings, owns adapter children on retained threads and stops only exact pidfds. Startup shares a successful instance, stop remains responsive during provider work, and its fence prevents earlier queued actions or pending captures from undoing suppression. Production clock sampling now occurs inside the transaction: concurrent admission cannot mistake an older pre-lock timestamp for wall-clock regression. The durable regression refusal remains tested.
+
+The final repository gate passes, including Rust 1.88, shared/native ESS, generation and conformance, tests/Clippy and library boundaries. Native host fixtures pass with a disposable qualified keyring, and two production GitLab CLI fixtures prove protected file/stdin entry, persisted reads, owner and keyring restart, four concurrent resumed reads without credential re-entry, failed identity-changing repair preserving a usable credential, schema/policy refusal, stale stop, busy stop and terminal revoke. PTY tests verify hidden input and echo restoration after SIGINT; the reply reader checks cancellation during partial frames without resetting the deadline. Website build, typecheck and reference drift checks pass. Exact commands, source hashes and receipts are retained in docs/evidence/gitlab-cli-owner-20260910/README.md.
+
+This closes an executable local fixture journey, not the story's dedicated GitLab sandbox acceptance. credential-blocker:gitlab-runtime-sandbox remains open. The current native evidence expires within 60 seconds; explicit revalidation of retained material is still required before the CLI offers lasting reuse without repair/re-entry. The remaining local-management work includes cohort-wide failure propagation after unsuccessful startup, authoritative reduction of positive native credential-invalidity outcomes, complete paging and cleanup/expiry scheduling. An already-dispatched read can finish within its original deadline after the CLI disconnects; no write is admitted or retried.
+
+The current owner/permission/custody/cache values were modeled and validated before dependent implementation; this adds no new entity or governed decomposition. There is still one decomposing child, so planning skill section 7 requires no critic panel for this evidence append. The story, initiative and active three-provider goal remain open. Next finish evidence revalidation and the remaining local-management cases, then integrate Kubernetes and PostgreSQL before MCP and the remaining providers. The existing paid-driver protocol-loading blocker was not requalified. Connectors stays local on main; no publication, new recovery repository or task-owned linked tree is introduced.

@@ -12,7 +12,7 @@ use std::{
     time::Instant,
 };
 
-pub(super) fn capture(mut source: File, expected_sha256: &str, until: Instant) -> Result<File> {
+pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -> Result<File> {
     source
         .seek(SeekFrom::Start(0))
         .map_err(|_| Failure::InvalidConfiguration)?;

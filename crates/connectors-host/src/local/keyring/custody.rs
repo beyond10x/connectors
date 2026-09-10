@@ -104,7 +104,10 @@ pub struct Store {
 
 impl Store {
     pub fn open(scope: Scope) -> Result<Self> {
-        Self::connect(super::local_stream().map_err(unavailable)?, scope)
+        Self::open_at(scope, None)
+    }
+    pub fn open_at(scope: Scope, socket: Option<&std::path::Path>) -> Result<Self> {
+        Self::connect(super::local_stream_at(socket).map_err(unavailable)?, scope)
     }
 
     fn connect(stream: std::os::unix::net::UnixStream, scope: Scope) -> Result<Self> {
@@ -358,9 +361,12 @@ impl Store {
 /// Passive qualification of the current custody owner and encrypted storage.
 /// Opens no secret session and reads no credential item or encrypted payload.
 pub fn available() -> bool {
+    available_at(None)
+}
+pub fn available_at(socket: Option<&std::path::Path>) -> bool {
     (|| -> Result<()> {
-        let service =
-            Service::connect(super::local_stream().map_err(unavailable)?).map_err(unavailable)?;
+        let service = Service::connect(super::local_stream_at(socket).map_err(unavailable)?)
+            .map_err(unavailable)?;
         if service.state().map_err(unavailable)? != State::Available {
             return Err(Failure::Unavailable);
         }

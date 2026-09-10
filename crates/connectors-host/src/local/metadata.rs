@@ -13,6 +13,7 @@ use std::{
 const APPLICATION_ID: i64 = 0x434e4354;
 const MIGRATION: &str = "CREATE TABLE local_authority (singleton INTEGER PRIMARY KEY CHECK(singleton=1), authority_id TEXT NOT NULL UNIQUE, owner_uid INTEGER NOT NULL); CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, digest TEXT NOT NULL);";
 const REGISTRY_MIGRATION: &str = include_str!("metadata/registry.sql");
+const RUNTIME_MIGRATION: &str = include_str!("metadata/runtime.sql");
 const NAME: &str = "metadata.sqlite3";
 const LOCK: &str = "metadata.lock";
 
@@ -146,7 +147,7 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(unavailable)?;
-        if version != 2 {
+        if !(2..=3).contains(&version) {
             return Err(Failure::MetadataUnavailable);
         }
         Ok(())
@@ -169,22 +170,24 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(unavailable)?;
-        if version == 2 {
-            return Ok(());
+        for (next, sql) in [(2, REGISTRY_MIGRATION), (3, RUNTIME_MIGRATION)] {
+            if version >= next {
+                continue;
+            }
+            let tx = self
+                .connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(unavailable)?;
+            tx.execute_batch(sql).map_err(unavailable)?;
+            tx.execute(
+                "INSERT INTO schema_migrations VALUES (?1, ?2)",
+                rusqlite::params![next, hex::encode(Sha256::digest(sql.as_bytes()))],
+            )
+            .map_err(unavailable)?;
+            tx.pragma_update(None, "user_version", next)
+                .map_err(unavailable)?;
+            tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
         }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(unavailable)?;
-        tx.execute_batch(REGISTRY_MIGRATION).map_err(unavailable)?;
-        tx.execute(
-            "INSERT INTO schema_migrations VALUES (2, ?1)",
-            [hex::encode(Sha256::digest(REGISTRY_MIGRATION.as_bytes()))],
-        )
-        .map_err(unavailable)?;
-        tx.pragma_update(None, "user_version", 2)
-            .map_err(unavailable)?;
-        tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
         self._directory
             .sync_all()
             .map_err(|_| Failure::OutcomeUnknown)?;
@@ -260,7 +263,7 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
             .map_err(unavailable)?;
-        if app != APPLICATION_ID || !(1..=2).contains(&version) || mode != "wal" {
+        if app != APPLICATION_ID || !(1..=3).contains(&version) || mode != "wal" {
             return Err(Failure::MetadataUnavailable);
         }
         let (authority, owner): (String, u32) = self
@@ -285,11 +288,14 @@ impl Metadata {
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(unavailable)?;
         let mut expected = vec![(1, migration_digest())];
-        if version == 2 {
+        if version >= 2 {
             expected.push((
                 2,
                 hex::encode(Sha256::digest(REGISTRY_MIGRATION.as_bytes())),
             ));
+        }
+        if version >= 3 {
+            expected.push((3, hex::encode(Sha256::digest(RUNTIME_MIGRATION.as_bytes()))));
         }
         if migrations != expected {
             return Err(Failure::MetadataUnavailable);
@@ -415,6 +421,69 @@ mod tests {
                 .unwrap()
                 .connections
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn runtime_migration_is_admitted_and_retains_the_v2_authority() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        let directory = fs::directory(&path, true, true).unwrap();
+        fs::publish_new(&directory, OsStr::new(NAME), &[]).unwrap();
+        fs::publish_new(&directory, OsStr::new(LOCK), &[]).unwrap();
+        let connection = Connection::open(path.join(NAME)).unwrap();
+        connection
+            .pragma_update(None, "journal_mode", "WAL")
+            .unwrap();
+        connection.execute_batch(MIGRATION).unwrap();
+        connection.execute_batch(REGISTRY_MIGRATION).unwrap();
+        let authority = uuid::Uuid::new_v4();
+        connection
+            .execute(
+                "INSERT INTO local_authority VALUES (1,?1,?2)",
+                rusqlite::params![authority.to_string(), fs::uid()],
+            )
+            .unwrap();
+        for (version, source) in [(1, MIGRATION), (2, REGISTRY_MIGRATION)] {
+            connection
+                .execute(
+                    "INSERT INTO schema_migrations VALUES (?1,?2)",
+                    rusqlite::params![version, hex::encode(Sha256::digest(source.as_bytes()))],
+                )
+                .unwrap();
+        }
+        connection
+            .pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        connection.pragma_update(None, "user_version", 2).unwrap();
+        drop(connection);
+        let passive = Metadata::inspect(&path).unwrap();
+        assert_eq!(passive.authority().unwrap(), authority);
+        assert_eq!(
+            passive
+                .connection
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+        drop(passive);
+        let active = Metadata::update(&path, true).unwrap();
+        assert_eq!(active.authority().unwrap(), authority);
+        assert_eq!(
+            active
+                .connection
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
+        drop(active);
+        let state = crate::local::runtime::state::State::new(&path);
+        state.suppress("fixture", true).unwrap();
+        drop(state);
+        assert!(
+            crate::local::runtime::state::State::new(&path)
+                .suppressed("fixture")
+                .unwrap()
         );
     }
 }
