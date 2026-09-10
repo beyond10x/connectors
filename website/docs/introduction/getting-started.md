@@ -6,7 +6,11 @@ sidebar_position: 3
 
 # Run your first adapter
 
-The current services run from the local source checkout. You need Rust 1.88.0 or later and an explicitly configured provider endpoint. No public package distribution is configured yet.
+The v0.2.0 services run from a source checkout with Rust 1.88.0 or later and an
+explicitly configured provider endpoint. On Linux x86_64, start with the
+[saved-credential GitLab CLI](/adapters/gitlab#use-saved-credentials).
+The steps below cover the compatible standalone service interface, also used by
+Kubernetes and PostgreSQL. Binary/package distribution is not configured.
 
 ## Build
 

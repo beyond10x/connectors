@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "connectors"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "connectors-cli-contract",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-build"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "connectors-spec",
@@ -566,7 +566,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "connectors-core",
  "futures-util",
@@ -578,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-conformance"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "connectors-cli-contract",
@@ -593,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-contracts"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hex",
  "serde",
@@ -612,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-gitlab"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -637,7 +637,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-host"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-kubernetes"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -689,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sdk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-spec"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "connectors-core",
@@ -722,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sql"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
