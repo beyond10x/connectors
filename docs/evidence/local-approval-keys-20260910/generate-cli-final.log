@@ -1,0 +1,4 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build cli`
+error: invalid or conflicting command path `approvals keys status`
+Error: "ESS CLI generation failed: exit status: 1"

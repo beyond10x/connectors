@@ -5,6 +5,36 @@ binary: connectors
 about: Local integration access through explicitly configured adapters
 globals: {config: config, state: state-dir, output: output}
 callables:
+  approval-keys-status:
+    target: {kind: local, owner: connectors.cli, action: approval-keys-status}
+    input: connectors.cli.ApprovalKeyStatusInput
+    result: connectors.cli.ApprovalKeysResult
+    errors: {failure: connectors.cli.Failure}
+  approval-keys-init:
+    target: {kind: local, owner: connectors.cli, action: approval-keys-init}
+    input: connectors.cli.ApprovalKeyInitInput
+    result: connectors.cli.ApprovalKeysResult
+    errors: {failure: connectors.cli.Failure}
+  approval-keys-rotate:
+    target: {kind: local, owner: connectors.cli, action: approval-keys-rotate}
+    input: connectors.cli.ApprovalKeyRotateInput
+    result: connectors.cli.ApprovalKeysResult
+    errors: {failure: connectors.cli.Failure}
+  approval-keys-recover:
+    target: {kind: local, owner: connectors.cli, action: approval-keys-recover}
+    input: connectors.cli.ApprovalKeyRecoverInput
+    result: connectors.cli.ApprovalKeysResult
+    errors: {failure: connectors.cli.Failure}
+  approval-keys-revoke:
+    target: {kind: local, owner: connectors.cli, action: approval-keys-revoke}
+    input: connectors.cli.ApprovalKeyRevokeInput
+    result: connectors.cli.ApprovalKeysResult
+    errors: {failure: connectors.cli.Failure}
+  approval-keys-retire:
+    target: {kind: local, owner: connectors.cli, action: approval-keys-retire}
+    input: connectors.cli.ApprovalKeyRetireInput
+    result: connectors.cli.ApprovalKeysResult
+    errors: {failure: connectors.cli.Failure}
   setup-init:
     target: {kind: local, owner: connectors.cli, action: setup-init}
     input: null
@@ -86,6 +116,66 @@ callables:
     result: connectors.cli.OperationInvokeResult
     errors: {failure: connectors.cli.Failure}
 commands:
+  - path: [approvals, key-status]
+    aliases: []
+    callable: approval-keys-status
+    about: Observe public key metadata without starting services or reading secrets
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+  - path: [approvals, key-init]
+    aliases: []
+    callable: approval-keys-init
+    about: Create a new approval-signing key in protected local custody
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+  - path: [approvals, key-rotate]
+    aliases: []
+    callable: approval-keys-rotate
+    about: Publish a replacement for the exact current approval-signing key
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+      - field: expected_key
+        source: {kind: option, long: expected-key}
+  - path: [approvals, key-recover]
+    aliases: []
+    callable: approval-keys-recover
+    about: Confirm and publish an exact staged approval-signing key
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+      - field: candidate
+        source: {kind: option, long: candidate}
+  - path: [approvals, key-revoke]
+    aliases: []
+    callable: approval-keys-revoke
+    about: Revoke the current key and cancel its pending replacement
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+      - field: expected_key
+        source: {kind: option, long: expected-key}
+  - path: [approvals, key-retire]
+    aliases: []
+    callable: approval-keys-retire
+    about: Delete exact noncurrent signing material while retaining public history
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+      - field: key
+        source: {kind: option, long: key}
   - path: [setup, init]
     aliases: []
     callable: setup-init

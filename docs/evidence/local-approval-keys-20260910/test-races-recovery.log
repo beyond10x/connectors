@@ -1,0 +1,53 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+error[E0373]: closure may outlive the current function, but it borrows `gate`, which is owned by the current function
+   --> crates/connectors-host/src/local/approval_keys/tests.rs:182:25
+    |
+180 |     std::thread::scope(|s| {
+    |                         - has type `&'1 std::thread::Scope<'1, '_>`
+181 |         let gate = std::sync::Barrier::new(2);
+182 |         let a = s.spawn(|| {
+    |                         ^^ may outlive borrowed value `gate`
+183 |             gate.wait();
+    |             ---- `gate` is borrowed here
+    |
+note: function requires argument type to outlive `'1`
+   --> crates/connectors-host/src/local/approval_keys/tests.rs:182:17
+    |
+182 |           let a = s.spawn(|| {
+    |  _________________^
+183 | |             gate.wait();
+184 | |             store.init(None)
+185 | |         });
+    | |__________^
+help: to force the closure to take ownership of `gate` (and any other referenced variables), use the `move` keyword
+    |
+182 |         let a = s.spawn(move || {
+    |                         ++++
+
+error[E0373]: closure may outlive the current function, but it borrows `gate`, which is owned by the current function
+   --> crates/connectors-host/src/local/approval_keys/tests.rs:186:25
+    |
+180 |     std::thread::scope(|s| {
+    |                         - has type `&'1 std::thread::Scope<'1, '_>`
+...
+186 |         let b = s.spawn(|| {
+    |                         ^^ may outlive borrowed value `gate`
+187 |             gate.wait();
+    |             ---- `gate` is borrowed here
+    |
+note: function requires argument type to outlive `'1`
+   --> crates/connectors-host/src/local/approval_keys/tests.rs:186:17
+    |
+186 |           let b = s.spawn(|| {
+    |  _________________^
+187 | |             gate.wait();
+188 | |             store.init(None)
+189 | |         });
+    | |__________^
+help: to force the closure to take ownership of `gate` (and any other referenced variables), use the `move` keyword
+    |
+186 |         let b = s.spawn(move || {
+    |                         ++++
+
+For more information about this error, try `rustc --explain E0373`.
+error: could not compile `connectors-host` (lib test) due to 2 previous errors

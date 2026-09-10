@@ -64,7 +64,9 @@ configuration and protected credential entry into local keyring custody. Its ESS
 binding and generated parser supply the production management handlers above.
 [Qualified keyring storage](docs/local-secret-service.md) and the
 [connection registry](docs/local-connection-registry.md) have disposable runtime
-tests. Writes, MCP binding and complete multi-provider acceptance remain
+tests. [Approval-signing key management](docs/local-approval-keys.md) supplies
+protected key initialization, rotation, recovery, revocation and retirement.
+Approval issuance, writes, MCP binding and complete multi-provider acceptance remain
 implementation work; the executable also provides `describe`, `invoke` and `serve`.
 
 There is no public release distribution or configured deployment. Historical

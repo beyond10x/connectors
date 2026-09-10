@@ -1,0 +1,189 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-cli-contract v0.0.0 (/home/timo/beyond10x/connectors_v2/apps/connectors-cli-contract)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+   |
+   = note: the type must implement `From<Code>`
+   = note: required for `Code` to implement `Into<_>`
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+50 |                     required_id("expected_revision")?,
+   |                                                     - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+51 |                     required_id("expected_key")?,
+   |                                                - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+57 |                 .recover(required_id("expected_revision")?, required_id("candidate")?)
+   |                                                          - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+57 |                 .recover(required_id("expected_revision")?, required_id("candidate")?)
+   |                                                                                     - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+63 |                     required_id("expected_revision")?,
+   |                                                     - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+64 |                     required_id("expected_key")?,
+   |                                                - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+70 |                 .retire(required_id("expected_revision")?, required_id("key")?)
+   |                                                         - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+error[E0283]: type annotations needed
+  --> apps/connectors/src/local/approval_keys.rs:39:90
+   |
+39 |     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+   |                                                                                          ^^^^
+...
+70 |                 .retire(required_id("expected_revision")?, required_id("key")?)
+   |                                                                              - type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `connectors_host::local::owner::Error: From<_>` found in the following crates: `connectors_host`, `core`:
+           - impl From<Code> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::registry::Failure> for connectors_host::local::owner::Error;
+           - impl From<connectors_host::local::runtime::Failure> for connectors_host::local::owner::Error;
+           - impl<T> From<T> for T;
+help: try using a fully qualified path to specify the expected types
+   |
+39 -     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| Code::InvalidInput.into());
+39 +     let required_id = |field: &str| optional_id(field)?.ok_or_else(|| <Code as Into<T>>::into(Code::InvalidInput));
+   |
+
+For more information about this error, try `rustc --explain E0283`.
+error: could not compile `connectors` (bin "connectors") due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...

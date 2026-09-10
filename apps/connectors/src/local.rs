@@ -10,6 +10,7 @@ use connectors_host::local::{
 };
 use serde_json::{Value, json};
 use std::ffi::OsString;
+mod approval_keys;
 mod connections;
 mod operations;
 mod session;
@@ -214,6 +215,10 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         .adapters
         .get(alias)
         .ok_or_else(|| failure("not_found", "configuration", "check_configuration", false))?;
+    if call.callable.starts_with("approval-keys-") {
+        return approval_keys::execute(call, &paths, &config, alias, adapter)
+            .map_err(owner_failure);
+    }
     if matches!(
         call.callable,
         "connections-list"

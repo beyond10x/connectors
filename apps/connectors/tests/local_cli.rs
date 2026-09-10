@@ -90,6 +90,36 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     assert_eq!(connections["connections"], serde_json::json!([]));
     assert_eq!(connections["source"], "authority");
     assert_eq!(connections["stale"], false);
+    let keys = success(&command(
+        &root,
+        &["approvals", "key-status", "--adapter", "forge"],
+    ));
+    assert!(keys.get("issuer").is_none());
+    for invalid in [
+        "private-sentinel",
+        "00000000-0000-0000-0000-000000000000",
+        "70FD9DE3-9AED-4673-8330-12F20CD0B962",
+    ] {
+        let output = command(
+            &root,
+            &[
+                "approvals",
+                "key-rotate",
+                "--adapter",
+                "forge",
+                "--expected-revision",
+                invalid,
+                "--expected-key",
+                invalid,
+            ],
+        );
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+        let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+        assert_eq!(error["error"]["data"]["code"], "invalid_input");
+        assert!(!String::from_utf8_lossy(&output.stderr).contains(invalid));
+    }
+    assert!(!root.path().join("state/approval-issuer.lock").exists());
     assert!(
         connections["valid_until_ms"].as_u64().unwrap()
             > connections["observed_at_ms"].as_u64().unwrap()

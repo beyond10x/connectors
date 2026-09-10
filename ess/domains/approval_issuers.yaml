@@ -1,0 +1,76 @@
+domain: connectors.approval_issuers
+summary: Local issuer identities and immutable signing-key versions with guarded publication.
+# Normative owner: contracts/service/approval-issuers.md. These are trusted host
+# decisions, not caller authority, custody implementations or public wire codecs.
+entities:
+  - name: connectors.approval_issuers.ApprovalIssuer
+    identity: {name: issuer_id, type: Uuid}
+    fields:
+      - {name: instance_id, type: String}
+      - {name: issuer, type: String}
+      - {name: audience, type: String}
+      - {name: revision, type: Uuid}
+    relations:
+      - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
+    lifecycle:
+      initial: Bound
+      states: [Bound]
+      terminal: [Bound]
+    # Binding identity is permanent; revision is the current management fence.
+    # Bound says nothing about readiness: authority comes only from an Active key.
+  - name: connectors.approval_issuers.ApprovalSigningKey
+    identity: {name: key_id, type: Uuid}
+    fields:
+      - {name: issuer_id, type: Uuid}
+      - {name: public_key, type: String}
+      - {name: not_before_unix_ms, type: Integer}
+      - {name: not_after_unix_ms, type: Integer}
+    relations:
+      - {name: issuer, kind: references, target: connectors.approval_issuers.ApprovalIssuer, cardinality: one, via: issuer_id}
+    lifecycle:
+      initial: Candidate
+      states: [Candidate, Active, Retired, Retiring, Deleted]
+      terminal: [Deleted]
+      transitions:
+        - {name: publish, from: [Candidate], to: Active}
+        - {name: revoke, from: [Candidate, Active], to: Retired}
+        - {name: retire, from: [Candidate, Retired], to: Retiring}
+        - {name: confirm_deletion, from: [Retiring], to: Deleted}
+commands:
+  - name: connectors.approval_issuers.PublishKey
+    input: [{name: key_id, type: Uuid}]
+    outcomes:
+      - {name: published, moves: connectors.approval_issuers.ApprovalSigningKey.publish, instance: key_id, emits: [connectors.approval_issuers.KeyPublished]}
+      - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
+  - name: connectors.approval_issuers.RevokeKey
+    input: [{name: key_id, type: Uuid}]
+    outcomes:
+      - {name: revoked, moves: connectors.approval_issuers.ApprovalSigningKey.revoke, instance: key_id, emits: [connectors.approval_issuers.KeyRevoked]}
+      - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
+  - name: connectors.approval_issuers.RetireKey
+    input: [{name: key_id, type: Uuid}]
+    outcomes:
+      - {name: retiring, moves: connectors.approval_issuers.ApprovalSigningKey.retire, instance: key_id, emits: [connectors.approval_issuers.KeyRetiring]}
+      - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
+  - name: connectors.approval_issuers.ConfirmKeyDeletion
+    input: [{name: key_id, type: Uuid}]
+    outcomes:
+      - {name: deleted, moves: connectors.approval_issuers.ApprovalSigningKey.confirm_deletion, instance: key_id, emits: [connectors.approval_issuers.KeyDeleted]}
+      - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
+events:
+  - name: connectors.approval_issuers.KeyPublished
+    fields: [{name: key_id, type: Uuid}]
+  - name: connectors.approval_issuers.KeyRevoked
+    fields: [{name: key_id, type: Uuid}]
+  - name: connectors.approval_issuers.KeyRetiring
+    fields: [{name: key_id, type: Uuid}]
+  - name: connectors.approval_issuers.KeyDeleted
+    fields: [{name: key_id, type: Uuid}]
+errors:
+  - name: connectors.approval_issuers.KeyStateConflict
+    fields:
+      - {name: state, type: connectors.approval_issuers.ApprovalSigningKey.State}
+# UNMAPPED: durable custody acknowledgements, purpose-separated private locators,
+# revision CAS, at-most-one active/candidate, bounded retention, atomic publication
+# plus old-key retirement, trusted caller policy/time, and process lease exclusion
+# require the host binding. No entity here stores a seed or grants approval use.

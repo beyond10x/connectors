@@ -1,0 +1,825 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build gate --msrv`
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 21 file(s), valid
+connectors v1 — 21 file(s), 415 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/ess-boundary-0.json
+connectors_atlassian v1 — 2 file(s), valid
+connectors_atlassian v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/ess-boundary-1.json
+connectors_docker v1 — 2 file(s), valid
+connectors_docker v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/ess-boundary-2.json
+connectors_gitlab v1 — 4 file(s), valid
+connectors_gitlab v1 — 4 file(s), 14 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/ess-boundary-3.json
+connectors_grafana v1 — 2 file(s), valid
+connectors_grafana v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/ess-boundary-4.json
+connectors_kubernetes v1 — 4 file(s), valid
+connectors_kubernetes v1 — 4 file(s), 11 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/ess-boundary-5.json
+connectors_loki v1 — 2 file(s), valid
+connectors_loki v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/ess-boundary-6.json
+gate: shared and 6 adapter ESS models validated and compiled independently; exit=0
+10 CLI artifact(s), current in apps/connectors-cli-contract
+CLI values: 69 structural, 2 cached expectations, 5 acquisition and 3 page consistency cases passed; runtime lifecycle/custody traces remain obligations
+CLI contract fixture matches; custody and lifecycle runtime conformance remain obligations
+gate: ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: exit=exit status: 0 ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: gitlab descriptor matches; exit=0
+gate: kubernetes descriptor matches; exit=0
+gate: sql descriptor matches; exit=0
+gate: ["build", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.04s
+gate: exit=exit status: 0 ["build", "--workspace", "--locked", "--offline"]
+gate: ["test", "--workspace", "--locked", "--offline"]
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 4.03s
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors-e03bbb21ccd66bca)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compatibility.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/compatibility-eebac1244565852a)
+
+running 2 tests
+test compatibility_inventory_matches_existing_help ... ok
+test legacy_describe_is_complete_and_invoke_prints_raw_result_once ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/input.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/input-06b6e343f136f2b6)
+
+running 1 test
+test duplicate_input_keys_are_refused_before_service_contact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/local_cli.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_cli-8189efa5921d2d0d)
+
+running 3 tests
+test protected_sources_are_not_consumed_before_configuration_admission ... ok
+test production_parser_initializes_and_inspects_across_processes ... ok
+test inventory_and_unavailable_status_never_launch_configured_executable ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_build-38cdbc67c8d8935c)
+
+running 19 tests
+test cli::tests::public_acquisition_examples_cannot_expose_internal_states_or_wrong_terminal_fields ... ok
+test cli::tests::cache_labels_and_page_deadlines_cannot_assert_unobserved_freshness ... ok
+test docs::tests::refuses_unknown_projection_nodes ... ok
+test docs::tests::rejects_duplicate_and_escaping_routes ... ok
+test docs::tests::cannot_publish_a_source_outside_its_owner ... ok
+test docs::tests::public_audit_checks_embedded_binary_paths ... ok
+test docs::tests::resolves_only_selected_local_links ... ok
+test ess_boundary::tests::matches_case_and_separator_variants_without_substring_false_positives ... ok
+test docs::tests::preserves_rules_and_stable_heading_anchors ... ok
+test docs::tests::reference_title_keeps_anchor_and_text_without_a_second_h1 ... ok
+test docs::tests::imported_markdown_cannot_execute_html_or_script_links ... ok
+test ess_boundary::tests::allows_shared_protocols_and_separate_provider_models ... ok
+test ess_boundary::tests::protocol_adapter_does_not_ban_shared_protocol_or_suppress_native_leaks ... ok
+test ess_boundary::tests::discovers_design_only_and_spec_only_owners_without_runtime_declarations ... ok
+test ess_boundary::tests::rejects_malformed_optional_alias_inputs_and_model_sources ... ok
+test ess_boundary::tests::refuses_linked_source_files_and_directories ... ok
+test ess_boundary::tests::checks_all_paths_and_requires_complete_local_domain_inventory ... ok
+test ess_boundary::tests::rejects_names_comments_fields_encoded_values_and_new_adapter_ids ... ok
+test docs::tests::walkthrough_fixtures_follow_the_real_descriptor ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_client-d67bb60af80240b7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_conformance-4c35c715e9e9c40d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_surface.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/cli_surface-0a8aa68dd6e52b29)
+
+running 7 tests
+test inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result ... ok
+test the_selected_inventory_has_twenty_two_grouped_commands_and_explicit_runtime_obligations ... ok
+test typed_application_usage_operational_and_interrupt_outcomes_use_distinct_exits ... ok
+test protected_source_conflicts_and_parser_errors_never_capture_or_echo_values ... ok
+test dynamic_business_sources_are_acquired_once_and_validate_both_directions ... ok
+test native_schema_refusals_prevent_handler_dispatch_and_bad_results_never_reach_stdout ... ok
+test every_local_action_dispatches_once_with_its_declared_result_type ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_contracts-347d961704d1da0d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_core-7987d709d1addba2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/wire-e9e77a8b72d9244a)
+
+running 4 tests
+test canonicalization_is_recursive_and_order_independent ... ok
+test duplicate_keys_are_refused_at_every_depth ... ok
+test contradictory_response_payloads_are_refused ... ok
+test response_roundtrips_success_and_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_gitlab-9cff096b0e4e4324)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_gitlab-924694007d73ec1b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/auth.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/auth-c2633c0c0e2bdceb)
+
+running 6 tests
+test both_reads_use_the_same_capability_and_evidence_has_an_absolute_expiry ... ok
+test validation_does_not_extend_time_budgets_or_expiry ... ok
+test provider_failures_and_invalid_json_do_not_trigger_retries ... ok
+test native_identity_grants_and_required_fields_cannot_be_inferred ... ok
+test protected_entry_validates_through_production_scoped_http ... ok
+test protected_document_is_strict_bounded_and_not_trimmed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ci.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/ci-2d21fe1e23ccefe7)
+
+running 6 tests
+test invalid_selection_and_unknown_fields_refuse_before_any_transport ... ok
+test continuations_bind_every_selection_and_connection_partition ... ok
+test paging_and_provider_errors_are_explicit_without_retry ... ok
+test exact_commit_polling_job_pages_and_failed_trace_use_generated_mappings ... ok
+test inconsistent_targets_and_malformed_native_shapes_cannot_satisfy_ci ... ok
+test trace_bytes_utf8_boundaries_and_completeness_are_preserved ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running tests/local_runtime.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_runtime-8505d59bbe6aba4d)
+
+running 8 tests
+test cli_journey::ci::gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test cli_journey::gitlab_cli_explicit_revalidation_after_real_expiry_without_reentry ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::gitlab_cli_failed_repair_and_busy_stop_preserve_authority ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test cli_journey::merge_requests::gitlab_cli_mr_window_exhaustion_saved_connection_and_current_policy ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test cli_journey::persistent_gitlab_cli_owner_and_keyring_restart ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test lost_validation_response_closes_the_owned_channel_without_replay ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_provider_work ... ok
+test private_gitlab_validates_and_reads_with_exact_caps_and_cursor_partitions ... ok
+
+test result: ok. 3 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 9.40s
+
+     Running tests/merge_requests.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/merge_requests-1817e3c1028fe39b)
+
+running 6 tests
+test invalid_selections_refuse_before_transport ... ok
+test provider_failures_are_safe_and_never_empty_success ... ok
+test pages_refuse_filter_window_order_duplicates_and_invalid_continuations ... ok
+test malformed_identity_and_projection_never_become_partial_success ... ok
+test window_traversal_and_project_local_get_preserve_observations ... ok
+test cursors_bind_every_window_axis_and_authenticated_partition ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/obligations.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/obligations-ab7ee8cfcbb2bd86)
+
+running 4 tests
+test generated_file_mapping_passes_unencoded_segments_to_the_scoped_transport ... ok
+test generated_dispatch_rejects_invalid_inputs_before_transport ... ok
+test empty_pages_with_continuation_and_full_pages_without_headers_are_partial ... ok
+test response_failures_and_nonadvancing_pagination_remain_explicit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/provider.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/provider-7b7ceb0e179e348d)
+
+running 1 test
+test project_issue_pagination_and_file_reads_use_scoped_auth_over_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-9be33d4262d103f6)
+
+running 93 tests
+test local::approval_keys::tests::durable_key_management_with_qualified_custody ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::key_crash_child ... ignored, auxiliary child entry; parent invokes exact phases
+test local::approval_keys::tests::key_use_excludes_rotation_and_concurrent_init_has_one_winner ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::process_exits_keep_pre_and_post_publication_distinct ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::production_cli_key_journey ... ignored, requires built production CLI and qualified disposable GNOME Secret Service
+test local::approval_keys::tests::purpose_isolation_for_identical_private_uuid_tuples ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::restart_failed_rotation_recovery_and_revocation_fences ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::uncertain_deletion_keeps_retirement_fence_and_exact_retry ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::unknown_storage_acknowledgement_requires_exact_reconfirmation ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::wrong_recovery_material_never_publishes ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approvals::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+test local::approvals::tests::canonical_framing_rejects_omission_duplicates_unknown_fields_and_alternate_spellings ... ok
+test local::approvals::tests::issuer_audience_time_key_and_clock_refusals_are_current ... ok
+test local::approvals::tests::rfc8032_vector_and_exact_fixed_algorithm_round_trip ... ok
+test local::approvals::tests::all_subject_coordinates_and_unicode_identity_are_bound ... ok
+test local::approval_keys::tests::passive_status_does_not_migrate_or_touch_custody ... ok
+
+running 1 test
+
+running 1 test
+test local::audit::tests::byte_bounds_safe_shapes_and_aggregate_budget_are_enforced ... ok
+test local::audit::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+test local::approvals::tests::unavailable_live_binding_is_storage_failure_without_receipt_or_retry ... ok
+test local::audit::tests::exact_private_identity_is_injective_bounded_and_strictly_decoded ... ok
+test local::approvals::tests::policy_guard_survives_commit_and_clock_is_rechecked_after_storage ... ok
+test local::approvals::tests::unavailable_redemption_evidence_cannot_open_dispatch ... ok
+test local::approval_keys::tests::unavailable_write_leaves_exact_candidate_and_no_duplicate_allocation ... ok
+test local::approvals::tests::concurrent_substituted_reference_cannot_rebind_one_attempt ... ok
+test local::keyring::custody::gnome::tests::daemon_environment_mapping_refuses_ambiguous_or_injected_layouts ... ok
+test local::keyring::custody::tests::disposable_changed_keyring_format_is_refused_before_transfer ... ignored, requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR
+test local::keyring::custody::tests::disposable_registry_publication_cli_and_retirement_restart ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test local::keyring::custody::tests::disposable_secret_service_restart_and_failures ... ignored, requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR
+test local::keyring::custody::tests::private_custody_identities_are_non_nil ... ok
+test local::approvals::tests::expiry_during_acknowledgement_retains_spend_without_granting_receipt ... ok
+test local::approvals::tests::tombstone_capacity_and_migrations_survive_restart_without_secret_storage ... ok
+test local::audit::tests::concurrent_finalization_has_one_immutable_winner_and_exact_retry ... ok
+test local::audit::tests::anchor_failure_or_lost_ack_never_returns_an_admission_receipt ... ok
+test local::approvals::tests::unkeyed_preparation_retains_authority_and_old_records_cannot_gain_it ... ok
+
+running 1 test
+test local::audit::tests::corrupted_or_unavailable_metadata_is_not_absence_or_recovered_acknowledgement ... ok
+
+running 1 test
+test local::audit::tests::failed_final_append_preserves_live_answer_and_unknown_ack_recovers_exactly ... ok
+test local::metadata::tests::passive_v1_inspection_cannot_migrate_or_claim_an_empty_registry ... ok
+test local::approvals::tests::mismatched_receipt_missing_subject_and_existing_key_never_open_new_gate ... ok
+test local::mutations::tests::crash_child ... ignored, subprocess entry point, exercised by abrupt_process_exit
+test local::approvals::tests::approved_gate_requires_original_spend_and_abort_never_refunds ... ok
+
+running 1 test
+test local::audit::tests::passive_old_schema_inspection_never_installs_audit_and_migration_preserves_history ... ok
+test local::audit::tests::capacity_is_atomic_per_instance_without_eviction_or_append_restriction ... ok
+test local::audit::tests::same_public_ref_is_independent_per_instance_and_gateway_and_leaf ... ok
+test local::metadata::tests::runtime_migration_is_admitted_and_retains_the_v2_authority ... ok
+test local::approvals::tests::rollback_or_lost_ack_never_reconstructs_receipt ... ok
+
+running 1 test
+test local::mutations::tests::capacity_and_corrupt_or_unavailable_reads_do_not_become_absence ... ok
+test local::audit::tests::retained_cross_owner_references_are_checked_and_never_cascade_deleted ... ok
+test local::protected::tests::source_admission_rejects_links_modes_and_oversized_files ... ok
+test local::protected::tests::terminal_fixture ... ok
+
+running 1 test
+test local::mutations::tests::every_fingerprint_coordinate_conflicts_including_exact_route_revisions ... ok
+test local::mutations::tests::concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation ... ok
+test local::audit::tests::abrupt_process_exits_preserve_acknowledgement_boundaries_without_resend ... ok
+test local::mutations::tests::terminal_first_fact_is_immutable_and_unknown_never_expires ... ok
+test local::audit::tests::early_refusal_and_malformed_or_mismatched_facts_cannot_satisfy_the_gate ... ok
+test local::mutations::tests::version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authority ... ok
+test local::mutations::tests::unkeyed_attempts_still_require_the_gate_and_retain_outcome ... ok
+
+running 1 test
+test local::mutations::tests::retention_uses_trusted_bounds_and_cas_cannot_retire_a_replacement ... ok
+test local::mutations::tests::atomic_prepare_faults_never_return_a_handle_or_leave_a_half_reservation ... ok
+test local::registry::tests::abandoned_candidates_require_acknowledged_retirement_and_full_retention ... ok
+test local::mutations::tests::namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys ... ok
+test local::approvals::tests::fresh_spend_rechecks_policy_key_time_and_exact_initial_proof ... ok
+test local::approvals::tests::concurrent_reference_and_attempt_spend_produce_one_receipt ... ok
+test local::approvals::tests::abrupt_process_exits_recover_without_refunding_or_resending ... ok
+test local::runtime::artifact::tests::admitted_snapshot_survives_source_changes_and_refuses_mutation ... ok
+test local::registry::tests::production_clock_samples_after_locking_and_still_rejects_regression ... ok
+test local::runtime::channel::tests::malformed_frames_are_refused_without_unbounded_reads ... ok
+test local::runtime::channel::tests::separate_protected_section_and_bounded_document_depth ... ok
+test local::runtime::channel::tests::stalled_partial_frame_uses_the_original_deadline ... ok
+test local::runtime::failure_tests::provider_codes_survive_the_private_boundary_without_raw_error_data ... ok
+test local::registry::tests::allocation_custody_and_publication_are_distinct_and_restartable ... ok
+test local::runtime::process::tests::protocol_fixture ... ok
+test local::registry::tests::lost_publication_acknowledgement_is_resolved_without_repeating_capture ... ok
+test server::tests::service_deadline_cancels_the_adapter_and_releases_capacity ... ok
+test server::tests::thirty_two_inflight_calls_refuse_the_next_until_one_is_dropped ... ok
+test local::registry::tests::identity_scope_and_expiry_failures_preserve_the_usable_generation ... ok
+test server::tests::oversized_adapter_result_is_refused_after_schema_validation ... ok
+test local::registry::tests::receipt_identity_and_known_missing_material_cannot_be_substituted ... ok
+test local::mutations::tests::ambiguous_gate_is_unknown_and_ambiguous_terminal_preserves_known_live_answer ... ok
+test local::mutations::tests::abrupt_process_exit_preserves_each_durable_boundary_without_resend ... ok
+test local::registry::tests::revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledgement ... ok
+test local::registry::tests::revalidation_capture_and_completion_are_one_use_and_keep_original_deadline ... ok
+test local::registry::tests::competing_repairs_have_one_winner_and_old_dispatch_is_fenced ... ok
+test local::registry::tests::cursors_are_scoped_bounded_and_invalidated_by_metadata_change ... ok
+test local::runtime::channel::tests::cancellation_observes_a_stalled_partial_reply_without_resetting_the_deadline ... ok
+test local::registry::tests::terminal_revoke_invalidates_repair_and_dispatch_without_custody ... ok
+test local::mutations::tests::malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention ... ok
+test local::protected::tests::controlling_terminal_hides_input_and_restores_echo_after_sigint ... ok
+test local::registry::tests::revalidation_orders_competing_recollection_repair_revoke_and_pending_reads ... ok
+test local::mutations::tests::connection_fences_authority_and_process_identity_refuse_stale_handles ... ok
+test local::registry::tests::revalidation_preserves_transient_failures_but_cannot_resurrect_known_invalidity ... ok
+test local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt ... ok
+test local::registry::tests::concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence ... ok
+test local::runtime::process::tests::malformed_replies_terminate_and_reap_only_the_owned_child ... ok
+
+test result: ok. 77 passed; 0 failed; 16 ignored; 0 measured; 0 filtered out; finished in 9.04s
+
+     Running tests/http.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http-7aa5c6a83fe96e05)
+
+running 3 tests
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+test custom_ca_accepts_its_endpoint_and_refuses_other_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/http_prefix.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http_prefix-49824763aa490855)
+
+running 6 tests
+test invalid_limits_and_unsupported_ports_refuse_before_work ... ok
+test excess_bytes_return_without_waiting_for_a_stalled_remainder ... ok
+test prefix_header_bytes_are_bounded_and_errors_do_not_include_provider_secrets ... ok
+test premature_fixed_or_chunked_closure_is_an_error_even_after_exact_prefix ... ok
+test prefix_distinguishes_eof_from_omitted_bytes_for_fixed_and_chunked_bodies ... ok
+test exact_prefix_still_obeys_original_deadline_and_caller_cancellation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/local_foundation.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_foundation-2d0f0f0674641eb3)
+
+running 7 tests
+test sidecar_symlink_is_refused_without_touching_its_target ... ok
+test symlinks_hardlinks_and_broad_permissions_are_refused ... ok
+test exclusive_setup_persists_private_metadata_and_refuses_overwrite ... ok
+test unavailable_or_unrecognized_metadata_is_never_reinitialized ... ok
+test owner_and_migration_tampering_refuse_inspection ... ok
+test concurrent_initialization_has_one_authority_and_one_configuration ... ok
+test contending_metadata_open_refuses_at_its_bound_and_recovers_after_release ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s
+
+     Running tests/service.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/service-8b6b1a3182eeef58)
+
+running 7 tests
+test credential_stores_are_substitutable_and_file_permissions_are_enforced ... ok
+test invalid_identifiers_cannot_inject_log_lines_or_terminal_controls ... ok
+test configuration_yaml_and_json_remain_strict ... ok
+test environment_credentials_apply_the_same_value_bounds_as_files ... ok
+test wire_admission_and_freshness_refuse_before_dispatch ... ok
+test federation_refreshes_atomically_without_replaying_and_rotates_credentials ... ok
+test federation_preserves_result_and_reports_downstream_failure ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_kubernetes-6545d3facdd3aec6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_kubernetes-3f5f55e91978c321)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/provider.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/provider-c6c296ce07061da7)
+
+running 3 tests
+test disabled_host_discovery_is_not_advertised_or_dispatched ... ok
+test endpoint_cross_product_is_bounded_even_for_one_source_slice ... ok
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_sdk-92765d98ca2c7bd6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cursor.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/cursor-1fb65ab0ecbc3000)
+
+running 1 test
+test cursors_cannot_be_rebound_forged_or_reused_after_restart ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_spec-ee0981ef26ff6627)
+
+running 10 tests
+test toolchain::tests::committed_manifest_uses_the_repository_pin ... ok
+test toolchain::tests::altered_binary_is_refused_before_it_can_execute ... ok
+test toolchain::tests::default_search_is_independent_of_path_version_order ... ok
+test toolchain::tests::exact_source_pin_refuses_same_version_without_receipt ... ok
+test toolchain::tests::explicit_overrides_win_and_wrong_paths_do_not_fall_back ... ok
+test toolchain::tests::exact_source_pin_rejects_wrong_source_with_the_same_version ... ok
+test toolchain::tests::legacy_release_records_remain_explicit_and_source_records_are_strict ... ok
+test toolchain::tests::missing_pin_reports_record_and_search_locations_and_cache_is_supported ... ok
+test toolchain::tests::invalid_receipts_are_closed_and_cannot_admit_a_tool ... ok
+test toolchain::tests::source_admission_requires_the_exact_clean_root_and_keeps_ignored_scratch_separate ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_spec-727f3c52ecf8494c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compiler.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/compiler-2faeb8eec59a2096)
+
+running 4 tests
+test configuration_examples_are_data_not_imports ... ok
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test shared_configuration_imports_keep_constraints_and_reject_unknown_versions ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+     Running tests/generation.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/generation-cd123f2341bda5d2)
+
+running 8 tests
+test response_prefix_is_explicit_bounded_and_absent_in_legacy_serialization ... ok
+test mapped_date_time_is_preserved_and_other_format_semantics_refuse ... ok
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test public_import_refuses_specs_changed_after_validation ... ok
+test checked_in_bundle_matches_its_pinned_sources_and_toolchain ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.18s
+
+     Running tests/toolchain_adversary.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/toolchain_adversary-5073eff827b1f88a)
+
+running 4 tests
+test source_pin_parser_preserves_legacy_and_rejects_incomplete_source_records ... ok
+test explicit_wrong_source_refuses_even_when_it_reports_the_pinned_release ... ok
+test malformed_or_wrong_identity_receipt_never_executes_matching_bytes ... ok
+test symlink_alias_cannot_supply_a_receipt_for_an_unproven_target ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_sql-f22e529add5b7388)
+
+running 1 test
+test tls_tests::configured_ca_replaces_public_roots_and_requires_certificates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_sql-ac26457a21047f12)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/protocol-2ea4509383e803df)
+
+running 7 tests
+test parsing_and_limits_refuse_before_credentials_or_connection ... ok
+test dropping_the_invocation_still_cancels_the_database ... ok
+test text_null_and_empty_parameters_reach_bind_without_interpolation ... ok
+test rows_nulls_native_types_and_truncation_are_preserved ... ok
+test authentication_database_errors_and_row_capacity_are_sanitized ... ok
+test unresponsive_database_cannot_extend_the_cleanup_budget ... ok
+test deadline_sends_the_backend_cancel_key_and_drains_the_connection ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.30s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/gitlab_types-96fbf12e70c3ad9b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_gitlab
+
+running 1 test
+test adapters/gitlab/src/lib.rs - (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests connectors_host
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gitlab_types
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+gate: exit=exit status: 0 ["test", "--workspace", "--locked", "--offline"]
+gate: ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+    Checking ring v0.17.14
+    Checking connectors-cli-contract v0.0.0 (/home/timo/beyond10x/connectors_v2/apps/connectors-cli-contract)
+    Checking rustls-webpki v0.103.15
+    Checking rcgen v0.14.10
+    Checking rustls v0.23.44
+    Checking tokio-rustls v0.26.5
+    Checking hyper-rustls v0.27.9
+    Checking tokio-postgres-rustls v0.14.0
+    Checking reqwest v0.12.28
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.31s
+gate: exit=exit status: 0 ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+gate: ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+gate: connectors-gitlab library boundary holds; exit=0
+gate: ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+gate: connectors-kubernetes library boundary holds; exit=0
+gate: ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+   Compiling rustls v0.23.44
+   Compiling tokio-rustls v0.26.5
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.29s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+gate: connectors-sql library boundary holds; exit=0
+gate: generic CLI boundary holds; exit=0
+gate: ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking connectors-cli-contract v0.0.0 (/home/timo/beyond10x/connectors_v2/apps/connectors-cli-contract)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.29s
+gate: exit=exit status: 0 ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+gate: collected 15 authored scenarios from contracts/operations/v1alpha1/scenarios; exit=0
+gate: collected 13 authored scenarios from contracts/auth/acquisition/v1alpha1/scenarios; exit=0
+gate: collected 6 authored scenarios from contracts/auth/evidence/v1alpha1/scenarios; exit=0
+gate: ["verify", "conform", "synthesize", "--path", "ess", "--target", "ir", "--scenarios", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/authored-scenarios", "--out", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/contract-conformance.json"]
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.ConfirmKeyDeletion/deleted has no scenario `connectors.approval_issuers.ConfirmKeyDeletion/outcome/deleted`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `confirm_deletion`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.PublishKey/published has no scenario `connectors.approval_issuers.PublishKey/outcome/published`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `publish`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.RetireKey/retiring has no scenario `connectors.approval_issuers.RetireKey/outcome/retiring`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `retire`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.RevokeKey/revoked has no scenario `connectors.approval_issuers.RevokeKey/outcome/revoked`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `revoke`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/publish has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/publish/by/connectors.approval_issuers.PublishKey/published`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `publish`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/revoke has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/revoke/by/connectors.approval_issuers.RevokeKey/revoked`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `revoke`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/retire has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/retire/by/connectors.approval_issuers.RetireKey/retiring`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `retire`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/confirm_deletion has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/confirm_deletion/by/connectors.approval_issuers.ConfirmKeyDeletion/deleted`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `confirm_deletion`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Active/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Active`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Active/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Active`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Active/refuses/connectors.approval_issuers.RetireKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Active`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Candidate/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Candidate`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.RetireKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.RevokeKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retired/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retired`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retired/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retired`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retired/refuses/connectors.approval_issuers.RevokeKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retired`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retiring/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retiring`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retiring/refuses/connectors.approval_issuers.RetireKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retiring`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retiring/refuses/connectors.approval_issuers.RevokeKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retiring`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+315 scenario(s) (34 authored), 22 refusal(s), written to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/contract-conformance.json
+gate: exit=exit status: 0 ["verify", "conform", "synthesize", "--path", "ess", "--target", "ir", "--scenarios", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/authored-scenarios", "--out", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-ptp7EF/contract-conformance.json"]
+gate: ["plan", "artifact", "validate"]
+205 file(s) in /home/timo/beyond10x/connectors_v2/.engineering/planning: 205 artifact(s)
+120 review(s) recorded no findings block:
+  - review-result:adapter-ownership-gate-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:adapter-ownership-gate-initial-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-binding-acceptance-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-binding-acceptance-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-binding-design-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-binding-parallel-safety-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-binding-parallel-safety-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-binding-scope-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-binding-scope-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-keys-acceptance-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-keys-design-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-keys-parallel-safety-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-keys-parallel-safety-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-keys-scope-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:approval-keys-scope-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-a-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-a-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-a-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-b-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-b-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-b-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-evidence-adversary-p1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-refresh-adversary-p1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-acceptance-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-acceptance-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-design-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-design-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-parallel-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-parallel-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-scope-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-semantic-adversary-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-toolchain-adversary-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:concept-stack-integration-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-ownership-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-ownership-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-ownership-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-semantics-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-semantics-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-semantics-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-docs-external-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-acceptance-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-design-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-parallel-safety-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-parallel-safety-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-scope-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-scope-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-semantics-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:core-model-a-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:core-model-b-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-a-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-a-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-a-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-b-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-b-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-b-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:ess-boundary-gate-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:ess-boundary-semantics-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:execution-audit-acceptance-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:execution-audit-design-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:execution-audit-parallel-safety-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:execution-audit-scope-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-binding-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-binding-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-binding-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-ci-acceptance-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-ci-design-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-ci-design-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-ci-parallel-safety-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-ci-parallel-safety-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-ci-scope-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-ci-scope-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-mr-acceptance-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-mr-design-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-mr-design-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-mr-parallel-safety-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-mr-parallel-safety-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-mr-scope-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:gitlab-mr-scope-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-model-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-model-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-semantics-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:independent-repository-a-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:independent-repository-b-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-a-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-a-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-b-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-b-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-ledger-acceptance-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-ledger-design-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-ledger-design-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-ledger-parallel-safety-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-ledger-parallel-safety-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-ledger-scope-round-1 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-ledger-scope-round-2 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-outcomes-model-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-outcomes-semantics-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-profiles-a-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-profiles-b-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-a-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-a-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-b-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-b-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:restart-visibility-a-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:restart-visibility-b-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-model-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-model-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-semantics-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-semantics-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:spec-completion-a-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:spec-completion-b-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-binding-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-binding-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-binding-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-family-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-family-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-family-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+valid
+gate: exit=exit status: 0 ["plan", "artifact", "validate"]
+gate: all checks passed

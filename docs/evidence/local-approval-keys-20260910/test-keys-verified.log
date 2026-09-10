@@ -1,0 +1,27 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling rcgen v0.14.10
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 14.35s
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-03ec8893ecafe4cf)
+
+running 11 tests
+test local::approval_keys::tests::durable_key_management_with_qualified_custody ... ok
+test local::approval_keys::tests::key_use_excludes_rotation_and_concurrent_init_has_one_winner ... ok
+test local::approval_keys::tests::passive_status_does_not_migrate_or_touch_custody ... ok
+test local::approval_keys::tests::process_exits_keep_pre_and_post_publication_distinct ... ok
+test local::approval_keys::tests::production_cli_key_journey ... ok
+test local::approval_keys::tests::purpose_isolation_for_identical_private_uuid_tuples ... ok
+test local::approval_keys::tests::restart_failed_rotation_recovery_and_revocation_fences ... ok
+test local::approval_keys::tests::unavailable_write_leaves_exact_candidate_and_no_duplicate_allocation ... ok
+test local::approval_keys::tests::uncertain_deletion_keeps_retirement_fence_and_exact_retry ... ok
+test local::approval_keys::tests::unknown_storage_acknowledgement_requires_exact_reconfirmation ... ok
+test local::approval_keys::tests::wrong_recovery_material_never_publishes ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 10.15s
+
