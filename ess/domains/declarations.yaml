@@ -62,6 +62,37 @@ types:
     # candidate-only approval/preflight and dispatch-time authority fencing.
     # No new entity, grant relation, lifecycle or declaration field is implied.
 
+  # Proposed v3 write mapping; the existing v1/v2 readers remain unchanged.
+  - name: connectors.declarations.BooleanBodyConstant
+    kind: struct
+    fields:
+      - {name: value, type: Boolean}
+  - name: connectors.declarations.IntegerBodyConstant
+    kind: struct
+    fields:
+      - {name: value, type: Integer}
+  - name: connectors.declarations.BodyParameter
+    kind: union
+    tag: kind
+    variants:
+      input: connectors.declarations.NamedParameter
+      string: connectors.declarations.ConstantParameter
+      boolean: connectors.declarations.BooleanBodyConstant
+      integer: connectors.declarations.IntegerBodyConstant
+  - name: connectors.declarations.WriteMapping
+    kind: struct
+    fields:
+      - {name: operation, type: String}
+      - {name: upstream_operation, type: String}
+      - {name: path, type: String}
+      - {name: method, type: String}
+      - {name: path_parameters, type: "Map<String, connectors.declarations.Parameter>"}
+      - {name: query_parameters, type: "Map<String, connectors.declarations.Parameter>"}
+      - {name: body, type: "Map<String, connectors.declarations.BodyParameter>"}
+    # UNMAPPED executable obligations: closed put-only reader, scalar schema
+    # agreement, exact pinned upstream binding, immutable prepared request,
+    # separate one-use write transport and legacy read-only projection.
+
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.
 entities:
@@ -112,6 +143,8 @@ entities:
         type: String
       - name: request_mapping
         type: Optional<connectors.declarations.RequestMapping>
+      - name: write_mapping
+        type: Optional<connectors.declarations.WriteMapping>
       # Authored decision value; absent remains unresolved where required.
       - name: curation
         type: Optional<connectors.artifact_provenance.Curation>

@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 18
+revision: 20
 ---
 ## Outcome and authority
 
@@ -150,3 +150,21 @@ story:local-bounded-clock implements the explicitly configured, authenticated pr
 This completes that bounded prerequisite only. Next runtime work is actual local approval issuance with authenticated current subject/clock-selection policy, followed by approval/audit/attempt dispatch and native GitLab mutations. Full GitLab—including dedicated sandbox acceptance and the unresolved create/update atomic-head decision—remains before Kubernetes, PostgreSQL, MCP and remaining providers. The existing AEP driver protocol-loading blocker and missing sandbox authority remain truthful. Physical source/timer assumptions require deployment qualification; signed observations alone are not approval authority.
 
 The externally edited release instructions and live connectors-release-v020-20260910 worktree belong to separate release work and are preserved. This clock checkpoint has no source release, deployment, Atlas registration or reproducible-distribution completion claim. Root remains the sole writer of this planning store and implementation increment.
+
+## Next vertical slice — guarded GitLab merge, 2026-09-11
+
+The next runtime outcome joins local approval policy, trusted subject preparation and protected issuance to the existing audit/spend/attempt ledgers, then dispatches a SHA-guarded GitLab merge through the production CLI. Native preflight must finish before the host opens its final gate. A separate one-use native write capability and private prepare/commit exchange prevent a read path or a lost response from resending a mutation. Existing legacy read interfaces remain supported.
+
+Current source inspection finds three missing bindings: current local issuance/receiver policy has no serialized authority record; the private child protocol only supports whole read invocations; and connectors.adapter/v2 generation explicitly admits GET only. These require authored contract/model work and review before decomposition. The existing canonical subject, audit, approval-redemption and attempt entities remain owners of those facts; new policy identity and native request/preparation values receive typed homes. Root remains the sole writer, directly on main; the external AGENTS.md edit is preserved.
+
+This slice will not clear the GitLab create/update atomic-head decision or substitute fixtures for dedicated sandbox acceptance. The parent order and complete workflow requirements remain intact.
+
+## Guarded merge implementation checkpoint — 2026-09-11
+
+The proposed contracts/model and governed decomposition are recorded in story:guarded-gitlab-merge, now active. The initial policy metadata port is implemented with migration eight, retained identity/revision CAS, exact issuer/instance binding, sorted bounded operation sets, passive inspection and process-bound shared/exclusive leases. Twelve policy tests pass, including actual child exit after commit before acknowledgement, cross-process held-use exclusion, fork refusal, failed writes, revision exhaustion and restart. This storage port consumes an already admitted set from its trusted host caller; it does not itself authenticate callers, classify native operations, issue proofs or dispatch writes.
+
+The complete Connectors gate with Rust 1.88 passes, including 103 host tests, six independent native model compilations, CLI/adapter generation, Clippy, conformance and planning validation. Retained evidence is docs/evidence/local-approval-policy-20260911/README.md. CLI policy/prepare/issue, private protocol two, v3 write generation, one-use write capability and native guarded merge remain required implementation under the active story. Its lost-response CLI acceptance, provider sandbox evidence and full distribution reproducibility have not been satisfied.
+
+Design, scope and parallel-safety critics approved round one. The first acceptance reading reused the scope critic's context; it is retained as an archived review-result and is not counted as the independent acceptance review. A fresh-context acceptance reviewer approved revision five without reading other critic outputs. Sonnet was unavailable, so inherited models were used; the fourth lane was delayed by available slots. No reviewer wrote code or planning state. AEP initially refused promotion because the existing-vision serves edge was missing, then refused a direct draft-to-active move; the edge was added and the legal draft-to-proposed-to-active transitions succeeded. These are planning checks, not runtime acceptance.
+
+The owner remains root, with serialized implementation on main. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers. The dedicated GitLab sandbox and create/update atomic-head decision remain open. Preserve the unrelated AGENTS.md release edit; this checkpoint does not publish Connectors or register Atlas.
