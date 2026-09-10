@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 20
+revision: 21
 ---
 ## Outcome and authority
 
@@ -168,3 +168,9 @@ The complete Connectors gate with Rust 1.88 passes, including 103 host tests, si
 Design, scope and parallel-safety critics approved round one. The first acceptance reading reused the scope critic's context; it is retained as an archived review-result and is not counted as the independent acceptance review. A fresh-context acceptance reviewer approved revision five without reading other critic outputs. Sonnet was unavailable, so inherited models were used; the fourth lane was delayed by available slots. No reviewer wrote code or planning state. AEP initially refused promotion because the existing-vision serves edge was missing, then refused a direct draft-to-active move; the edge was added and the legal draft-to-proposed-to-active transitions succeeded. These are planning checks, not runtime acceptance.
 
 The owner remains root, with serialized implementation on main. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers. The dedicated GitLab sandbox and create/update atomic-head decision remain open. Preserve the unrelated AGENTS.md release edit; this checkpoint does not publish Connectors or register Atlas.
+
+## Source release authorization — 2026-09-10
+
+The operator now requests a source release on top of the completed GitLab implementation commit a5b399d4f790e993aa3ab76f6a61ac1ee25b6c7a, after defining release as changelog and website documentation updates, verification, commit, tag and push. release-plan:gitlab-v020 owns that bounded release. This newer instruction supersedes earlier Connectors local-only publication exclusions for the requested source release and subsequent operator-directed verified provider-batch handoffs. Binary/registry publication, website/cloud deployment and Atlas registration remain excluded.
+
+Release v0.2.0 does not assert completion of GitLab sandbox acceptance, approval issuance, native writes, clock qualification, Kubernetes/PostgreSQL local lifecycle, MCP or remaining providers. Their existing owners and blockers stay open. The release is prepared from the exact completed commit in an isolated managed worktree, excluding ongoing clock research. The publication destination must be established from operator-provided configuration; the existing local recovery remote alone does not establish public distribution.
