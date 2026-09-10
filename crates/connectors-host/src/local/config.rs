@@ -150,6 +150,7 @@ impl Config {
                         | "adapters"
                         | "connections"
                         | "operations"
+                        | "approvals"
                         | "auth"
                         | "describe"
                         | "invoke"

@@ -35,6 +35,13 @@ type WireSecret = (OwnedObjectPath, Vec<u8>, Vec<u8>, String);
 pub struct Scope {
     authority: Uuid,
     allocation: Uuid,
+    purpose: Purpose,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Purpose {
+    Credential,
+    ApprovalSigning,
 }
 
 impl Scope {
@@ -45,7 +52,14 @@ impl Scope {
         Ok(Self {
             authority,
             allocation,
+            purpose: Purpose::Credential,
         })
+    }
+
+    pub(crate) fn approval_signing(authority: Uuid, allocation: Uuid) -> Result<Self> {
+        let mut scope = Self::new(authority, allocation)?;
+        scope.purpose = Purpose::ApprovalSigning;
+        Ok(scope)
     }
 }
 
@@ -149,7 +163,10 @@ impl Store {
         guard: impl FnOnce() -> Result<()>,
     ) -> Result<WrittenVersion> {
         self.admit(version)?;
-        if material.0.is_empty() || material.0.len() > MAX_BYTES {
+        if material.0.is_empty()
+            || material.0.len() > MAX_BYTES
+            || (self.scope.purpose == Purpose::ApprovalSigning && material.0.len() != 32)
+        {
             return Err(Failure::InvalidMaterial);
         }
         let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -166,7 +183,10 @@ impl Store {
         let mut properties: HashMap<&str, Value<'_>> = HashMap::new();
         properties.insert(
             "org.freedesktop.Secret.Item.Label",
-            Value::from("Connectors credential"),
+            Value::from(match self.scope.purpose {
+                Purpose::Credential => "Connectors credential",
+                Purpose::ApprovalSigning => "Connectors approval signing key",
+            }),
         );
         properties.insert("org.freedesktop.Secret.Item.Attributes", Value::from(attrs));
         let secret = (
@@ -212,6 +232,13 @@ impl Store {
             .map(|_| ())
     }
 
+    #[cfg(test)]
+    pub(crate) fn fail_synchronization(&self, fail: bool) {
+        self.persistence
+            .fail_sync
+            .store(fail, std::sync::atomic::Ordering::SeqCst);
+    }
+
     pub fn read(&self, version: Version) -> Result<Secret> {
         self.admit(version)?;
         let item = self.find(version)?.ok_or(Failure::Missing)?;
@@ -236,6 +263,36 @@ impl Store {
         }
         self.admit(version)?;
         Ok(secret)
+    }
+
+    /// Recovery of a staged signing key only. Readback alone never converts a
+    /// credential version into publication authority. The owner validates the
+    /// seed's public key while the physical writer lock excludes retirement.
+    pub(crate) fn confirm_signing_key_guarded(
+        &self,
+        version: Version,
+        guard: impl FnOnce() -> Result<()>,
+        validate: impl FnOnce(&Secret) -> Result<()>,
+    ) -> Result<WrittenVersion> {
+        if self.scope.purpose != Purpose::ApprovalSigning {
+            return Err(Failure::Denied);
+        }
+        self.admit(version)?;
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let _writer = self.writer_lock(until)?;
+        let _lock = self.persistence.lock(until)?;
+        self.admit(version)?;
+        guard()?;
+        let material = self.read(version)?;
+        if material.0.len() != 32 {
+            return Err(Failure::InvalidMaterial);
+        }
+        validate(&material)?;
+        self.persistence
+            .synchronize()
+            .map_err(|_| Failure::OutcomeUnknown)?;
+        self.admit(version).map_err(|_| Failure::OutcomeUnknown)?;
+        Ok(WrittenVersion { version })
     }
 
     pub(crate) fn delete_guarded(
@@ -304,12 +361,16 @@ impl Store {
     }
 
     fn attributes(&self, version: Version) -> HashMap<&'static str, String> {
-        HashMap::from([
-            (
-                "xdg:schema",
-                "org.beyond10x.Connectors.Credential".to_owned(),
+        let (schema, format) = match self.scope.purpose {
+            Purpose::Credential => ("org.beyond10x.Connectors.Credential", "custody/1"),
+            Purpose::ApprovalSigning => (
+                "org.beyond10x.Connectors.ApprovalSigningKey",
+                "approval-signing-custody/1",
             ),
-            ("connectors.format", "custody/1".to_owned()),
+        };
+        HashMap::from([
+            ("xdg:schema", schema.to_owned()),
+            ("connectors.format", format.to_owned()),
             ("connectors.authority", self.scope.authority.to_string()),
             ("connectors.scope", self.scope.allocation.to_string()),
             ("connectors.version", version.id.to_string()),
@@ -393,4 +454,4 @@ fn unknown<T>(_: T) -> Failure {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

@@ -5,6 +5,60 @@ summary: Selected local CLI presentation values; protected inputs are ephemeral,
 # Context, not these payloads. Existing auth/declaration identities retain their
 # String representations; these value references establish no entity relations.
 types:
+  - name: connectors.cli.ApprovalKeyState
+    kind: enum
+    variants: [candidate, active, retired, retiring, deleted]
+  - name: connectors.cli.ApprovalKeyView
+    kind: struct
+    fields:
+      - {name: key_id, type: String}
+      - {name: public_key, type: String}
+      - {name: state, type: connectors.cli.ApprovalKeyState}
+  - name: connectors.cli.ApprovalIssuerView
+    kind: struct
+    fields:
+      - {name: issuer, type: String}
+      - {name: audience, type: String}
+      - {name: revision, type: String}
+      - {name: keys, type: "List<connectors.cli.ApprovalKeyView>"}
+  - name: connectors.cli.ApprovalKeysResult
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: issuer, type: "Optional<connectors.cli.ApprovalIssuerView>"}
+  - name: connectors.cli.ApprovalKeyStatusInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+  - name: connectors.cli.ApprovalKeyInitInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: expected_revision, type: "Optional<String>"}
+  - name: connectors.cli.ApprovalKeyRotateInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: expected_revision, type: "String"}
+      - {name: expected_key, type: "String"}
+  - name: connectors.cli.ApprovalKeyRecoverInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: expected_revision, type: "String"}
+      - {name: candidate, type: "String"}
+  - name: connectors.cli.ApprovalKeyRevokeInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: expected_revision, type: "String"}
+      - {name: expected_key, type: "String"}
+  - name: connectors.cli.ApprovalKeyRetireInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: expected_revision, type: "String"}
+      - {name: key, type: "String"}
   # Local configuration-owner bindings, not independent identities or grants.
   - name: connectors.cli.LocalOperationPolicy
     kind: struct

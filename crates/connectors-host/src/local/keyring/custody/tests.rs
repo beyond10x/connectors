@@ -19,22 +19,25 @@ impl Drop for OwnedChild {
     }
 }
 
-struct Fixture {
+pub(crate) struct Fixture {
     daemon: Option<OwnedChild>,
     _bus: OwnedChild,
-    root: tempfile::TempDir,
-    socket: PathBuf,
+    pub(crate) root: tempfile::TempDir,
+    pub(crate) socket: PathBuf,
     data: PathBuf,
     incarnation: u32,
 }
 
 impl Fixture {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let temporary = std::env::var_os("TMPDIR").expect("task-owned TMPDIR required");
         let root = tempfile::Builder::new()
             .prefix("secret-service-")
             .tempdir_in(temporary)
             .unwrap();
+        // Production socket admission requires a private parent; direct custody
+        // fixtures previously bypassed that transport admission via connect().
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
         let socket = root.path().join("bus");
         let data = root.path().join("data");
         filesystem::directory(&data.join("keyrings"), true, true).unwrap();
@@ -68,7 +71,7 @@ impl Fixture {
         fixture
     }
 
-    fn start(&mut self, unlock: bool) {
+    pub(crate) fn start(&mut self, unlock: bool) {
         assert!(self.daemon.is_none());
         self.incarnation += 1;
         let runtime = self
@@ -144,7 +147,7 @@ impl Fixture {
         }
     }
 
-    fn stop(&mut self) {
+    pub(crate) fn stop(&mut self) {
         drop(self.daemon.take());
     }
     fn store(&self, scope: Scope) -> Result<Store> {
