@@ -27,19 +27,21 @@ try {
   for(const family of ['Service and execution','Authentication and access','Data reads','Discovery and composition','Sessions and media'])assert.equal(await page.getByRole('heading',{name:family,exact:true}).count(),1);
   await visit('/adapters');
   assert.equal(await page.locator('.adapter-catalog .b10x-content-card').count(),12);
-  await page.getByRole('button',{name:/Working first slice/}).click();
+  await page.getByRole('button',{name:/Available runtime/}).click();
   assert.equal(await page.locator('.adapter-catalog .b10x-content-card').count(),3);
   await page.getByLabel('Find an adapter',{exact:true}).fill('GitLab');
   assert.equal(await page.locator('.adapter-catalog .b10x-content-card').count(),1);
   await page.getByLabel('Find an adapter',{exact:true}).fill('no-such-provider');
   assert.match(await page.locator('.adapter-catalog').innerText(),/No adapters match/);
   await visit('/adapters/gitlab/contracts/reads');
-  assert.match(await page.locator('.document-context').innerText(),/Adapter runtime: Working first slice/);
+  assert.match(await page.locator('.document-context').innerText(),/Adapter runtime: Local CLI and eleven reads/);
   assert.equal(await navigation.locator('[aria-current="page"]').innerText(),'GitLab bounded reads');
 
   await visit('/search?q=GitLab&owner=gitlab');await results();
   assert.equal(await page.getByLabel('Owner',{exact:true}).inputValue(),'gitlab');
-  assert.equal(await page.locator('.search-results>li').count(),2);
+  const gitlabContracts=['/adapters/gitlab/contracts/reads','/adapters/gitlab/contracts/ci','/adapters/gitlab/contracts/merge-requests','/adapters/gitlab/contracts/merge-validation'].sort();
+  const resultRoutes=()=>page.locator('.search-results>li a').evaluateAll(links=>links.map(link=>link.getAttribute('href')).sort());
+  assert.deepEqual(await resultRoutes(),[...gitlabContracts,'/adapters/gitlab'].sort());
   assert(await page.locator('.search-results mark').count()>0,'excerpts highlight the query');
   const guide=page.locator('.search-results').getByRole('link',{name:'GitLab',exact:true});
   assert.equal(await guide.getAttribute('href'),'/adapters/gitlab');
@@ -47,7 +49,7 @@ try {
   await page.goBack({waitUntil:'networkidle'});await results();
   assert.equal(await page.getByLabel('Search all documentation',{exact:true}).inputValue(),'GitLab');
   await page.getByLabel('Document type',{exact:true}).selectOption('Contract');await results();
-  assert.equal(await page.locator('.search-results>li').count(),1);
+  assert.deepEqual(await resultRoutes(),gitlabContracts);
   await page.reload({waitUntil:'networkidle'});await results();
   assert.equal(await page.getByLabel('Document type',{exact:true}).inputValue(),'Contract');
   await page.getByLabel('Search all documentation',{exact:true}).fill('xxyyzznonexistent');await results();

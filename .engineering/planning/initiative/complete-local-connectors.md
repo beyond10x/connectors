@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 16
+revision: 17
 ---
 ## Outcome and authority
 
@@ -134,3 +134,9 @@ Time-source qualification is still unresolved: the researched Roughenough 2.0.0 
 The local CLI now invokes eleven GitLab read operations, including merge_request.validate. The new read checks an exact requested MR source SHA and selected successful head pipeline with opened/non-draft/mergeable predicates, reports ordered blockers and always reports merge_performed=false. It grants no future write. Twelve native MR tests, the complete Rust 1.88 gate, six production CLI/private HTTPS/qualified-keyring journeys, local GitLab image packaging and website/reference/fifteen example checks pass. docs/evidence/gitlab-mr-validation-20260910/README.md retains exact inputs, artifact identities, failed-test corrections and eight independent critic records; both acceptance findings are fixed and all final critics approve.
 
 story:gitlab-mr-validation stays active pending dedicated GitLab sandbox evidence, alongside the earlier read stories. Next implementation remains actual approval preparation/issuance with authenticated subject policy and a qualified clock, then complete connection-bound mutation ingress/dispatch and native GitLab writes. Clock qualification and the C14 create/update head-guard choice remain unresolved; the validation read does not substitute for those controls. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers, with all original acceptance, reproducible-delivery and publication boundaries retained. This checkpoint is local main integration only; no Connectors publication or Atlas registration is performed.
+
+## Source release authorization — 2026-09-10
+
+The operator now requests a source release on top of the completed GitLab implementation commit a5b399d4f790e993aa3ab76f6a61ac1ee25b6c7a, after defining release as changelog and website documentation updates, verification, commit, tag and push. release-plan:gitlab-v020 owns that bounded release. This newer instruction supersedes earlier Connectors local-only publication exclusions for the requested source release and subsequent operator-directed verified provider-batch handoffs. Binary/registry publication, website/cloud deployment and Atlas registration remain excluded.
+
+Release v0.2.0 does not assert completion of GitLab sandbox acceptance, approval issuance, native writes, clock qualification, Kubernetes/PostgreSQL local lifecycle, MCP or remaining providers. Their existing owners and blockers stay open. The release is prepared from the exact completed commit in an isolated managed worktree, excluding ongoing clock research. The publication destination must be established from operator-provided configuration; the existing local recovery remote alone does not establish public distribution.
