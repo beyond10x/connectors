@@ -215,6 +215,24 @@ pub fn operation_snapshot(paths: &Paths, alias: &str, call: &Value) -> Result<ru
     }
     Ok(bootstrap)
 }
+/// Revalidation can use expired baseline evidence but cannot revive material
+/// already known to be invalid. Admission precedes all owner/adapter startup.
+pub fn admit_revalidation(
+    paths: &Paths,
+    alias: &str,
+    connection: &str,
+    revision: &str,
+) -> Result<String> {
+    let profile = admit_capture(paths, alias, None, Some(connection), Some(revision))?;
+    let binding = cached(paths, alias)?.binding(&profile)?;
+    registry::Registry::with_system_clock(&paths.state).admit_revalidation(
+        &binding,
+        connection,
+        revision,
+        connectors_sdk::now_ms(),
+    )?;
+    Ok(profile)
+}
 /// Validate the original text carrier, including duplicate-key and depth checks.
 pub fn validate_document(schema: &Value, document: &[u8], limit: usize) -> Result<()> {
     if document.len() > limit {
@@ -283,6 +301,12 @@ enum Request {
         expected_revision: Option<String>,
     },
     Complete,
+    Revalidate {
+        adapter: String,
+        connection: String,
+        expected_revision: String,
+        deadline_ms: u64,
+    },
     Invoke {
         adapter: String,
         connection: String,

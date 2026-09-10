@@ -100,7 +100,7 @@ Refresh exclusion also covers aliases or duplicate captures of the same rotating
 
 For this first profile, successful refresh/replacement publication cuts off **all pending old-generation admissions**. A new request needs a new admission using the newly published generation and evidence; no old pin survives the publication boundary. Before that boundary a source file changing cannot silently change a pin's bytes: it may use its original validated material only while the host still considers that generation current and usable. Once replacement is detected, dispatch blocks as above. A request that already crossed the dispatch boundary may already have an external effect; publication does not undo that effect or authorize a retry.
 
-A host unable to pin material and enforce these checks must refuse. Revalidation is a new admitted decision over a newly captured generation, never mutation of an old admission. Authority, snapshot liveness and the atomic dispatch/publication ordering are runtime obligations; the ESS model records the decision shape without executing them.
+A host unable to pin material and enforce these checks must refuse. Revalidation is a new admitted decision over a fresh capture of the selected immutable generation, never mutation of an old admission. Recollecting evidence from an unchanged retained custody version preserves that generation; changed material requires a new generation and the replacement rules. Authority, snapshot liveness and the atomic dispatch/publication ordering are runtime obligations; the ESS model records the decision shape without executing them.
 
 ### 4.3 Which evidence can cross a generation change
 

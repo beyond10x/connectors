@@ -2,10 +2,10 @@
 
 The production `connectors` binary consumes the generated local CLI parser for
 setup, adapter and connection management, protected connect/repair, cached
-operation discovery and supervised GitLab reads.
+operation discovery, saved-credential revalidation and supervised GitLab reads.
 This is incremental work under
 `initiative:complete-local-connectors` and `story:persistent-gitlab-journey`.
-Dedicated sandbox acceptance, evidence revalidation and the broader runtime plan
+Dedicated sandbox acceptance and the broader runtime plan
 remain open. See the [GitLab CLI guide](local-gitlab-cli.md) for the runnable surface.
 
 ## Try the implemented commands
@@ -153,7 +153,7 @@ children on persistent worker threads, and exposes bounded same-UID sockets.
 Stop compares exact incarnation/configuration coordinates, commits suppression and
 signals only the retained pidfd. Its control path remains responsive during a
 provider read. Earlier queued jobs and pending captures cannot undo the stop fence.
-Only a later admitted explicit connect/repair/invoke resumes the entry.
+Only a later admitted explicit connect/repair/revalidate/invoke resumes the entry.
 
 The production-process tests cover fresh setup and metadata reuse across CLI
 processes, exclusive initialization, configured inventory and passive status,

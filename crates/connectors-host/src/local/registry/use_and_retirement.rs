@@ -79,7 +79,7 @@ pub enum InvalidCredential {
     Uncertain,
 }
 impl InvalidCredential {
-    fn value(self) -> &'static str {
+    pub(super) fn value(self) -> &'static str {
         match self {
             Self::Missing => "missing",
             Self::Invalid => "invalid",

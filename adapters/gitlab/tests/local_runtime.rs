@@ -35,6 +35,7 @@ struct Provider {
     config: PathBuf,
     calls: Arc<Mutex<Vec<String>>>,
     pause: Arc<std::sync::atomic::AtomicBool>,
+    response_status: Arc<std::sync::atomic::AtomicU16>,
 }
 impl Provider {
     fn new() -> Self {
@@ -62,6 +63,8 @@ impl Provider {
         let observed = calls.clone();
         let pause = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let paused = pause.clone();
+        let response_status = Arc::new(std::sync::atomic::AtomicU16::new(0));
+        let forced_status = response_status.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -92,7 +95,9 @@ impl Provider {
                     if paused.load(std::sync::atomic::Ordering::SeqCst) {
                         tokio::select! {_=&mut stopped=>break,_=tokio::time::sleep(Duration::from_secs(2))=>{}}
                     }
-                    let (status,body,extra)=if !valid {(401,json!({"error":"fixture refusal"}),"")}
+                    let forced = forced_status.load(std::sync::atomic::Ordering::SeqCst);
+                    let (status,body,extra)=if forced != 0 {(forced,json!({"error":"fixture override"}),"")}
+                        else if !valid {(401,json!({"error":"fixture refusal"}),"")}
                         else if route=="/api/v4/user" {(200,json!({"id":user,"state":"active"}),"")}
                         else if route=="/api/v4/personal_access_tokens/self" {(200,json!({"id":99,"user_id":user,"active":true,"revoked":false,"scopes":["api"],"expires_at":null}),"")}
                         else if path.contains("/issues?") && path.contains("page=2") {(200,json!([]),"x-next-page: \r\n")}
@@ -118,6 +123,7 @@ impl Provider {
             config,
             calls,
             pause,
+            response_status,
         }
     }
     fn selection(&self) -> Adapter {
