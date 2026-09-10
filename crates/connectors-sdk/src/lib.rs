@@ -85,6 +85,38 @@ pub trait AuthenticatedHttp: Send + Sync {
     }
 }
 
+/// A single admitted native write. Composition supplies exact credentials and
+/// destination restrictions after the host gate. GET capabilities cannot be
+/// converted into this port, and calling it consumes the capability even when
+/// the response is lost. Implementations must not retry or follow redirects.
+#[async_trait]
+pub trait AuthenticatedWrite: Send {
+    async fn put_json(
+        self: Box<Self>,
+        segments: &[&str],
+        query: &[(&str, String)],
+        body: &Value,
+    ) -> Result<HttpResponse>;
+}
+
+/// Native effect knowledge is independent of whether a safe result can be
+/// disclosed. A malformed result after a known applied effect must not turn it
+/// into a not-attempted failure or grant another send. No wire codec is implied.
+pub enum WriteOutcome<T> {
+    Applied(Result<T>),
+    Refused(Error),
+    Unknown(Error),
+}
+impl<T> WriteOutcome<T> {
+    pub fn try_map<U>(self, map: impl FnOnce(T) -> Result<U>) -> WriteOutcome<U> {
+        match self {
+            Self::Applied(value) => WriteOutcome::Applied(value.and_then(map)),
+            Self::Refused(error) => WriteOutcome::Refused(error),
+            Self::Unknown(error) => WriteOutcome::Unknown(error),
+        }
+    }
+}
+
 pub fn decode<T: DeserializeOwned>(input: Value) -> Result<T> {
     serde_json::from_value(input)
         .map_err(|_| Error::invalid("input does not match the operation type"))
@@ -98,6 +130,21 @@ pub fn validate(schema: &Value, value: &Value) -> Result<()> {
         Ok(())
     } else {
         Err(Error::invalid("value does not match its declared schema"))
+    }
+}
+/// Strict write codec validation, including supported format assertions. Kept
+/// separate so existing read consumers retain their established behavior.
+pub fn validate_write_value(schema: &Value, value: &Value) -> Result<()> {
+    let validator = jsonschema::options()
+        .should_validate_formats(true)
+        .build(schema)
+        .map_err(|_| Error::internal())?;
+    if validator.is_valid(value) {
+        Ok(())
+    } else {
+        Err(Error::invalid(
+            "write value does not match its declared schema",
+        ))
     }
 }
 pub fn now_ms() -> u64 {
