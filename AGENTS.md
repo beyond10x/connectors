@@ -81,6 +81,50 @@ specification, example and runtime support claims. Use [website checks](website/
 for presentation, reference tooling or example changes. Browser examples are
 bounded teaching implementations; they do not authorize production runtime work.
 
+## Cutting a release
+
+For the current provider delivery, cut a release at each verified, usable batch
+handoff before moving to the next provider. The order is GitLab, Kubernetes,
+PostgreSQL, MCP, then the remaining providers. The operator's instruction authorizes
+the source commit, tag and push sequence below; it supersedes the earlier
+local-only Connectors publication boundary for these releases.
+
+"Cutting a release" means completing all of these steps:
+
+1. Establish the exact released scope from runtime evidence. List unfinished
+   workflows and missing sandbox evidence explicitly; a release does not by itself
+   complete the provider batch or its parent plan. Choose the next version from
+   existing tags and compatibility changes, update the owning version inputs and
+   regenerate affected outputs and lockfiles.
+2. Update [CHANGELOG.md](CHANGELOG.md) with that version, release date, user-visible
+   changes, compatibility or migration requirements, and material limitations.
+   Preserve earlier entries. Update the website's authored guides, CLI examples
+   and support claims to match the released behavior; update selected public
+   inputs and regenerate references where needed. Generated pages are not edited
+   by hand. Follow [website ownership](website/README.md#edit-the-owning-source).
+3. Run the required [repository gate](docs/development.md) and affected
+   [website checks](website/README.md#build-and-verify), including Rust 1.88 and
+   relevant runtime acceptance. Retain commands, results and artifact identities;
+   reuse existing evidence only when its relevant inputs are unchanged.
+4. Have the single planning-store writer record the release scope, evidence and
+   current lifecycle state through AEP, reconciling earlier publication exclusions
+   with this instruction. Do not close unfinished work to make a release look done.
+5. Integrate the verified changes and release metadata on `main`, commit using
+   verified Atlas bot authority, and create an annotated `v<version>` tag at that
+   exact release commit. Verify author, committer and tagger identities. Existing
+   release tags are immutable.
+6. Push `main` and that exact tag to the authorized source remote using the bot
+   wrapper and normal hooks. Verify the remote branch and peeled tag resolve to
+   the intended release commit. Finish with clean `main`, retained release
+   evidence and cleanup of task-owned managed worktrees through `worktree`.
+   Report the version, commit, destination and verification result.
+
+A local commit or local tag alone is not a cut release. Source release does not
+implicitly include a hosted release page, binary/package or container-registry
+publication, website/cloud deployment, or Atlas registration; those need their
+own requested scope. If a release step is blocked, record the exact blocker and
+report the release as incomplete.
+
 ## Workspace and integrations
 
 For single-agent work, the operator's repository-specific rule is to work directly
