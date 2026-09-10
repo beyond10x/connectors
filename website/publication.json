@@ -47,7 +47,7 @@
       "title": "Mutations and idempotency",
       "source": "contracts/operations/v1alpha1/semantics.md",
       "owner": "shared",
-      "status": "Specified; runtime pending"
+      "status": "Specified; SQLite ledger fixtures; CLI writes pending"
     },
     {
       "route": "/contracts/auth/connection",

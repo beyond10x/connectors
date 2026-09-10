@@ -1,0 +1,74 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 3.54s
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-7ce2d89e78eb4a48)
+
+running 12 tests
+
+thread 'local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt' (3857202) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'local::mutations::tests::atomic_prepare_faults_never_return_a_handle_or_leave_a_half_reservation' (3857204) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+
+thread 'local::mutations::tests::ambiguous_gate_is_unknown_and_ambiguous_terminal_preserves_known_live_answer' (3857203) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+
+thread 'local::mutations::tests::capacity_and_corrupt_or_unavailable_reads_do_not_become_absence' (3857205) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+
+thread 'local::mutations::tests::concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation' (3857206) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+
+thread 'local::mutations::tests::every_fingerprint_coordinate_conflicts_including_exact_route_revisions' (3857208) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+
+thread 'local::mutations::tests::connection_fences_authority_and_process_identity_refuse_stale_handles' (3857207) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+test local::mutations::tests::ambiguous_gate_is_unknown_and_ambiguous_terminal_preserves_known_live_answer ... FAILED
+test local::mutations::tests::capacity_and_corrupt_or_unavailable_reads_do_not_become_absence ... FAILED
+test local::mutations::tests::atomic_prepare_faults_never_return_a_handle_or_leave_a_half_reservation ... FAILED
+test local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt ... FAILED
+
+thread 'local::mutations::tests::namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys' (3857210) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+
+thread 'local::mutations::tests::malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention' (3857209) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+test local::mutations::tests::concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation ... FAILED
+
+thread 'local::mutations::tests::retention_uses_trusted_bounds_and_cas_cannot_retire_a_replacement' (3857211) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+test local::mutations::tests::every_fingerprint_coordinate_conflicts_including_exact_route_revisions ... FAILED
+test local::mutations::tests::connection_fences_authority_and_process_identity_refuse_stale_handles ... FAILED
+
+thread 'local::mutations::tests::terminal_first_fact_is_immutable_and_unknown_never_expires' (3857212) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+
+thread 'local::mutations::tests::unkeyed_attempts_still_require_the_gate_and_retain_outcome' (3857213) panicked at crates/connectors-host/src/local/mutations/tests.rs:29:54:
+called `Result::unwrap()` on an `Err` value: MetadataUnavailable
+test local::mutations::tests::namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys ... FAILED
+test local::mutations::tests::malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention ... FAILED
+test local::mutations::tests::retention_uses_trusted_bounds_and_cas_cannot_retire_a_replacement ... FAILED
+test local::mutations::tests::terminal_first_fact_is_immutable_and_unknown_never_expires ... FAILED
+test local::mutations::tests::unkeyed_attempts_still_require_the_gate_and_retain_outcome ... FAILED
+
+failures:
+
+failures:
+    local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt
+    local::mutations::tests::ambiguous_gate_is_unknown_and_ambiguous_terminal_preserves_known_live_answer
+    local::mutations::tests::atomic_prepare_faults_never_return_a_handle_or_leave_a_half_reservation
+    local::mutations::tests::capacity_and_corrupt_or_unavailable_reads_do_not_become_absence
+    local::mutations::tests::concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation
+    local::mutations::tests::connection_fences_authority_and_process_identity_refuse_stale_handles
+    local::mutations::tests::every_fingerprint_coordinate_conflicts_including_exact_route_revisions
+    local::mutations::tests::malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention
+    local::mutations::tests::namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys
+    local::mutations::tests::retention_uses_trusted_bounds_and_cas_cannot_retire_a_replacement
+    local::mutations::tests::terminal_first_fact_is_immutable_and_unknown_never_expires
+    local::mutations::tests::unkeyed_attempts_still_require_the_gate_and_retain_outcome
+
+test result: FAILED. 0 passed; 12 failed; 0 ignored; 0 measured; 35 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p connectors-host --lib`

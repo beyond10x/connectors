@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running tests/local_runtime.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_runtime-2b42236dce454671)
+
+running 1 test
+test cli_journey::ci::gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces ... 
+thread 'cli_journey::ci::gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces' (4119406) panicked at adapters/gitlab/tests/local_runtime/ci.rs:23:21:
+CLI failed: {"error":{"code":"failure","data":{"code":"timeout","kind":"operational","next_action":"retry_explicitly","stage":"admission"}},"ok":false}
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    cli_journey::ci::gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 11.83s
+
+error: test failed, to rerun pass `-p connectors-gitlab --test local_runtime`

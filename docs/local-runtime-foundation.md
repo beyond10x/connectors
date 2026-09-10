@@ -57,8 +57,9 @@ provider work. SQLite owns the durable authority.
 Its first migration records the local authority identity, UID and migration
 digest. Migration two adds the [connection registry](local-connection-registry.md),
 acquisition/custody publication, retirement and bounded read-use guards. Migration
-three adds cached bootstraps and durable stop suppression. Approval
-spending and business write dispatch remain unfinished.
+three adds cached bootstraps and durable stop suppression. Migration four adds
+the private [mutation attempt and keyed-reservation store](local-mutation-ledger.md).
+Approval spending, audit and complete business write dispatch remain unfinished.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
 temporary storage, with two-second lock/busy bounds. Versioned migrations commit

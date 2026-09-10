@@ -1,0 +1,23 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 3.02s
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-7ce2d89e78eb4a48)
+
+running 15 tests
+test local::mutations::tests::crash_child ... ok
+test local::mutations::tests::capacity_and_corrupt_or_unavailable_reads_do_not_become_absence ... ok
+test local::mutations::tests::terminal_first_fact_is_immutable_and_unknown_never_expires ... ok
+test local::mutations::tests::version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authority ... ok
+test local::mutations::tests::every_fingerprint_coordinate_conflicts_including_exact_route_revisions ... ok
+test local::mutations::tests::unkeyed_attempts_still_require_the_gate_and_retain_outcome ... ok
+test local::mutations::tests::concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation ... ok
+test local::mutations::tests::retention_uses_trusted_bounds_and_cas_cannot_retire_a_replacement ... ok
+test local::mutations::tests::namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys ... ok
+test local::mutations::tests::atomic_prepare_faults_never_return_a_handle_or_leave_a_half_reservation ... ok
+test local::mutations::tests::ambiguous_gate_is_unknown_and_ambiguous_terminal_preserves_known_live_answer ... ok
+test local::mutations::tests::malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention ... ok
+test local::mutations::tests::connection_fences_authority_and_process_identity_refuse_stale_handles ... ok
+test local::mutations::tests::abrupt_process_exit_preserves_each_durable_boundary_without_resend ... ok
+test local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 5.58s
+
