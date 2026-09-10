@@ -2054,6 +2054,234 @@
         }
       }
     },
+    "connections-revalidate": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-revalidate"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionRevalidateInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "connection": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionRevalidateResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "connection": {
+              "kind": "struct",
+              "fields": {
+                "external_identity": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "kind": {
+                        "kind": "string"
+                      },
+                      "subject": {
+                        "kind": "string"
+                      }
+                    }
+                  }
+                },
+                "observed_at_ms": {
+                  "kind": "integer"
+                },
+                "source": {
+                  "kind": "enum",
+                  "variants": [
+                    "configuration",
+                    "cached",
+                    "authority"
+                  ]
+                },
+                "stale": {
+                  "kind": "boolean"
+                },
+                "summary": {
+                  "kind": "struct",
+                  "fields": {
+                    "adapter": {
+                      "kind": "string"
+                    },
+                    "connection": {
+                      "kind": "string"
+                    },
+                    "instance_id": {
+                      "kind": "string"
+                    },
+                    "profile": {
+                      "kind": "string"
+                    },
+                    "revision": {
+                      "kind": "string"
+                    },
+                    "state": {
+                      "kind": "enum",
+                      "variants": [
+                        "pending",
+                        "ready",
+                        "reauthorization_required",
+                        "custody_unavailable",
+                        "parent_degraded",
+                        "disabled",
+                        "revoked"
+                      ]
+                    }
+                  }
+                },
+                "valid_until_ms": {
+                  "kind": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "connections-revoke": {
       "target": {
         "kind": "local",
@@ -3724,6 +3952,38 @@
     {
       "path": [
         "connections",
+        "revalidate"
+      ],
+      "aliases": [],
+      "callable": "connections-revalidate",
+      "about": "Revalidate the saved credential without re-entry",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
         "revoke"
       ],
       "aliases": [],
@@ -3927,6 +4187,7 @@
     "handler:connections-describe: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-list: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-repair: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-status: implement the owner-qualified callable and its declared result/error contract",
     "handler:operations-describe: implement the owner-qualified callable and its declared result/error contract",

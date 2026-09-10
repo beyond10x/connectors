@@ -60,6 +60,11 @@ callables:
     input: connectors.cli.ConnectionStatusInput
     result: connectors.cli.ConnectionStatusResult
     errors: {failure: connectors.cli.Failure}
+  connections-revalidate:
+    target: {kind: local, owner: connectors.cli, action: connections-revalidate}
+    input: connectors.cli.ConnectionRevalidateInput
+    result: connectors.cli.ConnectionRevalidateResult
+    errors: {failure: connectors.cli.Failure}
   connections-revoke:
     target: {kind: local, owner: connectors.cli, action: connections-revoke}
     input: connectors.cli.ConnectionRevokeInput
@@ -182,6 +187,17 @@ commands:
         source: {kind: option, long: connection}
       - field: acquisition
         source: {kind: option, long: acquisition}
+  - path: [connections, revalidate]
+    aliases: []
+    callable: connections-revalidate
+    about: Revalidate the saved credential without re-entry
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
   - path: [connections, revoke]
     aliases: []
     callable: connections-revoke
@@ -230,4 +246,3 @@ commands:
         source: {kind: option, long: revision}
       - field: input
         source: {kind: document, inline: input-json, file: input-file, stdin: input-stdin}
-

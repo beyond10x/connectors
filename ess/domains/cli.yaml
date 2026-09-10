@@ -28,6 +28,17 @@ types:
       - {name: acquisition, type: String}
       - {name: expires_at_ms, type: Timestamp}
       - {name: profile, type: connectors.cli.PrivateStaticProfile}
+  # Transient admitted use of the existing immutable generation/custody version.
+  # No public handle, new generation, or independently owned evidence entity.
+  - name: connectors.cli.LocalRevalidationAdmission
+    kind: struct
+    fields:
+      - {name: connection, type: String}
+      - {name: generation, type: String}
+      - {name: custody_version, type: String}
+      - {name: publication_fence, type: String}
+      - {name: captured_at_ms, type: Timestamp}
+      - {name: expires_at_ms, type: Timestamp}
   - name: connectors.cli.LocalRuntimeRecord
     kind: struct
     fields:
@@ -364,6 +375,16 @@ types:
     fields:
       - {name: connection, type: "connectors.cli.ConnectionDescription"}
       - {name: acquisition, type: "Optional<String>"}
+  - name: connectors.cli.ConnectionRevalidateInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "String"}
+      - {name: expected_revision, type: "String"}
+  - name: connectors.cli.ConnectionRevalidateResult
+    kind: struct
+    fields:
+      - {name: connection, type: "connectors.cli.ConnectionDescription"}
   # Exactly one selector required by the binding; Optional alone does not enforce exclusivity.
   - name: connectors.cli.ConnectionStatusInput
     kind: struct
