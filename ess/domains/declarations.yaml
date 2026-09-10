@@ -36,6 +36,9 @@ types:
       - {name: path_parameters, type: "Map<String, connectors.declarations.Parameter>"}
       - {name: query_parameters, type: "Map<String, connectors.declarations.Parameter>"}
       - {name: obligations, type: "List<String>"}
+      - {name: response_prefix_limit, type: "Optional<Integer>"}
+    # Optional bounded HTTP prefix policy; absent retains the complete-body
+    # transport and existing finish signature. No retry or provider authority.
 
   - name: connectors.declarations.OperationAvailability
     kind: struct

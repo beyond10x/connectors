@@ -34,6 +34,14 @@ fn checked_in_bundle_matches_its_pinned_sources_and_toolchain() {
 fn public_import_refuses_specs_changed_after_validation() {
     let path = root().join("adapters/gitlab/spec/adapter.json");
     let mut spec = parse(&source()).unwrap();
+    spec.mappings[0].response_prefix_limit = Some(0);
+    assert!(
+        import(&spec, &path)
+            .unwrap_err()
+            .message
+            .contains("prefix limit")
+    );
+    let mut spec = parse(&source()).unwrap();
     spec.operations.clear();
     assert!(
         import(&spec, &path)
@@ -90,6 +98,39 @@ fn strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings() {
 }
 
 #[test]
+fn response_prefix_is_explicit_bounded_and_absent_in_legacy_serialization() {
+    let mut value = source();
+    for invalid in [
+        json!(0),
+        json!(1048577),
+        json!(-1),
+        json!(1.5),
+        json!("512000"),
+        json!(null),
+    ] {
+        value["mappings"][0]["response_prefix_limit"] = invalid;
+        assert!(parse(&value).is_err());
+    }
+    for valid in [1, 512000, 1048576] {
+        value["mappings"][0]["response_prefix_limit"] = json!(valid);
+        assert_eq!(
+            parse(&value).unwrap().mappings[0].response_prefix_limit,
+            Some(valid)
+        );
+    }
+    value["mappings"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("response_prefix_limit");
+    let serialized = serde_json::to_value(parse(&value).unwrap()).unwrap();
+    assert!(
+        serialized["mappings"][0]
+            .get("response_prefix_limit")
+            .is_none()
+    );
+}
+
+#[test]
 fn pinned_source_and_required_source_semantics_are_enforced() {
     let temp = tempfile::tempdir().unwrap();
     let mut spec = source();
@@ -99,7 +140,7 @@ fn pinned_source_and_required_source_semantics_are_enforced() {
         let mut params = vec![];
         for place in ["path", "query"] {
             for (name, _) in m[format!("{place}_parameters")].as_object().unwrap() {
-                params.push(json!({"in":place,"name":name,"required":place=="path","schema":{"type":if ["page","per_page"].contains(&name.as_str()) {"integer"} else {"string"}}}));
+                params.push(json!({"in":place,"name":name,"required":place=="path","schema":{"type":if ["page","per_page","pipeline_id","job_id"].contains(&name.as_str()) {"integer"} else {"string"}}}));
             }
         }
         upstream["paths"][m["path"].as_str().unwrap()] = json!({"get":{"operationId":m["upstream_operation"],"parameters":params,"responses":{"200":{"description":"test response"}}}});

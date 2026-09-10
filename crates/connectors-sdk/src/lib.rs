@@ -58,10 +58,31 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
 }
 
+/// A bounded response prefix. Completeness means EOF was observed for this
+/// response; it makes no assertion about future changes to the provider resource.
+pub struct HttpResponsePrefix {
+    pub status: u16,
+    pub headers: BTreeMap<String, String>,
+    pub body: Vec<u8>,
+    pub complete: bool,
+}
+
 #[async_trait]
 pub trait AuthenticatedHttp: Send + Sync {
     /// Segments are encoded individually by the binding; no arbitrary URL input.
     async fn get(&self, segments: &[&str], query: &[(&str, String)]) -> Result<HttpResponse>;
+
+    /// Retain at most `limit` bytes (1..=1048576) from one GET, under the same
+    /// authority and deadline as `get`. Unsupported ports refuse without I/O.
+    /// No range/resume or automatic retry is implied by an incomplete prefix.
+    async fn get_prefix(
+        &self,
+        _segments: &[&str],
+        _query: &[(&str, String)],
+        _limit: usize,
+    ) -> Result<HttpResponsePrefix> {
+        Err(Error::unavailable())
+    }
 }
 
 pub fn decode<T: DeserializeOwned>(input: Value) -> Result<T> {

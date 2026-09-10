@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 6
 ---
 ## Outcome and authority
 
@@ -57,3 +57,11 @@ Implementation commit 2c41fc49e00549ddb671a68845ec5fcf6ee4277b adds production s
 The installed 0.7.0 CLI is a separate product baseline and is not migrated. Dedicated GitLab sandbox target and protected credential-file path have been requested; credential-blocker:gitlab-runtime-sandbox remains open. The other provider sandboxes, Secret Service durable write/restart/deletion qualification and independent MCP interoperability remain required evidence. They are not assumed from installed credential presence. The Kubernetes driver protocol-loading blocker remains open for its distinct governed-run scope; paid driver runs are not required for interactive implementation.
 
 The provider-order update is an interactive planning change with one store writer and no approval bypass records. No runtime acceptance or lifecycle completion is claimed from this update.
+
+## Current runtime checkpoint — 2026-09-10
+
+The earlier current-evidence paragraph records the initiative's initial runtime state. Persistent GitLab restart/revalidation and local CI now have executable fixture evidence. story:gitlab-ci-runtime adds five generated CI read operations beside the original three, bounded trace transport and safe provider failure projection. The final repository gate and four production CLI/private HTTPS/keyring journeys pass; local GitLab image packaging also passes. docs/evidence/gitlab-ci-20260910/README.md records exact commands, source/artifact identities and remaining limits.
+
+The initiative now has two decomposing stories. Unlike the earlier one-child scheduling update, this CI decomposition ran all four planning critics independently in two bounded rounds, with the acceptance finding fixed and all second-round verdicts approved. Existing completed specification milestones, the related MCP epic and Kubernetes story remain unchanged.
+
+Neither GitLab story is complete without its dedicated sandbox evidence. Missing GitLab access remains an explicit credential blocker. The next independent implementation is GitLab MR/changed-record reads and admitted MR create/update/merge with the required shared write controls; Kubernetes and PostgreSQL follow the full selected GitLab work. MCP and the remaining providers retain their required order and scope. The paid AEP driver blocker, full cross-provider acceptance and reproducible distribution obligations remain open. Connectors stays local on main with no task-owned linked trees; MCP's pre-existing primary documentation-workflow edit is preserved.

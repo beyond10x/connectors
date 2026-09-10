@@ -1,7 +1,7 @@
 # GitLab through the local CLI
 
-The current local binding supports `project.get`, `issues.list` and `file.get`
-using a saved GitLab PAT. It requires Linux x86_64 and the
+The current local binding supports project, issue and file reads plus exact-commit
+CI pipeline, job and trace reads using a saved GitLab PAT. It requires Linux x86_64 and the
 [qualified Secret Service binding](local-secret-service.md). The separately
 installed older CLI is not upgraded by building this checkout.
 
@@ -50,7 +50,7 @@ restart = "never"
 
 [adapters.forge.permissions]
 profiles = ["gitlab.pat"]
-operations = ["project.get", "issues.list", "file.get"]
+operations = ["project.get", "issues.list", "file.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace"]
 
 [adapters.forge.executable]
 path = "/absolute/path/connectors-gitlab"
@@ -108,6 +108,39 @@ repair preserves the still-valid existing credential. `connections revoke` requi
 the same connection/revision selectors and commits terminal local revocation even
 when custody or the provider is unavailable. It does not revoke the PAT at GitLab.
 
+## Inspect CI for one commit
+
+Use `operations describe` for each operation's current schema and descriptor
+revision, then invoke with the saved connection as above. Select an exact full
+40- or 64-character lowercase SHA. The request shapes are:
+
+| Operation | Example input |
+|---|---|
+| `pipelines.list` | `{"project":"group/project","sha":"0123456789abcdef0123456789abcdef01234567","limit":10}` |
+| `pipeline.get` | `{"project":"group/project","pipeline_id":11,"sha":"0123456789abcdef0123456789abcdef01234567"}` |
+| `pipeline.jobs` | `{"project":"group/project","pipeline_id":11,"sha":"0123456789abcdef0123456789abcdef01234567","limit":20}` |
+| `job.get` | `{"project":"group/project","job_id":42,"pipeline_id":11,"sha":"0123456789abcdef0123456789abcdef01234567"}` |
+| `job.trace` | `{"project":"group/project","job_id":42,"max_bytes":10000}` |
+
+Poll the same pipeline ID and SHA with fresh admitted reads within your workflow's
+deadline. Preserve native pending/running/failure states; only literal `success`
+means pipeline success. A response for another SHA or pipeline fails. Unknown
+native statuses remain visible without being interpreted as success.
+
+List results contain `items`, `next_cursor` and `complete`. Pass a returned cursor
+alongside unchanged selectors, limit and connection. Pages are observations of a
+mutable collection. Pipeline jobs contain current attempts in descending ID order;
+retried and trigger-job histories are not part of that collection.
+
+Select the failed job from the verified pipeline's jobs. A trace request uses its
+project/job coordinates and makes no independent SHA assertion. Its `item`
+contains `job_id`, UTF-8 `content`, retained `bytes` and `complete`. The transport
+reads at most 512000 retained bytes; `max_bytes` may narrow this further. Omitted
+bytes or a cut UTF-8 suffix keep `complete: false`. Completeness describes this
+response, not whether a running job's trace will grow. Missing/erased traces and
+permission failures are errors. Trace bytes stay JSON data, including escaped
+terminal control characters.
+
 ## Current limits
 
 Native validation evidence lasts at most 60 seconds. After expiry, the connection
@@ -129,6 +162,7 @@ Disposable HTTPS/keyring fixtures cover restart reuse and revalidation after rea
 evidence expiry. Dedicated GitLab sandbox acceptance remains open.
 
 Kubernetes and PostgreSQL retain their existing explicit service operations but
-do not yet have this local connection/owner binding. They are next, before MCP and
-the remaining providers. Writes, OAuth onboarding, complete management pagination
+do not yet have this local connection/owner binding. GitLab MR and changed-record
+workflows and their governed write controls come first, followed by Kubernetes,
+PostgreSQL, MCP and the remaining providers. Writes, OAuth onboarding, complete management pagination
 and reproducible distribution acceptance remain outside this increment.

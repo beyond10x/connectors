@@ -8,23 +8,22 @@ use async_trait::async_trait;
 use connectors_contracts::Page;
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_sdk::{
-    Adapter, AuthenticatedHttp, Cursors, HttpResponse, encode, instance_descriptor, provenance,
-    upstream_json,
+    Adapter, AuthenticatedHttp, Cursors, HttpResponse, HttpResponsePrefix, encode,
+    instance_descriptor, provenance, upstream_json,
 };
-use gitlab_types::requests::{FileGetRequest, IssuesListRequest, ProjectGetRequest};
+use gitlab_types::requests::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
 pub mod auth;
+mod ci;
 
 #[path = "../generated/runtime.rs"]
 #[doc(hidden)]
 #[rustfmt::skip]
 pub mod generated;
-use generated::{
-    Bindings, FileGetRequestContext, IssuesListRequestContext, ProjectGetRequestContext,
-};
+use generated::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -115,6 +114,141 @@ impl GitLabBindings {
 }
 
 impl Bindings for GitLabBindings {
+    fn prepare_pipelines_list(
+        &self,
+        input: &PipelinesListRequest,
+    ) -> Result<PipelinesListRequestContext> {
+        self.admit_project(&input.project)?;
+        Ok(PipelinesListRequestContext {
+            page: self.ci_page_number(
+                &self.ci_cursor_context(
+                    "pipelines.list",
+                    &input.project,
+                    &input.sha,
+                    None,
+                    input.limit,
+                ),
+                input.cursor.as_deref(),
+            )?,
+        })
+    }
+    fn finish_pipelines_list(
+        &self,
+        input: PipelinesListRequest,
+        context: PipelinesListRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        let cursor = self.ci_cursor_context(
+            "pipelines.list",
+            &input.project,
+            &input.sha,
+            None,
+            input.limit,
+        );
+        self.ci_page(response, &context.page, &cursor, &input.project, |v| {
+            ci::pipeline(v, &input.project, &input.sha, None)
+        })
+    }
+    fn prepare_pipeline_get(
+        &self,
+        input: &PipelineGetRequest,
+    ) -> Result<PipelineGetRequestContext> {
+        self.admit_project(&input.project)?;
+        Ok(PipelineGetRequestContext {})
+    }
+    fn finish_pipeline_get(
+        &self,
+        input: PipelineGetRequest,
+        _: PipelineGetRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        let item = ci::pipeline(
+            &upstream_json(&response)?,
+            &input.project,
+            &input.sha,
+            Some(input.pipeline_id),
+        )?;
+        Ok(
+            json!({"item":item,"provenance":provenance(&self.descriptor.instance,
+            format!("{}/pipelines/{}",input.project,input.pipeline_id),Some(input.sha))}),
+        )
+    }
+    fn prepare_pipeline_jobs(
+        &self,
+        input: &PipelineJobsRequest,
+    ) -> Result<PipelineJobsRequestContext> {
+        self.admit_project(&input.project)?;
+        Ok(PipelineJobsRequestContext {
+            page: self.ci_page_number(
+                &self.ci_cursor_context(
+                    "pipeline.jobs",
+                    &input.project,
+                    &input.sha,
+                    Some(input.pipeline_id),
+                    input.limit,
+                ),
+                input.cursor.as_deref(),
+            )?,
+        })
+    }
+    fn finish_pipeline_jobs(
+        &self,
+        input: PipelineJobsRequest,
+        context: PipelineJobsRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        let cursor = self.ci_cursor_context(
+            "pipeline.jobs",
+            &input.project,
+            &input.sha,
+            Some(input.pipeline_id),
+            input.limit,
+        );
+        self.ci_page(
+            response,
+            &context.page,
+            &cursor,
+            &format!("{}/pipelines/{}/jobs", input.project, input.pipeline_id),
+            |v| ci::job(v, &input.sha, input.pipeline_id, None),
+        )
+    }
+    fn prepare_job_get(&self, input: &JobGetRequest) -> Result<JobGetRequestContext> {
+        self.admit_project(&input.project)?;
+        Ok(JobGetRequestContext {})
+    }
+    fn finish_job_get(
+        &self,
+        input: JobGetRequest,
+        _: JobGetRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        let item = ci::job(
+            &upstream_json(&response)?,
+            &input.sha,
+            input.pipeline_id,
+            Some(input.job_id),
+        )?;
+        Ok(
+            json!({"item":item,"provenance":provenance(&self.descriptor.instance,
+            format!("{}/jobs/{}",input.project,input.job_id),Some(input.sha))}),
+        )
+    }
+    fn prepare_job_trace(&self, input: &JobTraceRequest) -> Result<JobTraceRequestContext> {
+        self.admit_project(&input.project)?;
+        Ok(JobTraceRequestContext {})
+    }
+    fn finish_job_trace(
+        &self,
+        input: JobTraceRequest,
+        _: JobTraceRequestContext,
+        response: HttpResponsePrefix,
+    ) -> Result<Value> {
+        let item = ci::trace(response, input.job_id, input.max_bytes)?;
+        Ok(
+            json!({"item":item,"provenance":provenance(&self.descriptor.instance,
+            format!("{}/jobs/{}/trace",input.project,input.job_id),None)}),
+        )
+    }
     fn prepare_project_get(&self, input: &ProjectGetRequest) -> Result<ProjectGetRequestContext> {
         self.admit_project(&input.project)?;
         Ok(ProjectGetRequestContext {})
