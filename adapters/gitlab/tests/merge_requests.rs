@@ -7,6 +7,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
+#[path = "merge_requests/validation.rs"]
+mod validation;
 type Call = (Vec<String>, BTreeMap<String, String>);
 struct Fixture {
     responses: Mutex<VecDeque<HttpResponse>>,

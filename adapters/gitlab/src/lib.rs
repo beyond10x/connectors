@@ -115,6 +115,21 @@ impl GitLabBindings {
 }
 
 impl Bindings for GitLabBindings {
+    fn prepare_merge_request_validate(
+        &self,
+        input: &MergeRequestValidateRequest,
+    ) -> Result<MergeRequestValidateRequestContext> {
+        self.admit_project(&input.project)?;
+        Ok(MergeRequestValidateRequestContext {})
+    }
+    fn finish_merge_request_validate(
+        &self,
+        input: MergeRequestValidateRequest,
+        _: MergeRequestValidateRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value> {
+        self.mr_finish_validation(input, response)
+    }
     fn prepare_merge_request_get(
         &self,
         input: &MergeRequestGetRequest,
