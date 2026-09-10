@@ -6,6 +6,7 @@ status: open
 title: Dedicated GitLab sandbox target and protected credential source are missing
 relations:
 - blocks: story:persistent-gitlab-journey
+- blocks: story:gitlab-ci-runtime
 withholds: test_result
 revision: 1
 ---

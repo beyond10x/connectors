@@ -15,6 +15,13 @@ Repository data through bounded reads.
 
 Use `project.get` to inspect an allowed project, `issues.list` for a bounded issue page, and `file.get` for repository content.
 
+For CI, `pipelines.list` selects one exact full commit SHA; `pipeline.get` observes
+the selected pipeline's native status. `pipeline.jobs` pages its current job
+attempts, `job.get` verifies a job's pipeline and SHA, and `job.trace` returns a
+bounded UTF-8 prefix with explicit completeness. A successful pipeline for another
+SHA cannot satisfy the selection. Read the [CI contract](/adapters/gitlab/contracts/ci)
+for input shapes and limits. Dedicated GitLab sandbox acceptance remains open.
+
 ## Access and limits
 
 Configure the GitLab endpoint and an explicit project allowlist. Public reads can use no provider credential; private reads use a separately bound token. Caller authentication to the adapter service is a different boundary.

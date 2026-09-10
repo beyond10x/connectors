@@ -131,7 +131,10 @@ impl Local {
                     profile: auth::PROFILE_ID.into(),
                     scopes: BTreeSet::from(["read_api".into()]),
                     effect: match o.id.as_str() {
-                        "project.get" | "issues.list" | "file.get" => Effect::Read,
+                        "project.get" | "issues.list" | "file.get" | "pipelines.list"
+                        | "pipeline.get" | "pipeline.jobs" | "job.get" | "job.trace" => {
+                            Effect::Read
+                        }
                         _ => Effect::Unknown,
                     },
                 })
@@ -199,7 +202,7 @@ impl runtime::Adapter for Local {
             .map_err(Failure::from_service)?
             .invoke(operation, input)
             .await
-            .map_err(Failure::from_service)
+            .map_err(Failure::from_provider)
     }
 }
 fn native_failure(value: auth::Failure) -> Failure {
