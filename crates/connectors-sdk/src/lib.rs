@@ -35,6 +35,13 @@ pub trait Adapter: Send + Sync {
 /// prevents accidental formatting, not deliberate disclosure by a byte holder.
 pub struct Secret(pub Vec<u8>);
 
+impl Drop for Secret {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.0.zeroize();
+    }
+}
+
 #[async_trait]
 pub trait Credential: Send + Sync {
     async fn resolve(&self) -> Result<Secret>;

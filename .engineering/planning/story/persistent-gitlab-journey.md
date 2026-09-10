@@ -28,6 +28,8 @@ scope:
 - confidence: cited
   path: crates/connectors-build
 - confidence: cited
+  path: crates/connectors-conformance
+- confidence: cited
   path: crates/connectors-host
 - confidence: cited
   path: crates/connectors-sdk
@@ -35,7 +37,7 @@ scope:
   path: docs
 - confidence: cited
   path: ess/domains
-revision: 6
+revision: 9
 ---
 ## Acceptance
 
@@ -74,3 +76,21 @@ Final cargo run --locked --offline -p connectors-build -- gate --msrv passed wit
 No provider credential has been captured or stored, no managed connection published, and no local owner or adapter supervised. GitLab currently has generated request ESS, not an authored static-entry profile/bootstrap contract; model and review those native semantics before implementing their dependent runtime. Persistent Secret Service write/restart/deletion qualification remains required. credential-blocker:gitlab-runtime-sandbox records missing dedicated live-provider access. It does not block independent implementation, and the nine foundation tests are not the restart journey.
 
 MCP adoption/implementation/publication, later provider milestones, complete governed decomposition/critic reviews and reproducible distribution verification remain outstanding. The initiative and this story stay active; no selected workflow is marked complete by this checkpoint.
+
+## GitLab runtime continuation — 2026-09-10
+
+The active thread goal selects GitLab, Kubernetes and PostgreSQL usable through the CLI, in that order, while the initiative retains its full selected workflow scope. The previous goal turn updated authoritative scheduling; it did not implement runtime behavior. This story remains the first delivery.
+
+First close the GitLab-owned static-entry profile and baseline identity/grant/expiry validation in adapters/gitlab/contracts/auth/v1alpha1/semantics.md, adapters/gitlab/spec/ess and adapters/gitlab/src/auth.rs. The provider interprets its own token document and bounded provider responses through the existing narrow AuthenticatedHttp capability; generic host/CLI code gains no GitLab branch. Existing shared AuthProfile, Connection, Acquisition, CustodyVersion, CredentialGeneration and evidence declarations own their lifecycle and relations. The native auth document introduces bounded values, not another connection or custody entity.
+
+Then bind protected source preflight, durable custody, metadata publication and supervised invocation. The generated Sources seam runs before Handler, so production source admission must establish current configuration/profile/target and owner before consuming protected bytes. Do not use the demonstration source implementation or bypass the generated parser. Persisted metadata and keyring availability alone still establish no connection readiness.
+
+Validate the pinned shared/generated ESS baseline, author and validate the native values before dependent runtime implementation, verify provider interpretation with deterministic failure cases, and run the required repository gate on final changed inputs. The dedicated live GitLab sandbox has been requested again; its missing evidence remains recorded independently of ongoing implementation. No acceptance is closed by this note.
+
+## Native GitLab auth implementation checkpoint — 2026-09-10
+
+The new adapter-owned auth contract/model and adapters/gitlab/src/auth.rs implement strict protected PAT parsing plus native user/token identity, scope, expiry and freshness interpretation through the supplied scoped HTTP capability. Six tests pass, including a disposable server using production HTTP transport. SDK Secret and header assembly now clear their owned buffers; legacy/federation/conformance conversions are updated to retain compatibility. crates/connectors-conformance was added to the machine-readable cited scope for that affected consumer.
+
+The full repository gate with Rust 1.88, generation, conformance, tests/Clippy and boundaries passes on these inputs. Documentation drift checks pass. Exact commands, hashes and limits are retained in docs/evidence/gitlab-auth-20260910/README.md. This evidence covers a native helper and its boundaries, not CLI acquisition or the persistent restart journey.
+
+GNOME Keyring 50.0 source inspection finds file fsync followed by rename in its save path; the complete durability barrier and exact storage/service binding still need qualification before an acknowledged write can publish a connection. No existing keyring secret was accessed or changed. The private bootstrap binding, source admission, custody coordinator, metadata publication and supervised CLI invocation remain required. The dedicated sandbox request is still unanswered. This story and the three-provider goal remain active; no runtime milestone is marked complete.
