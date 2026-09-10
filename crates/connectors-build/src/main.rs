@@ -1,6 +1,9 @@
 //! Local executor for the bounded Linux adapter service realization.
 use clap::{Parser, Subcommand};
-use connectors_spec::v2::{check_ess, generate, hash, json_bytes, tree, write};
+use connectors_spec::{
+    generate,
+    v2::{check_ess, hash, json_bytes, tree, write},
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -132,8 +135,8 @@ fn main() -> Result<()> {
     declaration.validate()?;
     let generated = inside(&root, Path::new(&declaration.generated))?;
     let specification = inside(&root, Path::new(&declaration.specification))?;
-    let spec = connectors_spec::v2::Spec::parse(&std::fs::read(&specification)?)?;
-    if spec.id != declaration.adapter {
+    let spec = connectors_spec::compile(&std::fs::read(&specification)?)?;
+    if spec.adapter != declaration.adapter {
         return Err("realization adapter disagrees with specification".into());
     }
     generate(&specification, &generated, &ess, true)?;

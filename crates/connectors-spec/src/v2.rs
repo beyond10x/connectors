@@ -56,23 +56,23 @@ pub fn hash(bytes: &[u8]) -> String {
 fn refuse(message: impl Into<String>) -> Error {
     Error::invalid(message)
 }
-fn word(s: &str) -> bool {
+pub(crate) fn word(s: &str) -> bool {
     !s.is_empty()
         && s.as_bytes()[0].is_ascii_lowercase()
         && s.bytes()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
 }
-fn method_name(id: &str) -> String {
+pub(crate) fn method_name(id: &str) -> String {
     id.replace('.', "_")
 }
-fn type_name(id: &str) -> String {
+pub(crate) fn type_name(id: &str) -> String {
     id.split(['.', '_'])
         .filter(|s| !s.is_empty())
         .map(|s| format!("{}{}", s[..1].to_uppercase(), &s[1..]))
         .collect::<String>()
         + "Request"
 }
-fn ident(name: &str) -> String {
+pub(crate) fn ident(name: &str) -> String {
     format!("r#{name}")
 }
 #[derive(Clone)]
@@ -583,14 +583,21 @@ pub fn check_ess(executable: &Path) -> Result<()> {
 }
 
 pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) -> Result<()> {
-    let spec =
-        Spec::parse(&std::fs::read(spec_path).map_err(|_| refuse("cannot read specification"))?)?;
+    let source = std::fs::read(spec_path).map_err(|_| refuse("cannot read specification"))?;
+    let spec = Spec::parse(&source)?;
     let resolved = crate::toolchain::resolve(Some(executable))?;
     let executable = resolved.as_path();
     let temp = tempfile::tempdir().map_err(|_| Error::internal())?;
     let root = temp.path();
+    build(&spec, spec_path, root, executable)?;
+    finish(&source, out, root, &spec, check)
+}
+
+/// Shared read projection builder. The v3 frontend composes additional outputs;
+/// it never puts write mappings through this GET runtime renderer.
+pub(crate) fn build(spec: &Spec, spec_path: &Path, root: &Path, executable: &Path) -> Result<()> {
     let (selected, coverage) =
-        import(&spec, spec_path).map_err(|e| refuse(format!("import: {e}")))?;
+        import(spec, spec_path).map_err(|e| refuse(format!("import: {e}")))?;
     write(&root.join("upstream.openapi.json"), &json_bytes(&selected)?)?;
     write(&root.join("coverage.json"), &json_bytes(&coverage)?)?;
     // ESS imports source facts independently. Its coverage is retained even when
@@ -607,7 +614,7 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
             &json!({"exit_code":imported.status.code(),"stdout":String::from_utf8_lossy(&imported.stdout),"stderr":String::from_utf8_lossy(&imported.stderr)}),
         )?,
     )?;
-    lower(&spec, &root.join("ess"))?;
+    lower(spec, &root.join("ess"))?;
     ess(
         executable,
         &[
@@ -646,7 +653,7 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
         &root.join("descriptor.json"),
         &super::descriptor_bytes(&spec.descriptor()?)?,
     )?;
-    write(&root.join("runtime.rs"), render(&spec)?.as_bytes())?;
+    write(&root.join("runtime.rs"), render(spec)?.as_bytes())?;
     let formatted = Command::new("rustfmt")
         .args(["--edition", "2024"])
         .arg(root.join("runtime.rs"))
@@ -670,6 +677,16 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
             return Err(refuse("synthesized Rust did not format"));
         }
     }
+    Ok(())
+}
+
+pub(crate) fn finish(
+    source: &[u8],
+    out: &Path,
+    root: &Path,
+    spec: &Spec,
+    check: bool,
+) -> Result<()> {
     let rustfmt = Command::new("rustfmt")
         .arg("--version")
         .output()
@@ -681,9 +698,11 @@ pub fn generate(spec_path: &Path, out: &Path, executable: &Path, check: bool) ->
     // ESS owns this temporary anchor's recovery state. It contains native anchor
     // identity, not projection artifacts, and must never enter the portable bundle.
     // Keep `tree` complete for public-output audits and all other callers.
-    files.retain(|path, _| !path.starts_with("rust/.ess-output/"));
-    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(&std::fs::read(spec_path).map_err(|_|Error::internal())?),"upstream_sha256":spec.upstream.sha256,"ess":crate::toolchain::version()?,"ess_source":crate::toolchain::source()?,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
-    install(out, &files, &manifest, &spec, check)?;
+    files.retain(|path, _| {
+        !path.starts_with("rust/.ess-output/") && !path.starts_with("write-rust/.ess-output/")
+    });
+    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(source),"upstream_sha256":spec.upstream.sha256,"ess":crate::toolchain::version()?,"ess_source":crate::toolchain::source()?,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
+    install(out, &files, &manifest, spec, check)?;
     Ok(())
 }
 
