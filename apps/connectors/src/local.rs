@@ -9,9 +9,10 @@ use connectors_host::local::{
 };
 use serde_json::{Value, json};
 use std::ffi::OsString;
+mod connections;
 
 /// Protected capture must follow current owner/profile/target admission. Until
-/// the acquisition coordinator exists, refuse BEFORE reading any selected source.
+/// the private adapter/bootstrap admission is bound, refuse BEFORE reading a source.
 /// In particular, never fall back to the generated package's demonstration
 /// OsSources implementation or consume stdin while reporting unavailability.
 struct AdmittedSources;
@@ -101,9 +102,10 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             checks.push(json!({"name":format!("artifact:{alias}"), "state":if ready {"ready"} else {"failed"}, "next_action":if ready {"none"} else {"check_configuration"}}));
         }
         checks.push(json!({"name":"keyring", "state": if state == keyring::State::Available {"ready"} else {"failed"}, "next_action":if state == keyring::State::Available {"none"} else {"unlock_keyring"}}));
-        // A live unlocked collection does not prove durable write acknowledgement,
-        // restart recovery or guarded retirement. Keep that requirement visible.
-        checks.push(json!({"name":"persistent_custody_qualification", "state":"failed", "next_action":"none"}));
+        // Availability alone is weaker than the qualified implementation and
+        // storage binding with durable-write, restart and retirement evidence.
+        let qualified = state == keyring::State::Available && keyring::custody::available();
+        checks.push(json!({"name":"persistent_custody_qualification", "state":if qualified {"ready"} else {"failed"}, "next_action":"none"}));
         return Ok(
             json!({"config_path":paths.config,"state_path":paths.state,"os":"linux", "keyring":match state {keyring::State::Available => "available",keyring::State::Locked => "locked",keyring::State::Unavailable => "unavailable"},"prerequisites":checks}),
         );
@@ -150,6 +152,12 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         .adapters
         .get(alias)
         .ok_or_else(|| failure("not_found", "configuration", "check_configuration", false))?;
+    if matches!(
+        call.callable,
+        "connections-list" | "connections-describe" | "connections-status" | "connections-revoke"
+    ) {
+        return connections::execute(call, &paths, alias, adapter);
+    }
     match call.callable {
         "adapters-describe" => Ok(
             json!({"configuration":{"summary":summary(alias,adapter),"configuration_revision":adapter.configuration_revision,"protocol":adapter.protocol,"executable":adapter.executable},"source":"configuration","stale":true}),
@@ -164,8 +172,8 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             false,
         )),
         "adapters-stop" => Err(failure("unavailable", "stop", "retry_status", false)),
-        // The schema header is no connection registry. Neither a missing owner
-        // nor an unimplemented metadata binding implies an empty connection set.
+        // Protected acquisition and business dispatch still require the private
+        // adapter/lifecycle binding. Safe metadata cannot substitute for it.
         _ => Err(failure(
             "metadata_unavailable",
             "observation",

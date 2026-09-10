@@ -128,6 +128,15 @@ async fn native_identity_grants_and_required_fields_cannot_be_inferred() {
             Failure::InvalidResponse,
         ),
         ("scopes", json!(null), Failure::InvalidResponse),
+        (
+            "scopes",
+            json!(
+                std::iter::once("api".to_owned())
+                    .chain((0..63).map(|n| format!("scope_{n}")))
+                    .collect::<Vec<_>>()
+            ),
+            Failure::InvalidResponse,
+        ),
         ("expires_at", json!("2026-09-10"), Failure::Expired),
         ("expires_at", json!("2026-02-30"), Failure::InvalidResponse),
         (
