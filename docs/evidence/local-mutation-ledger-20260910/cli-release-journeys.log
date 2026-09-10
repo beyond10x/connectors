@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running tests/local_runtime.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_runtime-2b42236dce454671)
+
+running 5 tests
+test cli_journey::ci::gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces ... ok
+test cli_journey::gitlab_cli_explicit_revalidation_after_real_expiry_without_reentry ... ok
+test cli_journey::gitlab_cli_failed_repair_and_busy_stop_preserve_authority ... ok
+test cli_journey::merge_requests::gitlab_cli_mr_window_exhaustion_saved_connection_and_current_policy ... ok
+test cli_journey::persistent_gitlab_cli_owner_and_keyring_restart ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 86.42s
+
