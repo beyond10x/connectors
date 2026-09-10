@@ -37,6 +37,12 @@ impl Handler for LocalHandler {
             self.0.borrow_mut().complete(call).map_err(owner_failure)
         } else if call.callable == "operations-invoke" {
             operations::invoke(call, self.0.borrow().deadline).map_err(owner_failure)
+        } else if call.callable == "connections-revalidate" {
+            self.0
+                .borrow_mut()
+                .signals()
+                .map_err(owner_failure)
+                .and_then(|_| execute(call))
         } else {
             execute(call)
         };
@@ -210,7 +216,11 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         .ok_or_else(|| failure("not_found", "configuration", "check_configuration", false))?;
     if matches!(
         call.callable,
-        "connections-list" | "connections-describe" | "connections-status" | "connections-revoke"
+        "connections-list"
+            | "connections-describe"
+            | "connections-status"
+            | "connections-revoke"
+            | "connections-revalidate"
     ) {
         return connections::execute(
             call,

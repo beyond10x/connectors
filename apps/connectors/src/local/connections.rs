@@ -21,6 +21,15 @@ pub(super) fn execute(
     // of connections checks only the existing custody owner's qualified storage,
     // never starts it, opens a secret session, or resolves credential material.
     match call.callable {
+        "connections-revalidate" => {
+            let deadline = connectors_sdk::now_ms() + 30_000;
+            let reference = text("connection")?;
+            let revision = text("expected_revision")?;
+            owner::admit_revalidation(paths, alias, reference, revision).map_err(owner_failure)?;
+            owner::Client::connect(paths, true)
+                .and_then(|client| client.revalidate(alias, reference, revision, deadline))
+                .map_err(owner_failure)
+        }
         "connections-list" => {
             let limit = call
                 .input

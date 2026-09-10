@@ -216,6 +216,33 @@ impl Client {
         )?;
         self.value(until(deadline_ms)?)
     }
+    pub fn revalidate(
+        mut self,
+        adapter: &str,
+        connection: &str,
+        revision: &str,
+        deadline_ms: u64,
+    ) -> Result<Value> {
+        crate::local::protected::cancellation()?;
+        channel::write(
+            &mut self.stream,
+            &Request::Revalidate {
+                adapter: adapter.into(),
+                connection: connection.into(),
+                expected_revision: revision.into(),
+                deadline_ms,
+            },
+            None,
+            &[],
+            until(deadline_ms)?,
+        )?;
+        self.value(until(deadline_ms)?).map_err(|mut error| {
+            if matches!(error.code, Code::Unavailable | Code::Timeout) {
+                error.code = Code::OutcomeUnknown;
+            }
+            error
+        })
+    }
     pub fn status(mut self, adapter: &str) -> Result<Value> {
         self.simple(
             Request::Status {
@@ -563,6 +590,7 @@ fn action(
     }
     let alias = match &request {
         Request::Begin { adapter, .. }
+        | Request::Revalidate { adapter, .. }
         | Request::Invoke { adapter, .. }
         | Request::Status { adapter }
         | Request::Stop { adapter, .. } => adapter.clone(),
@@ -570,6 +598,33 @@ fn action(
     };
     let (config, adapter) = selected(&owner.paths, &alias)?;
     match request {
+        Request::Revalidate {
+            connection,
+            expected_revision,
+            deadline_ms,
+            ..
+        } => {
+            if !document.is_empty() || deadline_ms > connectors_sdk::now_ms() + 30_000 {
+                return Err(Code::InvalidInput.into());
+            }
+            super::until(deadline_ms)?;
+            let profile =
+                admit_revalidation(&owner.paths, &alias, &connection, &expected_revision)?;
+            let Output::Value(value) = owner.pool.run(
+                &alias,
+                &adapter,
+                Task::Revalidate {
+                    connection,
+                    revision: expected_revision,
+                    profile,
+                },
+                deadline_ms,
+            )?
+            else {
+                return Err(Code::Unavailable.into());
+            };
+            Ok(value)
+        }
         Request::Begin {
             profile,
             connection,

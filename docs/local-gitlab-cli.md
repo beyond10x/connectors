@@ -99,7 +99,7 @@ nothing. The cache always reports `stale: true` and does not grant permission.
 `adapters status --adapter forge` returns incarnation coordinates. Pass those exact
 values to `adapters stop` with `--expected-revision`, `--host-incarnation` and
 `--child-incarnation`. Stop remains suppressed across owner restart until a later
-admitted connect/repair/invoke explicitly resumes it. A stale stop cannot signal a
+admitted connect/repair/revalidate/invoke explicitly resumes it. A stale stop cannot signal a
 replacement process.
 
 `connections repair` requires `--adapter`, `--connection`, `--expected-revision`
@@ -110,11 +110,23 @@ when custody or the provider is unavailable. It does not revoke the PAT at GitLa
 
 ## Current limits
 
-Native validation evidence currently lasts at most 60 seconds. After expiry, reads
-refuse until explicit repair supplies valid material; the dedicated revalidation
-command that rechecks retained material is still implementation work. Restart reuse
-has been tested within that evidence lifetime using disposable HTTPS/keyring
-fixtures. Dedicated GitLab sandbox acceptance remains open.
+Native validation evidence lasts at most 60 seconds. After expiry, the connection
+reports `pending` and reads refuse. Explicitly revalidate the saved credential:
+
+```sh
+target/debug/connectors --output json connections revalidate --adapter forge --connection CONNECTION --expected-revision CONNECTION_REVISION
+```
+
+Use the connection revision returned by connect or connection status. This command
+needs no credential source; it has a 30-second budget including startup and checks
+the exact saved version through the native identity/token reads. Success preserves
+the connection identity, revision and credential version while replacing evidence.
+Transient provider failure preserves any still-valid evidence. A known invalid,
+expired or missing credential requires repair; revalidation cannot revive it.
+Concurrent repair/revoke or another successful revalidation refuses stale results.
+An unknown acknowledgement is observed through connection status without replay.
+Disposable HTTPS/keyring fixtures cover restart reuse and revalidation after real
+evidence expiry. Dedicated GitLab sandbox acceptance remains open.
 
 Kubernetes and PostgreSQL retain their existing explicit service operations but
 do not yet have this local connection/owner binding. They are next, before MCP and

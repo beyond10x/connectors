@@ -69,6 +69,7 @@ management wire payload or a persistent record.
 | `connections describe` | connection metadata authority | `ConnectionDescribeInput` → `ConnectionDescribeResult` | no / no |
 | `connections connect` | acquisition/configuration coordinator | `ConnectionConnectInput` → `ConnectionConnectResult` | yes / yes, after admission |
 | `connections repair` | exact existing connection's coordinator | `ConnectionRepairInput` → `ConnectionRepairResult` | yes / yes, after admission |
+| `connections revalidate` | exact existing connection's evidence coordinator | `ConnectionRevalidateInput` → `ConnectionRevalidateResult` | yes / yes, after admission |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
 | `connections revoke` | connection metadata authority | `ConnectionRevokeInput` → `ConnectionRevokeResult` | no / no |
 | `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | no / no |
@@ -225,7 +226,7 @@ credential custody or selecting another collection after a failure.
 
 `automatic` means start when this local host starts. Pure list, configuration
 inspection and status never start that host or its adapters. After local policy
-and selected action admission, connect/repair/invoke may start the host; its
+and selected action admission, connect/repair/revalidate/invoke may start the host; its
 automatic set and the selected on-demand entry become launch candidates. Provider
 dispatch remains fenced on actual readiness and current connection admission.
 Preflight admission is not a reusable grant across startup.
@@ -256,7 +257,7 @@ A remote, foreign or already-replaced process cannot be killed by this command.
 
 An explicit stop sets a durable suppression marker for the configured instance
 in the existing configuration owner's state; neither a later automatic sweep,
-crash nor host restart clears it. An admitted later connect/repair/invoke directed
+crash nor host restart clears it. An admitted later connect/repair/revalidate/invoke directed
 explicitly at that entry is the selected resume action, clears suppression under
 current authority and requests one fresh launch. An unrelated command never
 resumes it. `restart = "never"` also forbids background crash-restart loops;
