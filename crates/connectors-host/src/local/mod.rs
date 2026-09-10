@@ -6,6 +6,8 @@ pub mod config;
 pub mod filesystem;
 pub mod keyring;
 pub mod metadata;
+pub mod owner;
+pub mod protected;
 pub mod registry;
 pub mod runtime;
 

@@ -23,6 +23,9 @@ use tokio_rustls::{
     rustls::{self, pki_types::PrivatePkcs8KeyDer},
 };
 
+#[path = "local_runtime/cli_journey.rs"]
+mod cli_journey;
+
 struct Provider {
     stop: Option<oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
@@ -136,6 +139,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
+            permissions: Default::default(),
             instance_id: "fixture-gitlab".into(),
             adapter_id: "gitlab".into(),
             configuration_revision: bootstrap.configuration_revision,

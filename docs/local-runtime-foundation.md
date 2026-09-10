@@ -1,10 +1,12 @@
 # Local CLI foundation
 
 The production `connectors` binary consumes the generated local CLI parser for
-setup, passive configured inventory and connection list/describe/status/revoke.
+setup, adapter and connection management, protected connect/repair, cached
+operation discovery and supervised GitLab reads.
 This is incremental work under
 `initiative:complete-local-connectors` and `story:persistent-gitlab-journey`.
-It does not complete the persistent GitLab journey or the broader runtime plan.
+Dedicated sandbox acceptance, evidence revalidation and the broader runtime plan
+remain open. See the [GitLab CLI guide](local-gitlab-cli.md) for the runnable surface.
 
 ## Try the implemented commands
 
@@ -36,9 +38,10 @@ installs or starts an adapter, and `setup check` reports unavailable or changed
 artifacts as failed prerequisites. Credentials never belong in configuration or
 executable arguments.
 
-`adapters describe --adapter ALIAS` reports only the configured entry, with no
-runtime descriptor. `adapters status --adapter ALIAS` reports `owner_unavailable`;
-it does not infer a stopped or ready process. Inventory contains at most 64
+`adapters describe --adapter ALIAS` reports the configured entry and its cached
+descriptor when available; cache facts are always stale. `adapters status --adapter
+ALIAS` asks only an existing owner, or reports `owner_unavailable` when absent.
+It never starts a process or infers readiness from a PID/cache. Inventory contains at most 64
 entries. Its default page bound is 100; limits outside 1–500 are invalid. Until
 the cursor owner is implemented, a limit smaller than the configured inventory
 returns `capacity`, and a supplied cursor returns `stale_cursor`. It never silently
@@ -53,7 +56,8 @@ retirement; OS process exit releases it. These handles must not be held across
 provider work. SQLite owns the durable authority.
 Its first migration records the local authority identity, UID and migration
 digest. Migration two adds the [connection registry](local-connection-registry.md),
-acquisition/custody publication, retirement and bounded read-use guards. Approval
+acquisition/custody publication, retirement and bounded read-use guards. Migration
+three adds cached bootstraps and durable stop suppression. Approval
 spending and business write dispatch remain unfinished.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
@@ -84,12 +88,13 @@ is outside this boundary, as in the CLI contract.
 ## Credential and runtime boundary
 
 `setup check` observes only an already-running Secret Service on
-`/run/user/<uid>/bus`: it verifies the socket's owner and kernel peer UID, then the
+`/run/user/<uid>/bus`, or the private configuration's explicit local
+`secret_service_socket`: it verifies the socket's owner and kernel peer UID, then the
 unique service owner's UID, and inspects the default non-session collection's lock
 state. It never activates a service, opens a secret-transfer session, unlocks a
 collection or reads a secret. A missing service/collection, inaccessible bus or
 wrong owner reports `unavailable`; a locked collection reports `locked`.
-This initial profile does not use a caller-supplied D-Bus address or a remote bus.
+This initial profile does not use an environment-supplied D-Bus address or a remote bus.
 
 An available collection is not qualified persistent custody. The additional
 `persistent_custody_qualification` prerequisite checks the exact qualified daemon
@@ -107,18 +112,27 @@ filesystem synchronization. Its disposable daemon tests exercise crash/restart a
 failure handling. The registry binds publication and guarded retirement, with
 separate native tests covering both and CLI acquisition status/revoke after restart.
 
-Protected connect/repair sources refuse with `cli_source` before reading any file,
-stdin or terminal. No generated demonstration capture is used in production.
+Protected connect/repair sources require current configuration, profile permission,
+target metadata, qualified custody and an admitted owner capture before reading a
+file, deliberate stdin pipe or foreground controlling terminal. The generated
+parser receives only a nonsecret marker; the paired handler consumes the clearing
+buffer and private capture channel once. The owner validates the document through
+the native adapter, then coordinates durable custody and metadata publication.
+Unsafe sources return `protected_entry_unavailable`; interruption restores terminal
+echo and exits 130. No generated demonstration capture is used in production.
 `connections list --adapter ALIAS` returns safe authoritative summaries and bounded
 opaque cursors. `describe --connection REF`, `status --connection REF` or
 `status --acquisition REF` observe the selected owner records. `revoke --connection
 REF --expected-revision REV` commits terminal local revocation, even without a
 keyring or provider. These subcommands also require `--adapter ALIAS`. They never
 launch an adapter. Missing or unrecognized registry state returns
-`metadata_unavailable`; missing references return `not_found`. Cached operation
-inspection returns `description_unavailable`. Local operation invocation has no
-admitted source/schema/dispatch binding yet. These refusals are unfinished
-capabilities, not acceptance evidence for connection handling.
+`metadata_unavailable`; missing references return `not_found`. Operation discovery
+reads the exact cached bootstrap, with `description_unavailable` before the first
+admitted launch. Invocation requires the descriptor revision, schema identity,
+current operation/profile permissions and a ready connection. The host checks the
+original JSON text, pins exact material and commits the final read guard before
+dispatch. Expired evidence refuses; implicit identity probes and credential repair
+are not part of a business read.
 
 The original explicit `describe --endpoint --token-file`, `invoke --endpoint
 --token-file --operation --input`, and `serve --config` retain their implementations.
@@ -133,8 +147,13 @@ child ownership and bounded bootstrap/request handling. GitLab's
 uses it for native validation and the three existing reads against an immutable
 credential/target capability. Disposable TLS/process fixtures cover mismatch
 refusal, cursor partitioning, stale stop, deadline loss and fresh child startup.
-This is the transport/composition building block: it does not yet implement the
-CLI owner, startup coalescing, durable stop suppression or protected Sources hook.
+The [local owner](../contracts/cli/v1alpha1/owner.md) now binds that transport to
+the production CLI. It coalesces startup under a retained lifetime lock, owns
+children on persistent worker threads, and exposes bounded same-UID sockets.
+Stop compares exact incarnation/configuration coordinates, commits suppression and
+signals only the retained pidfd. Its control path remains responsive during a
+provider read. Earlier queued jobs and pending captures cannot undo the stop fence.
+Only a later admitted explicit connect/repair/invoke resumes the entry.
 
 The production-process tests cover fresh setup and metadata reuse across CLI
 processes, exclusive initialization, configured inventory and passive status,
@@ -142,6 +161,16 @@ permission errors and safe source refusal. Host tests cover concurrent
 initialization, stable authority identity, unsafe paths/private files/sidecars,
 future schema refusal and owner/migration tampering. The registry and native
 custody tests have separate scope described in their linked binding documents.
-The CLI tests do not claim provider authentication, complete owner supervision or
-the GitLab restart journey. Actual commands and results belong in the retained evidence
-record for this delivery.
+Additional production CLI fixtures combine a disposable GitLab HTTPS service and
+qualified private keyring. They exercise protected entry, persisted reads, owner
+and keyring restart, concurrent startup, failed repair, permission/schema refusal,
+busy stop and terminal local revoke. PTY tests check hidden input and restored echo
+after SIGINT. These fixtures do not satisfy dedicated provider sandbox acceptance
+or qualify a different custody implementation. Actual commands and results belong
+in the retained evidence record for this delivery.
+
+Remaining management obligations include propagating one failed startup outcome
+to all requests already waiting for that launch, renewing retained validation
+evidence, reducing positive native credential-invalidity results into connection
+readiness, and scheduling bounded expiry/retirement cleanup. The current read
+binding and its fixture evidence do not close those contract cases.

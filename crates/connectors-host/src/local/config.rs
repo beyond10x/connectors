@@ -14,6 +14,8 @@ pub struct Config {
     pub format: String,
     pub owner_uid: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret_service_socket: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_adapter: Option<String>,
     #[serde(default)]
     pub adapters: BTreeMap<String, Adapter>,
@@ -31,6 +33,25 @@ pub struct Adapter {
     #[serde(default)]
     pub restart: Restart,
     pub executable: Executable,
+    #[serde(default)]
+    pub permissions: Permissions,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Permissions {
+    #[serde(default)]
+    pub profiles: BTreeSet<String>,
+    #[serde(default)]
+    pub operations: BTreeSet<String>,
+}
+impl Adapter {
+    pub fn selection(&self) -> String {
+        connectors_core::digest(
+            &serde_json::json!({"instance":self.instance_id,"adapter":self.adapter_id,
+            "revision":self.configuration_revision,"protocol":self.protocol,"executable":self.executable}),
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
@@ -107,6 +128,9 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if let Some(path) = &self.secret_service_socket {
+            fs::validate_path(path)?;
+        }
         if self.format != "connectors-local/1"
             || self.owner_uid != fs::uid()
             || self.adapters.len() > 64
@@ -137,6 +161,14 @@ impl Config {
                 || !selector(&entry.configuration_revision)
                 || !instances.insert(&entry.instance_id)
                 || entry.protocol != "v1alpha1"
+                || entry.permissions.profiles.len() > 64
+                || entry.permissions.operations.len() > 256
+                || entry
+                    .permissions
+                    .profiles
+                    .iter()
+                    .chain(&entry.permissions.operations)
+                    .any(|id| !selector(id))
                 || entry.executable.sha256.len() != 64
                 || !entry
                     .executable
@@ -176,6 +208,7 @@ impl Config {
         let config = Self {
             format: "connectors-local/1".into(),
             owner_uid: fs::uid(),
+            secret_service_socket: None,
             default_adapter: None,
             adapters: BTreeMap::new(),
         };

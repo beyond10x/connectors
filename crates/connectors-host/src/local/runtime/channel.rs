@@ -7,12 +7,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub(super) struct Frame<T> {
+pub(crate) struct Frame<T> {
     pub control: T,
     pub secret: Secret,
     pub document: Vec<u8>,
 }
-pub(super) fn wait_readable(stream: &UnixStream) -> Result<()> {
+pub(crate) fn wait_readable(stream: &UnixStream) -> Result<()> {
     use std::os::fd::AsRawFd;
     let mut descriptor = libc::pollfd {
         fd: stream.as_raw_fd(),
@@ -31,7 +31,7 @@ pub(super) fn wait_readable(stream: &UnixStream) -> Result<()> {
         }
     }
 }
-pub(super) fn peer(stream: &UnixStream) -> Result<libc::ucred> {
+pub(crate) fn peer(stream: &UnixStream) -> Result<libc::ucred> {
     use std::os::fd::AsRawFd;
     let mut credentials = libc::ucred {
         pid: 0,
@@ -70,12 +70,37 @@ fn io(error: std::io::Error) -> Failure {
         _ => Failure::Unavailable,
     }
 }
-fn read_exact(stream: &mut UnixStream, mut bytes: &mut [u8], until: Instant) -> Result<()> {
+fn read_exact(
+    stream: &mut UnixStream,
+    mut bytes: &mut [u8],
+    until: Instant,
+    cancel: Option<&dyn Fn() -> Result<()>>,
+) -> Result<()> {
     while !bytes.is_empty() {
+        if let Some(check) = cancel {
+            check()?;
+        }
+        let remaining = remaining(until)?;
         stream
-            .set_read_timeout(Some(remaining(until)?))
+            .set_read_timeout(Some(if cancel.is_some() {
+                remaining.min(Duration::from_millis(250))
+            } else {
+                remaining
+            }))
             .map_err(io)?;
-        let count = stream.read(bytes).map_err(io)?;
+        let count = match stream.read(bytes) {
+            Ok(count) => count,
+            Err(error)
+                if cancel.is_some()
+                    && matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
+            {
+                continue;
+            }
+            Err(error) => return Err(io(error)),
+        };
         if count == 0 {
             return Err(Failure::Unavailable);
         }
@@ -96,14 +121,23 @@ fn write_all(stream: &mut UnixStream, mut bytes: &[u8], until: Instant) -> Resul
     }
     Ok(())
 }
-pub(super) fn read<T: DeserializeOwned>(
+pub(crate) fn read<T: DeserializeOwned>(
     stream: &mut UnixStream,
     until: Instant,
     secret_allowed: bool,
     document_limit: usize,
 ) -> Result<Frame<T>> {
+    read_with_cancel(stream, until, secret_allowed, document_limit, None)
+}
+pub(crate) fn read_with_cancel<T: DeserializeOwned>(
+    stream: &mut UnixStream,
+    until: Instant,
+    secret_allowed: bool,
+    document_limit: usize,
+    cancel: Option<&dyn Fn() -> Result<()>>,
+) -> Result<Frame<T>> {
     let mut sizes = [0; 12];
-    read_exact(stream, &mut sizes, until)?;
+    read_exact(stream, &mut sizes, until, cancel)?;
     let length = |offset| {
         u32::from_be_bytes(
             sizes[offset..offset + 4]
@@ -124,18 +158,18 @@ pub(super) fn read<T: DeserializeOwned>(
     let mut bytes = vec![0; control_size];
     let mut secret = Secret(vec![0; secret_size]);
     let mut document = vec![0; document_size];
-    read_exact(stream, &mut bytes, until)?;
+    read_exact(stream, &mut bytes, until, cancel)?;
     depth(&bytes)?;
     let control = connectors_core::read_json(&bytes).map_err(|_| Failure::Protocol)?;
-    read_exact(stream, &mut secret.0, until)?;
-    read_exact(stream, &mut document, until)?;
+    read_exact(stream, &mut secret.0, until, cancel)?;
+    read_exact(stream, &mut document, until, cancel)?;
     Ok(Frame {
         control,
         secret,
         document,
     })
 }
-pub(super) fn write(
+pub(crate) fn write(
     stream: &mut UnixStream,
     control: &impl Serialize,
     secret: Option<&Secret>,
@@ -157,7 +191,7 @@ pub(super) fn write(
     write_all(stream, protected, until)?;
     write_all(stream, document, until)
 }
-pub(super) fn depth(bytes: &[u8]) -> Result<()> {
+pub(crate) fn depth(bytes: &[u8]) -> Result<()> {
     let (mut quoted, mut escaped, mut depth) = (false, false, 0usize);
     for &b in bytes {
         if quoted {
@@ -193,6 +227,44 @@ mod tests {
     use super::*;
     fn deadline() -> Instant {
         Instant::now() + Duration::from_secs(2)
+    }
+
+    #[test]
+    fn cancellation_observes_a_stalled_partial_reply_without_resetting_the_deadline() {
+        let (mut reader, mut writer) = UnixStream::pair().unwrap();
+        writer.write_all(&[0, 0]).unwrap();
+        let started = Instant::now();
+        let cancel = || {
+            if started.elapsed() >= Duration::from_millis(100) {
+                Err(Failure::Interrupted)
+            } else {
+                Ok(())
+            }
+        };
+        assert!(matches!(
+            read_with_cancel::<serde_json::Value>(
+                &mut reader,
+                started + Duration::from_secs(5),
+                false,
+                0,
+                Some(&cancel)
+            ),
+            Err(Failure::Interrupted)
+        ));
+        assert!(started.elapsed() < Duration::from_secs(2));
+        let (mut reader, _writer) = UnixStream::pair().unwrap();
+        let started = Instant::now();
+        assert!(matches!(
+            read_with_cancel::<serde_json::Value>(
+                &mut reader,
+                started + Duration::from_millis(100),
+                false,
+                0,
+                Some(&|| Ok(()))
+            ),
+            Err(Failure::Timeout)
+        ));
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
     fn raw(control: &[u8], protected: &[u8], document: &[u8]) -> UnixStream {
         let (reader, mut writer) = UnixStream::pair().unwrap();
