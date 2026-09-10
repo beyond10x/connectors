@@ -1,5 +1,15 @@
 # Connectors CLI: from 0.7.x to v2
 
+## Runtime foundation, 2026-09-10
+
+Production now consumes the generated parser for private setup and passive
+configured adapter inventory. SQLite authority initialization is implemented;
+credential custody, connection management and supervised invocation remain
+unfinished. The [foundation guide](local-runtime-foundation.md) records the
+available commands and refusals. The dated comparison below retains the earlier
+runtime baseline; it does not override this update or migrate an installed
+0.7.x deployment.
+
 ## Current local direction, 2026-09-09
 
 The [local CLI contract](../contracts/cli/v1alpha1/semantics.md) now owns the

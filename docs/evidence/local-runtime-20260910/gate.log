@@ -1,0 +1,590 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.82s
+     Running `.local/tmp/local-runtime-20260910/target/debug/connectors-build gate --msrv`
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 19 file(s), valid
+connectors v1 — 19 file(s), 376 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/ess-boundary-0.json
+connectors_atlassian v1 — 2 file(s), valid
+connectors_atlassian v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/ess-boundary-1.json
+connectors_docker v1 — 2 file(s), valid
+connectors_docker v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/ess-boundary-2.json
+connectors_grafana v1 — 2 file(s), valid
+connectors_grafana v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/ess-boundary-3.json
+connectors_kubernetes v1 — 4 file(s), valid
+connectors_kubernetes v1 — 4 file(s), 11 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/ess-boundary-4.json
+connectors_loki v1 — 2 file(s), valid
+connectors_loki v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/ess-boundary-5.json
+gate: shared and 5 adapter ESS models validated and compiled independently; exit=0
+10 CLI artifact(s), current in apps/connectors-cli-contract
+CLI values: 64 structural, 2 cached expectations, 5 acquisition and 3 page consistency cases passed; runtime lifecycle/custody traces remain obligations
+CLI contract fixture matches; custody and lifecycle runtime conformance remain obligations
+gate: ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: exit=exit status: 0 ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: gitlab descriptor matches; exit=0
+gate: kubernetes descriptor matches; exit=0
+gate: sql descriptor matches; exit=0
+gate: ["build", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.85s
+gate: exit=exit status: 0 ["build", "--workspace", "--locked", "--offline"]
+gate: ["test", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling rcgen v0.14.10
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `test` profile [unoptimized] target(s) in 11.92s
+     Running unittests src/main.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors-b614da07584e18ee)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compatibility.rs (.local/tmp/local-runtime-20260910/target/debug/deps/compatibility-bc7f8a7c26d867c5)
+
+running 2 tests
+test compatibility_inventory_matches_existing_help ... ok
+test legacy_describe_is_complete_and_invoke_prints_raw_result_once ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/input.rs (.local/tmp/local-runtime-20260910/target/debug/deps/input-3bd7c72d40db4a4f)
+
+running 1 test
+test duplicate_input_keys_are_refused_before_service_contact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/local_cli.rs (.local/tmp/local-runtime-20260910/target/debug/deps/local_cli-88e754787b0402d5)
+
+running 3 tests
+test protected_sources_are_not_consumed_without_a_coordinator ... ok
+test production_parser_initializes_and_inspects_across_processes ... ok
+test inventory_and_unavailable_status_never_launch_configured_executable ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/main.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_build-aab592fc16beb2a9)
+
+running 19 tests
+test cli::tests::public_acquisition_examples_cannot_expose_internal_states_or_wrong_terminal_fields ... ok
+test cli::tests::cache_labels_and_page_deadlines_cannot_assert_unobserved_freshness ... ok
+test docs::tests::refuses_unknown_projection_nodes ... ok
+test docs::tests::rejects_duplicate_and_escaping_routes ... ok
+test docs::tests::cannot_publish_a_source_outside_its_owner ... ok
+test docs::tests::public_audit_checks_embedded_binary_paths ... ok
+test docs::tests::resolves_only_selected_local_links ... ok
+test ess_boundary::tests::matches_case_and_separator_variants_without_substring_false_positives ... ok
+test docs::tests::reference_title_keeps_anchor_and_text_without_a_second_h1 ... ok
+test docs::tests::preserves_rules_and_stable_heading_anchors ... ok
+test docs::tests::imported_markdown_cannot_execute_html_or_script_links ... ok
+test ess_boundary::tests::allows_shared_protocols_and_separate_provider_models ... ok
+test ess_boundary::tests::discovers_design_only_and_spec_only_owners_without_runtime_declarations ... ok
+test ess_boundary::tests::rejects_malformed_optional_alias_inputs_and_model_sources ... ok
+test ess_boundary::tests::refuses_linked_source_files_and_directories ... ok
+test ess_boundary::tests::protocol_adapter_does_not_ban_shared_protocol_or_suppress_native_leaks ... ok
+test ess_boundary::tests::checks_all_paths_and_requires_complete_local_domain_inventory ... ok
+test ess_boundary::tests::rejects_names_comments_fields_encoded_values_and_new_adapter_ids ... ok
+test docs::tests::walkthrough_fixtures_follow_the_real_descriptor ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_client-d67bb60af80240b7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_conformance-5893103e690b85e4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_surface.rs (.local/tmp/local-runtime-20260910/target/debug/deps/cli_surface-2b7dae237b44dd11)
+
+running 7 tests
+test inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result ... ok
+test the_selected_inventory_has_fifteen_grouped_commands_and_explicit_runtime_obligations ... ok
+test typed_application_usage_operational_and_interrupt_outcomes_use_distinct_exits ... ok
+test protected_source_conflicts_and_parser_errors_never_capture_or_echo_values ... ok
+test every_local_action_dispatches_once_with_its_declared_result_type ... ok
+test dynamic_business_sources_are_acquired_once_and_validate_both_directions ... ok
+test native_schema_refusals_prevent_handler_dispatch_and_bad_results_never_reach_stdout ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_contracts-347d961704d1da0d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_core-7987d709d1addba2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire.rs (.local/tmp/local-runtime-20260910/target/debug/deps/wire-e9e77a8b72d9244a)
+
+running 4 tests
+test canonicalization_is_recursive_and_order_independent ... ok
+test contradictory_response_payloads_are_refused ... ok
+test duplicate_keys_are_refused_at_every_depth ... ok
+test response_roundtrips_success_and_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_gitlab-a08bdc30fd9a6098)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_gitlab-c5904dd07c921726)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/obligations.rs (.local/tmp/local-runtime-20260910/target/debug/deps/obligations-fc372a2fbe5dfac4)
+
+running 4 tests
+test generated_file_mapping_passes_unencoded_segments_to_the_scoped_transport ... ok
+test generated_dispatch_rejects_invalid_inputs_before_transport ... ok
+test empty_pages_with_continuation_and_full_pages_without_headers_are_partial ... ok
+test response_failures_and_nonadvancing_pagination_remain_explicit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/provider.rs (.local/tmp/local-runtime-20260910/target/debug/deps/provider-5185c3510b1a72d7)
+
+running 1 test
+test project_issue_pagination_and_file_reads_use_scoped_auth_over_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_host-84da6b141a14cbe2)
+
+running 3 tests
+test server::tests::service_deadline_cancels_the_adapter_and_releases_capacity ... ok
+test server::tests::thirty_two_inflight_calls_refuse_the_next_until_one_is_dropped ... ok
+test server::tests::oversized_adapter_result_is_refused_after_schema_validation ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/http.rs (.local/tmp/local-runtime-20260910/target/debug/deps/http-41754850935ad318)
+
+running 3 tests
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+test custom_ca_accepts_its_endpoint_and_refuses_other_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/local_foundation.rs (.local/tmp/local-runtime-20260910/target/debug/deps/local_foundation-e8159f577434bb17)
+
+running 6 tests
+test sidecar_symlink_is_refused_without_touching_its_target ... ok
+test symlinks_hardlinks_and_broad_permissions_are_refused ... ok
+test exclusive_setup_persists_private_metadata_and_refuses_overwrite ... ok
+test unavailable_or_unrecognized_metadata_is_never_reinitialized ... ok
+test owner_and_migration_tampering_refuse_inspection ... ok
+test concurrent_initialization_has_one_authority_and_one_configuration ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s
+
+     Running tests/service.rs (.local/tmp/local-runtime-20260910/target/debug/deps/service-de571385e00a26a2)
+
+running 7 tests
+test credential_stores_are_substitutable_and_file_permissions_are_enforced ... ok
+test invalid_identifiers_cannot_inject_log_lines_or_terminal_controls ... ok
+test configuration_yaml_and_json_remain_strict ... ok
+test environment_credentials_apply_the_same_value_bounds_as_files ... ok
+test wire_admission_and_freshness_refuse_before_dispatch ... ok
+test federation_refreshes_atomically_without_replaying_and_rotates_credentials ... ok
+test federation_preserves_result_and_reports_downstream_failure ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_kubernetes-16c1743f499015af)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_kubernetes-679b79820317b3e3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/provider.rs (.local/tmp/local-runtime-20260910/target/debug/deps/provider-1548ca936d3e24e4)
+
+running 3 tests
+test disabled_host_discovery_is_not_advertised_or_dispatched ... ok
+test endpoint_cross_product_is_bounded_even_for_one_source_slice ... ok
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_sdk-04bd13e316ed7296)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cursor.rs (.local/tmp/local-runtime-20260910/target/debug/deps/cursor-d42d2f99a18a8ded)
+
+running 1 test
+test cursors_cannot_be_rebound_forged_or_reused_after_restart ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_spec-b53bf20c81218d73)
+
+running 10 tests
+test toolchain::tests::committed_manifest_uses_the_repository_pin ... ok
+test toolchain::tests::altered_binary_is_refused_before_it_can_execute ... ok
+test toolchain::tests::default_search_is_independent_of_path_version_order ... ok
+test toolchain::tests::exact_source_pin_rejects_wrong_source_with_the_same_version ... ok
+test toolchain::tests::exact_source_pin_refuses_same_version_without_receipt ... ok
+test toolchain::tests::explicit_overrides_win_and_wrong_paths_do_not_fall_back ... ok
+test toolchain::tests::legacy_release_records_remain_explicit_and_source_records_are_strict ... ok
+test toolchain::tests::invalid_receipts_are_closed_and_cannot_admit_a_tool ... ok
+test toolchain::tests::missing_pin_reports_record_and_search_locations_and_cache_is_supported ... ok
+test toolchain::tests::source_admission_requires_the_exact_clean_root_and_keeps_ignored_scratch_separate ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/main.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_spec-4ce7c5b2680cb13d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compiler.rs (.local/tmp/local-runtime-20260910/target/debug/deps/compiler-5a38a62c69fc6142)
+
+running 4 tests
+test configuration_examples_are_data_not_imports ... ok
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+test shared_configuration_imports_keep_constraints_and_reject_unknown_versions ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/generation.rs (.local/tmp/local-runtime-20260910/target/debug/deps/generation-0c368a6bccb91bd1)
+
+running 6 tests
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test public_import_refuses_specs_changed_after_validation ... ok
+test checked_in_bundle_matches_its_pinned_sources_and_toolchain ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 59.03s
+
+     Running tests/toolchain_adversary.rs (.local/tmp/local-runtime-20260910/target/debug/deps/toolchain_adversary-bf0ce19da17c5cc4)
+
+running 4 tests
+test source_pin_parser_preserves_legacy_and_rejects_incomplete_source_records ... ok
+test explicit_wrong_source_refuses_even_when_it_reports_the_pinned_release ... ok
+test malformed_or_wrong_identity_receipt_never_executes_matching_bytes ... ok
+test symlink_alias_cannot_supply_a_receipt_for_an_unproven_target ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_sql-eecfb339209dad69)
+
+running 1 test
+test tls_tests::configured_ca_replaces_public_roots_and_requires_certificates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/local-runtime-20260910/target/debug/deps/connectors_sql-ac2e65f7c2eeb1e8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (.local/tmp/local-runtime-20260910/target/debug/deps/protocol-bac6be354242d000)
+
+running 7 tests
+test parsing_and_limits_refuse_before_credentials_or_connection ... ok
+test dropping_the_invocation_still_cancels_the_database ... ok
+test text_null_and_empty_parameters_reach_bind_without_interpolation ... ok
+test rows_nulls_native_types_and_truncation_are_preserved ... ok
+test authentication_database_errors_and_row_capacity_are_sanitized ... ok
+test unresponsive_database_cannot_extend_the_cleanup_budget ... ok
+test deadline_sends_the_backend_cancel_key_and_drains_the_connection ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.43s
+
+     Running unittests src/lib.rs (.local/tmp/local-runtime-20260910/target/debug/deps/gitlab_types-96fbf12e70c3ad9b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_gitlab
+
+running 1 test
+test adapters/gitlab/src/lib.rs - (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests connectors_host
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gitlab_types
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+gate: exit=exit status: 0 ["test", "--workspace", "--locked", "--offline"]
+gate: ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+    Checking ring v0.17.14
+    Checking foldhash v0.2.0
+    Checking hashbrown v0.17.1
+    Checking rustls-webpki v0.103.15
+    Checking rustls v0.23.44
+    Checking tokio-rustls v0.26.5
+    Checking hyper-rustls v0.27.9
+    Checking indexmap v2.14.2
+    Checking reqwest v0.12.28
+    Checking libsqlite3-sys v0.38.2
+    Checking hashlink v0.12.2
+    Checking toml_edit v0.22.27
+    Checking rusqlite v0.40.2
+    Checking serde_yaml_ng v0.10.0
+    Checking toml v0.8.23
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking rcgen v0.14.10
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking tokio-postgres-rustls v0.14.0
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.76s
+gate: exit=exit status: 0 ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+gate: ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+gate: connectors-gitlab library boundary holds; exit=0
+gate: ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+gate: connectors-kubernetes library boundary holds; exit=0
+gate: ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+   Compiling rustls v0.23.44
+   Compiling tokio-rustls v0.26.5
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.89s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+gate: connectors-sql library boundary holds; exit=0
+gate: generic CLI boundary holds; exit=0
+gate: ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+    Checking foldhash v0.2.0
+   Compiling libsqlite3-sys v0.38.2
+    Checking hashbrown v0.17.1
+    Checking indexmap v2.14.2
+    Checking hashlink v0.12.2
+    Checking rusqlite v0.40.2
+    Checking toml_edit v0.22.27
+    Checking serde_yaml_ng v0.10.0
+    Checking toml v0.8.23
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Checking connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Checking connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+    Checking connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Checking connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+    Checking connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Checking connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Checking connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.15s
+gate: exit=exit status: 0 ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+gate: collected 15 authored scenarios from contracts/operations/v1alpha1/scenarios; exit=0
+gate: collected 13 authored scenarios from contracts/auth/acquisition/v1alpha1/scenarios; exit=0
+gate: collected 6 authored scenarios from contracts/auth/evidence/v1alpha1/scenarios; exit=0
+gate: ["verify", "conform", "synthesize", "--path", "ess", "--target", "ir", "--scenarios", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/authored-scenarios", "--out", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/contract-conformance.json"]
+315 scenario(s) (34 authored), 0 refusal(s), written to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/contract-conformance.json
+gate: exit=exit status: 0 ["verify", "conform", "synthesize", "--path", "ess", "--target", "ir", "--scenarios", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/authored-scenarios", "--out", "/home/timo/beyond10x/connectors_v2/.local/tmp/gate-mMUv4S/contract-conformance.json"]
+gate: ["plan", "artifact", "validate"]
+154 file(s) in /home/timo/beyond10x/connectors_v2/.engineering/planning: 154 artifact(s)
+1 without a scope:
+  - story:persistent-gitlab-journey is active and declares no scope, so nothing can tell whether it may be worked beside another story — `aep artifact scope story:persistent-gitlab-journey --add <path>` records one
+82 review(s) recorded no findings block:
+  - review-result:adapter-ownership-gate-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:adapter-ownership-gate-initial-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-a-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-a-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-a-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-b-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-b-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-access-b-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-evidence-adversary-p1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:auth-refresh-adversary-p1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-acceptance-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-acceptance-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-design-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-design-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-parallel-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-parallel-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-plan-scope-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-semantic-adversary-r2-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:cli-toolchain-adversary-r1-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:concept-stack-integration-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-ownership-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-ownership-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-ownership-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-semantics-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-semantics-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:connection-semantics-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-docs-external-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-acceptance-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-design-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-parallel-safety-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-parallel-safety-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-scope-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-plan-scope-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:contract-semantics-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:core-model-a-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:core-model-b-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-a-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-a-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-a-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-b-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-b-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:discovery-b-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:ess-boundary-gate-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:ess-boundary-semantics-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-binding-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-binding-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-binding-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-final-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:federation-subjects-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-model-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-model-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:idempotency-semantics-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:independent-repository-a-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:independent-repository-b-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-a-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-a-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-b-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-classification-b-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-outcomes-model-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-outcomes-semantics-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-profiles-a-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:mutation-profiles-b-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-a-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-a-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-b-initial-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:profile-persistence-b-recheck1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:restart-visibility-a-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:restart-visibility-b-recheck2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-model-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-model-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-semantics-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:sessions-semantics-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:spec-completion-a-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:spec-completion-b-final-20260909 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-binding-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-binding-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-binding-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-family-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-family-r2-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+  - review-result:wire-family-r3-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+valid
+gate: exit=exit status: 0 ["plan", "artifact", "validate"]
+gate: all checks passed
