@@ -622,11 +622,15 @@ dependencies = [
  "connectors-host",
  "connectors-sdk",
  "gitlab-types",
+ "hex",
+ "rcgen",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "time",
  "tokio",
+ "tokio-rustls",
  "zeroize",
 ]
 

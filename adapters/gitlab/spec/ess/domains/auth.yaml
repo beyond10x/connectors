@@ -5,6 +5,26 @@ summary: GitLab-owned personal access token entry and baseline verification valu
 # Shared connection, acquisition, custody and generation entities remain in the
 # independently compiled shared root. These native values own no such lifecycle.
 types:
+  - name: connectors_gitlab.auth.LocalConfiguration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: instance, type: String}
+      - {name: api_base, type: String}
+      - {name: ca_file, type: "Optional<String>"}
+      - {name: allowed_projects, type: "List<String>"}
+    # Nonsecret owner-only configuration; HTTPS API v4 authority, fixed PAT header.
+    # Canonical selected configuration computes its revision; no credential locator.
+  - name: connectors_gitlab.auth.EffectiveLocalConfiguration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: instance, type: String}
+      - {name: api_base, type: String}
+      - {name: ca_digest, type: "Optional<String>"}
+      - {name: allowed_projects, type: "List<String>"}
+    # Canonical API base, sorted allowlist, digest of the captured CA bytes.
+    # This descriptor configuration contains neither source paths nor secrets.
   - name: connectors_gitlab.auth.ProtectedEntry
     kind: struct
     fields:
