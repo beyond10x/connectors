@@ -8,6 +8,63 @@ use std::{
 const NOW: u64 = 1_788_998_400_000;
 
 #[test]
+fn production_clock_samples_after_locking_and_still_rejects_regression() {
+    let (root, _) = fixture();
+    let registry = Registry::with_system_clock(root.path());
+    // A call timestamp older than a committed observation is harmless when the
+    // physical clock is sampled inside this production transaction.
+    registry
+        .list(
+            "fixture-instance",
+            "fixture-adapter",
+            "fixture-config",
+            PageOptions {
+                limit: 10,
+                cursor: None,
+            },
+            0,
+            false,
+        )
+        .unwrap();
+    registry
+        .list(
+            "fixture-instance",
+            "fixture-adapter",
+            "fixture-config",
+            PageOptions {
+                limit: 10,
+                cursor: None,
+            },
+            0,
+            false,
+        )
+        .unwrap();
+    let metadata = Metadata::update(root.path(), false).unwrap();
+    metadata
+        .connection
+        .execute(
+            "UPDATE registry_clock SET last_seen_ms=?1",
+            [timestamp(connectors_sdk::now_ms() + 60_000).unwrap()],
+        )
+        .unwrap();
+    drop(metadata);
+    assert!(matches!(
+        registry.list(
+            "fixture-instance",
+            "fixture-adapter",
+            "fixture-config",
+            PageOptions {
+                limit: 10,
+                cursor: None
+            },
+            0,
+            false
+        ),
+        Err(Failure::MetadataUnavailable)
+    ));
+}
+
+#[test]
 fn lost_publication_acknowledgement_is_resolved_without_repeating_capture() {
     let (root, registry) = fixture();
     let (claim, candidate) = prepared(&registry, "one", NOW);
@@ -520,7 +577,7 @@ fn receipt_identity_and_known_missing_material_cannot_be_substituted() {
     let (root, registry) = fixture();
     let (_, first) = prepared(&registry, "one", NOW);
     let wrong = registry
-        .transaction(NOW, false, |_, authority| {
+        .transaction(NOW, false, |_, authority, _| {
             custody_version(authority, &new_id(), &new_id())
         })
         .unwrap();

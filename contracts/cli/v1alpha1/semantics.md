@@ -207,6 +207,22 @@ binding requires an explicit connection for a credentialed operation.
 
 ## 4. Lifecycle and bounded startup
 
+The executable owner binding is specified in [local owner transport](owner.md).
+Each configured adapter has an optional `permissions` table with `profiles` and
+`operations` lists of exact reviewed identifiers (at most 64 and 256 respectively).
+Omission means an empty allowlist, never all discovered capabilities. These select
+local-owner permission; profile/grant evidence, operation effects and native target
+allowlists remain additional checks. The first binding admits reads only.
+
+Optional top-level `secret_service_socket` selects an absolute, owner-controlled
+local Unix socket instead of `/run/user/<uid>/bus`. It is an explicit infrastructure
+binding, not a credential locator or business input. Parent directories, socket
+ownership and kernel peer UID must be admitted; TCP and environment bus addresses
+are never alternatives. The exact native service, encrypted storage and durable
+acknowledgement qualification remain mandatory on either transport. This permits
+dedicated local sessions and disposable acceptance infrastructure without weakening
+credential custody or selecting another collection after a failure.
+
 `automatic` means start when this local host starts. Pure list, configuration
 inspection and status never start that host or its adapters. After local policy
 and selected action admission, connect/repair/invoke may start the host; its
