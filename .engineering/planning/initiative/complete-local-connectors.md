@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 7
+revision: 9
 ---
 ## Outcome and authority
 
@@ -75,3 +75,19 @@ The full required gate, five production CLI journeys, website/reference checks a
 Next is native MR validation and guarded create/update/merge with shared approval, audit, durable attempts, dispatch and idempotency. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers. Missing write semantics must be modeled and reviewed before their implementation decomposition. Other GitLab collection, cross-provider acceptance, complete three-adapter management and reproducible distribution remain parent-owned ordered work.
 
 Worktree inspection finds no Connectors linked trees; the local main integration checkpoint retains verified artifacts and active-goal caches. MCP's primary checkout was separately observed clean at bf7f9415fbd8a28abff789d7d39d2584a8f6d2b2; the earlier workflow edit is no longer a local diff, and this increment made no MCP change or publication claim. Re-read that updated baseline when the MCP phase begins. The distinct AEP driver protocol-loading blocker remains unchanged, with paid governed runs outside this implementation requirement.
+
+## Mutation ledger increment — 2026-09-10
+
+story:local-mutation-ledger is the fourth partial runtime child. It owns the existing mutation metadata group's SQLite attempts, exact keyed reservations, conservative retention, fault tests and migration continuity; it does not advertise a business write or duplicate the earlier GitLab read journeys. Model ownership is ess/domains/mutations.yaml and idempotency.yaml, including the newly explicit trusted settlement-clock interval value. The local production clock source still requires qualification; no ordinary wall-clock sample is accepted as proof of safe key expiry.
+
+The next GitLab increments retained here are native MR validation/write semantics, local approval issuance and verification/spend, audit, clock qualification, authored CLI/wire inputs and the fully admitted connection-bound dispatch coordinator. Pinned native REST and GraphQL create/update have no source-SHA precondition, unlike merge; the full C14 guarantee must be resolved before those operations are advertised. The native semantics and dedicated sandbox gaps remain open and are not replaced by ledger tests. Full GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider ordering is unchanged.
+
+Implementation, planning writes, overlapping source edits and build outputs remain serialized on primary main. The four-child partial decomposition is reviewed by the four planning critics; existing completed specifications remain preserved. This is an interactive implementation, with no approval bypass or paid governed run.
+
+## Completed private ledger checkpoint — 2026-09-10
+
+story:local-mutation-ledger is implemented at its deliberately private storage-port boundary. The final Rust 1.88 gate, 14 ledger tests including four abrupt process exits, website checks and all five optimized CLI journeys pass. docs/evidence/local-mutation-ledger-20260910/README.md retains source and artifact identities plus the failed intermediate runs. Ordinary setup/read management keeps schema 3; admitted mutation preparation alone installs schema 4. Public CLI writes remain unadvertised.
+
+The initial unoptimized CLI rerun exposed owner-startup timeouts also reproduced by the unchanged prior verified binary. The optimized CLI passes all five journeys in 86.42 seconds under unchanged deadlines, and the guide now selects the optimized build. This evidence does not replace dedicated GitLab sandbox acceptance or assert an instrumented cause for the earlier timeout.
+
+Next implement the shared audit admission/finalization port, then local approval issuance/verification/spending and qualified clock/dispatch composition for GitLab writes. Model and review any missing binding semantics before those decompositions. Native MR validation and governed writes still belong to this GitLab phase; decision-blocker:gitlab-mr-create-update-head-guard holds the unresolved C14 create/update guard interpretation, while credential-blocker:gitlab-runtime-sandbox holds dedicated access. Neither stops independent shared implementation. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers, with all original acceptance and reproducible-distribution requirements retained.

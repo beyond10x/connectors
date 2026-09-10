@@ -37,11 +37,11 @@ scope:
   path: docs
 - confidence: cited
   path: ess/domains
-revision: 16
+revision: 18
 ---
 ## Acceptance
 
-From a fresh private configuration on Linux x86_64, an owner can enter an existing GitLab sandbox credential through a protected source, save a validated connection, invoke an existing allowed GitLab read, restart both CLI and local owner and repeat the read using the retained exact credential version without re-entry, with deterministic failure evidence and the required repository gate passing on Rust 1.88.
+From a fresh private configuration on Linux x86_64, an owner can enter an existing GitLab sandbox credential through a protected source, save a validated connection, invoke an existing allowed GitLab read, restart both CLI and local owner and repeat the read using the retained exact credential version without re-entry.
 
 ## Existing semantic owners
 
@@ -160,3 +160,7 @@ Connectors stays local on main under the single-agent rule. Worktree inspection 
 ## 2026-09-10 phase-order correction after authoritative re-read
 
 The preceding checkpoint's next-provider sentence was too early. initiative:complete-local-connectors delivery sequence item 2 explicitly requires the complete GitLab CI/MR workflows, including C09/C14 and their shared write controls, before Kubernetes. Follow that authoritative order; the persistence/revalidation fixture does not complete the GitLab phase. story:gitlab-ci-runtime now owns the next C09 runtime delivery, informed by this committed foundation. The new native CI values and generic bounded-prefix observation/mapping were modeled and passed pinned ESS validation before its decomposition. GitLab MR reads/writes remain required next work under the initiative, to be modeled/reviewed before decomposition. This correction preserves all existing runtime evidence and sandbox blockers and makes no lifecycle completion claim.
+
+## Verification prerequisites
+
+The journey requires the recorded deterministic failure evidence and the required repository gate passing on Rust 1.88 in addition to dedicated GitLab sandbox acceptance; moving these checks out of the acceptance sentence changes neither their required status nor the existing evidence or credential blocker.

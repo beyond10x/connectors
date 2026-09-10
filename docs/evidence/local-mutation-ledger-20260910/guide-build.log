@@ -1,0 +1,9 @@
+   Compiling time-core v0.1.9
+   Compiling num-conv v0.2.2
+   Compiling time-macros v0.2.32
+   Compiling powerfmt v0.2.0
+   Compiling deranged v0.5.8
+   Compiling gitlab-types v1.0.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab/generated/rust/crates/gitlab-types)
+   Compiling time v0.3.55
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+    Finished `release` profile [optimized] target(s) in 5.20s
