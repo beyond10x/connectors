@@ -43,6 +43,15 @@ Resolution never installs a tool or changes PATH. See the
 Kubernetes and SQL retain v1 descriptor
 generation: omit `--generate` and select their `generated/descriptor.json` output.
 
+The [v3 write generator](../spec-kinds/adapter/v3/semantics.md) is implemented for
+the guarded GitLab merge slice, with a separate private descriptor and consuming
+write capability. Production adapters still select their existing formats.
+`cargo test --locked --offline -p connectors-spec --test write_generation` checks
+closed-reader refusals, pinned imports, deterministic generation and an executable
+consumer fixture. That fixture uses a separate temporary Cargo target, two jobs
+and the repository's dependency pins. It does not grant a provider write or prove
+the pending approval/private-protocol CLI integration.
+
 Each adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:
 

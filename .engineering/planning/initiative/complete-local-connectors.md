@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 21
+revision: 22
 ---
 ## Outcome and authority
 
@@ -174,3 +174,13 @@ The owner remains root, with serialized implementation on main. Full GitLab stil
 The operator now requests a source release on top of the completed GitLab implementation commit a5b399d4f790e993aa3ab76f6a61ac1ee25b6c7a, after defining release as changelog and website documentation updates, verification, commit, tag and push. release-plan:gitlab-v020 owns that bounded release. This newer instruction supersedes earlier Connectors local-only publication exclusions for the requested source release and subsequent operator-directed verified provider-batch handoffs. Binary/registry publication, website/cloud deployment and Atlas registration remain excluded.
 
 Release v0.2.0 does not assert completion of GitLab sandbox acceptance, approval issuance, native writes, clock qualification, Kubernetes/PostgreSQL local lifecycle, MCP or remaining providers. Their existing owners and blockers stay open. The release is prepared from the exact completed commit in an isolated managed worktree, excluding ongoing clock research. The publication destination must be established from operator-provided configuration; the existing local recovery remote alone does not establish public distribution.
+
+## Verified write-generation checkpoint — 2026-09-11
+
+The v3 frontend and separate SDK write capability are implemented under story:guarded-gitlab-merge. The generator retains the v2 read projection, emits an independently revised private descriptor and ESS-generated typed write values, and consumes an immutable prepared request and authenticated write capability once. Native effect knowledge survives safe-result validation failure. Strict codecs, pinned source constraints, exact request mapping, output ownership, deterministic regeneration, lost replies and GET/write separation are exercised by an independently compiled consumer fixture. Production adapters still select v1/v2; no callable merge command is claimed.
+
+docs/evidence/write-generation-20260911/README.md retains the passing repository gate with Rust 1.88, the complete five-test write suite on Rust 1.88, three consumer runtime and three compile-fail cases, website/reference checks, exact source manifests and failed/corrected runs. A test checks the selected GitLab merge mapping against its existing pinned vendor source without provider I/O. After the full gate, the v1 rejection test gained an explicit valid-v1 baseline; the complete minimum-version suite and affected Clippy/format checks pass on that final test. Implementation bytes are unchanged across those checks.
+
+A separate release integration advanced main to f475e0b5610b1d7334094e5ab507cfa1aa030e45 during a gate's final planning read. Its transient journal/file mismatch is retained; the integrated store subsequently validated and the entire gate passed again with the integrated Cargo version inputs. Its release records and instructions are preserved. This generator increment adds no release, provider access or publication claim. Only the primary checkout remains; this increment created no linked tree.
+
+Next implement private version-two prepare/commit/cancel and production CLI policy/preparation/issuance, then join the existing approval/audit/attempt ledgers to one SHA-guarded GitLab merge. The story and initiative stay active: lost-response CLI/restart acceptance, dedicated sandbox evidence, full distribution reproducibility, complete GitLab workflows and the open create/update atomic-head decision remain required. Full GitLab continues before Kubernetes with Helm, PostgreSQL, MCP and remaining providers. Root remains the sole writer for this implementation and planning increment; paid governed runs are not required and the recorded driver blocker is unchanged.
