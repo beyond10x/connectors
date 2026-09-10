@@ -50,7 +50,7 @@ restart = "never"
 
 [adapters.forge.permissions]
 profiles = ["gitlab.pat"]
-operations = ["project.get", "issues.list", "file.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace"]
+operations = ["project.get", "issues.list", "file.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.get", "merge_requests.list"]
 
 [adapters.forge.executable]
 path = "/absolute/path/connectors-gitlab"
@@ -140,6 +140,29 @@ bytes or a cut UTF-8 suffix keep `complete: false`. Completeness describes this
 response, not whether a running job's trace will grow. Missing/erased traces and
 permission failures are errors. Trace bytes stay JSON data, including escaped
 terminal control characters.
+
+## Inspect merge requests and an update window
+
+Use the same saved connection and current operation description:
+
+| Operation | Example input |
+|---|---|
+| `merge_request.get` | `{"project":"group/project","iid":42}` |
+| `merge_requests.list` | `{"project":"group/project","state":"all","updated_after":"2026-09-01T00:00:00Z","updated_before":"2026-09-10T00:00:00Z","limit":20}` |
+
+The get selector is the project-local IID. List selects an inclusive UTC update
+window, sorts by update time ascending and accepts `all`, `opened`, `closed`,
+`locked` or `merged`. Follow `next_cursor` with unchanged selectors and connection
+until it is null and `complete` is true. This proves traversal exhaustion, not a
+snapshot or lossless change feed. The consumer owns overlap, deduplication and
+checkpoint policy; a failed or partial traversal must not advance a complete
+collection checkpoint.
+
+Results retain bounded native fields, including nullable source project and SHAs.
+Unknown merge status stays visible. An observed head or merge status does not
+validate a future merge, supply an approval or prove the outcome of a lost write.
+Read the [MR contract](../adapters/gitlab/contracts/merge-requests/v1alpha1/semantics.md)
+for exact projection and refusal rules. Governed MR writes remain unimplemented.
 
 ## Current limits
 

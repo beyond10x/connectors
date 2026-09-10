@@ -27,6 +27,8 @@ use tokio_rustls::{
 mod ci_provider;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
+#[path = "local_runtime/mr_provider.rs"]
+mod mr_provider;
 
 struct Provider {
     stop: Option<oneshot::Sender<()>>,
@@ -108,7 +110,7 @@ impl Provider {
                         else {(200,json!({"id":7,"name":"fixture-project"}),"")};
                     let body=serde_json::to_vec(&body).unwrap();
                     let (status,body,extra)=if valid && forced==0 {
-                        ci_provider::reply(route,&path,&observed.lock().unwrap()).unwrap_or((status,body,extra))
+                        mr_provider::reply(route,&path).or_else(||ci_provider::reply(route,&path,&observed.lock().unwrap())).unwrap_or((status,body,extra))
                     } else { (status,body,extra) };
                     let header=format!("HTTP/1.1 {status} fixture\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n",body.len());
                     let _=stream.write_all(header.as_bytes()).await;
