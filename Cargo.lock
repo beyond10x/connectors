@@ -625,7 +625,9 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "time",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -657,6 +659,7 @@ dependencies = [
  "url",
  "uuid",
  "zbus",
+ "zeroize",
 ]
 
 [[package]]
@@ -691,6 +694,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]

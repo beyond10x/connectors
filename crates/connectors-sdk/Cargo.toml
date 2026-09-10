@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+zeroize.workspace = true
 connectors-core.workspace = true
 connectors-contracts.workspace = true
 async-trait.workspace = true

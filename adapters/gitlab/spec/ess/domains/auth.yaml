@@ -1,0 +1,45 @@
+domain: connectors_gitlab.auth
+summary: GitLab-owned personal access token entry and baseline verification values.
+
+# Owner: adapters/gitlab/contracts/auth/v1alpha1/semantics.md.
+# Shared connection, acquisition, custody and generation entities remain in the
+# independently compiled shared root. These native values own no such lifecycle.
+types:
+  - name: connectors_gitlab.auth.ProtectedEntry
+    kind: struct
+    fields:
+      - {name: token, type: String}
+    # Ephemeral protected input; never a public request, log or metadata column.
+  - name: connectors_gitlab.auth.UserObservation
+    kind: struct
+    fields:
+      - {name: id, type: Integer}
+      - {name: state, type: String}
+  - name: connectors_gitlab.auth.TokenObservation
+    kind: struct
+    fields:
+      - {name: id, type: Integer}
+      - {name: user_id, type: Integer}
+      - {name: active, type: Boolean}
+      - {name: revoked, type: Boolean}
+      - {name: scopes, type: "List<String>"}
+      - {name: expires_at, type: "Optional<String>"}
+    # expires_at must be present; null explicitly means no provider expiry.
+    # A date means YYYY-MM-DD at 00:00 UTC, not the end of that day.
+  - name: connectors_gitlab.auth.BaselineValidation
+    kind: struct
+    fields:
+      - {name: user_id, type: Integer}
+      - {name: granted_scopes, type: "List<String>"}
+      - {name: collected_at, type: Timestamp}
+      - {name: expires_at, type: "Optional<Timestamp>"}
+      - {name: valid_until, type: Timestamp}
+    # Provider-native input to the host's generation-bound EvidenceSnapshot.
+    # No public constructor or serialization establishes publication authority.
+  - name: connectors_gitlab.auth.ValidationFailure
+    kind: enum
+    variants: [invalid_entry, invalid_credential, insufficient_scope, identity_mismatch, invalid_response, unavailable, permission_denied, expired, deadline]
+
+# Runtime predicates: strict bounded codecs; positive equal user IDs; exact
+# static-entry profile; fixed scoped capability; active/non-revoked token;
+# supported native scopes; UTC expiry; bounded fresh validation; no exchange.

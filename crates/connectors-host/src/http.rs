@@ -128,13 +128,13 @@ impl AuthenticatedHttp for ScopedHttp {
         let mut request = self.client.get(url);
         if let Some(credential) = &self.credential {
             let secret = credential.resolve().await?;
-            let value = if self.bearer {
+            let value = zeroize::Zeroizing::new(if self.bearer {
                 let mut value = b"Bearer ".to_vec();
-                value.extend(secret.0);
+                value.extend_from_slice(&secret.0);
                 value
             } else {
-                secret.0
-            };
+                secret.0.clone()
+            });
             let mut header = reqwest::header::HeaderValue::from_bytes(&value)
                 .map_err(|_| Error::new(ErrorCode::Unauthorized, "invalid provider credential"))?;
             header.set_sensitive(true);
