@@ -60,9 +60,13 @@ acquisition/custody publication, retirement and bounded read-use guards. Migrati
 three adds cached bootstraps and durable stop suppression. Migration four adds
 the private [mutation attempt and keyed-reservation store](local-mutation-ledger.md).
 Migration five adds the separately acknowledged [execution audit store](local-execution-audit.md).
-Only their admitted private owners install these two migrations; ordinary setup
-retains version three. Approval spending and complete business write dispatch
-remain unfinished.
+Migration six retains approval spending and migration seven retains
+[approval-signing issuers and keys](local-approval-keys.md). Migration eight adds
+the [local policy metadata and lease port](../contracts/service/local-mutations.md).
+Only each admitted private owner installs its migration; ordinary setup retains
+version three. The policy port requires a trusted host caller to admit its write
+operation set. CLI policy management, approval issuance and complete business
+write dispatch remain unfinished.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
 temporary storage, with two-second lock/busy bounds. Versioned migrations commit
