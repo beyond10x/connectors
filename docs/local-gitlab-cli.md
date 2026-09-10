@@ -1,14 +1,18 @@
 # GitLab through the local CLI
 
 The current local binding supports project, issue and file reads plus exact-commit
-CI pipeline, job and trace reads using a saved GitLab PAT. It requires Linux x86_64 and the
+CI pipeline, job and trace reads, plus merge-request reads, using a saved GitLab PAT. It requires Linux x86_64 and the
 [qualified Secret Service binding](local-secret-service.md). The separately
 installed older CLI is not upgraded by building this checkout.
 
+Use the optimized build for the local owner. Startup copies and verifies its
+executable within a bounded deadline; large unoptimized debug binaries can exceed
+that budget on a busy host. Such a refusal grants no provider dispatch.
+
 ```sh
-CARGO_BUILD_JOBS=2 cargo build --locked -p connectors -p connectors-gitlab
-target/debug/connectors --output json setup init
-target/debug/connectors --output json setup check
+CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-gitlab
+target/release/connectors --output json setup init
+target/release/connectors --output json setup check
 ```
 
 An absolute `--config` and `--state-dir` can select a separate private placement.
@@ -32,8 +36,8 @@ The optional `ca_file` names an owner-only PEM certificate file. Inspect the
 native bootstrap and hash the built executable:
 
 ```sh
-target/debug/connectors-gitlab --local-config /absolute/path/gitlab.json --print-local-bootstrap
-sha256sum target/debug/connectors-gitlab
+target/release/connectors-gitlab --local-config /absolute/path/gitlab.json --print-local-bootstrap
+sha256sum target/release/connectors-gitlab
 ```
 
 Add an adapter entry to the configuration created by setup. Use the bootstrap's
@@ -69,8 +73,8 @@ stop before a subsequent admitted launch.
 Use the hidden native token prompt on your foreground controlling terminal:
 
 ```sh
-target/debug/connectors --output json connections connect --adapter forge --profile gitlab.pat --credential-prompt
-target/debug/connectors --output json operations describe --adapter forge --operation project.get
+target/release/connectors --output json connections connect --adapter forge --profile gitlab.pat --credential-prompt
+target/release/connectors --output json operations describe --adapter forge --operation project.get
 ```
 
 For automation, `--credential-file /absolute/private/file.json` or
@@ -84,7 +88,7 @@ Retain the connection reference returned by connect, then the descriptor revisio
 and schema identity returned by operation describe:
 
 ```sh
-target/debug/connectors --output json operations invoke --adapter forge --connection CONNECTION --operation project.get --schema SCHEMA --revision REVISION --input-json '{"project":"group/project"}'
+target/release/connectors --output json operations invoke --adapter forge --connection CONNECTION --operation project.get --schema SCHEMA --revision REVISION --input-json '{"project":"group/project"}'
 ```
 
 Business JSON also supports `--input-file` and `--input-stdin`. The owner validates
@@ -170,7 +174,7 @@ Native validation evidence lasts at most 60 seconds. After expiry, the connectio
 reports `pending` and reads refuse. Explicitly revalidate the saved credential:
 
 ```sh
-target/debug/connectors --output json connections revalidate --adapter forge --connection CONNECTION --expected-revision CONNECTION_REVISION
+target/release/connectors --output json connections revalidate --adapter forge --connection CONNECTION --expected-revision CONNECTION_REVISION
 ```
 
 Use the connection revision returned by connect or connection status. This command
