@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 ---
 ## Outcome and authority
 
@@ -20,15 +20,21 @@ Linux x86_64 and Rust 1.88 are the initial platform. SQLite owns non-secret meta
 
 ## Delivery sequence
 
-1. Persistent GitLab: fresh setup, protected entry, saved connection, existing read, CLI and owner restart, reuse without re-entry. story:persistent-gitlab-journey owns this first delivery.
-2. Complete local management across GitLab, Kubernetes and SQL, including repair/revoke races, exact process ownership and durable stop suppression. Integrate story:kubernetes-spec-service after the first persistent journey.
-3. Expand ../mcp with resources, prompts, servers, progress/cancellation, consumer-owned stdio and explicit OAuth one-use exchange/publication seams. Adopt AEP there, preserve its primary documentation workflow edit, verify and publish source commits through verified Atlas bot authority.
-4. Pin that exact published MCP revision here and implement outbound and inbound tools/resources/prompts over stdio and Streamable HTTP, with version-specific 2026-07-28 and explicit 2025-11-25 interoperability, caller isolation and authenticated local verification of the cloud-capable server profile.
-5. Complete engineering reads: GitLab CI/MRs, PostgreSQL/MySQL, Jira JQL, Slack threads, Confluence collection, Loki/Prometheus/Grafana and Kubernetes diagnosis.
-6. Complete approval/audit/attempt/dispatch/idempotency handling, selected SaaS writes, Kubernetes changes/exec/copy/tunnels, Docker workflows and recorded Helm history/rollback. SQL remains read-only.
-7. Prove the full incident journey, sandbox cleanup, Rust 1.88 and existing tools-only MCP/Harness compatibility, deterministic generation and two isolated reproducible distributable builds; update support documentation.
+The operator's updated order is GitLab, two more native providers, MCP, then the remaining providers. Kubernetes and PostgreSQL are selected as those next two because README.md and their adapter sources already establish runnable implementations. This is a scheduling choice within the approved scope. MySQL stays in the remaining-provider phase; recorded Helm workflows accompany Kubernetes.
 
-Acceptance is docs/recent-adapter-usage-20260909.md C01-C17 and C20-C22 plus the supplied MCP interoperability and deterministic failure cases. Every selected workflow requires runtime evidence. Fixtures do not satisfy missing dedicated-provider sandbox evidence.
+1. Persistent GitLab: fresh setup, protected entry, saved connection, existing read, CLI and owner restart, reuse without re-entry. story:persistent-gitlab-journey continues to own this first concrete delivery.
+2. Complete the selected GitLab workflows: exact-commit CI pipelines/jobs/traces, MR and changed-record reads, validation and admitted MR create/update/merge. Bring forward the required management and approval/audit/attempt/dispatch/idempotency controls, including exact-head checks and possible-write uncertainty. Do not postpone these GitLab workflows until after MCP.
+3. Complete Kubernetes, then PostgreSQL through the same persistent local lifecycle. Kubernetes includes discovery, diagnosis, selected changes and rollout observation, bounded exec/copy/tunnels and associated Helm history/rollback. PostgreSQL includes the selected typed, parameterized, bounded read-only incident queries. Integrate story:kubernetes-spec-service here. Complete and verify all specified setup/adapter/connection/operation management across the three adapters, including repair/revoke/dispatch races, exact child ownership, concurrent startup and durable stop suppression.
+4. Expand ../mcp with resources, prompts, servers, progress/cancellation, consumer-owned stdio and explicit OAuth one-use exchange/publication seams. Adopt AEP there, preserve its primary documentation workflow edit, verify and publish source commits through verified Atlas bot authority.
+5. Pin that exact published MCP revision here and implement outbound and inbound tools/resources/prompts over stdio and Streamable HTTP, with version-specific 2026-07-28 and explicit 2025-11-25 interoperability, caller isolation and authenticated local verification of the cloud-capable server profile.
+6. Complete remaining selected providers: MySQL, Jira, Slack, Confluence, Loki, Prometheus, Grafana and Docker. Deliver each provider's required reads and, where selected, admitted writes or execution using the established shared controls. SQL remains read-only. Jira/Slack updates, Confluence collection, observability queries and Docker build/registry/container workflows retain their full original scope.
+7. Prove the complete cross-provider incident journey, required upgrade refusal cases, exact sandbox cleanup, Rust 1.88 and existing tools-only MCP/Harness compatibility, deterministic generation and two isolated reproducible distributable builds; finish support documentation and integration.
+
+Each provider phase includes generation, packaging, documentation and its runtime acceptance before advancing to MCP or the remaining providers. Shared lifecycle, mutation and execution foundations are implemented with the first selected provider that needs them. This replaces the original ordering that put MCP before completing the first three providers' selected reads and writes; it does not remove any acceptance requirement.
+
+Acceptance remains docs/recent-adapter-usage-20260909.md C01-C17 and C20-C22 plus the supplied MCP interoperability and deterministic failure cases. GitLab owns C09/C14 and its part of collection; Kubernetes owns C12/C15/C16, including the Helm actions; PostgreSQL owns its part of C06 before MCP, while the MySQL part follows MCP. Common lifecycle cases apply across the initial three providers. Cross-provider C20, the complete C21 collection and C22 capability-upgrade cases finish after their required providers exist. Every selected workflow requires runtime evidence; fixtures cannot satisfy missing dedicated-provider sandbox evidence.
+
+This order change introduces no new entity or decomposition. The initiative still has one decomposing story, so the planning skill's fewer-than-two-child rule skips a critic panel for this scheduling update. Model and review each unresolved native/shared semantic before creating its dependent implementation stories.
 
 ## Specification ownership and dependencies
 
@@ -44,6 +50,10 @@ Connectors publication and cloud deployment are excluded, as are GitHub/AWS adap
 
 ## Current evidence and open prerequisites
 
-Initial Connectors main is clean. Production apps/connectors/src/main.rs has only compatibility describe/invoke/serve; the grouped parser in apps/connectors-cli-contract is generated and its standalone default handler is unavailable. No persistent metadata authority or production Secret Service binding exists in this checkout. The installed 0.7.0 CLI is a separate product baseline and is not migrated.
+At the start of the implementation initiative, Connectors had compatibility describe/invoke/serve only; the grouped parser was generated but not bound to production management, and there was no persistent metadata authority. That is the historical starting point, not the current runtime support claim.
 
-Dedicated GitLab sandbox target and protected credential-file path have been requested; no secret is requested in conversation. The other provider sandboxes, Secret Service durability qualification and independent MCP interoperability remain required evidence. They are not assumed from installed credential presence. This is an interactive run with no approval bypass records.
+Implementation commit 2c41fc49e00549ddb671a68845ec5fcf6ee4277b adds production setup/inventory handlers, private configuration/state admission, a versioned SQLite authority and non-interactive keyring availability inspection. The gate including Rust 1.88, generation, conformance, tests and Clippy passed; docs/evidence/local-runtime-20260910/README.md retains exact inputs, commands and limits. Integration checkpoint 680f41eb8a6633063f87c280b934e0e3f369fe4d leaves clean local main with no task-owned linked worktrees. No persistent GitLab connection or restarted credential reuse has passed acceptance. story:persistent-gitlab-journey remains the active next delivery.
+
+The installed 0.7.0 CLI is a separate product baseline and is not migrated. Dedicated GitLab sandbox target and protected credential-file path have been requested; credential-blocker:gitlab-runtime-sandbox remains open. The other provider sandboxes, Secret Service durable write/restart/deletion qualification and independent MCP interoperability remain required evidence. They are not assumed from installed credential presence. The Kubernetes driver protocol-loading blocker remains open for its distinct governed-run scope; paid driver runs are not required for interactive implementation.
+
+The provider-order update is an interactive planning change with one store writer and no approval bypass records. No runtime acceptance or lifecycle completion is claimed from this update.
