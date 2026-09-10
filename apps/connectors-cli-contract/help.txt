@@ -4,6 +4,7 @@ Usage: connectors [OPTIONS] <COMMAND>
 
 Commands:
   adapters     
+  approvals    
   connections  
   operations   
   setup        

@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 13
+revision: 14
 ---
 ## Outcome and authority
 
@@ -116,3 +116,9 @@ This is an independently tested internal proof/spend increment, not public local
 story:local-approval-binding completes its private proof/spend and approved ledger-gate boundary. docs/evidence/local-approval-binding-20260910/README.md retains 17 approval tests with four actual process exits, the passing Rust 1.88 repository gate, website/reference and 15 example tests, and all five optimized GitLab CLI journeys. Exact source and executable digests, failed checks and eight planning critic records are retained. One missing audit dependency was fixed; all four final critics approve.
 
 Next is protected persistent local issuer-key custody/publication/rotation and actual approval preparation/issuance CLI, with authenticated caller policy and qualified time, followed by generated mutation ingress and complete connection-bound provider dispatch. Native GitLab validation/writes and dedicated sandbox acceptance remain required. The C14 create/update head-guard question is unanswered; no weaker semantics or approval are inferred. GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider scope and order remain unchanged, and this initiative stays active.
+
+## Persistent approval-key checkpoint — 2026-09-10
+
+story:local-approval-keys completes local `approvals key-init`, `key-status`, `key-rotate`, `key-recover`, `key-revoke` and `key-retire`. Migration seven and qualified purpose-separated Secret Service custody retain immutable key identities and exact publication/revocation/retirement fences. Current-key leases exclude management through protected use; they supply no caller or subject authority. docs/evidence/local-approval-keys-20260910/README.md retains the Rust 1.88 gate, eleven key tests with three actual child exits and all six production commands, five optimized GitLab CLI journeys, website/reference checks, fifteen example tests and exact source/tool/executable identities. All four final planning critics approve after three recorded fixes.
+
+Next implement actual local approval preparation/issuance with authenticated caller/subject policy and qualified time, then generated mutation ingress and complete connection-bound provider dispatch. Native GitLab validation/writes, the unanswered C14 create/update head-guard choice and dedicated GitLab sandbox acceptance remain open. The key-management CLI is not an approval-proof or provider-write interface. The initiative remains active and retains the complete GitLab → Kubernetes → PostgreSQL → MCP → remaining-provider order and all original acceptance, compatibility, publication-boundary and reproducible-delivery requirements.

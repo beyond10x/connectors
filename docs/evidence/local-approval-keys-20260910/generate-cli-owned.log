@@ -1,0 +1,5 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build cli`
+10 CLI artifact(s), generated in apps/connectors-cli-contract
+CLI values: 67 structural, 2 cached expectations, 5 acquisition and 3 page consistency cases passed; runtime lifecycle/custody traces remain obligations
+CLI contract fixture generated; custody and lifecycle runtime conformance remain obligations

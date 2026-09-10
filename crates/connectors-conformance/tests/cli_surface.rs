@@ -86,7 +86,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_sixteen_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_twenty_two_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -110,6 +110,12 @@ fn the_selected_inventory_has_sixteen_grouped_commands_and_explicit_runtime_obli
         "operations list",
         "operations describe",
         "operations invoke",
+        "approvals key-init",
+        "approvals key-status",
+        "approvals key-rotate",
+        "approvals key-recover",
+        "approvals key-revoke",
+        "approvals key-retire",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -173,6 +179,66 @@ fn inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result() {
 #[test]
 fn every_local_action_dispatches_once_with_its_declared_result_type() {
     let cases: &[(&[&str], &str)] = &[
+        (
+            &["approvals", "key-init", "--adapter", "forge"],
+            "ApprovalKeysResult",
+        ),
+        (
+            &["approvals", "key-status", "--adapter", "forge"],
+            "ApprovalKeysResult",
+        ),
+        (
+            &[
+                "approvals",
+                "key-rotate",
+                "--adapter",
+                "forge",
+                "--expected-revision",
+                "r1",
+                "--expected-key",
+                "k1",
+            ],
+            "ApprovalKeysResult",
+        ),
+        (
+            &[
+                "approvals",
+                "key-recover",
+                "--adapter",
+                "forge",
+                "--expected-revision",
+                "r1",
+                "--candidate",
+                "k1",
+            ],
+            "ApprovalKeysResult",
+        ),
+        (
+            &[
+                "approvals",
+                "key-revoke",
+                "--adapter",
+                "forge",
+                "--expected-revision",
+                "r1",
+                "--expected-key",
+                "k1",
+            ],
+            "ApprovalKeysResult",
+        ),
+        (
+            &[
+                "approvals",
+                "key-retire",
+                "--adapter",
+                "forge",
+                "--expected-revision",
+                "r1",
+                "--key",
+                "k1",
+            ],
+            "ApprovalKeysResult",
+        ),
         (&["setup", "init"], "SetupInitResult"),
         (&["setup", "check"], "SetupCheckResult"),
         (&["adapters", "list", "--limit", "10"], "AdapterListResult"),
