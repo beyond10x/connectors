@@ -64,3 +64,29 @@ rustfmt, or vendor access. Regeneration and the generation tests require the pin
 ESS and recorded rustfmt toolchain. `TMPDIR` should name a writable directory with
 space for the temporary bundle. No entity or relation outside this configured
 service profile is implied; SaaS ownership cardinality remains UNMAPPED in ESS.
+
+## Bounded response prefixes
+
+An optional mapping `response_prefix_limit` selects a fixed integer ceiling of
+1..1048576 bytes for the injected read-only HTTP capability. Omission preserves
+the existing complete-response call and finish signature. Selection generates a
+call to the explicit prefix capability and a finish obligation receiving its
+`HttpResponsePrefix`; it is not inferred from provider path or media type.
+Bindings without that capability refuse explicitly and cannot fabricate a complete
+response. Path/query construction, credential selection, redirect refusal,
+configured authority and the original request deadline remain unchanged.
+
+The transport retains at most the selected prefix, reads enough to distinguish
+EOF from additional bytes, then drops an unfinished response. `complete` is true
+only after observed EOF. A Content-Length header alone cannot prove completeness;
+premature closure or a transport error is a failure. Headers retain at most 128
+entries and 32768 bytes in total; overflow refuses. No HTTP Range, automatic retry,
+resume token or claim that a live document will never grow is introduced. The
+native finish owner interprets byte encoding and may narrow the public limit,
+preserving an incomplete result whenever any bytes were omitted.
+
+This additive profile is modeled in `connectors.declarations.RequestMapping` and
+`connectors.transport.HttpResponsePrefix`. It requires executable transport,
+generation compatibility/refusal and provider fixtures before runtime support is
+advertised. The source document remains unmodified; source response discrepancies
+stay explicit native finish obligations.

@@ -10,6 +10,11 @@
       "types": [
         "gitlab.requests.FileGetRequest",
         "gitlab.requests.IssuesListRequest",
+        "gitlab.requests.JobGetRequest",
+        "gitlab.requests.JobTraceRequest",
+        "gitlab.requests.PipelineGetRequest",
+        "gitlab.requests.PipelineJobsRequest",
+        "gitlab.requests.PipelinesListRequest",
         "gitlab.requests.ProjectGetRequest"
       ],
       "entities": [],
@@ -81,6 +86,214 @@
           },
           {
             "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.JobGetRequest": {
+      "name": "gitlab.requests.JobGetRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "pipeline_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "sha",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.JobTraceRequest": {
+      "name": "gitlab.requests.JobTraceRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "job_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "max_bytes",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.PipelineGetRequest": {
+      "name": "gitlab.requests.PipelineGetRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pipeline_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "sha",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.PipelineJobsRequest": {
+      "name": "gitlab.requests.PipelineJobsRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cursor",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "limit",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "pipeline_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "sha",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab.requests.PipelinesListRequest": {
+      "name": "gitlab.requests.PipelinesListRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cursor",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "limit",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "sha",
             "type_ref": {
               "kind": "primitive",
               "name": "string"

@@ -113,12 +113,20 @@ impl From<runtime::Failure> for Error {
             F::StaleDescription => Code::StaleDescription,
             F::IdentityMismatch => Code::IdentityMismatch,
             F::InsufficientScope => Code::NotGranted,
-            F::InvalidCredential | F::Protocol | F::StaleCursor => Code::ServiceFailure,
+            F::InvalidCredential
+            | F::Protocol
+            | F::StaleCursor
+            | F::ProviderNotFound
+            | F::ProviderRateLimited
+            | F::ProviderInternal => Code::ServiceFailure,
         };
         let service_code = match e {
             F::InvalidCredential => Some(connectors_core::ErrorCode::Unauthorized),
             F::Protocol => Some(connectors_core::ErrorCode::UpstreamProtocol),
             F::StaleCursor => Some(connectors_core::ErrorCode::StaleCursor),
+            F::ProviderNotFound => Some(connectors_core::ErrorCode::NotFound),
+            F::ProviderRateLimited => Some(connectors_core::ErrorCode::RateLimited),
+            F::ProviderInternal => Some(connectors_core::ErrorCode::Internal),
             _ => None,
         };
         Self {

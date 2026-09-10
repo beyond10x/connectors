@@ -1,4 +1,6 @@
 //! Production CLI, real private owner/adapter processes and disposable custody.
+#[path = "ci.rs"]
+mod ci;
 use super::*;
 use connectors_host::local::{config::Paths, keyring, owner};
 use std::{
