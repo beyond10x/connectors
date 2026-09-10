@@ -19,6 +19,7 @@ pub fn verify_descriptor(descriptor: &Descriptor) -> Result<()> {
             "pipeline.jobs",
             "job.get",
             "job.trace",
+            "merge_request.validate",
         ],
     )
 }
@@ -40,6 +41,7 @@ pub struct PipelineJobsRequestContext {
 }
 pub struct JobGetRequestContext {}
 pub struct JobTraceRequestContext {}
+pub struct MergeRequestValidateRequestContext {}
 pub trait Bindings: Send + Sync {
     fn prepare_merge_request_get(
         &self,
@@ -123,6 +125,16 @@ pub trait Bindings: Send + Sync {
         input: JobTraceRequest,
         context: JobTraceRequestContext,
         response: HttpResponsePrefix,
+    ) -> Result<Value>;
+    fn prepare_merge_request_validate(
+        &self,
+        input: &MergeRequestValidateRequest,
+    ) -> Result<MergeRequestValidateRequestContext>;
+    fn finish_merge_request_validate(
+        &self,
+        input: MergeRequestValidateRequest,
+        context: MergeRequestValidateRequestContext,
+        response: HttpResponse,
     ) -> Result<Value>;
 }
 pub struct GeneratedAdapter<B: Bindings> {
@@ -421,6 +433,36 @@ impl<B: Bindings> connectors_sdk::Adapter for GeneratedAdapter<B> {
                 let query = [];
                 let response = self.http.get_prefix(&segments, &query, 512000).await?;
                 self.bindings.finish_job_trace(args, context, response)
+            }
+            "merge_request.validate" => {
+                let args = MergeRequestValidateRequest {
+                    r#iid: input["iid"]
+                        .as_i64()
+                        .ok_or_else(|| Error::invalid("integer outside supported range"))?,
+                    r#pipeline_id: input["pipeline_id"]
+                        .as_i64()
+                        .ok_or_else(|| Error::invalid("integer outside supported range"))?,
+                    r#project: input["project"]
+                        .as_str()
+                        .ok_or_else(|| Error::invalid("invalid string input"))?
+                        .to_owned(),
+                    r#sha: input["sha"]
+                        .as_str()
+                        .ok_or_else(|| Error::invalid("invalid string input"))?
+                        .to_owned(),
+                };
+                let context = self.bindings.prepare_merge_request_validate(&args)?;
+                let path = [
+                    "projects".to_owned(),
+                    args.r#project.to_string(),
+                    "merge_requests".to_owned(),
+                    args.r#iid.to_string(),
+                ];
+                let segments: Vec<&str> = path.iter().map(String::as_str).collect();
+                let query = [];
+                let response = self.http.get(&segments, &query).await?;
+                self.bindings
+                    .finish_merge_request_validate(args, context, response)
             }
             _ => Err(Error::new(
                 ErrorCode::NotFound,
