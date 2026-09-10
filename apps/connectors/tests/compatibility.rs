@@ -34,8 +34,20 @@ fn compatibility_inventory_matches_existing_help() {
             assert!(help.contains(&format!("--{}", flag.as_str().unwrap())));
         }
     }
-    // The generated grouped-command fixture does not silently replace the runtime.
-    assert_eq!(cli(&["setup", "check"]).status.code(), Some(2));
+    // The production grouped setup is separate from the explicit endpoint routes.
+    // Use an isolated missing configuration instead of the operator's defaults.
+    let temp = tempfile::tempdir().unwrap();
+    assert_eq!(
+        cli(&[
+            "--config",
+            temp.path().join("missing.toml").to_str().unwrap(),
+            "setup",
+            "check"
+        ])
+        .status
+        .code(),
+        Some(2)
+    );
 }
 
 #[test]
