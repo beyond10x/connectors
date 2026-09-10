@@ -12,7 +12,7 @@
       "title": "Local CLI",
       "source": "contracts/cli/v1alpha1/semantics.md",
       "owner": "shared",
-      "status": "Specified; parser fixtures; runtime pending"
+      "status": "Local GitLab management and reads; full contract acceptance pending"
     },
     {
       "route": "/contracts/service",
