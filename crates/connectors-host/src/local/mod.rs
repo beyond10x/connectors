@@ -3,6 +3,7 @@
 //! These owners do not grant provider access. Custody qualification and the
 //! connection/supervisor coordinators must be bound before credential acquisition.
 pub mod approval_keys;
+pub mod approval_policy;
 pub mod approvals;
 pub mod audit;
 pub mod clock;

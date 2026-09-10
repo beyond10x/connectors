@@ -15,6 +15,7 @@ domains:
   - connectors.delegation
   - connectors.approval_issuers
   - connectors.clock
+  - connectors.local_approval_policy
   - connectors.connection_admission
   - connectors.auth_access
   - connectors.discovery
