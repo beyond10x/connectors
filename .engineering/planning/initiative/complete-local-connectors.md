@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 9
+revision: 11
 ---
 ## Outcome and authority
 
@@ -91,3 +91,15 @@ story:local-mutation-ledger is implemented at its deliberately private storage-p
 The initial unoptimized CLI rerun exposed owner-startup timeouts also reproduced by the unchanged prior verified binary. The optimized CLI passes all five journeys in 86.42 seconds under unchanged deadlines, and the guide now selects the optimized build. This evidence does not replace dedicated GitLab sandbox acceptance or assert an instrumented cause for the earlier timeout.
 
 Next implement the shared audit admission/finalization port, then local approval issuance/verification/spending and qualified clock/dispatch composition for GitLab writes. Model and review any missing binding semantics before those decompositions. Native MR validation and governed writes still belong to this GitLab phase; decision-blocker:gitlab-mr-create-update-head-guard holds the unresolved C14 create/update guard interpretation, while credential-blocker:gitlab-runtime-sandbox holds dedicated access. Neither stops independent shared implementation. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers, with all original acceptance and reproducible-distribution requirements retained.
+
+## Execution audit increment — 2026-09-10
+
+The fifth partial runtime child, story:local-execution-audit, binds the existing AuditRecord model and contract to the same local SQLite authority with a separately acknowledged anchor and one immutable final observation. It depends on the implemented mutation ledger only for retained attempt references and migration continuity. It does not expose audited CLI operations or provider writes before the full coordinator exists. Current private-port evidence remains distinct from dedicated provider acceptance.
+
+Single implementation and planning-store writer on primary main serializes the shared host, migrations, docs and website surfaces with prior GitLab increments. The four planning critics review this five-child partial decomposition independently. Local approval issuance/verification/spending and qualified clock/dispatch composition follow audit; native GitLab validation/writes, the C14 guard decision and dedicated sandbox evidence remain open. GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider order and scope are unchanged.
+
+## Completed private audit checkpoint — 2026-09-10
+
+story:local-execution-audit completes its private host persistence boundary, with the full Rust 1.88 gate, 12 audit tests including four abrupt process exits, website/reference checks and all five optimized production CLI journeys passing. docs/evidence/local-execution-audit-20260910/README.md retains exact source and executable identities and the corrected ESS-summary/Clippy failures. The audit port acknowledges anchors and final observations separately and cannot reconstruct execution authority during recovery.
+
+The next GitLab implementation is local approval issuance/verification/spending, followed by qualified clock and complete connection-bound dispatch composition, authored mutation ingress and native MR validation/writes. Public audited operations and business effects remain pending those controls. The operator has been asked to resolve C14 create/update head-guard semantics; no answer or weaker guarantee is assumed. Dedicated GitLab sandbox acceptance remains open. All original acceptance, compatibility, packaging and reproducible-delivery obligations remain required, in the unchanged GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider order.

@@ -1,0 +1,4 @@
+    Blocking waiting for file lock on package cache
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build docs --check`
+website: 43 contract pages, 93 total reference pages; no drift

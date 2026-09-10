@@ -1,0 +1,6 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.98s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build gate --msrv`
+Error: "ess/domains/execution_audit.yaml: decoded YAML contains provider term: sqlite\ness/domains/execution_audit.yaml:2: provider term: sqlite"

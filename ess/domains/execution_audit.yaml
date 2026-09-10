@@ -1,5 +1,5 @@
 domain: connectors.execution_audit
-summary: Proposed per-hop durable execution-audit anchor and one final observation; no runtime or exporter.
+summary: Per-hop durable execution-audit anchor and one final observation; private host port, with dispatch integration and exporter pending.
 
 # Normative owner: contracts/service/audit.md. Values are safe internal audit
 # facts. The public projection remains connectors.service_wire.SourceAudit.
