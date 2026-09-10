@@ -137,6 +137,8 @@ pub struct Prepared {
     pub(super) nonce: Uuid,
     pub(super) process: u32,
     pub(super) binding: super::GateBinding,
+    pub(super) approval: Option<Box<crate::local::approvals::ProofBinding>>,
+    pub(super) spend_started: std::sync::atomic::AtomicBool,
 }
 impl Prepared {
     pub fn reference(&self) -> AttemptRef {

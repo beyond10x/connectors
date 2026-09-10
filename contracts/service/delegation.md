@@ -1,6 +1,6 @@
 # One-hop delegated approval and dispatch
 
-**Proposed specification, not implemented.** Owner: `story:contracts-federated-approval` (F03). This completes the semantic selection left open by [service compatibility](compatibility.md) and [service v1alpha2](v1alpha2/semantics.md); it does not make a runtime advertise delegated support. It covers a client, one gateway and one executing leaf, including implicit configured and explicit managed connections. Multi-hop forwarding remains unsupported.
+**Proposed protocol; no delegated ingress runtime.** Owner: `story:contracts-federated-approval` (F03). The [private local approval binding](../../docs/local-approval-binding.md) implements approval proof and spend mechanics only. This completes the semantic selection left open by [service compatibility](compatibility.md) and [service v1alpha2](v1alpha2/semantics.md); it does not make a runtime advertise delegated support. It covers a client, one gateway and one executing leaf, including implicit configured and explicit managed connections. Multi-hop forwarding remains unsupported.
 
 ## 1. Evidence and distinct authorities
 
@@ -165,6 +165,15 @@ Store exact tuple coordinates or an injective canonical tagged-array encoding (`
 7. Leaf records its known applied/refused or conservative unknown observation. Gateway validates the correlated response, preserves the original attempt/request/effect/replay facts, and adds its own audit result plus `source_audit` from the leaf. The gateway and leaf records retain separate host-qualified refs and are not one transaction. Current disclosure must still be admitted when returning a waited/replayed result. Recovery never resends.
 
 Approval spend is not the send fence. A spent approval plus aborted Prepared attempt remains spent and not_attempted. Transport nonce consumption proves neither approval redemption nor dispatch. Gateway audit completion proves neither leaf admission nor business outcome.
+
+The local approval-aware preparation retains the exact complete canonical
+subject with the Prepared attempt, including authority and origin for an unkeyed
+attempt. The spend owner compares that immutable capture with its freshly
+admitted subject and original live preparation handle; neither a caller-supplied
+attempt id nor a matching target/input digest supplies the missing authority
+coordinates. Older attempts without this capture remain observable and
+recoverable, but cannot acquire a new approval-spend or approved-dispatch receipt.
+This retained value is historical binding evidence, never current permission.
 
 ## 7. Failure and correlation matrix
 
