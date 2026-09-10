@@ -19,6 +19,9 @@ _connectors() {
             connectors,adapters)
                 cmd="connectors__subcmd__adapters"
                 ;;
+            connectors,approvals)
+                cmd="connectors__subcmd__approvals"
+                ;;
             connectors,completions)
                 cmd="connectors__subcmd__completions"
                 ;;
@@ -63,6 +66,48 @@ _connectors() {
                 ;;
             connectors__subcmd__adapters__subcmd__help,stop)
                 cmd="connectors__subcmd__adapters__subcmd__help__subcmd__stop"
+                ;;
+            connectors__subcmd__approvals,help)
+                cmd="connectors__subcmd__approvals__subcmd__help"
+                ;;
+            connectors__subcmd__approvals,key-init)
+                cmd="connectors__subcmd__approvals__subcmd__key__subcmd__init"
+                ;;
+            connectors__subcmd__approvals,key-recover)
+                cmd="connectors__subcmd__approvals__subcmd__key__subcmd__recover"
+                ;;
+            connectors__subcmd__approvals,key-retire)
+                cmd="connectors__subcmd__approvals__subcmd__key__subcmd__retire"
+                ;;
+            connectors__subcmd__approvals,key-revoke)
+                cmd="connectors__subcmd__approvals__subcmd__key__subcmd__revoke"
+                ;;
+            connectors__subcmd__approvals,key-rotate)
+                cmd="connectors__subcmd__approvals__subcmd__key__subcmd__rotate"
+                ;;
+            connectors__subcmd__approvals,key-status)
+                cmd="connectors__subcmd__approvals__subcmd__key__subcmd__status"
+                ;;
+            connectors__subcmd__approvals__subcmd__help,help)
+                cmd="connectors__subcmd__approvals__subcmd__help__subcmd__help"
+                ;;
+            connectors__subcmd__approvals__subcmd__help,key-init)
+                cmd="connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__init"
+                ;;
+            connectors__subcmd__approvals__subcmd__help,key-recover)
+                cmd="connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__recover"
+                ;;
+            connectors__subcmd__approvals__subcmd__help,key-retire)
+                cmd="connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__retire"
+                ;;
+            connectors__subcmd__approvals__subcmd__help,key-revoke)
+                cmd="connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__revoke"
+                ;;
+            connectors__subcmd__approvals__subcmd__help,key-rotate)
+                cmd="connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__rotate"
+                ;;
+            connectors__subcmd__approvals__subcmd__help,key-status)
+                cmd="connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__status"
                 ;;
             connectors__subcmd__connections,connect)
                 cmd="connectors__subcmd__connections__subcmd__connect"
@@ -115,6 +160,9 @@ _connectors() {
             connectors__subcmd__help,adapters)
                 cmd="connectors__subcmd__help__subcmd__adapters"
                 ;;
+            connectors__subcmd__help,approvals)
+                cmd="connectors__subcmd__help__subcmd__approvals"
+                ;;
             connectors__subcmd__help,completions)
                 cmd="connectors__subcmd__help__subcmd__completions"
                 ;;
@@ -141,6 +189,24 @@ _connectors() {
                 ;;
             connectors__subcmd__help__subcmd__adapters,stop)
                 cmd="connectors__subcmd__help__subcmd__adapters__subcmd__stop"
+                ;;
+            connectors__subcmd__help__subcmd__approvals,key-init)
+                cmd="connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__init"
+                ;;
+            connectors__subcmd__help__subcmd__approvals,key-recover)
+                cmd="connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__recover"
+                ;;
+            connectors__subcmd__help__subcmd__approvals,key-retire)
+                cmd="connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__retire"
+                ;;
+            connectors__subcmd__help__subcmd__approvals,key-revoke)
+                cmd="connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__revoke"
+                ;;
+            connectors__subcmd__help__subcmd__approvals,key-rotate)
+                cmd="connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__rotate"
+                ;;
+            connectors__subcmd__help__subcmd__approvals,key-status)
+                cmd="connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__status"
                 ;;
             connectors__subcmd__help__subcmd__connections,connect)
                 cmd="connectors__subcmd__help__subcmd__connections__subcmd__connect"
@@ -227,7 +293,7 @@ _connectors() {
 
     case "${cmd}" in
         connectors)
-            opts="-h --config --state-dir --output --help adapters connections operations setup completions help"
+            opts="-h --config --state-dir --output --help adapters approvals connections operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -476,6 +542,360 @@ _connectors() {
                     return 0
                     ;;
                 --child-incarnation)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals)
+            opts="-h --config --state-dir --output --help key-init key-recover key-retire key-revoke key-rotate key-status help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help)
+            opts="key-init key-recover key-retire key-revoke key-rotate key-status help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help__subcmd__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__init)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__recover)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__retire)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__revoke)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__rotate)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__help__subcmd__key__subcmd__status)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__key__subcmd__init)
+            opts="-h --adapter --expected-revision --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__key__subcmd__recover)
+            opts="-h --adapter --expected-revision --candidate --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --candidate)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__key__subcmd__retire)
+            opts="-h --adapter --expected-revision --key --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__key__subcmd__revoke)
+            opts="-h --adapter --expected-revision --expected-key --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__key__subcmd__rotate)
+            opts="-h --adapter --expected-revision --expected-key --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__approvals__subcmd__key__subcmd__status)
+            opts="-h --adapter --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -943,7 +1363,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help)
-            opts="adapters connections operations setup completions help"
+            opts="adapters approvals connections operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1013,6 +1433,104 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help__subcmd__adapters__subcmd__stop)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__approvals)
+            opts="key-init key-recover key-retire key-revoke key-rotate key-status"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__init)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__recover)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__retire)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__revoke)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__rotate)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__approvals__subcmd__key__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

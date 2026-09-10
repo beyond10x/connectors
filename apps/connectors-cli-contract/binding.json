@@ -1131,6 +1131,1224 @@
         }
       }
     },
+    "approval-keys-init": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "approval-keys-init"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ApprovalKeyInitInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ApprovalKeysResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "issuer": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "audience": {
+                    "kind": "string"
+                  },
+                  "issuer": {
+                    "kind": "string"
+                  },
+                  "keys": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "key_id": {
+                          "kind": "string"
+                        },
+                        "public_key": {
+                          "kind": "string"
+                        },
+                        "state": {
+                          "kind": "enum",
+                          "variants": [
+                            "candidate",
+                            "active",
+                            "retired",
+                            "retiring",
+                            "deleted"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "revision": {
+                    "kind": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "approval-keys-recover": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "approval-keys-recover"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ApprovalKeyRecoverInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "candidate": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ApprovalKeysResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "issuer": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "audience": {
+                    "kind": "string"
+                  },
+                  "issuer": {
+                    "kind": "string"
+                  },
+                  "keys": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "key_id": {
+                          "kind": "string"
+                        },
+                        "public_key": {
+                          "kind": "string"
+                        },
+                        "state": {
+                          "kind": "enum",
+                          "variants": [
+                            "candidate",
+                            "active",
+                            "retired",
+                            "retiring",
+                            "deleted"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "revision": {
+                    "kind": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "approval-keys-retire": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "approval-keys-retire"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ApprovalKeyRetireInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            },
+            "key": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ApprovalKeysResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "issuer": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "audience": {
+                    "kind": "string"
+                  },
+                  "issuer": {
+                    "kind": "string"
+                  },
+                  "keys": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "key_id": {
+                          "kind": "string"
+                        },
+                        "public_key": {
+                          "kind": "string"
+                        },
+                        "state": {
+                          "kind": "enum",
+                          "variants": [
+                            "candidate",
+                            "active",
+                            "retired",
+                            "retiring",
+                            "deleted"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "revision": {
+                    "kind": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "approval-keys-revoke": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "approval-keys-revoke"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ApprovalKeyRevokeInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "expected_key": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ApprovalKeysResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "issuer": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "audience": {
+                    "kind": "string"
+                  },
+                  "issuer": {
+                    "kind": "string"
+                  },
+                  "keys": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "key_id": {
+                          "kind": "string"
+                        },
+                        "public_key": {
+                          "kind": "string"
+                        },
+                        "state": {
+                          "kind": "enum",
+                          "variants": [
+                            "candidate",
+                            "active",
+                            "retired",
+                            "retiring",
+                            "deleted"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "revision": {
+                    "kind": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "approval-keys-rotate": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "approval-keys-rotate"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ApprovalKeyRotateInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "expected_key": {
+              "kind": "string"
+            },
+            "expected_revision": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ApprovalKeysResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "issuer": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "audience": {
+                    "kind": "string"
+                  },
+                  "issuer": {
+                    "kind": "string"
+                  },
+                  "keys": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "key_id": {
+                          "kind": "string"
+                        },
+                        "public_key": {
+                          "kind": "string"
+                        },
+                        "state": {
+                          "kind": "enum",
+                          "variants": [
+                            "candidate",
+                            "active",
+                            "retired",
+                            "retiring",
+                            "deleted"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "revision": {
+                    "kind": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "approval-keys-status": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "approval-keys-status"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ApprovalKeyStatusInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ApprovalKeysResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "issuer": {
+              "kind": "optional",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "audience": {
+                    "kind": "string"
+                  },
+                  "issuer": {
+                    "kind": "string"
+                  },
+                  "keys": {
+                    "kind": "list",
+                    "of": {
+                      "kind": "struct",
+                      "fields": {
+                        "key_id": {
+                          "kind": "string"
+                        },
+                        "public_key": {
+                          "kind": "string"
+                        },
+                        "state": {
+                          "kind": "enum",
+                          "variants": [
+                            "candidate",
+                            "active",
+                            "retired",
+                            "retiring",
+                            "deleted"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "revision": {
+                    "kind": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure"
+                ]
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "none"
+                ]
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "connections-connect": {
       "target": {
         "kind": "local",
@@ -3819,6 +5037,177 @@
     },
     {
       "path": [
+        "approvals",
+        "key-init"
+      ],
+      "aliases": [],
+      "callable": "approval-keys-init",
+      "about": "Create a new approval-signing key in protected local custody",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "approvals",
+        "key-recover"
+      ],
+      "aliases": [],
+      "callable": "approval-keys-recover",
+      "about": "Confirm and publish an exact staged approval-signing key",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "candidate",
+          "source": {
+            "kind": "option",
+            "long": "candidate"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "approvals",
+        "key-retire"
+      ],
+      "aliases": [],
+      "callable": "approval-keys-retire",
+      "about": "Delete exact noncurrent signing material while retaining public history",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "key",
+          "source": {
+            "kind": "option",
+            "long": "key"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "approvals",
+        "key-revoke"
+      ],
+      "aliases": [],
+      "callable": "approval-keys-revoke",
+      "about": "Revoke the current key and cancel its pending replacement",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "expected_key",
+          "source": {
+            "kind": "option",
+            "long": "expected-key"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "approvals",
+        "key-rotate"
+      ],
+      "aliases": [],
+      "callable": "approval-keys-rotate",
+      "about": "Publish a replacement for the exact current approval-signing key",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "expected_key",
+          "source": {
+            "kind": "option",
+            "long": "expected-key"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "approvals",
+        "key-status"
+      ],
+      "aliases": [],
+      "callable": "approval-keys-status",
+      "about": "Observe public key metadata without starting services or reading secrets",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
         "connections",
         "connect"
       ],
@@ -4183,6 +5572,12 @@
     "handler:adapters-list: implement the owner-qualified callable and its declared result/error contract",
     "handler:adapters-status: implement the owner-qualified callable and its declared result/error contract",
     "handler:adapters-stop: implement the owner-qualified callable and its declared result/error contract",
+    "handler:approval-keys-init: implement the owner-qualified callable and its declared result/error contract",
+    "handler:approval-keys-recover: implement the owner-qualified callable and its declared result/error contract",
+    "handler:approval-keys-retire: implement the owner-qualified callable and its declared result/error contract",
+    "handler:approval-keys-revoke: implement the owner-qualified callable and its declared result/error contract",
+    "handler:approval-keys-rotate: implement the owner-qualified callable and its declared result/error contract",
+    "handler:approval-keys-status: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-connect: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-describe: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-list: implement the owner-qualified callable and its declared result/error contract",

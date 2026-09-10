@@ -36,6 +36,13 @@
       "status": "Specified; runtime pending"
     },
     {
+      "route": "/contracts/approval-keys",
+      "title": "Local approval-signing keys",
+      "source": "contracts/service/approval-issuers.md",
+      "owner": "shared",
+      "status": "Local key management binding; approval issuance pending"
+    },
+    {
       "route": "/contracts/audit",
       "title": "Execution audit",
       "source": "contracts/service/audit.md",
