@@ -2,8 +2,8 @@
   "provenance": {
     "system": "gitlab",
     "specification_version": "v1",
-    "source_digest": "ede8787ae4303e8248e5bd6de3675b12866d725713b94852f37db003d4982392",
-    "contract_digest": "9020464eeb141c4af3f7cd1c704975f1a25aa17da6a44f4b61ff3a5c25400334"
+    "source_digest": "b7b2cb3c4d5e331acc466cbffc8cb5f0365f08bc1fa22c9b39b3dd9e02fa5202",
+    "contract_digest": "e998b4b4fd35be0dc69280a8a0eec358930cb7071586963ad07fe9edfc0b828c"
   },
   "scope": {
     "profile": "component-skeletons"
@@ -33,6 +33,20 @@
     {
       "kind": "domain_type",
       "source": "gitlab.requests.JobTraceRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "gitlab.requests.MergeRequestGetRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "gitlab.requests.MergeRequestsListRequest",
       "disposition": {
         "disposition": "generated"
       }

@@ -9,6 +9,8 @@ pub fn verify_descriptor(descriptor: &Descriptor) -> Result<()> {
     connectors_sdk::verify_handlers(
         descriptor,
         &[
+            "merge_request.get",
+            "merge_requests.list",
             "project.get",
             "issues.list",
             "file.get",
@@ -19,6 +21,10 @@ pub fn verify_descriptor(descriptor: &Descriptor) -> Result<()> {
             "job.trace",
         ],
     )
+}
+pub struct MergeRequestGetRequestContext {}
+pub struct MergeRequestsListRequestContext {
+    pub r#page: String,
 }
 pub struct ProjectGetRequestContext {}
 pub struct IssuesListRequestContext {
@@ -35,6 +41,26 @@ pub struct PipelineJobsRequestContext {
 pub struct JobGetRequestContext {}
 pub struct JobTraceRequestContext {}
 pub trait Bindings: Send + Sync {
+    fn prepare_merge_request_get(
+        &self,
+        input: &MergeRequestGetRequest,
+    ) -> Result<MergeRequestGetRequestContext>;
+    fn finish_merge_request_get(
+        &self,
+        input: MergeRequestGetRequest,
+        context: MergeRequestGetRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value>;
+    fn prepare_merge_requests_list(
+        &self,
+        input: &MergeRequestsListRequest,
+    ) -> Result<MergeRequestsListRequestContext>;
+    fn finish_merge_requests_list(
+        &self,
+        input: MergeRequestsListRequest,
+        context: MergeRequestsListRequestContext,
+        response: HttpResponse,
+    ) -> Result<Value>;
     fn prepare_project_get(&self, input: &ProjectGetRequest) -> Result<ProjectGetRequestContext>;
     fn finish_project_get(
         &self,
@@ -113,6 +139,73 @@ impl<B: Bindings> connectors_sdk::Adapter for GeneratedAdapter<B> {
         let op = self.descriptor.operation(operation)?;
         connectors_sdk::validate(&op.input_schema, &input)?;
         match operation {
+            "merge_request.get" => {
+                let args = MergeRequestGetRequest {
+                    r#iid: input["iid"]
+                        .as_i64()
+                        .ok_or_else(|| Error::invalid("integer outside supported range"))?,
+                    r#project: input["project"]
+                        .as_str()
+                        .ok_or_else(|| Error::invalid("invalid string input"))?
+                        .to_owned(),
+                };
+                let context = self.bindings.prepare_merge_request_get(&args)?;
+                let path = [
+                    "projects".to_owned(),
+                    args.r#project.to_string(),
+                    "merge_requests".to_owned(),
+                    args.r#iid.to_string(),
+                ];
+                let segments: Vec<&str> = path.iter().map(String::as_str).collect();
+                let query = [];
+                let response = self.http.get(&segments, &query).await?;
+                self.bindings
+                    .finish_merge_request_get(args, context, response)
+            }
+            "merge_requests.list" => {
+                let args = MergeRequestsListRequest {
+                    r#cursor: input["cursor"].as_str().map(str::to_owned),
+                    r#limit: input["limit"]
+                        .as_i64()
+                        .ok_or_else(|| Error::invalid("integer outside supported range"))?,
+                    r#project: input["project"]
+                        .as_str()
+                        .ok_or_else(|| Error::invalid("invalid string input"))?
+                        .to_owned(),
+                    r#state: input["state"]
+                        .as_str()
+                        .ok_or_else(|| Error::invalid("invalid string input"))?
+                        .to_owned(),
+                    r#updated_after: input["updated_after"]
+                        .as_str()
+                        .ok_or_else(|| Error::invalid("invalid string input"))?
+                        .to_owned(),
+                    r#updated_before: input["updated_before"]
+                        .as_str()
+                        .ok_or_else(|| Error::invalid("invalid string input"))?
+                        .to_owned(),
+                };
+                let context = self.bindings.prepare_merge_requests_list(&args)?;
+                let path = [
+                    "projects".to_owned(),
+                    args.r#project.to_string(),
+                    "merge_requests".to_owned(),
+                ];
+                let segments: Vec<&str> = path.iter().map(String::as_str).collect();
+                let query = [
+                    ("order_by", "updated_at".to_owned()),
+                    ("page", context.r#page.clone()),
+                    ("per_page", args.r#limit.to_string()),
+                    ("scope", "all".to_owned()),
+                    ("sort", "asc".to_owned()),
+                    ("state", args.r#state.to_string()),
+                    ("updated_after", args.r#updated_after.to_string()),
+                    ("updated_before", args.r#updated_before.to_string()),
+                ];
+                let response = self.http.get(&segments, &query).await?;
+                self.bindings
+                    .finish_merge_requests_list(args, context, response)
+            }
             "project.get" => {
                 let args = ProjectGetRequest {
                     r#project: input["project"]

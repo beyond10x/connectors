@@ -1,6 +1,8 @@
 //! Production CLI, real private owner/adapter processes and disposable custody.
 #[path = "ci.rs"]
 mod ci;
+#[path = "merge_requests.rs"]
+mod merge_requests;
 use super::*;
 use connectors_host::local::{config::Paths, keyring, owner};
 use std::{
@@ -8,6 +10,39 @@ use std::{
     process::{Child as Process, Output, Stdio},
     time::Instant,
 };
+
+impl Cli {
+    fn operation_invoke(&self, connection: &str, operation: &str, input: Value) -> Output {
+        let description = success(self.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "forge",
+            "--operation",
+            operation,
+        ]));
+        self.run(&[
+            "operations",
+            "invoke",
+            "--adapter",
+            "forge",
+            "--connection",
+            connection,
+            "--operation",
+            operation,
+            "--schema",
+            description["schema"].as_str().unwrap(),
+            "--revision",
+            description["revision"].as_str().unwrap(),
+            "--input-json",
+            &input.to_string(),
+        ])
+    }
+    fn operation_result(&self, connection: &str, operation: &str, input: Value) -> Value {
+        let result = success(self.operation_invoke(connection, operation, input));
+        serde_json::from_str(result["result"].as_str().unwrap()).unwrap()
+    }
+}
 
 struct OwnedProcess(Process);
 impl Drop for OwnedProcess {

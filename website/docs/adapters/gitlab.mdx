@@ -22,6 +22,13 @@ bounded UTF-8 prefix with explicit completeness. A successful pipeline for anoth
 SHA cannot satisfy the selection. Read the [CI contract](/adapters/gitlab/contracts/ci)
 for input shapes and limits. Dedicated GitLab sandbox acceptance remains open.
 
+`merge_request.get` reads an MR by project-local IID. `merge_requests.list` traverses
+a fixed inclusive update window with bounded pages and explicit completeness.
+Unknown statuses and missing heads remain observations; they do not validate a
+merge. Read the [MR contract](/adapters/gitlab/contracts/merge-requests) for window,
+cursor and projection rules. Mutable pages are not a snapshot or lossless feed;
+the consumer owns its checkpoint. Governed MR writes remain unimplemented.
+
 ## Access and limits
 
 Configure the GitLab endpoint and an explicit project allowlist. Public reads can use no provider credential; private reads use a separately bound token. Caller authentication to the adapter service is a different boundary.

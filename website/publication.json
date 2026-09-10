@@ -183,6 +183,13 @@
       "status": "Local implementation; dedicated sandbox acceptance open"
     },
     {
+      "route": "/adapters/gitlab/contracts/merge-requests",
+      "title": "GitLab merge-request reads",
+      "source": "adapters/gitlab/contracts/merge-requests/v1alpha1/semantics.md",
+      "owner": "gitlab",
+      "status": "Local implementation; dedicated sandbox acceptance open"
+    },
+    {
       "route": "/adapters/sql/contracts/reads",
       "title": "PostgreSQL bounded reads",
       "source": "adapters/sql/contracts/reads/v1alpha1/semantics.md",
