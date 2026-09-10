@@ -10,7 +10,7 @@ struct Args {
     output: PathBuf,
     #[arg(long)]
     check: bool,
-    /// Generate the v2 source/ESS/runtime bundle instead of only a descriptor.
+    /// Generate a v2/v3 source/ESS/runtime bundle instead of only a descriptor.
     #[arg(long)]
     generate: bool,
     #[arg(long)]
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     if args.generate {
         let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
-        connectors_spec::v2::generate(&args.specification, &args.output, &ess, args.check)?;
+        connectors_spec::generate(&args.specification, &args.output, &ess, args.check)?;
         println!(
             "adapter bundle {}",
             if args.check { "matches" } else { "generated" }

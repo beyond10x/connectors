@@ -49,7 +49,7 @@ scope:
   path: spec-kinds/adapter
 - confidence: inferred
   path: website
-revision: 6
+revision: 7
 ---
 ## Outcome
 
@@ -96,3 +96,13 @@ The complete Connectors gate with Rust 1.88 passes, including 103 host tests, si
 Design, scope and parallel-safety critics approved round one. The first acceptance reading reused the scope critic's context; it is retained as an archived review-result and is not counted as the independent acceptance review. A fresh-context acceptance reviewer approved revision five without reading other critic outputs. Sonnet was unavailable, so inherited models were used; the fourth lane was delayed by available slots. No reviewer wrote code or planning state. AEP initially refused promotion because the existing-vision serves edge was missing, then refused a direct draft-to-active move; the edge was added and the legal draft-to-proposed-to-active transitions succeeded. These are planning checks, not runtime acceptance.
 
 The owner remains root, with serialized implementation on main. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers. The dedicated GitLab sandbox and create/update atomic-head decision remain open. Preserve the unrelated AGENTS.md release edit; this checkpoint does not publish Connectors or register Atlas.
+
+## Verified write-generation checkpoint — 2026-09-11
+
+The v3 frontend and separate SDK write capability are implemented under story:guarded-gitlab-merge. The generator retains the v2 read projection, emits an independently revised private descriptor and ESS-generated typed write values, and consumes an immutable prepared request and authenticated write capability once. Native effect knowledge survives safe-result validation failure. Strict codecs, pinned source constraints, exact request mapping, output ownership, deterministic regeneration, lost replies and GET/write separation are exercised by an independently compiled consumer fixture. Production adapters still select v1/v2; no callable merge command is claimed.
+
+docs/evidence/write-generation-20260911/README.md retains the passing repository gate with Rust 1.88, the complete five-test write suite on Rust 1.88, three consumer runtime and three compile-fail cases, website/reference checks, exact source manifests and failed/corrected runs. A test checks the selected GitLab merge mapping against its existing pinned vendor source without provider I/O. After the full gate, the v1 rejection test gained an explicit valid-v1 baseline; the complete minimum-version suite and affected Clippy/format checks pass on that final test. Implementation bytes are unchanged across those checks.
+
+A separate release integration advanced main to f475e0b5610b1d7334094e5ab507cfa1aa030e45 during a gate's final planning read. Its transient journal/file mismatch is retained; the integrated store subsequently validated and the entire gate passed again with the integrated Cargo version inputs. Its release records and instructions are preserved. This generator increment adds no release, provider access or publication claim. Only the primary checkout remains; this increment created no linked tree.
+
+Next implement private version-two prepare/commit/cancel and production CLI policy/preparation/issuance, then join the existing approval/audit/attempt ledgers to one SHA-guarded GitLab merge. The story and initiative stay active: lost-response CLI/restart acceptance, dedicated sandbox evidence, full distribution reproducibility, complete GitLab workflows and the open create/update atomic-head decision remain required. Full GitLab continues before Kubernetes with Helm, PostgreSQL, MCP and remaining providers. Root remains the sole writer for this implementation and planning increment; paid governed runs are not required and the recorded driver blocker is unchanged.
