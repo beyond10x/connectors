@@ -1,0 +1,47 @@
+    Checking ring v0.17.14
+    Checking rustls-webpki v0.103.15
+    Checking rustls v0.23.44
+    Checking tokio-rustls v0.26.5
+    Checking hyper-rustls v0.27.9
+    Checking reqwest v0.12.28
+    Checking connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+    Checking connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+error[E0505]: cannot move out of `record.view.issuer` because it is borrowed
+   --> crates/connectors-host/src/local/approval_keys.rs:398:25
+    |
+390 |         let record = self.current()?;
+    |             ------ binding `record` declared here
+391 |         let active = record.view.active().ok_or(Failure::NotFound)?;
+    |                      ----------- borrow of `record.view` occurs here
+...
+398 |                 issuer: record.view.issuer,
+    |                         ^^^^^^^^^^^^^^^^^^ move out of `record.view.issuer` occurs here
+399 |                 audience: record.view.audience,
+400 |                 kid: active.key_id.to_string(),
+    |                      ------------- borrow later used here
+    |
+help: consider cloning the value if the performance cost is acceptable
+    |
+391 |         let active = record.view.clone().active().ok_or(Failure::NotFound)?;
+    |                                 ++++++++
+
+error[E0505]: cannot move out of `record.view.audience` because it is borrowed
+   --> crates/connectors-host/src/local/approval_keys.rs:399:27
+    |
+390 |         let record = self.current()?;
+    |             ------ binding `record` declared here
+391 |         let active = record.view.active().ok_or(Failure::NotFound)?;
+    |                      ----------- borrow of `record.view` occurs here
+...
+399 |                 audience: record.view.audience,
+    |                           ^^^^^^^^^^^^^^^^^^^^ move out of `record.view.audience` occurs here
+400 |                 kid: active.key_id.to_string(),
+    |                      ------------- borrow later used here
+    |
+help: consider cloning the value if the performance cost is acceptable
+    |
+391 |         let active = record.view.clone().active().ok_or(Failure::NotFound)?;
+    |                                 ++++++++
+
+For more information about this error, try `rustc --explain E0505`.
+error: could not compile `connectors-host` (lib) due to 2 previous errors

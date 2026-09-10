@@ -1,0 +1,11 @@
+--- docs/evidence/local-approval-keys-20260910/gate-source-inputs.sha256	2026-09-10 22:41:58.022360111 +0200
++++ docs/evidence/local-approval-keys-20260910/source-inputs.sha256	2026-09-10 22:42:28.623855009 +0200
+@@ -222,7 +222,7 @@
+ 865e12dd40dca8d056b11a491023cd6846a766f09059b31c04ddd0c39f1f89b0  contracts/operations/v1alpha1/scenarios/response-loss-no-approval.yaml
+ 963bb8798423a2857c0a03fd0fdfc6bb9b5d5e7364523e6e090e4be49873b055  contracts/operations/v1alpha1/semantics.md
+ c702de78f52bafdb1966ba5317a6aad15d3478aba743e324300d5e88e5543350  contracts/operations/v1alpha1/verification.md
+-1938e8172a1d6451cf49d809d4ae761f2a7cff6c0627aa3036ec69afe146f018  contracts/service/approval-issuers.md
++cc234dbb89a06b83eaaa6fcd7ba606cee8c23d4d73491aa0cbeeac34a5d6d9d4  contracts/service/approval-issuers.md
+ 2beb84850d64a3e8b085fc6d36183faf5a8d0b9e80315cec1a6f56b655961ba3  contracts/service/audit.md
+ 85d261b4f4477d080bccede6748501a2b903d2618a02e5a1554f33603593feff  contracts/service/compatibility.md
+ 6c943a7a3e044e0d297e3dabe35d33b273c1ce8b52ea10c1ee1082e583791842  contracts/service/delegation.md

@@ -2,6 +2,18 @@
   "format": "connectors-cli-values/1",
   "cases": [
     {
+      "id": "approval-keys-uninitialized",
+      "type": "connectors.cli.ApprovalKeysResult",
+      "valid": true,
+      "value": {"adapter": "forge"}
+    },
+    {
+      "id": "approval-keys-no-secret-output",
+      "type": "connectors.cli.ApprovalKeysResult",
+      "valid": false,
+      "value": {"adapter": "forge", "seed": "must-not-be-exported"}
+    },
+    {
       "id": "valid-retained-revalidation-result",
       "type": "connectors.cli.ConnectionRevalidateResult",
       "valid": true,

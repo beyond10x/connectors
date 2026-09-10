@@ -1,0 +1,166 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.23s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build gate --msrv`
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 21 file(s), valid
+connectors v1 — 21 file(s), 415 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-RfeOQh/ess-boundary-0.json
+connectors_atlassian v1 — 2 file(s), valid
+connectors_atlassian v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-RfeOQh/ess-boundary-1.json
+connectors_docker v1 — 2 file(s), valid
+connectors_docker v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-RfeOQh/ess-boundary-2.json
+connectors_gitlab v1 — 4 file(s), valid
+connectors_gitlab v1 — 4 file(s), 14 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-RfeOQh/ess-boundary-3.json
+connectors_grafana v1 — 2 file(s), valid
+connectors_grafana v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-RfeOQh/ess-boundary-4.json
+connectors_kubernetes v1 — 4 file(s), valid
+connectors_kubernetes v1 — 4 file(s), 11 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-RfeOQh/ess-boundary-5.json
+connectors_loki v1 — 2 file(s), valid
+connectors_loki v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-RfeOQh/ess-boundary-6.json
+gate: shared and 6 adapter ESS models validated and compiled independently; exit=0
+10 CLI artifact(s), current in apps/connectors-cli-contract
+CLI values: 67 structural, 2 cached expectations, 5 acquisition and 3 page consistency cases passed; runtime lifecycle/custody traces remain obligations
+CLI contract fixture matches; custody and lifecycle runtime conformance remain obligations
+gate: ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: exit=exit status: 0 ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: gitlab descriptor matches; exit=0
+gate: kubernetes descriptor matches; exit=0
+gate: sql descriptor matches; exit=0
+gate: ["build", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling connectors-cli-contract v0.0.0 (/home/timo/beyond10x/connectors_v2/apps/connectors-cli-contract)
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.98s
+gate: exit=exit status: 0 ["build", "--workspace", "--locked", "--offline"]
+gate: ["test", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling connectors-cli-contract v0.0.0 (/home/timo/beyond10x/connectors_v2/apps/connectors-cli-contract)
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling rcgen v0.14.10
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-gitlab v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/gitlab)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-sql v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/sql)
+   Compiling connectors-kubernetes v0.1.0 (/home/timo/beyond10x/connectors_v2/adapters/kubernetes)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+   Compiling connectors v0.1.0 (/home/timo/beyond10x/connectors_v2/apps/connectors)
+   Compiling connectors-conformance v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-conformance)
+    Finished `test` profile [unoptimized] target(s) in 18.50s
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors-e03bbb21ccd66bca)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compatibility.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/compatibility-eebac1244565852a)
+
+running 2 tests
+test compatibility_inventory_matches_existing_help ... ok
+test legacy_describe_is_complete_and_invoke_prints_raw_result_once ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/input.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/input-06b6e343f136f2b6)
+
+running 1 test
+test duplicate_input_keys_are_refused_before_service_contact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/local_cli.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_cli-8189efa5921d2d0d)
+
+running 3 tests
+test protected_sources_are_not_consumed_before_configuration_admission ... ok
+test production_parser_initializes_and_inspects_across_processes ... ok
+test inventory_and_unavailable_status_never_launch_configured_executable ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_build-38cdbc67c8d8935c)
+
+running 19 tests
+test cli::tests::cache_labels_and_page_deadlines_cannot_assert_unobserved_freshness ... ok
+test cli::tests::public_acquisition_examples_cannot_expose_internal_states_or_wrong_terminal_fields ... ok
+test docs::tests::refuses_unknown_projection_nodes ... ok
+test docs::tests::rejects_duplicate_and_escaping_routes ... ok
+test docs::tests::cannot_publish_a_source_outside_its_owner ... ok
+test docs::tests::resolves_only_selected_local_links ... ok
+test docs::tests::public_audit_checks_embedded_binary_paths ... ok
+test ess_boundary::tests::matches_case_and_separator_variants_without_substring_false_positives ... ok
+test docs::tests::preserves_rules_and_stable_heading_anchors ... ok
+test docs::tests::reference_title_keeps_anchor_and_text_without_a_second_h1 ... ok
+test docs::tests::imported_markdown_cannot_execute_html_or_script_links ... ok
+test ess_boundary::tests::allows_shared_protocols_and_separate_provider_models ... ok
+test ess_boundary::tests::rejects_malformed_optional_alias_inputs_and_model_sources ... ok
+test ess_boundary::tests::protocol_adapter_does_not_ban_shared_protocol_or_suppress_native_leaks ... ok
+test ess_boundary::tests::refuses_linked_source_files_and_directories ... ok
+test ess_boundary::tests::discovers_design_only_and_spec_only_owners_without_runtime_declarations ... ok
+test ess_boundary::tests::checks_all_paths_and_requires_complete_local_domain_inventory ... ok
+test ess_boundary::tests::rejects_names_comments_fields_encoded_values_and_new_adapter_ids ... ok
+test docs::tests::walkthrough_fixtures_follow_the_real_descriptor ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_client-d67bb60af80240b7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_conformance-4c35c715e9e9c40d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_surface.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/cli_surface-0a8aa68dd6e52b29)
+
+running 7 tests
+test the_selected_inventory_has_sixteen_grouped_commands_and_explicit_runtime_obligations ... FAILED
+test inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result ... ok
+test typed_application_usage_operational_and_interrupt_outcomes_use_distinct_exits ... ok
+test protected_source_conflicts_and_parser_errors_never_capture_or_echo_values ... ok
+test dynamic_business_sources_are_acquired_once_and_validate_both_directions ... ok
+test every_local_action_dispatches_once_with_its_declared_result_type ... ok
+test native_schema_refusals_prevent_handler_dispatch_and_bad_results_never_reach_stdout ... ok
+
+failures:
+
+---- the_selected_inventory_has_sixteen_grouped_commands_and_explicit_runtime_obligations stdout ----
+
+thread 'the_selected_inventory_has_sixteen_grouped_commands_and_explicit_runtime_obligations' (596059) panicked at crates/connectors-conformance/tests/cli_surface.rs:117:5:
+assertion `left == right` failed
+  left: {"adapters describe", "adapters list", "adapters status", "adapters stop", "approvals key-init", "approvals key-recover", "approvals key-retire", "approvals key-revoke", "approvals key-rotate", "approvals key-status", "connections connect", "connections describe", "connections list", "connections repair", "connections revalidate", "connections revoke", "connections status", "operations describe", "operations invoke", "operations list", "setup check", "setup init"}
+ right: {"adapters describe", "adapters list", "adapters status", "adapters stop", "connections connect", "connections describe", "connections list", "connections repair", "connections revalidate", "connections revoke", "connections status", "operations describe", "operations invoke", "operations list", "setup check", "setup init"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_selected_inventory_has_sixteen_grouped_commands_and_explicit_runtime_obligations
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p connectors-conformance --test cli_surface`
+gate: exit=exit status: 101 ["test", "--workspace", "--locked", "--offline"]
+Error: "gate command \"cargo\" failed"

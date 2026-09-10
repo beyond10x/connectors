@@ -13,6 +13,7 @@ use std::{
 const APPLICATION_ID: i64 = 0x434e4354;
 const MIGRATION: &str = "CREATE TABLE local_authority (singleton INTEGER PRIMARY KEY CHECK(singleton=1), authority_id TEXT NOT NULL UNIQUE, owner_uid INTEGER NOT NULL); CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, digest TEXT NOT NULL);";
 const APPROVAL_MIGRATION: &str = include_str!("metadata/approvals.sql");
+const APPROVAL_KEYS_MIGRATION: &str = include_str!("metadata/approval_keys.sql");
 const REGISTRY_MIGRATION: &str = include_str!("metadata/registry.sql");
 const RUNTIME_MIGRATION: &str = include_str!("metadata/runtime.sql");
 const MUTATION_MIGRATION: &str = include_str!("metadata/mutations.sql");
@@ -172,10 +173,16 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(unavailable)?;
-        if !(2..=6).contains(&version) {
+        if !(2..=7).contains(&version) {
             return Err(Failure::MetadataUnavailable);
         }
         Ok(())
+    }
+
+    pub(super) fn update_approval_keys(path: &Path) -> Result<Self> {
+        let mut metadata = Self::update(path, true)?;
+        metadata.migrate(7)?;
+        Ok(metadata)
     }
 
     pub(super) fn authority(&self) -> Result<uuid::Uuid> {
@@ -201,6 +208,7 @@ impl Metadata {
             (4, MUTATION_MIGRATION),
             (5, AUDIT_MIGRATION),
             (6, APPROVAL_MIGRATION),
+            (7, APPROVAL_KEYS_MIGRATION),
         ] {
             if version >= next || next > target {
                 continue;
@@ -294,7 +302,7 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
             .map_err(unavailable)?;
-        if app != APPLICATION_ID || !(1..=6).contains(&version) || mode != "wal" {
+        if app != APPLICATION_ID || !(1..=7).contains(&version) || mode != "wal" {
             return Err(Failure::MetadataUnavailable);
         }
         let (authority, owner): (String, u32) = self
@@ -341,6 +349,12 @@ impl Metadata {
             expected.push((
                 6,
                 hex::encode(Sha256::digest(APPROVAL_MIGRATION.as_bytes())),
+            ));
+        }
+        if version >= 7 {
+            expected.push((
+                7,
+                hex::encode(Sha256::digest(APPROVAL_KEYS_MIGRATION.as_bytes())),
             ));
         }
         if migrations != expected {

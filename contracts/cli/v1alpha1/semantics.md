@@ -9,8 +9,11 @@ ownership, provider authentication or restart recovery. The existing runtime
 continues to support the [documented three-adapter slice](../../../README.md#where-the-project-stands).
 Setup, configured inventory and passive connection management have production
 handlers. The [private adapter transport](private-adapter.md) has process/TLS
-fixtures. Protected CLI acquisition and the complete owner lifecycle remain
-unfinished; the persistent GitLab restart journey has not passed acceptance.
+fixtures. Protected GitLab acquisition and restart reuse pass disposable runtime
+journeys; dedicated provider sandbox acceptance and the other adapters' persistent
+lifecycle bindings remain open. [Approval-key management](../../service/approval-issuers.md)
+adds the `approvals key-init`, `key-status`, `key-rotate`, `key-recover`, `key-revoke`
+and `key-retire` commands. It does not issue approval proofs or enable provider writes.
 
 ## 1. Owners and identities
 

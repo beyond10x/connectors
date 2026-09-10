@@ -1,0 +1,32 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 3.47s
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-03ec8893ecafe4cf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 84 filtered out; finished in 0.00s
+
+     Running tests/http.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http-42ce5ea7ef5c279b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/http_prefix.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http_prefix-4bb5092bd51cae83)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/local_foundation.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_foundation-558da1e8fe6714d9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/service.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/service-72d96f2a4c281909)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+

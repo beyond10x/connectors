@@ -38,6 +38,54 @@ Callable: `adapters-stop`. Input: `connectors.cli.AdapterStopInput`. Result: `co
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `approvals key-init`
+
+Create a new approval-signing key in protected local custody
+
+Callable: `approval-keys-init`. Input: `connectors.cli.ApprovalKeyInitInput`. Result: `connectors.cli.ApprovalKeysResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals key-recover`
+
+Confirm and publish an exact staged approval-signing key
+
+Callable: `approval-keys-recover`. Input: `connectors.cli.ApprovalKeyRecoverInput`. Result: `connectors.cli.ApprovalKeysResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals key-retire`
+
+Delete exact noncurrent signing material while retaining public history
+
+Callable: `approval-keys-retire`. Input: `connectors.cli.ApprovalKeyRetireInput`. Result: `connectors.cli.ApprovalKeysResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals key-revoke`
+
+Revoke the current key and cancel its pending replacement
+
+Callable: `approval-keys-revoke`. Input: `connectors.cli.ApprovalKeyRevokeInput`. Result: `connectors.cli.ApprovalKeysResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals key-rotate`
+
+Publish a replacement for the exact current approval-signing key
+
+Callable: `approval-keys-rotate`. Input: `connectors.cli.ApprovalKeyRotateInput`. Result: `connectors.cli.ApprovalKeysResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals key-status`
+
+Observe public key metadata without starting services or reading secrets
+
+Callable: `approval-keys-status`. Input: `connectors.cli.ApprovalKeyStatusInput`. Result: `connectors.cli.ApprovalKeysResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `connections connect`
 
 Begin admitted local protected credential acquisition
@@ -140,6 +188,12 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:adapters-list: implement the owner-qualified callable and its declared result/error contract
 - handler:adapters-status: implement the owner-qualified callable and its declared result/error contract
 - handler:adapters-stop: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-keys-init: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-keys-recover: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-keys-retire: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-keys-revoke: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-keys-rotate: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-keys-status: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-connect: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-describe: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-list: implement the owner-qualified callable and its declared result/error contract

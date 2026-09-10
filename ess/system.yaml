@@ -13,6 +13,7 @@ domains:
   - connectors.sessions
   - connectors.service_wire
   - connectors.delegation
+  - connectors.approval_issuers
   - connectors.connection_admission
   - connectors.auth_access
   - connectors.discovery

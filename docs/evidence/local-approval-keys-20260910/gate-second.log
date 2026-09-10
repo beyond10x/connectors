@@ -1,0 +1,30 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+   Compiling connectors-build v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.03s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build gate --msrv`
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 21 file(s), valid
+connectors v1 — 21 file(s), 415 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-h6mg4Y/ess-boundary-0.json
+connectors_atlassian v1 — 2 file(s), valid
+connectors_atlassian v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-h6mg4Y/ess-boundary-1.json
+connectors_docker v1 — 2 file(s), valid
+connectors_docker v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-h6mg4Y/ess-boundary-2.json
+connectors_gitlab v1 — 4 file(s), valid
+connectors_gitlab v1 — 4 file(s), 14 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-h6mg4Y/ess-boundary-3.json
+connectors_grafana v1 — 2 file(s), valid
+connectors_grafana v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-h6mg4Y/ess-boundary-4.json
+connectors_kubernetes v1 — 4 file(s), valid
+connectors_kubernetes v1 — 4 file(s), 11 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-h6mg4Y/ess-boundary-5.json
+connectors_loki v1 — 2 file(s), valid
+connectors_loki v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/beyond10x/connectors_v2/.local/tmp/gate-h6mg4Y/ess-boundary-6.json
+gate: shared and 6 adapter ESS models validated and compiled independently; exit=0
+10 CLI artifact(s), current in apps/connectors-cli-contract
+Error: "CLI structural fixture approval-keys-uninitialized disagrees with its selected model"

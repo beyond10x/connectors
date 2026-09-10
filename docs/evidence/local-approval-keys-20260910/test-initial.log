@@ -1,0 +1,29 @@
+   Compiling tokio-rustls v0.26.5
+   Compiling rcgen v0.14.10
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-client)
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+    Finished `test` profile [unoptimized] target(s) in 6.52s
+     Running unittests src/lib.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/connectors_host-03ec8893ecafe4cf)
+
+running 3 tests
+test local::approval_keys::tests::durable_key_management_with_qualified_custody ... FAILED
+test local::approval_keys::tests::passive_status_does_not_migrate_or_touch_custody ... ok
+test local::approval_keys::tests::unavailable_write_leaves_exact_candidate_and_no_duplicate_allocation ... ok
+
+failures:
+
+---- local::approval_keys::tests::durable_key_management_with_qualified_custody stdout ----
+
+thread 'local::approval_keys::tests::durable_key_management_with_qualified_custody' (514638) panicked at crates/connectors-host/src/local/approval_keys/tests.rs:90:36:
+called `Result::unwrap()` on an `Err` value: CustodyUnavailable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    local::approval_keys::tests::durable_key_management_with_qualified_custody
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 81 filtered out; finished in 0.29s
+
+error: test failed, to rerun pass `-p connectors-host --lib`

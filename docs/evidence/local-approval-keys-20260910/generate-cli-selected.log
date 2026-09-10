@@ -1,0 +1,4 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-build cli`
+error: unowned output destination: Cargo.toml; adopt exact generated reference bytes explicitly
+Error: "ESS CLI generation failed: exit status: 1"

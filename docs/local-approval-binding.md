@@ -30,14 +30,18 @@ Its current admission guard selects a trusted configured issuer/audience/key
 and serializes authority and key changes until dropped. The bounded `kid` is
 only a configuration lookup hint; proofs cannot select their own trust or cause
 network key discovery. A separate `IssuancePolicy` owns issuance authorization.
-No default allow-all policy is supplied. The embedding coordinator must obey
-metadata-before-policy lock ordering and perform bounded local admission work.
+No default allow-all policy is supplied. The embedding coordinator acquires its
+current-key lease before opening metadata, then lends that held lease to bounded
+policy admission inside the spend transaction. Policy must not reopen metadata
+or acquire a key-management lock from inside that transaction.
 
 Signing consumes a purpose-specific protected seed capability and generates a
 fresh 256-bit random reference using the operating system random source through
 ring. Proof bytes and the seed have no Debug/Clone/serialization implementation
 and remain outside SQLite. This in-memory signer does not provide persistent
-issuer custody, publication, rotation, human approval or a public issuer API.
+issuer custody itself. The separate [key coordinator](local-approval-keys.md)
+provides protected persistence, publication and rotation; human approval and a
+public proof-issuance API remain unimplemented.
 
 Both issuance and verification require trusted time containment within a maximum
 four-second interval, with checked integer/unit arithmetic. There is no default
@@ -99,7 +103,7 @@ association and four actual child-process crash boundaries. A simulated effect
 file establishes no native provider acceptance. These are local single-authority
 guarantees; divergent backups/failover must not activate the same leaf identity.
 
-Protected persistent issuer custody and rotation, actual local approval CLI,
+Actual local approval preparation and issuance,
 authenticated caller policy, production clock qualification, generated mutation
 ingress and the complete connection-bound dispatch coordinator remain required.
 Native GitLab writes and dedicated sandbox acceptance follow those foundations.
