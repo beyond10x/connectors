@@ -14,6 +14,8 @@ pub struct Config {
     pub format: String,
     pub owner_uid: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_clock: Option<super::clock::Configuration>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secret_service_socket: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_adapter: Option<String>,
@@ -128,6 +130,11 @@ impl Config {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if let Some(clock) = &self.approval_clock {
+            clock
+                .validate()
+                .map_err(|_| Failure::InvalidConfiguration)?;
+        }
         if let Some(path) = &self.secret_service_socket {
             fs::validate_path(path)?;
         }
@@ -209,6 +216,7 @@ impl Config {
         let config = Self {
             format: "connectors-local/1".into(),
             owner_uid: fs::uid(),
+            approval_clock: None,
             secret_service_socket: None,
             default_adapter: None,
             adapters: BTreeMap::new(),
