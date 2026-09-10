@@ -25,17 +25,18 @@ separate steps.
 
 ## Where the project stands
 
-The local CLI implements private `setup init`, passive `setup check`, configured
-adapter inventory, and connection list/describe/status/revoke through the generated
-parser. The host's SQLite registry coordinates immutable keyring storage, repair,
-publication and retirement. Protected connect/repair and supervised invocation
-are still unfinished; the
-persistent GitLab restart journey has **not** passed acceptance. See the
-[local runtime foundation](docs/local-runtime-foundation.md) for commands and
-current refusals. GitLab's private executable binding has disposable process/TLS
-tests for native validation and its three existing reads; the CLI owner still
-needs to bind it to protected acquisition and dispatch. The explicit network
-commands below remain compatible.
+The local CLI implements setup, configured adapter management, protected
+connect/repair, connection inspection/revoke, cached operation discovery and
+supervised GitLab reads through its generated parser. A local owner manages exact
+child processes; SQLite records metadata and a qualified Secret Service keyring
+stores credentials. See the [GitLab CLI guide](docs/local-gitlab-cli.md) and
+[runtime binding](docs/local-runtime-foundation.md).
+
+Disposable GitLab HTTPS and keyring fixtures prove saved-credential reuse after
+CLI, owner and keyring restarts. Dedicated GitLab sandbox acceptance and explicit
+renewal of the current 60-second validation evidence remain open. Kubernetes and
+PostgreSQL still need this local lifecycle binding; MCP and the remaining providers
+follow them. The explicit network commands below remain compatible.
 
 This repository contains a working local data/discovery slice and a broader,
 reviewed specification baseline. The local **v0.1.0 milestone is a specification
@@ -56,14 +57,14 @@ This slice does not advertise writes, managed OAuth acquisition, durable events,
 process execution or media sessions. Other adapters have designs and, in some
 cases, authored native models; their presence does not mean they can run.
 
-The next local CLI is specified under [CLI contracts](contracts/cli/v1alpha1/semantics.md):
+The local CLI is specified under [CLI contracts](contracts/cli/v1alpha1/semantics.md):
 `setup`, `adapters`, `connections` and `operations`, with per-adapter TOML startup
 configuration and protected credential entry into local keyring custody. Its ESS
 binding and generated parser supply the production management handlers above.
 [Qualified keyring storage](docs/local-secret-service.md) and the
 [connection registry](docs/local-connection-registry.md) have disposable runtime
-tests. Protected acquisition and adapter supervision remain implementation work;
-the executable also provides `describe`, `invoke` and `serve`.
+tests. Writes, MCP binding and complete multi-provider acceptance remain
+implementation work; the executable also provides `describe`, `invoke` and `serve`.
 
 There is no public release distribution or configured deployment. Historical
 [runtime verification](docs/verification.md) and the

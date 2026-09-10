@@ -4,8 +4,8 @@ The host's `local::keyring::custody` module implements immutable scoped writes a
 exact-version reads against one qualified Linux Secret Service implementation.
 It is infrastructure for the persistent GitLab journey. The
 [SQLite coordinator](local-connection-registry.md) now binds connection publication
-and guarded retirement. Protected CLI entry and supervised invocation remain
-unfinished. `setup check` qualifies the current daemon/storage against this exact
+and guarded retirement. [Protected CLI entry and supervised GitLab reads](local-gitlab-cli.md)
+now use this binding. `setup check` qualifies the current daemon/storage against this exact
 binding; that prerequisite alone does not establish a usable saved connection.
 
 ## Selected implementation
@@ -20,8 +20,11 @@ tested on ext4. In-memory and other unqualified filesystem types are refused eve
 if their fsync call succeeds. This is a deliberately narrow initial binding.
 
 Admission authenticates the local bus socket and unique Secret Service owner to
-the effective UID. Production connects only to `/run/user/<uid>/bus`, never an
-environment-selected or remote bus. It pins the unique bus name, opens a pidfd for
+the effective UID. Production defaults to `/run/user/<uid>/bus`. An optional
+`secret_service_socket` in the private owner configuration selects another absolute
+local Unix socket with an owner-only parent and the same peer/daemon/storage checks.
+The disposable CLI fixtures use that binding; no desktop collection is touched.
+Environment-selected and remote buses remain excluded. It pins the unique bus name, opens a pidfd for
 that owner's PID, verifies the executable digest, and requires the same mount and
 user namespaces and filesystem root. A dead owner cannot be replaced underneath
 an existing capability. There is no service activation, unlock, or prompt.
