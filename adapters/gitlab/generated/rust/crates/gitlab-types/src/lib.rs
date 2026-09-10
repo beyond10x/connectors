@@ -1,6 +1,6 @@
 // generated from gitlab v1
-// model digest 5464a959b36fe5673bd570eecf3f661540dd261b60c0fde2fd37f4a5bf2d97f3
-// contract digest c3d3a9b408c90c2a8b03daf08984379733603f2c84f483640772f01ea8aea190
+// model digest ede8787ae4303e8248e5bd6de3675b12866d725713b94852f37db003d4982392
+// contract digest 9020464eeb141c4af3f7cd1c704975f1a25aa17da6a44f4b61ff3a5c25400334
 // do not edit: regenerate with `ess synthesize`
 
 //! Semantic types synthesised from the `gitlab` specification, v1.

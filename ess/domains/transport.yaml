@@ -1,0 +1,13 @@
+domain: connectors.transport
+summary: Bounded private HTTP transport observations without credential or dispatch authority.
+types:
+  - name: connectors.transport.HttpResponsePrefix
+    kind: struct
+    fields:
+      - {name: status, type: Integer}
+      - {name: headers, type: "Map<String, String>"}
+      - {name: body, type: "List<Integer>"}
+      - {name: complete, type: Boolean}
+    # Bytes are 0..255. Retain at most the admitted 1..1048576-byte ceiling;
+    # complete means EOF was actually observed, not that Content-Length matched.
+    # No range/resume identity, retry, freshness or business permission is implied.

@@ -77,6 +77,10 @@ async fn upstream_redirects_cannot_exfiltrate_bound_credentials() {
         ErrorCode::UpstreamProtocol
     );
     assert_eq!(hits.load(Ordering::SeqCst), 0);
+    let prefix = http.get_prefix(&["redirect"], &[], 16).await.unwrap();
+    assert_eq!(prefix.status, 302);
+    assert!(prefix.complete);
+    assert_eq!(hits.load(Ordering::SeqCst), 0);
     server.abort();
     receiver.abort();
 }

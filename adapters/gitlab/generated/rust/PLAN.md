@@ -1,14 +1,14 @@
 <!--
   generated from gitlab v1
-  model digest 5464a959b36fe5673bd570eecf3f661540dd261b60c0fde2fd37f4a5bf2d97f3
-  contract digest c3d3a9b408c90c2a8b03daf08984379733603f2c84f483640772f01ea8aea190
+  model digest ede8787ae4303e8248e5bd6de3675b12866d725713b94852f37db003d4982392
+  contract digest 9020464eeb141c4af3f7cd1c704975f1a25aa17da6a44f4b61ff3a5c25400334
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — gitlab v1
 
 Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synthesize`.
 
-4 capabilities: **4 generated**, **0 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
+9 capabilities: **9 generated**, **0 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
 
 ## Generated
 
@@ -16,6 +16,11 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | --- | --- |
 | domain type | `gitlab.requests.FileGetRequest` |
 | domain type | `gitlab.requests.IssuesListRequest` |
+| domain type | `gitlab.requests.JobGetRequest` |
+| domain type | `gitlab.requests.JobTraceRequest` |
+| domain type | `gitlab.requests.PipelineGetRequest` |
+| domain type | `gitlab.requests.PipelineJobsRequest` |
+| domain type | `gitlab.requests.PipelinesListRequest` |
 | domain type | `gitlab.requests.ProjectGetRequest` |
 | component port | `gitlab-adapter` |
 

@@ -7,40 +7,41 @@
     "https://docs.gitlab.com/api/issues/",
     "https://docs.gitlab.com/api/repository_files/",
     "https://docs.gitlab.com/api/rest/",
-    "https://docs.gitlab.com/api/rest/authentication/"
+    "https://docs.gitlab.com/api/rest/authentication/",
+    "https://docs.gitlab.com/api/pipelines/",
+    "https://docs.gitlab.com/api/jobs/"
   ],
   "configuration_schema": {
     "oneOf": [
       {
         "type": "object",
         "properties": {
-          "format": { "const": "connectors-gitlab-local/1" },
-          "instance": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.-]+$" },
-          "api_base": { "type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^https://.+/api/v4/$" },
-          "ca_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
-          "allowed_projects": {
-            "type": "array", "minItems": 1, "maxItems": 1000, "uniqueItems": true,
-            "items": { "type": "string", "minLength": 1, "maxLength": 512 }
-          }
-        },
-        "required": ["format", "instance", "api_base", "ca_digest", "allowed_projects"],
-        "additionalProperties": false
-      },
-      {
-    "type": "object",
-    "properties": {
-      "service": {
-        "$ref": "urn:connectors:config:v1:service"
-      },
-      "http": {
-        "$ref": "urn:connectors:config:v1:http"
-      },
-      "adapter": {
-        "type": "object",
-        "properties": {
+          "format": {
+            "const": "connectors-gitlab-local/1"
+          },
+          "instance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "api_base": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^https://.+/api/v4/$"
+          },
+          "ca_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
           "allowed_projects": {
             "type": "array",
             "minItems": 1,
+            "maxItems": 1000,
             "uniqueItems": true,
             "items": {
               "type": "string",
@@ -50,17 +51,49 @@
           }
         },
         "required": [
+          "format",
+          "instance",
+          "api_base",
+          "ca_digest",
           "allowed_projects"
         ],
         "additionalProperties": false
-      }
-    },
-    "required": [
-      "service",
-      "http",
-      "adapter"
-    ],
-    "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "service": {
+            "$ref": "urn:connectors:config:v1:service"
+          },
+          "http": {
+            "$ref": "urn:connectors:config:v1:http"
+          },
+          "adapter": {
+            "type": "object",
+            "properties": {
+              "allowed_projects": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              }
+            },
+            "required": [
+              "allowed_projects"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "service",
+          "http",
+          "adapter"
+        ],
+        "additionalProperties": false
       }
     ]
   },
@@ -313,6 +346,653 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "pipelines.list",
+      "description": "Read a bounded page of pipelines for one exact full commit SHA.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "gitlab-pipelines-offset",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "sha": {
+            "type": "string",
+            "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project",
+          "sha",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "project_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "sha": {
+                  "type": "string",
+                  "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                },
+                "ref": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "id",
+                "project_id",
+                "sha",
+                "ref",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "pipeline.get",
+      "description": "Read the selected pipeline and verify its exact commit SHA.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "gitlab-pipeline",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "pipeline_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "sha": {
+            "type": "string",
+            "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          }
+        },
+        "required": [
+          "project",
+          "pipeline_id",
+          "sha"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9223372036854775807
+              },
+              "project_id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9223372036854775807
+              },
+              "sha": {
+                "type": "string",
+                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "id",
+              "project_id",
+              "sha",
+              "ref",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "item",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "pipeline.jobs",
+      "description": "Read a bounded page of current job attempts in the exact selected pipeline.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "gitlab-pipeline-jobs-offset",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "pipeline_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "sha": {
+            "type": "string",
+            "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "project",
+          "pipeline_id",
+          "sha",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "pipeline_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "sha": {
+                  "type": "string",
+                  "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "stage": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "allow_failure": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "pipeline_id",
+                "sha",
+                "name",
+                "stage",
+                "status",
+                "allow_failure"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "job.get",
+      "description": "Read a job and verify its pipeline and exact commit SHA.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "gitlab-job",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "job_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "pipeline_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "sha": {
+            "type": "string",
+            "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+          }
+        },
+        "required": [
+          "project",
+          "job_id",
+          "pipeline_id",
+          "sha"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9223372036854775807
+              },
+              "pipeline_id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9223372036854775807
+              },
+              "sha": {
+                "type": "string",
+                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "stage": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "allow_failure": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "pipeline_id",
+              "sha",
+              "name",
+              "stage",
+              "status",
+              "allow_failure"
+            ],
+            "additionalProperties": false
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "item",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "job.trace",
+      "description": "Read a bounded UTF-8 prefix of the selected job trace with explicit completeness.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "gitlab-job-trace-prefix",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "job_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512000
+          }
+        },
+        "required": [
+          "project",
+          "job_id",
+          "max_bytes"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "job_id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9223372036854775807
+              },
+              "content": {
+                "type": "string",
+                "maxLength": 512000
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 512000
+              },
+              "complete": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "job_id",
+              "content",
+              "bytes",
+              "complete"
+            ],
+            "additionalProperties": false
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "item",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
     }
   ],
   "upstream": {
@@ -395,6 +1075,138 @@
           "name": "ref"
         }
       },
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
+    },
+    {
+      "operation": "pipelines.list",
+      "upstream_operation": "getApiV4ProjectsIdPipelines",
+      "path": "/api/v4/projects/{id}/pipelines",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        }
+      },
+      "query_parameters": {
+        "sha": {
+          "kind": "input",
+          "name": "sha"
+        },
+        "page": {
+          "kind": "binding",
+          "name": "page"
+        },
+        "per_page": {
+          "kind": "input",
+          "name": "limit"
+        },
+        "order_by": {
+          "kind": "constant",
+          "value": "id"
+        },
+        "sort": {
+          "kind": "constant",
+          "value": "desc"
+        }
+      },
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
+    },
+    {
+      "operation": "pipeline.get",
+      "upstream_operation": "getApiV4ProjectsIdPipelinesPipelineId",
+      "path": "/api/v4/projects/{id}/pipelines/{pipeline_id}",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        },
+        "pipeline_id": {
+          "kind": "input",
+          "name": "pipeline_id"
+        }
+      },
+      "query_parameters": {},
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
+    },
+    {
+      "operation": "pipeline.jobs",
+      "upstream_operation": "getApiV4ProjectsIdPipelinesPipelineIdJobs",
+      "path": "/api/v4/projects/{id}/pipelines/{pipeline_id}/jobs",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        },
+        "pipeline_id": {
+          "kind": "input",
+          "name": "pipeline_id"
+        }
+      },
+      "query_parameters": {
+        "page": {
+          "kind": "binding",
+          "name": "page"
+        },
+        "per_page": {
+          "kind": "input",
+          "name": "limit"
+        }
+      },
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
+    },
+    {
+      "operation": "job.get",
+      "upstream_operation": "getApiV4ProjectsIdJobsJobId",
+      "path": "/api/v4/projects/{id}/jobs/{job_id}",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        },
+        "job_id": {
+          "kind": "input",
+          "name": "job_id"
+        }
+      },
+      "query_parameters": {},
+      "obligations": [
+        "prepare",
+        "finish"
+      ]
+    },
+    {
+      "operation": "job.trace",
+      "upstream_operation": "getApiV4ProjectsIdJobsJobIdTrace",
+      "path": "/api/v4/projects/{id}/jobs/{job_id}/trace",
+      "method": "get",
+      "path_parameters": {
+        "id": {
+          "kind": "input",
+          "name": "project"
+        },
+        "job_id": {
+          "kind": "input",
+          "name": "job_id"
+        }
+      },
+      "query_parameters": {},
+      "response_prefix_limit": 512000,
       "obligations": [
         "prepare",
         "finish"

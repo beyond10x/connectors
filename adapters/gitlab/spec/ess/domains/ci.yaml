@@ -1,0 +1,35 @@
+domain: connectors_gitlab.ci
+summary: GitLab-native bounded CI observations; these values create no provider resource or local persistent owner.
+types:
+  - name: connectors_gitlab.ci.Pipeline
+    kind: struct
+    fields:
+      - {name: id, type: Integer}
+      - {name: project_id, type: Integer}
+      - {name: sha, type: String}
+      - {name: ref, type: String}
+      - {name: status, type: String}
+  - name: connectors_gitlab.ci.Job
+    kind: struct
+    fields:
+      - {name: id, type: Integer}
+      - {name: pipeline_id, type: Integer}
+      - {name: sha, type: String}
+      - {name: name, type: String}
+      - {name: stage, type: String}
+      - {name: status, type: String}
+      - {name: allow_failure, type: Boolean}
+  - name: connectors_gitlab.ci.Trace
+    kind: struct
+    fields:
+      - {name: job_id, type: Integer}
+      - {name: content, type: String}
+      - {name: bytes, type: Integer}
+      - {name: complete, type: Boolean}
+    # UTF-8 byte length, at most min(selected maximum,512000); complete only
+    # after transport EOF with no native byte/suffix truncation. No resume claim.
+
+# Runtime owner: adapters/gitlab/contracts/ci/v1alpha1/semantics.md.
+# Positive signed IDs, exact full lowercase SHA, native status interpretation,
+# page/target equality, byte/UTF-8 bounds and provenance are native predicates.
+# Request shapes are authored in adapter.json and lowered by the v2 generator.

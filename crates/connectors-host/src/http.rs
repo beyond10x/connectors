@@ -1,7 +1,7 @@
 use crate::credentials::CredentialRef;
 use async_trait::async_trait;
 use connectors_core::{Error, ErrorCode, Result};
-use connectors_sdk::{AuthenticatedHttp, Credential, HttpResponse};
+use connectors_sdk::{AuthenticatedHttp, Credential, HttpResponse, HttpResponsePrefix};
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc, time::Duration};
@@ -117,6 +117,7 @@ impl ScopedHttp {
         let mut builder = Client::builder()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
+            .retry(reqwest::retry::never())
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(15));
         if let Some(bytes) = ca {
@@ -151,9 +152,12 @@ impl ScopedHttp {
     }
 }
 
-#[async_trait]
-impl AuthenticatedHttp for ScopedHttp {
-    async fn get(&self, segments: &[&str], query: &[(&str, String)]) -> Result<HttpResponse> {
+impl ScopedHttp {
+    async fn send_get(
+        &self,
+        segments: &[&str],
+        query: &[(&str, String)],
+    ) -> Result<reqwest::Response> {
         let mut url = self.base.clone();
         {
             let mut path = url
@@ -184,13 +188,22 @@ impl AuthenticatedHttp for ScopedHttp {
             header.set_sensitive(true);
             request = request.header(&self.header, header);
         }
-        let response = request.send().await.map_err(|e| {
-            if e.is_timeout() {
-                Error::new(ErrorCode::Timeout, "provider request timed out")
-            } else {
-                Error::unavailable()
-            }
-        })?;
+        request.send().await.map_err(provider_error)
+    }
+}
+
+fn provider_error(error: reqwest::Error) -> Error {
+    if error.is_timeout() {
+        Error::new(ErrorCode::Timeout, "provider request timed out")
+    } else {
+        Error::unavailable()
+    }
+}
+
+#[async_trait]
+impl AuthenticatedHttp for ScopedHttp {
+    async fn get(&self, segments: &[&str], query: &[(&str, String)]) -> Result<HttpResponse> {
+        let response = self.send_get(segments, query).await?;
         let status = response.status().as_u16();
         let headers = response
             .headers()
@@ -202,6 +215,55 @@ impl AuthenticatedHttp for ScopedHttp {
             status,
             headers,
             body,
+        })
+    }
+
+    async fn get_prefix(
+        &self,
+        segments: &[&str],
+        query: &[(&str, String)],
+        limit: usize,
+    ) -> Result<HttpResponsePrefix> {
+        if !(1..=1_048_576).contains(&limit) {
+            return Err(Error::invalid(
+                "response prefix limit is outside supported bounds",
+            ));
+        }
+        let mut response = self.send_get(segments, query).await?;
+        let status = response.status().as_u16();
+        let mut headers = std::collections::BTreeMap::new();
+        let mut header_bytes = 0_usize;
+        for (index, (name, value)) in response.headers().iter().enumerate() {
+            header_bytes = header_bytes.saturating_add(name.as_str().len());
+            header_bytes = header_bytes.saturating_add(value.as_bytes().len());
+            if index >= 128 || header_bytes > 32_768 {
+                return Err(Error::new(
+                    ErrorCode::Capacity,
+                    "provider response headers exceed limit",
+                ));
+            }
+            if let Ok(value) = value.to_str() {
+                headers.insert(name.to_string(), value.to_owned());
+            }
+        }
+        let mut body = Vec::with_capacity(limit);
+        let complete = loop {
+            let Some(chunk) = response.chunk().await.map_err(provider_error)? else {
+                break true;
+            };
+            let keep = chunk.len().min(limit - body.len());
+            body.extend_from_slice(&chunk[..keep]);
+            if keep < chunk.len() {
+                break false;
+            }
+            // At the limit, another read is still required: exact length (or a
+            // Content-Length header) does not establish a successfully read EOF.
+        };
+        Ok(HttpResponsePrefix {
+            status,
+            headers,
+            body,
+            complete,
         })
     }
 }
