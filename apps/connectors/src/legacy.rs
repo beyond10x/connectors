@@ -56,7 +56,8 @@ async fn client(
     allow_plaintext: bool,
 ) -> connectors_core::Result<connectors_client::Client> {
     let secret = CredentialRef::File { path: token_file }.resolve().await?;
-    let token = String::from_utf8(secret.0)
+    let token = std::str::from_utf8(&secret.0)
+        .map(str::to_owned)
         .map_err(|_| connectors_core::Error::invalid("invalid service token"))?;
     connectors_client::Client::new(&endpoint, token, allow_plaintext)
 }
