@@ -191,6 +191,9 @@ pub async fn validate(
     if granted_scopes.contains("api") {
         granted_scopes.insert("read_api".into());
     }
+    if granted_scopes.len() > 64 {
+        return Err(Failure::InvalidResponse);
+    }
     if !granted_scopes.contains("read_api") {
         return Err(Failure::InsufficientScope);
     }

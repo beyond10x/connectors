@@ -6,6 +6,7 @@ pub mod config;
 pub mod filesystem;
 pub mod keyring;
 pub mod metadata;
+pub mod registry;
 
 /// Closed, credential-free local failures. Never include OS, parser or DB text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

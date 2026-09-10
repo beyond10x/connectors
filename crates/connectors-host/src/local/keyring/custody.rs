@@ -58,7 +58,32 @@ pub struct Version {
     id: Uuid,
 }
 
+/// A definite backend acknowledgement, never constructed from caller JSON.
+pub struct WrittenVersion {
+    version: Version,
+}
+impl WrittenVersion {
+    pub(crate) fn matches(&self, version: Version) -> bool {
+        self.version == version
+    }
+    #[cfg(test)]
+    pub(crate) fn fixture(version: Version) -> Self {
+        Self { version }
+    }
+}
+pub struct DeletedVersion {
+    version: Version,
+}
+impl DeletedVersion {
+    pub(crate) fn matches(&self, version: Version) -> bool {
+        self.version == version
+    }
+}
+
 impl Version {
+    pub fn scope(&self) -> Scope {
+        self.scope
+    }
     pub fn new(scope: Scope, id: Uuid) -> Result<Self> {
         if id.is_nil() {
             return Err(Failure::Denied);
@@ -114,7 +139,12 @@ impl Store {
     /// bytes, then synchronize the encrypted backing file and its directories.
     /// Any failure once CreateItem may have been sent is OutcomeUnknown. Never
     /// retry it here, overwrite, or silently accept an existing version.
-    pub fn write_new(&self, version: Version, material: &Secret) -> Result<()> {
+    pub(crate) fn write_new_guarded(
+        &self,
+        version: Version,
+        material: &Secret,
+        guard: impl FnOnce() -> Result<()>,
+    ) -> Result<WrittenVersion> {
         self.admit(version)?;
         if material.0.is_empty() || material.0.len() > MAX_BYTES {
             return Err(Failure::InvalidMaterial);
@@ -123,6 +153,9 @@ impl Store {
         let _writer = self.writer_lock(until)?;
         let _lock = self.persistence.lock(until)?;
         self.admit(version)?;
+        // The coordinator rechecks publication/retirement while this physical
+        // lock excludes deletion. It closes its metadata handle before returning.
+        guard()?;
         if self.find(version)?.is_some() {
             return Err(Failure::Conflict);
         }
@@ -166,7 +199,14 @@ impl Store {
         self.persistence
             .synchronize()
             .map_err(|_| Failure::OutcomeUnknown)?;
-        self.admit(version).map_err(|_| Failure::OutcomeUnknown)
+        self.admit(version).map_err(|_| Failure::OutcomeUnknown)?;
+        Ok(WrittenVersion { version })
+    }
+
+    #[cfg(test)]
+    fn write_new(&self, version: Version, material: &Secret) -> Result<()> {
+        self.write_new_guarded(version, material, || Ok(()))
+            .map(|_| ())
     }
 
     pub fn read(&self, version: Version) -> Result<Secret> {
@@ -195,16 +235,17 @@ impl Store {
         Ok(secret)
     }
 
-    // Physical retirement is deliberately private until the metadata coordinator
-    // can supply an acknowledged fence, trustworthy retention and no-valid-use
-    // proof. Tests exercise backend deletion without exposing a production bypass.
-    #[cfg(test)]
-    fn delete_for_qualification(&self, version: Version) -> Result<()> {
+    pub(crate) fn delete_guarded(
+        &self,
+        version: Version,
+        guard: impl FnOnce() -> Result<()>,
+    ) -> Result<DeletedVersion> {
         self.admit(version)?;
         let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
         let _writer = self.writer_lock(until)?;
         let _lock = self.persistence.lock(until)?;
         self.admit(version)?;
+        guard()?;
         if let Some(item) = self.find(version)? {
             let proxy = self
                 .service
@@ -224,7 +265,13 @@ impl Store {
         }
         self.persistence
             .synchronize()
-            .map_err(|_| Failure::OutcomeUnknown)
+            .map_err(|_| Failure::OutcomeUnknown)?;
+        Ok(DeletedVersion { version })
+    }
+
+    #[cfg(test)]
+    fn delete_for_qualification(&self, version: Version) -> Result<()> {
+        self.delete_guarded(version, || Ok(())).map(|_| ())
     }
 
     fn admit(&self, version: Version) -> Result<()> {
@@ -306,6 +353,22 @@ impl Store {
                 suffix.starts_with('/') && suffix.len() > 1 && !suffix[1..].contains('/')
             })
     }
+}
+
+/// Passive qualification of the current custody owner and encrypted storage.
+/// Opens no secret session and reads no credential item or encrypted payload.
+pub fn available() -> bool {
+    (|| -> Result<()> {
+        let service =
+            Service::connect(super::local_stream().map_err(unavailable)?).map_err(unavailable)?;
+        if service.state().map_err(unavailable)? != State::Available {
+            return Err(Failure::Unavailable);
+        }
+        let persistence = gnome::Persistence::admit(&service)?;
+        persistence.check_process()?;
+        Ok(())
+    })()
+    .is_ok()
 }
 
 impl Drop for Store {

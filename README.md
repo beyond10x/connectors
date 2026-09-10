@@ -25,10 +25,11 @@ separate steps.
 
 ## Where the project stands
 
-The local CLI now implements private `setup init`, passive `setup check`, and
-configured adapter list/describe/status through the generated parser. Setup
-initializes a versioned SQLite metadata authority. Persistent credential custody,
-connection management and supervised invocation are still unfinished; the
+The local CLI implements private `setup init`, passive `setup check`, configured
+adapter inventory, and connection list/describe/status/revoke through the generated
+parser. The host's SQLite registry coordinates immutable keyring storage, repair,
+publication and retirement. Protected connect/repair and supervised invocation
+are still unfinished; the
 persistent GitLab restart journey has **not** passed acceptance. See the
 [local runtime foundation](docs/local-runtime-foundation.md) for commands and
 current refusals. The explicit network commands below remain compatible.
@@ -55,9 +56,11 @@ cases, authored native models; their presence does not mean they can run.
 The next local CLI is specified under [CLI contracts](contracts/cli/v1alpha1/semantics.md):
 `setup`, `adapters`, `connections` and `operations`, with per-adapter TOML startup
 configuration and protected credential entry into local keyring custody. Its ESS
-binding and generated parser are contract fixtures. Production keyring storage,
-adapter supervision and management handlers remain implementation work; the
-current executable still provides `describe`, `invoke` and `serve`.
+binding and generated parser supply the production management handlers above.
+[Qualified keyring storage](docs/local-secret-service.md) and the
+[connection registry](docs/local-connection-registry.md) have disposable runtime
+tests. Protected acquisition and adapter supervision remain implementation work;
+the executable also provides `describe`, `invoke` and `serve`.
 
 There is no public release distribution or configured deployment. Historical
 [runtime verification](docs/verification.md) and the

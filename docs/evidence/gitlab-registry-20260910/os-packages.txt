@@ -1,0 +1,5 @@
+gnome-keyring 1:50.0-1
+dbus 1.16.2-1
+glib2 2.88.3-1
+libgcrypt 1.12.3-1
+glibc 2.44+r24+g16be1518495f-1

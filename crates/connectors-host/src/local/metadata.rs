@@ -12,6 +12,7 @@ use std::{
 
 const APPLICATION_ID: i64 = 0x434e4354;
 const MIGRATION: &str = "CREATE TABLE local_authority (singleton INTEGER PRIMARY KEY CHECK(singleton=1), authority_id TEXT NOT NULL UNIQUE, owner_uid INTEGER NOT NULL); CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, digest TEXT NOT NULL);";
+const REGISTRY_MIGRATION: &str = include_str!("metadata/registry.sql");
 const NAME: &str = "metadata.sqlite3";
 const LOCK: &str = "metadata.lock";
 
@@ -19,7 +20,7 @@ pub struct Metadata {
     // Field drop order matters: SQLite closes and retires sidecars while the
     // lifecycle lock is still held. Releasing at open/validate left a race with
     // another process admitting a sidecar that the last connection was deleting.
-    connection: Connection,
+    pub(super) connection: Connection,
     _directory: std::fs::File,
     _lifecycle_lock: std::fs::File,
 }
@@ -49,6 +50,7 @@ impl Metadata {
             .map_err(unavailable)?;
         if version != 0 || app != 0 {
             metadata.validate()?;
+            metadata.migrate_registry()?;
             return Ok(metadata);
         }
         let count: i64 = metadata
@@ -111,6 +113,7 @@ impl Metadata {
             .sync_all()
             .map_err(|_| Failure::OutcomeUnknown)?;
         metadata.validate()?;
+        metadata.migrate_registry()?;
         Ok(metadata)
     }
 
@@ -122,6 +125,70 @@ impl Metadata {
         let metadata = Self::open_connection(path, dir, lock, true)?;
         metadata.validate()?;
         Ok(metadata)
+    }
+
+    /// An admitted mutating action may upgrade an existing, recognized database.
+    /// Missing authority is never recreated by connection management.
+    pub(super) fn update(path: &Path, migrate: bool) -> Result<Self> {
+        let dir = fs::directory(path, false, true).map_err(|_| Failure::MetadataUnavailable)?;
+        let lock = lifecycle_lock(&dir)?;
+        let mut metadata = Self::open_connection(path, dir, lock, false)?;
+        metadata.validate()?;
+        if migrate {
+            metadata.migrate_registry()?;
+        }
+        metadata.require_registry()?;
+        Ok(metadata)
+    }
+
+    pub(super) fn require_registry(&self) -> Result<()> {
+        let version: i64 = self
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .map_err(unavailable)?;
+        if version != 2 {
+            return Err(Failure::MetadataUnavailable);
+        }
+        Ok(())
+    }
+
+    pub(super) fn authority(&self) -> Result<uuid::Uuid> {
+        let text: String = self
+            .connection
+            .query_row(
+                "SELECT authority_id FROM local_authority WHERE singleton=1",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(unavailable)?;
+        uuid::Uuid::parse_str(&text).map_err(|_| Failure::MetadataUnavailable)
+    }
+
+    fn migrate_registry(&mut self) -> Result<()> {
+        let version: i64 = self
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .map_err(unavailable)?;
+        if version == 2 {
+            return Ok(());
+        }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(unavailable)?;
+        tx.execute_batch(REGISTRY_MIGRATION).map_err(unavailable)?;
+        tx.execute(
+            "INSERT INTO schema_migrations VALUES (2, ?1)",
+            [hex::encode(Sha256::digest(REGISTRY_MIGRATION.as_bytes()))],
+        )
+        .map_err(unavailable)?;
+        tx.pragma_update(None, "user_version", 2)
+            .map_err(unavailable)?;
+        tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        self._directory
+            .sync_all()
+            .map_err(|_| Failure::OutcomeUnknown)?;
+        self.validate()
     }
 
     fn open_connection(
@@ -193,7 +260,7 @@ impl Metadata {
             .connection
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
             .map_err(unavailable)?;
-        if app != APPLICATION_ID || version != 1 || mode != "wal" {
+        if app != APPLICATION_ID || !(1..=2).contains(&version) || mode != "wal" {
             return Err(Failure::MetadataUnavailable);
         }
         let (authority, owner): (String, u32) = self
@@ -204,7 +271,7 @@ impl Metadata {
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .map_err(unavailable)?;
-        if owner != fs::uid() || uuid::Uuid::parse_str(&authority).is_err() {
+        if owner != fs::uid() || uuid::Uuid::parse_str(&authority).map_or(true, |id| id.is_nil()) {
             return Err(Failure::MetadataUnavailable);
         }
         let migrations = self
@@ -217,7 +284,14 @@ impl Metadata {
             .map_err(unavailable)?
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(unavailable)?;
-        if migrations != vec![(1, migration_digest())] {
+        let mut expected = vec![(1, migration_digest())];
+        if version == 2 {
+            expected.push((
+                2,
+                hex::encode(Sha256::digest(REGISTRY_MIGRATION.as_bytes())),
+            ));
+        }
+        if migrations != expected {
             return Err(Failure::MetadataUnavailable);
         }
         Ok(())
@@ -227,6 +301,7 @@ impl Metadata {
 fn migration_digest() -> String {
     hex::encode(Sha256::digest(MIGRATION.as_bytes()))
 }
+
 fn unavailable(_: rusqlite::Error) -> Failure {
     Failure::MetadataUnavailable
 }
@@ -251,5 +326,95 @@ fn lifecycle_lock(directory: &std::fs::File) -> Result<std::fs::File> {
             return Err(Failure::MetadataUnavailable);
         }
         std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn passive_v1_inspection_cannot_migrate_or_claim_an_empty_registry() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        let directory = fs::directory(&path, true, true).unwrap();
+        fs::publish_new(&directory, OsStr::new(NAME), &[]).unwrap();
+        fs::publish_new(&directory, OsStr::new(LOCK), &[]).unwrap();
+        // Build the exact previous schema in a disposable database. This fixture
+        // does not rewrite a current database or bypass a production migration.
+        let connection = Connection::open(path.join(NAME)).unwrap();
+        connection
+            .pragma_update(None, "journal_mode", "WAL")
+            .unwrap();
+        connection.execute_batch(MIGRATION).unwrap();
+        let authority = uuid::Uuid::new_v4();
+        connection
+            .execute(
+                "INSERT INTO local_authority VALUES (1,?1,?2)",
+                rusqlite::params![authority.to_string(), fs::uid()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO schema_migrations VALUES (1,?1)",
+                [migration_digest()],
+            )
+            .unwrap();
+        connection
+            .pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        connection.pragma_update(None, "user_version", 1).unwrap();
+        drop(connection);
+        assert!(Metadata::inspect(&path).is_ok());
+        assert!(matches!(
+            Metadata::update(&path, false),
+            Err(Failure::MetadataUnavailable)
+        ));
+        let registry = crate::local::registry::Registry::new(&path);
+        assert!(matches!(
+            registry.list(
+                "one",
+                "fixture",
+                "cfg",
+                crate::local::registry::PageOptions {
+                    limit: 10,
+                    cursor: None
+                },
+                1000,
+                false
+            ),
+            Err(crate::local::registry::Failure::MetadataUnavailable)
+        ));
+        let metadata = Metadata::inspect(&path).unwrap();
+        assert_eq!(metadata.authority().unwrap(), authority);
+        assert_eq!(
+            metadata
+                .connection
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        drop(metadata);
+        let metadata = Metadata::update(&path, true).unwrap();
+        assert_eq!(metadata.authority().unwrap(), authority);
+        metadata.require_registry().unwrap();
+        drop(metadata);
+        assert!(
+            registry
+                .list(
+                    "one",
+                    "fixture",
+                    "cfg",
+                    crate::local::registry::PageOptions {
+                        limit: 10,
+                        cursor: None
+                    },
+                    1000,
+                    false
+                )
+                .unwrap()
+                .connections
+                .is_empty()
+        );
     }
 }
