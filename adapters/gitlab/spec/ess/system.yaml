@@ -3,3 +3,4 @@ system: connectors_gitlab
 version: v1
 domains:
   - connectors_gitlab.auth
+  - connectors_gitlab.ci

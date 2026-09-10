@@ -267,6 +267,11 @@
               ]
             }
           },
+          "response_prefix_limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
           "obligations": {
             "const": [
               "prepare",

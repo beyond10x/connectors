@@ -23,6 +23,8 @@ use tokio_rustls::{
     rustls::{self, pki_types::PrivatePkcs8KeyDer},
 };
 
+#[path = "local_runtime/ci_provider.rs"]
+mod ci_provider;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
 
@@ -105,6 +107,9 @@ impl Provider {
                         else if path.contains("/repository/files/") {(200,json!({"content":"Zml4dHVyZQ==","encoding":"base64","size":7,"last_commit_id":"fixture-commit"}),"")}
                         else {(200,json!({"id":7,"name":"fixture-project"}),"")};
                     let body=serde_json::to_vec(&body).unwrap();
+                    let (status,body,extra)=if valid && forced==0 {
+                        ci_provider::reply(route,&path,&observed.lock().unwrap()).unwrap_or((status,body,extra))
+                    } else { (status,body,extra) };
                     let header=format!("HTTP/1.1 {status} fixture\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n",body.len());
                     let _=stream.write_all(header.as_bytes()).await;
                     let _=stream.write_all(&body).await;
