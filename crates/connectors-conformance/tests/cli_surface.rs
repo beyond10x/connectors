@@ -86,7 +86,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_twenty_two_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_twenty_three_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -116,6 +116,7 @@ fn the_selected_inventory_has_twenty_two_grouped_commands_and_explicit_runtime_o
         "approvals key-recover",
         "approvals key-revoke",
         "approvals key-retire",
+        "approvals clock-check",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -179,6 +180,10 @@ fn inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result() {
 #[test]
 fn every_local_action_dispatches_once_with_its_declared_result_type() {
     let cases: &[(&[&str], &str)] = &[
+        (
+            &["approvals", "clock-check", "--adapter", "forge"],
+            "ApprovalClockCheckResult",
+        ),
         (
             &["approvals", "key-init", "--adapter", "forge"],
             "ApprovalKeysResult",
@@ -374,7 +379,10 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         );
         assert_eq!(output.exit_code, 0, "{args:?}: {output:?}");
         assert_eq!(handler.calls, 1);
-        if *result_type == "ConnectionRevalidateResult" {
+        if matches!(
+            *result_type,
+            "ConnectionRevalidateResult" | "ApprovalClockCheckResult"
+        ) {
             assert!(sources.calls.is_empty());
         }
         assert_eq!(

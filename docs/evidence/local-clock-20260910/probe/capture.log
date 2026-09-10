@@ -1,0 +1,4 @@
+   Compiling connectors-clock-qualification-probe v0.0.0 (/home/timo/beyond10x/connectors_v2/.local/tmp/gitlab-runtime-20260910/clock-probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running `target/debug/connectors-clock-qualification-probe`
+roughtime.se:2002 192.36.143.134:2002: verified midpoint=1789076475 radius_s=1 elapsed_ms=86 nonce_match=true version_match=true

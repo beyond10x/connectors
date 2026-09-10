@@ -1,6 +1,13 @@
 {
   "pages": [
     {
+      "route": "/contracts/clock",
+      "title": "Bounded local clock",
+      "source": "contracts/service/clock.md",
+      "owner": "shared",
+      "status": "Explicit source/timer trust; approval integration pending"
+    },
+    {
       "route": "/contracts/cli",
       "title": "Local CLI",
       "source": "contracts/cli/v1alpha1/semantics.md",

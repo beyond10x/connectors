@@ -64,6 +64,7 @@ management wire payload or a persistent record.
 |---|---|---|---|
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
+| `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
 | `adapters list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
 | `adapters describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
 | `adapters status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
@@ -79,7 +80,11 @@ management wire payload or a persistent record.
 | `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | no / no |
 | `operations invoke` | admitted service request | `OperationInvokeInput` → `OperationInvokeResult` | yes / yes, after admission |
 
-Read-only commands use configured/cached descriptions and safe persisted metadata
+`approvals clock-check` performs the bounded authenticated exchange specified in
+[the clock binding](../../service/clock.md). Its public observation cannot be
+reused as time evidence; it starts no service and reads no secret or metadata.
+
+Inventory and status commands use configured/cached descriptions and safe persisted metadata
 or query an already-running owner without provider authentication. Unavailable
 authoritative metadata returns `metadata_unavailable`; cached facts are labeled
 stale and cannot be used to decide fresh connection viability. Missing cached

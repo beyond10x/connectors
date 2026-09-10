@@ -5,6 +5,15 @@ summary: Selected local CLI presentation values; protected inputs are ephemeral,
 # Context, not these payloads. Existing auth/declaration identities retain their
 # String representations; these value references establish no entity relations.
 types:
+  - name: connectors.cli.ApprovalClockCheckInput
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+  - name: connectors.cli.ApprovalClockCheckResult
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: observation, type: connectors.clock.Observation}
   - name: connectors.cli.ApprovalKeyState
     kind: enum
     variants: [candidate, active, retired, retiring, deleted]

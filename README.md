@@ -66,6 +66,8 @@ binding and generated parser supply the production management handlers above.
 [connection registry](docs/local-connection-registry.md) have disposable runtime
 tests. [Approval-signing key management](docs/local-approval-keys.md) supplies
 protected key initialization, rotation, recovery, revocation and retirement.
+The [clock check](docs/local-clock.md) verifies an explicitly configured time
+source under declared source and local timer assumptions.
 Approval issuance, writes, MCP binding and complete multi-provider acceptance remain
 implementation work; the executable also provides `describe`, `invoke` and `serve`.
 

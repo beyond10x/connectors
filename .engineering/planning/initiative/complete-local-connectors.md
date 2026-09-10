@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 16
+revision: 18
 ---
 ## Outcome and authority
 
@@ -134,3 +134,19 @@ Time-source qualification is still unresolved: the researched Roughenough 2.0.0 
 The local CLI now invokes eleven GitLab read operations, including merge_request.validate. The new read checks an exact requested MR source SHA and selected successful head pipeline with opened/non-draft/mergeable predicates, reports ordered blockers and always reports merge_performed=false. It grants no future write. Twelve native MR tests, the complete Rust 1.88 gate, six production CLI/private HTTPS/qualified-keyring journeys, local GitLab image packaging and website/reference/fifteen example checks pass. docs/evidence/gitlab-mr-validation-20260910/README.md retains exact inputs, artifact identities, failed-test corrections and eight independent critic records; both acceptance findings are fixed and all final critics approve.
 
 story:gitlab-mr-validation stays active pending dedicated GitLab sandbox evidence, alongside the earlier read stories. Next implementation remains actual approval preparation/issuance with authenticated subject policy and a qualified clock, then complete connection-bound mutation ingress/dispatch and native GitLab writes. Clock qualification and the C14 create/update head-guard choice remain unresolved; the validation read does not substitute for those controls. Full GitLab still precedes Kubernetes, PostgreSQL, MCP and remaining providers, with all original acceptance, reproducible-delivery and publication boundaries retained. This checkpoint is local main integration only; no Connectors publication or Atlas registration is performed.
+
+## Bounded clock increment — 2026-09-10
+
+story:local-bounded-clock is the ninth partial runtime child. It binds explicitly admitted source/timekeeping assumptions to a bounded authenticated UTC interval, using the newly validated clock Configuration/Observation values and a generated approvals clock-check command. It introduces no persistent entity, signing authority or provider write. Native GitLab validation is integrated at a5b399d4f790e993aa3ab76f6a61ac1ee25b6c7a on local main; the exact task authority worktree was removed with current remote recovery proof.
+
+A Rust 1.88 probe verified a roughtime.se response with a one-second signed radius and 86 ms elapsed; this is protocol evidence, not unconditional proof of UTC or hardware correctness. The selected clock contract retains explicit source correctness and local timer-rate assumptions, short-lived process continuity, suspend refusal and conservative interval arithmetic. Four independent planning critics review the partial decomposition; all overlapping implementation, planning and build work remains serialized on main.
+
+Actual approval preparation/issuance with authenticated subject and current clock-trust policy, complete mutation ingress/dispatch, native GitLab writes, the open create/update SHA-guard decision and dedicated sandbox evidence remain required next work. No business effect is authorized by a public clock observation. Full GitLab, Kubernetes, PostgreSQL, MCP and remaining-provider order and the original acceptance/reproducibility/publication boundaries remain unchanged.
+
+## Bounded clock verified — 2026-09-11
+
+story:local-bounded-clock implements the explicitly configured, authenticated process-local clock and generated `approvals clock-check` command under the source/timer assumptions in contracts/service/clock.md. docs/evidence/local-clock-20260910/README.md retains the independent public Roughtime fixture/probe, fresh production verification, conditional-bound failure tests, complete repository gate with Rust 1.88, four CLI tests, eleven explicit key-custody tests, six GitLab CLI journeys, website/reference/example checks and local image identities. Both critic rounds are retained; the one design dependency finding was fixed and all final critics approve.
+
+This completes that bounded prerequisite only. Next runtime work is actual local approval issuance with authenticated current subject/clock-selection policy, followed by approval/audit/attempt dispatch and native GitLab mutations. Full GitLab—including dedicated sandbox acceptance and the unresolved create/update atomic-head decision—remains before Kubernetes, PostgreSQL, MCP and remaining providers. The existing AEP driver protocol-loading blocker and missing sandbox authority remain truthful. Physical source/timer assumptions require deployment qualification; signed observations alone are not approval authority.
+
+The externally edited release instructions and live connectors-release-v020-20260910 worktree belong to separate release work and are preserved. This clock checkpoint has no source release, deployment, Atlas registration or reproducible-distribution completion claim. Root remains the sole writer of this planning store and implementation increment.
