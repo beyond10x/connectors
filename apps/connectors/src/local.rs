@@ -215,6 +215,21 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         .adapters
         .get(alias)
         .ok_or_else(|| failure("not_found", "configuration", "check_configuration", false))?;
+    if call.callable == "approval-clock-check" {
+        let selected = config.approval_clock.as_ref().ok_or_else(|| {
+            failure(
+                "invalid_configuration",
+                "configuration",
+                "check_configuration",
+                true,
+            )
+        })?;
+        let observation = selected
+            .acquire()
+            .and_then(|clock| clock.observe())
+            .map_err(|_| failure("unavailable", "observation", "check_configuration", false))?;
+        return Ok(json!({"adapter":alias,"observation":observation}));
+    }
     if call.callable.starts_with("approval-keys-") {
         return approval_keys::execute(call, &paths, &config, alias, adapter)
             .map_err(owner_failure);

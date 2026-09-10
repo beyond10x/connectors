@@ -38,6 +38,14 @@ Callable: `adapters-stop`. Input: `connectors.cli.AdapterStopInput`. Result: `co
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `approvals clock-check`
+
+Check the configured authenticated clock without starting services
+
+Callable: `approval-clock-check`. Input: `connectors.cli.ApprovalClockCheckInput`. Result: `connectors.cli.ApprovalClockCheckResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `approvals key-init`
 
 Create a new approval-signing key in protected local custody
@@ -188,6 +196,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:adapters-list: implement the owner-qualified callable and its declared result/error contract
 - handler:adapters-status: implement the owner-qualified callable and its declared result/error contract
 - handler:adapters-stop: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-clock-check: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-init: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-recover: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-retire: implement the owner-qualified callable and its declared result/error contract
