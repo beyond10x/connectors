@@ -1,0 +1,68 @@
+# Draft for operator review before a single governed launch.
+id: connectors-kubernetes-spec-service
+kind: feature
+objective: kubernetes-spec-service
+protocol: adp/1
+profile: development.standard
+
+derived_from:
+  - story:kubernetes-spec-service
+
+constraints:
+  facts:
+    # The adapter-authoring/compiler contract expands; runtime read identities stay stable.
+    change.public_contract: true
+    # Generated request selection and reusable service realization cross existing boundaries.
+    change.architectural: true
+    change.code: true
+  notes:
+    - >-
+      The Acceptance and Work sequence sections of
+      .engineering/planning/story/kubernetes-spec-service.md define the outcome.
+      First prove baseline 801b8d5aad9166f3a378b9471e7d733cafa95f50 live, before
+      implementation edits. Then migrate and verify the GitLab generation/build
+      pipeline on the official ESS 0.20.0 release before implementing Kubernetes
+      generation and packaging; finally repeat direct/federated three-adapter
+      acceptance on the final revision.
+    - >-
+      Preserve resources.list (pods, services, deployments, endpointslices),
+      endpoints.discover and configuration-gated hosts.discover. Pin official
+      upstream bytes and preserve explicit missing-semantics refusals, namespace
+      and kind admission, cursor binding, completeness and provenance.
+    - >-
+      The story's Toolchain correction supersedes its initial 0.9.2 preference.
+      Pin ESS 0.20.0 at release commit c90ca1b2a3a5db02d7580dab63be6cbc56679e0b,
+      verify the executable, and adapt the GitLab frontend/build/gate command
+      surface, generated bundle and compatibility handling before Kubernetes.
+      Record changed coverage/refusals and prove the migrated image. Keep the
+      0.9.2 baseline as historical evidence; do not overwrite global binaries or
+      assume that the source checkout's unreleased HEAD is the tagged release.
+    - >-
+      Follow the existing ESS declaration ownership. Validate any needed typed
+      extension before implementation. Generate only supported mechanical behavior;
+      explicit handwritten bindings own the semantic obligations. Preserve GitLab
+      generation and SQL behavior. Use the story's recorded scope.
+    - >-
+      Run the Rust repository gate including minimum-Rust checks, deterministic
+      regeneration/refusals, exact-image acceptance, and clean service shutdown.
+      Retain baseline and final sanitized evidence separately with source/binary/image
+      digests. Do not claim live behavior from fixture-only evidence.
+    - >-
+      Use this managed checkout and maintain its worktree lease. Keep everything
+      local: no publication, Atlas integration, consumer rollout, other providers,
+      writes, watches, tenant management or automatic discovery activation.
+      Use connectors for integrations and report capability gaps before alternatives.
+    - >-
+      Honor AGENTS.md, including the verified Atlas as-bot commit wrapper; the driver
+      may not substitute inherited personal Git identity. Keep credential machinery
+      outside this checkout and secrets out of source, arguments and evidence.
+    - >-
+      Inspect disk space before builds; use two Cargo jobs and a private TMPDIR
+      under this checkout's .local/tmp. Do not borrow or delete another session's
+      fixtures or force a shared Cargo target directory. Remove only owned disposable
+      fixtures and preserve the local worktree for handoff.
+    - >-
+      This task is a draft. No model budget, approval or step map has been selected
+      by the preparing agent. The launch uses operator-supplied budget-usd and
+      assume-usd-per-run, automatic map selection and pause-on-approval. Engine
+      refusals must be reported without weakening flags or automatic retries.
