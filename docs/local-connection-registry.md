@@ -7,8 +7,8 @@ metadata transactions. Adapter libraries receive authenticated capabilities;
 they never open this database or select arbitrary keyring items.
 
 The production CLI uses this authority for connection list, describe, status and
-terminal local revoke. Protected connect/repair, explicit evidence revalidation,
-private adapter bootstrap and supervised invocation remain unfinished. A native
+terminal local revoke. Protected connect/repair, explicit evidence revalidation
+and the CLI owner's integration with the private adapter transport remain unfinished. A native
 fixture publishes a fictional connection through the coordinator and qualified
 Secret Service, restarts both, and exercises separate production CLI status/revoke
 processes. It does not prove the persistent GitLab acceptance journey.

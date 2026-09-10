@@ -1,0 +1,5 @@
+   Compiling connectors-host v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-host)
+   Compiling connectors-spec v0.1.0 (/home/timo/beyond10x/connectors_v2/crates/connectors-spec)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.61s
+     Running `.local/tmp/gitlab-runtime-20260910/target/debug/connectors-spec --generate --specification adapters/gitlab/spec/adapter.json --output adapters/gitlab/generated`
+adapter bundle generated

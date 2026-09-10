@@ -126,12 +126,22 @@ They use the existing service binding described in [running services](running-se
 
 ## Verification
 
+The host now supplies a [private adapter binding](../contracts/cli/v1alpha1/private-adapter.md)
+with a sealed, digest-verified executable snapshot, inherited Unix channel, exact
+child ownership and bounded bootstrap/request handling. GitLab's
+[local executable mode](../adapters/gitlab/contracts/auth/v1alpha1/semantics.md#local-executable-configuration)
+uses it for native validation and the three existing reads against an immutable
+credential/target capability. Disposable TLS/process fixtures cover mismatch
+refusal, cursor partitioning, stale stop, deadline loss and fresh child startup.
+This is the transport/composition building block: it does not yet implement the
+CLI owner, startup coalescing, durable stop suppression or protected Sources hook.
+
 The production-process tests cover fresh setup and metadata reuse across CLI
 processes, exclusive initialization, configured inventory and passive status,
 permission errors and safe source refusal. Host tests cover concurrent
 initialization, stable authority identity, unsafe paths/private files/sidecars,
 future schema refusal and owner/migration tampering. The registry and native
 custody tests have separate scope described in their linked binding documents.
-These tests do not claim provider authentication, process supervision or the GitLab
-restart journey. Actual commands and results belong in the retained evidence
+The CLI tests do not claim provider authentication, complete owner supervision or
+the GitLab restart journey. Actual commands and results belong in the retained evidence
 record for this delivery.

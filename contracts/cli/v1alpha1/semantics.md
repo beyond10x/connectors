@@ -1,12 +1,16 @@
 # Local CLI binding v1alpha1
 
-**Specified; production implementation deferred.** This contract owns the local
+**Specified; partial production implementation.** This contract owns the local
 Linux CLI presentation, configuration and host lifecycle choices selected by
 `story:local-cli-binding-semantics`. [ESS values](../../../ess/domains/cli.yaml)
 and [fixtures](fixtures/values.json) describe data and expected traces. Neither a
 generated parser nor a recording handler proves keyring durability, process
 ownership, provider authentication or restart recovery. The existing runtime
 continues to support the [documented three-adapter slice](../../../README.md#where-the-project-stands).
+Setup, configured inventory and passive connection management have production
+handlers. The [private adapter transport](private-adapter.md) has process/TLS
+fixtures. Protected CLI acquisition and the complete owner lifecycle remain
+unfinished; the persistent GitLab restart journey has not passed acceptance.
 
 ## 1. Owners and identities
 

@@ -1,0 +1,8 @@
+     Running tests/local_runtime.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/local_runtime-6fed6cccc06b0b0b)
+
+running 3 tests
+test lost_validation_response_closes_the_owned_channel_without_replay ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_provider_work ... ok
+test private_gitlab_validates_and_reads_with_exact_caps_and_cursor_partitions ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.08s

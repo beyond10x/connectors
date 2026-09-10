@@ -37,7 +37,7 @@ scope:
   path: docs
 - confidence: cited
   path: ess/domains
-revision: 11
+revision: 12
 ---
 ## Acceptance
 
@@ -112,3 +112,15 @@ The shared EvidenceSnapshot now explicitly retains optional native granted scope
 Production generated-parser handlers implement connections list/describe/status/revoke without launching an adapter or reading credential material. Missing authority remains unavailable; it never becomes an empty connection list. setup check distinguishes a merely available service from the exact qualified custody binding. docs/local-connection-registry.md records the model-to-table mapping, short transactions and distinct acknowledgement groups. docs/evidence/gitlab-registry-20260910/README.md retains the full Rust 1.88 gate, fifteen passing local/native tests, exact input hashes and documentation checks. Native fixture evidence covers real private keyring/SQLite restart, CLI acquisition status/revoke, unknown write/delete acknowledgement and guarded cleanup, using fictional credentials.
 
 Protected connect/repair entry, explicit baseline revalidation, private adapter bootstrap/owner supervision and the allowed GitLab read/restart journey remain unfinished. Dedicated GitLab sandbox access is still unavailable under credential-blocker:gitlab-runtime-sandbox; independent implementation continues. The story, initiative and three-provider goal remain active. Next bind the private adapter/bootstrap and protected source admission, then execute GitLab connect/read/restart reuse. Continue Kubernetes and PostgreSQL before MCP, followed by the remaining providers. No sandbox acceptance or full runtime milestone is closed by this checkpoint.
+
+## 2026-09-10 private GitLab process binding checkpoint
+
+The host now implements the bounded private adapter transport in contracts/cli/v1alpha1/private-adapter.md and crates/connectors-host/src/local/runtime. It captures a digest-verified ELF into a sealed memfd, authenticates the inherited local channel, checks the child's independently computed bootstrap, and owns termination through the exact Child/pidfd. Protected material never enters control JSON. Request identity, result JSON/schema and deadlines are checked; malformed replies or lost transport terminate ownership without replay.
+
+Shared private bootstrap/profile/requirement/baseline values are modeled in ess/domains/cli.yaml. Native local/effective configuration is modeled in adapters/gitlab/spec/ess/domains/auth.yaml, validated before dependent implementation, and admitted by an authored additive descriptor schema alternative. No new entity, provider vocabulary in shared models or governed decomposition was introduced. GitLab's executable composition binds native PAT validation and project.get/issues.list/file.get to immutable credential/target capabilities with partitioned native cursors. The library remains independent of the host and sibling adapters.
+
+The final cargo run --locked --offline -p connectors-build -- gate --msrv passes, including Rust 1.88, generation/reproducibility, ESS, conformance, workspace tests, Clippy and dependency boundaries. Six private host tests include three actual adversarial child launches; three native GitLab process/TLS tests pass. Website production build, typecheck and reference drift checks pass. Exact hashes, commands, results and limitations are retained in docs/evidence/gitlab-private-runtime-20260910/README.md. Existing custody/registry native evidence is reused only for unchanged inputs; no desktop keyring or real provider account was touched.
+
+This is an executable transport/composition increment, not the persistent CLI journey. Production protected Sources admission, reviewed operation/profile policy, owner socket and stable supervision, startup coalescing, durable stop suppression, explicit evidence revalidation and connect/read/restart reuse remain required. The current generated-parser connect/repair routes still refuse before capture. Dedicated GitLab sandbox access remains missing under credential-blocker:gitlab-runtime-sandbox. The paid-driver protocol-loading record was not requalified by these runtime tests; interactive implementation remains independent of it.
+
+The story, initiative and three-provider goal remain active. Next bind the CLI owner and protected entry to this private transport and existing SQLite/custody coordinator. Keep GitLab before Kubernetes and PostgreSQL, then MCP and the remaining providers. No runtime acceptance or specification milestone is closed by this checkpoint. There is still only one decomposing child of the initiative, so planning skill section 7 requires no new critic panel for this implementation evidence update.
