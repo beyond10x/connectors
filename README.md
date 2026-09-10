@@ -32,7 +32,10 @@ publication and retirement. Protected connect/repair and supervised invocation
 are still unfinished; the
 persistent GitLab restart journey has **not** passed acceptance. See the
 [local runtime foundation](docs/local-runtime-foundation.md) for commands and
-current refusals. The explicit network commands below remain compatible.
+current refusals. GitLab's private executable binding has disposable process/TLS
+tests for native validation and its three existing reads; the CLI owner still
+needs to bind it to protected acquisition and dispatch. The explicit network
+commands below remain compatible.
 
 This repository contains a working local data/discovery slice and a broader,
 reviewed specification baseline. The local **v0.1.0 milestone is a specification
