@@ -118,12 +118,23 @@ pub(super) fn dispatch(
     };
     // Current result-access admission and exact-key observation happen before
     // even opening the proof file, unlocking custody or starting the owner.
-    let value = if let Some(value) = mutation::observe(&paths, alias, &request, key, until)? {
-        value
-    } else {
-        let proof = proof_path
-            .map(|path| protected::file_until(std::path::Path::new(path), until, 20 * 1024))
-            .transpose();
+    let original = mutation::observe_original(&paths, alias, &request, key, until)?;
+    if let Some(original) = &original
+        && !original.pending
+    {
+        return project(call, &bootstrap, original.delivery.clone());
+    }
+    let pending = original.is_some();
+    let value = {
+        // Pending recovery is metadata-only. A deleted/locked proof source
+        // cannot block it, and it never supplies a new execution proof.
+        let proof = if pending {
+            Ok(None)
+        } else {
+            proof_path
+                .map(|path| protected::file_until(std::path::Path::new(path), until, 20 * 1024))
+                .transpose()
+        };
         let proof = match proof {
             Ok(proof) => proof,
             Err(error) => {
@@ -135,13 +146,19 @@ pub(super) fn dispatch(
                 return Err(error);
             }
         };
-        let result = owner::WriteClient::connect(&paths, true, deadline)?.invoke(
-            alias,
-            &request,
-            key,
-            proof.as_ref(),
-            deadline,
-        );
+        let result = owner::WriteClient::connect(&paths, true, deadline)
+            .and_then(|client| client.invoke(alias, &request, key, proof.as_ref(), deadline))
+            .map_err(|mut error| {
+                if pending
+                    && matches!(
+                        error.code,
+                        Code::Unavailable | Code::Timeout | Code::Interrupted | Code::Capacity
+                    )
+                {
+                    error.code = Code::OutcomeUnknown;
+                }
+                error
+            });
         match result {
             Ok(value) => value,
             Err(error) if error.code == Code::OutcomeUnknown => {

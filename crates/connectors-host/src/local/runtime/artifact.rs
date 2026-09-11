@@ -92,6 +92,57 @@ mod tests {
     use std::time::Duration;
 
     #[test]
+    fn configured_capture_requires_both_path_admission_and_matching_content() {
+        use crate::local::config::Executable;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("source");
+        let bytes = b"\x7fELFfictional executable content";
+        std::fs::write(&path, bytes).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let selected = Executable {
+            path: path.clone(),
+            sha256: hex::encode(Sha256::digest(bytes)),
+            args: Vec::new(),
+        };
+        let until = Instant::now() + Duration::from_secs(5);
+        selected.check().unwrap();
+        let mut snapshot = selected.capture(until).unwrap();
+        // Neither path replacement nor in-place source writes alter the
+        // admitted immutable bytes; later captures still check the selection.
+        std::fs::write(&path, b"\x7fELFchanged in place").unwrap();
+        assert!(selected.check().is_err());
+        assert!(matches!(
+            selected.capture(until),
+            Err(Failure::InvalidConfiguration)
+        ));
+        snapshot.seek(SeekFrom::Start(0)).unwrap();
+        let mut captured = Vec::new();
+        snapshot.read_to_end(&mut captured).unwrap();
+        assert_eq!(captured, bytes);
+        std::fs::write(&path, bytes).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o722)).unwrap();
+        assert!(matches!(
+            selected.capture(until),
+            Err(Failure::InvalidConfiguration)
+        ));
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let link = root.path().join("link");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        assert!(matches!(
+            Executable {
+                path: link,
+                ..selected.clone()
+            }
+            .capture(until),
+            Err(Failure::InvalidConfiguration)
+        ));
+        assert!(matches!(
+            selected.capture(Instant::now()),
+            Err(Failure::Timeout)
+        ));
+    }
+
+    #[test]
     fn admitted_snapshot_survives_source_changes_and_refuses_mutation() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("source");
