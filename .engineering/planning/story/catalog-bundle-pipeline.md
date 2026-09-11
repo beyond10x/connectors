@@ -2,20 +2,22 @@
 format: aep.planning-md/1
 id: story:catalog-bundle-pipeline
 kind: story
-status: active
+status: implemented
 title: Take a pinned document to an indexed bundle in one recorded run
 relations:
 - derived_from: specification:catalog-http-runtime-handoff
 - decomposes: initiative:complete-local-connectors
 - serves: vision:independent-contract-adapters
 scope:
+- confidence: cited
+  path: crates/connectors-catalog/src/bundle.rs
 - confidence: inferred
   path: crates/connectors-catalog/src/lib.rs
 - confidence: cited
   path: crates/connectors-catalog/src/pipeline.rs
 - confidence: cited
   path: crates/connectors-catalog/tests/pipeline.rs
-revision: 6
+revision: 8
 ---
 ## Outcome
 
