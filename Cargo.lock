@@ -555,6 +555,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-catalog"
+version = "0.2.0"
+dependencies = [
+ "connectors-core",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
 name = "connectors-cli-contract"
 version = "0.0.0"
 dependencies = [
