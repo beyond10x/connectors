@@ -3,6 +3,7 @@
 //! touches a runtime; a document this crate cannot represent is refused by name
 //! rather than accepted in part.
 
+pub mod bundle;
 pub mod inventory;
 
 use connectors_core::{Error, ErrorCode, Result};
