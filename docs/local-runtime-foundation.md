@@ -38,6 +38,16 @@ installs or starts an adapter, and `setup check` reports unavailable or changed
 artifacts as failed prerequisites. Credentials never belong in configuration or
 executable arguments.
 
+The parser also accepts an explicitly authored `connectors-local/2` configuration.
+Every adapter in that format requires `private_protocol`, exactly
+`connectors-private/1` or `connectors-private/2`. Version one refuses that field;
+setup still writes version one and loading never rewrites a file. An explicit
+selection changes the executable selection digest and requires fresh admission.
+Private version two supplies a bounded prepare/commit/cancel transport port with
+one-use pending writes. Production GitLab does not select it yet: approval issuance
+and the host write coordinator must be integrated first. See the
+[private mutation binding](../contracts/cli/v1alpha1/private-mutations.md).
+
 `adapters describe --adapter ALIAS` reports the configured entry and its cached
 descriptor when available; cache facts are always stale. `adapters status --adapter
 ALIAS` asks only an existing owner, or reports `owner_unavailable` when absent.

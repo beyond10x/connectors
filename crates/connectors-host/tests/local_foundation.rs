@@ -27,6 +27,71 @@ fn paths(root: &tempfile::TempDir) -> Paths {
 }
 
 #[test]
+fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
+    use connectors_host::local::runtime::PrivateProtocol;
+    let root = root();
+    let paths = paths(&root);
+    Config::initialize(&paths).unwrap();
+    let setup = fs::read_to_string(&paths.config).unwrap();
+    assert!(setup.contains("connectors-local/1"));
+    let text = format!(
+        "{setup}\n[adapters.fixture]\ninstance_id='fixture'\nadapter_id='fixture'\nconfiguration_revision='one'\nprotocol='v1alpha1'\n[adapters.fixture.executable]\npath='/fixture'\nsha256='{}'\n",
+        "a".repeat(64)
+    );
+    let legacy: Config = toml::from_str(&text).unwrap();
+    let adapter = &legacy.adapters["fixture"];
+    let old_digest = connectors_core::digest(&serde_json::json!({
+        "instance":adapter.instance_id, "adapter":adapter.adapter_id,
+        "revision":adapter.configuration_revision, "protocol":adapter.protocol,
+        "executable":adapter.executable,
+    }));
+    assert_eq!(adapter.selection(), old_digest);
+    assert_eq!(adapter.private_protocol(), PrivateProtocol::V1);
+    assert!(
+        !toml::to_string(&legacy)
+            .unwrap()
+            .contains("private_protocol")
+    );
+    let mut null_selection = serde_json::to_value(&legacy).unwrap();
+    null_selection["adapters"]["fixture"]["private_protocol"] = serde_json::Value::Null;
+    assert!(serde_json::from_value::<Config>(null_selection).is_err());
+    let explicit = text.replace(
+        "protocol='v1alpha1'",
+        "protocol='v1alpha1'\nprivate_protocol='connectors-private/2'",
+    );
+    assert!(toml::from_str::<Config>(&explicit).is_err());
+    assert!(
+        toml::from_str::<Config>(&text.replace("connectors-local/1", "connectors-local/2"))
+            .is_err()
+    );
+    let explicit = explicit.replace("connectors-local/1", "connectors-local/2");
+    let current: Config = toml::from_str(&explicit).unwrap();
+    assert_eq!(
+        current.adapters["fixture"].private_protocol(),
+        PrivateProtocol::V2
+    );
+    let digest = current.adapters["fixture"].selection();
+    assert_ne!(digest, old_digest);
+    let v1_explicit: Config =
+        toml::from_str(&explicit.replace("connectors-private/2", "connectors-private/1")).unwrap();
+    assert_ne!(v1_explicit.adapters["fixture"].selection(), old_digest);
+    assert_ne!(v1_explicit.adapters["fixture"].selection(), digest);
+    for invalid in [
+        explicit.replace("connectors-private/2", "connectors-private/3"),
+        explicit.replace("connectors-local/2", "connectors-local/3"),
+        explicit.replace("private_protocol=", "unreviewed="),
+    ] {
+        assert!(toml::from_str::<Config>(&invalid).is_err());
+    }
+    fs::write(&paths.config, &explicit).unwrap();
+    let loaded = Config::load(&paths.config).unwrap();
+    assert_eq!(loaded.adapters["fixture"].selection(), digest);
+    assert_eq!(fs::read_to_string(&paths.config).unwrap(), explicit);
+    let roundtrip: Config = toml::from_str(&toml::to_string(&loaded).unwrap()).unwrap();
+    assert_eq!(roundtrip.adapters["fixture"].selection(), digest);
+}
+
+#[test]
 fn exclusive_setup_persists_private_metadata_and_refuses_overwrite() {
     let root = root();
     let paths = paths(&root);
