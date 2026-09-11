@@ -189,6 +189,109 @@ fn count(root: &Path) -> u32 {
         })
         .unwrap()
 }
+
+#[test]
+fn policy_schema_supports_audit_spend_dispatch_and_restart_observation() {
+    use crate::local::audit;
+    let (root, clock, ledger, spend) = fixture();
+    drop(Metadata::update_approval_policy(root.path()).unwrap());
+    let s = subject();
+    let p = policy(&s);
+    let evidence = signer().issue(&s, &p, &clock).unwrap();
+    let mut candidate = candidate(&s, &evidence);
+    candidate.caller_key = Some("one-business-effect".into());
+    let audit = audit::Store::new(root.path(), 100).unwrap();
+    let anchor = audit::Anchor {
+        instance_id: s.target.instance.clone(),
+        kind: audit::Kind::AdmittedExecution,
+        activity: Some(audit::Activity::Invoke),
+        hop: audit::Hop::Execution,
+        stage: audit::Stage::Admission,
+        request_id: Some(candidate.request_id.clone()),
+        principal_ref: Some(s.authority.scope.caller.clone()),
+        operation_id: Some(s.target.operation.clone()),
+        connection_ref: Some(s.target.connection.clone()),
+        descriptor_revision: Some(s.target.descriptor_revision.clone()),
+        recorded_at_ms: NOW,
+        attempt_id: None,
+    };
+    let audit::Acknowledgement::Execution(admission) = audit.anchor(&anchor).unwrap() else {
+        panic!("execution admission required");
+    };
+    let verified = verify(&evidence, &s, &p, &clock).unwrap();
+    let m::Preparation::Prepared(prepared) =
+        ledger.prepare_approved(&candidate, &verified).unwrap()
+    else {
+        panic!("first invocation must prepare");
+    };
+    let reference = prepared.reference();
+    let spent = spend.spend(&prepared, &evidence, &s, &p).unwrap();
+    let audit_ref = audit.confirm(admission, &anchor).unwrap();
+    let winner = ledger.open_approved_dispatch(prepared, spent).unwrap();
+    assert_eq!(winner.consume().unwrap(), reference);
+    // No native response survives. Reconstruct only stores, never a live gate.
+    drop((ledger, spend, audit));
+    let restarted = m::Store::new(root.path(), clock, m::Limits::default()).unwrap();
+    assert_eq!(
+        restarted.lookup(&candidate).unwrap().unwrap().state,
+        m::State::Dispatching
+    );
+    let observed = restarted.recover(reference).unwrap();
+    assert_eq!(observed.state, m::State::Indeterminate);
+    assert_eq!(restarted.lookup(&candidate).unwrap(), Some(observed));
+    let audit = audit::Store::new(root.path(), 100).unwrap();
+    assert!(
+        audit
+            .observe(&audit_ref)
+            .unwrap()
+            .unwrap()
+            .final_observation
+            .is_none()
+    );
+    assert_eq!(count(root.path()), 1);
+    assert_eq!(
+        Metadata::inspect(root.path())
+            .unwrap()
+            .connection
+            .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+            .unwrap(),
+        8
+    );
+}
+
+#[test]
+fn protected_document_decoding_is_closed_bounded_and_verifiable() {
+    let s = subject();
+    let p = policy(&s);
+    let clock = TestClock::new();
+    let original = signer().issue(&s, &p, &clock).unwrap();
+    // Public test vector key and fixture subject only. Production issuance
+    // writes directly into a Secret; no deployment proof is logged here.
+    let document = format!(
+        "{{\"reference\":\"{}\",\"evidence\":\"{}\"}}",
+        original.reference(),
+        std::str::from_utf8(original.bytes()).unwrap()
+    );
+    let decoded = Evidence::from_document(Secret(document.as_bytes().to_vec())).unwrap();
+    assert_eq!(decoded.reference(), original.reference());
+    assert_eq!(decoded.bytes(), original.bytes());
+    verify(&decoded, &s, &p, &clock).unwrap();
+    for bad in [
+        document.replace("\"evidence\":", "\"extra\":null,\"evidence\":"),
+        document.replace("\"evidence\":", "\"evidence\":\"first\",\"evidence\":"),
+        document.replace("\"reference\":", "\"reference\":\"first\",\"reference\":"),
+        format!("{document}{{}}"),
+        " ".repeat(20 * 1024 + 1),
+        "{}".into(),
+        "null".into(),
+        document.replacen("\"evidence\":\"", "\"evidence\":\"\\u0065", 1),
+    ] {
+        assert!(matches!(
+            Evidence::from_document(Secret(bad.into_bytes())),
+            Err(Failure::Refused)
+        ));
+    }
+}
 fn parts(e: &Evidence) -> (Value, Value) {
     let parts: Vec<_> = std::str::from_utf8(e.bytes()).unwrap().split('.').collect();
     (

@@ -40,8 +40,18 @@ fresh 256-bit random reference using the operating system random source through
 ring. Proof bytes and the seed have no Debug/Clone/serialization implementation
 and remain outside SQLite. This in-memory signer does not provide persistent
 issuer custody itself. The separate [key coordinator](local-approval-keys.md)
-provides protected persistence, publication and rotation; human approval and a
-public proof-issuance API remain unimplemented.
+provides protected persistence, publication and rotation. The
+[local approval commands](local-approvals.md) prepare exact subjects and issue
+protected proof files under explicit owner policy. They make no claim of an
+independent human reviewer or public delegated issuance API.
+
+`Evidence::from_document` consumes the issuance file's closed
+`{reference,evidence}` document, bounded to 20 KiB. Both fields are literal JSON
+strings; escaped spellings are refused. Decoding borrows their bytes from the
+protected source, then retains the compact proof in a zeroizing buffer. Unknown,
+duplicate, missing and non-string fields are refused without putting evidence
+into the ordinary JSON Value decoder. This decoder alone neither verifies nor
+spends a proof; the invocation coordinator must perform current admission.
 
 Both issuance and verification require trusted time containment within a maximum
 four-second interval, with checked integer/unit arithmetic. There is no default
@@ -54,6 +64,8 @@ clock and policy qualification remain consumer obligations.
 
 Only approval-aware preparation installs SQLite migration six. Previous migration
 bytes and authority identities are preserved; normal setup remains version three.
+The spend, audit and mutation ports accept the recognized schema through version
+eight, including a database with the local policy migration installed.
 The migration adds the optional full subject to existing attempts and a separate
 immutable redemption table. Old records remain observable and recoverable, but
 their absent subjects are never invented during upgrade.
@@ -103,10 +115,14 @@ association and four actual child-process crash boundaries. A simulated effect
 file establishes no native provider acceptance. These are local single-authority
 guarantees; divergent backups/failover must not activate the same leaf identity.
 
-Actual local approval preparation and issuance,
-authenticated caller policy, production clock qualification, generated mutation
-ingress and the complete connection-bound dispatch coordinator remain required.
-Native GitLab writes and dedicated sandbox acceptance follow those foundations.
+Local approval preparation/issuance and configured clock checks now have
+production handlers and disposable runtime evidence. Generated mutation ingress,
+the complete connection-bound dispatch coordinator, native GitLab writes and
+dedicated sandbox acceptance remain required. The concrete host HTTP write
+capability consumes itself for one PUT and reuses the captured endpoint, TLS and
+credential configuration. Executable fixtures prove exact path/body framing,
+redirect refusal, bounded responses and no retry after a lost reply. They do not
+establish native effect classification or a CLI merge.
 C14 create/update head-guard semantics remain unresolved; no race window has
 been accepted. GitLab remains first, followed by Kubernetes, PostgreSQL, MCP and
 the remaining providers.
