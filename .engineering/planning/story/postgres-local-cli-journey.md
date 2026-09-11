@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:postgres-local-cli-journey
 kind: story
-status: active
+status: implemented
 title: Persist and reuse an admitted PostgreSQL connection through the local CLI
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -18,7 +18,7 @@ scope:
   path: apps/connectors
 - confidence: cited
   path: docs
-revision: 4
+revision: 5
 ---
 ## Acceptance
 
