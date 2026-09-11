@@ -1,7 +1,9 @@
 use crate::credentials::CredentialRef;
 use async_trait::async_trait;
 use connectors_core::{Error, ErrorCode, Result};
-use connectors_sdk::{AuthenticatedHttp, Credential, HttpResponse, HttpResponsePrefix};
+use connectors_sdk::{
+    AuthenticatedHttp, AuthenticatedWrite, Credential, HttpResponse, HttpResponsePrefix,
+};
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc, time::Duration};
@@ -153,11 +155,40 @@ impl ScopedHttp {
 }
 
 impl ScopedHttp {
+    /// Trusted composition selects a single consuming PUT capability. This
+    /// conversion grants no approval or ledger authority. Business adapters
+    /// receiving only `AuthenticatedHttp` cannot perform it.
+    ///
+    /// ```compile_fail
+    /// use connectors_host::http::ScopedHttp;
+    /// async fn repeat(http: ScopedHttp) {
+    ///     let write = http.into_write();
+    ///     write.put_json(&["items", "1"], &[], &serde_json::json!({})).await;
+    ///     write.put_json(&["items", "1"], &[], &serde_json::json!({})).await;
+    /// }
+    /// ```
+    pub fn into_write(self) -> Box<dyn AuthenticatedWrite> {
+        Box::new(ScopedWrite(self))
+    }
+
     async fn send_get(
         &self,
         segments: &[&str],
         query: &[(&str, String)],
     ) -> Result<reqwest::Response> {
+        self.request(reqwest::Method::GET, segments, query)
+            .await?
+            .send()
+            .await
+            .map_err(provider_error)
+    }
+
+    async fn request(
+        &self,
+        method: reqwest::Method,
+        segments: &[&str],
+        query: &[(&str, String)],
+    ) -> Result<reqwest::RequestBuilder> {
         let mut url = self.base.clone();
         {
             let mut path = url
@@ -173,7 +204,7 @@ impl ScopedHttp {
         }
         url.query_pairs_mut()
             .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
-        let mut request = self.client.get(url);
+        let mut request = self.client.request(method, url);
         if let Some(credential) = &self.credential {
             let secret = credential.resolve().await?;
             let value = zeroize::Zeroizing::new(if self.bearer {
@@ -188,7 +219,53 @@ impl ScopedHttp {
             header.set_sensitive(true);
             request = request.header(&self.header, header);
         }
-        request.send().await.map_err(provider_error)
+        Ok(request)
+    }
+}
+
+// Deliberately private, non-Clone, and separate from the GET capability. Native
+// effect interpretation remains with the adapter: even a successful HTTP status
+// is only a response, and every transport failure can follow a committed write.
+struct ScopedWrite(ScopedHttp);
+#[async_trait]
+impl AuthenticatedWrite for ScopedWrite {
+    async fn put_json(
+        self: Box<Self>,
+        segments: &[&str],
+        query: &[(&str, String)],
+        body: &serde_json::Value,
+    ) -> Result<HttpResponse> {
+        let response = self
+            .0
+            .request(reqwest::Method::PUT, segments, query)
+            .await?
+            .json(body)
+            .send()
+            .await
+            .map_err(provider_error)?;
+        let status = response.status().as_u16();
+        let mut headers = std::collections::BTreeMap::new();
+        let mut bytes = 0_usize;
+        for (index, (name, value)) in response.headers().iter().enumerate() {
+            bytes = bytes
+                .saturating_add(name.as_str().len())
+                .saturating_add(value.as_bytes().len());
+            if index >= 128 || bytes > 32_768 {
+                return Err(Error::new(
+                    ErrorCode::Capacity,
+                    "provider response headers exceed limit",
+                ));
+            }
+            if let Ok(value) = value.to_str() {
+                headers.insert(name.to_string(), value.to_owned());
+            }
+        }
+        let body = connectors_client::bounded(response).await?;
+        Ok(HttpResponse {
+            status,
+            headers,
+            body,
+        })
     }
 }
 

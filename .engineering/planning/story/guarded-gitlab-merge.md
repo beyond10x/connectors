@@ -32,7 +32,11 @@ scope:
 - confidence: inferred
   path: crates/connectors-conformance
 - confidence: cited
+  path: crates/connectors-host/src/http.rs
+- confidence: cited
   path: crates/connectors-host/src/local
+- confidence: cited
+  path: crates/connectors-host/tests/http_write.rs
 - confidence: cited
   path: crates/connectors-sdk
 - confidence: cited
@@ -51,7 +55,7 @@ scope:
   path: spec-kinds/adapter
 - confidence: inferred
   path: website
-revision: 10
+revision: 13
 ---
 ## Outcome
 
@@ -126,3 +130,13 @@ The canonical preparation fixture exposed an existing projection discrepancy: op
 docs/evidence/local-approval-issuance-20260911/README.md retains failed/corrected logs, 412 source/dependency hashes and runtime binary identities. The full repository gate with Rust 1.88 passes, including 122 host unit tests, CLI/adapter generation, 81 structural CLI fixtures, conformance and boundaries. The explicit production approval CLI journey passes with qualified disposable custody and an independent synthetic clock, including protected publication, printed-subject digest verification, restart reuse, overwrite refusal and locked custody. All six disposable production GitLab read journeys pass in 256.70 seconds. Website build/typecheck and reference drift checks pass. These facts do not establish dedicated provider acceptance or full distributable reproducibility.
 
 The guarded-merge story and initiative remain active. Next integrate protected proof consumption and owner mutation IPC with the existing approval/audit/attempt/connection dispatch gates, then implement one SHA-guarded GitLab merge and its lost-response/restart acceptance. Full GitLab workflows, dedicated sandbox access, the create/update atomic-head decision and distribution reproducibility remain open. Full GitLab still precedes Kubernetes with Helm, PostgreSQL, MCP and remaining providers. Root remains the sole implementation/planning writer on primary main; no linked worktree, release, external publication or paid governed run is created by this checkpoint. The recorded driver blocker remains unchanged.
+
+## Verified mutation integration checkpoint — 2026-09-11
+
+An integration test exposed a concrete incompatibility: audit, mutation and approval-spend ports accepted only through metadata version seven, while current local policy publication requires version eight. Their version guards now admit eight without changing migration bytes or acknowledgement boundaries. A combined test exercises audit admission, preparation, spend, audit confirmation, dispatch and store reconstruction/recovery against that schema, retaining the exact key and spent proof after an unknown result. It uses fixture policy/clock/key inputs; it does not claim a native effect or production owner restart.
+
+The private proof-file decoder consumes the existing issuance document under explicit bounds without sending compact proof bytes through ordinary JSON Values. Closed and duplicate/escaped/oversized refusals are tested, as is verification of a decoded valid document. The concrete host HTTP capability consumes itself for one PUT over captured target/TLS/credential configuration. Four disposable network tests cover exact framing, disabled redirects/retries, a response lost after a complete request, native error responses, response bounds and path refusal before credential resolution. Provider effect interpretation stays with the native adapter. These APIs are not yet called by CLI write invocation.
+
+docs/evidence/mutation-composition-20260911/README.md retains verification commands, logs, 386 source/dependency hashes, runtime binary identities and the initial fixture correction. The full repository gate with Rust 1.88 passes, including 124 host unit tests, four HTTP write tests, three existing HTTP tests, a consuming-capability compile-fail case, generation/drift, boundaries and conformance. All six disposable production GitLab CLI journeys pass in 206.80 seconds. Dependency pins, generated output and public website inputs are unchanged. Two local implementation guides now reflect already delivered approval issuance and the still-unfinished coordinator.
+
+The story and initiative stay active. The next required implementation is protected proof consumption and explicitly selected owner IPC version two joined to current result-access admission, audit, mutation, approval and connection-use dispatch, then the native SHA-guarded merge. No callable GitLab write, full lost-response CLI acceptance, dedicated sandbox evidence or reproducible distribution is claimed. Dedicated sandbox access and C14 create/update atomic-head semantics remain open. Full GitLab still precedes Kubernetes including Helm, PostgreSQL, MCP and remaining providers. Root remains the single implementation/planning writer on primary main; this checkpoint creates no linked tree, release, external publication, Atlas registration or paid governed run.
