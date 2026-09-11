@@ -96,6 +96,146 @@ fn existing(store: &Store<TestClock>, candidate: &Candidate) -> Observation {
 }
 
 #[test]
+fn pending_scan_does_not_install_mutation_state() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    drop(Metadata::initialize(root.path()).unwrap());
+    let version = || {
+        Metadata::inspect(root.path())
+            .unwrap()
+            .connection
+            .pragma_query_value::<i64, _>(None, "user_version", |row| row.get(0))
+            .unwrap()
+    };
+    let before = version();
+    let clock = TestClock(Arc::new(Mutex::new(Err(Failure::ClockUnavailable))));
+    let store = Store::new(root.path(), clock, Limits::default()).unwrap();
+    assert!(
+        store
+            .pending(&mut PendingScan::default(), 64)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(version(), before);
+    let metadata = Metadata::inspect(root.path()).unwrap();
+    let count: i64 = metadata
+        .connection
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE name='mutation_attempts'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn pending_scan_pages_existing_instances_and_keyed_or_unkeyed_attempts() {
+    let (_root, store, original) = fixture();
+    let mut expected = Vec::new();
+    for index in 0..7 {
+        let mut candidate = original.clone();
+        candidate.caller_key = (index % 2 == 0).then(|| format!("key-{index}"));
+        candidate.request_id = format!("request-{index}");
+        if index >= 4 {
+            candidate.namespace.receiver_instance = "second".into();
+            candidate.fingerprint.operation.instance = "second".into();
+            candidate.fingerprint.connection_ref = "second-connection".into();
+        }
+        let prepared = prepared(&store, &candidate);
+        let reference = prepared.reference();
+        if index % 2 == 0 {
+            let _ = store.open_dispatch(prepared).unwrap();
+        } else {
+            drop(prepared);
+        }
+        expected.push(reference.attempt_id);
+    }
+    let mut scan = PendingScan::default();
+    let mut seen = Vec::new();
+    loop {
+        let page = store.pending(&mut scan, 2).unwrap();
+        assert!(page.len() <= 2);
+        if page.is_empty() {
+            break;
+        }
+        for entry in page {
+            assert!(matches!(entry.state, State::Prepared | State::Dispatching));
+            seen.push(entry.reference.attempt_id);
+            store
+                .recover_for_instance(entry.reference, &entry.instance)
+                .unwrap();
+        }
+    }
+    expected.sort();
+    seen.sort();
+    assert_eq!(seen, expected);
+    assert!(store.pending(&mut scan, 64).unwrap().is_empty());
+    let mut candidate = original;
+    candidate.caller_key = None;
+    let later = prepared(&store, &candidate).reference();
+    let page = store.pending(&mut scan, 64).unwrap();
+    assert_eq!(page.len(), 1);
+    assert_eq!(page[0].reference, later);
+    assert!(matches!(
+        store.pending(&mut scan, 65),
+        Err(Failure::InvalidInput)
+    ));
+}
+
+#[test]
+fn instance_recovery_preserves_fault_uncertainty_and_ignores_revoked_business_grants() {
+    let (root, store, candidate) = fixture();
+    let reference = prepared(&store, &candidate).reference();
+    assert_eq!(
+        store.recover_for_instance(reference, "second"),
+        Err(Failure::BindingChanged)
+    );
+    assert_eq!(store.observe(reference).unwrap().state, State::Prepared);
+    let metadata = Metadata::update(root.path(), false).unwrap();
+    metadata
+        .connection
+        .execute(
+            "UPDATE registry_connections SET state='revoked',revoked_at_ms=1 WHERE connection_ref='connection'",
+            [],
+        )
+        .unwrap();
+    drop(metadata);
+    store.fault.store(1, Ordering::SeqCst);
+    assert_eq!(
+        store.recover_for_instance(reference, "instance"),
+        Err(Failure::MetadataUnavailable)
+    );
+    let page = store.pending(&mut PendingScan::default(), 64).unwrap();
+    assert_eq!(page.len(), 1);
+    assert_eq!(page[0].state, State::Prepared);
+    store.clock.unavailable();
+    assert_eq!(
+        store.recover_for_instance(reference, "instance"),
+        Err(Failure::ClockUnavailable)
+    );
+    assert_eq!(store.observe(reference).unwrap().state, State::Prepared);
+    store.clock.set(NOW, NOW + 2000);
+    store.fault.store(2, Ordering::SeqCst);
+    assert_eq!(
+        store.recover_for_instance(reference, "instance"),
+        Err(Failure::OutcomeUnknown)
+    );
+    assert!(
+        store
+            .pending(&mut PendingScan::default(), 64)
+            .unwrap()
+            .is_empty()
+    );
+    let terminal = store.observe(reference).unwrap();
+    assert_eq!(terminal.state, State::Aborted);
+    assert_eq!(
+        store.recover_for_instance(reference, "instance").unwrap(),
+        terminal
+    );
+}
+
+#[test]
 fn concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation() {
     let (root, store, candidate) = fixture();
     let store = Arc::new(store);

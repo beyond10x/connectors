@@ -26,6 +26,19 @@ pub enum Failure {
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
+/// Private, transient scan position over existing instance/attempt identities.
+/// It is neither durable state nor authority to recover a live worker's attempt.
+#[derive(Clone, Default)]
+pub(crate) struct PendingScan {
+    instance: Option<String>,
+    after: Option<Uuid>,
+}
+pub(crate) struct PendingAttempt {
+    pub instance: String,
+    pub reference: AttemptRef,
+    pub state: State,
+}
+
 /// No default unqualified wall clock is provided. Each method closes the
 /// SQLite handle before returning, including before any receipt can be used.
 pub struct Store<C> {
@@ -174,6 +187,76 @@ impl<C: Clock> Store<C> {
         observation(&metadata.connection, reference)
     }
 
+    /// No migration, payload access, clock, or recovery permission. Use the
+    /// existing instance/state index rather than scanning all retained history.
+    /// Visit at most eight instances and return at most 64 references per pass.
+    pub(crate) fn pending(
+        &self,
+        scan: &mut PendingScan,
+        limit: u16,
+    ) -> Result<Vec<PendingAttempt>> {
+        use self::db as db_error;
+        if !(1..=64).contains(&limit) {
+            return Err(Failure::InvalidInput);
+        }
+        let metadata = Metadata::inspect(&self.path).map_err(host_error)?;
+        let db = &metadata.connection;
+        let version: i64 = db
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .map_err(db_error)?;
+        if version < 4 {
+            *scan = PendingScan::default();
+            return Ok(Vec::new());
+        }
+        require_schema(db)?;
+        let authority = metadata.authority().map_err(host_error)?;
+        let mut next = scan.clone();
+        if next.instance.is_none() {
+            next.instance = db.query_row("SELECT instance_id FROM mutation_attempts INDEXED BY mutation_attempt_instance ORDER BY instance_id LIMIT 1", [], |r| r.get(0)).optional().map_err(db_error)?;
+        }
+        for _ in 0..8 {
+            let Some(instance) = &next.instance else {
+                break;
+            };
+            types::identifier(instance)?;
+            let mut statement = db.prepare("SELECT attempt_id,state FROM mutation_attempts INDEXED BY mutation_attempt_instance WHERE instance_id=?1 AND state IN ('prepared','dispatching') AND (?2 IS NULL OR attempt_id>?2) ORDER BY attempt_id LIMIT ?3").map_err(db_error)?;
+            let mut rows = statement
+                .query(params![
+                    instance,
+                    next.after.map(|id| id.to_string()),
+                    limit
+                ])
+                .map_err(db_error)?;
+            let mut entries = Vec::new();
+            while let Some(row) = rows.next().map_err(db_error)? {
+                let id: String = row.get(0).map_err(db_error)?;
+                let attempt_id = Uuid::parse_str(&id).map_err(|_| Failure::MetadataUnavailable)?;
+                if attempt_id.is_nil() || attempt_id.to_string() != id {
+                    return Err(Failure::MetadataUnavailable);
+                }
+                entries.push(PendingAttempt {
+                    instance: instance.clone(),
+                    reference: AttemptRef {
+                        authority,
+                        attempt_id,
+                    },
+                    state: State::parse(&row.get::<_, String>(1).map_err(db_error)?)?,
+                });
+            }
+            drop(rows);
+            drop(statement);
+            if let Some(last) = entries.last() {
+                next.after = Some(last.reference.attempt_id);
+                *scan = next;
+                return Ok(entries);
+            }
+            next.instance = db.query_row("SELECT instance_id FROM mutation_attempts INDEXED BY mutation_attempt_instance WHERE instance_id>?1 ORDER BY instance_id LIMIT 1", [instance], |r| r.get(0)).optional().map_err(db_error)?;
+            next.after = None;
+        }
+        *scan = next;
+        Ok(Vec::new())
+    }
+
     /// Separately acknowledged one-shot CAS. This receipt proves only the
     /// metadata gate; it is not sufficient authority for a provider call.
     pub fn open_dispatch(&self, prepared: Prepared) -> Result<GateWinner> {
@@ -262,8 +345,34 @@ impl<C: Clock> Store<C> {
     /// Never sends or recreates a handle. The coordinator must first establish
     /// recovery ownership; this can race only through the same durable fences.
     pub fn recover(&self, reference: AttemptRef) -> Result<Observation> {
+        self.recover_bound(reference, None)
+    }
+
+    pub(crate) fn recover_for_instance(
+        &self,
+        reference: AttemptRef,
+        instance: &str,
+    ) -> Result<Observation> {
+        types::identifier(instance)?;
+        self.recover_bound(reference, Some(instance))
+    }
+
+    fn recover_bound(&self, reference: AttemptRef, instance: Option<&str>) -> Result<Observation> {
         self.transaction(false, |tx, authority| {
             check_authority(reference, authority)?;
+            if let Some(instance) = instance {
+                let retained: Option<String> = tx
+                    .query_row(
+                        "SELECT instance_id FROM mutation_attempts WHERE attempt_id=?1",
+                        [reference.attempt_id.to_string()],
+                        |r| r.get(0),
+                    )
+                    .optional()
+                    .map_err(db)?;
+                if retained.as_deref() != Some(instance) {
+                    return Err(Failure::BindingChanged);
+                }
+            }
             let current = observation(tx, reference)?;
             match current.state {
                 State::Prepared => self.terminal(

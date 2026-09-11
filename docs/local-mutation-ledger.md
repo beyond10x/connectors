@@ -48,8 +48,8 @@ requires the original live approval spend receipt as well as the preparation;
 old records with no subject capture cannot acquire either approval receipt.
 
 The store neither calls providers nor gives them metadata or credentials. A
-future coordinator must combine its receipt with those other admitted
-capabilities and enforce one send. Approval spending and audit admission retain
+local coordinator combines its receipt with those other admitted
+capabilities and enforces one send. Approval spending and audit admission retain
 their separate acknowledgements; they are not silently bundled into preparation.
 The provider call is always outside a metadata handle or transaction.
 
@@ -81,8 +81,17 @@ retire the exact reservation generation. The store records a clock watermark,
 rejects regression, and never infers expiry from an unavailable clock or read.
 Clock failure during known settlement leaves the earlier durable state intact;
 it cannot erase the live caller's known effect. Unknown settlement needs no expiry
-clock. The port has no default SystemTime clock: local production qualification
-remains required before keyed writes can be advertised.
+clock. The port has no default SystemTime clock: the local coordinator uses its
+explicitly configured qualified source and refuses unsupported time evidence.
+
+The local owner now performs periodic bounded recovery as well as exact-key
+observation. It scans existing instance/attempt references without migration or
+payload access, then obtains quiescence on the retained worker or under the
+worker-creation lock for an instance with no live worker. It can fence unkeyed,
+revoked or removed targets without exposing their results or starting a child.
+Unavailable time leaves Prepared pending; uncertain dispatch can be quarantined
+without time. The [local binding](../contracts/service/local-mutations.md) records
+the scan/queue bounds, current clock selection and shutdown behavior.
 
 Retention does not slide on replay. A stale retirement request compares both
 the exact tuple and reservation ID, so it cannot retire a replacement. Retiring
@@ -103,7 +112,9 @@ GitLab write. Private proof/spend and audit persistence,
 [protected issuer custody](local-approval-keys.md), [local approval issuance](local-approvals.md)
 and [configured clock checks](local-clock.md) are available. A combined SQLite
 test exercises audit admission, proof spend, dispatch and reconstruction/recovery
-on the policy's version-eight schema. Generated mutation CLI/wire surfaces and
-the fully admitted dispatch coordinator remain implementation work.
+on the policy's version-eight schema. The production CLI now joins guarded GitLab
+merge, original-result admission and both recovery paths through that coordinator.
+The broader acknowledgement-failure matrix and original-audit reconciliation
+remain implementation work.
 Dedicated GitLab sandbox acceptance and the C14 native create/update head guard
 are still open. GitLab precedes Kubernetes, PostgreSQL, MCP and remaining providers.
