@@ -2,7 +2,7 @@ use crate::credentials::CredentialRef;
 use async_trait::async_trait;
 use connectors_core::{Error, ErrorCode, Result};
 use connectors_sdk::{
-    AuthenticatedHttp, AuthenticatedWrite, Credential, HttpResponse, HttpResponsePrefix,
+    AuthProbe, AuthenticatedHttp, AuthenticatedWrite, Credential, HttpResponse, HttpResponsePrefix,
 };
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
@@ -171,6 +171,40 @@ impl ScopedHttp {
         Box::new(ScopedWrite(self))
     }
 
+    /// Trusted composition fixes the probe's path here, once. The returned port
+    /// POSTs a bounded document to exactly those segments under the captured
+    /// target, TLS configuration and credential, and can express nothing else.
+    /// A business adapter holding only `AuthenticatedHttp` cannot build one.
+    ///
+    /// ```compile_fail
+    /// use connectors_sdk::AuthenticatedHttp;
+    /// fn probe(http: &dyn AuthenticatedHttp) {
+    ///     http.probe_capability(&["apis"]);
+    /// }
+    /// ```
+    pub fn probe_capability(&self, segments: &[&str]) -> Result<Arc<dyn AuthProbe>> {
+        if segments.is_empty() || segments.len() > 16 {
+            return Err(Error::invalid("a probe endpoint is one bounded fixed path"));
+        }
+        let mut fixed = Vec::with_capacity(segments.len());
+        for segment in segments {
+            if segment.is_empty() || *segment == "." || *segment == ".." {
+                return Err(Error::invalid("invalid provider path segment"));
+            }
+            fixed.push((*segment).to_owned());
+        }
+        Ok(Arc::new(ScopedProbe {
+            http: Self {
+                client: self.client.clone(),
+                base: self.base.clone(),
+                credential: self.credential.clone(),
+                header: self.header.clone(),
+                bearer: self.bearer,
+            },
+            segments: fixed,
+        }))
+    }
+
     async fn send_get(
         &self,
         segments: &[&str],
@@ -240,6 +274,58 @@ impl AuthenticatedWrite for ScopedWrite {
             .request(reqwest::Method::PUT, segments, query)
             .await?
             .json(body)
+            .send()
+            .await
+            .map_err(provider_error)?;
+        let status = response.status().as_u16();
+        let mut headers = std::collections::BTreeMap::new();
+        let mut bytes = 0_usize;
+        for (index, (name, value)) in response.headers().iter().enumerate() {
+            bytes = bytes
+                .saturating_add(name.as_str().len())
+                .saturating_add(value.as_bytes().len());
+            if index >= 128 || bytes > 32_768 {
+                return Err(Error::new(
+                    ErrorCode::Capacity,
+                    "provider response headers exceed limit",
+                ));
+            }
+            if let Ok(value) = value.to_str() {
+                headers.insert(name.to_string(), value.to_owned());
+            }
+        }
+        let body = connectors_client::bounded(response).await?;
+        Ok(HttpResponse {
+            status,
+            headers,
+            body,
+        })
+    }
+}
+
+// Deliberately private and separate from both the GET and the consuming PUT
+// capability. The path is fixed at construction, so no caller can retarget it.
+struct ScopedProbe {
+    http: ScopedHttp,
+    segments: Vec<String>,
+}
+#[async_trait]
+impl AuthProbe for ScopedProbe {
+    async fn probe(&self, body: &serde_json::Value) -> Result<HttpResponse> {
+        let document = serde_json::to_vec(body).map_err(|_| Error::internal())?;
+        if document.len() > connectors_sdk::PROBE_BODY_LIMIT {
+            return Err(Error::new(
+                ErrorCode::Capacity,
+                "probe document exceeds the permitted size",
+            ));
+        }
+        let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
+        let response = self
+            .http
+            .request(reqwest::Method::POST, &segments, &[])
+            .await?
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(document)
             .send()
             .await
             .map_err(provider_error)?;
@@ -342,5 +428,76 @@ impl AuthenticatedHttp for ScopedHttp {
             body,
             complete,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use connectors_sdk::PROBE_BODY_LIMIT;
+
+    /// A base that resolves nowhere, so any test reaching I/O fails with
+    /// `Unavailable` rather than the refusal the case is asserting.
+    fn scoped() -> ScopedHttp {
+        ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: "https://probe.invalid/".into(),
+                credential: None,
+                credential_header: "authorization".into(),
+                bearer: true,
+                allow_plaintext: false,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_probe_endpoint_is_one_bounded_fixed_path() {
+        let http = scoped();
+        let refused = |result: Result<Arc<dyn AuthProbe>>, what: &str| match result {
+            Ok(_) => panic!("{what} was accepted as a probe endpoint"),
+            Err(error) => assert_eq!(error.code, ErrorCode::InvalidInput, "{what}"),
+        };
+        refused(http.probe_capability(&[]), "an empty path");
+        refused(http.probe_capability(&["a"; 17]), "a 17-segment path");
+        for segment in ["", ".", ".."] {
+            refused(http.probe_capability(&["apis", segment]), segment);
+        }
+        assert!(http.probe_capability(&["apis", "v1", "reviews"]).is_ok());
+        assert!(http.probe_capability(&["a"; 16]).is_ok());
+    }
+
+    #[tokio::test]
+    async fn an_oversized_probe_document_is_refused_without_any_request() {
+        let http = scoped();
+        let probe = http.probe_capability(&["apis", "v1", "reviews"]).unwrap();
+        // One byte over the limit once serialized: the quotes carry two bytes.
+        let oversized = serde_json::json!("x".repeat(PROBE_BODY_LIMIT - 1));
+        assert_eq!(
+            serde_json::to_vec(&oversized).unwrap().len(),
+            PROBE_BODY_LIMIT + 1
+        );
+        let Err(error) = probe.probe(&oversized).await else {
+            panic!("an oversized probe document was sent");
+        };
+        // Capacity, not Unavailable: the refusal precedes the transport, which
+        // could not have reached this unresolvable base in any case.
+        assert_eq!(error.code, ErrorCode::Capacity);
+        let largest = serde_json::json!("x".repeat(PROBE_BODY_LIMIT - 2));
+        assert_eq!(
+            serde_json::to_vec(&largest).unwrap().len(),
+            PROBE_BODY_LIMIT
+        );
+        let Err(error) = probe.probe(&largest).await else {
+            panic!("an unresolvable base produced a response");
+        };
+        assert_eq!(
+            error.code,
+            ErrorCode::Unavailable,
+            "a document at the limit must be sent, not refused"
+        );
     }
 }
