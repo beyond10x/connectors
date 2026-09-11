@@ -203,8 +203,8 @@ fn read(mut file: File, limit: usize, deadline: u64) -> Result<Secret> {
     check(deadline)?;
     Ok(data)
 }
-pub fn document(path: Option<&Path>) -> Result<String> {
-    let file = if let Some(path) = path {
+fn document_file(path: Option<&Path>) -> Result<File> {
+    if let Some(path) = path {
         let file = OpenOptions::new()
             .read(true)
             .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
@@ -213,12 +213,77 @@ pub fn document(path: Option<&Path>) -> Result<String> {
         if !file.metadata().map_err(source_error)?.is_file() {
             return Err(Code::InvalidInput.into());
         }
-        file
+        Ok(file)
     } else {
-        duplicate(0)?
-    };
-    let mut bytes = read(file, 1024 * 1024, connectors_sdk::now_ms() + 30_000)?;
+        duplicate(0)
+    }
+}
+pub fn document(path: Option<&Path>) -> Result<String> {
+    let mut bytes = read(
+        document_file(path)?,
+        1024 * 1024,
+        connectors_sdk::now_ms() + 30_000,
+    )?;
     String::from_utf8(std::mem::take(&mut bytes.0)).map_err(source_error)
+}
+
+/// Nonsecret document acquisition within an original monotonic helper budget.
+/// Time spent parsing arguments, waiting for stdin and reading a file is shared
+/// with subsequent approval resolution and issuance; no phase restarts it.
+pub fn document_until(
+    path: Option<&Path>,
+    until: std::time::Instant,
+    limit: usize,
+) -> Result<String> {
+    if limit > 1024 * 1024 {
+        return Err(Code::InvalidInput.into());
+    }
+    let check = || -> Result<()> {
+        cancellation()?;
+        if std::time::Instant::now() >= until {
+            return Err(Code::Timeout.into());
+        }
+        Ok(())
+    };
+    check()?;
+    let mut file = document_file(path)?;
+    if file.metadata().map_err(source_error)?.len() > limit as u64 {
+        return Err(Code::InvalidInput.into());
+    }
+    let mut bytes = Vec::with_capacity(limit + 1);
+    let mut buffer = [0; 4096];
+    loop {
+        check()?;
+        let ms = until
+            .saturating_duration_since(std::time::Instant::now())
+            .as_millis()
+            .min(100) as i32;
+        let mut poll = libc::pollfd {
+            fd: file.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        // SAFETY: a live descriptor and one initialized pollfd; bounded wait.
+        let ready = unsafe { libc::poll(&mut poll, 1, ms.max(1)) };
+        check()?;
+        if ready < 0 {
+            return Err(Code::InvalidInput.into());
+        }
+        if ready == 0 {
+            continue;
+        }
+        let remaining = (limit + 1 - bytes.len()).min(buffer.len());
+        let count = file.read(&mut buffer[..remaining]).map_err(source_error)?;
+        if count == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&buffer[..count]);
+        if bytes.len() > limit {
+            return Err(Code::InvalidInput.into());
+        }
+    }
+    check()?;
+    String::from_utf8(bytes).map_err(source_error)
 }
 struct Terminal {
     file: File,
