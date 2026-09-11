@@ -5,6 +5,8 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use connectors_host::local::owner::{approval_issuance, mutation};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+#[path = "background_recovery.rs"]
+mod background_recovery;
 
 /// An exact kernel handle obtained from this test's private owner socket.
 /// The crash fixture requires Linux SO_PEERPIDFD, not a numeric PID kill.
@@ -227,6 +229,18 @@ fn gitlab_cli_recovers_abandoned_preparation_only_with_trusted_time() {
 }
 
 #[test]
+#[ignore = "requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR"]
+fn gitlab_cli_background_recovery_waits_for_live_work_and_recovers_unkeyed_attempts() {
+    journey(6);
+}
+
+#[test]
+#[ignore = "requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR"]
+fn gitlab_cli_background_recovers_revoked_removed_target_without_disclosure() {
+    journey(7);
+}
+
+#[test]
 #[ignore = "subprocess fixture; no action without its explicit task-owned root"]
 fn prepared_attempt_exit_fixture() {
     use connectors_host::local::{approvals::Subject, mutations as ledger};
@@ -270,7 +284,9 @@ fn prepared_attempt_exit_fixture() {
             input_digest: subject.input_sha256,
             route: None,
         },
-        caller_key: Some("owned-merge".into()),
+        caller_key: std::env::var_os("CONNECTORS_PREPARED_FIXTURE_UNKEYED")
+            .is_none()
+            .then(|| "owned-merge".into()),
         request_id: "a6b7af40-a60f-4a73-a4b2-fd247c773c11".into(),
         // This process exercises the durable port, not native preflight or
         // approval spending. No provider capability or dispatch gate is used.
@@ -294,7 +310,9 @@ fn stored_attempt(cli: &Cli) -> (String, String, Option<i64>, Option<i64>) {
 
 fn journey(mode: u8) {
     let provider = Provider::new();
-    provider.merge_mode.store(mode, Ordering::SeqCst);
+    provider
+        .merge_mode
+        .store(if mode == 6 { 3 } else { mode }, Ordering::SeqCst);
     let mut custody = Custody::new(provider.root.path());
     let clock = Clock::new();
     let cli = Cli::new(provider.root.path());
@@ -425,12 +443,13 @@ fn journey(mode: u8) {
         assert_eq!(pending["mutation"]["classification"], "unknown");
         assert_eq!(pending["mutation"]["replayed"], false);
         assert_eq!(stored_attempt(&cli).0, "prepared");
-        assert_eq!(clock.count.load(Ordering::SeqCst), clock_calls + 1);
+        assert!(clock.count.load(Ordering::SeqCst) > clock_calls);
         assert_eq!(pending["mutation"]["cause"]["code"], "unavailable");
         assert!(cli.status()["child_incarnation"].is_null());
+        let failed_clock_calls = clock.count.load(Ordering::SeqCst);
         clock.respond.store(true, Ordering::SeqCst);
         let recovered = refusal(cli.run(&invocation), "interrupted");
-        assert_eq!(clock.count.load(Ordering::SeqCst), clock_calls + 2);
+        assert!(clock.count.load(Ordering::SeqCst) > failed_clock_calls);
         assert_eq!(recovered["mutation"]["classification"], "not_attempted");
         assert_eq!(recovered["mutation"]["replayed"], true);
         assert_eq!(
@@ -463,6 +482,22 @@ fn journey(mode: u8) {
                 .unwrap()
                 .iter()
                 .any(|method| method == "PUT")
+        );
+        return;
+    }
+    if mode == 6 || mode == 7 {
+        let run = if mode == 6 {
+            background_recovery::run
+        } else {
+            background_recovery::removed
+        };
+        run(
+            &cli,
+            &provider,
+            &mut custody,
+            &clock,
+            &prepared["preparation"]["subject"],
+            &invocation,
         );
         return;
     }

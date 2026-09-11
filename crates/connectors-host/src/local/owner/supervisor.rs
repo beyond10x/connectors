@@ -65,13 +65,25 @@ struct Job {
     epoch: u64,
 }
 struct Worker {
-    sender: mpsc::SyncSender<Job>,
+    sender: mpsc::SyncSender<Work>,
     control: Arc<Mutex<lifecycle::Control>>,
     thread: std::thread::JoinHandle<()>,
     busy: Arc<AtomicBool>,
+    recovery_pending: Arc<AtomicBool>,
 }
-/// Constructed only between invocations on this instance's retained worker.
-/// The exclusive child-slot borrow excludes any simultaneous native exchange.
+enum Work {
+    Invoke(Box<Job>),
+    Recover(maintenance::Batch, RecoveryQueued),
+}
+struct RecoveryQueued(Arc<AtomicBool>);
+impl Drop for RecoveryQueued {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+/// The supervisor constructs this between invocations, or while holding its
+/// creation lock with no live worker for the instance. Neither state admits a
+/// simultaneous native exchange; the lifetime lock excludes another owner.
 pub(super) struct Quiescent<'a> {
     instance: &'a str,
     _child: &'a mut Option<runtime::Child>,
@@ -155,9 +167,11 @@ impl Pool {
             let stopped = self.stopped.clone();
             let busy = Arc::new(AtomicBool::new(false));
             let active = busy.clone();
+            let recovery_pending = Arc::new(AtomicBool::new(false));
+            let instance = adapter.instance_id.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
-                .spawn(move || worker(paths, launches, shared, stopped, active, receiver))
+                .spawn(move || worker(paths, launches, shared, stopped, active, instance, receiver))
                 .map_err(|_| Code::Unavailable)?;
             workers.insert(
                 adapter.instance_id.clone(),
@@ -166,6 +180,7 @@ impl Pool {
                     control,
                     thread,
                     busy,
+                    recovery_pending,
                 },
             );
         }
@@ -185,14 +200,14 @@ impl Pool {
         let (reply, receiver) = mpsc::channel();
         worker
             .sender
-            .try_send(Job {
+            .try_send(Work::Invoke(Box::new(Job {
                 alias: alias.into(),
                 adapter: adapter.clone(),
                 task,
                 deadline,
                 reply,
                 epoch: control.epoch,
-            })
+            })))
             .map_err(|e| match e {
                 mpsc::TrySendError::Full(_) => Code::Capacity,
                 mpsc::TrySendError::Disconnected(_) => Code::Unavailable,
@@ -206,6 +221,46 @@ impl Pool {
                 mpsc::RecvTimeoutError::Timeout => Code::Timeout,
                 _ => Code::Unavailable,
             })?
+    }
+    pub(super) fn recover(&self, batch: maintenance::Batch) -> Result<()> {
+        let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
+        if self.stopped.load(Ordering::SeqCst) {
+            return Err(Code::Unavailable.into());
+        }
+        if let Some(worker) = workers.get(&batch.instance)
+            && !worker.thread.is_finished()
+        {
+            if worker
+                .recovery_pending
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_err()
+            {
+                return Ok(());
+            }
+            let queued = RecoveryQueued(worker.recovery_pending.clone());
+            worker
+                .sender
+                .try_send(Work::Recover(batch, queued))
+                .map_err(|error| match error {
+                    mpsc::TrySendError::Full(_) => Code::Capacity,
+                    mpsc::TrySendError::Disconnected(_) => Code::Unavailable,
+                })?;
+        } else {
+            // Keep worker creation excluded until these exact fences finish.
+            // A retained finished thread cannot dispatch or be replaced here.
+            let instance = batch.instance.clone();
+            let mut absent = None;
+            maintenance::apply(
+                &self.paths,
+                batch,
+                Quiescent {
+                    instance: &instance,
+                    _child: &mut absent,
+                },
+                &self.stopped,
+            )?;
+        }
+        Ok(())
     }
     /// Latency hint only. Recovery ownership comes from executing on the one
     /// serialized instance worker, never from observing this flag.
@@ -316,13 +371,32 @@ fn worker(
     control: Arc<Mutex<lifecycle::Control>>,
     stopped: Arc<AtomicBool>,
     busy: Arc<AtomicBool>,
-    receiver: mpsc::Receiver<Job>,
+    instance: String,
+    receiver: mpsc::Receiver<Work>,
 ) {
     let state = runtime::state::State::new(&paths.state);
     let mut child: Option<runtime::Child> = None;
     let mut selection = String::new();
-    for job in receiver {
+    for work in receiver {
         busy.store(true, Ordering::SeqCst);
+        let job = match work {
+            Work::Invoke(job) => *job,
+            Work::Recover(batch, _queued) => {
+                if !stopped.load(Ordering::SeqCst) {
+                    let _ = maintenance::apply(
+                        &paths,
+                        batch,
+                        Quiescent {
+                            instance: &instance,
+                            _child: &mut child,
+                        },
+                        &stopped,
+                    );
+                }
+                busy.store(false, Ordering::SeqCst);
+                continue;
+            }
+        };
         let result = (|| {
             until(job.deadline)?;
             if stopped.load(Ordering::SeqCst) {
@@ -735,5 +809,61 @@ fn worker(
         }
         busy.store(false, Ordering::SeqCst);
         let _ = job.reply.send(result);
+    }
+}
+
+#[cfg(test)]
+mod maintenance_tests {
+    use super::*;
+
+    #[test]
+    fn a_live_worker_with_an_idle_hint_queues_one_recovery_instead_of_taking_ownership() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Arc::new(Paths {
+            config: root.path().join("unread-config"),
+            state: root.path().join("unopened-state"),
+        });
+        let pool = Pool::new(paths, uuid::Uuid::new_v4().to_string());
+        let (sender, receiver) = mpsc::sync_channel(16);
+        // An unresponsive live worker is deliberately not executing recovery.
+        // Dropping release also ends it if any assertion panics.
+        let (release, blocked) = mpsc::channel::<()>();
+        let thread = std::thread::spawn(move || {
+            let _ = blocked.recv();
+        });
+        let queued = Arc::new(AtomicBool::new(false));
+        pool.workers.lock().unwrap().insert(
+            "instance".into(),
+            Worker {
+                sender,
+                thread,
+                control: Arc::new(Mutex::new(lifecycle::Control::default())),
+                busy: Arc::new(AtomicBool::new(false)),
+                recovery_pending: queued.clone(),
+            },
+        );
+        let reference = crate::local::mutations::AttemptRef {
+            authority: uuid::Uuid::new_v4(),
+            attempt_id: uuid::Uuid::new_v4(),
+        };
+        let batch = || maintenance::Batch::without_clock("instance".into(), vec![reference]);
+        pool.recover(batch()).unwrap();
+        pool.recover(batch()).unwrap();
+        let Work::Recover(observed, token) = receiver.try_recv().unwrap() else {
+            panic!("wrong work kind");
+        };
+        assert_eq!(observed.references, vec![reference]);
+        assert!(matches!(
+            receiver.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+        assert!(queued.load(Ordering::SeqCst));
+        drop(token);
+        assert!(!queued.load(Ordering::SeqCst));
+        pool.recover(batch()).unwrap();
+        assert!(matches!(receiver.try_recv(), Ok(Work::Recover(_, _))));
+        assert!(!root.path().join("unopened-state").exists());
+        drop(release);
+        pool.shutdown().unwrap();
     }
 }
