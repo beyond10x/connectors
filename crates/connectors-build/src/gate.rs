@@ -1,7 +1,7 @@
 use super::Result;
 use std::{path::Path, process::Command};
 
-pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
+pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     connectors_spec::v2::check_ess(ess)?;
     let base = root.join(".local/tmp");
     std::fs::create_dir_all(&base)?;
@@ -225,7 +225,9 @@ pub fn run(root: &Path, ess: &Path, msrv: bool) -> Result<()> {
             .arg("--out")
             .arg(temp.path().join("contract-conformance.json")),
     )?;
-    execute(command("aep").args(["plan", "artifact", "validate"]))?;
+    let mut planning = Command::new(aep);
+    planning.current_dir(root).env("TMPDIR", temp.path());
+    execute(planning.args(["plan", "artifact", "validate"]))?;
     println!("gate: all checks passed");
     Ok(())
 }
