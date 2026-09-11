@@ -112,6 +112,11 @@ impl Provider {
                     let valid=matches!(credential,Some("fixture-pat-one"|"fixture-pat-two"));
                     let user=if credential==Some("fixture-pat-two") {43} else {42};
                     observed.lock().unwrap().push(path.clone());
+                    if route == "/api/v4/projects/org%2Fproject/merge_requests/4" {
+                        while merge_behavior.load(std::sync::atomic::Ordering::SeqCst) == 4 {
+                            tokio::select! {_=&mut stopped=>return,_=tokio::time::sleep(Duration::from_millis(10))=>{}}
+                        }
+                    }
                     if paused.load(std::sync::atomic::Ordering::SeqCst) {
                         tokio::select! {_=&mut stopped=>break,_=tokio::time::sleep(Duration::from_secs(2))=>{}}
                     }
@@ -123,6 +128,14 @@ impl Provider {
                         let (status, body) = if mode == 2 { (409, b"head changed".to_vec()) } else {
                             effects.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                             if mode == 1 { continue; } // effect occurred; response lost
+                            if mode == 3 {
+                                // Hold the response until the test kills the exact owner.
+                                // Drop the stream afterward; never produce a late result.
+                                while merge_behavior.load(std::sync::atomic::Ordering::SeqCst) == 3 {
+                                    tokio::select! {_=&mut stopped=>return,_=tokio::time::sleep(Duration::from_millis(10))=>{}}
+                                }
+                                continue;
+                            }
                             let (_, body, _) = mr_provider::reply("/api/v4/projects/org%2Fproject/merge_requests/4", "", &[]).unwrap();
                             let mut item: Value = serde_json::from_slice(&body).unwrap();
                             item["state"] = json!("merged");

@@ -3,7 +3,7 @@
 The local CLI can call `merge_request.merge` through the approval, audit and
 mutation coordinator. This development work extends the v0.2.0 source release;
 it is not a completed GitLab provider batch. Dedicated sandbox acceptance,
-owner-crash failure cases and the wider write failure matrix remain open.
+recovery across storage acknowledgements and the wider write failure matrix remain open.
 
 Start with the [saved GitLab connection guide](local-gitlab-cli.md). Deliberately
 select `format = "connectors-local/2"` in the host configuration and
@@ -73,6 +73,11 @@ observes the original attempt without provider, credential, proof or clock acces
 Every delivery has fresh request/audit correlation. A pending original remains
 unknown; observing it does not authorize takeover or resend.
 
-Disposable production CLI fixtures prove applied/refused/lost-response behavior,
-same-key observation after owner shutdown and no duplicate PUT. They do not
-establish real GitLab sandbox behavior or full crash-recovery qualification.
+Disposable production CLI fixtures cover applied/refused/lost-response behavior,
+same-key observation through a newly started owner with custody stopped, and an
+owner killed after the provider receives the PUT. The crash leaves the original
+attempt pending/unknown; observation never sends again. The exact native child
+exits with its owner, and approval spend survives the restart. Revocation during
+preflight refuses the write and completes its admitted audit before returning.
+These cases do not establish real GitLab sandbox behavior, automatic recovery of
+abandoned attempts, or crashes across every storage acknowledgement.
