@@ -5,8 +5,10 @@ pub(crate) mod channel;
 mod process;
 mod server;
 pub mod state;
-pub use process::Child;
+mod writes;
+pub use process::{Child, PreparedInvocation};
 pub use server::{Adapter, serve};
+pub use writes::{PreparedWrite, WriteEffect, WriteResult};
 
 use super::registry;
 use connectors_core::{Descriptor, ErrorCode};
@@ -14,6 +16,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 pub const VERSION: &str = "connectors-private/1";
+pub const WRITE_VERSION: &str = "connectors-private/2";
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PrivateProtocol {
+    #[serde(rename = "connectors-private/1")]
+    V1,
+    #[serde(rename = "connectors-private/2")]
+    V2,
+}
+impl PrivateProtocol {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::V1 => VERSION,
+            Self::V2 => WRITE_VERSION,
+        }
+    }
+}
 pub const SECRET_LIMIT: usize = 65536;
 pub const INPUT_LIMIT: usize = 1024 * 1024;
 pub const RESULT_LIMIT: usize = 8 * 1024 * 1024;
@@ -166,6 +184,16 @@ pub struct Bootstrap {
     pub requirements: Vec<Requirement>,
 }
 impl Bootstrap {
+    pub fn validate_for(&self, protocol: PrivateProtocol) -> Result<()> {
+        self.validate()?;
+        if self.requirements.iter().any(|requirement| {
+            requirement.effect == Effect::Unknown
+                || (protocol == PrivateProtocol::V1 && requirement.effect != Effect::Read)
+        }) {
+            return Err(Failure::Unsupported);
+        }
+        Ok(())
+    }
     pub fn descriptor(&self) -> Result<Descriptor> {
         connectors_core::read_json(self.descriptor.as_bytes()).map_err(|_| Failure::Protocol)
     }
