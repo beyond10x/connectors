@@ -250,12 +250,27 @@ impl Adapter for Kubernetes {
                     let service = slice["metadata"]["labels"]["kubernetes.io/service-name"]
                         .as_str()
                         .map(str::to_owned);
-                    let ports = slice["ports"].as_array().ok_or_else(|| {
-                        Error::new(ErrorCode::UpstreamProtocol, "EndpointSlice lacks ports")
-                    })?;
-                    let entries = slice["endpoints"].as_array().ok_or_else(|| {
-                        Error::new(ErrorCode::UpstreamProtocol, "EndpointSlice lacks endpoints")
-                    })?;
+                    // A Service with no ready backends is ordinary Kubernetes,
+                    // and its EndpointSlice serialises both collections as an
+                    // explicit null rather than an empty array. Null therefore
+                    // means "no observations from this slice", not a malformed
+                    // document; any other non-array value is still a protocol
+                    // violation. Observed on Kubernetes v1.31.5 with a Service
+                    // whose selector matched no pod.
+                    let empty = Vec::new();
+                    let collection = |name: &str| -> Result<&Vec<Value>> {
+                        match &slice[name] {
+                            Value::Null => Ok(&empty),
+                            value => value.as_array().ok_or_else(|| {
+                                Error::new(
+                                    ErrorCode::UpstreamProtocol,
+                                    "EndpointSlice collection is not a list",
+                                )
+                            }),
+                        }
+                    };
+                    let ports = collection("ports")?;
+                    let entries = collection("endpoints")?;
                     for entry in entries {
                         let addresses = entry["addresses"].as_array().ok_or_else(|| {
                             Error::new(ErrorCode::UpstreamProtocol, "endpoint lacks addresses")
