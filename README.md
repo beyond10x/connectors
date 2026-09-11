@@ -46,9 +46,15 @@ identity validated by one SelfSubjectReview probe, and its three reads through t
 local owner. Disposable TLS cluster and keyring fixtures prove reuse after CLI,
 owner and keyring restarts. Per-operation SelfSubjectAccessReview permission
 checks are not implemented and no result claims authorization coverage; dedicated
-Kubernetes sandbox acceptance remains open. PostgreSQL still needs this local
-lifecycle binding; MCP and the remaining providers follow. The explicit network
-commands below remain compatible.
+Kubernetes sandbox acceptance remains open.
+
+PostgreSQL now has it too, as the third execution family: it speaks its own wire
+protocol rather than HTTP, so the session itself is the credential check and the
+saved identity is the role and database. Its two reads run inside a read-only
+transaction with fixed statement and lock timeouts. A loopback wire fixture
+proves the journey; dedicated sandbox acceptance remains open. See the
+[PostgreSQL CLI guide](docs/local-postgres-cli.md). MCP and the remaining
+providers follow. The explicit network commands below remain compatible.
 
 This repository contains a working local data/discovery slice and a broader,
 reviewed specification baseline. The local **v0.1.0 milestone is a specification
@@ -62,7 +68,7 @@ The current services provide:
 |---|---|---|
 | GitLab | `project.get`, `issues.list`, `file.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.validate` | GitLab API v4, with a configured project allowlist; exact-commit CI, bounded traces, MR update windows and pinned-head validation observations |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover` | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI |
-| SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines |
+| SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
 
 They can run as separate Rust services, with a generic CLI and one-hop federation.
 This slice does not advertise writes, managed OAuth acquisition, durable events,
