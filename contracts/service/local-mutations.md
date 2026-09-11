@@ -3,9 +3,10 @@
 Binding for the next GitLab runtime slice. The policy metadata/lease port is
 implemented in `crates/connectors-host/src/local/approval_policy.rs`, with trusted
 CLI policy admission, subject preparation and protected issuance in
-`crates/connectors-host/src/local/owner/approval_issuance.rs`. Complete provider
-dispatch below remains implementation work; production GitLab still advertises
-reads. This
+`crates/connectors-host/src/local/owner/approval_issuance.rs`. The development CLI
+joins guarded GitLab merge through explicitly selected private protocol two;
+the public service remains read-only. The wider failure and sandbox acceptance
+remain implementation work. This
 composes [approval proofs](delegation.md), [issuer custody](approval-issuers.md),
 [bounded time](clock.md), [audit](audit.md) and the
 [mutation ledger](../operations/v1alpha1/semantics.md). It adds no new business

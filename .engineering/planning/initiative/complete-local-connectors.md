@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 26
+revision: 27
 ---
 ## Outcome and authority
 
@@ -216,3 +216,13 @@ The story and initiative stay active. The next required implementation is protec
 ## GitLab guarded merge development checkpoint — 2026-09-11
 
 story:guarded-gitlab-merge now joins the production CLI, owner coordinator and native SHA-guarded PUT. The full Rust 1.88 gate, all seven disposable GitLab CLI journeys and affected website checks pass; evidence is docs/evidence/guarded-gitlab-cli-20260911/README.md. Applied/refused/lost-response outcomes, no duplicate PUT on same-key passive replay after owner shutdown, spent-proof refusal and unavailable-custody replay are exercised. This is a local integrated development increment, not a provider handoff or release. Newly started-owner replay, owner-crash acknowledgements, the broader joined failure matrix, dedicated sandbox evidence, C14 semantics/workflows and reproducible distribution remain open. The order remains full GitLab, Kubernetes including Helm, PostgreSQL, MCP and remaining providers.
+
+## Verified owner restart, crash and revocation increment — 2026-09-11
+
+The joined production CLI fixture now proves actual owner/2 observation through a newly started owner for Applied, Refused and lost-response Unknown, with the proof file deleted, no proof supplied, custody stopped and no provider/clock call. A fourth case holds the provider response after one applied PUT, observes the pending live attempt, kills the exact owner through its socket-derived pidfd, verifies both owner and native child exit, then observes the same attempt through a new owner without another PUT. Approval spend remains enforced under a different business key after that crash. The original crash attempt remains pending/unknown; no automatic recovery or new send authority is claimed.
+
+A deterministic revocation-during-preflight fixture reproduced an unfinished admitted audit after the current-admission refusal. Both affected coordinator paths now finish their audit before propagating the refusal. The fixed fixture verifies the exact original audit ends refused/revoked and no PUT occurs. All eight disposable production CLI journeys pass in 421.43 seconds. The full gate with Rust 1.88 passes, including 124 host unit tests, generation/drift, shared/native ESS, Clippy, boundaries and 315 conformance scenarios. Website typecheck/build and reference drift pass. The first barrier mismatch and actual audit regression are retained separately.
+
+docs/evidence/gitlab-owner-recovery-20260911/README.md retains commands, logs, 188 selected source hashes and tested runtime identities. The gate's workspace build produced different executable bytes; its hashes are recorded separately, and rebuilding the exact acceptance package selections restored both tested hashes byte-for-byte. No registry version, generated native/CLI output, native write semantics or protocol shape changed. This corrects existing audit completion and adds runtime evidence under the active guarded-merge scope; it introduces no entity, relation or new decomposition.
+
+Automatic abandoned-attempt recovery, every storage acknowledgement crash, the remaining concurrent admission/final-audit failure matrix, dedicated provider sandbox acceptance, C14 create/update atomic-head semantics and distribution reproducibility stay open. The sandbox URL/project/protected-file details were requested again while independent work continued. The story and initiative remain active. Root is the sole writer on primary main; no linked tree, release tag, push, deployment or paid governed run is part of this increment. Full GitLab still precedes Kubernetes including Helm, PostgreSQL, MCP and remaining providers; the driver protocol-loading blocker retains its existing scope.
