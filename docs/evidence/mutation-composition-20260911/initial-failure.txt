@@ -1,0 +1,39 @@
+Session-output excerpt from the initial focused HTTP test run (2026-09-11):
+
+Command: cargo test --locked --offline -p connectors-host --test http_write --test http
+
+     Running tests/http.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http-28c5b61028f7099e)
+
+running 3 tests
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test custom_ca_accepts_its_endpoint_and_refuses_other_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/http_write.rs (.local/tmp/gitlab-runtime-20260910/target/debug/deps/http_write-f79c0e1b88a727ca)
+
+running 4 tests
+test invalid_target_segments_refuse_before_credential_resolution ... ok
+test lost_reply_after_complete_put_is_never_retried ... FAILED
+test put_preserves_exact_segments_body_and_native_response_without_redirect ... ok
+test native_failures_are_returned_once_and_body_limits_remain_errors ... ok
+
+failures:
+
+---- lost_reply_after_complete_put_is_never_retried stdout ----
+
+thread 'lost_reply_after_complete_put_is_never_retried' (2502314) panicked at crates/connectors-host/tests/http_write.rs:92:17:
+assertion failed: header.starts_with("PUT /api/v4/items/7 HTTP/1.1\r\n")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'lost_reply_after_complete_put_is_never_retried' (2502314) panicked at crates/connectors-host/tests/http_write.rs:116:31:
+called `Result::unwrap()` on an `Err` value: JoinError::Panic(Id(1), "assertion failed: header.starts_with(\"PUT /api/v4/items/7 HTTP/1.1\\r\\n\")", ...)
+
+
+failures:
+    lost_reply_after_complete_put_is_never_retried
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p connectors-host --test http_write`
