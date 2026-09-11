@@ -61,8 +61,39 @@ Nothing else — no push, no tag, no release.
 
 | unit | stage |
 |---|---|
-| 1 | dispatched |
+| 1 | **left the wave** — red after two attacks. Pass 1: 7 findings, all resolved. Pass 2: 5 new, 2 blockers. `decision-blocker:catalog-template-second-pass` is open and the tree is retained |
 
 ## Agent types
 
 `aep-drive:implementor`, then `aep-drive:adversary`.
+
+## Cost
+
+| agent | tokens | tool uses | wall |
+|---|---|---|---|
+| implementor unit 1 | 88,268 | 42 | 165 s |
+| adversary unit 1 pass 1 | 67,603 | 25 | 133 s |
+| implementor unit 1 correction | 136,443 | 17 | 142 s |
+| adversary unit 1 pass 2 | 114,507 | 12 | 131 s |
+| **total** | **406,821** | **96** | **9.7 min** |
+
+## Coordinator actions the implementor could not take
+
+`cargo fmt --package connectors-catalog -- --check` reported 11 hunks, all in files that landed in
+the three earlier catalog waves and none in the unit's own two files. The repository gate builds
+that check per workspace member, so `main` is currently red on it. The implementor wrote the fix
+and left it unapplied because those files were not its to edit; the coordinator applied it, and the
+package is fmt-clean, test-green and clippy-clean after it.
+
+## Close
+
+Zero units merged. The unit is green on its own suite — 51 cases, `cargo test`, `cargo clippy
+-D warnings` and `cargo fmt --check` all exit 0 with the adversary's eleven cases in the tree —
+and red on its second adversary pass, which is the row the skill sends to a person rather than to
+a third attack.
+
+The whole-repository gate was not run: there was nothing to merge into the base branch, and a gate
+on an unmerged tree answers a question nobody asked.
+
+Retained: worktree `wt-35ad348b4293` with all of unit 1's work uncommitted, and the coordinator's
+rustfmt correction to the three earlier catalog commits, which `main` still needs.
