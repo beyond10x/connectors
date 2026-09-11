@@ -195,7 +195,7 @@ fn media_type_writable(text: &str) -> bool {
 /// ambiguous. A parameter's identity is its name *and* its location, and this is
 /// the only spelling that can say both.
 fn qualified(parameter: &Parameter) -> String {
-    format!("{}:{}", label(parameter.location), parameter.name)
+    format!("{}:{}", parameter.location.label(), parameter.name)
 }
 
 /// The reverse of [`qualified`], for a key no parameter is literally named.
@@ -207,22 +207,13 @@ fn split_qualified(key: &str) -> Option<(Location, &str)> {
         Location::Cookie,
     ] {
         if let Some(name) = key
-            .strip_prefix(label(location))
+            .strip_prefix(location.label())
             .and_then(|rest| rest.strip_prefix(':'))
         {
             return Some((location, name));
         }
     }
     None
-}
-
-fn label(location: Location) -> &'static str {
-    match location {
-        Location::Path => "path",
-        Location::Query => "query",
-        Location::Header => "header",
-        Location::Cookie => "cookie",
-    }
 }
 
 /// Which parameters a supplied key can reach, best first.
