@@ -109,6 +109,20 @@ are rechecked before acknowledgement, and the leases remain held through it.
 
 ## Invocation, original-result admission and audit
 
+Finalization retains one exact audit observation across bounded acknowledgement
+recovery. After a failed append, read the original audit. An identical final
+observation proves completion; another final observation conflicts. A readable
+original anchor with no final observation permits at most one retry of the same
+UUID, outcome, safe code and timestamp. After a failed retry, observe once more.
+Missing, malformed or unavailable records grant no append or completion authority.
+Additional calls check the original invocation deadline and a 250 ms recovery
+budget between calls, retaining the metadata port's bounded wait within a call.
+The original business result and acknowledged audit reference survive failure;
+unresolved finalization reports incomplete. This recovers audit acknowledgement
+only and cannot repeat provider, approval, credential or mutation work. General
+reconstruction after a process loses its final observation remains unimplemented
+pending its own reviewed persistence binding.
+
 The authored local operation interface gains an optional opaque idempotency key
 and an independent protected approval-document source. The existing private
 protected-source pattern retains proof bytes outside ordinary parser JSON values.

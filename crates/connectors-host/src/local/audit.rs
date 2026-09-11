@@ -3,11 +3,12 @@
 mod types;
 pub use types::*;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use super::metadata::Metadata;
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,7 +26,11 @@ pub struct Store {
     path: PathBuf,
     capacity_per_instance: u32,
     #[cfg(test)]
-    fault: std::sync::atomic::AtomicU8,
+    pub(crate) fault: std::sync::atomic::AtomicU8,
+    #[cfg(test)]
+    appends: std::sync::Mutex<Vec<FinalObservation>>,
+    #[cfg(test)]
+    reads: std::sync::atomic::AtomicUsize,
 }
 impl Store {
     /// Capacity may be lowered by the operator, never raised above the selected
@@ -39,6 +44,10 @@ impl Store {
             capacity_per_instance,
             #[cfg(test)]
             fault: std::sync::atomic::AtomicU8::new(0),
+            #[cfg(test)]
+            appends: std::sync::Mutex::new(Vec::new()),
+            #[cfg(test)]
+            reads: std::sync::atomic::AtomicUsize::new(0),
         })
     }
 
@@ -133,6 +142,8 @@ impl Store {
     /// Internal exact-pair resolution. None means definite absence in an
     /// admitted schema; unavailable state is an error, never an empty history.
     pub fn observe(&self, reference: &Reference) -> Result<Option<Record>> {
+        #[cfg(test)]
+        self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         reference.encode_private()?;
         let metadata = Metadata::inspect(&self.path).map_err(host_error)?;
         require_schema(&metadata.connection)?;
@@ -146,6 +157,8 @@ impl Store {
         reference: &Reference,
         final_observation: &FinalObservation,
     ) -> Result<Record> {
+        #[cfg(test)]
+        self.appends.lock().unwrap().push(final_observation.clone());
         reference.encode_private()?;
         final_observation.validate()?;
         self.transaction(false, |tx, _| {
@@ -172,8 +185,75 @@ impl Store {
         })
     }
 
+    /// Recover acknowledgement of this exact live observation only. No read can
+    /// reconstruct admission or substitute another observation after a crash.
+    /// Extra calls check both deadlines; each retains the metadata port's wait.
+    pub(crate) fn append_recovering(
+        &self,
+        reference: &Reference,
+        observation: &FinalObservation,
+        until: Instant,
+    ) -> Result<Record> {
+        let first_error = match self.append(reference, observation) {
+            Ok(record) => return Ok(record),
+            Err(error) => error,
+        };
+        let until = until.min(Instant::now() + Duration::from_millis(250));
+        if Instant::now() >= until {
+            return Err(first_error);
+        }
+        if let Some(record) = self.matching_final(reference, observation)? {
+            return Ok(record);
+        }
+        if Instant::now() >= until {
+            return Err(first_error);
+        }
+        // Definite absence of a final observation permits one exact append
+        // retry. It does not permit a new UUID, timestamp or business operation.
+        match self.append(reference, observation) {
+            Ok(record) => Ok(record),
+            Err(error) => {
+                if Instant::now() >= until {
+                    return Err(error);
+                }
+                self.matching_final(reference, observation)?.ok_or(error)
+            }
+        }
+    }
+
+    fn matching_final(
+        &self,
+        reference: &Reference,
+        observation: &FinalObservation,
+    ) -> Result<Option<Record>> {
+        let record = self.observe(reference)?.ok_or(Failure::NotFound)?;
+        match &record.final_observation {
+            Some(retained) if retained == observation => Ok(Some(record)),
+            Some(_) => Err(Failure::Conflict),
+            None => Ok(None),
+        }
+    }
+
     #[cfg(test)]
     fn take_fault(&self, expected: u8) -> bool {
+        // Two-call scripts for bounded final-append recovery: first roll back,
+        // then lose the commit acknowledgement (9) or roll back again (10).
+        if expected == 1 {
+            for (script, next) in [(9, 2), (10, 1)] {
+                if self
+                    .fault
+                    .compare_exchange(
+                        script,
+                        next,
+                        std::sync::atomic::Ordering::SeqCst,
+                        std::sync::atomic::Ordering::SeqCst,
+                    )
+                    .is_ok()
+                {
+                    return true;
+                }
+            }
+        }
         self.fault
             .compare_exchange(
                 expected,
