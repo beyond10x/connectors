@@ -3,6 +3,8 @@
 //! touches a runtime; a document this crate cannot represent is refused by name
 //! rather than accepted in part.
 
+pub mod inventory;
+
 use connectors_core::{Error, ErrorCode, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
