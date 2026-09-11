@@ -5,6 +5,7 @@
 
 pub mod authored;
 pub mod bundle;
+pub mod coverage;
 pub mod inventory;
 pub mod template;
 
