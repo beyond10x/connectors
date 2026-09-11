@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: decision-blocker:catalog-template-second-pass
 kind: decision-blocker
-status: open
+status: cleared
 title: The catalog template unit is red after its second adversary pass
 relations:
 - blocks: story:catalog-operation-template
-revision: 2
+revision: 3
 ---
 ## What is open
 
