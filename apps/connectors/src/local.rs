@@ -50,7 +50,9 @@ impl Handler for LocalHandler {
                 .and_then(|_| approvals::execute(call, session.approval_deadline))
                 .map_err(owner_failure)
         } else if call.callable == "operations-invoke" {
-            operations::invoke(call, self.0.borrow().deadline).map_err(owner_failure)
+            let session = self.0.borrow();
+            return operations::dispatch(call, session.deadline, session.mutation_deadline)
+                .unwrap_or_else(owner_failure);
         } else if call.callable == "connections-revalidate" {
             self.0
                 .borrow_mut()

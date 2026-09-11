@@ -1,6 +1,8 @@
 //! Production CLI, real private owner/adapter processes and disposable custody.
 #[path = "ci.rs"]
 mod ci;
+#[path = "guarded_merge.rs"]
+mod guarded_merge;
 #[path = "merge_requests.rs"]
 mod merge_requests;
 #[path = "mr_validation.rs"]

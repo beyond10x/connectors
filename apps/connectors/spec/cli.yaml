@@ -426,3 +426,7 @@ commands:
         source: {kind: option, long: revision}
       - field: input
         source: {kind: document, inline: input-json, file: input-file, stdin: input-stdin}
+      - field: approval_file
+        source: {kind: option, long: approval-file}
+      - field: idempotency_key
+        source: {kind: option, long: idempotency-key}

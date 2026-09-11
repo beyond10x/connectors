@@ -36,7 +36,16 @@ The result contains `checks_passed`, ordered `blockers` and
 `checks_passed` even when the CLI exits successfully. A passing observation
 does not reserve the head or authorize a later write. See the
 [validation contract](/adapters/gitlab/contracts/merge-validation).
-Governed MR writes remain unimplemented.
+The development checkout also implements `merge_request.merge` through explicitly
+selected `connectors-local/2` and `connectors-private/2`, with a saved PAT granting
+`api`, current local approval policy, signing keys and an authenticated clock.
+Prepare and issue a proof for the exact input, then pass its owner-private path
+as `--approval-file` and an optional `--idempotency-key` to `operations invoke`.
+Fresh preflight precedes one source-SHA-guarded PUT. Results carry mutation and
+audit observations; an unknown outcome never triggers another PUT, and an exact
+retained key can observe the original attempt after restart. This development
+feature is outside v0.2.0; its wider failure and sandbox acceptance remain open.
+Create/update workflows remain unfinished.
 
 ## Use saved credentials
 

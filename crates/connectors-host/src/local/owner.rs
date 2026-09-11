@@ -2,6 +2,7 @@
 //! receive this authority, the metadata database, or a credential resolver.
 pub mod approval_issuance;
 mod lifecycle;
+pub mod mutation;
 mod supervisor;
 mod transport;
 use super::{
@@ -15,7 +16,7 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-pub use transport::{Capture, Client, serve};
+pub use transport::{Capture, Client, WriteClient, serve};
 
 const VERSION: &str = "connectors-owner/1";
 pub type Result<T> = std::result::Result<T, Error>;

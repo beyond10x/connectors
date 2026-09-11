@@ -618,6 +618,7 @@ version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
  "clap",
  "connectors-client",
  "connectors-contracts",
@@ -625,8 +626,10 @@ dependencies = [
  "connectors-host",
  "connectors-sdk",
  "gitlab-types",
+ "gitlab_writes-types",
  "hex",
  "rcgen",
+ "ring",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1188,6 +1191,10 @@ dependencies = [
 
 [[package]]
 name = "gitlab-types"
+version = "1.0.0"
+
+[[package]]
+name = "gitlab_writes-types"
 version = "1.0.0"
 
 [[package]]

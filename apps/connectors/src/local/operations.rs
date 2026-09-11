@@ -75,3 +75,133 @@ pub(super) fn invoke(call: &Invocation<'_>, deadline: u64) -> owner::Result<Valu
     }
     owner::Client::connect(&paths, true)?.invoke(alias, &call.input, document, deadline)
 }
+
+pub(super) fn dispatch(
+    call: &Invocation<'_>,
+    read_deadline: u64,
+    deadline: Option<owner::mutation::Deadline>,
+) -> owner::Result<HandlerReply> {
+    use connectors_host::local::{protected, runtime::Effect};
+    use owner::{approval_issuance::Request, mutation};
+    let paths = Paths::resolve(
+        call.context.config.as_deref(),
+        call.context.state_dir.as_deref(),
+    )?;
+    let text = |field: &str| call.input[field].as_str().ok_or(Code::InvalidInput);
+    let alias = text("adapter")?;
+    let bootstrap = owner::operation_snapshot(&paths, alias, &call.input)?;
+    let operation = text("operation")?;
+    let requirement = bootstrap
+        .requirements
+        .iter()
+        .find(|r| r.operation == operation)
+        .ok_or(Code::NotFound)?;
+    let key = call.input["idempotency_key"].as_str();
+    let proof_path = call.input["approval_file"].as_str();
+    if requirement.effect == Effect::Read {
+        if key.is_some() || proof_path.is_some() {
+            return Err(Code::InvalidInput.into());
+        }
+        return invoke(call, read_deadline).map(HandlerReply::Success);
+    }
+    if requirement.effect != Effect::Write {
+        return Err(Code::Unsupported.into());
+    }
+    let deadline = deadline.ok_or(Code::Unavailable)?;
+    let until = deadline.until()?;
+    let request = Request {
+        connection: text("connection")?,
+        operation,
+        schema: text("schema")?,
+        revision: text("revision")?,
+        input: text("input")?,
+    };
+    // Current result-access admission and exact-key observation happen before
+    // even opening the proof file, unlocking custody or starting the owner.
+    let value = if let Some(value) = mutation::observe(&paths, alias, &request, key, until)? {
+        value
+    } else {
+        let proof = proof_path
+            .map(|path| protected::file_until(std::path::Path::new(path), until, 20 * 1024))
+            .transpose();
+        let proof = match proof {
+            Ok(proof) => proof,
+            Err(error) => {
+                // Another caller may have reserved the same key while protected
+                // entry failed. Reveal only a currently admitted exact winner.
+                if let Some(value) = mutation::observe(&paths, alias, &request, key, until)? {
+                    return project(call, &bootstrap, value);
+                }
+                return Err(error);
+            }
+        };
+        let result = owner::WriteClient::connect(&paths, true, deadline)?.invoke(
+            alias,
+            &request,
+            key,
+            proof.as_ref(),
+            deadline,
+        );
+        match result {
+            Ok(value) => value,
+            Err(error) if error.code == Code::OutcomeUnknown => {
+                let mut reply = owner_failure(error);
+                if let HandlerReply::Error { data, .. } = &mut reply {
+                    data["mutation"] = json!({"classification":"unknown","attempt":null,"original_request_id":null,"replayed":false,"cause":{"code":"unavailable","stage":"response"}});
+                    data["source_audit"] = json!({"instance":bootstrap.instance,"audit_ref":null,"audit_status":"unavailable"});
+                }
+                return Ok(reply);
+            }
+            Err(error) => return Err(error),
+        }
+    };
+    // No payload enters the generated success carrier without native validation.
+    // The owner is the authority for current admission and effect classification.
+    project(call, &bootstrap, value)
+}
+
+fn project(
+    call: &Invocation<'_>,
+    bootstrap: &Bootstrap,
+    mut value: owner::mutation::Delivery,
+) -> owner::Result<HandlerReply> {
+    use owner::mutation::{Cause, FailureCode, Stage};
+    if let Some(payload) = &value.result {
+        let descriptor = bootstrap.descriptor()?;
+        let operation = descriptor
+            .operation(call.input["operation"].as_str().ok_or(Code::InvalidInput)?)
+            .map_err(|_| Code::NotFound)?;
+        if connectors_sdk::validate_write_value(&operation.output_schema, payload).is_err() {
+            value.result = None;
+            value.error = Some(owner::mutation::Failure {
+                code: FailureCode::Owner(Code::ServiceFailure),
+                service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
+            });
+            value.mutation.cause = Some(Cause {
+                code: connectors_core::ErrorCode::UpstreamProtocol,
+                stage: Stage::Response,
+            });
+        }
+    }
+    let mut output = if let Some(payload) = value.result {
+        json!({"adapter":call.input["adapter"],"operation":call.input["operation"],"revision":call.input["revision"],"result":payload.to_string()})
+    } else {
+        let error = value.error.as_ref().ok_or(Code::OutcomeUnknown)?;
+        let mut data = json!({"kind":"operational","code":error.code,"stage":"dispatch","next_action":"retry_status"});
+        if let Some(code) = &error.service_code {
+            data["service_code"] = json!(code);
+        }
+        data
+    };
+    output["request_id"] = json!(value.request_id);
+    output["mutation"] = json!(value.mutation);
+    output["source_audit"] = json!(value.source_audit);
+    Ok(if value.error.is_some() {
+        HandlerReply::Error {
+            code: "failure".into(),
+            data: output,
+        }
+    } else {
+        HandlerReply::Success(output)
+    })
+}

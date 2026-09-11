@@ -27,6 +27,8 @@ use tokio_rustls::{
 mod ci_provider;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
+#[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
+mod clock_fixture;
 #[path = "local_runtime/mr_provider.rs"]
 mod mr_provider;
 
@@ -41,6 +43,8 @@ struct Provider {
     methods: Arc<Mutex<Vec<String>>>,
     pause: Arc<std::sync::atomic::AtomicBool>,
     response_status: Arc<std::sync::atomic::AtomicU16>,
+    merge_mode: Arc<std::sync::atomic::AtomicU8>,
+    merge_effects: Arc<std::sync::atomic::AtomicUsize>,
 }
 impl Provider {
     fn new() -> Self {
@@ -72,6 +76,10 @@ impl Provider {
         let paused = pause.clone();
         let response_status = Arc::new(std::sync::atomic::AtomicU16::new(0));
         let forced_status = response_status.clone();
+        let merge_mode = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        let merge_behavior = merge_mode.clone();
+        let merge_effects = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let effects = merge_effects.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -94,6 +102,10 @@ impl Provider {
                     observed_methods.lock().unwrap().push(request.split_whitespace().next().unwrap_or_default().to_owned());
                     let path=request.split_whitespace().nth(1).unwrap_or_default().to_owned();
                     let route=path.split('?').next().unwrap();
+                    let content_length=request.lines().find_map(|line|line.split_once(':').filter(|(name,_)|name.eq_ignore_ascii_case("content-length")).map(|(_,value)|value.trim().parse::<usize>().unwrap())).unwrap_or(0);
+                    assert!(content_length <= 4096);
+                    let mut body = vec![0; content_length];
+                    stream.read_exact(&mut body).await.unwrap();
                     let credential=request.lines().find_map(|line|line.split_once(':').filter(|(name,_)|name.eq_ignore_ascii_case("private-token")).map(|(_,value)|value.trim()));
                     // Only fictional fixture material is accepted. Do not retain
                     // raw headers in observations or failure diagnostics.
@@ -104,6 +116,23 @@ impl Provider {
                         tokio::select! {_=&mut stopped=>break,_=tokio::time::sleep(Duration::from_secs(2))=>{}}
                     }
                     let forced = forced_status.load(std::sync::atomic::Ordering::SeqCst);
+                    if valid && request.starts_with("PUT ") && route=="/api/v4/projects/org%2Fproject/merge_requests/4/merge" {
+                        let input: Value = serde_json::from_slice(&body).unwrap();
+                        assert_eq!(input, json!({"sha":"0123456789abcdef0123456789abcdef01234567","auto_merge":false,"should_remove_source_branch":false}));
+                        let mode = merge_behavior.load(std::sync::atomic::Ordering::SeqCst);
+                        let (status, body) = if mode == 2 { (409, b"head changed".to_vec()) } else {
+                            effects.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                            if mode == 1 { continue; } // effect occurred; response lost
+                            let (_, body, _) = mr_provider::reply("/api/v4/projects/org%2Fproject/merge_requests/4", "", &[]).unwrap();
+                            let mut item: Value = serde_json::from_slice(&body).unwrap();
+                            item["state"] = json!("merged");
+                            (200, serde_json::to_vec(&item).unwrap())
+                        };
+                        let header=format!("HTTP/1.1 {status} fixture\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",body.len());
+                        let _=stream.write_all(header.as_bytes()).await;
+                        let _=stream.write_all(&body).await;
+                        continue;
+                    }
                     let (status,body,extra)=if forced != 0 {(forced,json!({"error":"fixture override"}),"")}
                         else if !valid {(401,json!({"error":"fixture refusal"}),"")}
                         else if route=="/api/v4/user" {(200,json!({"id":user,"state":"active"}),"")}
@@ -137,6 +166,8 @@ impl Provider {
             methods,
             pause,
             response_status,
+            merge_mode,
+            merge_effects,
         }
     }
     fn selection(&self) -> Adapter {

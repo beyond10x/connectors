@@ -1,4 +1,5 @@
-use connectors_spec::v2::{Spec, generate, hash, import, tree};
+use connectors_spec::generate;
+use connectors_spec::v2::{Spec, hash, import, tree};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -10,10 +11,15 @@ fn root() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
 }
 fn source() -> Value {
-    serde_json::from_slice(
+    let mut value: Value = serde_json::from_slice(
         &std::fs::read(root().join("adapters/gitlab/spec/adapter.json")).unwrap(),
     )
-    .unwrap()
+    .unwrap();
+    // Retain explicit v2 parser/import coverage after the production adapter
+    // selects v3. Bundle tests below exercise the actual selected format.
+    value["kind"] = json!("connectors.adapter/v2");
+    value.as_object_mut().unwrap().remove("writes");
+    value
 }
 fn parse(value: &Value) -> connectors_core::Result<Spec> {
     Spec::parse(&serde_json::to_vec(value).unwrap())

@@ -2312,7 +2312,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__operations__subcmd__invoke)
-            opts="-h --adapter --connection --operation --schema --revision --input-json --input-file --input-stdin --config --state-dir --output --help"
+            opts="-h --adapter --connection --operation --schema --revision --input-json --input-file --input-stdin --approval-file --idempotency-key --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2343,6 +2343,14 @@ _connectors() {
                     return 0
                     ;;
                 --input-file)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --approval-file)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --idempotency-key)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
