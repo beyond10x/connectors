@@ -103,7 +103,11 @@ fn media_types(container: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn parameters(raw: Option<&Value>, designation: &str, gaps: &mut Vec<Unsupported>) -> Vec<Parameter> {
+fn parameters(
+    raw: Option<&Value>,
+    designation: &str,
+    gaps: &mut Vec<Unsupported>,
+) -> Vec<Parameter> {
     let mut out = Vec::new();
     let Some(list) = raw.and_then(Value::as_array) else {
         return out;
@@ -201,7 +205,19 @@ pub fn extract(document: &Value) -> Inventory {
                 None => format!("{} {}", method.to_uppercase(), path),
             };
             let mut declared = parameters(shared, &designation, &mut unsupported);
-            declared.extend(parameters(body.get("parameters"), &designation, &mut unsupported));
+            for parameter in parameters(body.get("parameters"), &designation, &mut unsupported) {
+                // OpenAPI 3.1 section 4.8.9.1: the operation's own parameter
+                // overrides the path item's of the same name and location, and a
+                // parameter's identity is that pair. Keeping both would inventory
+                // one parameter twice and lose the override's `required`.
+                match declared
+                    .iter_mut()
+                    .find(|d| d.name == parameter.name && d.location == parameter.location)
+                {
+                    Some(overridden) => *overridden = parameter,
+                    None => declared.push(parameter),
+                }
+            }
             let request = body.get("requestBody");
             if request.map(|r| r.get("$ref").is_some()).unwrap_or(false) {
                 unsupported.push(Unsupported {
