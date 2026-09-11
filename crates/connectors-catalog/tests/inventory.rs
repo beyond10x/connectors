@@ -104,9 +104,20 @@ fn every_unrepresentable_thing_is_named_with_its_operation() {
         .iter()
         .map(|u| (u.designation.as_str(), u.reason.as_str()))
         .collect();
-    assert!(reasons.contains(&("document.webhooks", "`webhooks` is a document member this build does not read")));
-    assert!(reasons.iter().any(|(d, r)| *d == "refBody" && r.contains("request body is a $ref")));
-    assert!(reasons.iter().any(|(d, r)| *d == "oddLocation" && r.contains("`matrix`")));
+    assert!(reasons.contains(&(
+        "document.webhooks",
+        "`webhooks` is a document member this build does not read"
+    )));
+    assert!(
+        reasons
+            .iter()
+            .any(|(d, r)| *d == "refBody" && r.contains("request body is a $ref"))
+    );
+    assert!(
+        reasons
+            .iter()
+            .any(|(d, r)| *d == "oddLocation" && r.contains("`matrix`"))
+    );
     assert!(reasons.iter().any(|(d, _)| *d == "/c"));
 }
 
@@ -122,4 +133,59 @@ fn coverage_reports_its_two_numbers_apart() {
 fn a_document_without_paths_is_empty_rather_than_an_error() {
     let inventory = extract(&json!({"openapi": "3.0.0"}));
     assert_eq!(inventory.coverage(), (0, 0));
+}
+
+#[test]
+fn an_operation_level_parameter_replaces_the_path_level_one_it_overrides() {
+    // OpenAPI 3.1 section 4.8.9.1: a parameter at the operation overrides the one
+    // the path item declares with the same name and location.
+    let document = json!({
+        "openapi": "3.1.0",
+        "paths": {"/projects/{id}": {
+            "parameters": [
+                {"name": "id", "in": "path", "required": true},
+                {"name": "page", "in": "query", "required": true}
+            ],
+            "get": {
+                "operationId": "readProject",
+                "parameters": [{"name": "page", "in": "query", "required": false}],
+                "responses": {}
+            }
+        }}
+    });
+    let inventory = extract(&document);
+    let operation = &inventory.operations[0];
+    let declared: Vec<(&str, bool)> = operation
+        .parameters
+        .iter()
+        .map(|p| (p.name.as_str(), p.required))
+        .collect();
+    assert_eq!(declared, vec![("id", true), ("page", false)]);
+}
+
+#[test]
+fn a_parameter_in_another_location_is_not_an_override() {
+    // Identity is name and location together: `id` in the path and `id` in the
+    // query are two parameters, and neither replaces the other.
+    let document = json!({
+        "openapi": "3.1.0",
+        "paths": {"/projects/{id}": {
+            "parameters": [{"name": "id", "in": "path", "required": true}],
+            "get": {
+                "operationId": "readProject",
+                "parameters": [{"name": "id", "in": "query", "required": false}],
+                "responses": {}
+            }
+        }}
+    });
+    let operation = &extract(&document).operations[0];
+    let declared: Vec<(&str, Location)> = operation
+        .parameters
+        .iter()
+        .map(|p| (p.name.as_str(), p.location))
+        .collect();
+    assert_eq!(
+        declared,
+        vec![("id", Location::Path), ("id", Location::Query)]
+    );
 }
