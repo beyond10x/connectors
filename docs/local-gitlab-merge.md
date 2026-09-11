@@ -78,6 +78,11 @@ automatic startup. The on-demand fixture starts no native child. A live original
 remains pending. An abandoned dispatch becomes quarantined/unknown; an abandoned preparation becomes
 not_attempted when trusted time is available for its replay retention. Unavailable
 time leaves the preparation pending. Terminal replay remains passive.
+While running, the owner also scans pending attempts periodically, including
+unkeyed writes and targets later revoked or removed from configuration. It fences
+abandoned records without another invocation of the original write. Live worker
+exchanges finish before their queued recovery batch runs; suppression remains set.
+Background recovery does not expose an old result or grant a new effect.
 
 Disposable production CLI fixtures cover applied/refused/lost-response behavior,
 same-key observation through a newly started owner with custody stopped, and an
@@ -88,5 +93,12 @@ preflight refuses the write and completes its admitted audit before returning.
 The preparation-recovery fixture separately exits a durable-port producer before
 any dispatch gate and verifies clock failure/recovery through the production CLI.
 It does not exercise native preflight or approval spending before that exit.
-These cases do not establish real GitLab sandbox behavior, background/unkeyed
-recovery, or crashes across every storage acknowledgement.
+An additional CLI fixture holds a live write during a background pass, crashes
+its owner, starts a new owner through a separate admitted read, then stops the
+adapter and custody. Background recovery quarantines the original write with
+exactly one PUT and settles a separate unkeyed preparation when trusted time
+returns, without a request using the original key. Another CLI fixture starts a
+new owner through a different instance, then proves recovery of the revoked,
+removed original target and refusal of later result disclosure. These cases do
+not establish real GitLab sandbox behavior, original-audit reconciliation or
+crashes across every storage acknowledgement.
