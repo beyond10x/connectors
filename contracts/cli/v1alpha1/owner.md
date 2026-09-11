@@ -12,6 +12,10 @@ the same lifetime lock before spawning; failure to acquire it never authorizes a
 replacement process. A startup socket carries a fresh challenge, owner incarnation
 and metadata authority before the parent releases startup ownership. The daemon
 keeps the inherited lock and owns its children after the launching CLI exits.
+Once it starts admitting requests, that lock is retained until kernel process
+exit even on early return or unwinding. The serialized worker, rather than a
+busy/idle observation, owns the quiescent interval used for the
+[local mutation recovery binding](../../service/local-mutations.md).
 
 Private requests reuse the bounded three-section framing of the
 [adapter binding](private-adapter.md), with distinct `connectors-owner/1` greetings.

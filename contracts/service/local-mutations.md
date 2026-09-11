@@ -124,6 +124,33 @@ preflight, credential access, proof verification/spend or dispatch. Conflict,
 pending and quarantine never authorize a new send. Result disclosure still needs
 current policy and target admission; it cannot be obtained by naming an old key.
 
+An unsettled exact-key observation may start the local owner for metadata recovery.
+A busy instance worker returns the pending observation. Otherwise recovery is
+queued on that instance's one retained worker; earlier native exchanges and their
+non-clone preparations/gate winners must have ended before it runs. A private
+exclusive borrow of that worker's child slot binds this quiescent interval. The
+owner retains its lifetime lock until kernel process exit, including unwinding,
+so a replacement process cannot overlap an old dispatcher. A busy/idle hint alone
+is never recovery ownership.
+
+The recovery task never starts a native child, lifts stop suppression, reads
+credentials, verifies/spends another proof, or sends provider work. Starting an
+owner still honors separately configured automatic startup; with on-demand
+adapters the recovery path starts no native child. Under current result-access
+policy it applies the existing exact-attempt fences: Prepared becomes Aborted;
+Dispatching becomes Indeterminate with a quarantined key. Known non-dispatch
+settlement requires a fresh configured trusted-clock sample to establish the fixed
+replay retention interval. Acquire that sample before policy/metadata locks. If
+time is unavailable, leave Prepared pending and report uncertainty with its safe
+cause. Quarantine needs no clock and has no expiry. A failed/uncertain recovery
+acknowledgement grants no send or retry; observe the authoritative original once.
+Terminal results retain their passive path without owner startup or clock access.
+The original invocation budget includes owner startup, queueing and recovery.
+
+This local binding currently selects recovery through an exact business key.
+Background recovery and cleanup of unkeyed or unobserved abandoned attempts remain
+required runtime work; neither a pending row nor storage pressure grants reuse.
+
 For a new candidate, verify required proof, current credential readiness and native
 input. Acknowledge the admitted execution audit anchor before native preflight,
 because its declared reads are provider dispatches under the audit contract.

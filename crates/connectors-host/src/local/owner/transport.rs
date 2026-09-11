@@ -438,10 +438,10 @@ fn spawn(
     ));
     let selection = crate::local::config::Executable {
         path: binary,
-        sha256: hash.clone(),
+        sha256: hash,
         args: Vec::new(),
     };
-    let executable = runtime::artifact::capture(selection.open()?, &hash, deadline)?;
+    let executable = selection.capture(deadline)?;
     let (parent, child) = UnixStream::pair().map_err(|_| Code::Unavailable)?;
     // Put source fds beyond the destination slots before fork.
     let duplicate = |fd| -> Result<File> {
@@ -542,6 +542,10 @@ pub fn serve(paths: Paths) -> Result<()> {
         shutdown: AtomicBool::new(false),
         clients: AtomicUsize::new(0),
     });
+    // From the first request onward, keep lifetime authority through kernel
+    // process exit, including unwinding or any early return with live threads.
+    // CLOEXEC prevents native children from inheriting it.
+    std::mem::forget(lifetime);
     handle(owner.clone(), startup)?;
     owner.pool.automatic(&config);
     let mut result = Ok(());
@@ -566,10 +570,6 @@ pub fn serve(paths: Paths) -> Result<()> {
     if std::fs::remove_file(socket).is_err() {
         result = Err(Code::Unavailable.into());
     }
-    // This entrypoint returns directly to process::exit. Keep the owner lock
-    // until kernel process exit, including any in-flight request publication.
-    // CLOEXEC prevents adapter children from inheriting that lifetime authority.
-    std::mem::forget(lifetime);
     result
 }
 fn inherited() -> Result<(UnixStream, File)> {
@@ -738,18 +738,38 @@ fn write_action(
         revision: &request.revision,
         input: &document,
     };
-    if let Some(value) = mutation::observe(
+    let original = mutation::observe_original(
         &owner.paths,
         &request.adapter,
         &target,
         request.idempotency_key.as_deref(),
         until,
-    )? {
-        return Ok(value);
-    }
+    )?;
     let (_, adapter) = selected(&owner.paths, &request.adapter)?;
     let deadline = connectors_sdk::now_ms()
         + until.saturating_duration_since(Instant::now()).as_millis() as u64;
+    if let Some(original) = original {
+        if !original.pending || !owner.pool.idle(&adapter)? {
+            return Ok(original.delivery);
+        }
+        return match owner.pool.run(
+            &request.adapter,
+            &adapter,
+            supervisor::Task::ObserveWrite {
+                connection: request.connection,
+                operation: request.operation,
+                schema: request.schema,
+                revision: request.revision,
+                document,
+                key: request.idempotency_key.ok_or(Code::OutcomeUnknown)?,
+                until,
+            },
+            deadline,
+        )? {
+            supervisor::Output::Write(value) => Ok(value),
+            _ => Err(Code::OutcomeUnknown.into()),
+        };
+    }
     match owner.pool.run(
         &request.adapter,
         &adapter,
