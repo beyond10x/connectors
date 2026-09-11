@@ -57,7 +57,7 @@ scope:
   path: spec-kinds/adapter
 - confidence: inferred
   path: website
-revision: 16
+revision: 17
 ---
 ## Outcome
 
@@ -158,3 +158,13 @@ The full Connectors gate with Rust 1.88 passes for the joined owner/private-tran
 This is CLI process restart and passive observation after owner shutdown; it does not prove a newly started owner's owner/2 replay path or crashes between storage acknowledgements. Those cases, final-admission failure/audit completion and the broader joined failure matrix remain required. Dedicated sandbox access, create/update atomic-head semantics, other selected GitLab workflows and reproducible distribution remain open. No story/provider/initiative completion or release is claimed.
 
 Correction to the preceding Cargo scope wording: the root manifest excludes generated workspace directories, but Cargo still lists generated type path dependencies as implicit workspace members. The gate checks their formatting and complete generated bundles; no generated source was manually changed. The pinned CLI refusal `unsupported CLI primitive Uuid` was addressed only by a canonical-string presentation of the existing UUID identity. The original shared type and ledger identity are unchanged.
+
+## Verified owner restart, crash and revocation increment — 2026-09-11
+
+The joined production CLI fixture now proves actual owner/2 observation through a newly started owner for Applied, Refused and lost-response Unknown, with the proof file deleted, no proof supplied, custody stopped and no provider/clock call. A fourth case holds the provider response after one applied PUT, observes the pending live attempt, kills the exact owner through its socket-derived pidfd, verifies both owner and native child exit, then observes the same attempt through a new owner without another PUT. Approval spend remains enforced under a different business key after that crash. The original crash attempt remains pending/unknown; no automatic recovery or new send authority is claimed.
+
+A deterministic revocation-during-preflight fixture reproduced an unfinished admitted audit after the current-admission refusal. Both affected coordinator paths now finish their audit before propagating the refusal. The fixed fixture verifies the exact original audit ends refused/revoked and no PUT occurs. All eight disposable production CLI journeys pass in 421.43 seconds. The full gate with Rust 1.88 passes, including 124 host unit tests, generation/drift, shared/native ESS, Clippy, boundaries and 315 conformance scenarios. Website typecheck/build and reference drift pass. The first barrier mismatch and actual audit regression are retained separately.
+
+docs/evidence/gitlab-owner-recovery-20260911/README.md retains commands, logs, 188 selected source hashes and tested runtime identities. The gate's workspace build produced different executable bytes; its hashes are recorded separately, and rebuilding the exact acceptance package selections restored both tested hashes byte-for-byte. No registry version, generated native/CLI output, native write semantics or protocol shape changed. This corrects existing audit completion and adds runtime evidence under the active guarded-merge scope; it introduces no entity, relation or new decomposition.
+
+Automatic abandoned-attempt recovery, every storage acknowledgement crash, the remaining concurrent admission/final-audit failure matrix, dedicated provider sandbox acceptance, C14 create/update atomic-head semantics and distribution reproducibility stay open. The sandbox URL/project/protected-file details were requested again while independent work continued. The story and initiative remain active. Root is the sole writer on primary main; no linked tree, release tag, push, deployment or paid governed run is part of this increment. Full GitLab still precedes Kubernetes including Helm, PostgreSQL, MCP and remaining providers; the driver protocol-loading blocker retains its existing scope.
