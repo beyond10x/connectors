@@ -5,6 +5,7 @@
 
 pub mod bundle;
 pub mod inventory;
+pub mod template;
 
 use connectors_core::{Error, ErrorCode, Result};
 use serde::{Deserialize, Serialize};

@@ -70,7 +70,10 @@ fn replacing_an_indexed_provider_needs_asking() {
     let refused = write(directory.path(), &bundle("fixture"), false).expect_err("must refuse");
     assert!(refused.message.contains("already indexed"));
     write(directory.path(), &bundle("fixture"), true).expect("explicit replacement");
-    assert_eq!(read_index(directory.path()).expect("index").entries.len(), 1);
+    assert_eq!(
+        read_index(directory.path()).expect("index").entries.len(),
+        1
+    );
 }
 
 #[test]
@@ -86,5 +89,10 @@ fn the_index_lists_providers_in_a_stable_order() {
 #[test]
 fn an_empty_directory_reads_as_an_empty_index_rather_than_an_error() {
     let directory = tempfile::tempdir().expect("temporary directory");
-    assert!(read_index(directory.path()).expect("index").entries.is_empty());
+    assert!(
+        read_index(directory.path())
+            .expect("index")
+            .entries
+            .is_empty()
+    );
 }
