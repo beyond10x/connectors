@@ -8,20 +8,38 @@
     "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/node-v1/"
   ],
   "configuration_schema": {
-    "type": "object",
-    "properties": {
-      "service": {
-        "$ref": "urn:connectors:config:v1:service"
-      },
-      "http": {
-        "$ref": "urn:connectors:config:v1:http"
-      },
-      "adapter": {
+    "oneOf": [
+      {
+        "title": "effective local configuration",
+        "description": "The document the adapter composition builds and validates at bootstrap, not the file an operator writes. The file carries ca_file and may omit discover_hosts; this schema describes the resolved form, in which the CA is reduced to ca_digest and discover_hosts is always present. See docs/local-kubernetes-cli.md for the on-disk format.",
         "type": "object",
         "properties": {
+          "format": {
+            "const": "connectors-kubernetes-local/1"
+          },
+          "instance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "api_base": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^https://.+/$"
+          },
+          "ca_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
           "namespaces": {
             "type": "array",
             "minItems": 1,
+            "maxItems": 256,
             "uniqueItems": true,
             "items": {
               "type": "string",
@@ -31,6 +49,8 @@
           },
           "resource_kinds": {
             "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
             "uniqueItems": true,
             "items": {
               "enum": [
@@ -46,18 +66,71 @@
           }
         },
         "required": [
+          "format",
+          "instance",
+          "api_base",
+          "ca_digest",
           "namespaces",
-          "resource_kinds"
+          "resource_kinds",
+          "discover_hosts"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "title": "federated service configuration",
+        "description": "The on-disk document read by --config in the federated service mode.",
+        "type": "object",
+        "properties": {
+          "service": {
+            "$ref": "urn:connectors:config:v1:service"
+          },
+          "http": {
+            "$ref": "urn:connectors:config:v1:http"
+          },
+          "adapter": {
+            "type": "object",
+            "properties": {
+              "namespaces": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                }
+              },
+              "resource_kinds": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "pods",
+                    "services",
+                    "deployments",
+                    "endpointslices"
+                  ]
+                }
+              },
+              "discover_hosts": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "namespaces",
+              "resource_kinds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "service",
+          "http",
+          "adapter"
         ],
         "additionalProperties": false
       }
-    },
-    "required": [
-      "service",
-      "http",
-      "adapter"
-    ],
-    "additionalProperties": false
+    ]
   },
   "operations": [
     {
