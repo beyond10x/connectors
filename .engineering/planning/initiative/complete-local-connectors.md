@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 29
+revision: 31
 ---
 ## Outcome and authority
 
@@ -46,7 +46,9 @@ The existing epic:mcp-contracts remains the Connectors MCP contract owner. The K
 
 Use task-owned TMPDIR under .local/tmp and two Cargo jobs. Run the affected ESS validation, generation/drift/conformance, website checks where affected, and the required Connectors gate with MSRV. MCP uses cargo xtask gate; recheck remote policy before publishing already locally verified source. Keep timestamped receipts separate from deterministic payloads. Reuse evidence only when its relevant inputs are unchanged.
 
-Connectors publication and cloud deployment are excluded, as are GitHub/AWS adapters, optional MCP extensions, Atlas registration/delivery wiring and unrelated Harness repinning. Publish only verified MCP source commits and consume their exact revision. Keep Connectors local. No new bare recovery repository. Follow the explicit single-agent direct-checkout rule here; use managed worktrees and leases for MCP. Final integration requires clean Connectors main, published MCP goal commits and no task-owned linked worktrees.
+The operator's later source-release authorization, recorded below under Source release authorization — 2026-09-10 and in AGENTS.md's Cutting a release section, supersedes the original Connectors publication exclusion. At each verified, usable provider-batch handoff, complete the scoped changelog/website update, checks, bot commit, annotated version tag and source push, then verify the exact remote branch and tag. release-plan:gitlab-v020 records the first bounded source release. A release does not by itself complete missing workflows or sandbox acceptance. Ordinary development increments remain local until a required release handoff; do not tag or publish every internal checkpoint.
+
+Publish verified MCP source commits and consume their exact revision in Connectors. Cloud/website deployment, binary or registry publication, native SaaS OAuth onboarding, GitHub/AWS adapters, optional MCP extensions, Atlas registration/delivery wiring and unrelated Harness repinning remain excluded unless separately authorized. No new bare recovery repository. Follow the explicit single-agent direct-checkout rule here; use managed worktrees and leases for MCP. Final integration requires clean Connectors main, published MCP goal commits, the authorized provider source releases and no task-owned linked worktrees. Preserve other sessions' active managed trees and leases.
 
 ## Current evidence and open prerequisites
 
@@ -246,3 +248,11 @@ Under active story:guarded-gitlab-merge, the running owner now recovers abandone
 docs/evidence/gitlab-background-recovery-20260911/README.md records all 11 disposable production CLI journeys plus one inert fixture driver passing in 460.12 seconds, the new ledger/worker cases, the full Rust 1.88 gate with 129 host tests and 315 conformance scenarios, reference checks and exact source/runtime identities. Gate builds were restored to the tested executable bytes. Failed fixture/lint checks and their corrections are retained. This is a development checkpoint, not real GitLab sandbox acceptance or a provider release.
 
 Original-audit recovery requires review against the current one-final-observation contract before further implementation. The remaining acknowledgement/concurrency matrix, dedicated sandbox access, C14 create/update head guard, other selected GitLab workflows and reproducible distributions stay open. No story, provider batch, initiative or goal is completed by this increment. Full GitLab, Kubernetes including Helm, PostgreSQL, MCP and remaining-provider order is unchanged. Root remains the sole writer on primary main, with no linked tree or publication in this checkpoint. Existing blockers remain truthful; no paid governed run is required.
+
+## Verified audit acknowledgement recovery checkpoint — 2026-09-11
+
+Active story:guarded-gitlab-merge now binds exact-observation audit acknowledgement recovery into live execution and original-result observation. Audit storage can retry only the same final observation after positive absence, within the original deadline and a bounded recovery budget; failure preserves the known business result. The same increment fixes expired-deadline cause reporting after private write transport loss without changing possible-write uncertainty or retry authority.
+
+docs/evidence/gitlab-audit-ack-recovery-20260911/README.md records 17 audit tests, 35 production-finalizer result/fault combinations, the passing full Rust 1.88 gate (135 host tests; 315 conformance scenarios), all 11 production CLI journeys plus an inert fixture entry passing in 464.32 seconds, reference checks and final source/runtime hashes. Failed gate/CLI runs and the deadline and synthetic-clock corrections remain separate evidence. docs/gitlab-write-failure-matrix.md distinguishes low-level storage/protocol coverage from still-required joined CLI failures. No sandbox or complete-provider claim is made.
+
+Next, verify metadata unavailability after a known native write effect, including final disclosure and restart behavior without another effect. General original-audit reconciliation still needs a reviewed persistence/correlation binding. Remaining joined failure/concurrency cases, sandbox access, C14 create/update head guard, selected GitLab workflows and reproducible distributions remain required. Provider order and active lifecycle are unchanged. The current publication section now reflects the already-recorded source-release authorization; dated history is preserved. This checkpoint stays local on primary main, with no task-owned linked tree or cleanup authority over the two separately active managed trees.

@@ -169,18 +169,21 @@ impl Clock {
         let calls = count.clone();
         let thread = std::thread::spawn(move || {
             let mut buffer = [0; 4096];
+            let started = Instant::now();
             while !stop.load(Ordering::SeqCst) {
                 match socket.recv_from(&mut buffer) {
                     Ok((size, peer)) => {
-                        calls.fetch_add(1, Ordering::SeqCst);
+                        let sequence = calls.fetch_add(1, Ordering::SeqCst) as u64;
                         if !replies.load(Ordering::SeqCst) {
                             continue;
                         }
+                        // Synthetic time advances across exchanges as well as
+                        // within an acquired sample. Repeating the fixed epoch
+                        // can legitimately fail the ledger's rollback guard.
+                        let mut fixture = clock_fixture::Fixture::default();
+                        fixture.midpoint += started.elapsed().as_secs() + sequence;
                         socket
-                            .send_to(
-                                &clock_fixture::Fixture::default().reply(&buffer[..size]),
-                                peer,
-                            )
+                            .send_to(&fixture.reply(&buffer[..size]), peer)
                             .unwrap();
                     }
                     Err(e)
@@ -613,6 +616,10 @@ fn journey(mode: u8) {
     if mode != 3 {
         let refused = refusal(cli.run(&reused), "approval_replayed");
         assert_eq!(refused["mutation"]["classification"], "not_attempted");
+        assert!(
+            refused["mutation"]["cause"].is_null(),
+            "mode {mode}: refused preparation did not settle: {refused}"
+        );
     }
     assert_eq!(
         provider
@@ -697,7 +704,11 @@ fn journey(mode: u8) {
     assert_ne!(replay["request_id"], first["request_id"]);
     assert_eq!(replay["source_audit"]["audit_status"], "complete");
     assert_eq!(provider.count(), native_calls);
-    assert_eq!(clock.count.load(Ordering::SeqCst), clock_calls);
+    assert_eq!(
+        clock.count.load(Ordering::SeqCst),
+        clock_calls,
+        "mode {mode}: clock access during settled owner replay"
+    );
     assert_eq!(
         provider.merge_effects.load(Ordering::SeqCst),
         usize::from(mode != 2)
