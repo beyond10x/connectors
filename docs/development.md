@@ -6,6 +6,9 @@ see [Run adapter services](running-services.md).
 Rust 1.88.0 is the checked minimum. The full test/generation gate uses the ESS pin in
 [`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json)
 and the rustfmt recorded in the GitLab generated manifest (currently Rust 1.98.1).
+Planning validation uses the separate [AEP executable pin](../crates/connectors-build/aep-toolchain.json).
+The protocol document pin in `.engineering/project.yaml` selects governance documents;
+it does not identify an installed executable.
 `--msrv` additionally checks all targets on installed Rust 1.88.0. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
@@ -13,6 +16,49 @@ independent adapter-model compilation and AEP validation. It uses a task-owned t
 `.local/tmp`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`). This local repository has no
 configured CI or publication target.
+
+## Pinned tools
+
+The 2026-09-11 selection is ESS 0.22.2 at
+`6b666e58f2e87dd8798d27f935e9a012203296a3` and AEP 0.55.0 at
+`4eb999e0ae3cc77d1c387152e23a85ad4eae86dc`. Both versions were checked against
+upstream release tags and source main. AEP additionally carries the digest-pinned
+[findings correction](../crates/connectors-build/aep-findings.patch): it recognizes
+explicit empty findings blocks and source-bound transcriptions of immutable legacy
+reviews. This is a local patch on current AEP source, not an upstream released fix.
+Remove the patch when selecting an upstream commit that contains the correction.
+
+Build from reviewed local Git repositories containing those exact commits:
+
+```sh
+cargo run --locked -p connectors-build -- toolchain --source /path/to/ess
+cargo run --locked -p connectors-build -- aep-toolchain --source /path/to/aep
+```
+
+The commands print the selected executable paths. For interactive planning, set
+`CONNECTORS_AEP` to the second path and invoke `"$CONNECTORS_AEP" plan artifact ...`.
+The gate selects `--aep`, then `CONNECTORS_AEP`, then its source-and-patch-keyed cache,
+then PATH candidates. It checks a local build receipt and binary digest before even
+running `--version`; an explicit invalid selection refuses without fallback. Tool
+resolution never installs or replaces a global binary. AEP source builds use only
+committed Git objects plus the pinned patch, so unrelated working-tree edits cannot
+enter the binary. These receipts record local builds, not signed upstream attestations.
+
+ESS 0.22 introduces generated-output ownership. On a checkout whose existing CLI
+fixture has no local ownership record, generate a fresh reference and adopt only
+byte-identical output before regenerating it. `--check` needs no adoption:
+
+```sh
+"$CONNECTORS_ESS" generate cli --path ess --binding apps/connectors/spec/cli.yaml \
+  --out .local/tmp/cli-adoption-reference
+"$CONNECTORS_ESS" generate output adopt --ownership-root apps/connectors-cli-contract \
+  --from .local/tmp/cli-adoption-reference --owner cli-binding
+cargo run --locked -p connectors-build -- cli
+```
+
+Use a fresh task-owned reference path. Set `CONNECTORS_ESS` to the path printed by
+the ESS build command. Preserve an adoption refusal and inspect the differing
+bytes; never overwrite them to manufacture an ownership record.
 
 The gate selects authored Cargo workspace members for formatting. `cargo fmt --all`
 also follows excluded path dependencies, including generated CLI sources; use the
