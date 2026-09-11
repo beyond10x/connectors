@@ -279,13 +279,38 @@ impl Child {
         input: &[u8],
         deadline_ms: u64,
     ) -> Result<PreparedInvocation<'_>> {
+        self.prepare_write_until(
+            operation,
+            revision,
+            partition,
+            secret,
+            input,
+            (deadline_ms, writes::budget(deadline_ms)?),
+        )
+    }
+
+    /// Compose a narrower original owner budget with the private wire deadline.
+    /// Clock changes or time consumed before this call cannot extend that budget.
+    pub fn prepare_write_until(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        deadline: (u64, Instant),
+    ) -> Result<PreparedInvocation<'_>> {
+        let (deadline_ms, original_until) = deadline;
         if self.protocol != PrivateProtocol::V2 {
             return Err(Failure::Unsupported);
         }
         if !self.live {
             return Err(Failure::Unavailable);
         }
-        let until = writes::budget(deadline_ms)?;
+        let until = writes::budget(deadline_ms)?.min(original_until);
+        if Instant::now() >= until {
+            return Err(Failure::Timeout);
+        }
         if input.len() > INPUT_LIMIT || secret.0.is_empty() || secret.0.len() > SECRET_LIMIT {
             return Err(Failure::InvalidInput);
         }

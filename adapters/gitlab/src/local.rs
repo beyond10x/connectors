@@ -31,6 +31,7 @@ struct Configuration {
 
 pub struct Local {
     bootstrap: Bootstrap,
+    bootstrap_v2: Bootstrap,
     http: Arc<ScopedHttp>,
     adapter: GitLab,
 }
@@ -148,8 +149,19 @@ impl Local {
                 .collect(),
         };
         bootstrap.validate()?;
+        let mut bootstrap_v2 = bootstrap.clone();
+        bootstrap_v2.descriptor =
+            serde_json::to_string(&adapter.private_descriptor()).map_err(|_| Failure::Protocol)?;
+        bootstrap_v2.requirements.push(Requirement {
+            operation: "merge_request.merge".into(),
+            profile: auth::PROFILE_ID.into(),
+            scopes: BTreeSet::from(["api".into()]),
+            effect: Effect::Write,
+        });
+        bootstrap_v2.validate_for(runtime::PrivateProtocol::V2)?;
         Ok(Self {
             bootstrap,
+            bootstrap_v2,
             http,
             adapter,
         })
@@ -176,6 +188,31 @@ impl Credential for Fixed {
 impl runtime::Adapter for Local {
     fn bootstrap(&self) -> Bootstrap {
         self.bootstrap.clone()
+    }
+    fn bootstrap_v2(&self) -> Result<Bootstrap> {
+        Ok(self.bootstrap_v2.clone())
+    }
+    async fn prepare_write(
+        &self,
+        operation: &str,
+        partition: &str,
+        document: Secret,
+        input: Value,
+    ) -> Result<Box<dyn runtime::PreparedWrite>> {
+        if operation != "merge_request.merge" {
+            return Err(Failure::Unsupported);
+        }
+        let http = Arc::new(self.authenticated(document)?);
+        let prepared = self
+            .adapter
+            .prepare_merge(http.clone(), partition, input)
+            .await
+            .map_err(Failure::from_provider)?;
+        let http = Arc::try_unwrap(http).map_err(|_| Failure::Protocol)?;
+        Ok(Box::new(Merge {
+            prepared,
+            http: http.into_write(),
+        }))
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline> {
         if profile != auth::PROFILE_ID {
@@ -210,6 +247,16 @@ impl runtime::Adapter for Local {
             .invoke(operation, input)
             .await
             .map_err(Failure::from_provider)
+    }
+}
+struct Merge {
+    prepared: connectors_gitlab::PreparedMerge,
+    http: Box<dyn connectors_sdk::AuthenticatedWrite>,
+}
+#[async_trait::async_trait]
+impl runtime::PreparedWrite for Merge {
+    async fn execute(self: Box<Self>) -> connectors_sdk::WriteOutcome<Value> {
+        self.prepared.execute(self.http).await
     }
 }
 fn native_failure(value: auth::Failure) -> Failure {

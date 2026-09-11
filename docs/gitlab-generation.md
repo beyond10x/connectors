@@ -1,7 +1,7 @@
 # Generate and package the GitLab service
 
 The active implementation is driven by
-[the v2 adapter document](../adapters/gitlab/spec/adapter.json). It preserves
+[the v3 adapter document](../adapters/gitlab/spec/adapter.json). Its public projection preserves
 `project.get`, `issues.list`, and `file.get` from the configured service contract,
 and adds `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`,
 `merge_request.get`, `merge_requests.list` and `merge_request.validate`.
@@ -17,7 +17,12 @@ calendar validity and window order before transport.
 The [native validation profile](../adapters/gitlab/contracts/merge-requests/v1alpha1/validation.md)
 uses the same generated MR GET with native pinned-head and selected-pipeline
 checks. Its result is an observation and never grants a write.
-See [v2 semantics](../spec-kinds/adapter/v2/semantics.md) for generation boundaries
+The separate private projection adds `merge_request.merge`, its typed request/body
+mapping and a consuming write binding. The handwritten native implementation owns
+fresh preflight and effect classification. [Local merge dispatch](local-gitlab-merge.md)
+requires the host's approval, audit and attempt coordinator; generation supplies no
+authority. The public descriptor and generated read runtime retain their bytes.
+See [v3 semantics](../spec-kinds/adapter/v3/semantics.md) for generation boundaries
 and [source provenance](../adapters/gitlab/upstream/README.md) for the exact vendor
 input and its separate license.
 

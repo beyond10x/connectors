@@ -28,11 +28,13 @@ pub(super) struct Session {
     early: Option<(String, Context, owner::Error)>,
     pub deadline: u64,
     pub approval_deadline: Instant,
+    pub mutation_deadline: Option<owner::mutation::Deadline>,
     pub cancelled: bool,
 }
 impl Session {
     pub fn new(args: &[OsString]) -> Shared {
         let approval_deadline = Instant::now() + Duration::from_secs(20);
+        let mutation_deadline = owner::mutation::Deadline::start().ok();
         let selection = (|| {
             // Use the generated command and its argument ids. No effect is
             // performed by this preparse, including help and invalid arguments.
@@ -63,7 +65,13 @@ impl Session {
                 .iter()
                 .find(|c| c.path == path || c.aliases.contains(&path))?;
             let mut selectors = json!({});
-            for field in ["adapter", "profile", "connection", "expected_revision"] {
+            for field in [
+                "adapter",
+                "profile",
+                "connection",
+                "expected_revision",
+                "operation",
+            ] {
                 if let Ok(Some(value)) = leaf.try_get_one::<String>(&format!("field:{field}")) {
                     selectors[field] = json!(value);
                 }
@@ -81,6 +89,7 @@ impl Session {
             early: None,
             deadline: 0,
             approval_deadline,
+            mutation_deadline,
             cancelled: false,
         }))
     }
@@ -99,10 +108,31 @@ impl Session {
     }
     fn acquire(&mut self, source: ProtectedSource) -> owner::Result<String> {
         self.signals()?;
+        let is_write = (|| {
+            let selection = self.selection.as_ref()?;
+            if selection.callable != "operations-invoke" {
+                return None;
+            }
+            let paths = Paths::resolve(
+                selection.context.config.as_deref(),
+                selection.context.state_dir.as_deref(),
+            )
+            .ok()?;
+            let bootstrap = owner::cached(&paths, selection.selectors["adapter"].as_str()?).ok()?;
+            let operation = selection.selectors["operation"].as_str()?;
+            Some(
+                bootstrap
+                    .requirements
+                    .iter()
+                    .any(|r| r.operation == operation && r.effect == runtime::Effect::Write),
+            )
+        })()
+        .unwrap_or(false);
         if self
             .selection
             .as_ref()
             .is_some_and(|s| matches!(s.callable.as_str(), "approval-prepare" | "approval-issue"))
+            || is_write
         {
             return match source {
                 ProtectedSource::DocumentFile(path) => protected::document_until(
@@ -265,6 +295,14 @@ impl DynamicValidator for NativeValidator {
     ) -> Result<(), DynamicError> {
         // Failure data has already passed the generated closed Failure shape.
         if matches!(phase, DynamicPhase::Error(_)) {
+            return Ok(());
+        }
+        // Write delivery is validated under current admission by the owner and
+        // against the selected native schema before the handler projects it.
+        // A second mutable snapshot lookup here could erase known effect data.
+        if matches!(phase, DynamicPhase::Result)
+            && value.get("mutation").is_some_and(|v| !v.is_null())
+        {
             return Ok(());
         }
         let result: owner::Result<()> = (|| {

@@ -1,7 +1,9 @@
-# Proposed guarded merge
+# Guarded merge
 
-This selects the first native write in the current GitLab phase. It is not yet
-advertised. Existing MR reads and validation remain observations. Create/update
+This selects the first native write in the current GitLab phase. The development
+binding exposes it only through explicitly selected private protocol two;
+sandbox acceptance remains open. Existing MR reads and validation remain
+observations. Create/update
 retain the open C14 atomic-head decision; this document does not weaken it.
 
 `merge_request.merge` is an approval-required, local-only Write. Its input reuses
