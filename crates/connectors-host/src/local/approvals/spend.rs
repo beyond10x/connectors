@@ -56,7 +56,7 @@ impl<C: Clock> Store<C> {
             .connection
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(db)?;
-        if !(6..=7).contains(&version) {
+        if !(6..=8).contains(&version) {
             return Err(Failure::MetadataUnavailable);
         }
         let authority = metadata.authority().map_err(host_error)?;
