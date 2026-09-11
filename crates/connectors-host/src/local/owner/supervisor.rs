@@ -35,6 +35,15 @@ pub(super) enum Task {
         proof: Option<Secret>,
         until: Instant,
     },
+    ObserveWrite {
+        connection: String,
+        operation: String,
+        schema: String,
+        revision: String,
+        document: String,
+        key: String,
+        until: Instant,
+    },
     Revalidate {
         connection: String,
         revision: String,
@@ -59,6 +68,18 @@ struct Worker {
     sender: mpsc::SyncSender<Job>,
     control: Arc<Mutex<lifecycle::Control>>,
     thread: std::thread::JoinHandle<()>,
+    busy: Arc<AtomicBool>,
+}
+/// Constructed only between invocations on this instance's retained worker.
+/// The exclusive child-slot borrow excludes any simultaneous native exchange.
+pub(super) struct Quiescent<'a> {
+    instance: &'a str,
+    _child: &'a mut Option<runtime::Child>,
+}
+impl Quiescent<'_> {
+    pub(super) fn instance(&self) -> &str {
+        self.instance
+    }
 }
 #[derive(Default)]
 struct Launches {
@@ -132,9 +153,11 @@ impl Pool {
             let control = Arc::new(Mutex::new(lifecycle::Control::default()));
             let shared = control.clone();
             let stopped = self.stopped.clone();
+            let busy = Arc::new(AtomicBool::new(false));
+            let active = busy.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
-                .spawn(move || worker(paths, launches, shared, stopped, receiver))
+                .spawn(move || worker(paths, launches, shared, stopped, active, receiver))
                 .map_err(|_| Code::Unavailable)?;
             workers.insert(
                 adapter.instance_id.clone(),
@@ -142,6 +165,7 @@ impl Pool {
                     sender,
                     control,
                     thread,
+                    busy,
                 },
             );
         }
@@ -182,6 +206,16 @@ impl Pool {
                 mpsc::RecvTimeoutError::Timeout => Code::Timeout,
                 _ => Code::Unavailable,
             })?
+    }
+    /// Latency hint only. Recovery ownership comes from executing on the one
+    /// serialized instance worker, never from observing this flag.
+    pub fn idle(&self, adapter: &Adapter) -> Result<bool> {
+        Ok(self
+            .workers
+            .lock()
+            .map_err(|_| Code::Unavailable)?
+            .get(&adapter.instance_id)
+            .is_none_or(|worker| !worker.busy.load(Ordering::SeqCst)))
     }
     pub fn automatic(&self, config: &Config) {
         for (alias, adapter) in &config.adapters {
@@ -281,12 +315,14 @@ fn worker(
     launches: Arc<Launches>,
     control: Arc<Mutex<lifecycle::Control>>,
     stopped: Arc<AtomicBool>,
+    busy: Arc<AtomicBool>,
     receiver: mpsc::Receiver<Job>,
 ) {
     let state = runtime::state::State::new(&paths.state);
     let mut child: Option<runtime::Child> = None;
     let mut selection = String::new();
     for job in receiver {
+        busy.store(true, Ordering::SeqCst);
         let result = (|| {
             until(job.deadline)?;
             if stopped.load(Ordering::SeqCst) {
@@ -308,6 +344,40 @@ fn worker(
             }
             if current.selection() != job.adapter.selection() {
                 return Err(Code::LifecycleConflict.into());
+            }
+            if let Task::ObserveWrite {
+                connection,
+                operation,
+                schema,
+                revision,
+                document,
+                key,
+                until,
+            } = &job.task
+            {
+                // Earlier jobs have ended. No original native preparation or
+                // gate winner can survive this worker's serialized boundary.
+                // Clock acquisition must not hold lifecycle or policy locks.
+                drop(guard);
+                let request = approval_issuance::Request {
+                    connection,
+                    operation,
+                    schema,
+                    revision,
+                    input: document,
+                };
+                return mutation::recover_observation(
+                    &paths,
+                    &job.alias,
+                    &request,
+                    key,
+                    *until,
+                    Quiescent {
+                        instance: &current.instance_id,
+                        _child: &mut child,
+                    },
+                )
+                .map(Output::Write);
             }
             if let Task::Write {
                 connection,
@@ -400,6 +470,7 @@ fn worker(
             until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
             match job.task {
+                Task::ObserveWrite { .. } => Err(Code::OutcomeUnknown.into()),
                 Task::Write {
                     connection,
                     operation,
@@ -662,6 +733,7 @@ fn worker(
             guard.starting = false;
             guard.failed = true;
         }
+        busy.store(false, Ordering::SeqCst);
         let _ = job.reply.send(result);
     }
 }

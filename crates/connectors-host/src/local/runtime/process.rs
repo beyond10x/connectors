@@ -33,11 +33,7 @@ impl Child {
         deadline: Instant,
     ) -> Result<Self> {
         let until = deadline.min(Instant::now() + Duration::from_secs(10));
-        let executable = config
-            .executable
-            .open()
-            .map_err(|_| Failure::InvalidConfiguration)?;
-        let executable = super::artifact::capture(executable, &config.executable.sha256, until)?;
+        let executable = config.executable.capture(until)?;
         let (channel, child_channel) = UnixStream::pair().map_err(|_| Failure::Unavailable)?;
         channel::peer(&channel)?;
         let child_fd = child_channel.as_raw_fd();

@@ -299,6 +299,44 @@ impl Executable {
     /// Return the admitted source file at EOF. Launch additionally captures and
     /// verifies a sealed snapshot: an inode can still be written in place.
     pub fn open(&self) -> Result<std::fs::File> {
+        let mut file = self.source()?;
+        let mut digest = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        let mut remaining: usize = 512 * 1024 * 1024 + 1;
+        loop {
+            let count = file
+                .read(&mut buffer)
+                .map_err(|_| Failure::InvalidConfiguration)?;
+            if count == 0 {
+                break;
+            }
+            remaining = remaining
+                .checked_sub(count)
+                .ok_or(Failure::InvalidConfiguration)?;
+            digest.update(&buffer[..count]);
+        }
+        if hex::encode(digest.finalize()) != self.sha256 {
+            return Err(Failure::InvalidConfiguration);
+        }
+        Ok(file)
+    }
+
+    /// Admit the source path and return only a verified sealed snapshot. Hash
+    /// while copying: hashing the mutable source first adds no exec guarantee
+    /// and needlessly spends the original startup deadline a second time.
+    pub(crate) fn capture(
+        &self,
+        until: std::time::Instant,
+    ) -> super::runtime::Result<std::fs::File> {
+        let source = self
+            .source()
+            .map_err(|_| super::runtime::Failure::InvalidConfiguration)?;
+        super::runtime::artifact::capture(source, &self.sha256, until)
+    }
+
+    // Content is deliberately unverified here. Keep this private so callers
+    // cannot confuse source path admission with an executable snapshot.
+    fn source(&self) -> Result<std::fs::File> {
         use std::os::{
             fd::{AsRawFd, FromRawFd},
             unix::ffi::OsStrExt,
@@ -327,7 +365,7 @@ impl Executable {
             return Err(Failure::InvalidConfiguration);
         }
         // SAFETY: openat returned a new owned descriptor.
-        let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
+        let file = unsafe { std::fs::File::from_raw_fd(fd) };
         let stat = file.metadata().map_err(|_| Failure::InvalidConfiguration)?;
         if !stat.is_file()
             || (stat.uid() != fs::uid() && stat.uid() != 0)
@@ -335,24 +373,6 @@ impl Executable {
             || stat.mode() & 0o111 == 0
             || stat.len() > 512 * 1024 * 1024
         {
-            return Err(Failure::InvalidConfiguration);
-        }
-        let mut digest = Sha256::new();
-        let mut buffer = [0u8; 65536];
-        let mut remaining: usize = 512 * 1024 * 1024 + 1;
-        loop {
-            let count = file
-                .read(&mut buffer)
-                .map_err(|_| Failure::InvalidConfiguration)?;
-            if count == 0 {
-                break;
-            }
-            remaining = remaining
-                .checked_sub(count)
-                .ok_or(Failure::InvalidConfiguration)?;
-            digest.update(&buffer[..count]);
-        }
-        if hex::encode(digest.finalize()) != self.sha256 {
             return Err(Failure::InvalidConfiguration);
         }
         Ok(file)

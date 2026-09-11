@@ -149,6 +149,7 @@ struct Clock {
     address: String,
     count: Arc<AtomicUsize>,
     stopped: Arc<AtomicBool>,
+    respond: Arc<AtomicBool>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 impl Clock {
@@ -160,6 +161,8 @@ impl Clock {
         let address = socket.local_addr().unwrap().to_string();
         let count = Arc::new(AtomicUsize::new(0));
         let stopped = Arc::new(AtomicBool::new(false));
+        let respond = Arc::new(AtomicBool::new(true));
+        let replies = respond.clone();
         let stop = stopped.clone();
         let calls = count.clone();
         let thread = std::thread::spawn(move || {
@@ -168,6 +171,9 @@ impl Clock {
                 match socket.recv_from(&mut buffer) {
                     Ok((size, peer)) => {
                         calls.fetch_add(1, Ordering::SeqCst);
+                        if !replies.load(Ordering::SeqCst) {
+                            continue;
+                        }
                         socket
                             .send_to(
                                 &clock_fixture::Fixture::default().reply(&buffer[..size]),
@@ -188,6 +194,7 @@ impl Clock {
             address,
             count,
             stopped,
+            respond,
             thread: Some(thread),
         }
     }
@@ -211,6 +218,78 @@ fn gitlab_cli_guarded_merge_applied_refused_and_lost_response_restart() {
 #[ignore = "requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR"]
 fn gitlab_cli_guarded_merge_revocation_finishes_admitted_audit() {
     journey(4);
+}
+
+#[test]
+#[ignore = "requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR"]
+fn gitlab_cli_recovers_abandoned_preparation_only_with_trusted_time() {
+    journey(5);
+}
+
+#[test]
+#[ignore = "subprocess fixture; no action without its explicit task-owned root"]
+fn prepared_attempt_exit_fixture() {
+    use connectors_host::local::{approvals::Subject, mutations as ledger};
+    let Some(root) = std::env::var_os("CONNECTORS_PREPARED_FIXTURE") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let subject: Subject =
+        serde_json::from_slice(&fs::read(root.join("private/subject.json")).unwrap()).unwrap();
+    let t = subject.target;
+    struct NoClock;
+    impl ledger::Clock for NoClock {
+        fn now(&self) -> ledger::Result<ledger::ClockInterval> {
+            Err(ledger::Failure::ClockUnavailable)
+        }
+    }
+    let store =
+        ledger::Store::new(&root.join("cli/state"), NoClock, ledger::Limits::default()).unwrap();
+    let candidate = ledger::Candidate {
+        namespace: ledger::Namespace {
+            receiver_instance: t.instance.clone(),
+            tenant: None,
+            realm: None,
+            caller: subject.authority.scope.caller,
+            executor: None,
+            origin: ledger::Origin::Direct,
+        },
+        fingerprint: ledger::Fingerprint {
+            operation: ledger::OperationRef {
+                instance: t.instance,
+                adapter: "gitlab".into(),
+                operation: t.operation,
+            },
+            connection_ref: t.connection,
+            connection_revision: t.connection_revision,
+            contract_ref: t.contract,
+            profile: t.profile,
+            descriptor_revision: t.descriptor_revision,
+            configuration_revision: t.configuration_revision,
+            canonicalization_version: subject.canonicalization,
+            input_digest: subject.input_sha256,
+            route: None,
+        },
+        caller_key: Some("owned-merge".into()),
+        request_id: "a6b7af40-a60f-4a73-a4b2-fd247c773c11".into(),
+        // This process exercises the durable port, not native preflight or
+        // approval spending. No provider capability or dispatch gate is used.
+        approval: ledger::Approval::NotRequired,
+    };
+    assert!(matches!(
+        store.prepare(&candidate).unwrap(),
+        ledger::Preparation::Prepared(_)
+    ));
+    std::process::exit(73);
+}
+
+fn stored_attempt(cli: &Cli) -> (String, String, Option<i64>, Option<i64>) {
+    let db = rusqlite::Connection::open_with_flags(
+        cli.paths.state.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    db.query_row("SELECT a.state,k.state,k.settled_at_ms,k.replay_expires_at_ms FROM mutation_attempts a JOIN mutation_keys k ON k.attempt_id=a.attempt_id", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))).unwrap()
 }
 
 fn journey(mode: u8) {
@@ -315,6 +394,78 @@ fn journey(mode: u8) {
     success(cli.run(&issue));
     let mut invocation = missing.clone();
     invocation.extend(["--approval-file", proof.to_str().unwrap()]);
+    if mode == 5 {
+        cli.shutdown();
+        drop(custody.daemon.take());
+        fs::remove_file(&proof).unwrap();
+        private(
+            &provider.root.path().join("private/subject.json"),
+            &serde_json::to_vec(&prepared["preparation"]["subject"]).unwrap(),
+        );
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "cli_journey::guarded_merge::prepared_attempt_exit_fixture",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env_clear()
+            .env("CONNECTORS_PREPARED_FIXTURE", provider.root.path())
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(73), "{output:?}");
+        assert_eq!(
+            stored_attempt(&cli),
+            ("prepared".into(), "pending".into(), None, None)
+        );
+        let native_calls = provider.count();
+        let clock_calls = clock.count.load(Ordering::SeqCst);
+        clock.respond.store(false, Ordering::SeqCst);
+        let pending = refusal(cli.run(&invocation), "outcome_unknown");
+        assert_eq!(pending["mutation"]["classification"], "unknown");
+        assert_eq!(pending["mutation"]["replayed"], false);
+        assert_eq!(stored_attempt(&cli).0, "prepared");
+        assert_eq!(clock.count.load(Ordering::SeqCst), clock_calls + 1);
+        assert_eq!(pending["mutation"]["cause"]["code"], "unavailable");
+        assert!(cli.status()["child_incarnation"].is_null());
+        clock.respond.store(true, Ordering::SeqCst);
+        let recovered = refusal(cli.run(&invocation), "interrupted");
+        assert_eq!(clock.count.load(Ordering::SeqCst), clock_calls + 2);
+        assert_eq!(recovered["mutation"]["classification"], "not_attempted");
+        assert_eq!(recovered["mutation"]["replayed"], true);
+        assert_eq!(
+            recovered["mutation"]["attempt"],
+            pending["mutation"]["attempt"]
+        );
+        assert_eq!(
+            recovered["mutation"]["original_request_id"],
+            "a6b7af40-a60f-4a73-a4b2-fd247c773c11"
+        );
+        let settled = stored_attempt(&cli);
+        assert_eq!((&*settled.0, &*settled.1), ("aborted", "replayable"));
+        assert_eq!(settled.3.unwrap() - settled.2.unwrap(), 86_400_000);
+        cli.shutdown();
+        clock.respond.store(false, Ordering::SeqCst);
+        let clock_calls = clock.count.load(Ordering::SeqCst);
+        let replay = refusal(cli.run(&invocation), "interrupted");
+        assert_eq!(
+            replay["mutation"]["attempt"],
+            recovered["mutation"]["attempt"]
+        );
+        assert!(!cli.paths.state.join("owner.sock").exists());
+        assert_eq!(clock.count.load(Ordering::SeqCst), clock_calls);
+        assert_eq!(stored_attempt(&cli), settled);
+        assert_eq!(provider.count(), native_calls);
+        assert!(
+            !provider
+                .methods
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|method| method == "PUT")
+        );
+        return;
+    }
     if mode == 4 {
         let mut running = OwnedProcess(cli.command(&invocation).spawn().unwrap());
         let until = Instant::now() + Duration::from_secs(10);
@@ -457,10 +608,26 @@ fn journey(mode: u8) {
         first["mutation"]["original_request_id"]
     );
     assert_ne!(replay["request_id"], first["request_id"]);
-    assert_eq!(replay["mutation"]["replayed"], mode != 3);
+    assert_eq!(replay["mutation"]["replayed"], true);
     assert_eq!(provider.count(), native_calls);
     assert_eq!(clock.count.load(Ordering::SeqCst), clock_calls);
-    assert!(std::os::unix::net::UnixStream::connect(cli.paths.state.join("owner.sock")).is_err());
+    if mode == 3 {
+        assert_ne!(
+            owner::Client::connect(&cli.paths, false)
+                .unwrap()
+                .host_incarnation,
+            original_owner
+        );
+        assert!(cli.status()["child_incarnation"].is_null());
+        assert_eq!(
+            stored_attempt(&cli),
+            ("indeterminate".into(), "quarantined".into(), None, None)
+        );
+    } else {
+        assert!(
+            std::os::unix::net::UnixStream::connect(cli.paths.state.join("owner.sock")).is_err()
+        );
+    }
     let changed = input.replace("\"pipeline_id\":12", "\"pipeline_id\":13");
     let mut conflict = invocation.clone();
     let i = conflict.iter().position(|s| *s == "--input-json").unwrap() + 1;
@@ -487,7 +654,7 @@ fn journey(mode: u8) {
             .as_object()
             .map(|m| {
                 let mut m = m.clone();
-                m.insert("replayed".into(), json!(mode != 3));
+                m.insert("replayed".into(), json!(true));
                 Value::Object(m)
             })
             .unwrap()

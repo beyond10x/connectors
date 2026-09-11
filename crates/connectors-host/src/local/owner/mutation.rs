@@ -7,7 +7,9 @@ use serde_json::Value;
 use std::time::Instant;
 use uuid::Uuid;
 mod execution;
+mod recovery;
 pub(super) use execution::{Control, Invocation, execute};
+pub(in crate::local::owner) use recovery::recover_observation;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -470,7 +472,26 @@ pub fn observe(
     key: Option<&str>,
     until: Instant,
 ) -> Result<Option<Delivery>, Error> {
-    observe_as(
+    observe_original(paths, alias, request, key, until)
+        .map(|value| value.map(|value| value.delivery))
+}
+
+/// An admitted lookup result, distinct from a live execution reply. Only this
+/// lookup can identify an unsettled original; replayed=false on a live reply
+/// does not by itself mean that the durable attempt is still pending.
+pub struct OriginalObservation {
+    pub delivery: Delivery,
+    pub pending: bool,
+}
+
+pub fn observe_original(
+    paths: &Paths,
+    alias: &str,
+    request: &issuance::Request<'_>,
+    key: Option<&str>,
+    until: Instant,
+) -> Result<Option<OriginalObservation>, Error> {
+    observe_as_original(
         paths,
         alias,
         request,
@@ -489,6 +510,26 @@ fn observe_as(
     request_id: &str,
     existing_audit: Option<&audit::Reference>,
 ) -> Result<Option<Delivery>, Error> {
+    observe_as_original(
+        paths,
+        alias,
+        request,
+        key,
+        until,
+        request_id,
+        existing_audit,
+    )
+    .map(|value| value.map(|value| value.delivery))
+}
+fn observe_as_original(
+    paths: &Paths,
+    alias: &str,
+    request: &issuance::Request<'_>,
+    key: Option<&str>,
+    until: Instant,
+    request_id: &str,
+    existing_audit: Option<&audit::Reference>,
+) -> Result<Option<OriginalObservation>, Error> {
     let first = issuance::resolve(paths, alias, request, until)?;
     let candidate = candidate(&first, key, request_id)?;
     if key.is_none() {
@@ -502,6 +543,7 @@ fn observe_as(
     }
     let ledger = store(paths, NoClock)?;
     let original = ledger.lookup(&candidate);
+    let pending = matches!(&original, Ok(Some(value)) if matches!(value.state, ledger::State::Prepared | ledger::State::Dispatching));
     let current = issuance::resolve(paths, alias, request, until)?;
     unchanged(&first, &current)?;
     let mut value = match original {
@@ -547,5 +589,8 @@ fn observe_as(
         Err(_) => value.source_audit.audit_status = AuditStatus::Unavailable,
     }
     unchanged(&current, &issuance::resolve(paths, alias, request, until)?)?;
-    Ok(Some(value))
+    Ok(Some(OriginalObservation {
+        delivery: value,
+        pending,
+    }))
 }
