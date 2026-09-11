@@ -2,7 +2,7 @@
 resolver = "2"
 # Specification-only adapters have no Cargo package until implemented.
 members = ["crates/*", "adapters/gitlab", "adapters/kubernetes", "adapters/sql", "apps/connectors"]
-exclude = ["adapters/gitlab/generated/rust", "apps/connectors-cli-contract"]
+exclude = ["adapters/gitlab/generated/rust", "adapters/gitlab/generated/write-rust", "apps/connectors-cli-contract"]
 
 [workspace.package]
 version = "0.2.0"

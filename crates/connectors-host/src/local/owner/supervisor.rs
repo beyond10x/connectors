@@ -25,6 +25,16 @@ pub(super) enum Task {
         revision: String,
         document: Vec<u8>,
     },
+    Write {
+        connection: String,
+        operation: String,
+        schema: String,
+        revision: String,
+        document: String,
+        key: Option<String>,
+        proof: Option<Secret>,
+        until: Instant,
+    },
     Revalidate {
         connection: String,
         revision: String,
@@ -35,6 +45,7 @@ pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
     Baseline(runtime::Baseline),
     Value(Value),
+    Write(mutation::Delivery),
 }
 struct Job {
     alias: String,
@@ -298,6 +309,32 @@ fn worker(
             if current.selection() != job.adapter.selection() {
                 return Err(Code::LifecycleConflict.into());
             }
+            if let Task::Write {
+                connection,
+                operation,
+                schema,
+                revision,
+                document,
+                key,
+                until,
+                ..
+            } = &job.task
+            {
+                let request = approval_issuance::Request {
+                    connection,
+                    operation,
+                    schema,
+                    revision,
+                    input: document,
+                };
+                // Even a queued winner is observed before suppression is lifted
+                // or this worker starts any adapter child.
+                if let Some(value) =
+                    mutation::observe(&paths, &job.alias, &request, key.as_deref(), *until)?
+                {
+                    return Ok(Output::Write(value));
+                }
+            }
             if let Task::Validate { capture_epoch, .. } = &job.task {
                 if *capture_epoch != job.epoch {
                     return Err(Code::LifecycleConflict.into());
@@ -308,7 +345,10 @@ fn worker(
             }
             let resume = matches!(
                 job.task,
-                Task::Ensure { resume: true } | Task::Invoke { .. } | Task::Revalidate { .. }
+                Task::Ensure { resume: true }
+                    | Task::Invoke { .. }
+                    | Task::Write { .. }
+                    | Task::Revalidate { .. }
             );
             match &job.task {
                 Task::Validate { profile, .. } | Task::Revalidate { profile, .. }
@@ -316,7 +356,7 @@ fn worker(
                 {
                     return Err(Code::Forbidden.into());
                 }
-                Task::Invoke { operation, .. }
+                Task::Invoke { operation, .. } | Task::Write { operation, .. }
                     if !current.permissions.operations.contains(operation) =>
                 {
                     return Err(Code::Forbidden.into());
@@ -360,6 +400,41 @@ fn worker(
             until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
             match job.task {
+                Task::Write {
+                    connection,
+                    operation,
+                    schema,
+                    revision,
+                    document,
+                    key,
+                    proof,
+                    until,
+                } => {
+                    let request = approval_issuance::Request {
+                        connection: &connection,
+                        operation: &operation,
+                        schema: &schema,
+                        revision: &revision,
+                        input: &document,
+                    };
+                    mutation::execute(
+                        &paths,
+                        &job.alias,
+                        mutation::Invocation {
+                            request,
+                            key: key.as_deref(),
+                            proof,
+                            until,
+                        },
+                        active,
+                        mutation::Control {
+                            lifecycle: &control,
+                            epoch: job.epoch,
+                            stopped: &stopped,
+                        },
+                    )
+                    .map(Output::Write)
+                }
                 Task::Ensure { .. } => Ok(Output::Bootstrap(active.bootstrap().clone(), job.epoch)),
                 Task::Validate {
                     profile, secret, ..

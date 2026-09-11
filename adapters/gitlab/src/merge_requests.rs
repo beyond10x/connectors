@@ -35,7 +35,7 @@ fn optional_sha(v: &Value) -> Result<Value> {
     }
     Ok(json!(s))
 }
-fn observation(v: &Value, project: &str, iid: Option<i64>) -> Result<Value> {
+pub(super) fn observation(v: &Value, project: &str, iid: Option<i64>) -> Result<Value> {
     let id = positive(&v["id"])?;
     let observed_iid = positive(&v["iid"])?;
     let project_id = positive(&v["project_id"])?;

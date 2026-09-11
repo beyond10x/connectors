@@ -16,6 +16,7 @@ required-features = ["service"]
 
 [dependencies]
 gitlab-types = { path = "generated/rust/crates/gitlab-types" }
+gitlab_writes-types = { path = "generated/write-rust/crates/gitlab_writes-types" }
 connectors-core.workspace = true
 connectors-contracts.workspace = true
 connectors-sdk.workspace = true
@@ -29,6 +30,8 @@ clap = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
+base64.workspace = true
+ring = "0.17"
 sha2.workspace = true
 hex.workspace = true
 rcgen = "0.14"
