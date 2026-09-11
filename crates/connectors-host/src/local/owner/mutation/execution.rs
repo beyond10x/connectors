@@ -275,7 +275,7 @@ pub(in crate::local::owner) fn execute(
             }
             let mut value = failure(&first, &request_id, Classification::NotAttempted, error);
             if let Some(reference) = audit_reference {
-                finish_audit(&audits, reference, &mut value);
+                finish_audit(&audits, reference, &mut value, until);
             }
             // Current disclosure may be revoked while native preflight runs.
             // Complete our admitted audit before propagating that refusal.
@@ -311,7 +311,7 @@ pub(in crate::local::owner) fn execute(
                 return Ok(value);
             }
             let mut value = failure(&current, &request_id, Classification::NotAttempted, error);
-            finish_audit(&audits, reference, &mut value);
+            finish_audit(&audits, reference, &mut value, until);
             observed?;
             return Ok(value);
         }
@@ -363,7 +363,7 @@ pub(in crate::local::owner) fn execute(
                 _ => Code::OutcomeUnknown.into(),
             };
             let mut value = failure(&current, &request_id, Classification::NotAttempted, error);
-            finish_audit(&audits, reference, &mut value);
+            finish_audit(&audits, reference, &mut value, until);
             observed?;
             return Ok(value);
         }
@@ -414,7 +414,7 @@ pub(in crate::local::owner) fn execute(
                     stage: Stage::AttemptStore,
                 });
             }
-            finish_audit(&audits, reference, &mut value);
+            finish_audit(&audits, reference, &mut value, until);
             return Ok(value);
         }
     };
@@ -443,7 +443,7 @@ pub(in crate::local::owner) fn execute(
                 outcome,
             );
             correlation(&mut value, &current, &candidate, attempt);
-            finish_audit(&audits, reference, &mut value);
+            finish_audit(&audits, reference, &mut value, until);
             return Ok(value);
         }
     };
@@ -512,7 +512,7 @@ pub(in crate::local::owner) fn execute(
             stage: Stage::AttemptStore,
         });
     }
-    finish_audit(&audits, reference, &mut value);
+    finish_audit(&audits, reference, &mut value, until);
     // Final disclosure still requires current target admission. Policy and key
     // leases remain live through commit, settlement and this response decision.
     match issuance::resolve(paths, alias, request, until) {

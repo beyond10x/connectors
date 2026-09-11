@@ -8,6 +8,8 @@ use std::time::Instant;
 use uuid::Uuid;
 mod execution;
 mod recovery;
+#[cfg(test)]
+mod tests;
 pub(super) use execution::{Control, Invocation, execute};
 pub(in crate::local::owner) use recovery::recover_observation;
 
@@ -303,7 +305,12 @@ fn admit_audit(store: &audit::Store, facts: &audit::Anchor) -> Result<audit::Adm
         _ => Err(Code::MetadataUnavailable.into()),
     }
 }
-fn finish_audit(store: &audit::Store, reference: audit::Reference, delivery: &mut Delivery) {
+fn finish_audit(
+    store: &audit::Store,
+    reference: audit::Reference,
+    delivery: &mut Delivery,
+    until: Instant,
+) {
     let observation = audit::FinalObservation {
         observation_id: Uuid::new_v4(),
         outcome: if delivery.mutation.classification == Classification::Unknown {
@@ -326,7 +333,10 @@ fn finish_audit(store: &audit::Store, reference: audit::Reference, delivery: &mu
         recorded_at_ms: connectors_sdk::now_ms() as i64,
     };
     delivery.source_audit.audit_ref = Some(reference.audit_ref.clone());
-    delivery.source_audit.audit_status = if store.append(&reference, &observation).is_ok() {
+    delivery.source_audit.audit_status = if store
+        .append_recovering(&reference, &observation, until)
+        .is_ok()
+    {
         AuditStatus::Complete
     } else {
         AuditStatus::Incomplete
@@ -583,7 +593,7 @@ fn observe_as_original(
         }),
     };
     match reference {
-        Ok(reference) => finish_audit(&audits, reference, &mut value),
+        Ok(reference) => finish_audit(&audits, reference, &mut value, until),
         // No provider is being called here. Preserve the admitted original
         // outcome, with no invented audit acknowledgement.
         Err(_) => value.source_audit.audit_status = AuditStatus::Unavailable,
