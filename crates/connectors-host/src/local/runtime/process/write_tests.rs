@@ -209,6 +209,7 @@ fn peer_fixture(root: &Path, mode: &str) {
         return;
     };
     record(root, "received-secret");
+    let deadline_ms = request.control["deadline_ms"].as_u64().unwrap();
     let id = request.control["id"].clone();
     let preparation_id = uuid::Uuid::new_v4().to_string();
     let mut prepared = json!({"kind":"prepared_write","id":id,"preparation_id":preparation_id});
@@ -242,6 +243,22 @@ fn peer_fixture(root: &Path, mode: &str) {
         return;
     }
     assert_eq!(request.control["kind"], "commit_write");
+    if mode == "peer-expired-eof" {
+        record(root, "send");
+        // Close at the captured wall deadline. It may precede the parent's
+        // independently captured monotonic/socket timeout by a fraction of a ms.
+        loop {
+            let remaining = deadline_ms.saturating_sub(connectors_sdk::now_ms());
+            if remaining == 0 {
+                return;
+            }
+            if remaining > 2 {
+                std::thread::sleep(Duration::from_millis(remaining - 1));
+            } else {
+                std::hint::spin_loop();
+            }
+        }
+    }
     let mut reply = json!({"kind":"write_result","id":id,"effect":"applied"});
     let mut document = br#"{"kind":"success","value":{"value":true}}"#.to_vec();
     match mode {
@@ -423,16 +440,28 @@ fn native_outcomes_and_lost_replies_never_repeat_a_send() {
         ),
         ("lost", WriteEffect::Unknown, Some(Failure::Unavailable)),
         ("timeout", WriteEffect::Unknown, Some(Failure::Timeout)),
+        (
+            "peer-expired-eof",
+            WriteEffect::Unknown,
+            Some(Failure::Timeout),
+        ),
     ] {
         let root = temp();
         let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
-        let result = prepare(&mut child, if mode == "timeout" { 300 } else { 2000 })
-            .unwrap()
-            .commit();
+        let result = prepare(
+            &mut child,
+            if matches!(mode, "timeout" | "peer-expired-eof") {
+                300
+            } else {
+                2000
+            },
+        )
+        .unwrap()
+        .commit();
         assert_eq!(result.effect, effect, "{mode}");
         assert_eq!(result.result.err(), failure, "{mode}");
         assert_eq!(count(root.path(), "send"), 1, "{mode}");
-        if matches!(mode, "lost" | "timeout") {
+        if matches!(mode, "lost" | "timeout" | "peer-expired-eof") {
             assert!(!child.live);
             assert!(child.process.try_wait().unwrap().is_some());
             assert!(prepare(&mut child, 2000).is_err());
