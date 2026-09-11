@@ -44,12 +44,14 @@ scope:
 - confidence: cited
   path: ess/domains/declarations.yaml
 - confidence: cited
+  path: ess/domains/delegation.yaml
+- confidence: cited
   path: ess/domains/local_approval_policy.yaml
 - confidence: cited
   path: spec-kinds/adapter
 - confidence: inferred
   path: website
-revision: 8
+revision: 10
 ---
 ## Outcome
 
@@ -114,3 +116,13 @@ Private protocol two and explicit local configuration version two are implemente
 docs/evidence/private-protocol-v2-20260911/README.md retains commands, full logs, 385 source/dependency hashes, tested CLI/adapter/keyring identities and limitations. The repository gate with Rust 1.88 passes with two test threads, along with all six disposable GitLab CLI journeys, affected Clippy, website build/typecheck and reference drift checks. The host suite has 113 passes and 18 existing ignored cases; integration tests and the one-use compile-fail example pass. The first full gate encountered MetadataUnavailable in an unchanged audit-capacity test; its exact isolated recheck and the bounded full gate passed. No audit code, contention timeout or test assertion was changed, and the initial failure is preserved without asserting a proven root cause.
 
 Next implement the production CLI policy/preparation/issuance handlers and owner mutation IPC, then join current approval/audit/attempt/connection dispatch to one native SHA-guarded GitLab merge. The lost-response CLI/restart acceptance, dedicated sandbox evidence, full distribution reproducibility and complete GitLab workflows remain required. The sandbox and create/update atomic-head blockers stay open. Root remains the sole writer on main; no linked tree was created. The full GitLab → Kubernetes with Helm → PostgreSQL → MCP → remaining-provider order is unchanged. This is an implementation checkpoint, not a completed guarded merge, provider batch, release or publication; the paid driver blocker is unchanged.
+
+## Verified local approval CLI checkpoint — 2026-09-11
+
+The generated production CLI now implements approvals policy-status, policy-set, prepare and issue under story:guarded-gitlab-merge. Policy publication admits current private-protocol-two write metadata and operation/profile permissions before the existing revision CAS. Preparation resolves the exact retained connection, current policy and strict native input without secret/provider/clock access, service startup or metadata writes. Issuance reconstructs the approved subject independently, acquires fresh authenticated time before policy/key leases, rechecks current selection, reads the qualified seed and durably publishes a new protected proof file. It preserves possible publication after a failed acknowledgement and never overwrites or automatically reissues. No business effect or proof spend is performed by these commands.
+
+The canonical preparation fixture exposed an existing projection discrepancy: optional object fields omit members, while the selected canonical codec requires explicit nulls. The delegation owner now models required nullable values and the canonical authority-scope projection; unrelated idempotency scope projections keep their existing meaning. ess/domains/delegation.yaml is added to the story's cited scope. This corrects the model to the existing canonical proof contract; it adds no persistent entity, new protocol format or separate foundation story. The file-only policy carrier uses a generated path option plus the trusted bounded reader because pinned ESS requires all three sources for a document carrier.
+
+docs/evidence/local-approval-issuance-20260911/README.md retains failed/corrected logs, 412 source/dependency hashes and runtime binary identities. The full repository gate with Rust 1.88 passes, including 122 host unit tests, CLI/adapter generation, 81 structural CLI fixtures, conformance and boundaries. The explicit production approval CLI journey passes with qualified disposable custody and an independent synthetic clock, including protected publication, printed-subject digest verification, restart reuse, overwrite refusal and locked custody. All six disposable production GitLab read journeys pass in 256.70 seconds. Website build/typecheck and reference drift checks pass. These facts do not establish dedicated provider acceptance or full distributable reproducibility.
+
+The guarded-merge story and initiative remain active. Next integrate protected proof consumption and owner mutation IPC with the existing approval/audit/attempt/connection dispatch gates, then implement one SHA-guarded GitLab merge and its lost-response/restart acceptance. Full GitLab workflows, dedicated sandbox access, the create/update atomic-head decision and distribution reproducibility remain open. Full GitLab still precedes Kubernetes with Helm, PostgreSQL, MCP and remaining providers. Root remains the sole implementation/planning writer on primary main; no linked worktree, release, external publication or paid governed run is created by this checkpoint. The recorded driver blocker remains unchanged.

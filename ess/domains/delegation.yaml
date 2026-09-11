@@ -5,6 +5,32 @@ summary: One-hop approval subjects and immutable receiver receipts; private host
 # never trust derived from matching a caller-written string. Codec and policy
 # predicates below remain explicit obligations, not simulated ESS commands.
 types:
+  # Canonical wire coordinates are required members whose absent value is null.
+  # ESS Optional in field position means an omitted member; naming the optional
+  # value preserves the required field and its nullable schema. Other uses of
+  # idempotency.AuthorityScope retain their original omission-based projection.
+  - name: connectors.delegation.NullableIdentifier
+    kind: newtype
+    of: "Optional<String>"
+  - name: connectors.delegation.NullableInteger
+    kind: newtype
+    of: "Optional<Integer>"
+  - name: connectors.delegation.NullableAuthoritySnapshot
+    kind: newtype
+    of: "Optional<connectors.delegation.AuthoritySnapshot>"
+  - name: connectors.delegation.NullableExecutorBinding
+    kind: newtype
+    of: "Optional<connectors.delegation.ExecutorBinding>"
+  - name: connectors.delegation.NullableRouteBinding
+    kind: newtype
+    of: "Optional<connectors.idempotency.RouteBinding>"
+  - name: connectors.delegation.CanonicalAuthorityScope
+    kind: struct
+    fields:
+      - {name: tenant, type: connectors.delegation.NullableIdentifier}
+      - {name: realm, type: connectors.delegation.NullableIdentifier}
+      - {name: caller, type: String}
+      - {name: executor, type: connectors.delegation.NullableIdentifier}
   - name: connectors.delegation.ReceiptId
     kind: newtype
     of: Uuid
@@ -22,9 +48,9 @@ types:
   - name: connectors.delegation.AdmittedAuthority
     kind: struct
     fields:
-      - {name: scope, type: connectors.idempotency.AuthorityScope}
-      - {name: current_authority, type: "Optional<connectors.delegation.AuthoritySnapshot>"}
-      - {name: executor, type: "Optional<connectors.delegation.ExecutorBinding>"}
+      - {name: scope, type: connectors.delegation.CanonicalAuthorityScope}
+      - {name: current_authority, type: connectors.delegation.NullableAuthoritySnapshot}
+      - {name: executor, type: connectors.delegation.NullableExecutorBinding}
   - name: connectors.delegation.ExecutionTarget
     kind: struct
     fields:
@@ -43,7 +69,7 @@ types:
       - {name: target, type: connectors.delegation.ExecutionTarget}
       - {name: authority, type: connectors.delegation.AdmittedAuthority}
       - {name: origin, type: connectors.idempotency.Origin}
-      - {name: route, type: "Optional<connectors.idempotency.RouteBinding>"}
+      - {name: route, type: connectors.delegation.NullableRouteBinding}
       - {name: canonicalization, type: String}
       - {name: input_sha256, type: String}
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
@@ -52,15 +78,15 @@ types:
     fields:
       - {name: instance, type: String}
       - {name: operation, type: String}
-      - {name: connection, type: "Optional<String>"}
+      - {name: connection, type: connectors.delegation.NullableIdentifier}
       - {name: descriptor_revision, type: String}
   - name: connectors.delegation.ApprovalPolicy
     kind: struct
     fields:
       - {name: mode, type: connectors.mutations.ApprovalMode}
-      - {name: issuer, type: "Optional<String>"}
-      - {name: audience, type: "Optional<String>"}
-      - {name: max_lifetime_seconds, type: "Optional<Integer>"}
+      - {name: issuer, type: connectors.delegation.NullableIdentifier}
+      - {name: audience, type: connectors.delegation.NullableIdentifier}
+      - {name: max_lifetime_seconds, type: connectors.delegation.NullableInteger}
   - name: connectors.delegation.ApprovalPreparation
     kind: struct
     fields:

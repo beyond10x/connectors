@@ -46,6 +46,14 @@ Callable: `approval-clock-check`. Input: `connectors.cli.ApprovalClockCheckInput
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `approvals issue`
+
+Approve the exact reconstructed subject and publish a new protected proof file
+
+Callable: `approval-issue`. Input: `connectors.cli.ApprovalIssueInput`. Result: `connectors.cli.ApprovalIssueResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `approvals key-init`
 
 Create a new approval-signing key in protected local custody
@@ -91,6 +99,30 @@ Error `failure`: `connectors.cli.Failure`.
 Observe public key metadata without starting services or reading secrets
 
 Callable: `approval-keys-status`. Input: `connectors.cli.ApprovalKeyStatusInput`. Result: `connectors.cli.ApprovalKeysResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals policy-set`
+
+Publish the exact permitted write-operation set under revision control
+
+Callable: `approval-policy-set`. Input: `connectors.cli.ApprovalPolicySetInput`. Result: `connectors.cli.ApprovalPolicyResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals policy-status`
+
+Inspect retained local write policy without starting services
+
+Callable: `approval-policy-status`. Input: `connectors.cli.ApprovalPolicyStatusInput`. Result: `connectors.cli.ApprovalPolicyResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `approvals prepare`
+
+Resolve the exact approval subject without provider or credential access
+
+Callable: `approval-prepare`. Input: `connectors.cli.ApprovalPrepareInput`. Result: `connectors.cli.ApprovalPrepareResult`.
 
 Error `failure`: `connectors.cli.Failure`.
 
@@ -197,12 +229,16 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:adapters-status: implement the owner-qualified callable and its declared result/error contract
 - handler:adapters-stop: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-clock-check: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-issue: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-init: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-recover: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-retire: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-revoke: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-rotate: implement the owner-qualified callable and its declared result/error contract
 - handler:approval-keys-status: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-policy-set: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-policy-status: implement the owner-qualified callable and its declared result/error contract
+- handler:approval-prepare: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-connect: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-describe: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-list: implement the owner-qualified callable and its declared result/error contract

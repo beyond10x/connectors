@@ -149,6 +149,29 @@ pub fn read_bounded(file: File, limit: usize) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+/// Inspect a held directory without following the destination or creating it.
+pub(crate) fn require_absent(parent: &File, child: &OsStr) -> Result<()> {
+    let child = name(child)?;
+    // SAFETY: fstatat initializes the live stat buffer on success. NOFOLLOW
+    // makes even a dangling link an existing destination, never an empty name.
+    let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+    let result = unsafe {
+        libc::fstatat(
+            parent.as_raw_fd(),
+            child.as_ptr(),
+            stat.as_mut_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    if result == 0 {
+        return Err(Failure::ConfigurationExists);
+    }
+    if std::io::Error::last_os_error().kind() != std::io::ErrorKind::NotFound {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok(())
+}
+
 /// Publish one durable private file, atomically refusing any existing name.
 pub fn publish_new(parent: &File, child: &OsStr, contents: &[u8]) -> Result<()> {
     let temporary = format!(".connectors-{}", uuid::Uuid::new_v4());
