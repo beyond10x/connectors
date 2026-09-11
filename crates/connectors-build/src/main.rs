@@ -12,6 +12,7 @@ use std::{
     process::{Command, Output},
 };
 
+mod aep_toolchain;
 mod cli;
 mod docs;
 mod ess_boundary;
@@ -25,6 +26,8 @@ struct Args {
     root: PathBuf,
     #[arg(long)]
     ess: Option<PathBuf>,
+    #[arg(long)]
+    aep: Option<PathBuf>,
     #[arg(long, default_value = "adapters/gitlab/realizations/local.json")]
     declaration: PathBuf,
     #[command(subcommand)]
@@ -41,6 +44,12 @@ enum Action {
     /// Build the exact pinned ESS commit into the local toolchain cache.
     Toolchain {
         /// Clean local ESS checkout at the pinned source commit.
+        #[arg(long)]
+        source: PathBuf,
+    },
+    /// Build the pinned AEP source and reviewed patch into the local cache.
+    AepToolchain {
+        /// Local Git repository containing the exact pinned AEP commit.
         #[arg(long)]
         source: PathBuf,
     },
@@ -96,6 +105,10 @@ fn save_json(path: &Path, value: &Value) -> Result<()> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let root = args.root.canonicalize()?;
+    if let Action::AepToolchain { source } = &args.command {
+        println!("{}", aep_toolchain::build(&root, source)?.display());
+        return Ok(());
+    }
     if let Action::Toolchain { source } = &args.command {
         let executable = connectors_spec::toolchain::build_from_source(source)?;
         println!("{}", executable.display());
@@ -127,7 +140,8 @@ fn main() -> Result<()> {
         return ess_boundary::run(&root, &ess, temp.path());
     }
     if let Action::Gate { msrv } = args.command {
-        return gate::run(&root, &ess, msrv);
+        let aep = aep_toolchain::resolve(&root, args.aep.as_deref())?;
+        return gate::run(&root, &ess, &aep, msrv);
     }
     check_ess(&ess)?;
     let declaration: LocalService =
