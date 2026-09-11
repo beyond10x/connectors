@@ -490,7 +490,7 @@ struct Owner {
     paths: Arc<Paths>,
     authority: String,
     incarnation: String,
-    pool: supervisor::Pool,
+    pool: Arc<supervisor::Pool>,
     shutdown: AtomicBool,
     clients: AtomicUsize,
 }
@@ -538,7 +538,7 @@ pub fn serve(paths: Paths) -> Result<()> {
         paths: paths.clone(),
         authority,
         incarnation: incarnation.clone(),
-        pool: supervisor::Pool::new(paths, incarnation),
+        pool: Arc::new(supervisor::Pool::new(paths, incarnation)),
         shutdown: AtomicBool::new(false),
         clients: AtomicUsize::new(0),
     });
@@ -546,6 +546,7 @@ pub fn serve(paths: Paths) -> Result<()> {
     // process exit, including unwinding or any early return with live threads.
     // CLOEXEC prevents native children from inheriting it.
     std::mem::forget(lifetime);
+    let recovery = maintenance::Background::start(owner.paths.clone(), owner.pool.clone())?;
     handle(owner.clone(), startup)?;
     owner.pool.automatic(&config);
     let mut result = Ok(());
@@ -564,6 +565,9 @@ pub fn serve(paths: Paths) -> Result<()> {
         }
     }
     drop(listener);
+    if let Err(error) = recovery.stop() {
+        result = Err(error);
+    }
     if let Err(error) = owner.pool.shutdown() {
         result = Err(error);
     }

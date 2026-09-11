@@ -2,6 +2,7 @@
 //! receive this authority, the metadata database, or a credential resolver.
 pub mod approval_issuance;
 mod lifecycle;
+mod maintenance;
 pub mod mutation;
 mod supervisor;
 mod transport;

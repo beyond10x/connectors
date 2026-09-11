@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 28
+revision: 29
 ---
 ## Outcome and authority
 
@@ -238,3 +238,11 @@ All nine disposable production CLI journeys plus the inert subprocess fixture dr
 The full gate with Rust 1.88 passes: 125 host tests, shared and six native ESS roots, generation/drift, Clippy, dependency boundaries and conformance. Reference drift passes. Unchanged website/example inputs reuse the preceding verified checks. Exact package rebuilds after the gate restore all tested runtime executable hashes. docs/evidence/gitlab-keyed-recovery-20260911/README.md retains commands, logs, 100 source/dependency hashes, intermediate and accepted executable identities and limitations.
 
 Background/unkeyed/unobserved recovery, all storage-acknowledgement crashes and the wider concurrent failure matrix remain open, as do dedicated sandbox acceptance, C14 create/update atomic-head semantics, remaining GitLab workflows and distributable reproducibility. The story, initiative and goal stay active. Full GitLab still precedes Kubernetes including Helm, PostgreSQL, MCP and remaining providers. Root remains the sole implementation/planning writer on primary main, with no linked tree, release, push, deployment, Atlas registration or paid governed run. The driver blocker and existing sandbox input request remain unchanged. This increment introduces no entity or new decomposition and does not require a new critic panel.
+
+## Background recovery checkpoint — 2026-09-11
+
+Under active story:guarded-gitlab-merge, the running owner now recovers abandoned keyed/unkeyed attempts periodically, including revoked or removed targets, using the existing ledger fences and serialized instance ownership. Live workers receive one coalesced recovery batch; no-live-worker recovery holds the worker-creation lock. Qualified time remains required for known preparation settlement. Recovery grants no provider-send authority, credential access, child startup, suppression change or result disclosure.
+
+docs/evidence/gitlab-background-recovery-20260911/README.md records all 11 disposable production CLI journeys plus one inert fixture driver passing in 460.12 seconds, the new ledger/worker cases, the full Rust 1.88 gate with 129 host tests and 315 conformance scenarios, reference checks and exact source/runtime identities. Gate builds were restored to the tested executable bytes. Failed fixture/lint checks and their corrections are retained. This is a development checkpoint, not real GitLab sandbox acceptance or a provider release.
+
+Original-audit recovery requires review against the current one-final-observation contract before further implementation. The remaining acknowledgement/concurrency matrix, dedicated sandbox access, C14 create/update head guard, other selected GitLab workflows and reproducible distributions stay open. No story, provider batch, initiative or goal is completed by this increment. Full GitLab, Kubernetes including Helm, PostgreSQL, MCP and remaining-provider order is unchanged. Root remains the sole writer on primary main, with no linked tree or publication in this checkpoint. Existing blockers remain truthful; no paid governed run is required.
