@@ -38,7 +38,10 @@ fn both_supported_dialects_report_their_own_version() {
 fn each_unsupported_shape_is_refused_by_its_own_reason() {
     let cases: [(&[u8], Refusal); 5] = [
         (br#"{"swagger":"2.0","paths":{}}"#, Refusal::VersionAbsent),
-        (br#"{"openapi":"2.0","paths":{}}"#, Refusal::VersionUnsupported),
+        (
+            br#"{"openapi":"2.0","paths":{}}"#,
+            Refusal::VersionUnsupported,
+        ),
         (br#"{"openapi":4,"paths":{}}"#, Refusal::VersionAbsent),
         (br#"[1,2,3]"#, Refusal::NotADocument),
         (br#"{"openapi":"3.1","#, Refusal::Malformed),
