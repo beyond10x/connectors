@@ -24,6 +24,26 @@ pub struct Client {
     stream: UnixStream,
     pub host_incarnation: String,
 }
+pub struct WriteClient(Client);
+const WRITE_VERSION: &str = "connectors-owner/2";
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WriteRequest {
+    format: String,
+    adapter: String,
+    connection: String,
+    operation: String,
+    schema: String,
+    revision: String,
+    deadline_monotonic_ns: u64,
+    idempotency_key: Option<String>,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum WriteReply {
+    Done,
+    Failed { error: Error },
+}
 pub struct Capture {
     client: Client,
     pub acquisition: String,
@@ -70,14 +90,26 @@ impl Capture {
 }
 impl Client {
     pub fn connect(paths: &Paths, start: bool) -> Result<Self> {
+        Self::connect_version(
+            paths,
+            start,
+            VERSION,
+            Instant::now() + Duration::from_secs(10),
+        )
+    }
+    fn connect_version(
+        paths: &Paths,
+        start: bool,
+        version: &str,
+        deadline: Instant,
+    ) -> Result<Self> {
         let authority = Metadata::inspect(&paths.state)?.authority()?.to_string();
         let directory = fs::directory(&paths.state, false, true)?;
         let socket = socket_path(&directory);
-        let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             crate::local::protected::cancellation()?;
             match connect_socket(&socket) {
-                Ok(stream) => return Self::greet(stream, paths, &authority, deadline),
+                Ok(stream) => return Self::greet(stream, paths, &authority, version, deadline),
                 Err(error) if !start => return Err(error),
                 Err(error) if error.code != Code::Unavailable => return Err(error),
                 Err(_) => {}
@@ -89,10 +121,10 @@ impl Client {
             // SAFETY: the held owner-only file is the one admitted lifetime lock.
             if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
                 if let Ok(stream) = connect_socket(&socket) {
-                    return Self::greet(stream, paths, &authority, deadline);
+                    return Self::greet(stream, paths, &authority, version, deadline);
                 }
                 let (stream, mut process) = spawn(paths, &lock, deadline)?;
-                let result = Self::greet(stream, paths, &authority, deadline);
+                let result = Self::greet(stream, paths, &authority, version, deadline);
                 if result.is_err() {
                     let _ = process.kill();
                     let _ = process.wait();
@@ -113,6 +145,7 @@ impl Client {
         mut stream: UnixStream,
         paths: &Paths,
         authority: &str,
+        selected_version: &str,
         deadline: Instant,
     ) -> Result<Self> {
         channel::peer(&stream)?;
@@ -120,7 +153,7 @@ impl Client {
         channel::write(
             &mut stream,
             &Request::Hello {
-                version: VERSION.into(),
+                version: selected_version.into(),
                 challenge: challenge.clone(),
                 configuration: paths.config.clone(),
                 authority: authority.into(),
@@ -136,7 +169,7 @@ impl Client {
                 challenge: returned,
                 host_incarnation,
                 authority: returned_authority,
-            } if version == VERSION
+            } if version == selected_version
                 && returned == challenge
                 && returned_authority == authority
                 && uuid::Uuid::parse_str(&host_incarnation).is_ok() =>
@@ -293,6 +326,79 @@ impl Client {
             }
             Reply::Failed { error } if frame.document.is_empty() => Err(error),
             _ => Err(Code::Unavailable.into()),
+        }
+    }
+}
+impl WriteClient {
+    pub fn connect(paths: &Paths, start: bool, deadline: mutation::Deadline) -> Result<Self> {
+        Client::connect_version(
+            paths,
+            start,
+            WRITE_VERSION,
+            deadline
+                .until()?
+                .min(Instant::now() + Duration::from_secs(10)),
+        )
+        .map(Self)
+    }
+    pub fn invoke(
+        mut self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        key: Option<&str>,
+        proof: Option<&Secret>,
+        deadline: mutation::Deadline,
+    ) -> Result<mutation::Delivery> {
+        let until = deadline.until()?;
+        crate::local::protected::cancellation()?;
+        let control = WriteRequest {
+            format: WRITE_VERSION.into(),
+            adapter: adapter.into(),
+            connection: request.connection.into(),
+            operation: request.operation.into(),
+            schema: request.schema.into(),
+            revision: request.revision.into(),
+            deadline_monotonic_ns: deadline.ticks(),
+            idempotency_key: key.map(str::to_owned),
+        };
+        let response = (|| {
+            channel::write(
+                &mut self.0.stream,
+                &control,
+                proof,
+                request.input.as_bytes(),
+                until,
+            )?;
+            channel::read_with_cancel::<WriteReply>(
+                &mut self.0.stream,
+                until,
+                false,
+                runtime::RESULT_LIMIT,
+                Some(&|| {
+                    crate::local::protected::cancellation()
+                        .map_err(|_| runtime::Failure::Interrupted)
+                }),
+            )
+        })()
+        .map_err(|_| Error::from(Code::OutcomeUnknown))?;
+        match response.control {
+            WriteReply::Done => {
+                channel::depth(&response.document).map_err(|_| Code::OutcomeUnknown)?;
+                let value: mutation::Delivery = connectors_core::read_json(&response.document)
+                    .map_err(|_| Code::OutcomeUnknown)?;
+                value.validate()?;
+                Ok(value)
+            }
+            WriteReply::Failed { mut error } if response.document.is_empty() => {
+                if matches!(
+                    error.code,
+                    Code::Timeout | Code::Interrupted | Code::Unavailable
+                ) {
+                    error.code = Code::OutcomeUnknown;
+                }
+                Err(error)
+            }
+            _ => Err(Code::OutcomeUnknown.into()),
         }
     }
 }
@@ -523,7 +629,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
     else {
         return Err(Code::InvalidInput.into());
     };
-    if version != VERSION
+    if (version != VERSION && version != WRITE_VERSION)
         || uuid::Uuid::parse_str(&challenge).is_err()
         || configuration != owner.paths.config
         || authority != owner.authority
@@ -533,7 +639,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
     channel::write(
         stream,
         &Reply::Hello {
-            version: VERSION.into(),
+            version: version.clone(),
             challenge,
             host_incarnation: owner.incarnation.clone(),
             authority: owner.authority.clone(),
@@ -542,6 +648,9 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
         &[],
         until,
     )?;
+    if version == WRITE_VERSION {
+        return exchange_write(owner, stream);
+    }
     let frame = channel::read::<Request>(
         stream,
         Instant::now() + Duration::from_secs(10),
@@ -570,6 +679,99 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
     }
     written?;
     Ok(())
+}
+fn exchange_write(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
+    let frame = channel::read::<WriteRequest>(
+        stream,
+        Instant::now() + Duration::from_secs(10),
+        true,
+        approval_issuance::TARGET_LIMIT,
+    )?;
+    let until = mutation::Deadline::from_ticks(frame.control.deadline_monotonic_ns)?.until()?;
+    let result = write_action(owner, frame.control, frame.secret, frame.document, until);
+    let (reply, document) = match result {
+        Ok(mut value) => {
+            value.validate()?;
+            let mut document = serde_json::to_vec(&value).map_err(|_| Code::Unavailable)?;
+            if document.len() > runtime::RESULT_LIMIT {
+                value.result = None;
+                value.error = Some(Code::Capacity.into());
+                value.mutation.cause = Some(mutation::Cause {
+                    code: connectors_core::ErrorCode::Capacity,
+                    stage: mutation::Stage::Response,
+                });
+                document = serde_json::to_vec(&value).map_err(|_| Code::Unavailable)?;
+            }
+            (WriteReply::Done, document)
+        }
+        Err(error) => (WriteReply::Failed { error }, Vec::new()),
+    };
+    // A terminal response may report a known effect even if metadata work used
+    // the last budget. This bounded delivery grace grants no native dispatch.
+    channel::write(
+        stream,
+        &reply,
+        None,
+        &document,
+        Instant::now() + Duration::from_secs(5),
+    )?;
+    Ok(())
+}
+fn write_action(
+    owner: &Owner,
+    request: WriteRequest,
+    proof: Secret,
+    document: Vec<u8>,
+    until: Instant,
+) -> Result<mutation::Delivery> {
+    if owner.shutdown.load(Ordering::SeqCst) {
+        return Err(Code::Unavailable.into());
+    }
+    if request.format != WRITE_VERSION || proof.0.len() > 20 * 1024 {
+        return Err(Code::InvalidInput.into());
+    }
+    let document = String::from_utf8(document).map_err(|_| Code::InvalidInput)?;
+    let target = approval_issuance::Request {
+        connection: &request.connection,
+        operation: &request.operation,
+        schema: &request.schema,
+        revision: &request.revision,
+        input: &document,
+    };
+    if let Some(value) = mutation::observe(
+        &owner.paths,
+        &request.adapter,
+        &target,
+        request.idempotency_key.as_deref(),
+        until,
+    )? {
+        return Ok(value);
+    }
+    let (_, adapter) = selected(&owner.paths, &request.adapter)?;
+    let deadline = connectors_sdk::now_ms()
+        + until.saturating_duration_since(Instant::now()).as_millis() as u64;
+    match owner.pool.run(
+        &request.adapter,
+        &adapter,
+        supervisor::Task::Write {
+            connection: request.connection,
+            operation: request.operation,
+            schema: request.schema,
+            revision: request.revision,
+            document,
+            key: request.idempotency_key,
+            proof: if proof.0.is_empty() {
+                None
+            } else {
+                Some(proof)
+            },
+            until,
+        },
+        deadline,
+    )? {
+        supervisor::Output::Write(value) => Ok(value),
+        _ => Err(Code::OutcomeUnknown.into()),
+    }
 }
 fn action(
     owner: &Owner,

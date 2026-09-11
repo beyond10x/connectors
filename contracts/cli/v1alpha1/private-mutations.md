@@ -4,9 +4,10 @@ This selects the guarded GitLab merge binding and extends
 [private adapter ownership](private-adapter.md) and
 [local mutation coordination](../../service/local-mutations.md). The explicit
 configuration selection and private adapter transport below are implemented.
-Production GitLab still uses the read-only projection; CLI approval issuance,
-owner mutation IPC and the complete write coordinator remain implementation
-work. The transport port alone does not admit a provider write.
+The development GitLab binding joins CLI approval issuance, owner mutation IPC
+and native merge dispatch using version two. Version one retains the read-only
+projection. The remaining failure matrix and sandbox acceptance are open; the
+transport port alone does not admit a provider write.
 
 The host configuration format `connectors-local/2` adds an adapter
 `private_protocol` selection, exactly `connectors-private/1` or

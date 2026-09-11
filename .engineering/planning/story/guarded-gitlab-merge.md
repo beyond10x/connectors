@@ -18,6 +18,8 @@ scope:
 - confidence: inferred
   path: Cargo.lock
 - confidence: cited
+  path: Cargo.toml
+- confidence: cited
   path: adapters/gitlab
 - confidence: cited
   path: apps/connectors
@@ -55,7 +57,7 @@ scope:
   path: spec-kinds/adapter
 - confidence: inferred
   path: website
-revision: 13
+revision: 16
 ---
 ## Outcome
 
@@ -140,3 +142,19 @@ The private proof-file decoder consumes the existing issuance document under exp
 docs/evidence/mutation-composition-20260911/README.md retains verification commands, logs, 386 source/dependency hashes, runtime binary identities and the initial fixture correction. The full repository gate with Rust 1.88 passes, including 124 host unit tests, four HTTP write tests, three existing HTTP tests, a consuming-capability compile-fail case, generation/drift, boundaries and conformance. All six disposable production GitLab CLI journeys pass in 206.80 seconds. Dependency pins, generated output and public website inputs are unchanged. Two local implementation guides now reflect already delivered approval issuance and the still-unfinished coordinator.
 
 The story and initiative stay active. The next required implementation is protected proof consumption and explicitly selected owner IPC version two joined to current result-access admission, audit, mutation, approval and connection-use dispatch, then the native SHA-guarded merge. No callable GitLab write, full lost-response CLI acceptance, dedicated sandbox evidence or reproducible distribution is claimed. Dedicated sandbox access and C14 create/update atomic-head semantics remain open. Full GitLab still precedes Kubernetes including Helm, PostgreSQL, MCP and remaining providers. Root remains the single implementation/planning writer on primary main; this checkpoint creates no linked tree, release, external publication, Atlas registration or paid governed run.
+
+## Integrated guarded merge in progress — 2026-09-11
+
+The production owner/2 coordinator, generated CLI approval-file/idempotency-key inputs and GitLab native v3 merge binding are now joined locally. The v1/public projection retains eleven reads. One production CLI fixture passes all three outcomes (Applied, Refused and lost-response Unknown), preserving the original attempt across owner shutdown and same-key replay with a deleted proof file, no provider/clock call and no second PUT. Fourteen native MR tests pass, including exact target/response classification, current preflight refusal and no retry. Proof reuse and unavailable-custody replay are being added before the required full gate; this is not final release or sandbox evidence.
+
+The execution audit is acknowledged before provider preflight reads and its original receipt/facts are confirmed at attempt preparation. contracts/service/local-mutations.md now states this ordering explicitly; no new audit entity or transaction is introduced. Pinned CLI generation refused with `error: unsupported CLI primitive `Uuid``. The CLI presentation therefore projects the existing attempt UUID as canonical string correlation while the owner validates it; durable identity and the service-wire model remain unchanged. The native spec reuses the existing ValidationInput and Observation models and the pinned merge endpoint.
+
+Cargo.toml excludes the new generated write-type package from the authored workspace, and the adapter consumes that generated path dependency. GitLab business code still has no host or sibling-adapter dependency. Current changes remain uncommitted under this active story. Owner-crash acknowledgement cases, the wider failure matrix, dedicated sandbox acceptance, remaining GitLab workflows and reproducible distribution are still required. Kubernetes including Helm, then PostgreSQL, MCP and remaining providers follow the agreed provider order.
+
+## Integrated CLI merge verification — 2026-09-11
+
+The full Connectors gate with Rust 1.88 passes for the joined owner/private-transport/CLI/native implementation. All seven production GitLab CLI journeys pass in 290.91 seconds. The new journey verifies Applied, Refused and lost-response Unknown, exact PUT/effect counts, a spent proof refused under another key, conflict without original-result disclosure, and same-key passive replay after owner shutdown with proof deleted and the keyring daemon stopped. Fourteen native MR tests pass. Website typecheck/build/reference drift, fifteen Rust example tests and both browser/UI suites pass. Retained commands, logs, input hashes and runtime artifact identities are in docs/evidence/guarded-gitlab-cli-20260911/README.md.
+
+This is CLI process restart and passive observation after owner shutdown; it does not prove a newly started owner's owner/2 replay path or crashes between storage acknowledgements. Those cases, final-admission failure/audit completion and the broader joined failure matrix remain required. Dedicated sandbox access, create/update atomic-head semantics, other selected GitLab workflows and reproducible distribution remain open. No story/provider/initiative completion or release is claimed.
+
+Correction to the preceding Cargo scope wording: the root manifest excludes generated workspace directories, but Cargo still lists generated type path dependencies as implicit workspace members. The gate checks their formatting and complete generated bundles; no generated source was manually changed. The pinned CLI refusal `unsupported CLI primitive Uuid` was addressed only by a canonical-string presentation of the existing UUID identity. The original shared type and ledger identity are unchanged.

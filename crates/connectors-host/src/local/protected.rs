@@ -122,6 +122,44 @@ pub fn file(path: &Path, deadline: u64) -> Result<Secret> {
     private(&file)?;
     read(file, 65536, deadline)
 }
+/// Bounded protected proof acquisition under the invocation's original budget.
+/// Only an owner-private regular file is admitted; buffers zeroize on all exits.
+pub fn file_until(path: &Path, until: std::time::Instant, limit: usize) -> Result<Secret> {
+    if limit > 65536 {
+        return Err(Code::InvalidInput.into());
+    }
+    let check = || -> Result<()> {
+        cancellation()?;
+        if std::time::Instant::now() >= until {
+            return Err(Code::Timeout.into());
+        }
+        Ok(())
+    };
+    check()?;
+    let mut file = fs::private_file(path).map_err(source_error)?;
+    private(&file)?;
+    if file.metadata().map_err(source_error)?.len() > limit as u64 {
+        return Err(Code::InvalidInput.into());
+    }
+    let mut bytes = Secret(Vec::with_capacity(limit + 1));
+    let mut buffer = Secret(vec![0; 4096]);
+    loop {
+        check()?;
+        let remaining = (limit + 1 - bytes.0.len()).min(buffer.0.len());
+        let count = file
+            .read(&mut buffer.0[..remaining])
+            .map_err(source_error)?;
+        if count == 0 {
+            break;
+        }
+        bytes.0.extend_from_slice(&buffer.0[..count]);
+        if bytes.0.len() > limit {
+            return Err(Code::InvalidInput.into());
+        }
+    }
+    check()?;
+    Ok(bytes)
+}
 pub fn stdin(deadline: u64) -> Result<Secret> {
     let file = duplicate(0)?;
     let info = file.metadata().map_err(source_error)?;

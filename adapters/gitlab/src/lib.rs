@@ -18,7 +18,13 @@ use std::sync::Arc;
 
 pub mod auth;
 mod ci;
+mod merge;
 mod merge_requests;
+pub use merge::PreparedMerge;
+
+#[path = "../generated/writes.rs"]
+#[rustfmt::skip]
+mod writes;
 
 #[path = "../generated/runtime.rs"]
 #[doc(hidden)]
@@ -36,6 +42,7 @@ pub struct GitLab(generated::GeneratedAdapter<GitLabBindings>);
 struct GitLabBindings {
     config: Config,
     descriptor: Descriptor,
+    private_descriptor: Descriptor,
     cursors: Arc<Cursors>,
     partition: Option<String>,
 }
@@ -60,12 +67,18 @@ impl GitLab {
             &effective_configuration,
         )?;
         generated::verify_descriptor(&descriptor)?;
+        let private_descriptor = instance_descriptor(
+            include_str!("../generated/private-descriptor.json"),
+            instance,
+            &effective_configuration,
+        )?;
         Ok(Self(generated::GeneratedAdapter {
             http,
             descriptor: descriptor.clone(),
             bindings: GitLabBindings {
                 config,
                 descriptor,
+                private_descriptor,
                 cursors: Arc::new(Cursors::default()),
                 partition: None,
             },
@@ -88,10 +101,16 @@ impl GitLab {
             bindings: GitLabBindings {
                 config: self.0.bindings.config.clone(),
                 descriptor: self.0.bindings.descriptor.clone(),
+                private_descriptor: self.0.bindings.private_descriptor.clone(),
                 cursors: self.0.bindings.cursors.clone(),
                 partition: Some(partition.to_owned()),
             },
         }))
+    }
+    /// Full local projection, selected only by private protocol two. The public
+    /// Adapter implementation continues to expose its read-only descriptor.
+    pub fn private_descriptor(&self) -> Descriptor {
+        self.0.bindings.private_descriptor.clone()
     }
 }
 impl GitLabBindings {

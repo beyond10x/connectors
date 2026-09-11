@@ -32,10 +32,12 @@ The GitLab increment has six production CLI journeys using disposable HTTPS and
 keyring fixtures, native MR tests, local packaging checks, and the repository
 gate including Rust 1.88. Dedicated GitLab sandbox acceptance is still open.
 
-Private mutation-ledger, audit and approval proof/spend ports have executable
-failure and restart tests. Public approval issuance, qualified production approval
-time and the complete write-dispatch binding remain unfinished. These private
-ports do not make governed GitLab writes available.
+The development checkout extends this release with local approval policy,
+protected proof issuance and a guarded GitLab merge through private protocol two.
+Disposable CLI fixtures join the mutation ledger, audit, approval spend and one
+native PUT, including lost-response observation after owner shutdown without
+resending. Public/version-one interfaces retain reads. The wider crash/failure
+matrix and dedicated sandbox acceptance remain unfinished.
 
 Kubernetes and PostgreSQL still need the persistent local connection lifecycle.
 Their remaining selected workflows precede MCP and the remaining providers.

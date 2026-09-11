@@ -18,7 +18,7 @@ const RESULT_LIMIT: usize = 64 * 1024;
 #[cfg(test)]
 mod tests;
 
-fn check(until: Instant) -> Result<()> {
+pub(super) fn check(until: Instant) -> Result<()> {
     protected::cancellation()?;
     if Instant::now() >= until {
         return Err(Code::Timeout.into());
@@ -32,11 +32,15 @@ struct PolicyInput {
     operations: Vec<String>,
 }
 
-fn policy_store(paths: &Paths, adapter: &Adapter) -> Result<approval_policy::Store> {
+pub(super) fn policy_store(paths: &Paths, adapter: &Adapter) -> Result<approval_policy::Store> {
     approval_policy::Store::new(&paths.state, &adapter.instance_id, &adapter.adapter_id)
         .map_err(policy_error)
 }
-fn key_store(paths: &Paths, config: &Config, adapter: &Adapter) -> Result<approval_keys::Store> {
+pub(super) fn key_store(
+    paths: &Paths,
+    config: &Config,
+    adapter: &Adapter,
+) -> Result<approval_keys::Store> {
     approval_keys::Store::new(
         &paths.state,
         config.secret_service_socket.as_deref(),
@@ -169,13 +173,18 @@ pub struct ApprovalPolicy {
     pub max_lifetime_seconds: Option<u16>,
 }
 
-struct Resolved {
-    config: Config,
-    adapter: Adapter,
-    policy: approval_policy::View,
-    preparation: Preparation,
+pub(super) struct Resolved {
+    pub config: Config,
+    pub adapter: Adapter,
+    pub policy: approval_policy::View,
+    pub preparation: Preparation,
 }
-fn resolve(paths: &Paths, alias: &str, request: &Request<'_>, until: Instant) -> Result<Resolved> {
+pub(super) fn resolve(
+    paths: &Paths,
+    alias: &str,
+    request: &Request<'_>,
+    until: Instant,
+) -> Result<Resolved> {
     check(until)?;
     if request.input.len() > TARGET_LIMIT
         || [
@@ -429,12 +438,12 @@ fn publish_checked(
     current().map_err(|_| Code::OutcomeUnknown.into())
 }
 
-struct Admission<'a> {
-    policy: &'a approval_policy::PolicyUse,
-    key: &'a approval_keys::KeyUse,
-    subject: &'a approvals::Subject,
+pub(super) struct Admission<'a> {
+    pub policy: &'a approval_policy::PolicyUse,
+    pub key: &'a approval_keys::KeyUse,
+    pub subject: &'a approvals::Subject,
 }
-struct Guard<'a>(&'a approvals::ConfiguredApprovalKey);
+pub(super) struct Guard<'a>(&'a approvals::ConfiguredApprovalKey);
 impl approvals::CurrentAdmission for Guard<'_> {
     fn key(&self) -> &approvals::ConfiguredApprovalKey {
         self.0
@@ -492,7 +501,7 @@ impl approvals::ReceiverPolicy for Admission<'_> {
         self.current(subject, kid)
     }
 }
-fn policy_error(error: approval_policy::Failure) -> Error {
+pub(super) fn policy_error(error: approval_policy::Failure) -> Error {
     use approval_policy::Failure::*;
     match error {
         InvalidInput => Code::InvalidInput,
@@ -505,7 +514,7 @@ fn policy_error(error: approval_policy::Failure) -> Error {
     }
     .into()
 }
-fn key_error(error: approval_keys::Failure) -> Error {
+pub(super) fn key_error(error: approval_keys::Failure) -> Error {
     use approval_keys::Failure::*;
     match error {
         InvalidInput => Code::InvalidInput,

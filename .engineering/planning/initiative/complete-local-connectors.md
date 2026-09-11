@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 25
+revision: 26
 ---
 ## Outcome and authority
 
@@ -212,3 +212,7 @@ The private proof-file decoder consumes the existing issuance document under exp
 docs/evidence/mutation-composition-20260911/README.md retains verification commands, logs, 386 source/dependency hashes, runtime binary identities and the initial fixture correction. The full repository gate with Rust 1.88 passes, including 124 host unit tests, four HTTP write tests, three existing HTTP tests, a consuming-capability compile-fail case, generation/drift, boundaries and conformance. All six disposable production GitLab CLI journeys pass in 206.80 seconds. Dependency pins, generated output and public website inputs are unchanged. Two local implementation guides now reflect already delivered approval issuance and the still-unfinished coordinator.
 
 The story and initiative stay active. The next required implementation is protected proof consumption and explicitly selected owner IPC version two joined to current result-access admission, audit, mutation, approval and connection-use dispatch, then the native SHA-guarded merge. No callable GitLab write, full lost-response CLI acceptance, dedicated sandbox evidence or reproducible distribution is claimed. Dedicated sandbox access and C14 create/update atomic-head semantics remain open. Full GitLab still precedes Kubernetes including Helm, PostgreSQL, MCP and remaining providers. Root remains the single implementation/planning writer on primary main; this checkpoint creates no linked tree, release, external publication, Atlas registration or paid governed run.
+
+## GitLab guarded merge development checkpoint — 2026-09-11
+
+story:guarded-gitlab-merge now joins the production CLI, owner coordinator and native SHA-guarded PUT. The full Rust 1.88 gate, all seven disposable GitLab CLI journeys and affected website checks pass; evidence is docs/evidence/guarded-gitlab-cli-20260911/README.md. Applied/refused/lost-response outcomes, no duplicate PUT on same-key passive replay after owner shutdown, spent-proof refusal and unavailable-custody replay are exercised. This is a local integrated development increment, not a provider handoff or release. Newly started-owner replay, owner-crash acknowledgements, the broader joined failure matrix, dedicated sandbox evidence, C14 semantics/workflows and reproducible distribution remain open. The order remains full GitLab, Kubernetes including Helm, PostgreSQL, MCP and remaining providers.

@@ -8,15 +8,16 @@ pub fn reply(route: &str, path: &str, calls: &[String]) -> Option<(u16, Vec<u8>,
         "" => (json!([item(1)]), "x-next-page: 2\r\n"),
         "/1" => (item(1), ""),
         "/2" => (item(2), ""),
-        "/3" => {
+        "/3" | "/4" => {
             let sha = "0123456789abcdef0123456789abcdef01234567";
-            let mut value = item(3);
+            let mut value = item(if route == "/3" { 3 } else { 4 });
             value["detailed_merge_status"] = json!("mergeable");
-            value["sha"] = if calls.iter().filter(|p| p.as_str() == path).count() > 1 {
-                json!("a".repeat(40))
-            } else {
-                json!(sha)
-            };
+            value["sha"] =
+                if route == "/3" && calls.iter().filter(|p| p.as_str() == path).count() > 1 {
+                    json!("a".repeat(40))
+                } else {
+                    json!(sha)
+                };
             value["head_pipeline"] = json!({"id":12,"project_id":7,"sha":sha,"status":"success"});
             (value, "")
         }

@@ -250,7 +250,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
@@ -280,6 +280,9 @@ types:
       - {name: service_code, type: "Optional<connectors.service_wire.ErrorCode>"}
       - {name: connection, type: "Optional<String>"}
       - {name: acquisition, type: "Optional<String>"}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
+      - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
   - name: connectors.cli.Prerequisite
     kind: struct
     fields:
@@ -576,6 +579,10 @@ types:
       - {name: schema, type: "String"}
       - {name: revision, type: "String"}
       - {name: input, type: "String"}
+      # Path metadata only. The trusted handler reads proof bytes into a protected
+      # buffer after current admission and exact-key observation; never parser JSON.
+      - {name: approval_file, type: "Optional<String>"}
+      - {name: idempotency_key, type: "Optional<String>"}
   # result is the bounded JSON text carrier for selected provider output; it must pass that operation's output schema.
   - name: connectors.cli.OperationInvokeResult
     kind: struct
@@ -584,7 +591,26 @@ types:
       - {name: operation, type: "String"}
       - {name: revision, type: "String"}
       - {name: result, type: "String"}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
+      - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
   # Compatibility value only. Existing runtime arguments and codecs remain unchanged; token file metadata is sensitive.
+  # Presentation projection of service_wire only: pinned ess-cli cannot emit
+  # Uuid. Runtime validates id as canonical non-nil UUID text before projection.
+  # This is correlation metadata, not a new attempt identity or lookup authority.
+  - name: connectors.cli.AttemptReference
+    kind: struct
+    fields:
+      - {name: instance, type: String}
+      - {name: id, type: String}
+  - name: connectors.cli.MutationObservation
+    kind: struct
+    fields:
+      - {name: classification, type: connectors.mutations.EffectKnowledge}
+      - {name: attempt, type: "Optional<connectors.cli.AttemptReference>"}
+      - {name: original_request_id, type: "Optional<String>"}
+      - {name: replayed, type: Boolean}
+      - {name: cause, type: "Optional<connectors.service_wire.DiagnosticCause>"}
   - name: connectors.cli.LegacyDescribeInput
     kind: struct
     fields:

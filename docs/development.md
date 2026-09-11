@@ -24,7 +24,8 @@ TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked -p connectors-bui
 ```
 
 Normal builds consume checked-in generated files and need neither ESS nor networked
-vendor-source refresh. GitLab uses the full v2 generation pipeline:
+vendor-source refresh. GitLab uses the full v3 generation pipeline with separate
+read-only and private write projections:
 
 ```sh
 cargo run --locked -p connectors-spec -- \
@@ -45,7 +46,7 @@ generation: omit `--generate` and select their `generated/descriptor.json` outpu
 
 The [v3 write generator](../spec-kinds/adapter/v3/semantics.md) is implemented for
 the guarded GitLab merge slice, with a separate private descriptor and consuming
-write capability. Production adapters still select their existing formats.
+write capability. The development GitLab adapter selects this format.
 `cargo test --locked --offline -p connectors-spec --test write_generation` checks
 closed-reader refusals, pinned imports, deterministic generation and an executable
 consumer fixture. That fixture uses a separate temporary Cargo target, two jobs
