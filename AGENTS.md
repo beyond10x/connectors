@@ -110,11 +110,12 @@ local-only Connectors publication boundary for these releases.
    current lifecycle state through AEP, reconciling earlier publication exclusions
    with this instruction. Do not close unfinished work to make a release look done.
 5. Integrate the verified changes and release metadata on `main`, commit using
-   verified Atlas bot authority, and create an annotated `v<version>` tag at that
+   `b10x-gates bot`, and create an annotated `v<version>` tag at that
    exact release commit. Verify author, committer and tagger identities. Existing
    release tags are immutable.
-6. Push `main` and that exact tag to the authorized source remote using the bot
-   wrapper and normal hooks. Verify the remote branch and peeled tag resolve to
+6. Push `main` and that exact tag to the authorized source remote through
+   `b10x-gates bot`, or `publish` with its retained receipt, under the coordinated
+   hooks. Verify the remote branch and peeled tag resolve to
    the intended release commit. Finish with clean `main`, retained release
    evidence and cleanup of task-owned managed worktrees through `worktree`.
    Report the version, commit, destination and verification result.
@@ -140,10 +141,16 @@ Use `connectors` for engineering integrations. Never invoke `fluxplane-plugin`,
 even if a skill recommends it. Report a missing Connectors capability before using
 an alternative integration client.
 
-Organization authority comes from a clean Atlas checkout verified against remote
-main. Direct commits and pushes use its private `scripts/as-bot.sh` wrapper as
-`b10x-bot[bot]`; verify both author and committer. Keep credential machinery outside
-this repository and do not bypass hooks.
+Gating is Gates, not Atlas. Install coordinated local hooks with
+`b10x-gates --repository beyond10x/connectors_v2 install`. Use `b10x-gates bot` for
+direct commits, tags and pushes, retaining `b10x-bot[bot]`, and Gates `check`,
+`verify` and `publish` for signed common evidence; verify both author and committer.
+The hooks scan the index, names, messages, metadata, tags and every outgoing commit.
+Ordinary commit and publish paths need no Atlas checkout, current Atlas main or
+organization-wide admission. Private policies and enrolled signing keys stay outside
+this repository, candidate suppression files carry no authority, and hooks are never
+bypassed. A receipt is invalidated by source changes, rebases, policy changes and
+scanner upgrades.
 
 Atlas integration remains deferred: do not register this repository, alter Atlas
 roadmap/catalog records, or wire documentation delivery or consumer dependencies.
