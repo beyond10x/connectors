@@ -75,8 +75,10 @@ Migration six retains approval spending and migration seven retains
 the [local policy metadata and lease port](../contracts/service/local-mutations.md).
 Only each admitted private owner installs its migration; ordinary setup retains
 version three. The policy port requires a trusted host caller to admit its write
-operation set. CLI policy management, approval issuance and complete business
-write dispatch remain unfinished.
+operation set. The [local approval commands](local-approvals.md) now perform that
+admission, prepare subjects without modifying metadata, and publish protected
+proofs under current policy/key leases. Complete business write dispatch remains
+unfinished; production GitLab continues to advertise reads.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
 temporary storage, with two-second lock/busy bounds. Versioned migrations commit

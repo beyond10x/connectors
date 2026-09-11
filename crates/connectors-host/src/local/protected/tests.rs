@@ -9,6 +9,37 @@ use std::{
 };
 
 #[test]
+fn bounded_document_uses_original_deadline_and_rejects_links_and_excess_input() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("input.json");
+    std::fs::write(&path, b"{\"operations\":[]}").unwrap();
+    assert_eq!(
+        document_until(Some(&path), Instant::now(), 1024)
+            .unwrap_err()
+            .code,
+        Code::Timeout
+    );
+    assert_eq!(
+        document_until(Some(&path), Instant::now() + Duration::from_secs(1), 4)
+            .unwrap_err()
+            .code,
+        Code::InvalidInput
+    );
+    assert_eq!(
+        document_until(Some(&path), Instant::now() + Duration::from_secs(1), 1024).unwrap(),
+        "{\"operations\":[]}"
+    );
+    let link = root.path().join("link.json");
+    symlink(&path, &link).unwrap();
+    assert_eq!(
+        document_until(Some(&link), Instant::now() + Duration::from_secs(1), 1024)
+            .unwrap_err()
+            .code,
+        Code::InvalidInput
+    );
+}
+
+#[test]
 fn source_admission_rejects_links_modes_and_oversized_files() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("input");

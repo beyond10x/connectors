@@ -132,10 +132,16 @@ fn validate_values(root: &Path, ess: &Path) -> Result<()> {
                 .join("schemas/schema/types")
                 .join(format!("{}.schema.json", case.type_name)),
         )?)?;
-        if jsonschema::validator_for(&schema)?.is_valid(&case.value) != case.valid {
+        let validator = jsonschema::validator_for(&schema)?;
+        if validator.is_valid(&case.value) != case.valid {
+            let reasons = validator
+                .iter_errors(&case.value)
+                .map(|error| format!("{}: {error}", error.instance_path))
+                .collect::<Vec<_>>()
+                .join("; ");
             return Err(format!(
-                "CLI structural fixture {} disagrees with its selected model",
-                case.id
+                "CLI structural fixture {} disagrees with its selected model (expected valid={}): {}",
+                case.id, case.valid, if reasons.is_empty() { "no validation errors" } else { &reasons }
             )
             .into());
         }
