@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:catalog-operation-template
 kind: story
-status: active
+status: implemented
 title: Bind an inventoried operation into a bounded request template
 relations:
 - derived_from: specification:catalog-http-runtime-handoff
@@ -15,7 +15,7 @@ scope:
   path: crates/connectors-catalog/src/template.rs
 - confidence: cited
   path: crates/connectors-catalog/tests/template.rs
-revision: 6
+revision: 7
 ---
 ## Outcome
 

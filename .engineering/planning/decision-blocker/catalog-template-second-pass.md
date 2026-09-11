@@ -6,45 +6,29 @@ status: open
 title: The catalog template unit is red after its second adversary pass
 relations:
 - blocks: story:catalog-operation-template
-revision: 1
+revision: 2
 ---
-## What is blocked
+## What is open
 
-`story:catalog-operation-template` is green on its own suite and red on its second adversary pass.
-The two-pass attack budget is spent, so the unit does not merge and the decision is a person's.
+One thing, and it is the residue of the second adversary pass rather than a defect anybody has
+demonstrated reaching: a **document-declared** path containing dot segments — `/files/{name}/../admin`
+— binds to a path that resolves elsewhere. The implementor's argument for leaving it is that the
+declared path is the operation's own identity and no caller value moves it. The adversary's counter
+is that `bundle::load` reads a document a third party may have written, and its SHA-256 check
+vouches for the file matching its index row, not for who authored it.
 
-## The trend, from `aep plan artifact findings`
+It is recorded `INFEASIBLE` because no case was written against it: asserting the opposite of a
+stated decision asserts a preference, and no caller that loads an untrusted bundle exists yet.
 
-Pass 1 found 7, all CONFIRMED and introduced. The correction resolved all 7 — the ledger reports
-`carried 0`, `resolved 7`. Pass 2 then found 5 more, `new 5`, on ground the correction itself
-created: four of the five are defects in the `location:name` key convention the implementor
-invented to answer pass 1's finding about name-plus-location identity.
+## What is settled
 
-A falling count with nothing carried is a correction that landed. A second pass whose findings are
-all new is ground that is still moving. Both are true here, which is why this is a judgement rather
-than a rule.
+The two blockers and two warnings the second pass raised were fixed on the operator's instruction
+and the unit merged as `9b88cd0`: 53 cases, `cargo test`, `cargo clippy -D warnings` and
+`cargo fmt --package connectors-catalog -- --check` all exit 0, with all eleven adversarial cases
+from both passes in the suite and none modified.
 
-## The open five
+## The decision, when a caller arrives
 
-Two blockers: an absent-value refusal that names a key the caller already supplied, so re-supplying
-it cannot satisfy the refusal; and the `location:name` key being an unescaped string prefix, so a
-parameter literally named `query:trace` collides with the qualified spelling of `trace`.
-
-Two warnings: a key the guard accepts but the precedence rule never reads, so a supplied value is
-silently dropped; and header names accepted that are not RFC 9110 tokens.
-
-One note, INFEASIBLE and recorded as residue rather than a case: a document-declared path holding
-dot segments resolves elsewhere, which matters only once a caller loads a bundle it did not write.
-
-## The decision
-
-Whether a third pass is opened, whether the key convention is replaced by a typed key that cannot
-collide, or whether the unit ships with the two warnings open and the two blockers fixed. The
-implementor's own proposals are in the pass-2 review-result.
-
-## What holds while this is open
-
-The unit's worktree is retained — it is the only copy of the work. Nothing merged to `main`. The
-rustfmt correction the wave applied to the three earlier catalog commits is in that same tree, so
-`main` stays red on `cargo fmt --package connectors-catalog -- --check` until this is resolved or
-that correction is landed separately.
+Whether a document-declared path is trusted because the bundle's digest matched, or whether the
+template refuses a declared path whose segments resolve away from it. The question becomes live the
+first time something loads a bundle this repository did not produce.
