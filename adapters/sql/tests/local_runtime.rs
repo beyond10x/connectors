@@ -22,6 +22,8 @@ use std::{
     },
     time::Duration,
 };
+#[path = "local_runtime/cli_journey.rs"]
+mod cli_journey;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,

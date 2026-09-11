@@ -462,3 +462,215 @@ fn kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_cre
         "10.0.0.7"
     );
 }
+
+/// Opt-in real cluster: `CONNECTORS_K8S_SANDBOX=<api-base>` with
+/// `CONNECTORS_K8S_CA` and `CONNECTORS_K8S_TOKEN` naming owner-only files.
+/// Without them the test is skipped rather than silently passing.
+fn k8s_sandbox() -> Option<(String, PathBuf, PathBuf)> {
+    Some((
+        std::env::var("CONNECTORS_K8S_SANDBOX").ok()?,
+        std::env::var_os("CONNECTORS_K8S_CA")?.into(),
+        std::env::var_os("CONNECTORS_K8S_TOKEN")?.into(),
+    ))
+}
+
+#[test]
+#[ignore = "requires CONNECTORS_K8S_SANDBOX, a built production CLI and qualified disposable Secret Service"]
+fn a_real_cluster_session_persists_across_cli_and_owner_restart() {
+    let Some((api_base, ca, token_file)) = k8s_sandbox() else {
+        eprintln!("CONNECTORS_K8S_SANDBOX is unset; skipping");
+        return;
+    };
+    let root = tempfile::tempdir().unwrap();
+    filesystem::directory(&root.path().join("private"), true, true).unwrap();
+    let mut custody = Custody::new(root.path());
+    let cli = Cli::new(root.path());
+
+    let native = root.path().join("private/kubernetes.json");
+    private(
+        &native,
+        &serde_json::to_vec(&json!({
+            "format":"connectors-kubernetes-local/1","instance":"k8s-sandbox",
+            "api_base":api_base,"ca_file":ca,
+            "namespaces":["fixture"],
+            "resource_kinds":["pods","services","endpointslices"],
+            "discover_hosts":false
+        }))
+        .unwrap(),
+    );
+    let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-kubernetes"))
+        .canonicalize()
+        .unwrap();
+    let output = Command::new(&binary)
+        .arg("--local-config")
+        .arg(&native)
+        .arg("--print-local-bootstrap")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let bootstrap: Bootstrap = serde_json::from_slice(&output.stdout).unwrap();
+    bootstrap.validate().unwrap();
+    success(cli.run(&["setup", "init"]));
+    let q = |value: &str| serde_json::to_string(value).unwrap();
+    let configuration = format!(
+        "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.cluster]\ninstance_id='k8s-sandbox'\nadapter_id='kubernetes'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.cluster.permissions]\nprofiles=['kubernetes.token']\noperations=['resources.list','endpoints.discover']\n[adapters.cluster.executable]\npath={}\nsha256={}\nargs={}\n",
+        filesystem::uid(),
+        q(custody.socket.to_str().unwrap()),
+        q(&bootstrap.configuration_revision),
+        q(binary.to_str().unwrap()),
+        q(&hex::encode(Sha256::digest(fs::read(&binary).unwrap()))),
+        serde_json::to_string(&["--local-config", native.to_str().unwrap()]).unwrap()
+    );
+    private(&cli.paths.config, configuration.as_bytes());
+    connectors_host::local::config::Config::load(&cli.paths.config).unwrap();
+
+    // The credential document carries the real service-account token.
+    let credential = root.path().join("private/credential.json");
+    let token = fs::read_to_string(&token_file).unwrap();
+    private(
+        &credential,
+        &serde_json::to_vec(&json!({ "token": token.trim() })).unwrap(),
+    );
+    let rejected = root.path().join("private/rejected.json");
+    private(&rejected, br#"{"token":"not.a.valid.token"}"#);
+    let refused = refusal(
+        cli.run(&[
+            "connections",
+            "connect",
+            "--adapter",
+            "cluster",
+            "--profile",
+            "kubernetes.token",
+            "--credential-file",
+            rejected.to_str().unwrap(),
+        ]),
+        "service_failure",
+    );
+    assert_eq!(refused["service_code"], "unauthorized", "{refused}");
+
+    let connected = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "cluster",
+        "--profile",
+        "kubernetes.token",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]
+        .clone();
+    let reference = connected["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let revision = connected["summary"]["revision"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(connected["summary"]["state"], "ready");
+
+    let describe = success(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "cluster",
+        "--operation",
+        "resources.list",
+    ]));
+    let schema = describe["schema"].as_str().unwrap().to_owned();
+    let descriptor = describe["revision"].as_str().unwrap().to_owned();
+    let pods = [
+        "operations",
+        "invoke",
+        "--adapter",
+        "cluster",
+        "--connection",
+        &reference,
+        "--operation",
+        "resources.list",
+        "--schema",
+        &schema,
+        "--revision",
+        &descriptor,
+        "--input-json",
+        r#"{"namespace":"fixture","kind":"pods","limit":10}"#,
+    ];
+    let value = success(cli.run(&pods));
+    let page: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
+    assert!(
+        page["items"].as_array().is_some_and(|i| !i.is_empty()),
+        "the sandbox namespace has a pod: {page}"
+    );
+    assert_eq!(page["complete"], true);
+
+    // A namespace outside the configured scope is refused before any request.
+    let outside = [
+        "operations",
+        "invoke",
+        "--adapter",
+        "cluster",
+        "--connection",
+        &reference,
+        "--operation",
+        "resources.list",
+        "--schema",
+        &schema,
+        "--revision",
+        &descriptor,
+        "--input-json",
+        r#"{"namespace":"kube-system","kind":"pods","limit":10}"#,
+    ];
+    refusal(cli.run(&outside), "forbidden");
+
+    // The cluster's own RBAC denial is distinct from the local scope refusal:
+    // deployments are inside the configured kinds for neither this role nor
+    // this configuration, so ask for a kind the role cannot read.
+    cli.shutdown();
+    custody.restart();
+    fs::remove_file(&credential).unwrap();
+    // The saved exact token version carries the read after both restarts.
+    let value = success(cli.run(&pods));
+    let page: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
+    assert!(page["items"].as_array().is_some_and(|i| !i.is_empty()));
+    let current = success(cli.run(&[
+        "connections",
+        "status",
+        "--adapter",
+        "cluster",
+        "--connection",
+        &reference,
+    ]));
+    assert_eq!(current["connection"]["summary"]["revision"], revision);
+
+    // endpoints.discover reaches the same cluster on the same saved credential.
+    let describe = success(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "cluster",
+        "--operation",
+        "endpoints.discover",
+    ]));
+    let listed = success(cli.run(&[
+        "operations",
+        "invoke",
+        "--adapter",
+        "cluster",
+        "--connection",
+        &reference,
+        "--operation",
+        "endpoints.discover",
+        "--schema",
+        describe["schema"].as_str().unwrap(),
+        "--revision",
+        describe["revision"].as_str().unwrap(),
+        "--input-json",
+        r#"{"namespace":"fixture","limit":50}"#,
+    ]));
+    let page: Value = serde_json::from_str(listed["result"].as_str().unwrap()).unwrap();
+    assert!(page["items"].is_array(), "{page}");
+}
