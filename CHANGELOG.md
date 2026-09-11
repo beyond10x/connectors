@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Pin ESS 0.22.2 and AEP 0.55.0 by source identity, with receipt-checked local
+  binaries for the repository gate and a digest-pinned AEP findings correction.
+  Global installations remain independently managed.
+- Correct 88 false empty-findings warnings and preserve 51 immutable legacy
+  reviews through source-bound structured transcriptions. These add no reviews,
+  approvals or claims of current runtime conformance.
+
 ## 0.2.0 — 2026-09-11
 
 Persistent local GitLab CLI and engineering reads, based on implementation commit

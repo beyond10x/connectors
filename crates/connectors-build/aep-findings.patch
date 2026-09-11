@@ -1,0 +1,543 @@
+diff --git a/crates/edge/aep-cli/src/planning.rs b/crates/edge/aep-cli/src/planning.rs
+index e73658e7..461a6fda 100644
+--- a/crates/edge/aep-cli/src/planning.rs
++++ b/crates/edge/aep-cli/src/planning.rs
+@@ -43,6 +43,7 @@ pub(crate) const OUTCOME_DAYS: u64 = 14;
+ // file, no clock. Split out because `waves` is the one verb here that *computes* rather than reads
+ // and renders, and a derivation nobody can unit-test without a directory is one nobody unit-tests.
+ mod waves;
++mod review_findings;
+ 
+ /// The directory inside `.engineering` that holds the plan.
+ const PLANNING_DIRECTORY: &str = "planning";
+@@ -3710,8 +3711,10 @@ fn print_waves(derived: &waves::Derivation) {
+ fn shown_from(
+     stored: &aep_backend_markdown::StoredDocument,
+     providers: Option<&aep_domain::project::ProjectConfig>,
++    report: &StoreReport,
+ ) -> Shown {
+     let frontmatter = &stored.document.frontmatter;
++    let resolved = review_findings::resolve(report, stored).ok().flatten();
+     Shown {
+         id: frontmatter.id.to_string(),
+         kind: frontmatter.kind.to_string(),
+@@ -3752,7 +3755,8 @@ fn shown_from(
+         // Always an array, `[]` where the body carries no block and `[]` where it carries one this
+         // build cannot read — `validate` is what reports the second, because `show` printing an
+         // error in place of a document would make an unreadable block hide the document it is in.
+-        findings: aep_backend_markdown::findings::parse(&stored.document.body).unwrap_or_default(),
++        findings_source: resolved.as_ref().map(|value| value.source.to_string()),
++        findings: resolved.map(|value| value.findings).unwrap_or_default(),
+         outcomes: Vec::new(),
+         body: stored.document.body.clone(),
+     }
+@@ -3794,7 +3798,7 @@ fn show(args: &StoreArgs, id: &str, body_only: bool) -> Result<ExitCode> {
+     // store handed to `--store` outside any project has no project.yaml, and printing the
+     // references without their links is the right answer there.
+     let config = aep_project::project::load_config(&args.repository_root()).ok();
+-    let mut shown = shown_from(stored, config.as_ref());
++    let mut shown = shown_from(stored, config.as_ref(), &opened.report);
+     // On the review, not on the artifact it is about. A reader holding a review id is asking
+     // whether that lens ever changed anything, and the record that answers it is filed against the
+     // reviewed artifact — so a verb that only showed what is filed *here* would answer *no* to a
+@@ -4828,11 +4832,10 @@ fn findings_ledger(
+         return Ok(ExitCode::SUCCESS);
+     };
+ 
+-    // A block this build cannot read is empty here rather than fatal: `validate` reports it, and a
+-    // ledger that refused to answer because one of four reviews is malformed would be a report
+-    // nobody could get out of a store that has a defect in it.
+-    let before = findings::parse(&earlier.document.body).unwrap_or_default();
+-    let after = findings::parse(&later.document.body).unwrap_or_default();
++    // Invalid structured evidence must not masquerade as an empty comparison. `show` still
++    // exposes the original body for repair; this derived report requires readable findings.
++    let before = review_findings::resolve(&opened.report, earlier)?.map(|value| value.findings).unwrap_or_default();
++    let after = review_findings::resolve(&opened.report, later)?.map(|value| value.findings).unwrap_or_default();
+     let compared = findings::compare(&before, &after);
+ 
+     let ledger = FindingsLedger {
+@@ -5100,12 +5103,10 @@ fn review_value(args: &StoreArgs, since: Option<&str>) -> Result<ExitCode> {
+         counted += 1;
+         let tally = tallies.entry(reviewer_of(stored)).or_default();
+         tally.reviews += 1;
+-        // A block this build cannot read counts as no findings, and `validate` is what says so:
+-        // a table that refused to be printed because one review of forty is malformed would be a
+-        // report nobody can get out of a store that has a defect in it.
+-        tally.findings += aep_backend_markdown::findings::parse(&stored.document.body)
+-            .map(|found| found.len())
+-            .unwrap_or_default();
++        // A missing block is unknown and contributes no enumerated findings. Invalid structured
++        // evidence refuses, so a stale transcription cannot silently change the reported count.
++        tally.findings += review_findings::resolve(&opened.report, stored)?
++            .map(|value| value.findings.len()).unwrap_or_default();
+         for outcome in records.outcomes.get(id).into_iter().flatten() {
+             *tally.outcomes.entry(*outcome).or_default() += 1;
+         }
+@@ -5291,14 +5292,15 @@ fn findings(opened: &Opened, registry: &aep_engine::Registry, repository_root: &
+     // a **problem**: `new` refuses one, so a broken block in the store was hand-written past the
+     // command, which is the same class as drift. A block that is simply absent is reported.
+     let mut without_findings = Vec::new();
++    problems.extend(review_findings::problems(report));
+     for stored in report.documents.values() {
+         if stored.document.frontmatter.kind != ArtifactKind::ReviewResult {
+             continue;
+         }
+         let id = &stored.document.frontmatter.id;
+-        match aep_backend_markdown::findings::parse(&stored.document.body) {
++        match review_findings::resolve(report, stored) {
+             Err(error) => problems.push(format!("{id}: {error}")),
+-            Ok(found) if found.is_empty() => without_findings.push(format!(
++            Ok(None) => without_findings.push(format!(
+                 "{id} states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere"
+             )),
+             Ok(_) => {}
+@@ -7235,6 +7237,8 @@ pub(crate) struct Shown {
+     /// Always written, on any kind. A `review-result` is where one belongs, and a reader that had
+     /// to know the kind before it knew whether the key would be there would be reading two shapes.
+     findings: Vec<aep_backend_markdown::findings::Finding>,
++    /// The original review or source-bound transcription supplying findings; null if absent.
++    findings_source: Option<String>,
+     /// What became of it, for a `review-result`: every `review_outcome` record naming it.
+     outcomes: Vec<ShownOutcome>,
+     /// The markdown body, exactly as the store holds it.
+@@ -7714,7 +7718,7 @@ pub(crate) fn shown_of(location: &StoreLocation, id: &str) -> Result<Shown> {
+         .get(&id)
+         .with_context(|| opened.missing(&id))?;
+     let config = aep_project::project::load_config(&location.repository_root()).ok();
+-    Ok(shown_from(stored, config.as_ref()))
++    Ok(shown_from(stored, config.as_ref(), &opened.report))
+ }
+ 
+ /// Where one artifact may go next, what each rung costs, and what it already holds.
+diff --git a/crates/edge/aep-cli/src/planning/review_findings.rs b/crates/edge/aep-cli/src/planning/review_findings.rs
+new file mode 100644
+index 00000000..fabcf178
+--- /dev/null
++++ b/crates/edge/aep-cli/src/planning/review_findings.rs
+@@ -0,0 +1,115 @@
++//! Source-bound transcriptions of immutable reviews, without manufacturing another review round.
++
++use aep_backend_markdown::{findings, StoreReport, StoredDocument};
++use aep_domain::artifact::{ArtifactId, ArtifactKind, RelationKind};
++use anyhow::{bail, Context, Result};
++use sha2::{Digest as _, Sha256};
++use std::fmt::Write as _;
++
++const TAG: &str = "review-findings-supplement";
++const SOURCE: &str = "review-body-sha256:";
++
++pub(super) struct Resolved {
++    pub source: ArtifactId,
++    pub findings: Vec<findings::Finding>,
++}
++
++fn tagged(stored: &StoredDocument) -> bool {
++    stored.document.frontmatter.tags.contains(TAG)
++}
++
++/// Check the transcription itself, including the immutable bytes it names.
++fn target<'a>(report: &'a StoreReport, supplement: &StoredDocument) -> Result<&'a StoredDocument> {
++    let front = &supplement.document.frontmatter;
++    if front.kind != ArtifactKind::VerificationReport {
++        bail!("review-findings-supplement requires verification-report");
++    }
++    let targets: Vec<_> = front
++        .relations
++        .iter()
++        .filter(|relation| relation.kind == RelationKind::Verifies)
++        .collect();
++    if targets.len() != 1 {
++        bail!("review-findings-supplement requires exactly one verifies relation");
++    }
++    let original = report
++        .documents
++        .get(targets[0].target.id())
++        .context("review-findings-supplement target is missing")?;
++    if original.document.frontmatter.kind != ArtifactKind::ReviewResult {
++        bail!("review-findings-supplement must verify a review-result");
++    }
++    if findings::opens_a_block(&original.document.body) {
++        bail!("review-findings-supplement cannot replace an original findings block");
++    }
++    let sources: Vec<_> = front
++        .refs
++        .iter()
++        .map(ToString::to_string)
++        .filter(|reference| reference.starts_with(SOURCE))
++        .collect();
++    let mut digest = String::with_capacity(64);
++    for byte in Sha256::digest(original.document.body.as_bytes()) {
++        write!(digest, "{byte:02x}")?;
++    }
++    let expected = format!("{SOURCE}{digest}");
++    if sources.as_slice() != [expected] {
++        bail!("review-findings-supplement requires the exact review-body-sha256 reference");
++    }
++    if !findings::opens_a_block(&supplement.document.body) {
++        bail!(
++            "review-findings-supplement requires a findings block, including [] for zero findings"
++        );
++    }
++    findings::parse(&supplement.document.body)?;
++    Ok(original)
++}
++
++/// Invalid declarations must be reported even when they name no existing review.
++pub(super) fn problems(report: &StoreReport) -> Vec<String> {
++    report
++        .documents
++        .values()
++        .filter(|stored| tagged(stored))
++        .filter_map(|stored| {
++            target(report, stored)
++                .err()
++                .map(|error| format!("{}: {error}", stored.document.frontmatter.id))
++        })
++        .collect()
++}
++
++/// Resolve once for every reader; transcriptions never become additional reviews.
++pub(super) fn resolve(report: &StoreReport, stored: &StoredDocument) -> Result<Option<Resolved>> {
++    let id = &stored.document.frontmatter.id;
++    let candidates: Vec<_> = report
++        .documents
++        .values()
++        .filter(|candidate| {
++            stored.document.frontmatter.kind == ArtifactKind::ReviewResult
++                && tagged(candidate)
++                && candidate
++                    .document
++                    .frontmatter
++                    .relations
++                    .iter()
++                    .any(|relation| {
++                        relation.kind == RelationKind::Verifies && relation.target.id() == id
++                    })
++        })
++        .collect();
++    if candidates.len() > 1 {
++        bail!("multiple review-findings-supplement records verify {id}");
++    }
++    let Some(supplement) = candidates.first() else {
++        if findings::opens_a_block(&stored.document.body) {
++            return Ok(Some(Resolved { source: id.clone(), findings: findings::parse(&stored.document.body)? }));
++        }
++        return Ok(None);
++    };
++    target(report, supplement)?;
++    Ok(Some(Resolved {
++        source: supplement.document.frontmatter.id.clone(),
++        findings: findings::parse(&supplement.document.body)?,
++    }))
++}
+diff --git a/crates/edge/aep-cli/tests/planning_cli.rs b/crates/edge/aep-cli/tests/planning_cli.rs
+index 6fc8d11f..d9fd9d3b 100644
+--- a/crates/edge/aep-cli/tests/planning_cli.rs
++++ b/crates/edge/aep-cli/tests/planning_cli.rs
+@@ -4472,6 +4472,233 @@ fn subject_epic(store: &Path) {
+     assert_eq!(code(&subject), 0, "{}", stderr(&subject));
+ }
+ 
++fn findings_supplement(
++    store: &Path,
++    drafts: &Path,
++    name: &str,
++    kind: &str,
++    target: &str,
++    original: &str,
++    body: &str,
++) {
++    use sha2::{Digest as _, Sha256};
++    use std::fmt::Write as _;
++    let mut digest = String::with_capacity(64);
++    for byte in Sha256::digest(original.as_bytes()) {
++        write!(digest, "{byte:02x}").expect("write digest");
++    }
++    let path = drafts.join(format!("{name}.md"));
++    std::fs::write(&path, body).expect("write transcription");
++    let created = protocol(&[
++        "plan",
++        "artifact",
++        "new",
++        kind,
++        name,
++        "--title",
++        name,
++        "--tag",
++        "review-findings-supplement",
++        "--ref",
++        &format!("review-body-sha256:{digest}"),
++        "--relate",
++        &format!("verifies:{target}"),
++        "--from",
++        printable(&path),
++        "--store",
++        printable(store),
++    ]);
++    assert_eq!(code(&created), 0, "{}", stderr(&created));
++}
++
++#[test]
++fn a_source_bound_findings_transcription_preserves_the_review_and_its_count() {
++    let store = scratch("aep-plan-findings-supplement");
++    let drafts = scratch("aep-plan-findings-supplement-drafts");
++    subject_epic(&store);
++    let original = "needs-revision: The loop never advances.\n";
++    review_of(&store, &drafts, "legacy", "epic:objectives", original);
++    let before = std::fs::read(store.join("review-result/legacy.md")).expect("original bytes");
++    findings_supplement(
++        &store,
++        &drafts,
++        "transcription",
++        "verification-report",
++        "review-result:legacy",
++        original,
++        &findings_body(&finding("src/loop.rs", 10, "The loop never advances")),
++    );
++    let validated = protocol(&[
++        "plan",
++        "artifact",
++        "validate",
++        "--store",
++        printable(&store),
++        "--strict",
++        "--format",
++        "json",
++    ]);
++    assert_eq!(code(&validated), 0, "{}", stdout(&validated));
++    let shown = protocol(&[
++        "plan",
++        "artifact",
++        "show",
++        "review-result:legacy",
++        "--store",
++        printable(&store),
++        "--format",
++        "json",
++    ]);
++    let shown: serde_json::Value = serde_json::from_str(&stdout(&shown)).expect("shown JSON");
++    assert_eq!(shown["body"], original);
++    assert_eq!(
++        shown["findings_source"],
++        "verification-report:transcription"
++    );
++    assert_eq!(shown["findings"][0]["message"], "The loop never advances");
++    let value = protocol(&[
++        "plan",
++        "artifact",
++        "review-value",
++        "--store",
++        printable(&store),
++        "--format",
++        "json",
++    ]);
++    let value: serde_json::Value = serde_json::from_str(&stdout(&value)).expect("value JSON");
++    assert_eq!(value["reviews"], 1);
++    assert_eq!(value["reviewers"][0]["findings"], 1);
++    review_of(
++        &store,
++        &drafts,
++        "resolved",
++        "epic:objectives",
++        &findings_body("[]\n"),
++    );
++    let ledger = protocol(&[
++        "plan",
++        "artifact",
++        "findings",
++        "epic:objectives",
++        "--from",
++        "review-result:legacy",
++        "--to",
++        "review-result:resolved",
++        "--store",
++        printable(&store),
++        "--format",
++        "json",
++    ]);
++    let ledger: serde_json::Value = serde_json::from_str(&stdout(&ledger)).expect("ledger JSON");
++    assert_eq!(ledger["resolved"].as_array().expect("resolved").len(), 1);
++    assert_eq!(
++        std::fs::read(store.join("review-result/legacy.md")).expect("retained bytes"),
++        before
++    );
++}
++
++#[test]
++fn ungraded_source_findings_remain_unspecified_rather_than_becoming_notes() {
++    let store = scratch("aep-plan-findings-unspecified");
++    let drafts = scratch("aep-plan-findings-unspecified-drafts");
++    subject_epic(&store);
++    review_of(
++        &store,
++        &drafts,
++        "ungraded",
++        "epic:objectives",
++        "There is an ungraded gap.\n",
++    );
++    findings_supplement(&store, &drafts, "ungraded-copy", "verification-report", "review-result:ungraded",
++        "There is an ungraded gap.\n", "```findings\n- file: design.md\n  severity: unspecified\n  category: gap\n  message: There is an ungraded gap.\n```\n");
++    let shown = protocol(&[
++        "plan",
++        "artifact",
++        "show",
++        "review-result:ungraded",
++        "--store",
++        printable(&store),
++        "--format",
++        "json",
++    ]);
++    let value: serde_json::Value = serde_json::from_str(&stdout(&shown)).expect("shown JSON");
++    assert_eq!(value["findings"][0]["severity"], "unspecified");
++    assert!(value["findings"][0]["verdict"].is_null());
++}
++
++#[test]
++fn invalid_findings_transcriptions_cannot_silence_missing_structure() {
++    for (case, reason) in [
++        ("stale", "exact review-body-sha256"),
++        ("duplicate", "multiple review-findings-supplement"),
++        ("kind", "requires verification-report"),
++        ("target", "must verify a review-result"),
++        ("block", "requires a findings block"),
++        ("structured", "cannot replace an original findings block"),
++    ] {
++        let store = scratch(&format!("aep-plan-findings-supplement-{case}"));
++        let drafts = scratch(&format!("aep-plan-findings-supplement-{case}-drafts"));
++        subject_epic(&store);
++        let original = if case == "structured" {
++            "```findings\n[]\n```\n"
++        } else {
++            "approve: no remaining findings.\n"
++        };
++        review_of(&store, &drafts, "legacy", "epic:objectives", original);
++        findings_supplement(
++            &store,
++            &drafts,
++            "transcription",
++            if case == "kind" {
++                "specification"
++            } else {
++                "verification-report"
++            },
++            if case == "target" {
++                "epic:objectives"
++            } else {
++                "review-result:legacy"
++            },
++            if case == "stale" {
++                "different review\n"
++            } else {
++                original
++            },
++            if case == "block" {
++                "no structured block\n"
++            } else {
++                "```findings\n[]\n```\n"
++            },
++        );
++        if case == "duplicate" {
++            findings_supplement(
++                &store,
++                &drafts,
++                "second",
++                "verification-report",
++                "review-result:legacy",
++                original,
++                "```findings\n[]\n```\n",
++            );
++        }
++        let validated = protocol(&[
++            "plan",
++            "artifact",
++            "validate",
++            "--store",
++            printable(&store),
++            "--format",
++            "json",
++        ]);
++        assert_eq!(code(&validated), 1, "{case}: {}", stdout(&validated));
++        assert!(
++            stdout(&validated).contains(reason),
++            "{case}: {}",
++            stdout(&validated)
++        );
++    }
++}
++
+ #[test]
+ fn a_review_results_findings_block_is_parsed_at_new_and_returned_by_show_as_an_array() {
+     let store = scratch("aep-plan-findings-parsed");
+@@ -4581,6 +4808,45 @@ fn a_malformed_findings_block_is_refused_at_new_with_the_line_it_is_wrong_on() {
+     );
+ }
+ 
++#[test]
++fn validate_accepts_an_explicit_empty_findings_block_including_strict_mode() {
++    let store = scratch("aep-plan-findings-empty");
++    let drafts = scratch("aep-plan-findings-empty-drafts");
++    subject_epic(&store);
++    review_of(
++        &store,
++        &drafts,
++        "approved",
++        "epic:objectives",
++        "approve\n\n```findings\n[]\n```\n",
++    );
++
++    for strict in [false, true] {
++        let mut args = vec![
++            "plan",
++            "artifact",
++            "validate",
++            "--store",
++            printable(&store),
++            "--format",
++            "json",
++        ];
++        if strict {
++            args.push("--strict");
++        }
++        let validated = protocol(&args);
++        assert_eq!(code(&validated), 0, "{}", stdout(&validated));
++        let summary: serde_json::Value = serde_json::from_str(&stdout(&validated)).unwrap();
++        assert!(
++            summary["without_findings"]
++                .as_array()
++                .is_none_or(Vec::is_empty),
++            "an explicit empty findings block records zero findings: {}",
++            stdout(&validated)
++        );
++    }
++}
++
+ #[test]
+ fn validate_reports_a_review_result_with_no_findings_block_without_failing() {
+     let store = scratch("aep-plan-findings-absent");
+diff --git a/crates/plan/aep-backend-markdown/src/findings.rs b/crates/plan/aep-backend-markdown/src/findings.rs
+index 9c34ac9f..a69aa8cb 100644
+--- a/crates/plan/aep-backend-markdown/src/findings.rs
++++ b/crates/plan/aep-backend-markdown/src/findings.rs
+@@ -63,11 +63,13 @@ pub enum Severity {
+     Warning,
+     /// Worth writing down, and nothing is owed.
+     Note,
++    /// The source report did not grade the finding; this is not a claim of low severity.
++    Unspecified,
+ }
+ 
+ impl Severity {
+     /// Every severity, in the order a report reads them.
+-    pub const ALL: &'static [Self] = &[Self::Blocker, Self::Warning, Self::Note];
++    pub const ALL: &'static [Self] = &[Self::Blocker, Self::Warning, Self::Note, Self::Unspecified];
+ 
+     /// The severity as written in a block.
+     #[must_use]
+@@ -76,6 +78,7 @@ impl Severity {
+             Self::Blocker => "blocker",
+             Self::Warning => "warning",
+             Self::Note => "note",
++            Self::Unspecified => "unspecified",
+         }
+     }
+ 

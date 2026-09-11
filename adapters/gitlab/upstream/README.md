@@ -32,5 +32,6 @@ response body schema; job trace declares JSON job data despite returning raw tex
 Handwritten response checks preserve the service and native CI contracts. The trace
 binding does not depend on the source's optional byte-offset/limit parameters.
 `../generated/coverage.json` records source coverage; `ess-import.json` retains the
-complete ESS 0.20.0 refusal of the original OpenAPI subset. Source refresh requires
+complete refusal recorded by ESS 0.20.0; the current pinned ESS 0.22.2 reproduces
+those bytes unchanged. Source refresh requires
 updating this pin, its attribution and the reviewed mappings together.
