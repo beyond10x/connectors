@@ -2,6 +2,87 @@
   "format": "connectors-cli-values/1",
   "cases": [
     {
+      "id": "approval-policy-uninitialized",
+      "type": "connectors.cli.ApprovalPolicyResult",
+      "valid": true,
+      "value": {"adapter":"forge"}
+    },
+    {
+      "id": "approval-policy-file-input",
+      "type": "connectors.cli.ApprovalPolicySetInput",
+      "valid": true,
+      "value": {"adapter":"forge","input_file":"/fixture/policy.json","expected_revision":1}
+    },
+    {
+      "id": "approval-policy-rejects-inline-document",
+      "type": "connectors.cli.ApprovalPolicySetInput",
+      "valid": false,
+      "value": {"adapter":"forge","input":"{\"operations\":[]}"}
+    },
+    {
+      "id": "approval-preparation-value",
+      "type": "connectors.cli.ApprovalPrepareResult",
+      "valid": true,
+      "value": {
+        "adapter":"forge",
+        "preparation": {
+          "subject": {
+            "format":"connectors.approval-subject/v1",
+            "target":{"instance":"fixture","operation":"item.write","connection":"c1","connection_revision":"c-r1","contract":"operations/v1alpha1","profile":"resource","descriptor_revision":"r1","configuration_revision":"cfg1"},
+            "authority":{"scope":{"tenant":null,"realm":null,"caller":"owner","executor":null},"current_authority":null,"executor":null},
+            "origin":{"kind":"direct","authority_ref":"fixture"},
+            "route":null,
+            "canonicalization":"adapter-v1-canonical-json",
+            "input_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "approval_mode":"required"
+          },
+          "subject_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "presentation":{"instance":"fixture","operation":"item.write","connection":"c1","descriptor_revision":"r1"},
+          "approval_policy":{"mode":"required","issuer":"issuer","audience":"audience","max_lifetime_seconds":300}
+        }
+      }
+    },
+    {
+      "id": "approval-issuance-safe-result",
+      "type": "connectors.cli.ApprovalIssueResult",
+      "valid": true,
+      "value":{"adapter":"forge","reference":"reference","subject_sha256":"digest","disposition":"published"}
+    },
+    {
+      "id": "approval-preparation-requires-explicit-null-route",
+      "type": "connectors.cli.ApprovalPrepareResult",
+      "valid": false,
+      "value": {
+        "adapter":"forge",
+        "preparation": {
+          "subject": {
+            "format":"connectors.approval-subject/v1",
+            "target":{"instance":"fixture","operation":"item.write","connection":"c1","connection_revision":"c-r1","contract":"operations/v1alpha1","profile":"resource","descriptor_revision":"r1","configuration_revision":"cfg1"},
+            "authority":{"scope":{"tenant":null,"realm":null,"caller":"owner","executor":null},"current_authority":null,"executor":null},
+            "origin":{"kind":"direct","authority_ref":"fixture"},
+            "canonicalization":"adapter-v1-canonical-json",
+            "input_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "approval_mode":"required"
+          },
+          "subject_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "presentation":{"instance":"fixture","operation":"item.write","connection":"c1","descriptor_revision":"r1"},
+          "approval_policy":{"mode":"required","issuer":"issuer","audience":"audience","max_lifetime_seconds":300}
+        }
+      }
+    },
+    {
+      "id": "approval-issuance-no-proof-output",
+      "type": "connectors.cli.ApprovalIssueResult",
+      "valid": false,
+      "value":{"adapter":"forge","reference":"reference","subject_sha256":"digest","disposition":"published","evidence":"must-not-be-exported"}
+    },
+    {
+      "id": "approval-issuance-requires-explicit-subject",
+      "type": "connectors.cli.ApprovalIssueInput",
+      "valid": false,
+      "value":{"adapter":"forge","connection":"c1","operation":"item.write","schema":"s1","revision":"r1","input":"{}","proof_output":"/fixture/proof.json"}
+    },
+    {
       "id": "approval-clock-check-input",
       "type": "connectors.cli.ApprovalClockCheckInput",
       "valid": true,

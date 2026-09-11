@@ -3,7 +3,8 @@
 The local owner can create and manage Ed25519 approval-signing keys in qualified
 Secret Service custody. SQLite stores public keys, immutable identity history and
 publication state. Key management does not issue approval proofs or enable provider
-writes; those still require caller admission, qualified time and dispatch binding.
+writes. [Local approval issuance](local-approvals.md) supplies caller/policy admission
+and qualified time; complete provider dispatch binding remains unfinished.
 
 After local setup and adapter configuration, initialize and inspect an issuer:
 

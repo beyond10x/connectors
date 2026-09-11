@@ -1,10 +1,11 @@
 # Local approval and mutation coordination
 
-Proposed binding for the next GitLab runtime slice; not yet advertised. The
-policy metadata/lease port now has an initial implementation in
-`crates/connectors-host/src/local/approval_policy.rs`; its trusted host caller
-must supply already admitted operations. CLI admission, issuance and provider
-dispatch below remain implementation work. This
+Binding for the next GitLab runtime slice. The policy metadata/lease port is
+implemented in `crates/connectors-host/src/local/approval_policy.rs`, with trusted
+CLI policy admission, subject preparation and protected issuance in
+`crates/connectors-host/src/local/owner/approval_issuance.rs`. Complete provider
+dispatch below remains implementation work; production GitLab still advertises
+reads. This
 composes [approval proofs](delegation.md), [issuer custody](approval-issuers.md),
 [bounded time](clock.md), [audit](audit.md) and the
 [mutation ledger](../operations/v1alpha1/semantics.md). It adds no new business

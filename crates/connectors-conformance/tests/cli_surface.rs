@@ -86,7 +86,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_twenty_three_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_twenty_seven_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -117,6 +117,10 @@ fn the_selected_inventory_has_twenty_three_grouped_commands_and_explicit_runtime
         "approvals key-revoke",
         "approvals key-retire",
         "approvals clock-check",
+        "approvals policy-status",
+        "approvals policy-set",
+        "approvals prepare",
+        "approvals issue",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -180,6 +184,65 @@ fn inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result() {
 #[test]
 fn every_local_action_dispatches_once_with_its_declared_result_type() {
     let cases: &[(&[&str], &str)] = &[
+        (
+            &["approvals", "policy-status", "--adapter", "forge"],
+            "ApprovalPolicyResult",
+        ),
+        (
+            &[
+                "approvals",
+                "policy-set",
+                "--adapter",
+                "forge",
+                "--input-file",
+                "/fixture/policy.json",
+                "--expected-revision",
+                "1",
+            ],
+            "ApprovalPolicyResult",
+        ),
+        (
+            &[
+                "approvals",
+                "prepare",
+                "--adapter",
+                "forge",
+                "--connection",
+                "c1",
+                "--operation",
+                "item.write",
+                "--schema",
+                "s1",
+                "--revision",
+                "r1",
+                "--input-json",
+                "{}",
+            ],
+            "ApprovalPrepareResult",
+        ),
+        (
+            &[
+                "approvals",
+                "issue",
+                "--adapter",
+                "forge",
+                "--connection",
+                "c1",
+                "--operation",
+                "item.write",
+                "--schema",
+                "s1",
+                "--revision",
+                "r1",
+                "--input-json",
+                "{}",
+                "--approve-subject",
+                "digest",
+                "--proof-output",
+                "/fixture/proof.json",
+            ],
+            "ApprovalIssueResult",
+        ),
         (
             &["approvals", "clock-check", "--adapter", "forge"],
             "ApprovalClockCheckResult",

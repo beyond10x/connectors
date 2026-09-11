@@ -1,5 +1,6 @@
 //! Owner-side composition for the production local CLI. Provider libraries never
 //! receive this authority, the metadata database, or a credential resolver.
+pub mod approval_issuance;
 mod lifecycle;
 mod supervisor;
 mod transport;

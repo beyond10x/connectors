@@ -3,7 +3,7 @@
 //! Public observations cannot reconstruct the process-bound capability.
 #[cfg(test)]
 #[path = "../../tests/fixtures/clock/server.rs"]
-mod fixture;
+pub(crate) mod fixture;
 mod protocol;
 #[cfg(test)]
 mod tests;
