@@ -7,6 +7,8 @@ use rustls::pki_types::{CertificateDer, pem::PemObject};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc, time::Duration};
+
+pub mod auth;
 use tokio::{sync::oneshot, time::Instant};
 use tokio_postgres::{
     CancelToken, Client, NoTls,
@@ -113,6 +115,18 @@ impl Sql {
             ))
         }
     }
+    /// Native credential validation. The server accepts or rejects the password
+    /// during the startup exchange, so opening one session and closing it is the
+    /// whole check: no statement runs and no business read is performed. A
+    /// rejected password surfaces as the provider's own authentication failure.
+    pub async fn validate_session(&self) -> Result<()> {
+        let (client, connection) = tokio::time::timeout(CONNECT_TIMEOUT, self.connect())
+            .await
+            .map_err(|_| query_timeout())??;
+        connection.close(client, false).await;
+        Ok(())
+    }
+
     async fn query(&self, args: Query) -> Result<Value> {
         if args.query.is_empty()
             || args.query.len() > 8192

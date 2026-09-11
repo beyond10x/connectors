@@ -758,15 +758,18 @@ dependencies = [
  "connectors-host",
  "connectors-sdk",
  "futures-util",
+ "hex",
  "rcgen",
  "rustls",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
  "webpki-roots",
+ "zeroize",
 ]
 
 [[package]]
