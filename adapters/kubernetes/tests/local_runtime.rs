@@ -61,6 +61,16 @@ fn pods(count: usize, continuation: &str) -> Value {
     json!({"metadata":{"resourceVersion":"41","continue":continuation},"items":items})
 }
 
+/// A Service with no ready backends: Kubernetes serialises both collections as
+/// an explicit null. Observed on v1.31.5. It must read as no observations.
+fn empty_slice() -> Value {
+    json!({"metadata":{"resourceVersion":"44","continue":""},"items":[{
+        "metadata":{"uid":"slice-uid-empty","name":"api-empty","resourceVersion":"44"},
+        "ports": null,
+        "endpoints": null
+    }]})
+}
+
 fn slices() -> Value {
     json!({"metadata":{"resourceVersion":"42","continue":""},"items":[{
         "metadata":{"uid":"slice-uid-1","name":"api-abc","labels":{"kubernetes.io/service-name":"api"},"resourceVersion":"42"},
@@ -201,6 +211,8 @@ impl Cluster {
                     } else if route == "/api/v1/namespaces/fixture/pods" {
                         let second = path.contains("continue=");
                         (200, pods(1, if second { "" } else { "next-page-token" }))
+                    } else if route == "/apis/discovery.k8s.io/v1/namespaces/backendless/endpointslices" {
+                        (200, empty_slice())
                     } else if route == "/apis/discovery.k8s.io/v1/namespaces/fixture/endpointslices" {
                         (200, slices())
                     } else if route == "/api/v1/nodes" {
@@ -227,7 +239,7 @@ impl Cluster {
                 "instance":"fixture-kubernetes",
                 "api_base":format!("https://localhost:{}/", address.port()),
                 "ca_file":ca,
-                "namespaces":["fixture"],
+                "namespaces":["backendless","fixture"],
                 "resource_kinds":["pods","endpointslices"],
                 "discover_hosts":discover_hosts
             }))
@@ -676,4 +688,24 @@ fn lost_validation_response_closes_the_owned_channel_without_replay() {
         Err(Failure::Unavailable)
     ));
     assert_eq!(cluster.count(), 1);
+}
+
+#[test]
+fn a_backendless_endpointslice_reads_as_no_observations_rather_than_malformed() {
+    let cluster = Cluster::new(false);
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+    // The `backendless` namespace returns null for both collections, which is
+    // what a real Service with no ready backends produces.
+    let page = invoke(
+        &mut child,
+        "endpoints.discover",
+        "one",
+        &token(true),
+        json!({"namespace":"backendless","limit":10}),
+    )
+    .unwrap_or_else(|failure| {
+        panic!("a null collection must not be a protocol error: {failure:?}")
+    });
+    assert_eq!(page["items"].as_array().map(|i| i.len()), Some(0));
+    assert_eq!(page["complete"], true);
 }
