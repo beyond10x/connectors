@@ -7,7 +7,7 @@ use std::{
 };
 
 const NOW: i64 = 1_789_056_000_000;
-fn fixture() -> (tempfile::TempDir, Store) {
+pub(crate) fn fixture() -> (tempfile::TempDir, Store) {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     drop(Metadata::initialize(root.path()).unwrap());
@@ -22,7 +22,7 @@ fn fixture() -> (tempfile::TempDir, Store) {
     let store = Store::new(root.path(), 100_000).unwrap();
     (root, store)
 }
-fn anchor() -> Anchor {
+pub(crate) fn anchor() -> Anchor {
     Anchor {
         instance_id: "alpha".into(),
         kind: Kind::AdmittedExecution,
@@ -727,4 +727,170 @@ fn crash_child() {
     );
     store.append(&reference, &final_value()).unwrap();
     panic!("fault did not exit");
+}
+
+#[test]
+fn recovering_append_reuses_exact_fields_and_reads_a_lost_acknowledgement() {
+    for (fault, appends, reads) in [(1, 2, 1), (2, 1, 1), (9, 2, 2)] {
+        let (root, store) = fixture();
+        let reference = reference(store.anchor(&anchor()).unwrap());
+        let observation = final_value();
+        store.fault.store(fault, Ordering::SeqCst);
+        let record = store
+            .append_recovering(
+                &reference,
+                &observation,
+                Instant::now() + Duration::from_secs(1),
+            )
+            .unwrap();
+        assert_eq!(record.final_observation, Some(observation.clone()));
+        assert_eq!(
+            *store.appends.lock().unwrap(),
+            vec![observation.clone(); appends]
+        );
+        assert_eq!(store.reads.load(Ordering::SeqCst), reads);
+        assert_eq!(count(root.path()), 1);
+        let restored = Store::new(root.path(), 100_000).unwrap();
+        assert_eq!(restored.observe(&reference).unwrap(), Some(record.clone()));
+        assert_eq!(restored.append(&reference, &observation).unwrap(), record);
+    }
+}
+
+#[test]
+fn recovering_append_never_substitutes_a_different_final_observation() {
+    for field in 0..4 {
+        let (_root, store) = fixture();
+        let reference = reference(store.anchor(&anchor()).unwrap());
+        let original = store.append(&reference, &final_value()).unwrap();
+        let mut changed = final_value();
+        match field {
+            0 => changed.observation_id = Uuid::new_v4(),
+            1 => changed.outcome = Outcome::Unknown,
+            2 => changed.code = Some("outcome_unknown".into()),
+            3 => changed.recorded_at_ms += 1,
+            _ => unreachable!(),
+        }
+        store.appends.lock().unwrap().clear();
+        assert_eq!(
+            store.append_recovering(
+                &reference,
+                &changed,
+                Instant::now() + Duration::from_secs(1)
+            ),
+            Err(Failure::Conflict)
+        );
+        assert_eq!(*store.appends.lock().unwrap(), vec![changed]);
+        assert_eq!(store.reads.load(Ordering::SeqCst), 1);
+        assert_eq!(store.observe(&reference).unwrap(), Some(original));
+    }
+}
+
+#[test]
+fn expired_recovery_budget_performs_no_extra_storage_calls() {
+    for (fault, failure) in [
+        (1, Failure::MetadataUnavailable),
+        (2, Failure::OutcomeUnknown),
+    ] {
+        let (root, store) = fixture();
+        let reference = reference(store.anchor(&anchor()).unwrap());
+        let observation = final_value();
+        store.fault.store(fault, Ordering::SeqCst);
+        assert_eq!(
+            store.append_recovering(&reference, &observation, Instant::now()),
+            Err(failure)
+        );
+        assert_eq!(*store.appends.lock().unwrap(), vec![observation.clone()]);
+        assert_eq!(store.reads.load(Ordering::SeqCst), 0);
+        let restored = Store::new(root.path(), 100_000).unwrap();
+        assert_eq!(
+            restored
+                .observe(&reference)
+                .unwrap()
+                .unwrap()
+                .final_observation,
+            (fault == 2).then(|| observation.clone())
+        );
+        assert_eq!(
+            restored
+                .append_recovering(
+                    &reference,
+                    &observation,
+                    Instant::now() + Duration::from_secs(1)
+                )
+                .unwrap()
+                .final_observation,
+            Some(observation)
+        );
+    }
+}
+
+#[test]
+fn recovering_append_requires_a_readable_exact_original_anchor() {
+    let (root, store) = fixture();
+    let reference = reference(store.anchor(&anchor()).unwrap());
+    let other = Reference {
+        instance: "beta".into(),
+        audit_ref: reference.audit_ref.clone(),
+    };
+    assert_eq!(
+        store.append_recovering(
+            &other,
+            &final_value(),
+            Instant::now() + Duration::from_secs(1)
+        ),
+        Err(Failure::NotFound)
+    );
+    assert_eq!(store.appends.lock().unwrap().len(), 1);
+    assert!(
+        store
+            .observe(&reference)
+            .unwrap()
+            .unwrap()
+            .final_observation
+            .is_none()
+    );
+    let metadata = Metadata::update(root.path(), false).unwrap();
+    metadata
+        .connection
+        .execute("UPDATE execution_audits SET record_json='{}'", [])
+        .unwrap();
+    drop(metadata);
+    store.appends.lock().unwrap().clear();
+    store.reads.store(0, Ordering::SeqCst);
+    assert_eq!(
+        store.append_recovering(
+            &reference,
+            &final_value(),
+            Instant::now() + Duration::from_secs(1)
+        ),
+        Err(Failure::MetadataUnavailable)
+    );
+    assert_eq!(store.appends.lock().unwrap().len(), 1);
+    assert_eq!(store.reads.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn recovering_append_stops_after_one_failed_retry() {
+    let (_root, store) = fixture();
+    let reference = reference(store.anchor(&anchor()).unwrap());
+    let observation = final_value();
+    store.fault.store(10, Ordering::SeqCst);
+    assert_eq!(
+        store.append_recovering(
+            &reference,
+            &observation,
+            Instant::now() + Duration::from_secs(1)
+        ),
+        Err(Failure::MetadataUnavailable)
+    );
+    assert_eq!(*store.appends.lock().unwrap(), vec![observation; 2]);
+    assert_eq!(store.reads.load(Ordering::SeqCst), 2);
+    assert!(
+        store
+            .observe(&reference)
+            .unwrap()
+            .unwrap()
+            .final_observation
+            .is_none()
+    );
 }
