@@ -54,19 +54,23 @@ fn shared_configuration_imports_keep_constraints_and_reject_unknown_versions() {
     let mut value: Value =
         serde_json::from_slice(include_bytes!("../../../adapters/sql/spec/adapter.json")).unwrap();
     let descriptor = compile(&serde_json::to_vec(&value).unwrap()).unwrap();
-    let schema = &descriptor.configuration_schema["properties"]["service"];
+    // The SQL adapter carries a local and a federated configuration shape, so
+    // the shared imports under test live in the federated branch. Resolving
+    // them inside a `oneOf` arm is part of what this checks.
+    let federated = 1;
+    let schema = &descriptor.configuration_schema["oneOf"][federated]["properties"]["service"];
     let validator = jsonschema::validator_for(schema).unwrap();
     assert!(validator.is_valid(&json!({"instance":"sql","listen":"127.0.0.1:0","service_credential":{"kind":"file","path":"token"}})));
     assert!(!validator.is_valid(
         &json!({"instance":"bad\nname","listen":"x","service_credential":{"kind":"file","path":""}})
     ));
-    value["configuration_schema"]["properties"]["service"]["$ref"] =
+    value["configuration_schema"]["oneOf"][federated]["properties"]["service"]["$ref"] =
         json!("urn:connectors:config:v99:service");
     assert!(compile(&serde_json::to_vec(&value).unwrap()).is_err());
-    value["configuration_schema"]["properties"]["service"] =
+    value["configuration_schema"]["oneOf"][federated]["properties"]["service"] =
         json!({"$ref":"urn:connectors:config:v1:service","required":["extra"]});
     let descriptor = compile(&serde_json::to_vec(&value).unwrap()).unwrap();
-    assert!(!jsonschema::validator_for(&descriptor.configuration_schema["properties"]["service"]).unwrap().is_valid(&json!({"instance":"sql","listen":"x","service_credential":{"kind":"file","path":"token"}})));
+    assert!(!jsonschema::validator_for(&descriptor.configuration_schema["oneOf"][federated]["properties"]["service"]).unwrap().is_valid(&json!({"instance":"sql","listen":"x","service_credential":{"kind":"file","path":"token"}})));
 }
 
 #[test]
