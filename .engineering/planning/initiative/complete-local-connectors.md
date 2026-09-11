@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 31
+revision: 32
 ---
 ## Outcome and authority
 
@@ -20,19 +20,29 @@ Linux x86_64 and Rust 1.88 are the initial platform. SQLite owns non-secret meta
 
 ## Delivery sequence
 
+## Delivery sequence
+
+## Delivery sequence
+
 The operator's updated order is GitLab, two more native providers, MCP, then the remaining providers. Kubernetes and PostgreSQL are selected as those next two because README.md and their adapter sources already establish runnable implementations. This is a scheduling choice within the approved scope. MySQL stays in the remaining-provider phase; recorded Helm workflows accompany Kubernetes.
 
+`architecture-decision-record:declarative-http-provider-runtime` records why that order was chosen: each provider covers **different execution semantics**, not per-provider Rust. Once shared HTTP execution and its auth boundary exist, further ordinary HTTP providers arrive as declarative templates with provider auth profiles, and GitLab is not expanded endpoint-by-endpoint to reach its full vendor inventory. Kubernetes, PostgreSQL and MCP keep their explicit native semantics; the ADR states that Kubernetes REST calls reuse HTTP without reducing its behavior to unary templates.
+
+Work is split across two tracks. This initiative's implementation track owns the host, SDK, local CLI and auth foundation, then Kubernetes including the selected Helm behavior, then PostgreSQL, then MCP. The catalog track owns the OpenAPI importer, provider bundles and index, generic template execution and the authored local TOML action input, specified by `specification:catalog-http-runtime-handoff`. Neither track waits on the other.
+
 1. Persistent GitLab: fresh setup, protected entry, saved connection, existing read, CLI and owner restart, reuse without re-entry. story:persistent-gitlab-journey continues to own this first concrete delivery.
-2. Complete the selected GitLab workflows: exact-commit CI pipelines/jobs/traces, MR and changed-record reads, validation and admitted MR create/update/merge. Bring forward the required management and approval/audit/attempt/dispatch/idempotency controls, including exact-head checks and possible-write uncertainty. Do not postpone these GitLab workflows until after MCP.
-3. Complete Kubernetes, then PostgreSQL through the same persistent local lifecycle. Kubernetes includes discovery, diagnosis, selected changes and rollout observation, bounded exec/copy/tunnels and associated Helm history/rollback. PostgreSQL includes the selected typed, parameterized, bounded read-only incident queries. Integrate story:kubernetes-spec-service here. Complete and verify all specified setup/adapter/connection/operation management across the three adapters, including repair/revoke/dispatch races, exact child ownership, concurrent startup and durable stop suppression.
+2. Complete the selected GitLab workflows: exact-commit CI pipelines/jobs/traces, MR and changed-record reads, validation and admitted MR create/update/merge. Bring forward the required management and approval/audit/attempt/dispatch/idempotency controls, including exact-head checks and possible-write uncertainty. The ADR supersedes the earlier requirement that every selected GitLab workflow finish before the next execution family starts; these workflows and their sandbox obligations stay open and recorded, and are not cancelled or marked implemented by that change.
+3. Complete Kubernetes, then PostgreSQL through the same persistent local lifecycle. Kubernetes includes discovery, diagnosis, selected changes and rollout observation, bounded exec/copy/tunnels and the Helm behavior admitted by `decision-blocker:helm-execution-family`. PostgreSQL includes the selected typed, parameterized, bounded read-only incident queries. Integrate story:kubernetes-spec-service here. Complete and verify all specified setup/adapter/connection/operation management across the three adapters, including repair/revoke/dispatch races, exact child ownership, concurrent startup and durable stop suppression.
 4. Expand ../mcp with resources, prompts, servers, progress/cancellation, consumer-owned stdio and explicit OAuth one-use exchange/publication seams. Adopt AEP there, preserve its primary documentation workflow edit, verify and publish source commits through verified Atlas bot authority.
 5. Pin that exact published MCP revision here and implement outbound and inbound tools/resources/prompts over stdio and Streamable HTTP, with version-specific 2026-07-28 and explicit 2025-11-25 interoperability, caller isolation and authenticated local verification of the cloud-capable server profile.
-6. Complete remaining selected providers: MySQL, Jira, Slack, Confluence, Loki, Prometheus, Grafana and Docker. Deliver each provider's required reads and, where selected, admitted writes or execution using the established shared controls. SQL remains read-only. Jira/Slack updates, Confluence collection, observability queries and Docker build/registry/container workflows retain their full original scope.
+6. Complete remaining selected providers: MySQL, Jira, Slack, Confluence, Loki, Prometheus, Grafana and Docker. Deliver each provider's required reads and, where selected, admitted writes or execution using the established shared controls. SQL remains read-only. Jira/Slack updates, Confluence collection, observability queries and Docker build/registry/container workflows retain their full original scope. Under the ADR these ordinary HTTP providers are expected to arrive through the catalog track's templates and auth profiles rather than new handwritten endpoint handlers.
 7. Prove the complete cross-provider incident journey, required upgrade refusal cases, exact sandbox cleanup, Rust 1.88 and existing tools-only MCP/Harness compatibility, deterministic generation and two isolated reproducible distributable builds; finish support documentation and integration.
 
 Each provider phase includes generation, packaging, documentation and its runtime acceptance before advancing to MCP or the remaining providers. Shared lifecycle, mutation and execution foundations are implemented with the first selected provider that needs them. This replaces the original ordering that put MCP before completing the first three providers' selected reads and writes; it does not remove any acceptance requirement.
 
 Acceptance remains docs/recent-adapter-usage-20260909.md C01-C17 and C20-C22 plus the supplied MCP interoperability and deterministic failure cases. GitLab owns C09/C14 and its part of collection; Kubernetes owns C12/C15/C16, including the Helm actions; PostgreSQL owns its part of C06 before MCP, while the MySQL part follows MCP. Common lifecycle cases apply across the initial three providers. Cross-provider C20, the complete C21 collection and C22 capability-upgrade cases finish after their required providers exist. Every selected workflow requires runtime evidence; fixtures cannot satisfy missing dedicated-provider sandbox evidence.
+
+C15's Helm half and C16 are claimed here but not currently deliverable: `decision-blocker:helm-execution-family` records that 106 of the 132 recorded Helm command sites, and C16's exec/copy/tunnels, need a process-execution family this repository does not have. That claim stands as an obligation until the operator answers; it is not silently narrowed here.
 
 This order change introduces no new entity or decomposition. The initiative still has one decomposing story, so the planning skill's fewer-than-two-child rule skips a critic panel for this scheduling update. Model and review each unresolved native/shared semantic before creating its dependent implementation stories.
 
