@@ -11,6 +11,20 @@ use std::{
 #[async_trait::async_trait]
 pub trait Adapter: Send + Sync {
     fn bootstrap(&self) -> Bootstrap;
+    /// Explicit opt-in with the separately revised full private projection.
+    /// Existing read-only compositions refuse v2 before receiving credentials.
+    fn bootstrap_v2(&self) -> Result<Bootstrap> {
+        Err(Failure::Unsupported)
+    }
+    async fn prepare_write(
+        &self,
+        _operation: &str,
+        _partition: &str,
+        _document: Secret,
+        _input: Value,
+    ) -> Result<Box<dyn PreparedWrite>> {
+        Err(Failure::Unsupported)
+    }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline>;
     async fn invoke(
         &self,
@@ -54,18 +68,27 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
     else {
         return Err(Failure::Protocol);
     };
-    if version != VERSION
-        || uuid::Uuid::parse_str(&nonce).is_err()
+    let protocol = match version.as_str() {
+        VERSION => PrivateProtocol::V1,
+        WRITE_VERSION => PrivateProtocol::V2,
+        _ => return Err(Failure::Protocol),
+    };
+    if uuid::Uuid::parse_str(&nonce).is_err()
         || uuid::Uuid::parse_str(&child_incarnation).is_err()
+        || (protocol == PrivateProtocol::V2
+            && (!writes::canonical_id(&nonce) || !writes::canonical_id(&child_incarnation)))
     {
         return Err(Failure::Protocol);
     }
-    let bootstrap = adapter.bootstrap();
-    bootstrap.validate()?;
+    let bootstrap = match protocol {
+        PrivateProtocol::V1 => adapter.bootstrap(),
+        PrivateProtocol::V2 => adapter.bootstrap_v2()?,
+    };
+    bootstrap.validate_for(protocol)?;
     channel::write(
         &mut channel,
         &Reply::Ready {
-            version: VERSION.into(),
+            version,
             nonce,
             child_incarnation,
             bootstrap: bootstrap.clone(),
@@ -82,12 +105,37 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
         // Idle waits are not provider deadlines. A kernel parent-death signal or
         // channel EOF terminates the child; each request gets its original budget.
         channel::wait_readable(&channel)?;
-        let frame = channel::read::<Request>(
-            &mut channel,
-            Instant::now() + Duration::from_secs(10),
-            true,
-            INPUT_LIMIT,
-        )?;
+        let until = Instant::now() + Duration::from_secs(10);
+        let frame = match protocol {
+            PrivateProtocol::V1 => {
+                channel::read::<Request>(&mut channel, until, true, INPUT_LIMIT)?
+            }
+            PrivateProtocol::V2 => {
+                let frame =
+                    channel::read::<writes::RequestV2>(&mut channel, until, true, INPUT_LIMIT)?;
+                match frame.control {
+                    writes::RequestV2::Legacy(control) => channel::Frame {
+                        control,
+                        secret: frame.secret,
+                        document: frame.document,
+                    },
+                    writes::RequestV2::Write(control) => {
+                        writes::serve_write(
+                            &mut channel,
+                            &executor,
+                            &adapter,
+                            &bootstrap,
+                            channel::Frame {
+                                control,
+                                secret: frame.secret,
+                                document: frame.document,
+                            },
+                        )?;
+                        continue;
+                    }
+                }
+            }
+        };
         let (id, deadline, operation) = match frame.control {
             Request::Validate {
                 request_id,

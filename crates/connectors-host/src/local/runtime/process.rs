@@ -20,6 +20,7 @@ pub struct Child {
     channel: UnixStream,
     bootstrap: Bootstrap,
     incarnation: String,
+    protocol: PrivateProtocol,
     live: bool,
     _parent_thread: PhantomData<Rc<()>>,
 }
@@ -95,13 +96,14 @@ impl Child {
                 requirements: Vec::new(),
             },
             incarnation: incarnation.clone(),
+            protocol: config.private_protocol(),
             live: true,
             _parent_thread: PhantomData,
         };
         channel::write(
             &mut child.channel,
             &Request::Hello {
-                version: VERSION.into(),
+                version: config.private_protocol().as_str().into(),
                 nonce: nonce.clone(),
                 child_incarnation: incarnation.clone(),
             },
@@ -120,9 +122,9 @@ impl Child {
             return Err(Failure::ReadinessMismatch);
         };
         bootstrap
-            .validate()
+            .validate_for(config.private_protocol())
             .map_err(|_| Failure::ReadinessMismatch)?;
-        if version != VERSION
+        if version != config.private_protocol().as_str()
             || returned != nonce
             || child_incarnation != incarnation
             || bootstrap.instance != config.instance_id
@@ -265,6 +267,85 @@ impl Child {
             }
         }
     }
+    /// Prepare on this exact child without writing. The returned borrow occupies
+    /// it through commit/cancel and keeps the original monotonic deadline. The
+    /// host coordinator must admit current policy and credentials before entry.
+    pub fn prepare_write(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        deadline_ms: u64,
+    ) -> Result<PreparedInvocation<'_>> {
+        if self.protocol != PrivateProtocol::V2 {
+            return Err(Failure::Unsupported);
+        }
+        if !self.live {
+            return Err(Failure::Unavailable);
+        }
+        let until = writes::budget(deadline_ms)?;
+        if input.len() > INPUT_LIMIT || secret.0.is_empty() || secret.0.len() > SECRET_LIMIT {
+            return Err(Failure::InvalidInput);
+        }
+        let descriptor = self.bootstrap.descriptor()?;
+        let declaration = writes::write_declaration(
+            &self.bootstrap,
+            &descriptor,
+            operation,
+            revision,
+            partition,
+        )?;
+        channel::depth(input)?;
+        let value = connectors_core::read_json(input).map_err(|_| Failure::InvalidInput)?;
+        connectors_sdk::validate_write_value(&declaration.input_schema, &value)
+            .map_err(Failure::from_service)?;
+        let output_schema = declaration.output_schema.clone();
+        let id = uuid::Uuid::new_v4().to_string();
+        let request = writes::WriteRequest::Prepare {
+            id: id.clone(),
+            operation: operation.into(),
+            revision: revision.into(),
+            partition: partition.into(),
+            deadline_ms,
+        };
+        let response = channel::write(&mut self.channel, &request, Some(secret), input, until)
+            .and_then(|_| channel::read::<writes::WriteReply>(&mut self.channel, until, false, 0));
+        match response {
+            Ok(channel::Frame {
+                control:
+                    writes::WriteReply::PreparedWrite {
+                        id: returned,
+                        preparation_id,
+                    },
+                ..
+            }) if returned == id && writes::canonical_id(&preparation_id) => {
+                Ok(PreparedInvocation {
+                    child: self,
+                    id,
+                    preparation_id,
+                    until,
+                    deadline_ms,
+                    output_schema,
+                    finished: false,
+                })
+            }
+            Ok(channel::Frame {
+                control: writes::WriteReply::Failed { request_id, code },
+                ..
+            }) if request_id == id => {
+                if matches!(code, Failure::Timeout | Failure::Interrupted) {
+                    self.terminate();
+                }
+                Err(code)
+            }
+            response => {
+                self.terminate();
+                Err(response.err().unwrap_or(Failure::Protocol))
+            }
+        }
+    }
     fn exchange(
         &mut self,
         request: Request,
@@ -349,13 +430,129 @@ impl Drop for Child {
     }
 }
 
+/// Live process-only preparation. Dropping it kills/reaps the exact child so
+/// unacknowledged cancellation can never leave a reusable pending write.
+/// ```compile_fail
+/// use connectors_host::local::runtime::PreparedInvocation;
+/// fn reuse(prepared: PreparedInvocation<'_>) {
+///     prepared.commit();
+///     prepared.commit();
+/// }
+/// ```
+#[must_use]
+pub struct PreparedInvocation<'a> {
+    child: &'a mut Child,
+    id: String,
+    preparation_id: String,
+    until: Instant,
+    deadline_ms: u64,
+    output_schema: serde_json::Value,
+    finished: bool,
+}
+impl PreparedInvocation<'_> {
+    pub fn remaining(&self) -> Result<()> {
+        writes::remaining(self.until, self.deadline_ms)
+    }
+    pub fn cancel(mut self) -> Result<()> {
+        self.remaining()?;
+        let response = channel::write(
+            &mut self.child.channel,
+            &writes::WriteRequest::Cancel {
+                id: self.id.clone(),
+                preparation_id: self.preparation_id.clone(),
+            },
+            None,
+            &[],
+            self.until,
+        )
+        .and_then(|_| {
+            channel::read::<writes::WriteReply>(&mut self.child.channel, self.until, false, 0)
+        });
+        match response {
+            Ok(channel::Frame {
+                control: writes::WriteReply::CancelledWrite { id, preparation_id },
+                ..
+            }) if id == self.id && preparation_id == self.preparation_id => {
+                self.finished = true;
+                Ok(())
+            }
+            response => Err(response.err().unwrap_or(Failure::Protocol)),
+        }
+    }
+    /// Transport commit only: the trusted coordinator must already hold definite
+    /// approval, audit, attempt, credential-dispatch and gate acknowledgements.
+    /// Every failure from here is possible-write uncertainty, including expiry
+    /// before the send. The caller must retain/quarantine its attempt, not retry.
+    pub fn commit(mut self) -> WriteResult {
+        if let Err(code) = self.remaining() {
+            return WriteResult::unknown(code);
+        }
+        let response = channel::write(
+            &mut self.child.channel,
+            &writes::WriteRequest::Commit {
+                id: self.id.clone(),
+                preparation_id: self.preparation_id.clone(),
+            },
+            None,
+            &[],
+            self.until,
+        )
+        .and_then(|_| {
+            channel::read::<writes::WriteReply>(
+                &mut self.child.channel,
+                self.until,
+                false,
+                RESULT_LIMIT,
+            )
+        });
+        let frame = match response {
+            Ok(frame) => frame,
+            Err(code) => return WriteResult::unknown(code),
+        };
+        let writes::WriteReply::WriteResult { id, effect } = frame.control else {
+            return WriteResult::unknown(Failure::Protocol);
+        };
+        if id != self.id || channel::depth(&frame.document).is_err() {
+            return WriteResult::unknown(Failure::Protocol);
+        }
+        let document: writes::ResultDocument = match connectors_core::read_json(&frame.document) {
+            Ok(value) => value,
+            Err(_) => return WriteResult::unknown(Failure::Protocol),
+        };
+        let result = match document {
+            writes::ResultDocument::Failure { code } => Err(code),
+            writes::ResultDocument::Success { value } if effect == WriteEffect::Applied => {
+                if connectors_sdk::validate_write_value(&self.output_schema, &value).is_err() {
+                    // Retain definite applied knowledge; discard an invalid safe
+                    // payload and terminate the peer that violated its schema.
+                    return WriteResult {
+                        effect,
+                        result: Err(Failure::Protocol),
+                    };
+                }
+                Ok(value)
+            }
+            _ => return WriteResult::unknown(Failure::Protocol),
+        };
+        self.finished = true;
+        WriteResult { effect, result }
+    }
+}
+impl Drop for PreparedInvocation<'_> {
+    fn drop(&mut self) {
+        if !self.finished {
+            self.child.terminate();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::local::config::{Adapter, Executable, Restart, Startup};
     use sha2::{Digest, Sha256};
 
-    fn bootstrap() -> Bootstrap {
+    pub(super) fn bootstrap() -> Bootstrap {
         Bootstrap {
             instance: "fixture".into(), adapter: "fixture".into(), protocol: "v1alpha1".into(),
             configuration_revision: "fixture-config".into(), provider_authority: "fixture-authority".into(),
@@ -442,6 +639,7 @@ mod tests {
         let hash = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
         for mode in ["json", "schema", "identity"] {
             let config = Adapter {
+                private_protocol: None,
                 permissions: Default::default(),
                 instance_id: "fixture".into(),
                 adapter_id: "fixture".into(),
@@ -478,3 +676,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod write_tests;

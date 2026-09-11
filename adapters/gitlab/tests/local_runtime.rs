@@ -158,6 +158,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
+            private_protocol: None,
             permissions: Default::default(),
             instance_id: "fixture-gitlab".into(),
             adapter_id: "gitlab".into(),
