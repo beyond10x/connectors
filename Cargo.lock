@@ -688,10 +688,15 @@ dependencies = [
  "connectors-core",
  "connectors-host",
  "connectors-sdk",
+ "hex",
+ "rcgen",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "tokio",
+ "tokio-rustls",
+ "zeroize",
 ]
 
 [[package]]

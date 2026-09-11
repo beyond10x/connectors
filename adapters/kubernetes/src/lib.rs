@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
+pub mod auth;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -21,7 +23,8 @@ pub struct Kubernetes {
     http: Arc<dyn AuthenticatedHttp>,
     config: Config,
     descriptor: Descriptor,
-    cursors: Cursors,
+    cursors: Arc<Cursors>,
+    partition: Option<String>,
 }
 
 impl Kubernetes {
@@ -64,7 +67,28 @@ impl Kubernetes {
             http,
             config,
             descriptor,
-            cursors: Cursors::default(),
+            cursors: Arc::new(Cursors::default()),
+            partition: None,
+        })
+    }
+    /// A new immutable HTTP capability for one host-admitted use. Cursor state
+    /// stays adapter-owned and is partitioned by an opaque authenticated binding,
+    /// so a continuation issued under one connection is not readable under
+    /// another. This value grants no credential lookup or dispatch authority.
+    pub fn with_authenticated_http(
+        &self,
+        http: Arc<dyn AuthenticatedHttp>,
+        partition: &str,
+    ) -> Result<Self> {
+        if !connectors_core::valid_id(partition) {
+            return Err(Error::invalid("invalid cursor partition"));
+        }
+        Ok(Self {
+            http,
+            config: self.config.clone(),
+            descriptor: self.descriptor.clone(),
+            cursors: self.cursors.clone(),
+            partition: Some(partition.to_owned()),
         })
     }
     fn namespace(&self, namespace: &str) -> Result<()> {
@@ -90,7 +114,10 @@ impl Kubernetes {
         if kind != "nodes" {
             self.namespace(namespace)?;
         }
-        let context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespace":namespace,"kind":kind,"limit":limit});
+        let mut context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespace":namespace,"kind":kind,"limit":limit});
+        if let Some(partition) = &self.partition {
+            context["partition"] = json!(partition);
+        }
         let mut query = vec![("limit", limit.to_string())];
         if let Some(cursor) = cursor {
             query.push(("continue", self.cursors.read(&context, cursor)?));
