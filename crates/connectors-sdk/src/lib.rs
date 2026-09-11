@@ -99,6 +99,23 @@ pub trait AuthenticatedWrite: Send {
     ) -> Result<HttpResponse>;
 }
 
+/// A check-specific probe bound to one provider endpoint fixed by the trusted
+/// composition when the port is built. The caller supplies only a bounded JSON
+/// body; it cannot choose the path, the method or any other resource. This is an
+/// identity or permission check, not an approved business mutation: it is never
+/// reachable from a business adapter holding only `AuthenticatedHttp`, and its
+/// response carries no write semantics. Implementations must not retry or follow
+/// redirects.
+#[async_trait]
+pub trait AuthProbe: Send + Sync {
+    /// The bounded request document. Implementations refuse a body over
+    /// `PROBE_BODY_LIMIT` bytes without performing any I/O.
+    async fn probe(&self, body: &Value) -> Result<HttpResponse>;
+}
+
+/// The largest serialized probe document a fixed-endpoint check may send.
+pub const PROBE_BODY_LIMIT: usize = 16 * 1024;
+
 /// Native effect knowledge is independent of whether a safe result can be
 /// disclosed. A malformed result after a known applied effect must not turn it
 /// into a not-attempted failure or grant another send. No wire codec is implied.
