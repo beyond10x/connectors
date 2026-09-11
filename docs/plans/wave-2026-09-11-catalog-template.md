@@ -47,7 +47,7 @@ judgement rather than the verb's.
 
 | unit | worktree | build directory | scratch root |
 |---|---|---|---|
-| 1 | `/home/timo/.local/state/worktree/trees/b10x/connectors_v2/wt-35ad348b4293` | that tree's own `target/` | `/home/timo/.cache/cv2-catalog-tmp` |
+| 1 | `~/.local/state/worktree/trees/b10x/connectors_v2/wt-35ad348b4293` | that tree's own `target/` | `~/.cache/cv2-catalog-tmp` |
 
 With N=1 the integration branch and the unit branch collapse into that one tree, which is already
 leased by this session and already holds the three merged catalog commits.
