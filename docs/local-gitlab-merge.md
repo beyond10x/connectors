@@ -68,16 +68,25 @@ and `source_audit`. Failure carries those observations inside `error.data` when
 available. Inspect `mutation.classification`: `not_attempted`, `refused`,
 `applied` or `unknown`. Applied can accompany a result-delivery error; incomplete
 audit cannot undo the known effect. A lost response is unknown and never triggers
-another PUT. Repeating an exact retained key under current result-access policy
-observes the original attempt without provider, credential, proof or clock access.
-Every delivery has fresh request/audit correlation. A pending original remains
-unknown; observing it does not authorize takeover or resend.
+another PUT. Repeating an exact retained key for a terminal attempt under current
+result-access policy observes it without provider, credential, proof or clock access.
+Every delivery has fresh request/audit correlation. A pending original never
+authorizes resend. Repeating its exact key may start the owner for metadata
+recovery on the serialized instance worker, without loading a proof or credential.
+Recovery does not launch a native child; owner startup still honors configured
+automatic startup. The on-demand fixture starts no native child. A live original
+remains pending. An abandoned dispatch becomes quarantined/unknown; an abandoned preparation becomes
+not_attempted when trusted time is available for its replay retention. Unavailable
+time leaves the preparation pending. Terminal replay remains passive.
 
 Disposable production CLI fixtures cover applied/refused/lost-response behavior,
 same-key observation through a newly started owner with custody stopped, and an
 owner killed after the provider receives the PUT. The crash leaves the original
-attempt pending/unknown; observation never sends again. The exact native child
-exits with its owner, and approval spend survives the restart. Revocation during
+attempt uncertain; exact-key recovery quarantines it without another send. The
+exact native child exits with its owner, and approval spend survives the restart. Revocation during
 preflight refuses the write and completes its admitted audit before returning.
-These cases do not establish real GitLab sandbox behavior, automatic recovery of
-abandoned attempts, or crashes across every storage acknowledgement.
+The preparation-recovery fixture separately exits a durable-port producer before
+any dispatch gate and verifies clock failure/recovery through the production CLI.
+It does not exercise native preflight or approval spending before that exit.
+These cases do not establish real GitLab sandbox behavior, background/unkeyed
+recovery, or crashes across every storage acknowledgement.
