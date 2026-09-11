@@ -10,17 +10,13 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 32
+revision: 33
 ---
 ## Outcome and authority
 
 Implement the operator-approved local Connectors product through seven successive working runtime milestones. Connectors owns product authority; ../mcp owns reusable protocol mechanics. This record carries the implementation plan supplied on 2026-09-10. It does not close the completed specification milestones or treat them as runtime proof.
 
 Linux x86_64 and Rust 1.88 are the initial platform. SQLite owns non-secret metadata, with versioned migrations, WAL and full synchronization. The admitted OS Secret Service collection owns credentials. Existing installed Connectors configuration and credentials are not automatically migrated. Local native credential entry is protected; native SaaS OAuth onboarding is excluded. MCP browser OAuth and refresh are included.
-
-## Delivery sequence
-
-## Delivery sequence
 
 ## Delivery sequence
 
