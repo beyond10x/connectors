@@ -7,6 +7,7 @@ pub mod authored;
 pub mod bundle;
 pub mod coverage;
 pub mod inventory;
+pub mod pipeline;
 pub mod template;
 
 use connectors_core::{Error, ErrorCode, Result};
