@@ -31,6 +31,8 @@ tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 base64.workspace = true
+libc = "0.2"
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
 ring = "0.17"
 sha2.workspace = true
 hex.workspace = true
