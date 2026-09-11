@@ -1,8 +1,12 @@
-# Proposed private mutation extension
+# Private mutation extension
 
-This is the implementation selection for the guarded GitLab merge slice, not
-current runtime support. It extends [private adapter ownership](private-adapter.md)
-and [local mutation coordination](../../service/local-mutations.md).
+This selects the guarded GitLab merge binding and extends
+[private adapter ownership](private-adapter.md) and
+[local mutation coordination](../../service/local-mutations.md). The explicit
+configuration selection and private adapter transport below are implemented.
+Production GitLab still uses the read-only projection; CLI approval issuance,
+owner mutation IPC and the complete write coordinator remain implementation
+work. The transport port alone does not admit a provider write.
 
 The host configuration format `connectors-local/2` adds an adapter
 `private_protocol` selection, exactly `connectors-private/1` or
@@ -38,6 +42,17 @@ The additional closed control variants are:
 | `prepare_write` | `id`, `operation`, `revision`, `partition`, `deadline_ms`; then exactly one bounded secret frame and one input-document frame, as for existing invoke | `prepared_write` with the same `id` and a fresh canonical non-nil `preparation_id` UUID, or existing safe `failed` |
 | `commit_write` | `id`, `preparation_id`; no secret or input frame | `write_result` with `id`, effect `applied`, `refused` or `unknown`, then one bounded result document; or channel loss/invalid reply, which the host treats as unknown |
 | `cancel_write` | `id`, `preparation_id`; no extra frames | `cancelled_write` with matching `id` and `preparation_id`, only after pending state has been destroyed |
+
+The existing `failed` reply retains `request_id` and its closed safe `code`, even
+when answering `prepare_write`; it has no document. A `write_result` has exactly
+one closed JSON document: `{"kind":"success","value":...}` for an applied safe
+result, or `{"kind":"failure","code":...}` using the same closed failure codes.
+Only `applied` permits a success document. The effect and safe result are separate:
+an applied native effect can carry a failure to project, validate or bound the
+result. No native error text crosses this boundary. Malformed framing, control,
+document envelopes or correlation yields unknown effect. A well-formed, correlated
+applied reply whose success value violates its declared schema retains applied
+effect knowledge, discards that value and terminates the child.
 
 The preparation ID names only the same request ID, child incarnation, operation,
 revision, partition, canonical input digest and original deadline captured in
