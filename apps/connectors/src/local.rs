@@ -11,6 +11,7 @@ use connectors_host::local::{
 use serde_json::{Value, json};
 use std::ffi::OsString;
 mod approval_keys;
+mod approvals;
 mod connections;
 mod operations;
 mod session;
@@ -36,6 +37,18 @@ impl Handler for LocalHandler {
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
         let result = if matches!(call.callable, "connections-connect" | "connections-repair") {
             self.0.borrow_mut().complete(call).map_err(owner_failure)
+        } else if matches!(
+            call.callable,
+            "approval-policy-status"
+                | "approval-policy-set"
+                | "approval-prepare"
+                | "approval-issue"
+        ) {
+            let mut session = self.0.borrow_mut();
+            session
+                .signals()
+                .and_then(|_| approvals::execute(call, session.approval_deadline))
+                .map_err(owner_failure)
         } else if call.callable == "operations-invoke" {
             operations::invoke(call, self.0.borrow().deadline).map_err(owner_failure)
         } else if call.callable == "connections-revalidate" {

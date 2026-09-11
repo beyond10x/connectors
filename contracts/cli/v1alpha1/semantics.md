@@ -14,6 +14,9 @@ journeys; dedicated provider sandbox acceptance and the other adapters' persiste
 lifecycle bindings remain open. [Approval-key management](../../service/approval-issuers.md)
 adds the `approvals key-init`, `key-status`, `key-rotate`, `key-recover`, `key-revoke`
 and `key-retire` commands. It does not issue approval proofs or enable provider writes.
+The [local approval coordinator](../../service/local-mutations.md) adds policy
+publication, exact subject preparation and protected issuance. Provider write
+dispatch remains unfinished.
 
 ## 1. Owners and identities
 
@@ -65,6 +68,10 @@ management wire payload or a persistent record.
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
 | `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
+| `approvals policy-status` | local policy inspector | `ApprovalPolicyStatusInput` → `ApprovalPolicyResult` | no / no |
+| `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
+| `approvals prepare` | local subject coordinator | `ApprovalPrepareInput` → `ApprovalPrepareResult` | no / no |
+| `approvals issue` | local issuer coordinator | `ApprovalIssueInput` → `ApprovalIssueResult` | no / no |
 | `adapters list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
 | `adapters describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
 | `adapters status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
@@ -83,6 +90,14 @@ management wire payload or a persistent record.
 `approvals clock-check` performs the bounded authenticated exchange specified in
 [the clock binding](../../service/clock.md). Its public observation cannot be
 reused as time evidence; it starts no service and reads no secret or metadata.
+
+`approvals policy-set` accepts only `--input-file`; its path is acquired by the
+production handler using the bounded document reader. `prepare` and `issue` use
+one of `--input-json`, `--input-file` or `--input-stdin` for nonsecret business input.
+`issue` additionally requires `--approve-subject` and `--proof-output`. Their
+authority, publication boundaries and helper limits belong to the
+[local mutation binding](../../service/local-mutations.md). Proof bytes never
+enter the ordinary successful CLI result.
 
 Inventory and status commands use configured/cached descriptions and safe persisted metadata
 or query an already-running owner without provider authentication. Unavailable

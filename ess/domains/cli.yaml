@@ -5,6 +5,68 @@ summary: Selected local CLI presentation values; protected inputs are ephemeral,
 # Context, not these payloads. Existing auth/declaration identities retain their
 # String representations; these value references establish no entity relations.
 types:
+  # Local approval commands project existing policy/subject owners. A preparation
+  # is metadata, not a lease or proof; issuance returns no protected proof bytes.
+  - name: connectors.cli.ApprovalPolicyView
+    kind: struct
+    fields:
+      - {name: policy_id, type: String}
+      - {name: instance_id, type: String}
+      - {name: issuer_id, type: String}
+      - {name: revision, type: Integer}
+      - {name: owner_uid, type: Integer}
+      - {name: selection, type: connectors.local_approval_policy.Selection}
+      - {name: operations, type: "List<String>"}
+  - name: connectors.cli.ApprovalPolicyStatusInput
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+  - name: connectors.cli.ApprovalPolicySetInput
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: expected_revision, type: "Optional<Integer>"}
+      - {name: input_file, type: String}
+  - name: connectors.cli.ApprovalPolicyResult
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: policy, type: "Optional<connectors.cli.ApprovalPolicyView>"}
+  - name: connectors.cli.ApprovalPrepareInput
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: connection, type: String}
+      - {name: operation, type: String}
+      - {name: schema, type: String}
+      - {name: revision, type: String}
+      - {name: input, type: String}
+  - name: connectors.cli.ApprovalPrepareResult
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: preparation, type: connectors.delegation.ApprovalPreparation}
+  - name: connectors.cli.ApprovalIssueInput
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: connection, type: String}
+      - {name: operation, type: String}
+      - {name: schema, type: String}
+      - {name: revision, type: String}
+      - {name: input, type: String}
+      - {name: approve_subject, type: String}
+      - {name: proof_output, type: String}
+  - name: connectors.cli.ApprovalIssueDisposition
+    kind: enum
+    variants: [published]
+  - name: connectors.cli.ApprovalIssueResult
+    kind: struct
+    fields:
+      - {name: adapter, type: String}
+      - {name: reference, type: String}
+      - {name: subject_sha256, type: String}
+      - {name: disposition, type: connectors.cli.ApprovalIssueDisposition}
   - name: connectors.cli.ApprovalClockCheckInput
     kind: struct
     fields:

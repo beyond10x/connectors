@@ -8,6 +8,100 @@ use std::{
 const NOW: u64 = 1_788_998_400_000;
 
 #[test]
+fn approval_target_is_passive_but_requires_exact_retained_admission() {
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let old = describe(&registry, &reference, NOW + 60_001);
+    assert_eq!(old.state, State::Pending);
+    let metadata = Metadata::inspect(root.path()).unwrap();
+    let path = metadata.connection.path().unwrap().to_owned();
+    drop(metadata);
+    // Independent read-only observer; do not retain the metadata owner's
+    // lifecycle lease while the tested coordinator opens its own handle.
+    let observer =
+        rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .unwrap();
+    let watermark: i64 = observer
+        .query_row("SELECT last_seen_ms FROM registry_clock", [], |r| r.get(0))
+        .unwrap();
+    let changes: i64 = observer
+        .query_row("PRAGMA data_version", [], |r| r.get(0))
+        .unwrap();
+    // A system-clock registry must not sample that clock on this path. The
+    // retained evidence is expired, but it still identifies this exact target.
+    let passive = Registry::with_system_clock(root.path());
+    assert_eq!(
+        passive
+            .approval_target(&binding(), &reference, &BTreeSet::new())
+            .unwrap(),
+        old.revision
+    );
+    let mut changed = binding();
+    changed.provider_authority.push_str("/other");
+    assert_eq!(
+        passive.approval_target(&changed, &reference, &BTreeSet::new()),
+        Err(Failure::Conflict)
+    );
+    assert_eq!(
+        passive.approval_target(&binding(), &reference, &BTreeSet::from(["write".into()])),
+        Err(Failure::InsufficientScope)
+    );
+    assert_eq!(
+        observer
+            .query_row("SELECT last_seen_ms FROM registry_clock", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        watermark
+    );
+    assert_eq!(
+        observer
+            .query_row("PRAGMA data_version", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        changes
+    );
+    drop(observer);
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &old.revision,
+            NOW + 60_001,
+        )
+        .unwrap();
+    assert_eq!(
+        passive.approval_target(&binding(), &reference, &BTreeSet::new()),
+        Err(Failure::Revoked)
+    );
+}
+
+#[test]
+fn approval_target_refuses_known_invalid_material_without_custody_access() {
+    for (column, expected) in [
+        (
+            "deleted=1,byte_size=NULL,retirement_fence='7c9a4817-95ef-46ae-8363-ac98e1fe042d',retired_at_ms=1788998400000,delete_not_before_ms=1788998400000",
+            Failure::MetadataUnavailable,
+        ),
+        ("invalid_reason='invalid'", Failure::NotReady),
+    ] {
+        let (root, registry) = fixture();
+        let (_, candidate) = prepared(&registry, "one", NOW);
+        let reference = publish_fixture(&registry, candidate, NOW);
+        let metadata = Metadata::update(root.path(), false).unwrap();
+        metadata
+            .connection
+            .execute(&format!("UPDATE registry_materials SET {column}"), [])
+            .unwrap();
+        drop(metadata);
+        assert_eq!(
+            registry.approval_target(&binding(), &reference, &BTreeSet::new()),
+            Err(expected)
+        );
+    }
+}
+
+#[test]
 fn revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledgement() {
     let (root, registry) = fixture();
     let (_, candidate) = prepared(&registry, "one", NOW);

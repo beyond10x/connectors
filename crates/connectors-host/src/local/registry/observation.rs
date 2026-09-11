@@ -43,6 +43,53 @@ pub struct ObservedAcquisition {
 }
 
 impl Registry {
+    /// Resolve a retained approval target without sampling time, updating the
+    /// registry clock, checking custody or granting a provider call. Expired
+    /// validation evidence can identify this binding; known invalid material
+    /// cannot. Invocation must independently establish current readiness.
+    pub fn approval_target(
+        &self,
+        binding: &Binding,
+        reference: &str,
+        scopes: &BTreeSet<String>,
+    ) -> Result<String> {
+        if !connectors_core::valid_id(reference) {
+            return Err(Failure::InvalidInput);
+        }
+        let mut metadata =
+            Metadata::inspect(&self.path).map_err(|_| Failure::MetadataUnavailable)?;
+        let tx = metadata.connection.transaction().map_err(db)?;
+        let row = Self::connection(&tx, reference)?;
+        visible(&row, &binding.instance_id, &binding.adapter_id)?;
+        if row.state == "revoked" {
+            return Err(Failure::Revoked);
+        }
+        if row.binding != *binding {
+            return Err(Failure::Conflict);
+        }
+        let version = row.material.as_ref().ok_or(Failure::NotReady)?;
+        let (ack, deleted, invalid, retired): (bool, bool, Option<String>, bool) = tx.query_row(
+            "SELECT acknowledged,deleted,invalid_reason,retirement_fence IS NOT NULL FROM registry_materials WHERE version_id=?1 AND connection_ref=?2 AND generation_id=?3",
+            params![version,row.reference,row.generation],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+        ).map_err(db)?;
+        if !ack || retired {
+            return Err(Failure::MetadataUnavailable);
+        }
+        if deleted || invalid.is_some() || row.identity.is_none() {
+            return Err(Failure::NotReady);
+        }
+        let baseline = row.baseline.as_ref().ok_or(Failure::MetadataUnavailable)?;
+        if (!binding.profile.minimum_scopes.is_empty() || !scopes.is_empty())
+            && !baseline.granted_scopes.as_ref().is_some_and(|granted| {
+                binding.profile.minimum_scopes.is_subset(granted) && scopes.is_subset(granted)
+            })
+        {
+            return Err(Failure::InsufficientScope);
+        }
+        Ok(row.revision)
+    }
+
     pub fn describe(
         &self,
         instance: &str,
