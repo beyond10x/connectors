@@ -71,7 +71,11 @@ the original remaining budget at every boundary. The child consumes pending
 state before invoking its one-use write capability. It cannot accept an extended
 deadline or replacement material. Deadline, cancellation or response loss after
 the host gate remains possible-write uncertainty, including before a commit was
-observed by the child. The existing private `invoke` always requires Read, even
+observed by the child. On unavailable commit transport, the host rechecks both
+captured deadlines: an already expired bound reports Timeout as the cause while
+the effect remains Unknown. Early transport loss remains Unavailable. This
+neither extends a deadline nor authorizes another send.
+The existing private `invoke` always requires Read, even
 on version two. No generic adapter method gains an ungated write.
 
 The owner/CLI IPC gets a separately selected version-two envelope for write

@@ -2,10 +2,11 @@
 
 The host provides a private SQLite implementation of the
 [execution audit contract](../contracts/service/audit.md) in
-`crates/connectors-host/src/local/audit.rs`. It is a prerequisite for governed
-GitLab writes. It does not yet change CLI response audit status or enable any
-provider write. Caller policy, approval spending, credential admission and the
-complete dispatch coordinator remain separate implementation work.
+`crates/connectors-host/src/local/audit.rs`. The production local
+[guarded GitLab merge](local-gitlab-merge.md) joins it to caller policy, approval
+spending, credential admission and the dispatch coordinator. Its CLI response
+reports audit status separately from the business result. The public query
+service, exporter and general reconciliation remain unimplemented.
 
 ## Storage and identity
 
@@ -13,7 +14,7 @@ The port uses the existing private local metadata authority, lifecycle lock,
 SQLite WAL and full synchronization. Admitted audit anchoring alone installs
 migration five, including earlier recognized migrations needed for attempt
 references. Ordinary setup retains version three; passive reads never migrate.
-Mutation preparation continues to work on versions four and five. Migration
+Mutation preparation continues to work on recognized versions four through eight. Migration
 bytes one through four, authority UUID and retained connection identities are
 unchanged.
 
@@ -55,7 +56,7 @@ was lost, but cannot reconstruct its original receipt.
 
 `Store::confirm` consumes that receipt and compares its original process, exact
 anchor facts and metadata authority with the retained unfinalized record. This
-confirms audit only. The eventual coordinator must enforce current caller policy,
+confirms audit only. The coordinator enforces current caller policy,
 approval, credential and connection authority, and the mutation gate separately
 before provider or leaf dispatch. No store method sends or retries provider work.
 
@@ -73,12 +74,35 @@ recover only audit knowledge. Gateway and execution-hop records remain separate
 even when their opaque public refs happen to match. Lookup never interprets
 unavailable, malformed or an older uninstalled schema as absent history.
 
+Production finalization retains its one observation while recovering an append
+failure. It first reads the exact original record. An identical final observation
+establishes completion; a different one refuses. Only a readable original anchor
+without a final observation permits one retry, using the unchanged UUID, outcome,
+safe code and timestamp. If that retry fails, one final read may establish its
+acknowledgement. Missing or unreadable records never justify another append.
+
+Additional storage calls check the original invocation deadline and a 250 ms
+recovery budget between calls. A call retains the metadata port's existing
+bounded wait. Exhaustion or unresolved failure leaves the response's audit
+incomplete and preserves its known business result and acknowledged reference.
+This path retries only audit append; it never repeats a provider call, mutation
+gate, approval spend or credential operation. The first append remains independent
+of business result persistence and retains its existing bounded cleanup behavior.
+
+This exact-observation recovery runs in the original finalizer. General completion
+after the owner process loses that observation needs a separately reviewed
+persistence binding. An anchored audit or a matching-looking request ID is not
+enough evidence to reconstruct a lost final observation or its attempt relation.
+
 ## Verification boundary
 
 Real SQLite fixtures cover concurrency, rollback and ambiguous acknowledgements,
 four abrupt process exits, exact identity and instance isolation, immutable final
 observations, capacity, byte bounds, reference retention and migration continuity.
-Simulated effects test the receipt ordering only. Dedicated provider evidence and
-full production dispatch integration remain required by the owning GitLab work.
+The production finalizer also has real-SQLite failure checks covering all four
+mutation classifications without changing their business result. These checks
+use constructed safe results; native dispatch and restart evidence comes from the
+separate disposable CLI journeys. Dedicated provider evidence and the wider
+acknowledgement failure matrix remain required by the owning GitLab work.
 Commands and input identities are retained in the
 [verification receipt](evidence/local-execution-audit-20260910/README.md).

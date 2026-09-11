@@ -528,6 +528,14 @@ impl PreparedInvocation<'_> {
         });
         let frame = match response {
             Ok(frame) => frame,
+            // The child may exhaust the captured wall deadline and close before
+            // our socket's monotonic timer fires. Recheck the original bounds;
+            // an early transport loss stays unavailable, and neither grants retry.
+            Err(Failure::Unavailable) => {
+                return WriteResult::unknown(
+                    self.remaining().err().unwrap_or(Failure::Unavailable),
+                );
+            }
             Err(code) => return WriteResult::unknown(code),
         };
         let writes::WriteReply::WriteResult { id, effect } = frame.control else {
