@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:catalog-index-concurrent-writers
 kind: story
-status: draft
+status: implemented
 title: Two writers into one bundle directory keep both index entries
 relations:
 - derived_from: review-result:adversary-catalog-pipeline-pass-1
@@ -11,7 +11,7 @@ relations:
 scope:
 - confidence: cited
   path: crates/connectors-catalog/src/bundle.rs
-revision: 2
+revision: 5
 ---
 ## Outcome
 
