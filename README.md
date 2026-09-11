@@ -73,8 +73,11 @@ The [clock check](docs/local-clock.md) verifies an explicitly configured time
 source under declared source and local timer assumptions.
 On current `main`, [local approval commands](docs/local-approvals.md) manage policy,
 prepare exact subjects and issue protected proofs for explicitly selected private-protocol-two
-write adapters. GitLab still advertises reads: provider write dispatch, MCP binding
-and complete multi-provider acceptance remain implementation work. The executable
+write adapters. The development checkout also joins a local-only
+[guarded GitLab merge](docs/local-gitlab-merge.md) through private protocol two,
+including approval, audit and same-key result observation. Its wider failure and
+sandbox acceptance remain open. MCP binding and complete multi-provider
+acceptance remain implementation work. The executable
 also provides `describe`, `invoke` and `serve`.
 
 Build this source release locally; binary/package distribution and deployment

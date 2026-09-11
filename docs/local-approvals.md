@@ -4,9 +4,10 @@ The CLI on current `main` can publish local write policy, prepare an exact appro
 subject and issue a protected proof. Preparing a write or issuing its proof requires an explicitly configured
 `connectors-local/2` adapter using `connectors-private/2`, admitted cached write
 metadata, a saved connection, a local signing issuer and a configured bounded
-clock. Policy status can inspect any configured adapter alias. Production GitLab
-still advertises its eleven reads. The approval commands
-do not by themselves enable a merge or any other provider write.
+clock. Policy status can inspect any configured adapter alias. GitLab's public
+and private-version-one projections retain eleven reads; its explicitly selected
+private-version-two projection adds the [guarded merge](local-gitlab-merge.md).
+Issuance itself performs no provider write.
 
 After [key initialization](local-approval-keys.md) and
 [clock configuration](local-clock.md), inspect the retained policy:
@@ -85,6 +86,7 @@ The implementation is exercised through the generated production CLI with a
 disposable qualified Secret Service and independent synthetic clock responder,
 including keyring restart and locked custody. Deterministic tests also cover
 policy changes during clock acquisition and failure after proof publication.
-These fixtures establish no provider effect or dedicated GitLab sandbox result.
-Proof consumption, the final audit/attempt/connection dispatch gates and native
-guarded merge remain required under the active guarded-merge story.
+These issuance fixtures establish no provider effect or dedicated sandbox result.
+The separate guarded-merge CLI fixture joins proof consumption, final
+audit/attempt/connection gates and native dispatch. Its broader crash/failure
+matrix and dedicated GitLab sandbox acceptance remain open under the active story.
