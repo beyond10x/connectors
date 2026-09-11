@@ -158,9 +158,11 @@ fn selected(paths: &Paths, alias: &str) -> Result<(Config, Adapter)> {
 }
 pub fn cached(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     let (_, adapter) = selected(paths, alias)?;
-    runtime::state::State::new(&paths.state)
+    let bootstrap = runtime::state::State::new(&paths.state)
         .cached(&adapter.instance_id, &adapter.selection())?
-        .ok_or_else(|| Code::DescriptionUnavailable.into())
+        .ok_or(Code::DescriptionUnavailable)?;
+    bootstrap.validate_for(adapter.private_protocol())?;
+    Ok(bootstrap)
 }
 pub fn schema(bootstrap: &runtime::Bootstrap, operation: &str) -> Result<String> {
     let descriptor = bootstrap.descriptor()?;

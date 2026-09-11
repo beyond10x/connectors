@@ -9,7 +9,7 @@ use std::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "ConfigInput")]
 pub struct Config {
     pub format: String,
     pub owner_uid: u32,
@@ -23,6 +23,38 @@ pub struct Config {
     pub adapters: BTreeMap<String, Adapter>,
 }
 
+// Deserialize the closed envelope before selecting its version. Validation is
+// part of decoding: even callers using serde directly cannot give v1 a v2 field
+// or omit v2's explicit private selection.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ConfigInput {
+    format: String,
+    owner_uid: u32,
+    approval_clock: Option<super::clock::Configuration>,
+    secret_service_socket: Option<PathBuf>,
+    default_adapter: Option<String>,
+    #[serde(default)]
+    adapters: BTreeMap<String, Adapter>,
+}
+impl TryFrom<ConfigInput> for Config {
+    type Error = &'static str;
+    fn try_from(input: ConfigInput) -> std::result::Result<Self, Self::Error> {
+        let config = Self {
+            format: input.format,
+            owner_uid: input.owner_uid,
+            approval_clock: input.approval_clock,
+            secret_service_socket: input.secret_service_socket,
+            default_adapter: input.default_adapter,
+            adapters: input.adapters,
+        };
+        config
+            .validate()
+            .map_err(|_| "invalid local configuration")?;
+        Ok(config)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Adapter {
@@ -30,6 +62,9 @@ pub struct Adapter {
     pub adapter_id: String,
     pub configuration_revision: String,
     pub protocol: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "private_selection")]
+    pub private_protocol: Option<super::runtime::PrivateProtocol>,
     #[serde(default)]
     pub startup: Startup,
     #[serde(default)]
@@ -37,6 +72,13 @@ pub struct Adapter {
     pub executable: Executable,
     #[serde(default)]
     pub permissions: Permissions,
+}
+
+fn private_selection<'de, D: serde::Deserializer<'de>>(
+    input: D,
+) -> std::result::Result<Option<super::runtime::PrivateProtocol>, D::Error> {
+    // Presence must mean an explicit supported string, never null-as-absence.
+    super::runtime::PrivateProtocol::deserialize(input).map(Some)
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -48,11 +90,19 @@ pub struct Permissions {
     pub operations: BTreeSet<String>,
 }
 impl Adapter {
+    pub fn private_protocol(&self) -> super::runtime::PrivateProtocol {
+        self.private_protocol
+            .unwrap_or(super::runtime::PrivateProtocol::V1)
+    }
     pub fn selection(&self) -> String {
-        connectors_core::digest(
-            &serde_json::json!({"instance":self.instance_id,"adapter":self.adapter_id,
-            "revision":self.configuration_revision,"protocol":self.protocol,"executable":self.executable}),
-        )
+        let mut value = serde_json::json!({"instance":self.instance_id,"adapter":self.adapter_id,
+            "revision":self.configuration_revision,"protocol":self.protocol,"executable":self.executable});
+        // Preserve every v1 digest byte. An explicit v2-format selection,
+        // including private/1, is a new selection requiring fresh admission.
+        if let Some(protocol) = self.private_protocol {
+            value["private_protocol"] = serde_json::json!(protocol);
+        }
+        connectors_core::digest(&value)
     }
 }
 
@@ -138,8 +188,10 @@ impl Config {
         if let Some(path) = &self.secret_service_socket {
             fs::validate_path(path)?;
         }
-        if self.format != "connectors-local/1"
-            || self.owner_uid != fs::uid()
+        if !matches!(
+            self.format.as_str(),
+            "connectors-local/1" | "connectors-local/2"
+        ) || self.owner_uid != fs::uid()
             || self.adapters.len() > 64
             || self
                 .default_adapter
@@ -169,6 +221,7 @@ impl Config {
                 || !selector(&entry.configuration_revision)
                 || !instances.insert(&entry.instance_id)
                 || entry.protocol != "v1alpha1"
+                || (self.format == "connectors-local/2") != entry.private_protocol.is_some()
                 || entry.permissions.profiles.len() > 64
                 || entry.permissions.operations.len() > 256
                 || entry

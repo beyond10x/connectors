@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 22
+revision: 23
 ---
 ## Outcome and authority
 
@@ -184,3 +184,11 @@ docs/evidence/write-generation-20260911/README.md retains the passing repository
 A separate release integration advanced main to f475e0b5610b1d7334094e5ab507cfa1aa030e45 during a gate's final planning read. Its transient journal/file mismatch is retained; the integrated store subsequently validated and the entire gate passed again with the integrated Cargo version inputs. Its release records and instructions are preserved. This generator increment adds no release, provider access or publication claim. Only the primary checkout remains; this increment created no linked tree.
 
 Next implement private version-two prepare/commit/cancel and production CLI policy/preparation/issuance, then join the existing approval/audit/attempt ledgers to one SHA-guarded GitLab merge. The story and initiative stay active: lost-response CLI/restart acceptance, dedicated sandbox evidence, full distribution reproducibility, complete GitLab workflows and the open create/update atomic-head decision remain required. Full GitLab continues before Kubernetes with Helm, PostgreSQL, MCP and remaining providers. Root remains the sole writer for this implementation and planning increment; paid governed runs are not required and the recorded driver blocker is unchanged.
+
+## Verified private mutation transport checkpoint — 2026-09-11
+
+Private protocol two and explicit local configuration version two are implemented under story:guarded-gitlab-merge. Version-one codecs and implicit selection digests remain unchanged; the old configuration refuses the new field. Readiness and cached descriptor admission enforce the selected effect profile. A live preparation retains immutable native input/credentials and occupies its exact child across the original deadline. Commit and cancel consume it once; malformed/replaced controls, duplicate commit, EOF and expiry refuse without another write. Cancellation acknowledges destruction. Lost commit replies remain unknown; a known applied effect survives failure to validate or disclose safe output. Production GitLab still advertises its read-only projection, and this trusted transport port does not itself admit an approval or write.
+
+docs/evidence/private-protocol-v2-20260911/README.md retains commands, full logs, 385 source/dependency hashes, tested CLI/adapter/keyring identities and limitations. The repository gate with Rust 1.88 passes with two test threads, along with all six disposable GitLab CLI journeys, affected Clippy, website build/typecheck and reference drift checks. The host suite has 113 passes and 18 existing ignored cases; integration tests and the one-use compile-fail example pass. The first full gate encountered MetadataUnavailable in an unchanged audit-capacity test; its exact isolated recheck and the bounded full gate passed. No audit code, contention timeout or test assertion was changed, and the initial failure is preserved without asserting a proven root cause.
+
+Next implement the production CLI policy/preparation/issuance handlers and owner mutation IPC, then join current approval/audit/attempt/connection dispatch to one native SHA-guarded GitLab merge. The lost-response CLI/restart acceptance, dedicated sandbox evidence, full distribution reproducibility and complete GitLab workflows remain required. The sandbox and create/update atomic-head blockers stay open. Root remains the sole writer on main; no linked tree was created. The full GitLab → Kubernetes with Helm → PostgreSQL → MCP → remaining-provider order is unchanged. This is an implementation checkpoint, not a completed guarded merge, provider batch, release or publication; the paid driver blocker is unchanged.
