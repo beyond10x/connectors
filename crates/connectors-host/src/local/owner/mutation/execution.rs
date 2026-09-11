@@ -261,7 +261,7 @@ pub(in crate::local::owner) fn execute(
     let (evidence, current, clock, mut connection_use, native, audit, facts) = match initial {
         Ok(value) => value,
         Err(error) => {
-            if let Some(existing) = observe_as(
+            let observed = observe_as(
                 paths,
                 alias,
                 request,
@@ -269,13 +269,17 @@ pub(in crate::local::owner) fn execute(
                 until,
                 &request_id,
                 audit_reference.as_ref(),
-            )? {
+            );
+            if let Ok(Some(existing)) = observed {
                 return Ok(existing);
             }
             let mut value = failure(&first, &request_id, Classification::NotAttempted, error);
             if let Some(reference) = audit_reference {
                 finish_audit(&audits, reference, &mut value);
             }
+            // Current disclosure may be revoked while native preflight runs.
+            // Complete our admitted audit before propagating that refusal.
+            observed?;
             return Ok(value);
         }
     };
@@ -342,7 +346,7 @@ pub(in crate::local::owner) fn execute(
             let _ = native.cancel();
             drop(keys);
             drop(policy);
-            if let Some(existing) = observe_as(
+            let observed = observe_as(
                 paths,
                 alias,
                 request,
@@ -350,7 +354,8 @@ pub(in crate::local::owner) fn execute(
                 until,
                 &request_id,
                 Some(&reference),
-            )? {
+            );
+            if let Ok(Some(existing)) = observed {
                 return Ok(existing);
             }
             let error = match other {
@@ -359,6 +364,7 @@ pub(in crate::local::owner) fn execute(
             };
             let mut value = failure(&current, &request_id, Classification::NotAttempted, error);
             finish_audit(&audits, reference, &mut value);
+            observed?;
             return Ok(value);
         }
     };
