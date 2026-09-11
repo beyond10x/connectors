@@ -8,17 +8,21 @@
     "https://www.postgresql.org/docs/current/protocol-flow.html"
   ],
   "configuration_schema": {
-    "type": "object",
-    "properties": {
-      "service": {
-        "$ref": "urn:connectors:config:v1:service"
-      },
-      "password": {
-        "$ref": "urn:connectors:config:v1:credential"
-      },
-      "adapter": {
+    "oneOf": [
+      {
+        "title": "effective local configuration",
+        "description": "The document the adapter composition builds and validates at bootstrap, not the file an operator writes. The file carries ca_file; this schema describes the resolved form, in which the CA is reduced to ca_digest. See docs/local-postgres-cli.md for the on-disk format.",
         "type": "object",
         "properties": {
+          "format": {
+            "const": "connectors-sql-local/1"
+          },
+          "instance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
           "host": {
             "type": "string",
             "minLength": 1,
@@ -42,34 +46,93 @@
           "allow_plaintext": {
             "type": "boolean"
           },
-          "ca_file": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 4096
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "ca_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
           }
         },
         "required": [
+          "format",
+          "instance",
           "host",
           "port",
           "database",
-          "user"
+          "user",
+          "allow_plaintext",
+          "ca_digest"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "title": "federated service configuration",
+        "description": "The on-disk document read by --config in the federated service mode.",
+        "type": "object",
+        "properties": {
+          "service": {
+            "$ref": "urn:connectors:config:v1:service"
+          },
+          "password": {
+            "$ref": "urn:connectors:config:v1:credential"
+          },
+          "adapter": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "database": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "user": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "allow_plaintext": {
+                "type": "boolean"
+              },
+              "ca_file": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "host",
+              "port",
+              "database",
+              "user"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "service",
+          "password",
+          "adapter"
         ],
         "additionalProperties": false
       }
-    },
-    "required": [
-      "service",
-      "password",
-      "adapter"
-    ],
-    "additionalProperties": false
+    ]
   },
   "operations": [
     {
