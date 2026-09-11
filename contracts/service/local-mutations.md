@@ -143,13 +143,38 @@ settlement requires a fresh configured trusted-clock sample to establish the fix
 replay retention interval. Acquire that sample before policy/metadata locks. If
 time is unavailable, leave Prepared pending and report uncertainty with its safe
 cause. Quarantine needs no clock and has no expiry. A failed/uncertain recovery
-acknowledgement grants no send or retry; observe the authoritative original once.
+acknowledgement grants no send or immediate retry; observe the authoritative original once.
 Terminal results retain their passive path without owner startup or clock access.
 The original invocation budget includes owner startup, queueing and recovery.
 
-This local binding currently selects recovery through an exact business key.
-Background recovery and cleanup of unkeyed or unobserved abandoned attempts remain
-required runtime work; neither a pending row nor storage pressure grants reuse.
+The owner also runs periodic metadata recovery without requiring a caller to
+return with a key. It waits five seconds between read-only passes using the existing
+instance/state index, visiting at most eight instances and returning at most 64 pending
+references for one instance. Its transient instance/attempt cursor rotates across
+retained records, including unkeyed attempts. Scanning never installs a mutation
+schema or reads stored result payloads. Metadata handles close before clock I/O.
+
+For a live instance worker, at most one maintenance batch is queued on that
+retained worker. Earlier native exchanges must finish before it can apply a
+recovery fence. With no live worker, the supervisor instead holds its
+worker-creation lock while recovering that instance; a definitely exited retained
+thread supplies no dispatch authority and is not replaced implicitly. Each
+transaction checks the exact retained attempt/instance binding. The batch checks
+a 250 ms work budget between attempts, with the existing bounded metadata wait
+inside an attempt; remaining records are revisited by later scans. Owner cleanup
+stops and joins the maintenance thread as well as its instance workers.
+
+This housekeeping fences existing records even after a connection is revoked or
+an adapter is removed from configuration. It does not disclose their results,
+spend proof, resolve credentials, launch an instance worker or adapter child, lift
+suppression, expire a key, delete history, or create new business authority. Known settlement still
+needs the currently selected trusted clock; absent/changed time leaves Prepared
+pending while Dispatching can be quarantined without time. A later scheduled
+pass may revisit an unresolved attempt only after fresh positive pending evidence,
+never merely because an earlier acknowledgement failed. Current admission still
+governs every subsequent result request. Pending/quarantined entries and storage
+pressure never grant reuse. Original-audit reconciliation and the complete
+acknowledgement-failure matrix remain separate required work.
 
 For a new candidate, verify required proof, current credential readiness and native
 input. Acknowledge the admitted execution audit anchor before native preflight,
