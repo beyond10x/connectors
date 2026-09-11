@@ -22,13 +22,27 @@ pub enum Location {
 }
 
 impl Location {
-    fn parse(value: &str) -> Option<Self> {
+    /// The spellings a document uses, read into the model. Shared with the
+    /// authored reader: a second table of these four would be a second answer to
+    /// what `header` means, and the readers must give one.
+    pub(crate) fn parse(value: &str) -> Option<Self> {
         match value {
             "path" => Some(Self::Path),
             "query" => Some(Self::Query),
             "header" => Some(Self::Header),
             "cookie" => Some(Self::Cookie),
             _ => None,
+        }
+    }
+
+    /// The reverse: how this location is written when a report or a supplied key
+    /// has to name it.
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Path => "path",
+            Self::Query => "query",
+            Self::Header => "header",
+            Self::Cookie => "cookie",
         }
     }
 }
