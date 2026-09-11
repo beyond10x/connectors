@@ -109,6 +109,27 @@ pub struct Evidence {
     compact: Secret,
 }
 impl Evidence {
+    /// Decode the protected file format emitted by local issuance. The proof
+    /// borrows directly from its zeroizing source buffer while decoding; it
+    /// never enters the ordinary JSON Value/String decoder. Literal ASCII JWS
+    /// bytes need no JSON escapes, so escaped proof strings are refused.
+    pub fn from_document(document: Secret) -> Result<Self> {
+        if document.0.len() > 20 * 1024 {
+            return Err(Failure::Refused);
+        }
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Document<'a> {
+            reference: &'a str,
+            evidence: &'a str,
+        }
+        let value: Document<'_> =
+            serde_json::from_slice(&document.0).map_err(|_| Failure::Refused)?;
+        Self::from_protected(
+            value.reference.into(),
+            Secret(value.evidence.as_bytes().to_vec()),
+        )
+    }
     pub fn from_protected(reference: String, compact: Secret) -> Result<Self> {
         digest(&reference)?;
         if compact.0.is_empty() || compact.0.len() > 18 * 1024 {

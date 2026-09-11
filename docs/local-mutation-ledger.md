@@ -16,7 +16,9 @@ validation does not qualify a clock or establish durable dispatch behavior.
 Version 4 extends the existing private SQLite authority, preserving the bytes and
 digests of migrations 1–3. Reads do not create or upgrade missing state.
 Only admitted mutation preparation installs version 4; ordinary setup and read
-management retain version 3 and can inspect recognized versions 4–6. WAL, FULL
+management retain version 3 and can inspect recognized versions 4–8. The mutation,
+audit and approval-spend ports also accept version 8, so publication of a local
+approval policy does not disable their independently acknowledged decisions. WAL, FULL
 synchronization, owner-only files and bounded lifecycle locking remain the
 [existing metadata binding](local-runtime-foundation.md).
 
@@ -97,9 +99,11 @@ credentials, approval evidence and raw input have no storage field.
 
 The SQLite tests exercise durable faults and races using a deterministic trusted
 clock fixture. A test counter can demonstrate receipt use, but is not a native
-GitLab write. Private proof/spend and audit persistence are now available;
-protected persistent issuer custody, local approval CLI issuance, production
-clock qualification, generated mutation CLI/wire surfaces and their fully
-admitted dispatch composition remain the next GitLab foundation work.
+GitLab write. Private proof/spend and audit persistence,
+[protected issuer custody](local-approval-keys.md), [local approval issuance](local-approvals.md)
+and [configured clock checks](local-clock.md) are available. A combined SQLite
+test exercises audit admission, proof spend, dispatch and reconstruction/recovery
+on the policy's version-eight schema. Generated mutation CLI/wire surfaces and
+the fully admitted dispatch coordinator remain implementation work.
 Dedicated GitLab sandbox acceptance and the C14 native create/update head guard
 are still open. GitLab precedes Kubernetes, PostgreSQL, MCP and remaining providers.
