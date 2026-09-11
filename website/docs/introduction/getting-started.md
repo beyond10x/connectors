@@ -90,7 +90,9 @@ Success returns the adapter alias and an observation containing
 `configuration_sha256`, `lower_unix_ms` and `upper_unix_ms`, at most four seconds
 apart. The command starts no owner or adapter and reads no credential or metadata.
 An unavailable source, wrong key or uncertain time bound refuses safely.
-The output is historical observation, not reusable approval evidence. Approval
-issuance and provider writes remain pending. Ordinary reads need no approval
+The output is historical observation, not reusable approval evidence. On current `main`, the CLI also
+provides `approvals policy-status`, `policy-set`, `prepare` and `issue` for explicitly
+selected private-protocol-two write adapters. Production GitLab still advertises
+reads; its write dispatch remains pending. Ordinary reads need no approval
 clock. See the [clock contract](/contracts/clock) for the trust assumptions,
 process lifetime, suspend detection and conservative UTC-midnight refusal window.

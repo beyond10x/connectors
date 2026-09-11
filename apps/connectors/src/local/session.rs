@@ -7,7 +7,11 @@ use connectors_host::local::{
     protected, runtime,
 };
 use connectors_sdk::Secret;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 const MARKER: &str = "connectors-admitted-private-capture/1";
 pub(super) type Shared = Rc<RefCell<Session>>;
@@ -23,10 +27,12 @@ pub(super) struct Session {
     signals: Option<protected::Signals>,
     early: Option<(String, Context, owner::Error)>,
     pub deadline: u64,
+    pub approval_deadline: Instant,
     pub cancelled: bool,
 }
 impl Session {
     pub fn new(args: &[OsString]) -> Shared {
+        let approval_deadline = Instant::now() + Duration::from_secs(20);
         let selection = (|| {
             // Use the generated command and its argument ids. No effect is
             // performed by this preparse, including help and invalid arguments.
@@ -74,6 +80,7 @@ impl Session {
             signals: None,
             early: None,
             deadline: 0,
+            approval_deadline,
             cancelled: false,
         }))
     }
@@ -92,6 +99,25 @@ impl Session {
     }
     fn acquire(&mut self, source: ProtectedSource) -> owner::Result<String> {
         self.signals()?;
+        if self
+            .selection
+            .as_ref()
+            .is_some_and(|s| matches!(s.callable.as_str(), "approval-prepare" | "approval-issue"))
+        {
+            return match source {
+                ProtectedSource::DocumentFile(path) => protected::document_until(
+                    Some(&path),
+                    self.approval_deadline,
+                    owner::approval_issuance::TARGET_LIMIT,
+                ),
+                ProtectedSource::DocumentStdin => protected::document_until(
+                    None,
+                    self.approval_deadline,
+                    owner::approval_issuance::TARGET_LIMIT,
+                ),
+                _ => Err(Code::InvalidInput.into()),
+            };
+        }
         match source {
             ProtectedSource::DocumentFile(path) => return protected::document(Some(&path)),
             ProtectedSource::DocumentStdin => return protected::document(None),

@@ -5,6 +5,26 @@ binary: connectors
 about: Local integration access through explicitly configured adapters
 globals: {config: config, state: state-dir, output: output}
 callables:
+  approval-policy-status:
+    target: {kind: local, owner: connectors.cli, action: approval-policy-status}
+    input: connectors.cli.ApprovalPolicyStatusInput
+    result: connectors.cli.ApprovalPolicyResult
+    errors: {failure: connectors.cli.Failure}
+  approval-policy-set:
+    target: {kind: local, owner: connectors.cli, action: approval-policy-set}
+    input: connectors.cli.ApprovalPolicySetInput
+    result: connectors.cli.ApprovalPolicyResult
+    errors: {failure: connectors.cli.Failure}
+  approval-prepare:
+    target: {kind: local, owner: connectors.cli, action: approval-prepare}
+    input: connectors.cli.ApprovalPrepareInput
+    result: connectors.cli.ApprovalPrepareResult
+    errors: {failure: connectors.cli.Failure}
+  approval-issue:
+    target: {kind: local, owner: connectors.cli, action: approval-issue}
+    input: connectors.cli.ApprovalIssueInput
+    result: connectors.cli.ApprovalIssueResult
+    errors: {failure: connectors.cli.Failure}
   approval-clock-check:
     target: {kind: local, owner: connectors.cli, action: approval-clock-check}
     input: connectors.cli.ApprovalClockCheckInput
@@ -121,6 +141,64 @@ callables:
     result: connectors.cli.OperationInvokeResult
     errors: {failure: connectors.cli.Failure}
 commands:
+  - path: [approvals, policy-status]
+    aliases: []
+    callable: approval-policy-status
+    about: Inspect retained local write policy without starting services
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+  - path: [approvals, policy-set]
+    aliases: []
+    callable: approval-policy-set
+    about: Publish the exact permitted write-operation set under revision control
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: expected_revision
+        source: {kind: option, long: expected-revision}
+      # ess-cli/1 document carriers require all three sources. The production
+      # handler acquires this file-only input through its bounded document reader.
+      - field: input_file
+        source: {kind: option, long: input-file}
+  - path: [approvals, prepare]
+    aliases: []
+    callable: approval-prepare
+    about: Resolve the exact approval subject without provider or credential access
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: operation
+        source: {kind: option, long: operation}
+      - field: schema
+        source: {kind: option, long: schema}
+      - field: revision
+        source: {kind: option, long: revision}
+      - field: input
+        source: {kind: document, inline: input-json, file: input-file, stdin: input-stdin}
+  - path: [approvals, issue]
+    aliases: []
+    callable: approval-issue
+    about: Approve the exact reconstructed subject and publish a new protected proof file
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: operation
+        source: {kind: option, long: operation}
+      - field: schema
+        source: {kind: option, long: schema}
+      - field: revision
+        source: {kind: option, long: revision}
+      - field: input
+        source: {kind: document, inline: input-json, file: input-file, stdin: input-stdin}
+      - field: approve_subject
+        source: {kind: option, long: approve-subject}
+      - field: proof_output
+        source: {kind: option, long: proof-output}
   - path: [approvals, clock-check]
     aliases: []
     callable: approval-clock-check
