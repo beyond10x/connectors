@@ -69,9 +69,14 @@ pub fn read_index(directory: &Path) -> Result<Index> {
     if !path.exists() {
         return Ok(Index::default());
     }
-    let bytes = std::fs::read(&path).map_err(|_| refuse(ErrorCode::NotFound, "index cannot be read"))?;
-    connectors_core::read_json(&bytes)
-        .map_err(|_| refuse(ErrorCode::InvalidInput, "index is not a document this build parses"))
+    let bytes =
+        std::fs::read(&path).map_err(|_| refuse(ErrorCode::NotFound, "index cannot be read"))?;
+    connectors_core::read_json(&bytes).map_err(|_| {
+        refuse(
+            ErrorCode::InvalidInput,
+            "index is not a document this build parses",
+        )
+    })
 }
 
 fn write_index(directory: &Path, index: &Index) -> Result<()> {
@@ -85,7 +90,10 @@ fn write_index(directory: &Path, index: &Index) -> Result<()> {
 /// overwrite an inventory somebody is loading.
 pub fn write(directory: &Path, bundle: &Bundle, replace: bool) -> Result<Entry> {
     if !connectors_core::valid_id(&bundle.provider) {
-        return Err(refuse(ErrorCode::InvalidInput, "invalid provider identifier"));
+        return Err(refuse(
+            ErrorCode::InvalidInput,
+            "invalid provider identifier",
+        ));
     }
     std::fs::create_dir_all(directory)
         .map_err(|_| refuse(ErrorCode::Unavailable, "bundle directory cannot be created"))?;
@@ -99,7 +107,10 @@ pub fn write(directory: &Path, bundle: &Bundle, replace: bool) -> Result<Entry> 
     let file_name = format!("{}.bundle.json", bundle.provider);
     let bytes = serde_json::to_vec(bundle).map_err(|_| Error::internal())?;
     if bytes.len() > BUNDLE_LIMIT {
-        return Err(refuse(ErrorCode::Capacity, "bundle exceeds the permitted size"));
+        return Err(refuse(
+            ErrorCode::Capacity,
+            "bundle exceeds the permitted size",
+        ));
     }
     std::fs::write(directory.join(&file_name), &bytes)
         .map_err(|_| refuse(ErrorCode::Unavailable, "bundle cannot be written"))?;
@@ -130,7 +141,10 @@ pub fn load(directory: &Path, provider: &str) -> Result<Bundle> {
     let bytes = std::fs::read(&path)
         .map_err(|_| refuse(ErrorCode::NotFound, "indexed bundle file is absent"))?;
     if bytes.len() > BUNDLE_LIMIT {
-        return Err(refuse(ErrorCode::Capacity, "bundle exceeds the permitted size"));
+        return Err(refuse(
+            ErrorCode::Capacity,
+            "bundle exceeds the permitted size",
+        ));
     }
     if hex::encode(Sha256::digest(&bytes)) != entry.bundle_sha256 {
         return Err(refuse(
@@ -138,8 +152,12 @@ pub fn load(directory: &Path, provider: &str) -> Result<Bundle> {
             "bundle does not match the digest the index recorded",
         ));
     }
-    let bundle: Bundle = connectors_core::read_json(&bytes)
-        .map_err(|_| refuse(ErrorCode::InvalidInput, "bundle is not a document this build parses"))?;
+    let bundle: Bundle = connectors_core::read_json(&bytes).map_err(|_| {
+        refuse(
+            ErrorCode::InvalidInput,
+            "bundle is not a document this build parses",
+        )
+    })?;
     if bundle.provider != entry.provider {
         return Err(refuse(
             ErrorCode::InvalidInput,
