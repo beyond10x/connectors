@@ -154,10 +154,11 @@ fn a_write_step_refusal_leaves_a_bundle_file_behind() {
 /// Story, Acceptance: a run "returns a record ... whose index entry matches what
 /// `bundle::read_index` reports."
 ///
-/// `bundle::write` reads the index, writes the bundle and writes the index back
-/// with no lock over the three, so two runs into one directory lose each other's
-/// entries: every run returns `Ok` with an entry, and the index names fewer
-/// providers than there are bundle files beside it.
+/// `bundle::write` held no lock over its read-modify-write, so two runs into one
+/// directory lost each other's entries: every run returned `Ok` with an entry,
+/// and the index named fewer providers than there were bundle files beside it.
+/// It now takes an exclusive lock for that section, and this case asserts the
+/// property the adversary pass originally wrote it for.
 #[test]
 fn concurrent_runs_into_one_directory_lose_index_entries() {
     const WRITERS: usize = 8;
@@ -201,28 +202,17 @@ fn concurrent_runs_into_one_directory_lose_index_entries() {
                 record.entry.provider
             );
         }
-        // The property this case was written to assert — that the index names every run that
-        // returned a record — does not hold: concurrent writers lose each other's index entries
-        // through the read-modify-write in `bundle::write`. That defect is open as
-        // `story:catalog-index-concurrent-writers`, and the equality above is its acceptance.
-        //
-        // What is pinned here is today's behaviour, deterministically: every accepted run wrote
-        // its bundle, the index names at least one of them, and it never names a provider that did
-        // not run. When the story is taken, restore the equality assertion and delete this note.
-        assert!(
-            !named.is_empty(),
-            "round {round}: the index names nothing at all, which is worse than the known race; \
+        // The property holds: every run that returned a record is named by the index.
+        // `bundle::write` now holds an exclusive lock over the read-modify-write, so a
+        // second writer waits rather than reading a copy the first is about to replace.
+        // This equality is the acceptance of `story:catalog-index-concurrent-writers`.
+        assert_eq!(
+            named,
+            accepted,
+            "round {round}: the index must name exactly the runs that returned a record; \
              directory holds {:?}",
             listing(&directory)
         );
-        for provider in &named {
-            assert!(
-                accepted.contains(provider),
-                "round {round}: the index names `{provider}`, which no run returned a record for; \
-                 accepted {accepted:?}, directory holds {:?}",
-                listing(&directory)
-            );
-        }
     }
 }
 
