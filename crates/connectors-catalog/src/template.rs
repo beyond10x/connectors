@@ -40,6 +40,16 @@ pub enum Refusal {
     /// survive encoding, and RFC 3986 section 5.2.4 resolves them away before the
     /// request leaves — moving the path rather than filling it.
     PathValueDotSegment(String),
+    /// A **declared** path whose own literal text carries a dot segment, as in
+    /// `/files/{name}/../admin`. RFC 3986 section 5.2.4 resolves it away before
+    /// the request leaves, so the operation would bind to a path other than the
+    /// one it names. The declared path is the operation's identity and no caller
+    /// value moves it, but `bundle::load` reads a document a third party may have
+    /// written and its digest vouches for the bytes matching the index row, not
+    /// for who wrote them. Refusing here costs nothing: the HTTP capability
+    /// already rejects a `.` or `..` segment at dispatch, so such a template
+    /// could never have reached a provider.
+    PathDeclaredDotSegment(String),
     /// A header name or value carrying a byte a header line cannot hold. A bare
     /// CR or LF ends the line and starts a header nobody declared.
     HeaderUnsafe(String),
@@ -66,6 +76,7 @@ impl Refusal {
             | Self::PathMalformed(subject)
             | Self::PathValueEmpty(subject)
             | Self::PathValueDotSegment(subject)
+            | Self::PathDeclaredDotSegment(subject)
             | Self::HeaderUnsafe(subject)
             | Self::MediaTypeUnoffered(subject)
             | Self::MediaTypeUnsafe(subject)
@@ -98,6 +109,9 @@ impl Refusal {
             Self::PathValueDotSegment(name) => {
                 format!("path parameter `{name}` has a value that is a dot segment")
             }
+            Self::PathDeclaredDotSegment(path) => {
+                format!("declared path `{path}` contains a dot segment")
+            }
             Self::HeaderUnsafe(name) => {
                 format!("header `{name}` carries a byte a header line cannot hold")
             }
@@ -129,6 +143,7 @@ impl From<Refusal> for Error {
             | Refusal::PathMalformed(_)
             | Refusal::PathValueEmpty(_)
             | Refusal::PathValueDotSegment(_)
+            | Refusal::PathDeclaredDotSegment(_)
             | Refusal::HeaderUnsafe(_)
             | Refusal::MediaTypeUnoffered(_)
             | Refusal::MediaTypeUnsafe(_) => ErrorCode::InvalidInput,
@@ -298,6 +313,20 @@ fn segments(path: &str) -> std::result::Result<Vec<Segment>, Refusal> {
     }
     if !rest.is_empty() {
         out.push(Segment::Literal(rest.to_owned()));
+    }
+    // The declared literals are checked once, here, rather than at dispatch:
+    // a template that could never leave the process is better refused when it
+    // is bound than when somebody invokes it.
+    for segment in &out {
+        let Segment::Literal(text) = segment else {
+            continue;
+        };
+        if text
+            .split('/')
+            .any(|component| component == "." || component == "..")
+        {
+            return Err(Refusal::PathDeclaredDotSegment(path.to_owned()));
+        }
     }
     Ok(out)
 }

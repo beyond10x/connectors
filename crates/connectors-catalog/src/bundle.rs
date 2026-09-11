@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 /// The file that names every bundle in a directory.
 pub const INDEX_FILE: &str = "index.json";
@@ -102,6 +103,80 @@ fn restore_index(directory: &Path, previous: Option<&[u8]>) {
     }
 }
 
+/// The name that holds one directory's index while a writer reads it, changes it
+/// and writes it back. A bundle file ends `.bundle.json` and the index is
+/// `index.json`, so this name shadows nothing a reader looks for.
+const LOCK_FILE: &str = ".index.writing";
+/// How long a writer waits for another to finish before refusing. The held
+/// section is a read, a sort and a write of one small file.
+const LOCK_WAIT: Duration = Duration::from_secs(10);
+/// A lock older than this is treated as abandoned by a writer that died. It is
+/// far longer than the held section, so a live writer is never displaced.
+const LOCK_STALE: Duration = Duration::from_secs(120);
+
+/// Exclusive hold over one directory's index.
+///
+/// Without it, `write` reads the index, appends its row and writes the whole file
+/// back with nothing in between, so two writers each read the same index and the
+/// second erases the first's row while both are told they succeeded. Measured
+/// before this existed: eight concurrent writers, eight bundle files on disk, two
+/// rows in the index.
+///
+/// `create_new` is the exclusion: on a local filesystem exactly one caller
+/// creates the name. Dropping the guard removes it, including on the error paths,
+/// because the guard outlives every `?` in the section it covers.
+struct IndexLock {
+    path: PathBuf,
+}
+
+impl IndexLock {
+    fn acquire(directory: &Path) -> Result<Self> {
+        let path = directory.join(LOCK_FILE);
+        let deadline = Instant::now() + LOCK_WAIT;
+        loop {
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(_) => return Ok(Self { path }),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if std::fs::metadata(&path)
+                        .and_then(|meta| meta.modified())
+                        .ok()
+                        .and_then(|modified| modified.elapsed().ok())
+                        .is_some_and(|age| age > LOCK_STALE)
+                    {
+                        // The holder is gone. Removing the name is safe to race:
+                        // whoever wins the next `create_new` holds the lock.
+                        let _ = std::fs::remove_file(&path);
+                        continue;
+                    }
+                    if Instant::now() >= deadline {
+                        return Err(refuse(
+                            ErrorCode::Unavailable,
+                            "another writer holds the bundle index",
+                        ));
+                    }
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                Err(_) => {
+                    return Err(refuse(
+                        ErrorCode::Unavailable,
+                        "bundle index cannot be locked",
+                    ));
+                }
+            }
+        }
+    }
+}
+
+impl Drop for IndexLock {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 /// A bundle written under a working name, put in place by a rename.
 ///
 /// Dropping one without committing removes the working file, so a refusal raised
@@ -178,6 +253,10 @@ pub fn write(directory: &Path, bundle: &Bundle, replace: bool) -> Result<Entry> 
     }
     std::fs::create_dir_all(directory)
         .map_err(|_| refuse(ErrorCode::Unavailable, "bundle directory cannot be created"))?;
+    // Held from before the index is read until after it is written back, which
+    // is the whole read-modify-write. The duplicate-provider check reads the
+    // index too, so it is inside the hold and cannot decide on a stale copy.
+    let _lock = IndexLock::acquire(directory)?;
     let mut index = read_index(directory)?;
     if index.find(&bundle.provider).is_some() && !replace {
         return Err(refuse(

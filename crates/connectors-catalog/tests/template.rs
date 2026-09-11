@@ -478,3 +478,32 @@ fn the_media_types_a_document_really_writes_are_accepted() {
         }
     }
 }
+
+#[test]
+fn a_declared_path_carrying_a_dot_segment_is_refused_when_the_template_is_bound() {
+    // The second adversary pass raised this and could not write a case for it,
+    // because asserting the opposite of a stated decision asserts a preference.
+    // The decision is now made: a declared path is refused, so the case exists.
+    for path in [
+        "/files/{id}/../admin",
+        "/../admin",
+        "/files/./{id}",
+        "/files/{id}/..",
+    ] {
+        let mut operation = operation();
+        operation.path = path.to_owned();
+        let refusal = Template::from_operation(&operation)
+            .expect_err("a declared dot segment resolves the path away from itself");
+        assert_eq!(refusal, Refusal::PathDeclaredDotSegment(path.into()));
+        assert_eq!(refusal.subject(), path);
+        assert!(refusal.reason().contains(path), "{}", refusal.reason());
+    }
+    // A literal dot inside a segment is not a dot segment and still binds.
+    let mut operation = operation();
+    operation.path = "/files/v1.0/{id}".into();
+    let bound = Template::from_operation(&operation)
+        .expect("a dot inside a segment names a real path component")
+        .bind(&values(&[("id", "42"), ("tenant", "acme")]), None)
+        .expect("binds");
+    assert_eq!(bound.path, "/files/v1.0/42");
+}
