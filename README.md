@@ -30,17 +30,25 @@ operations. The [changelog](CHANGELOG.md) records its scope and remaining work.
 
 The local CLI implements setup, configured adapter management, protected
 connect/repair, saved-credential revalidation, connection inspection/revoke, cached operation discovery and
-supervised GitLab reads through its generated parser. A local owner manages exact
+supervised GitLab and Kubernetes reads. A local owner manages exact
 child processes; SQLite records metadata and a qualified Secret Service keyring
-stores credentials. See the [GitLab CLI guide](docs/local-gitlab-cli.md) and
+stores credentials. See the [GitLab CLI guide](docs/local-gitlab-cli.md), the
+[Kubernetes CLI guide](docs/local-kubernetes-cli.md) and the
 [runtime binding](docs/local-runtime-foundation.md).
 
 Disposable GitLab HTTPS and keyring fixtures prove saved-credential reuse after
 CLI, owner and keyring restarts. Explicit revalidation renews the 60-second
 validation evidence without credential re-entry. Dedicated GitLab sandbox
-acceptance remains open. Kubernetes and
-PostgreSQL still need this local lifecycle binding; MCP and the remaining providers
-follow them. The explicit network commands below remain compatible.
+acceptance remains open.
+
+Kubernetes now has the same local lifecycle binding: a saved bearer token, an
+identity validated by one SelfSubjectReview probe, and its three reads through the
+local owner. Disposable TLS cluster and keyring fixtures prove reuse after CLI,
+owner and keyring restarts. Per-operation SelfSubjectAccessReview permission
+checks are not implemented and no result claims authorization coverage; dedicated
+Kubernetes sandbox acceptance remains open. PostgreSQL still needs this local
+lifecycle binding; MCP and the remaining providers follow. The explicit network
+commands below remain compatible.
 
 This repository contains a working local data/discovery slice and a broader,
 reviewed specification baseline. The local **v0.1.0 milestone is a specification
@@ -53,7 +61,7 @@ The current services provide:
 | Adapter | Implemented operations | Binding |
 |---|---|---|
 | GitLab | `project.get`, `issues.list`, `file.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.validate` | GitLab API v4, with a configured project allowlist; exact-commit CI, bounded traces, MR update windows and pinned-head validation observations |
-| Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover` | Kubernetes API, with namespace and resource-kind restrictions |
+| Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover` | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines |
 
 They can run as separate Rust services, with a generic CLI and one-hop federation.
