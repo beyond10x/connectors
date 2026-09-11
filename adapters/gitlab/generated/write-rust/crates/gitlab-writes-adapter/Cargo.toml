@@ -1,0 +1,13 @@
+# generated from gitlab_writes v1
+# model digest 60e62b0197192fde0bab0673274f72e3236cac4e4c6b290f72b847ab42c0254f
+# contract digest bf080db26d82ecf93e6e97307361cd6a49bbf2ef3cb125dd19f3a4605b5a35c2
+# do not edit: regenerate with `ess synthesize`
+
+[package]
+name = "gitlab-writes-adapter"
+description = "The `gitlab-writes-adapter` component of the `gitlab_writes` specification, v1: its port, generated."
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+gitlab_writes-types = { path = "../gitlab_writes-types" }

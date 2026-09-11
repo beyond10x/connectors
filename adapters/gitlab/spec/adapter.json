@@ -1,5 +1,5 @@
 {
-  "kind": "connectors.adapter/v2",
+  "kind": "connectors.adapter/v3",
   "id": "gitlab",
   "version": "0.1.0",
   "sources": [
@@ -2069,6 +2069,256 @@
         "prepare",
         "finish"
       ]
+    }
+  ],
+  "writes": [
+    {
+      "operation": {
+        "id": "merge_request.merge",
+        "description": "Merge the current approved source head after fresh pipeline checks",
+        "contract": "gitlab.merge-requests/v1alpha1",
+        "profile": "guarded-merge",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "iid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            "sha": {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            "pipeline_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            }
+          },
+          "required": [
+            "project",
+            "iid",
+            "sha",
+            "pipeline_id"
+          ],
+          "additionalProperties": false
+        },
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "item": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "iid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "project_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "source_project_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9223372036854775807
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "target_project_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9223372036854775807
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 16384
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "source_branch": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "target_branch": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "draft": {
+                  "type": "boolean"
+                },
+                "detailed_merge_status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "sha": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "merge_commit_sha": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "squash_commit_sha": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "updated_at": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "id",
+                "iid",
+                "project_id",
+                "source_project_id",
+                "target_project_id",
+                "title",
+                "description",
+                "source_branch",
+                "target_branch",
+                "state",
+                "draft",
+                "detailed_merge_status",
+                "sha",
+                "merge_commit_sha",
+                "squash_commit_sha",
+                "updated_at"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object",
+              "properties": {
+                "instance": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "resource": {
+                  "type": "string"
+                },
+                "observed_at_unix_ms": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "source_revision": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "instance",
+                "resource",
+                "observed_at_unix_ms",
+                "source_revision"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "item",
+            "provenance"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "mapping": {
+        "operation": "merge_request.merge",
+        "upstream_operation": "putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge",
+        "path": "/api/v4/projects/{id}/merge_requests/{merge_request_iid}/merge",
+        "method": "put",
+        "path_parameters": {
+          "id": {
+            "kind": "input",
+            "name": "project"
+          },
+          "merge_request_iid": {
+            "kind": "input",
+            "name": "iid"
+          }
+        },
+        "query_parameters": {},
+        "body": {
+          "sha": {
+            "kind": "input",
+            "name": "sha"
+          },
+          "auto_merge": {
+            "kind": "boolean",
+            "value": false
+          },
+          "should_remove_source_branch": {
+            "kind": "boolean",
+            "value": false
+          }
+        }
+      }
     }
   ]
 }

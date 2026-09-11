@@ -124,9 +124,11 @@ pending and quarantine never authorize a new send. Result disclosure still needs
 current policy and target admission; it cannot be obtained by naming an old key.
 
 For a new candidate, verify required proof, current credential readiness and native
-input. Native preflight may perform declared bounded reads but cannot write. After
-it returns the exact immutable native preparation, acquire/recheck current time,
-policy/key and connection-bound use. Acknowledge audit admission, then atomically
+input. Acknowledge the admitted execution audit anchor before native preflight,
+because its declared reads are provider dispatches under the audit contract.
+Native preflight cannot write. After it returns the exact immutable native
+preparation, acquire/recheck current time, policy/key and connection-bound use.
+Confirm the original acknowledged audit receipt and its unchanged facts, then atomically
 prepare the attempt and any business-key reservation. Spend approval for that exact
 Prepared attempt, acknowledge the connection-use dispatch admission, then win the
 separate durable Prepared-to-Dispatching gate under the still-current binding.

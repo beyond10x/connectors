@@ -7,10 +7,13 @@ fn root() -> &'static Path {
     Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
 }
 fn legacy() -> Value {
-    serde_json::from_slice(
+    let mut value: Value = serde_json::from_slice(
         &std::fs::read(root().join("adapters/gitlab/spec/adapter.json")).unwrap(),
     )
-    .unwrap()
+    .unwrap();
+    value["kind"] = json!("connectors.adapter/v2");
+    value.as_object_mut().unwrap().remove("writes");
+    value
 }
 
 #[test]
