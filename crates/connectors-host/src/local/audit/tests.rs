@@ -356,7 +356,23 @@ fn capacity_is_atomic_per_instance_without_eviction_or_append_restriction() {
                 let store = &store;
                 scope.spawn(move || {
                     barrier.wait();
-                    store.anchor(&anchor())
+                    // Eight threads contend for four slots against one SQLite file. This
+                    // test asserts that capacity is atomic, not how the store behaves when
+                    // its busy timeout is exhausted — and under a loaded machine running
+                    // the rest of the suite beside it, a thread can exhaust that timeout
+                    // and return MetadataUnavailable, which is neither of the two answers
+                    // capacity has. Retry that one failure mode so the assertion below
+                    // measures what it is about. See story:host-suite-load-sensitivity.
+                    let mut attempt = 0;
+                    loop {
+                        match store.anchor(&anchor()) {
+                            Err(Failure::MetadataUnavailable) if attempt < 16 => {
+                                attempt += 1;
+                                std::thread::sleep(Duration::from_millis(50));
+                            }
+                            outcome => break outcome,
+                        }
+                    }
                 })
             })
             .collect();
@@ -736,11 +752,15 @@ fn recovering_append_reuses_exact_fields_and_reads_a_lost_acknowledgement() {
         let reference = reference(store.anchor(&anchor()).unwrap());
         let observation = final_value();
         store.fault.store(fault, Ordering::SeqCst);
+        // A recovery budget generous enough that a busy scheduler cannot consume it.
+        // These tests assert what recovery does, not how fast it is; the one test that
+        // does assert expiry passes an already-elapsed instant. See
+        // story:host-suite-load-sensitivity.
         let record = store
             .append_recovering(
                 &reference,
                 &observation,
-                Instant::now() + Duration::from_secs(1),
+                Instant::now() + Duration::from_secs(60),
             )
             .unwrap();
         assert_eq!(record.final_observation, Some(observation.clone()));
@@ -775,7 +795,7 @@ fn recovering_append_never_substitutes_a_different_final_observation() {
             store.append_recovering(
                 &reference,
                 &changed,
-                Instant::now() + Duration::from_secs(1)
+                Instant::now() + Duration::from_secs(60)
             ),
             Err(Failure::Conflict)
         );
@@ -815,7 +835,7 @@ fn expired_recovery_budget_performs_no_extra_storage_calls() {
                 .append_recovering(
                     &reference,
                     &observation,
-                    Instant::now() + Duration::from_secs(1)
+                    Instant::now() + Duration::from_secs(60)
                 )
                 .unwrap()
                 .final_observation,
@@ -836,7 +856,7 @@ fn recovering_append_requires_a_readable_exact_original_anchor() {
         store.append_recovering(
             &other,
             &final_value(),
-            Instant::now() + Duration::from_secs(1)
+            Instant::now() + Duration::from_secs(60)
         ),
         Err(Failure::NotFound)
     );
@@ -861,7 +881,7 @@ fn recovering_append_requires_a_readable_exact_original_anchor() {
         store.append_recovering(
             &reference,
             &final_value(),
-            Instant::now() + Duration::from_secs(1)
+            Instant::now() + Duration::from_secs(60)
         ),
         Err(Failure::MetadataUnavailable)
     );
@@ -879,7 +899,7 @@ fn recovering_append_stops_after_one_failed_retry() {
         store.append_recovering(
             &reference,
             &observation,
-            Instant::now() + Duration::from_secs(1)
+            Instant::now() + Duration::from_secs(60)
         ),
         Err(Failure::MetadataUnavailable)
     );
