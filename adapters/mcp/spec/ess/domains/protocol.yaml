@@ -1,0 +1,192 @@
+domain: connectors_mcp.protocol
+summary: MCP-owned protocol values read from the pinned specification revisions.
+
+# Normative owner: adapters/mcp/design.md and the pinned-source record
+# adapters/mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md.
+#
+# Every citation below is written `<archived file>:<line>`, where the file is
+# `adapters/mcp/contracts/protocol/v1alpha1/evidence/20260912/vendor/<file>.gz` and the
+# line is a line of its *uncompressed* bytes, the convention that record states for its
+# own section table. Nothing here is read from the network; the archives are the
+# authority.
+#
+# These are protocol declarations, not support claims. A value listed here is what the
+# pinned revisions say exists. It is not evidence that any MCP server implements it and
+# it is not a statement that this repository speaks it: specification-sources.md
+# "## Limits" says so in its own words, and adapters/mcp/design.md repeats it.
+#
+# UNMAPPED: which revisions, transports and capabilities this repository selects. That
+# is story:mcp-profile-selection-matrix, which reads this file; no selection is made
+# here and no enum below may be read as one.
+types:
+  # The two negotiable wire version strings, taken from the PRIMARY revision.
+  # mcp-2026-07-28-basic-versioning.mdx:62 is the `UnsupportedProtocolVersionError`
+  # example, `"supported": ["2026-07-28", "2025-11-25"]`, and
+  # mcp-2026-07-28-schema.ts:30 declares `LATEST_PROTOCOL_VERSION = "2026-07-28"`.
+  #
+  # Three places a reader would look first give a DIFFERENT string, and none of them is
+  # cited here (specification-sources.md "## The version-string trap this pin makes
+  # checkable"): mcp-2025-11-25-schema.ts:14 declares `LATEST_PROTOCOL_VERSION =
+  # "DRAFT-2025-v3"`; mcp-2025-11-25-basic-lifecycle.mdx:61 and :107 carry
+  # `"protocolVersion": "2024-11-05"`; mcp-2025-11-25-basic-transports.mdx:271 gives
+  # `MCP-Protocol-Version: 2025-06-18`. The `2025-11-25` revision does state its own
+  # string, in the `<Info>**Protocol Revision**: 2025-11-25</Info>` banner carried by 18
+  # of its 22 archived documents.
+  #
+  # UNMAPPED: the protocol's version set is not closed by these two.
+  # mcp-2026-07-28-basic-versioning.mdx:36-37 defines "Legacy" as `2025-11-25` *and
+  # earlier*, so further strings exist upstream. These two are the ones this repository
+  # pinned; a third would need its own archived bytes before it could be named.
+  - name: connectors_mcp.protocol.ProtocolRevision
+    kind: enum
+    variants: ["2026-07-28", "2025-11-25"]
+
+  # mcp-2026-07-28-basic-versioning.mdx:34-39, "## Terminology", verbatim three terms:
+  # Modern (per-request metadata, `2026-07-28` and later), Legacy (an `initialize`
+  # handshake, `2025-11-25` and earlier), Dual-era (an implementation supporting both).
+  # :148-152 states that era is a property of the SERVER, not of an individual request,
+  # that a client SHOULD cache it for the lifetime of the server process (stdio) or
+  # origin (HTTP), and MAY persist it across restarts of the same server configuration,
+  # re-probing if the cached assumption later fails.
+  #
+  # UNMAPPED: whether this repository persists a determined era at all, and where. The
+  # source says a client MAY; "MAY" is not a cardinality and is not a durable record.
+  - name: connectors_mcp.protocol.ProtocolEra
+    kind: enum
+    variants: [modern, legacy, dual-era]
+
+  # Four bindings, not two. mcp-2026-07-28-basic-transports-index.mdx:18-22 names stdio
+  # and Streamable HTTP as the standard bindings; :60-72 permits custom transports under
+  # MUST-level constraints; mcp-2026-07-28-basic-transports-streamable-http.mdx:695 and
+  # :703-705 retain the `2024-11-05` HTTP+SSE transport as deprecated-not-removed, and
+  # mcp-2026-07-28-deprecated.mdx:22,31,37 lists it under `## Deprecated` and above
+  # `## Removed`. mcp-2025-11-25-basic-transports.mdx:22 and :54 name the same first two
+  # for the interoperability revision, and its :284-311 fallback terminates in HTTP+SSE.
+  # adapters/mcp/design.md "## What is deliberately not decided here" tabulates all four
+  # with these citations.
+  #
+  # UNMAPPED: which of these four this repository supports, and whether any is
+  # explicitly refused. story:mcp-profile-selection-matrix owns a row per binding. The
+  # initiative names stdio and Streamable HTTP as implementation targets; a target list
+  # is not a selection and is not the option space.
+  - name: connectors_mcp.protocol.TransportBinding
+    kind: enum
+    variants: [stdio, streamable-http, custom, http-sse-2024-11-05]
+
+  # mcp-2026-07-28-schema.ts:793-883, `interface ServerCapabilities`, in declaration
+  # order: experimental (797), logging (808), completions (815), prompts (825),
+  # resources (846), tools (865), extensions (882). `logging` is deprecated as of
+  # `2026-07-28` and retained for at least twelve months (schema.ts:801-803).
+  #
+  # UNMAPPED: this enum is NOT the closed set of server capabilities.
+  # mcp-2026-07-28-schema.ts:789 says in as many words: "Known capabilities are defined
+  # here, in this schema, but this is not a closed set: any server can define its own,
+  # additional capabilities." How an unknown advertised key is carried — a String, a
+  # second variant, a refusal — is unread, so nothing here carries one.
+  - name: connectors_mcp.protocol.ServerCapabilityKind
+    kind: enum
+    variants: [experimental, logging, completions, prompts, resources, tools, extensions]
+
+  # mcp-2026-07-28-schema.ts:716-786, `interface ClientCapabilities`, in declaration
+  # order: experimental (720), roots (732), sampling (749), elicitation (769),
+  # extensions (785). `roots` (724-726) and `sampling` (736-738) are deprecated as of
+  # `2026-07-28`. The interoperability revision's own table
+  # (mcp-2025-11-25-basic-lifecycle.mdx:195-199) additionally lists a client `tasks`
+  # capability, which the primary revision's schema does not carry as a named field.
+  #
+  # UNMAPPED: whether `tasks` is modelled as a client capability of this root or as an
+  # extension identifier. mcp-2026-07-28-basic-versioning.mdx:105-112 shows Tasks as the
+  # extension `io.modelcontextprotocol/tasks` instead, so the two pinned revisions
+  # disagree about its shape and no reading of one settles the other.
+  - name: connectors_mcp.protocol.ClientCapabilityKind
+    kind: enum
+    variants: [experimental, roots, sampling, elicitation, extensions]
+
+  # mcp-2025-11-25-basic-lifecycle.mdx:12-14, the interoperability revision's own
+  # numbered list: 1. Initialization, 2. Operation, 3. Shutdown.
+  #
+  # These are phases of the LEGACY revision only. The primary revision declares no
+  # session at all: mcp-2026-07-28-basic-index.mdx:184-187 says MCP "is a **stateless
+  # protocol**" and that a server "processes each request independently", and its
+  # :204-209 note says "an open connection, such as a STDIO process, is not a
+  # conversation or session". A phase value is therefore meaningful only where the
+  # legacy revision is in force.
+  - name: connectors_mcp.protocol.LegacySessionPhase
+    kind: enum
+    variants: [initialization, operation, shutdown]
+
+  # mcp-2026-07-28-schema.ts:434, :442, :450 declare the three codes this revision adds:
+  # HEADER_MISMATCH = -32020, MISSING_REQUIRED_CLIENT_CAPABILITY = -32021,
+  # UNSUPPORTED_PROTOCOL_VERSION = -32022. schema.ts:422-424 records that `-32002`
+  # (resource not found, `2025-11-25` and earlier) and `-32042` (URL elicitation
+  # required, `2025-11-25` only) remain reserved and are never reused.
+  #
+  # UNMAPPED: the JSON-RPC base codes and every per-capability error this repository
+  # would have to map. story:mcp-profile-selection-matrix and the later invocation
+  # contracts read mcp-2026-07-28-server-tools.mdx:738 and
+  # mcp-2025-11-25-server-tools.mdx:449 for those; naming three codes here is not a
+  # claim to have enumerated the protocol's errors.
+  - name: connectors_mcp.protocol.ProtocolErrorCode
+    kind: enum
+    variants: [header-mismatch, missing-required-client-capability, unsupported-protocol-version]
+
+  # mcp-2026-07-28-basic-versioning.mdx:54-67, the `UnsupportedProtocolVersionError`
+  # example body. `supported` is List<String> and not List<ProtocolRevision> on purpose:
+  # a server names the versions IT supports, which need not be either pinned revision,
+  # and :69-71 has the client select a mutually supported one from that list.
+  - name: connectors_mcp.protocol.UnsupportedProtocolVersion
+    kind: struct
+    fields:
+      - {name: supported, type: "List<String>"}
+      - {name: requested, type: String}
+
+  # mcp-2026-07-28-server-discover.mdx:50-53 and :98-99, the
+  # `_meta['io.modelcontextprotocol/serverInfo']` name and version of the server
+  # software, which servers SHOULD include.
+  #
+  # :103-107 is a note this model carries forward rather than paraphrases: serverInfo
+  # "is self-reported by the server and is not verified by the protocol", clients
+  # SHOULD NOT use it to change their behavior and SHOULD NOT rely on it for security
+  # decisions. It is display, logging and debugging data. It is not an identity, not an
+  # admission input and not a provenance fact.
+  - name: connectors_mcp.protocol.ServerIdentity
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: version, type: String}
+
+  # mcp-2026-07-28-server-utilities-caching.mdx:44 names the two values of the
+  # `cacheScope` field, and :100-101 defines them: "public" — no user-specific data, any
+  # client, shared gateway or caching proxy MAY store and serve it to any user;
+  # "private" — MAY be reused for the same authorization context, and caches MUST NOT be
+  # shared across authorization contexts.
+  - name: connectors_mcp.protocol.CacheScope
+    kind: enum
+    variants: [public, private]
+
+  # How the two directions obtain a credential at all, which the pinned revisions make a
+  # property of the TRANSPORT rather than of the peer.
+  # mcp-2026-07-28-basic-index.mdx:223-229 and the identical
+  # mcp-2026-07-28-basic-authorization-index.mdx:20-24: HTTP-based transports SHOULD
+  # conform to the MCP authorization framework; STDIO transports SHOULD NOT follow it
+  # "and instead retrieve credentials from the environment"; alternative transports MUST
+  # follow established security best practices for their protocol; and clients and
+  # servers MAY negotiate their own custom strategies (basic-index.mdx:228-229).
+  - name: connectors_mcp.protocol.CredentialAcquisitionMode
+    kind: enum
+    variants: [http-authorization-framework, stdio-environment, custom-negotiated]
+
+  # mcp-2026-07-28-basic-authorization-index.mdx:47-58, "## Roles": a protected MCP
+  # server acts as an OAuth 2.1 resource server (49-50); an MCP client acts as an OAuth
+  # 2.1 client (52-53); the authorization server issues the access tokens used at the
+  # MCP server and "may be hosted with the resource server or a separate entity"
+  # (55-58).
+  #
+  # UNMAPPED: how many authorization servers one MCP server has.
+  # :84-86 and :157 have a client "extract authorization server(s)" from Protected
+  # Resource Metadata and then "determine[] AS to use", which states that the list may
+  # hold more than one and that the client picks, but no source states a bound, a
+  # default or what a client does when the list is empty.
+  - name: connectors_mcp.protocol.AuthorizationRole
+    kind: enum
+    variants: [mcp-client, mcp-server-resource-server, authorization-server]
