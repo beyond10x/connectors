@@ -110,5 +110,21 @@
     "sha256": "d08a4dcdbbadcc56a7ae6e87c69ac07cdba5b34dfa170cacc6f60088c5ddcbe0",
     "bytes": 4248,
     "archive": "vendor/helm-v3.22.0-validate-name.go.gz"
+  },
+  {
+    "file": "helm-v4.3.0-action.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/action/action.go",
+    "sha256": "c0e51629b03d3833829ee0206836239f0107b32847bf4806706b6ccd55b79b00",
+    "bytes": 25269,
+    "archive": "vendor/helm-v4.3.0-action.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-action.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/action/action.go",
+    "sha256": "f9253c25df531bbf3a25e6f4227959ee0c111f32b72f49d76fea078929d81e72",
+    "bytes": 14606,
+    "archive": "vendor/helm-v3.22.0-action.go.gz"
   }
 ]

@@ -43,12 +43,15 @@ types:
     # source_secret is the exact object name sh.helm.release.v1.<release>.v<revision>
     # (pinned storage.go:327-328 / :251-252); it is the provenance the observation
     # came from, not a caller-selectable locator. source_revision is the
-    # Kubernetes resourceVersion of that object and is absent when the provider
-    # omits it; it is bounded at 512 bytes, the bound the published output
-    # schema declares, and an object exceeding it refuses. namespace is the
-    # namespace the object reports, falling back to the admitted selection only
-    # when the object omits it, so no field of an observation is the caller's
-    # own input. revision is the decimal version label (secrets.go:266 / :236).
+    # Kubernetes resourceVersion of that object and is absent when, and only
+    # when, the provider omits the key; it is bounded at 512 bytes, the bound
+    # the published output schema declares, and an object exceeding it refuses.
+    # A value present in a shape this binding has not established — a number, a
+    # null, anything but a string — is not an omission and refuses rather than
+    # being reported as absent. namespace is the namespace the object reports,
+    # falling back to the admitted selection under the same rule: only when the
+    # key is absent, never when it is present and unreadable, so no field of an
+    # observation is the caller's own input. revision is the decimal version label (secrets.go:266 / :236).
     # created_at_unix_s and modified_at_unix_s are written by separate code paths
     # (secrets.go:174 and :205 in the v4 line, :155 and :181 in the v3 line), so a
     # revision carries one, both or neither; absent means not recorded, never zero.
@@ -111,11 +114,24 @@ types:
       - {name: bytes, type: Integer}
       - {name: content_digest, type: String}
     # The safe projection of one document of the rendered manifest (pinned
-    # release.go:43 / :33). index is its position in the stored text, bytes its
-    # UTF-8 length and content_digest a SHA-256 over exactly those bytes — the
-    # document text itself, which sha256sum on the document reproduces. It is
-    # deliberately not the digest RecordedValueProjection.value_digest computes;
-    # see that type for why the two cover different bytes.
+    # release.go:43 / :33). index is the document's position in this projection,
+    # counting from zero over the documents actually emitted — not its position
+    # in the stored text. The two coincide for every manifest Helm writes,
+    # because Helm's writer emits no empty document (action.go:358,476 / :183)
+    # and this projection drops a whitespace-only chunk, but a page that starts
+    # at a later document or omits one would separate them, so index is defined
+    # as the emitted position rather than assumed equal to the stored one.
+    # bytes is the document's UTF-8 length as stored and content_digest an
+    # unsalted SHA-256 over exactly those stored bytes, with nothing stripped:
+    # Helm terminates every document with a newline, including the last, so a
+    # reader that extracts a document reproduces content_digest with sha256sum.
+    # It is deliberately not the digest RecordedValueProjection.value_digest
+    # computes; see that type for why the two cover different bytes.
+    # A chart's templates are usually public, so the unknown part of a rendered
+    # document may be only the value injected into it, and bytes publishes that
+    # document's exact length. This projection is therefore no stronger than the
+    # recorded-value one and in a public chart can be weaker: like value_digest,
+    # content_digest confirms a guess offline.
     # UNMAPPED: the apiVersion, kind, name and namespace of the document. The
     # stored manifest is YAML and this binding has no YAML reader; extracting
     # those from lines would be a guess, not a parse, so they are absent rather

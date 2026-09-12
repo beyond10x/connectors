@@ -1,8 +1,8 @@
 # Helm release storage sources — 2026-09-12
 
 [provider-source-hashes.json](provider-source-hashes.json) retains the exact URL,
-uncompressed SHA-256 and byte length of fourteen Helm source files: seven from
-Helm `v4.3.0`, commit `bec5b06ed841fe5269972d864d5177944fd5970f`, and the seven
+uncompressed SHA-256 and byte length of sixteen Helm source files: eight from
+Helm `v4.3.0`, commit `bec5b06ed841fe5269972d864d5177944fd5970f`, and the eight
 corresponding files from Helm `v3.22.0`, commit
 `144ca65f8501953fa8b41cd1d37c7223051c85b7`. Each `vendor/*.go.gz` is a `gzip -n`
 archive whose decompressed bytes were compared against the recorded digest and
@@ -101,6 +101,20 @@ exist only in the v4 line and are not read. `info.notes` (`v4 info.go:42`,
 `v3 info.go:37`) and `info.resources` (`v4 info.go:44`, `v3 info.go:39`) are not
 read; notes are rendered template output and resources are populated by a status
 action rather than by the storage driver.
+
+## How a stored manifest is framed
+
+| Fact | Helm v4.3.0 | Helm v3.22.0 |
+|---|---|---|
+| every document is written `"---\n# Source: %s\n%s\n"` | `action.go:358,476` | `action.go:183` |
+| hooks and CRDs use the same framing | `action.go:487,503` | `action.go:194,210` |
+
+The format string terminates **every** document with a newline, including the
+last, so the stored manifest ends with one and each document's bytes between
+separators end with one. That is why the native contract's projection digests
+and counts the stored bytes with nothing stripped: a document whose trailing
+newline were removed would not reproduce under `sha256sum` for a reader that
+extracted it, and the final document would differ from every other one.
 
 ## Status values
 
