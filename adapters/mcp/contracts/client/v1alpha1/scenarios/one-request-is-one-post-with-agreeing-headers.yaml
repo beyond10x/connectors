@@ -7,6 +7,9 @@ wire_code: n/a
 summary: One JSON-RPC message is one POST whose mirrored headers agree with the body they
   mirror.
 given:
+  - A binding configured for the primary revision (2026-07-28); under the
+    interoperability revision (2025-11-25) the mirrored headers are `MCP-Protocol-Version`
+    and any assigned `MCP-Session-Id` instead.
   - A binding configured for `transport:streamable-http`.
 when:
   - The client sends a request and, separately, a notification

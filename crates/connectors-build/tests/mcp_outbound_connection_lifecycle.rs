@@ -152,6 +152,7 @@ struct Row {
     state: String,
     outcome: String,
     wire_code: String,
+    actor: String,
     scenario: String,
     line: usize,
 }
@@ -176,14 +177,14 @@ fn rows() -> Vec<Row> {
         }
         assert_eq!(
             cells.len(),
-            4,
-            "semantics.md:{} is a register row with {} cells, not the four the register \
-             declares (state, outcome, wire code, scenario): {trimmed}",
+            5,
+            "semantics.md:{} is a register row with {} cells, not the five the register \
+             declares (state, outcome, wire code, whose act, scenario): {trimmed}",
             index + 1,
             cells.len()
         );
         let scenario = link
-            .captures(&cells[3])
+            .captures(&cells[4])
             .unwrap_or_else(|| {
                 panic!(
                     "semantics.md:{} names no `scenarios/<file>.yaml` link: {trimmed}",
@@ -198,6 +199,7 @@ fn rows() -> Vec<Row> {
             state,
             outcome: cells[1].trim_matches('`').to_string(),
             wire_code: cells[2].trim_matches('`').to_string(),
+            actor: cells[3].trim_matches('`').to_string(),
             scenario,
             line: index + 1,
         });
@@ -678,10 +680,17 @@ fn the_document_does_not_close_the_revision_set_the_model_leaves_open() {
 }
 
 /// Outbound stdio is held by an open decision-blocker, so this document specifies none of
-/// it. Every mention of the word sits in the section that holds it, or on a line that
-/// names the blocker.
+/// it — and nothing else is held by that blocker either.
+///
+/// The first pass of this case exempted every line that named the blocker, which let a
+/// line naming it say anything about any transport: the document called the remainder of
+/// a **four**-family space "the other outbound transport family" and attributed it here,
+/// while the matrix refuses two of those families under no blocker at all. So the
+/// exemption now requires the line to name stdio in its own words rather than inside the
+/// blocker's id, and a collective reference to "the other" transport is refused outright,
+/// because the family a disposition is stated for has to be the one that was named.
 #[test]
-fn outbound_stdio_is_held_by_its_blocker_and_specified_nowhere() {
+fn outbound_stdio_is_held_by_its_blocker_and_nothing_else_is() {
     let document = semantics();
     let blocker = "decision-blocker:mcp-outbound-stdio-process-ownership";
     assert!(
@@ -689,25 +698,56 @@ fn outbound_stdio_is_held_by_its_blocker_and_specified_nowhere() {
         "semantics.md specifies an outbound transport without naming the blocker that \
          holds the other one"
     );
+    let families = outbound_transport_families();
+    assert!(
+        families.len() > 2,
+        "the selection matrix names {} outbound transport families, so \"the other\" one \
+         would be an unambiguous reference: {families:?}",
+        families.len()
+    );
+
     let held = section(&document, HELD_HEADING);
+    // The held section, in line numbers, so a paragraph can be placed inside or outside
+    // it without matching wrapped text against wrapped text.
+    let held_from = document
+        .lines()
+        .position(|line| line.starts_with(HELD_HEADING))
+        .expect("semantics.md carries no held section")
+        + 1;
+    let held_to = held_from + held.lines().count();
+    let collective = regex::Regex::new(r"(?i)the other (outbound |inbound )?transport").unwrap();
     let mut broken = Vec::new();
-    for (index, line) in document.lines().enumerate() {
-        if !line.to_lowercase().contains("stdio") {
-            continue;
+    // Read by paragraph, not by line: the claim a disposition belongs to is a sentence,
+    // and this document is hard-wrapped, so the transport a paragraph names and the
+    // blocker it attributes it to land on different lines about half the time.
+    for (line, text) in paragraphs(&document) {
+        let held_here = (held_from..held_to).contains(&line);
+        // The blocker's own id contains the word, so a paragraph has only named the
+        // transport if it names it outside that id.
+        let outside_the_id = text.replace(blocker, "").to_lowercase();
+        if collective.is_match(&text) {
+            broken.push(format!(
+                "semantics.md:{line} calls a {}-family transport space \"the other\" one: \
+                 {text:?}",
+                families.len()
+            ));
         }
-        if held.contains(line) || line.contains(blocker) {
-            continue;
+        if text.contains(blocker) && !outside_the_id.contains("stdio") {
+            broken.push(format!(
+                "semantics.md:{line} attributes `{blocker}` to a transport it does not \
+                 name, and that blocker holds outbound stdio alone: {text:?}"
+            ));
         }
-        broken.push(format!(
-            "semantics.md:{} states something about stdio outside `{HELD_HEADING}` and \
-             without naming the blocker: {}",
-            index + 1,
-            line.trim()
-        ));
+        if outside_the_id.contains("stdio") && !held_here && !text.contains(blocker) {
+            broken.push(format!(
+                "semantics.md:{line} states something about stdio outside \
+                 `{HELD_HEADING}` and without naming the blocker: {text:?}"
+            ));
+        }
     }
     assert!(
         broken.is_empty(),
-        "{} lines answer a held question:\n  {}",
+        "{} lines answer a held question, or hold a question that was not asked:\n  {}",
         broken.len(),
         broken.join("\n  ")
     );
@@ -746,6 +786,335 @@ fn no_citation_into_an_editable_document_carries_a_line_number() {
     assert!(
         broken.is_empty(),
         "{} citations will drift when their target is edited:\n  {}",
+        broken.len(),
+        broken.join("\n  ")
+    );
+}
+
+// ── Round 1: the classes behind the adversary's findings ────────────────────────────
+//
+// Each case below answers a *class* an adversary pass found one instance of. The
+// instance is named in the case's own documentation; the rule is what the case asserts.
+
+fn selection_matrix() -> String {
+    read(&repository_root().join("adapters/mcp/contracts/protocol/v1alpha1/selection.md"))
+}
+
+fn mcp_model() -> String {
+    read(&repository_root().join("adapters/mcp/spec/ess/domains/state.yaml"))
+}
+
+/// Every run of whitespace collapsed, because these documents are hard-wrapped and a
+/// phrase straddles the wrap.
+fn flat(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The text with every archived-source citation removed.
+///
+/// An archived file is named `mcp-<revision>-…`, so a passage that cites one contains a
+/// revision string without having said anything about which revision it holds for. Every
+/// rule below that asks a passage to name a revision asks it of the prose.
+fn without_citations(text: &str) -> String {
+    regex::Regex::new(r"mcp-[0-9A-Za-z._+-]+\.(?:mdx|ts)(?::\d+(?:-\d+)?)?")
+        .unwrap()
+        .replace_all(text, " ")
+        .to_string()
+}
+
+/// Paragraphs of a document as `(first line number, text with the wrap collapsed)`.
+fn paragraphs(document: &str) -> Vec<(usize, String)> {
+    let mut found = Vec::new();
+    let mut start = 0usize;
+    let mut buffer: Vec<&str> = Vec::new();
+    for (index, line) in document.lines().enumerate() {
+        if line.trim().is_empty() {
+            if !buffer.is_empty() {
+                found.push((start + 1, flat(&buffer.join(" "))));
+                buffer.clear();
+            }
+            continue;
+        }
+        if buffer.is_empty() {
+            start = index;
+        }
+        buffer.push(line);
+    }
+    if !buffer.is_empty() {
+        found.push((start + 1, flat(&buffer.join(" "))));
+    }
+    found
+}
+
+/// The revisions the selection matrix dispositions `supported` in the outbound direction,
+/// read out of the matrix. Two of them disagreeing is the whole reason for the rule below.
+fn supported_outbound_revisions() -> BTreeSet<String> {
+    let row = regex::Regex::new(
+        r"\|\s*`revision:([0-9A-Za-z.-]+)`\s*\|\s*(?:outbound|both)\s*\|[^|]*\|\s*supported\s*\|",
+    )
+    .unwrap();
+    row.captures_iter(&selection_matrix())
+        .map(|capture| capture[1].to_string())
+        .collect()
+}
+
+/// The outbound transport families the matrix names, read the same way.
+fn outbound_transport_families() -> BTreeSet<String> {
+    let row =
+        regex::Regex::new(r"\|\s*`(transport:[a-z-]+)`\s*\|\s*(?:outbound|both)\s*\|").unwrap();
+    row.captures_iter(&selection_matrix())
+        .map(|capture| capture[1].to_string())
+        .collect()
+}
+
+/// The name the document gives each revision, declared once in its own preamble. Reading
+/// the aliases out of the document rather than writing them here means a section may
+/// resolve the question in the document's own words, and a renamed revision fails.
+fn revision_aliases() -> BTreeMap<String, String> {
+    let document = flat(&semantics());
+    let declaration =
+        regex::Regex::new(r"`revision:([0-9A-Za-z.-]+)` \*\*(the [a-z ]+ revision)\*\*").unwrap();
+    declaration
+        .captures_iter(&document)
+        .map(|capture| (capture[1].to_string(), capture[2].to_string()))
+        .collect()
+}
+
+/// The fields `connectors_mcp.state.McpServerBinding` declares, read out of the model.
+fn binding_fields() -> Vec<String> {
+    let model = mcp_model();
+    let start = model
+        .find("- name: connectors_mcp.state.McpServerBinding")
+        .expect("the MCP model declares no `McpServerBinding`");
+    let rest = &model[start..];
+    let end = rest
+        .find("\n    lifecycle:")
+        .expect("`McpServerBinding` declares no lifecycle, so its field block has no end");
+    let field = regex::Regex::new(r"\{name: ([a-z_]+), type:").unwrap();
+    field
+        .captures_iter(&rest[..end])
+        .map(|capture| capture[1].to_string())
+        .collect()
+}
+
+/// **The class behind three of the adversary's findings.** The matrix dispositions two
+/// revisions `supported` outbound; where they disagree, a passage that names neither
+/// states one of them as the transport's rule. Sections 3, 10 and 11 said which revision
+/// they held for; 6 to 9 did not, and all three findings landed in 6 to 9.
+///
+/// So: every numbered section resolves the question for every supported revision, and so
+/// does every scenario's `given` — a scenario is read as a case about a binding, and a
+/// binding has a configured revision. The pair is read from the matrix and the names from
+/// the document's own preamble; neither is written here.
+#[test]
+fn every_section_and_scenario_resolves_which_revision_it_holds_for() {
+    let supported = supported_outbound_revisions();
+    assert!(
+        supported.len() > 1,
+        "the selection matrix dispositions {} revision(s) supported outbound, so no \
+         passage can state the wrong one's rule and this case has nothing to hold: \
+         {supported:?}",
+        supported.len()
+    );
+    let aliases = revision_aliases();
+    let mut undeclared: Vec<&String> = supported
+        .iter()
+        .filter(|revision| !aliases.contains_key(*revision))
+        .collect();
+    undeclared.sort();
+    assert!(
+        undeclared.is_empty(),
+        "semantics.md gives no name to {undeclared:?}, which the matrix dispositions \
+         supported outbound; it names {aliases:?}"
+    );
+
+    let names_the_revision = |text: &str, revision: &str| -> bool {
+        let prose = without_citations(&flat(text)).to_lowercase();
+        prose.contains(revision) || prose.contains(&aliases[revision].to_lowercase())
+    };
+
+    let document = semantics();
+    let mut unresolved = Vec::new();
+    let numbered = regex::Regex::new(r"(?m)^## \d+\. .*$").unwrap();
+    let headings: Vec<String> = numbered
+        .find_iter(&document)
+        .map(|found| found.as_str().to_string())
+        .collect();
+    assert!(
+        headings.len() > 1,
+        "semantics.md carries {} numbered sections, so this case is reading the wrong \
+         document",
+        headings.len()
+    );
+    for heading in &headings {
+        let body = section(&document, heading);
+        for revision in &supported {
+            if !names_the_revision(&body, revision) {
+                unresolved.push(format!(
+                    "`{heading}` says nothing about `{revision}`, which the matrix \
+                     dispositions supported outbound, so its rule reads as the \
+                     transport's for a binding it may be false for"
+                ));
+            }
+        }
+    }
+    for (path, value) in owned_scenarios() {
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .expect("scenario file name");
+        let given = match &value["given"] {
+            serde_yaml_ng::Value::Sequence(items) => items
+                .iter()
+                .filter_map(|item| item.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
+            serde_yaml_ng::Value::String(text) => text.clone(),
+            _ => String::new(),
+        };
+        if !supported
+            .iter()
+            .any(|revision| names_the_revision(&given, revision))
+        {
+            unresolved.push(format!(
+                "{name} names no revision in its `given`, so it reads as a case about \
+                 every binding this repository selects: {:?}",
+                flat(&given)
+            ));
+        }
+    }
+    assert!(
+        unresolved.is_empty(),
+        "{} passages state a rule without saying which of {supported:?} it holds for:\n  {}",
+        unresolved.len(),
+        unresolved.join("\n  ")
+    );
+}
+
+/// **The class behind the durable-record finding.** `determined_era` was declared
+/// byte-identical before and after an observation in one paragraph and recorded from a
+/// wire probe in another — and it is a field of the `McpServerBinding` **entity**, which
+/// the model says a client may persist.
+///
+/// The instance was one field and one verb. The rule is the story's own: this document
+/// specifies what a live connection does, and no sentence of it writes a field of the
+/// binding entity. Every field is read out of the model, so a field added later is
+/// covered without this file being edited.
+#[test]
+fn no_sentence_writes_a_field_of_the_binding_entity() {
+    let fields = binding_fields();
+    assert!(
+        fields.len() > 1,
+        "the model declares {} field(s) on `McpServerBinding`, so this case is reading \
+         the wrong entity: {fields:?}",
+        fields.len()
+    );
+    let writes = regex::Regex::new(
+        r"(?i)\b(?:is|are|was|were|gets?|becomes?)\s+(?:then\s+)?(?:recorded|set|written|stored|saved|persisted|updated|assigned|remembered)\b",
+    )
+    .unwrap();
+
+    let document = semantics();
+    let mut broken = Vec::new();
+    for (line, text) in paragraphs(&document) {
+        let named: Vec<&String> = fields
+            .iter()
+            .filter(|field| text.contains(*field))
+            .collect();
+        if named.is_empty() {
+            continue;
+        }
+        if let Some(verb) = writes.find(&text) {
+            broken.push(format!(
+                "semantics.md:{line} says `{}` of {named:?}, which are fields of the \
+                 `McpServerBinding` entity; this document specifies a live connection and \
+                 implies no durable record of one",
+                verb.as_str().trim()
+            ));
+        }
+    }
+    assert!(
+        broken.is_empty(),
+        "{} paragraphs write a field of the binding entity:\n  {}",
+        broken.len(),
+        broken.join("\n  ")
+    );
+}
+
+/// **The class behind the wrong wire code.** `-32020` was filed under `upstream_protocol`
+/// — a code that blames the peer — for a condition only this client or an intermediary
+/// can produce. Which code is right for a given condition is a judgement no test can
+/// make; *whose act a refusal reports* is a fact the register can carry, and once it does,
+/// the code that contradicts it is mechanical.
+///
+/// So the register carries a fourth column, and this case holds the mapping: an
+/// observation names no actor, a refusal names one, `upstream_protocol` is the peer's,
+/// `internal` is this client's, and `outcome_unknown` is nobody's because nothing was
+/// observed.
+#[test]
+fn every_refusal_names_whose_act_it_reports() {
+    const ACTORS: [&str; 5] = ["n/a", "peer", "client", "operator", "unobserved"];
+    /// A code that names a side may only be reported as that side's act. `peer` carries
+    /// several codes and `operator` one, so only these three are fixed by their code.
+    const CODE_NAMES_THE_ACT_OF: [(&str, &str); 3] = [
+        ("upstream_protocol", "peer"),
+        ("internal", "client"),
+        ("outcome_unknown", "unobserved"),
+    ];
+    /// The other direction, for the two acts that have exactly one code: a refusal that
+    /// reports this client's own act is `internal`, and one that reports nothing observed
+    /// is `outcome_unknown`. Saying so in both directions is what makes the code that
+    /// blames the wrong side fail rather than read plausibly.
+    const ACT_IS_CARRIED_BY: [(&str, &str); 2] =
+        [("client", "internal"), ("unobserved", "outcome_unknown")];
+
+    let rows = rows();
+    let mut broken = Vec::new();
+    for row in &rows {
+        if !ACTORS.contains(&row.actor.as_str()) {
+            broken.push(format!(
+                "semantics.md:{} `{}` reports the act of `{}`, which is not one of \
+                 {ACTORS:?}",
+                row.line, row.outcome, row.actor
+            ));
+            continue;
+        }
+        match (row.wire_code.as_str(), row.actor.as_str()) {
+            ("n/a", "n/a") => {}
+            ("n/a", actor) => broken.push(format!(
+                "semantics.md:{} `{}` is an observation, not a refusal, and reports the \
+                 act of `{actor}`",
+                row.line, row.outcome
+            )),
+            (_, "n/a") => broken.push(format!(
+                "semantics.md:{} `{}` refuses with `{}` and names whose act it reports as \
+                 nobody's",
+                row.line, row.outcome, row.wire_code
+            )),
+            _ => {}
+        }
+        for (code, actor) in CODE_NAMES_THE_ACT_OF {
+            if row.wire_code == code && row.actor != actor {
+                broken.push(format!(
+                    "semantics.md:{} `{}` carries `{code}`, which reports the act of \
+                     `{actor}`, and names `{}`",
+                    row.line, row.outcome, row.actor
+                ));
+            }
+        }
+        for (actor, code) in ACT_IS_CARRIED_BY {
+            if row.actor == actor && row.wire_code != code {
+                broken.push(format!(
+                    "semantics.md:{} `{}` reports the act of `{actor}`, whose code is \
+                     `{code}`, and carries `{}`",
+                    row.line, row.outcome, row.wire_code
+                ));
+            }
+        }
+    }
+    assert!(
+        broken.is_empty(),
+        "{} register rows disagree about whose act they report:\n  {}",
         broken.len(),
         broken.join("\n  ")
     );
