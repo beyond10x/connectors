@@ -45,6 +45,10 @@ struct Provider {
     response_status: Arc<std::sync::atomic::AtomicU16>,
     merge_mode: Arc<std::sync::atomic::AtomicU8>,
     merge_effects: Arc<std::sync::atomic::AtomicUsize>,
+    /// Incremented once a held merge response is actually waiting for its
+    /// release. An observer that waits for this cannot release a hold the
+    /// handler has not entered yet.
+    merge_held: Arc<std::sync::atomic::AtomicUsize>,
 }
 impl Provider {
     fn new() -> Self {
@@ -80,6 +84,8 @@ impl Provider {
         let merge_behavior = merge_mode.clone();
         let merge_effects = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let effects = merge_effects.clone();
+        let merge_held = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let held = merge_held.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -99,6 +105,11 @@ impl Provider {
                         match stream.read_u8().await {Ok(byte)=>header.push(byte),Err(_)=>break}
                     }
                     let request=String::from_utf8(header).unwrap();
+                    // Latch the merge behavior before this request becomes observable.
+                    // Recording the method first would let an observer release a hold
+                    // between that record and the branch below, so the handler would
+                    // answer the released mode instead of the held one.
+                    let merge=merge_behavior.load(std::sync::atomic::Ordering::SeqCst);
                     observed_methods.lock().unwrap().push(request.split_whitespace().next().unwrap_or_default().to_owned());
                     let path=request.split_whitespace().nth(1).unwrap_or_default().to_owned();
                     let route=path.split('?').next().unwrap();
@@ -124,8 +135,18 @@ impl Provider {
                     if valid && request.starts_with("PUT ") && route=="/api/v4/projects/org%2Fproject/merge_requests/4/merge" {
                         let input: Value = serde_json::from_slice(&body).unwrap();
                         assert_eq!(input, json!({"sha":"0123456789abcdef0123456789abcdef01234567","auto_merge":false,"should_remove_source_branch":false}));
-                        let mode = merge_behavior.load(std::sync::atomic::Ordering::SeqCst);
-                        let (status, body) = if mode == 2 { (409, b"head changed".to_vec()) } else {
+                        let mode = merge;
+                        let (status, body) = if mode == 2 || mode == 6 {
+                            if mode == 6 {
+                                // Hold a known refusal until the test has made host
+                                // settlement fail, then answer the same refusal.
+                                held.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                                while merge_behavior.load(std::sync::atomic::Ordering::SeqCst) == 6 {
+                                    tokio::select! {_=&mut stopped=>return,_=tokio::time::sleep(Duration::from_millis(10))=>{}}
+                                }
+                            }
+                            (409, b"head changed".to_vec())
+                        } else {
                             effects.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                             if mode == 1 { continue; } // effect occurred; response lost
                             if mode == 3 {
@@ -135,6 +156,14 @@ impl Provider {
                                     tokio::select! {_=&mut stopped=>return,_=tokio::time::sleep(Duration::from_millis(10))=>{}}
                                 }
                                 continue;
+                            }
+                            if mode == 5 {
+                                // The effect already happened. Hold its known response
+                                // until the test has made host settlement fail.
+                                held.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                                while merge_behavior.load(std::sync::atomic::Ordering::SeqCst) == 5 {
+                                    tokio::select! {_=&mut stopped=>return,_=tokio::time::sleep(Duration::from_millis(10))=>{}}
+                                }
                             }
                             let (_, body, _) = mr_provider::reply("/api/v4/projects/org%2Fproject/merge_requests/4", "", &[]).unwrap();
                             let mut item: Value = serde_json::from_slice(&body).unwrap();
@@ -181,6 +210,7 @@ impl Provider {
             response_status,
             merge_mode,
             merge_effects,
+            merge_held,
         }
     }
     fn selection(&self) -> Adapter {
@@ -461,4 +491,196 @@ fn lost_validation_response_closes_the_owned_channel_without_replay() {
         Err(Failure::Unavailable)
     ));
     assert_eq!(provider.count(), 1);
+}
+
+// ---------------------------------------------------------------------------
+// Adversary pass 1, unit 1. Test-only additions; no production source touched.
+// ---------------------------------------------------------------------------
+
+/// The failed-settlement journey is the declared delivery of the **Attempt
+/// terminal settlement** row of `docs/gitlab-write-failure-matrix.md`. Nothing
+/// compares the shipped journey against that row, so this does: the row must
+/// not still be written as production CLI evidence that has yet to be produced.
+#[test]
+fn the_failure_matrix_row_stops_demanding_the_settlement_journey_that_exists() {
+    let matrix = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../docs/gitlab-write-failure-matrix.md"
+    ))
+    .unwrap();
+    let journeys = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/local_runtime/guarded_merge.rs"
+    ))
+    .unwrap();
+    assert!(
+        journeys.contains(
+            "fn gitlab_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively"
+        ),
+        "the journey this row is measured against is not in the fixture"
+    );
+    let row = matrix
+        .lines()
+        .find(|line| line.starts_with("| Attempt terminal settlement |"))
+        .expect("the matrix must carry an Attempt terminal settlement row");
+    let cells: Vec<&str> = row.split('|').map(str::trim).collect();
+    assert!(
+        !cells[4].starts_with("Fail settlement after a known native Applied/Refused response"),
+        "the shipped CLI journey exists, and the row still lists it as remaining \
+         production CLI evidence: {}",
+        cells[4]
+    );
+}
+
+/// The mode 8/9 settlement journey releases its held provider response the
+/// moment one PUT appears in `methods` and the effect count matches. For the
+/// refused half (`merge_mode` 6) the effect count is zero before the request
+/// exists, so the whole of that condition is `methods` — which is recorded at
+/// the end of the request header, before the body is read and before the merge
+/// branch latches `merge_mode`. The release is therefore able to overtake the
+/// hold, and the fixture answers with the released mode instead of the held
+/// one: 200 applied plus a real provider effect where the journey asserts a
+/// refusal and zero effects.
+#[test]
+fn a_held_refusal_survives_the_release_the_settlement_journey_performs() {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use std::sync::atomic::Ordering::SeqCst;
+    let provider = Provider::new();
+    provider.merge_mode.store(6, SeqCst);
+    let configuration: Value =
+        serde_json::from_slice(&fs::read(&provider.config).unwrap()).unwrap();
+    let port: u16 = configuration["api_base"]
+        .as_str()
+        .unwrap()
+        .trim_end_matches("/api/v4")
+        .rsplit(':')
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let mut roots = rustls::RootCertStore::empty();
+    roots
+        .add(rustls::pki_types::CertificateDer::from(
+            STANDARD
+                .decode(
+                    provider
+                        .pem
+                        .lines()
+                        .filter(|line| !line.starts_with("-----"))
+                        .collect::<String>(),
+                )
+                .unwrap(),
+        ))
+        .unwrap();
+    let client = rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .with_root_certificates(roots)
+    .with_no_client_auth();
+    let body = br#"{"sha":"0123456789abcdef0123456789abcdef01234567","auto_merge":false,"should_remove_source_branch":false}"#;
+    let head = format!(
+        "PUT /api/v4/projects/org%2Fproject/merge_requests/4/merge HTTP/1.1\r\nHost: localhost\r\nPrivate-Token: fixture-pat-one\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let response = runtime.block_on(async {
+        let socket = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        let mut stream = tokio_rustls::TlsConnector::from(Arc::new(client))
+            .connect(
+                rustls::pki_types::ServerName::try_from("localhost").unwrap(),
+                socket,
+            )
+            .await
+            .unwrap();
+        stream.write_all(head.as_bytes()).await.unwrap();
+        stream.flush().await.unwrap();
+        // Verbatim the break condition of the mode 8/9 branch, for mode 9.
+        let until = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
+            let sent = provider
+                .methods
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|method| method.as_str() == "PUT")
+                .count();
+            if sent == 1 && provider.merge_effects.load(SeqCst) == 0 {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < until,
+                "fixture did not record the merge"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // What the journey does next: inject the metadata fault, then release.
+        provider.merge_mode.store(0, SeqCst);
+        stream.write_all(body).await.unwrap();
+        stream.flush().await.unwrap();
+        let mut response = Vec::new();
+        // The fixture closes without close_notify; an unclean EOF is expected.
+        let _ = stream.read_to_end(&mut response).await;
+        response
+    });
+    let response = String::from_utf8_lossy(&response);
+    assert!(
+        response.starts_with("HTTP/1.1 409"),
+        "the held refusal was answered with the released mode instead: {response}"
+    );
+    assert_eq!(
+        provider.merge_effects.load(SeqCst),
+        0,
+        "the refused half of the settlement journey recorded a provider merge effect"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Adversary pass 2, unit 1. Test-only addition; no production source touched.
+// ---------------------------------------------------------------------------
+
+/// Journey mode 10 revokes the connection after a known Applied provider effect
+/// and checks that disclosure is refused with no second effect. That is not the
+/// **Attempt terminal settlement** row it was added under; it is a connection
+/// race after the native response, which is what the **Final result disclosure**
+/// row lists as work still to be done. One row was rewritten when the evidence
+/// landed and this one was not, so its two cells now understate what is covered
+/// and overstate what remains.
+#[test]
+fn the_disclosure_row_records_the_post_effect_revocation_journey_that_exists() {
+    let matrix = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../docs/gitlab-write-failure-matrix.md"
+    ))
+    .unwrap();
+    let journeys = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/local_runtime/guarded_merge.rs"
+    ))
+    .unwrap();
+    if !journeys.contains("Final disclosure admission is checked after settlement") {
+        // No such evidence in the fixture; the row is entitled to keep asking.
+        return;
+    }
+    let row = matrix
+        .lines()
+        .find(|line| line.starts_with("| Final result disclosure |"))
+        .expect("the matrix must carry a Final result disclosure row");
+    let cells: Vec<&str> = row.split('|').map(str::trim).collect();
+    assert_ne!(
+        cells[4],
+        "Complete policy/key/connection races after native response and during final \
+         audit handling, with effect counts and safe response checks.",
+        "guarded_merge.rs now runs a connection race after the native response with \
+         effect counts and a safe response check, and this row's remaining column is \
+         byte-unchanged; its existing-evidence column still names only preflight \
+         revocation and background recovery: {}",
+        cells[3]
+    );
 }
