@@ -10,6 +10,22 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 pub mod auth;
+pub mod helm;
+
+/// How much of a Helm release this composition may read. `Off` advertises no
+/// release operation at all. `Metadata` advertises the two that read only
+/// release-Secret metadata. `RedactedContent` additionally advertises the two
+/// content reads, which disclose a projection of structure and digests. There
+/// is deliberately no variant that discloses stored provider bytes: recorded
+/// values routinely carry credentials, so the projection is the disclosure.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HelmReleaseReads {
+    #[default]
+    Off,
+    Metadata,
+    RedactedContent,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -18,6 +34,8 @@ pub struct Config {
     pub resource_kinds: Vec<String>,
     #[serde(default)]
     pub discover_hosts: bool,
+    #[serde(default)]
+    pub helm_release_reads: HelmReleaseReads,
 }
 pub struct Kubernetes {
     http: Arc<dyn AuthenticatedHttp>,
@@ -58,11 +76,25 @@ impl Kubernetes {
         )?;
         connectors_sdk::verify_handlers(
             &descriptor,
-            &["resources.list", "endpoints.discover", "hosts.discover"],
+            &[
+                "resources.list",
+                "endpoints.discover",
+                "hosts.discover",
+                "helm_releases.history",
+                "helm_releases.status",
+                "helm_releases.values",
+                "helm_releases.manifest",
+            ],
         )?;
         if !config.discover_hosts {
             descriptor.operations.retain(|o| o.id != "hosts.discover");
         }
+        // An operation whose disclosure the configuration did not admit is not
+        // advertised at all, so a caller cannot describe it, and the separate
+        // guard in `invoke` still refuses it.
+        descriptor
+            .operations
+            .retain(|o| helm_admitted(config.helm_release_reads, &o.id));
         Ok(Self {
             http,
             config,
@@ -90,6 +122,113 @@ impl Kubernetes {
             cursors: self.cursors.clone(),
             partition: Some(partition.to_owned()),
         })
+    }
+    /// One bounded page of a release's own Secrets, selected the way Helm's
+    /// storage selects them. This never consults `resource_kinds`: a release
+    /// read is its own admitted operation, not a resource kind a caller picks,
+    /// and it can neither be reached by nor widen that closed enum.
+    async fn releases(
+        &self,
+        operation: &str,
+        namespace: &str,
+        release: &str,
+        deployed: bool,
+        limit: u16,
+        cursor: Option<&str>,
+    ) -> Result<Page<helm::Revision>> {
+        if !(1..=100).contains(&limit) {
+            return Err(Error::invalid("limit must be between one and 100"));
+        }
+        if !helm::valid_release(release) {
+            return Err(Error::invalid("release name is not a Helm release name"));
+        }
+        self.namespace(namespace)?;
+        let mut context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespace":namespace,"release":release,"deployed":deployed,"limit":limit});
+        if let Some(partition) = &self.partition {
+            context["partition"] = json!(partition);
+        }
+        let mut query = vec![
+            ("labelSelector", helm::selector(release, deployed)),
+            ("limit", limit.to_string()),
+        ];
+        if let Some(cursor) = cursor {
+            query.push(("continue", self.cursors.read(&context, cursor)?));
+        }
+        let response = self
+            .http
+            .get(&["api", "v1", "namespaces", namespace, "secrets"], &query)
+            .await?;
+        let value = upstream_json(&response)?;
+        let items = value["items"].as_array().ok_or_else(|| {
+            Error::new(
+                ErrorCode::UpstreamProtocol,
+                "invalid Kubernetes list response",
+            )
+        })?;
+        if items.len() > limit as usize {
+            return Err(Error::new(
+                ErrorCode::UpstreamProtocol,
+                "Kubernetes exceeded requested page size",
+            ));
+        }
+        let revisions = items
+            .iter()
+            .map(|item| helm::revision(item, namespace, release))
+            .collect::<Result<Vec<_>>>()?;
+        let continuation = value["metadata"]["continue"].as_str().unwrap_or_default();
+        let next_cursor = if continuation.is_empty() {
+            None
+        } else {
+            Some(self.cursors.issue(&context, continuation.into())?)
+        };
+        Ok(Page {
+            items: revisions,
+            complete: next_cursor.is_none(),
+            next_cursor,
+            provenance: provenance(
+                &self.descriptor.instance,
+                format!(
+                    "{namespace}/helm-releases/{release}{}",
+                    if deployed { "/deployed" } else { "" }
+                ),
+                value["metadata"]["resourceVersion"]
+                    .as_str()
+                    .map(str::to_owned),
+            ),
+        })
+    }
+    /// Read one exact release Secret by the name Helm's storage gives it. The
+    /// admitted target is that single object, not the namespace's Secrets.
+    async fn release_body(
+        &self,
+        namespace: &str,
+        release: &str,
+        revision: u32,
+    ) -> Result<(String, Option<String>, Value)> {
+        if !helm::valid_release(release) {
+            return Err(Error::invalid("release name is not a Helm release name"));
+        }
+        self.namespace(namespace)?;
+        let name = helm::object_name(release, revision);
+        let response = self
+            .http
+            .get(
+                &["api", "v1", "namespaces", namespace, "secrets", &name],
+                &[],
+            )
+            .await?;
+        let secret = upstream_json(&response)?;
+        // The object is checked as a release record before its payload is
+        // decoded, so a foreign object under that name is never decompressed.
+        let record = helm::revision(&secret, namespace, release)?;
+        if record.revision != revision {
+            return Err(Error::new(
+                ErrorCode::UpstreamProtocol,
+                "release Secret reports a different revision",
+            ));
+        }
+        let body = helm::body(&secret)?;
+        Ok((name, record.source_revision, body))
     }
     fn namespace(&self, namespace: &str) -> Result<()> {
         if !self.config.namespaces.iter().any(|n| n == namespace) {
@@ -204,6 +343,35 @@ struct Hosts {
     #[serde(default)]
     cursor: Option<String>,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Releases {
+    namespace: String,
+    release: String,
+    limit: u16,
+    #[serde(default)]
+    cursor: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReleaseContent {
+    namespace: String,
+    release: String,
+    revision: u32,
+    limit: u16,
+}
+
+/// The advertised set for a disclosure mode. Metadata reads never carry a
+/// stored value, so they are admitted one step below the content reads.
+fn helm_admitted(mode: HelmReleaseReads, operation: &str) -> bool {
+    match operation {
+        "helm_releases.history" | "helm_releases.status" => mode != HelmReleaseReads::Off,
+        "helm_releases.values" | "helm_releases.manifest" => {
+            mode == HelmReleaseReads::RedactedContent
+        }
+        _ => true,
+    }
+}
 
 #[async_trait]
 impl Adapter for Kubernetes {
@@ -211,6 +379,15 @@ impl Adapter for Kubernetes {
         self.descriptor.clone()
     }
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
+        // The descriptor already omits an unadmitted release operation; this
+        // repeats the decision at dispatch so a stale description grants
+        // nothing, exactly as host discovery does below.
+        if !helm_admitted(self.config.helm_release_reads, operation) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "Helm release disclosure is not configured for this operation",
+            ));
+        }
         match operation {
             "resources.list" => {
                 let args: Resources = decode(input)?;
@@ -339,6 +516,60 @@ impl Adapter for Kubernetes {
                     .await?;
                 page.items=page.items.into_iter().map(|node|json!({"id":node["metadata"]["uid"],"name":node["metadata"]["name"],"addresses":node["status"]["addresses"],"conditions":node["status"]["conditions"],"source_revision":node["metadata"]["resourceVersion"]})).collect();
                 encode(page)
+            }
+            "helm_releases.history" | "helm_releases.status" => {
+                let args: Releases = decode(input)?;
+                encode(
+                    self.releases(
+                        operation,
+                        &args.namespace,
+                        &args.release,
+                        operation == "helm_releases.status",
+                        args.limit,
+                        args.cursor.as_deref(),
+                    )
+                    .await?,
+                )
+            }
+            "helm_releases.values" | "helm_releases.manifest" => {
+                let args: ReleaseContent = decode(input)?;
+                if !(1..=500).contains(&args.limit) || args.revision == 0 {
+                    return Err(Error::invalid("invalid release revision or page limit"));
+                }
+                let (name, source_revision, body) = self
+                    .release_body(&args.namespace, &args.release, args.revision)
+                    .await?;
+                let limit = args.limit as usize;
+                let values = operation == "helm_releases.values";
+                let (items, complete) = if values {
+                    let (items, complete) = helm::recorded_values(&name, &body, limit)?;
+                    (encode(items)?, complete)
+                } else {
+                    let (items, complete) = helm::manifest_documents(&name, &body, limit)?;
+                    (encode(items)?, complete)
+                };
+                let items = match items {
+                    Value::Array(items) => items,
+                    _ => return Err(Error::internal()),
+                };
+                encode(Page {
+                    items,
+                    // The projection has no provider continuation: it is one
+                    // stored object, not a provider collection. A cursor here
+                    // would be manufactured, so incompleteness is reported
+                    // through `complete` alone.
+                    next_cursor: None,
+                    complete,
+                    provenance: provenance(
+                        &self.descriptor.instance,
+                        format!(
+                            "{}/{name}/{}",
+                            args.namespace,
+                            if values { "values" } else { "manifest" }
+                        ),
+                        source_revision,
+                    ),
+                })
             }
             _ => Err(Error::new(
                 ErrorCode::NotFound,
