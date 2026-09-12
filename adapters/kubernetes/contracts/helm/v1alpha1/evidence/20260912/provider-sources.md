@@ -66,20 +66,32 @@ and the stored bytes are already Helm's base64 text, so a reader going through t
 API base64-decodes twice before testing the gzip magic. That second decode is a
 Kubernetes fact, not a Helm one; Helm's own driver receives the raw `[]byte`.
 
-## Release fields this binding reads
+## Release-body fields cited from the pinned source
 
-| JSON field | Helm v4.3.0 | Helm v3.22.0 |
-|---|---|---|
-| `name` | `release.go:34` | `release.go:24` |
-| `info` | `release.go:36` | `release.go:26` |
-| `config` — the recorded values | `release.go:41` | `release.go:31` |
-| `manifest` — the rendered manifest text | `release.go:43` | `release.go:33` |
-| `version` — the revision number | `release.go:47` | `release.go:37` |
-| `namespace` | `release.go:49` | `release.go:39` |
-| `info.first_deployed` | `info.go:30` | `info.go:27` |
-| `info.last_deployed` | `info.go:32` | `info.go:29` |
-| `info.description` | `info.go:36` | `info.go:33` |
-| `info.status` | `info.go:38` | `info.go:35` |
+This table is the pin, not the binding's read set. It records where each field
+of the stored release body is declared, so that a later increment reading one of
+them cites a line rather than guessing a name. **The binding reads two of them**
+— `config` and `manifest` — and cross-checks three more against the object's
+labels when the body carries them. The remaining five are cited and unread.
+
+| JSON field | Read? | Helm v4.3.0 | Helm v3.22.0 |
+|---|---|---|---|
+| `config` — the recorded values | **read** | `release.go:41` | `release.go:31` |
+| `manifest` — the rendered manifest text | **read** | `release.go:43` | `release.go:33` |
+| `name` | cross-checked against the `name` label | `release.go:34` | `release.go:24` |
+| `namespace` | cross-checked against the object's namespace | `release.go:49` | `release.go:39` |
+| `version` — the revision number | cross-checked against the `version` label | `release.go:47` | `release.go:37` |
+| `info` | cited, unread | `release.go:36` | `release.go:26` |
+| `info.first_deployed` | cited, unread | `info.go:30` | `info.go:27` |
+| `info.last_deployed` | cited, unread | `info.go:32` | `info.go:29` |
+| `info.description` | cited, unread | `info.go:36` | `info.go:33` |
+| `info.status` | cited, unread | `info.go:38` | `info.go:35` |
+
+Every revision field the binding does report — revision number, status and the
+two timestamps — comes from the object's **labels**, not from this body. The
+five `info.*` and `info` rows above are cited because a later increment reading
+a release's description or deployment times will need them; citing a line is not
+a claim that anything reads it today.
 
 `labels` is explicitly excluded from the JSON body and lives only in the object's
 metadata (`v4 release.go:52`, `v3 release.go:42`). `chart` and `hooks` exist

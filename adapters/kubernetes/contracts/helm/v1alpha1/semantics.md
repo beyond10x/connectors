@@ -84,11 +84,31 @@ the bodies of every Secret the release applied. Neither is disclosed.
 `helm_releases.values` returns one item per node of the recorded value
 structure: its dotted path, its JSON shape and a SHA-256 over the canonical JSON
 of its value. `helm_releases.manifest` returns one item per document of the
-rendered text: its position, its UTF-8 byte length and a SHA-256 over that text.
-No stored scalar and no manifest byte appears in either result, at any depth,
-for any shape. There is no configuration, input or mode that discloses one; the
-projection **is** the disclosure, and a caller that needs the literal is asking
-for something this binding does not do.
+rendered text: its position, its UTF-8 byte length and a SHA-256 over exactly
+the bytes that length counts. No stored scalar and no manifest byte appears in
+either result, at any depth, for any shape. There is no configuration, input or
+mode that discloses one; the projection **is** the disclosure, and a caller that
+needs the literal is asking for something this binding does not do.
+
+The two digests deliberately cover different bytes, because they exist for
+different things. `content_digest` exists to be **reproduced**: a reader holding
+the rendered document must get the same value from `sha256sum`, so it covers the
+document text itself and nothing else. `value_digest` exists to be **compared**:
+a recorded value is a JSON value, not a byte string, so it covers the canonical
+JSON of that value and two equal values therefore digest equally across
+revisions and across releases. Neither is a digest of the other's bytes, and
+neither is salted.
+
+**Unsalted means a digest confirms a guess.** A `value_digest` is a plain
+SHA-256 over a canonicalisation anyone can compute, so a holder of the
+projection can test a candidate literal offline and learn whether it is
+correct. This is a property of the comparison the projection is for, not an
+oversight: the two cannot both hold. What the projection therefore bounds is
+disclosure of a value an attacker cannot enumerate; what it does not do is
+protect a short, low-entropy or already-suspected value. A consumer must treat
+the result as it would treat the key names of a values file — safe to hold, not
+a secret — and an operator who needs a guessable credential kept from a reader
+of this output must not grant that reader `redacted_content`.
 
 The path is a display projection, not a selector: a recorded key containing `.`
 or `[` produces a path that cannot be parsed back unambiguously. The digest is
@@ -118,7 +138,14 @@ before the JSON is parsed, so a compressed payload cannot expand without bound.
 A single recorded container with more than 65,536 entries refuses the same way.
 The object is validated as a release record — type, owner, name, labels — before
 its payload is decompressed, so a foreign object under that name is never
-expanded.
+expanded. The decoded body must itself be a JSON object: a payload decoding to
+`null`, an array or a scalar refuses, because projecting it would report an
+empty, complete recorded-value set over a body nothing observed, which is the
+same unsound completeness claim this contract refuses one layer up. Where the
+body carries its own `name`, `namespace` or `version` — each `omitempty` in the
+pinned source, so absence is not disagreement — they are cross-checked against
+the object's labels, since the provenance is built from those labels and a body
+naming a different release must not be served under them.
 
 ## Completeness and cursors
 
@@ -134,6 +161,17 @@ The two projections read one object and have no provider continuation to carry.
 They return `next_cursor:null` always, and report a projection larger than the
 requested page as `complete:false`. No cursor is manufactured for a collection
 the provider cannot continue.
+
+A recorded node is also omitted, and the page likewise reported `complete:false`,
+when its path falls outside the bounds this operation publishes for
+`items[].path` — an empty recorded key against `minLength 1`, or a concatenation
+past `maxLength 1024`. Such a node is dropped with its subtree rather than
+emitted, because a result that fails the operation's own published schema is not
+a bounded refusal: the local runtime terminates the adapter child on that
+validation failure. Dropping the whole read instead would lose a release that is
+otherwise entirely readable, so the loss is reported through the mechanism that
+already exists for it. `complete:false` provides no absence evidence, so a caller
+must not read a missing path as an unset value.
 
 ## Refusals
 
