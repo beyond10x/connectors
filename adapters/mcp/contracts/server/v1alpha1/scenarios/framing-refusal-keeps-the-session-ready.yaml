@@ -51,6 +51,9 @@ timeline:
     session_id:
       $instance: session
     decision: allow
+    # Lifetime 2,000 ms: the ceiling contracts/sessions/v1alpha1/semantics.md §4.1 sets on
+    # the effective deadline of a data lease, which ess/domains/sessions.yaml repeats as
+    # "lease lifetime <= 2000 ms including uncertainty".
     lease:
       issued_at: '2026-09-12T12:00:02Z'
       effective_expiry: '2026-09-12T12:00:04Z'

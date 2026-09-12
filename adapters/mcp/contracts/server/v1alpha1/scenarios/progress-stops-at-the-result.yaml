@@ -13,7 +13,7 @@
 type: ess-scenario/1
 domain: connectors.sessions
 scenario: progress-stops-at-the-result
-summary: 'Progress notifications ride the live session as outbound data, renew no lease, and stop at the result; the session stays Ready.'
+summary: 'Progress notifications ride the live session as outbound data and renew nothing; the supervisor renews the lease the request outlives, and the notifications stop at the result with the session Ready.'
 arrange:
 - instance: session
   entity: connectors.sessions.Session
@@ -51,9 +51,12 @@ timeline:
     session_id:
       $instance: session
     decision: allow
+    # Lifetime 2,000 ms: the ceiling contracts/sessions/v1alpha1/semantics.md §4.1 sets on
+    # the effective deadline of a data lease, which ess/domains/sessions.yaml repeats as
+    # "lease lifetime <= 2000 ms including uncertainty".
     lease:
       issued_at: '2026-09-12T12:00:02Z'
-      effective_expiry: '2026-09-12T12:00:06Z'
+      effective_expiry: '2026-09-12T12:00:04Z'
       sequence: 1
   outcome: ready
   events:
@@ -75,9 +78,28 @@ timeline:
   - connectors.sessions.DataLeaseRenewed
   - connectors.sessions.ClosingBegun
   - connectors.sessions.ContinuityLost
-# Second notification, with an increased progress value
-# (mcp-2026-07-28-basic-patterns-progress.mdx:53-54).
+# The request outlives the lease that admits it, and the only thing that keeps it Ready is
+# the supervisor's own renewal — taken at the deadline of lease 1, not after it, "under the
+# same serialized authority check as revocation" (contracts/sessions/v1alpha1/semantics.md
+# §4.1). No progress notification causes this act: a peer-visible notification is not a
+# lease input. Had the supervisor not renewed, the lease would have expired, and the model
+# fixes that terminal to lease_expired with no grace — which is ../semantics.md §3.3.
 - at: '2026-09-12T12:00:04Z'
+  command: connectors.sessions.RenewDataLease
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    lease:
+      issued_at: '2026-09-12T12:00:04Z'
+      effective_expiry: '2026-09-12T12:00:06Z'
+      sequence: 2
+  outcome: renewed
+  events:
+  - event: connectors.sessions.DataLeaseRenewed
+# Second notification, with an increased progress value
+# (mcp-2026-07-28-basic-patterns-progress.mdx:53-54). It rides lease 2.
+- at: '2026-09-12T12:00:05Z'
   command: connectors.sessions.PermitData
   input:
     session_id:
@@ -92,8 +114,8 @@ timeline:
   - connectors.sessions.ClosingBegun
   - connectors.sessions.ContinuityLost
 # The response. Progress stops here: "Progress notifications MUST stop after completion"
-# (mcp-2026-07-28-basic-patterns-progress.mdx:90).
-- at: '2026-09-12T12:00:05Z'
+# (mcp-2026-07-28-basic-patterns-progress.mdx:90). Still within lease 2.
+- at: '2026-09-12T12:00:06Z'
   command: connectors.sessions.PermitData
   input:
     session_id:
