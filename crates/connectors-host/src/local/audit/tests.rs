@@ -356,7 +356,23 @@ fn capacity_is_atomic_per_instance_without_eviction_or_append_restriction() {
                 let store = &store;
                 scope.spawn(move || {
                     barrier.wait();
-                    store.anchor(&anchor())
+                    // Eight threads contend for four slots against one SQLite file. This
+                    // test asserts that capacity is atomic, not how the store behaves when
+                    // its busy timeout is exhausted — and under a loaded machine running
+                    // the rest of the suite beside it, a thread can exhaust that timeout
+                    // and return MetadataUnavailable, which is neither of the two answers
+                    // capacity has. Retry that one failure mode so the assertion below
+                    // measures what it is about. See story:host-suite-load-sensitivity.
+                    let mut attempt = 0;
+                    loop {
+                        match store.anchor(&anchor()) {
+                            Err(Failure::MetadataUnavailable) if attempt < 16 => {
+                                attempt += 1;
+                                std::thread::sleep(Duration::from_millis(50));
+                            }
+                            outcome => break outcome,
+                        }
+                    }
                 })
             })
             .collect();
