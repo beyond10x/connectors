@@ -1,0 +1,409 @@
+domain: connectors_mcp.state
+summary: MCP-owned nouns, the three distinct credential kinds, and the relations no
+  source answers.
+
+# Normative owner: adapters/mcp/design.md, epic:mcp-contracts and the pinned-source
+# record adapters/mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md.
+# Archived-source citations use the same `<file>:<line>` convention as
+# domains/protocol.yaml: the file under that record's `vendor/`, the line of its
+# uncompressed bytes.
+#
+# ── This model declares no relation, and that is the finding ───────────────────────
+#
+# `relations:` appears nowhere below. Every candidate edge in this epic is in exactly
+# one of four states, and all four are recorded here rather than resolved:
+#
+#   1. citable, but undeclarable in this root — McpAdvertisedCapability → the
+#      OperationDeclaration an AdapterSpecification already owns;
+#   2. deliberately absent, with the absence itself cited — McpSession → Connection;
+#   3. unreadable, so carried as an `UNMAPPED:` marker — six of them;
+#   4. filed as a decision nobody has taken — two open decision-blockers.
+#
+# The ESS validator does NOT protect any of this. It accepts a guessed `cardinality:
+# one` exactly as readily as a correct one; only the markers below distinguish them.
+# A later editor who replaces a marker with a cardinality must bring a source line, not
+# a plausible reading.
+#
+# ── Why no lifecycle below has more than one state ─────────────────────────────────
+#
+# ESS 0.22.2 refuses a transition that no command outcome causes
+# (`error[ESS-ENTITY-005] missing_causation`) and refuses a multi-state lifecycle with
+# no transitions (`error[ESS-ENTITY-011] dead_end_state` and `unreachable_state`). Both
+# refusals were reproduced against this root before it was written. So a declared
+# lifecycle here would force commands, and commands are behaviour; story:mcp-domain-model
+# models nouns and declares no behaviour for either direction. Each entity therefore
+# carries the single-state shape `connectors.auth_bindings.AuthProfile` uses
+# (ess/domains/auth_bindings.yaml:73-76, `initial: Declared`, one state, terminal), which
+# is this repository's existing idiom for "the record exists; no transition is selected".
+# The protocol's own phase vocabulary is a value instead —
+# connectors_mcp.protocol.LegacySessionPhase — because the phases are the protocol's,
+# not a selected lifecycle this repository owns.
+#
+# ── Why no shared type is named below ──────────────────────────────────────────────
+#
+# adapters/README.md:67-71: "Shared ESS includes none of these roots and imports none of
+# their types. Each compiles independently. Native-to-shared projection is an explicit
+# adapter binding obligation, not a cross-root ESS import or arbitrary JSON bag." This is
+# also mechanically enforced: naming `connectors.auth_bindings.Connection` in a field of
+# this root is refused with `error[ESS-ENTITY-001] undeclared_reference`, reproduced
+# against these files. Cross-root edges below are therefore stated in prose with their
+# citations, never as ESS relations, and a flat `String` carrier is used where one is
+# readable — the shape adapters/docker/spec/ess/domains/mutations.yaml:12-13 already uses
+# for `instance_ref` and `connection_ref`.
+types:
+  # ── The three credential kinds, kept apart ───────────────────────────────────────
+  #
+  # epic:mcp-contracts requires it: "Caller credentials for inbound access, credentials
+  # for an outbound MCP server and underlying provider credentials are distinct."
+  #
+  # The pinned primary revision requires the same separation on the wire, and says so
+  # about the pair that is easiest to collapse.
+  # mcp-2026-07-28-basic-authorization-security-considerations.mdx:126: "If the MCP
+  # server makes requests to upstream APIs, it may act as an OAuth client to them. The
+  # access token used at the upstream API is a separate token, issued by the upstream
+  # authorization server. The MCP server **MUST NOT** pass through the token it received
+  # from the MCP client." Its :124 requires a server to reject any token that does not
+  # name it in the audience claim, and
+  # mcp-2026-07-28-basic-authorization-index.mdx:292-297 states both halves: clients MUST
+  # NOT send tokens other than ones issued by the MCP server's authorization server, and
+  # servers "MUST NOT accept or transit any other tokens".
+  #
+  # So these are three types, never one polymorphic credential value. No field is shared
+  # between them by accident: each names its own authority and its own audience, because
+  # the audience is exactly what makes them non-interchangeable.
+  #
+  # `material_handle` is a handle, not bytes, in all three — the shape
+  # ess/domains/auth_bindings.yaml:44-50 already uses for
+  # `connectors.auth_bindings.CredentialSet` ("no secret bytes or public locator
+  # projection"). Nothing here holds or projects secret material.
+
+  # 1 of 3 — a caller's credential for INBOUND access to the MCP server this repository
+  # would expose. Audience is this repository's own inbound binding, by
+  # security-considerations.mdx:120,124 and authorization-index.mdx:285-286 (a server
+  # MUST validate that a token was issued specifically for it).
+  #
+  # UNMAPPED: the whole of `McpInboundSession → McpCaller` and
+  # `McpCaller → connectors.auth_bindings.Connection` — see the census at the foot of
+  # this file. This type is the credential, not the caller, and declares no caller.
+  - name: connectors_mcp.state.McpInboundCallerCredential
+    kind: struct
+    fields:
+      # The canonical URI of THIS repository's inbound MCP server, which is the audience
+      # the token must name. authorization-index.mdx:218-228 defines the canonical server
+      # URI as the RFC 8707 resource identifier and :232-244 gives its valid and invalid
+      # forms. Optional because authorization-index.mdx:20-24 says a stdio-transport
+      # implementation SHOULD NOT follow the authorization specification at all, and no
+      # canonical URI exists for a subprocess.
+      - {name: audience_canonical_uri, type: "Optional<String>"}
+      # authorization-index.mdx:125-134 (scope selection) and :340 (a challenge names
+      # `scope="required_scope1 required_scope2"`). A list of opaque scope strings; the
+      # vocabulary is the deployment's, not the protocol's.
+      - {name: granted_scopes, type: "List<String>"}
+      - {name: acquisition, type: connectors_mcp.protocol.CredentialAcquisitionMode}
+      - {name: material_handle, type: String}
+
+  # 2 of 3 — the credential this repository presents to an OUTBOUND, remote MCP server.
+  # Audience is that remote server, never this repository and never the provider behind
+  # it. authorization-index.mdx:217-222: the `resource` parameter MUST be included in
+  # both authorization and token requests and MUST identify the MCP server the client
+  # intends to use the token with.
+  - name: connectors_mcp.state.McpOutboundServerCredential
+    kind: struct
+    fields:
+      # The remote MCP server's canonical URI. Optional for the same stdio reason as
+      # above (authorization-index.mdx:20-24, mcp-2026-07-28-basic-index.mdx:223-226:
+      # stdio implementations "instead retrieve credentials from the environment").
+      - {name: resource_canonical_uri, type: "Optional<String>"}
+      # authorization-index.mdx:192: before redirecting the user-agent the client MUST
+      # record the `issuer` value from the selected authorization server's validated
+      # metadata, and :196-213 validates the returned `iss` against exactly that recorded
+      # value, with no normalization (:211). It is the recorded expectation, not a
+      # discovered fact.
+      - {name: expected_issuer, type: "Optional<String>"}
+      - {name: granted_scopes, type: "List<String>"}
+      - {name: acquisition, type: connectors_mcp.protocol.CredentialAcquisitionMode}
+      - {name: material_handle, type: String}
+      # authorization-index.mdx:304-309: a client that desires refresh tokens MUST keep
+      # them confidential and "MUST NOT assume refresh tokens will be issued; the AS
+      # retains discretion". Hence Optional, and hence a second handle rather than a flag.
+      - {name: refresh_material_handle, type: "Optional<String>"}
+
+  # 3 of 3 — the UNDERLYING provider credential: the one used at the upstream API behind
+  # an MCP server, issued by the upstream authorization server, which
+  # security-considerations.mdx:126 calls "a separate token" that MUST NOT be the
+  # passed-through caller token. This is not an MCP credential and its name says so.
+  #
+  # UNMAPPED: its custody. The census row `McpServerBinding → credential custody` below
+  # holds the open question of whether this is a
+  # `connectors.credentials.CredentialGeneration` under a `Connection` or a custody
+  # record with no connection owner, so this type carries no custody reference of either
+  # shape.
+  - name: connectors_mcp.state.UnderlyingProviderCredential
+    kind: struct
+    fields:
+      # The upstream authority that issued it — "the upstream authorization server" of
+      # security-considerations.mdx:126. Opaque here; this root does not model providers.
+      - {name: upstream_authority, type: String}
+      - {name: material_handle, type: String}
+
+  # ── A discovered capability set, carried as a VALUE and not as an entity ──────────
+  #
+  # This is the `server/discover` result. mcp-2026-07-28-server-discover.mdx:33-60 is the
+  # response shape; :88-101 the field meanings.
+  #
+  # It is a type and not an entity because no pinned source says a discovered
+  # tool/resource/prompt set is durable. What the sources DO say is the opposite shape: a
+  # discover response is a cacheable value with a server-set freshness hint —
+  # server-discover.mdx:36 ("This operation supports caching"), :56-57 (`ttlMs`,
+  # `cacheScope`), and mcp-2026-07-28-server-utilities-caching.mdx:48-60, where an absent
+  # `ttlMs` means immediately stale. An entity would assert identity, persistence and a
+  # lifecycle that nothing states.
+  #
+  # UNMAPPED: `McpServerBinding → McpCapabilitySnapshot` — whether a discovered
+  # tool/resource/prompt set is durable state or a per-session value, and therefore
+  # whether a cardinality exists to declare at all. Declaring this a value is the weaker
+  # of the two readings, not a decision that it can never be an entity; a later source
+  # that establishes durable custody makes it one then.
+  - name: connectors_mcp.state.McpCapabilitySnapshot
+    kind: struct
+    fields:
+      # server-discover.mdx:44 and :94-95: "Protocol versions the server supports. The
+      # client should choose one of these for subsequent requests." A list, cited — a
+      # server is not limited to one. List<String> and not List<ProtocolRevision>
+      # because a server may name versions neither pinned revision covers.
+      - {name: supported_versions, type: "List<String>"}
+      # server-discover.mdx:45-48 and :96-97. The known kinds only; protocol.yaml records
+      # that mcp-2026-07-28-schema.ts:789 declares the capability set open, so an unknown
+      # advertised key has no carrier here.
+      - {name: server_capabilities, type: "List<connectors_mcp.protocol.ServerCapabilityKind>"}
+      # Optional because server-discover.mdx:98-99 is SHOULD, not MUST — and unverified
+      # even when present (:103-107).
+      - {name: server_identity, type: "Optional<connectors_mcp.protocol.ServerIdentity>"}
+      # server-discover.mdx:100-101: "Optional natural-language guidance for LLMs".
+      - {name: instructions, type: "Optional<String>"}
+      # caching.mdx:43 (milliseconds), :56 (absent means assume 0), :60 (a server MUST
+      # provide a value >= 0 when it provides one).
+      - {name: ttl_ms, type: "Optional<Integer>"}
+      - {name: cache_scope, type: "Optional<connectors_mcp.protocol.CacheScope>"}
+
+entities:
+  # ── An explicitly selected outbound MCP server ────────────────────────────────────
+  #
+  # epic:mcp-contracts requires "discovery and explicit selection of a server" and, in
+  # acceptance 1, that the CLI "exits/restarts and reuses its persisted credential
+  # binding" — so a record survives a restart and this is an entity, not a value.
+  #
+  # UNMAPPED, five separate things, none of them guessed:
+  #
+  #   · `McpServerBinding → connectors.declarations.ServiceConfiguration` — whether a
+  #     selected outbound server is a configured instance at all. It cannot be an ESS
+  #     relation from this root in any case (adapters/README.md:67-71); the question is
+  #     whether the projection exists, and nothing answers it.
+  #   · `McpServerBinding → connectors.auth_bindings.Connection` — whether it is one
+  #     `Connection` row, several, or none.
+  #   · `McpServerBinding → McpCapabilitySnapshot` — recorded on that type above.
+  #   · `McpServerBinding → credential custody` — whether the outbound server credential
+  #     is a `connectors.credentials.CredentialGeneration` under a `Connection`
+  #     (ess/domains/credentials.yaml:41-45, `kind: references`, `cardinality: one`,
+  #     `via: connection_ref`) or a custody record with no connection owner. The shared
+  #     model's shape is cited so a reader can see exactly which of the two is open — it
+  #     is not adopted here.
+  #   · `McpServerBinding → supervised OS process` is
+  #     `decision-blocker:mcp-outbound-stdio-process-ownership`, open. The protocol says
+  #     who launches — mcp-2026-07-28-basic-transports-stdio.mdx:7, "the client launches
+  #     the MCP server as a subprocess", and mcp-2025-11-25-basic-transports.mdx:26 the
+  #     same. It does not say whether the Connectors owner is that client, supervises
+  #     the process, or must pin and digest-verify it. That is the blocker's question and
+  #     this model does not answer it by declaring a field.
+  #
+  # No removal, disable or re-selection transition is declared, for the ESS-ENTITY-005
+  # reason at the head of this file and because none is stated anywhere. The shape
+  # follows `connectors.auth_bindings.AuthProfile`, whose own note reads "No delete
+  # command or cascade into referencing Connections is selected."
+  - name: connectors_mcp.state.McpServerBinding
+    identity: {name: binding_ref, type: String}
+    fields:
+      # The remote server's canonical URI where one exists. Optional: a stdio server is a
+      # launched subprocess (stdio.mdx:7) and has none, and authorization-index.mdx:224-244
+      # defines the canonical URI only for the HTTP authorization flow's `resource`.
+      # UNMAPPED: what identifies a stdio server instead — a command, a path, a digest,
+      # an operator-supplied name. That is the process-ownership blocker's territory.
+      - {name: canonical_uri, type: "Optional<String>"}
+      - {name: transport_binding, type: connectors_mcp.protocol.TransportBinding}
+      # Optional because era is DETERMINED, not configured, and may be absent before the
+      # first probe. mcp-2026-07-28-basic-versioning.mdx:148-152: era "is a property of
+      # the server, not of an individual request", clients SHOULD cache it for the
+      # lifetime of the server process or origin and MAY persist it across restarts of
+      # the same server configuration, re-probing if the cached assumption later fails.
+      - {name: determined_era, type: "Optional<connectors_mcp.protocol.ProtocolEra>"}
+      # The revision this repository would speak to this server. Optional for the same
+      # reason; versioning.mdx:69-71 has the client select one from a server's supported
+      # list, and mcp-2026-07-28-basic-versioning.mdx:12-13 states there is no negotiation
+      # handshake in the primary revision — every request carries its own version.
+      - {name: selected_revision, type: "Optional<connectors_mcp.protocol.ProtocolRevision>"}
+    lifecycle:
+      initial: Selected
+      states: [Selected]
+      terminal: [Selected]
+
+  # ── A Connectors capability this repository would advertise over inbound MCP ──────
+  #
+  # This is the one cross-root edge the census can CITE, so it is stated — in prose,
+  # because adapters/README.md:67-71 and `ESS-ENTITY-001` both forbid declaring it here:
+  #
+  #   McpAdvertisedCapability → connectors.declarations.OperationDeclaration, MANY
+  #   advertised capabilities to the operations already declared, with the
+  #   `AdapterSpecification` owning both. ess/domains/declarations.yaml:119-123 declares
+  #   `connectors.declarations.AdapterSpecification.operations` as `kind: owns`,
+  #   `cardinality: many`, `via: adapter_id`.
+  #
+  # The cardinality is read off that block, not chosen. epic:mcp-contracts requires the
+  # reuse rather than a second owner — "Reuse established owners instead of making MCP
+  # the universal internal contract" — so an advertised MCP capability is a PROJECTION of
+  # an owned declaration and never a second record of it. `operation_ref` below is that
+  # projection's flat carrier, the shape
+  # adapters/docker/spec/ess/domains/mutations.yaml:12-13 already uses.
+  #
+  # UNMAPPED: which Connectors operations are advertised, and under which admission.
+  # epic:mcp-contracts acceptance 2 requires a client to discover "only supported/admitted
+  # capabilities"; no source says what the admitted set is, and this model declares none.
+  - name: connectors_mcp.state.McpAdvertisedCapability
+    identity: {name: advertised_ref, type: String}
+    fields:
+      # The owned `connectors.declarations.OperationDeclaration` this projects. A String
+      # carrier, not an ESS relation — the relation lives in the cited shared block above.
+      - {name: operation_ref, type: String}
+      - {name: capability_kind, type: connectors_mcp.protocol.ServerCapabilityKind}
+      # The name this capability is advertised under on the wire. Distinct from the
+      # operation's own identifier: nothing states they are equal, and assuming so would
+      # be a mapping decision this model does not own.
+      - {name: advertised_name, type: String}
+    lifecycle:
+      initial: Advertised
+      states: [Advertised]
+      terminal: [Advertised]
+
+  # ── Sessions ─────────────────────────────────────────────────────────────────────
+  #
+  # A session is a LEGACY-revision noun. The primary revision has none:
+  # mcp-2026-07-28-basic-index.mdx:184-187 declares MCP "a **stateless protocol**" whose
+  # server "processes each request independently", :191-193 forbids a server relying on
+  # prior requests over the same connection, and :204-209 says "an open connection, such
+  # as a STDIO process, is not a conversation or session". The interoperability revision
+  # is the one that defines it: mcp-2025-11-25-basic-transports.mdx:196-197, "An MCP
+  # 'session' consists of logically related interactions between a client and a server,
+  # beginning with the initialization phase."
+  #
+  # Both session entities below therefore carry a phase value and no more. Their identity
+  # is a local opaque `session_ref`, following `connectors.sessions.Session`, whose note
+  # at ess/domains/sessions.yaml:86 reads "SessionId is opaque, not a wire-format
+  # mandate" — and it has to be local, because the WIRE id is optional:
+  # mcp-2025-11-25-basic-transports.mdx:200-202, a server "MAY assign a session ID at
+  # initialization time".
+  #
+  # The rest of that wire contract is cited here so a later story need not re-derive it,
+  # but none of it is declared as a transition (ESS-ENTITY-005, head of file):
+  # transports.mdx:208-212 a returned id MUST be echoed on every subsequent request;
+  # :213-214 the server MAY terminate a session at any time and then answers 404;
+  # :215-217 a client receiving 404 MUST start a new session with a fresh
+  # `InitializeRequest`; :218-222 a client SHOULD DELETE to terminate and the server MAY
+  # answer 405. mcp-2025-11-25-basic-lifecycle.mdx:224-246 gives shutdown per transport.
+
+  # An outbound session: this repository as the MCP client, against a remote server.
+  #
+  # UNMAPPED: `McpOutboundSession → McpServerBinding` — whether a session may outlive a
+  # binding, and what a binding's removal does to a live session. No carrier for the
+  # binding appears below, deliberately: a `binding_ref: String` would read as a settled
+  # one-to-one. mcp-2025-11-25-basic-transports.mdx:196-197 does establish that a session
+  # on the wire is between one client and one server, but that is a statement about a
+  # live wire session, not about how many durable sessions a durable binding record may
+  # carry or survive, which is what the census asks.
+  #
+  # UNMAPPED: whether an outbound session is durable at all — whether it survives a CLI
+  # exit and restart. epic:mcp-contracts acceptance 1 requires only that the persisted
+  # CREDENTIAL binding be reused across a restart; it says nothing about a session, and
+  # no pinned source does either.
+  - name: connectors_mcp.state.McpOutboundSession
+    identity: {name: session_ref, type: String}
+    fields:
+      # `MCP-Session-Id` when the server assigned one. Optional by
+      # mcp-2025-11-25-basic-transports.mdx:200-202 (MAY). Its :205-206 constrains it to
+      # visible ASCII 0x21-0x7E and :203-204 asks for a globally unique,
+      # cryptographically secure value — constraints this model records but does not
+      # encode as a type.
+      - {name: wire_session_id, type: "Optional<String>"}
+      - {name: phase, type: connectors_mcp.protocol.LegacySessionPhase}
+    lifecycle:
+      initial: Recorded
+      states: [Recorded]
+      terminal: [Recorded]
+
+  # An inbound session: this repository as the MCP server, serving a caller.
+  #
+  # UNMAPPED: `McpInboundSession → McpCaller` — whether a caller is an entity in this
+  # repository at all. No caller field appears below and no `McpCaller` type is declared:
+  # declaring one would answer that question, and declaring a `caller_ref: String` would
+  # answer it while pretending not to.
+  #
+  # FILED, not modelled: `McpCaller → connectors.auth_bindings.Connection` is
+  # `decision-blocker:mcp-caller-connection-assignment`, open — which connection's
+  # provider credential carries out an inbound invocation. Its own record notes that
+  # ess/domains/declarations.yaml:180-181 declines the same question in an `ess/1`
+  # document: "UNMAPPED: multi-tenant SaaS ownership/assignment cardinality remains
+  # outside this local, explicitly configured service slice. No tenant is
+  # caller-selected." This model repeats that refusal.
+  - name: connectors_mcp.state.McpInboundSession
+    identity: {name: session_ref, type: String}
+    fields:
+      - {name: wire_session_id, type: "Optional<String>"}
+      - {name: phase, type: connectors_mcp.protocol.LegacySessionPhase}
+    lifecycle:
+      initial: Recorded
+      states: [Recorded]
+      terminal: [Recorded]
+
+# ── The relation census, closed ─────────────────────────────────────────────────────
+#
+# story:mcp-domain-model carries the whole census for epic:mcp-contracts, so this file
+# closes it. Ten entries; every one appears above and every one appears here.
+#
+# STATED, with its source line:
+#   1. McpAdvertisedCapability → connectors.declarations.OperationDeclaration — many,
+#      owner `AdapterSpecification`, from ess/domains/declarations.yaml:119-123. Prose,
+#      not an ESS relation: adapters/README.md:67-71 forbids the cross-root import and
+#      `ESS-ENTITY-001` refuses it mechanically.
+#
+# DELIBERATELY ABSENT, with the absence itself cited:
+#   2. McpSession → connectors.auth_bindings.Connection. ess/domains/sessions.yaml:89-91:
+#      "UNMAPPED: a future selected session binding must join its one Connection and
+#      establishment authority, whose persistence model remains unselected. Sessions are
+#      outside the current three-adapter model milestone; no stub edge is implied." The
+#      shared model declined to declare this edge; this model does not invent it for
+#      McpOutboundSession or McpInboundSession, and no stub edge is implied here either.
+#
+# UNMAPPED — unreadable from any `ess/1` document and any pinned specification byte:
+#   3. McpServerBinding → connectors.declarations.ServiceConfiguration — whether a
+#      selected outbound server is a configured instance at all.
+#   4. McpServerBinding → connectors.auth_bindings.Connection — whether it is one
+#      `Connection` row, several, or none.
+#   5. McpServerBinding → McpCapabilitySnapshot — whether a discovered
+#      tool/resource/prompt set is durable state or a per-session value, and therefore
+#      whether a cardinality exists to declare.
+#   6. McpOutboundSession → McpServerBinding — whether a session may outlive a binding,
+#      and what a binding's removal does to a live session.
+#   7. McpServerBinding → credential custody — whether the outbound server credential is
+#      a `connectors.credentials.CredentialGeneration` under a `Connection`
+#      (ess/domains/credentials.yaml:41-45) or a custody record with no connection owner.
+#   8. McpInboundSession → McpCaller — whether a caller is an entity in this repository
+#      at all.
+#
+# FILED AS DECISIONS, not modelling gaps — a cardinality written here would answer them:
+#   9. McpCaller → connectors.auth_bindings.Connection —
+#      decision-blocker:mcp-caller-connection-assignment (open).
+#  10. McpServerBinding → supervised OS process —
+#      decision-blocker:mcp-outbound-stdio-process-ownership (open).
+#
+# Nothing above is a cardinality this model chose. Ten stories read this file; a guessed
+# one-to-many and a guessed one-to-one produce different schemas, different lifecycles
+# and different stories, so a guess here is not a smaller error than inventing the
+# relation outright.
