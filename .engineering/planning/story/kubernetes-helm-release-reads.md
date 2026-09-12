@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:kubernetes-helm-release-reads
 kind: story
-status: active
+status: implemented
 title: Read Helm release history, status, values and manifest through the local CLI
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -24,7 +24,7 @@ scope:
   path: adapters/kubernetes/tests
 - confidence: cited
   path: docs/local-kubernetes-cli.md
-revision: 4
+revision: 5
 ---
 ## Acceptance
 
