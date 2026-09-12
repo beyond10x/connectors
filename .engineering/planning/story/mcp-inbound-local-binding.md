@@ -13,16 +13,31 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1/scenarios
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/semantics.md
-revision: 2
+revision: 4
 ---
 ## Acceptance
 
-`adapters/mcp/contracts/server/v1alpha1/semantics.md` specifies the local-client
-inbound binding exposed by the CLI — which transport a local MCP client uses to
-reach it, which principal it admits before any capability is named, how a session
-begins, is lost and ends — such that the whole binding is described without
-reference to any cloud control plane, identity service or network service this
-repository does not already have.
+`adapters/mcp/contracts/server/v1alpha1/semantics.md` and its scenarios specify the
+complete local-client inbound binding exposed by the CLI — which transport a local
+MCP client uses to reach it, which principal it admits before any capability is
+named, and how message framing, streaming, progress, cancellation, connection and
+session loss, and version and capability mismatch behave on that binding — such
+that **every one of those six behaviours has a named observable outcome, the state
+transition it turns on in the `connectors.sessions.Session` vocabulary, and a
+scenario file under `adapters/mcp/contracts/server/v1alpha1/scenarios/` named after
+it**; such that the whole binding is described without reference to any cloud
+control plane, identity service or network service this repository does not already
+have; and such that a behaviour the selected transport does not offer appears in
+that same enumeration as refused with its reason rather than absent.
+
+Framing covers a malformed or truncated inbound message; streaming covers a
+partially delivered outbound result. Both are named that way in the document so the
+six behaviours and their six scenario files correspond one to one.
+
+Lost replies and mutation uncertainty are `story:mcp-inbound-mutation-replay`.
+Error mapping onto `connectors.service_wire.ErrorCode` is
+`story:mcp-inbound-capability-projection`. Those two plus the six scenario files
+above are the inbound half of the epic's acceptance criterion 5.
 
 ## Scope
 
