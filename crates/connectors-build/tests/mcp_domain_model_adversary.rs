@@ -267,18 +267,18 @@ fn the_one_stated_census_edge_agrees_with_the_field_that_realises_it() {
 /// A binding must be able to record the selection it makes.
 ///
 /// `McpCapabilitySnapshot.supported_versions` is `List<String>` on purpose, and the
-/// model says why at `domains/state.yaml:170-173`: "a server may name versions neither
+/// model says why at `domains/state.yaml`, on `supported_versions`: "a server may name versions neither
 /// pinned revision covers". `UnsupportedProtocolVersion.supported` is `List<String>`
-/// for the same stated reason (`domains/protocol.yaml:133-136`). The selection is drawn
+/// for the same stated reason (`domains/protocol.yaml`, on `UnsupportedProtocolVersion.supported`). The selection is drawn
 /// from exactly that list — `mcp-2026-07-28-basic-versioning.mdx:69-71`, quoted by
 /// `McpServerBinding.selected_revision`'s own comment: "The client **SHOULD** select a
 /// mutually supported version from the `supported` list".
 ///
 /// So whatever carries a reported version must also carry a selected one. Typing the
 /// selection to the two-variant `ProtocolRevision` enum closes the set that
-/// `domains/protocol.yaml:36-39` declares open in as many words — "UNMAPPED: the
+/// `domains/protocol.yaml` declares open, on `ProtocolRevision`, in as many words — "UNMAPPED: the
 /// protocol's version set is not closed by these two" — and it is a selection, which
-/// `domains/protocol.yaml:18-20` says this file does not make.
+/// `domains/protocol.yaml` says, in its header, this file does not make.
 #[test]
 fn a_binding_can_select_every_version_a_server_can_report_as_supported() {
     let reported = field_type(
@@ -295,7 +295,7 @@ fn a_binding_can_select_every_version_a_server_can_report_as_supported() {
         inner(&selected),
         inner(&reported),
         "a server may report `supported_versions: {reported}` — any string, because \
-         domains/state.yaml:170-173 says \"a server may name versions neither pinned \
+         domains/state.yaml, on supported_versions, says \"a server may name versions neither pinned \
          revision covers\" — but a binding records the one it picked from that same \
          list as `selected_revision: {selected}`, a closed two-variant enum. \
          `2025-06-18` and `2024-11-05` are reportable and unselectable, and \

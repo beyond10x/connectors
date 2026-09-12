@@ -152,9 +152,10 @@ fn words(name: &str) -> Vec<String> {
 
 /// Every field name that would read as a carrier for `target`: any contiguous run of its
 /// words, with and without the `_ref`/`_refs`/`_id`/`_ids` suffixes this repository uses
-/// for flat reference carriers. `McpServerBinding` yields `binding`, `binding_ref`,
-/// `server_binding`, `mcp_server_binding`, … so the `binding_ref: String` the model
-/// itself names as the risk is in the set.
+/// for flat reference carriers, and each of those pluralised. `McpServerBinding` yields
+/// `binding`, `bindings`, `binding_ref`, `binding_refs`, `server_binding`,
+/// `mcp_server_binding`, … so both the `binding_ref: String` the model names as the risk
+/// and the plural form that escaped the first repair are in the set.
 fn carrier_names(target: &str) -> Vec<String> {
     let parts = words(target);
     let mut out = Vec::new();
@@ -162,7 +163,14 @@ fn carrier_names(target: &str) -> Vec<String> {
         for end in start + 1..=parts.len() {
             let stem = parts[start..end].join("_");
             for suffix in ["", "_ref", "_refs", "_id", "_ids"] {
-                out.push(format!("{stem}{suffix}"));
+                let name = format!("{stem}{suffix}");
+                if !name.ends_with('s') {
+                    out.push(format!("{name}s"));
+                }
+                if name.ends_with("sh") || name.ends_with('s') || name.ends_with('x') {
+                    out.push(format!("{name}es"));
+                }
+                out.push(name);
             }
         }
     }
@@ -210,39 +218,45 @@ fn declared_relations() -> Vec<(String, String, String)> {
     found
 }
 
-/// The `(field name, field type)` pairs `<entity>` declares in `domains/state.yaml`.
+/// The `(field name, field type)` pairs `<declaration>` declares in `domains/state.yaml`,
+/// across **both** `types:` and `entities:`.
 ///
-/// `identity` is deliberately not read: it is the entity's own key, not a carrier to
-/// another entity.
-fn entity_fields(entity_short: &str) -> Vec<(String, String)> {
-    let Some(entities) = document("domains/state.yaml")
-        .get("entities")
-        .and_then(|e| e.as_sequence())
-        .cloned()
-    else {
-        return Vec::new();
-    };
-    for entity in &entities {
-        let name = entity.get("name").and_then(|n| n.as_str()).unwrap_or("");
-        if short(name) != entity_short {
+/// Values are read as well as entities because a carrier on the value side realises an
+/// edge exactly as well: `binding_ref: String` on the `McpCapabilitySnapshot` *value*
+/// binds a snapshot to one binding, produces no `relations:` entry, and validates and
+/// compiles at exit 0. The first repair of this guard read `entities:` only and the
+/// pass-2 adversary measured that hole.
+///
+/// `identity` is deliberately not read: it is the declaration's own key, not a carrier
+/// to something else.
+fn declared_fields(declaration_short: &str) -> Vec<(String, String)> {
+    let value = document("domains/state.yaml");
+    for section in ["types", "entities"] {
+        let Some(items) = value.get(section).and_then(|i| i.as_sequence()) else {
             continue;
-        }
-        let Some(fields) = entity.get("fields").and_then(|f| f.as_sequence()) else {
-            return Vec::new();
         };
-        return fields
-            .iter()
-            .map(|field| {
-                let text = |key| {
-                    field
-                        .get(key)
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_owned()
-                };
-                (text("name"), text("type"))
-            })
-            .collect();
+        for item in items {
+            let name = item.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            if short(name) != declaration_short {
+                continue;
+            }
+            let Some(fields) = item.get("fields").and_then(|f| f.as_sequence()) else {
+                return Vec::new();
+            };
+            return fields
+                .iter()
+                .map(|field| {
+                    let text = |key| {
+                        field
+                            .get(key)
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_owned()
+                    };
+                    (text("name"), text("type"))
+                })
+                .collect();
+        }
     }
     Vec::new()
 }
@@ -269,19 +283,32 @@ fn declared_names() -> Vec<String> {
     names
 }
 
-/// How far from an edge its own verdict may sit, in lines. Two, so that a marker may
-/// lead a wrapped sentence, and no further: a marker in a heading above a list of five
-/// edges is not a marker for any of them.
-const MARKER_WINDOW: usize = 2;
+/// How far from an edge its own verdict may sit, in lines. **One**, so that a marker may
+/// lead a wrapped sentence and no further.
+///
+/// Two was one too many and it was measured: the census footer lists its rows two lines
+/// apart, so at a window of two every row sat inside its neighbours' markers, a row
+/// could lose its verdict at every site in the file, and this guard stayed green while
+/// the mutant validated at exit 0 — the strike lands inside a YAML comment. The guard's
+/// own words are that a marker in a heading above a list is not a marker for the edges
+/// in it; at two lines the footer was exactly that list.
+const MARKER_WINDOW: usize = 1;
 
-/// The text that carries a verdict, which a reader must find beside the edge itself.
-/// A `Filed` row is bound to *its own* blocker, not to either of them.
-fn marker(verdict: Verdict) -> Option<&'static str> {
+/// The text a reader must find beside the edge itself for each verdict.
+///
+/// `UNMAPPED` is required for a `Filed` row **as well as** its blocker id, because the
+/// acceptance of `story:mcp-domain-model` says "every relation the model could not read
+/// … carried as an explicit `UNMAPPED:` comment", and a filed decision is a relation the
+/// model could not read — that is why it is filed. An earlier version of this guard
+/// wanted the blocker id *instead*, which made it a test of this implementation's own
+/// two-vocabulary scheme rather than of the sentence the story is accepted against.
+/// `story:mcp-profile-selection-matrix` greps for the word.
+fn markers(verdict: Verdict) -> Vec<&'static str> {
     match verdict {
-        Verdict::Unmapped => Some("UNMAPPED"),
-        Verdict::Filed(blocker) => Some(blocker),
-        Verdict::Absent => Some("ess/domains/sessions.yaml:89-91"),
-        Verdict::Stated => None,
+        Verdict::Unmapped => vec!["UNMAPPED"],
+        Verdict::Filed(blocker) => vec!["UNMAPPED", blocker],
+        Verdict::Absent => vec!["ess/domains/sessions.yaml:89-91"],
+        Verdict::Stated => Vec::new(),
     }
 }
 
@@ -330,7 +357,7 @@ fn every_census_edge_is_marked_and_no_unreadable_one_is_realised() {
         );
 
         // — the verdict must be legible at every site, not merely present in the file —
-        if let Some(wanted) = marker(*verdict) {
+        for wanted in markers(*verdict) {
             let unmarked: Vec<String> = sites
                 .iter()
                 .filter(|site| {
@@ -343,8 +370,8 @@ fn every_census_edge_is_marked_and_no_unreadable_one_is_realised() {
             assert!(
                 unmarked.is_empty(),
                 "`{edge}` is named at {} without `{wanted}` within {MARKER_WINDOW} \
-                 lines. A marker in a heading above a list is not a marker for the edges \
-                 in it; a reader who lands on one edge must see its verdict",
+                 line(s). A marker in a heading above a list is not a marker for the \
+                 edges in it; a reader who lands on one edge must see its whole verdict",
                 unmarked.join(", ")
             );
         }
@@ -365,23 +392,36 @@ fn every_census_edge_is_marked_and_no_unreadable_one_is_realised() {
             );
         }
 
-        // — realisation form 2: a field named for, or typed as, the target —
-        let names = carrier_names(target);
-        for (field, declared_type) in entity_fields(source) {
-            assert!(
-                !names.contains(&field),
-                "`{edge}` is realised by the field \
-                 `{source}.{field}: {declared_type}`. A flat carrier is the same claim \
-                 in a weaker syntax — a scalar `{field}` says one-to-one as loudly as \
-                 `cardinality: one` does — and it produces no `relations:` entry and \
-                 validates at exit 0. This edge has no answered cardinality to carry"
-            );
-            assert!(
-                !is_type_name(target) || !declared_type.contains(short(target)),
-                "`{edge}` is realised by the field \
-                 `{source}.{field}: {declared_type}`, whose type names the target. \
-                 Embedding the target is the same claim as declaring the relation"
-            );
+        // — realisation form 2: a carrier named for, or typed as, the other end —
+        //
+        // Symmetric, and over `types:` as well as `entities:`. An edge is a claim about
+        // two things; either of them may carry it, and a value carries it as well as a
+        // record does. `binding_ref: String` on the `McpCapabilitySnapshot` value binds
+        // a snapshot to one binding just as surely as the same field on
+        // `McpOutboundSession` would, and both validate at exit 0.
+        for (near, far) in [(source, target), (target, source)] {
+            let names = carrier_names(far);
+            for (field, declared_type) in declared_fields(short(near)) {
+                assert!(
+                    !names.contains(&field),
+                    "`{edge}` is realised by the carrier \
+                     `{}.{field}: {declared_type}`, which names the other end. A flat \
+                     carrier is the same claim in a weaker syntax — a scalar says \
+                     one-to-one and a `List<…>` says one-to-many, as loudly as \
+                     `cardinality:` does — and it produces no `relations:` entry and \
+                     validates at exit 0. This edge has no answered cardinality to \
+                     carry, at either end",
+                    short(near)
+                );
+                assert!(
+                    !is_type_name(far) || !declared_type.contains(short(far)),
+                    "`{edge}` is realised by the carrier \
+                     `{}.{field}: {declared_type}`, whose type names the other end. \
+                     Embedding one end in the other is the same claim as declaring the \
+                     relation",
+                    short(near)
+                );
+            }
         }
     }
 
@@ -399,10 +439,55 @@ fn every_census_edge_is_marked_and_no_unreadable_one_is_realised() {
         assert!(
             text.contains(citation),
             "the one stated census edge is stated without `{citation}`, one of the four \
-             `ess/1` blocks that bind a scalar `via` carrier to `cardinality: one` and a \
-             `List<…>` carrier to `cardinality: many`"
+             `kind: references` blocks that bind a scalar `via` carrier to \
+             `cardinality: one` and a `List<…>` carrier to `cardinality: many`"
         );
     }
+
+    // The `references` scope of that rule is load-bearing, and dropping it would condemn
+    // two correct shared declarations: `ess/domains/declarations.yaml:119-123` and
+    // `ess/domains/discovery_state.yaml:85-89` both carry `cardinality: many` through a
+    // scalar `via`, and both are `kind: owns`, where `via` names the child's
+    // back-reference to the owner's identity. The model must keep saying so.
+    //
+    // Bound to the rule's own sentence, not to the file. `kind: references` appears
+    // elsewhere in this model as part of an unrelated citation, so asserting the bare
+    // phrase would be satisfied by that mention — the same file-global weakness this
+    // guard was corrected for once already, and a red run caught it here a second time.
+    for scope in [
+        "`kind: references` relation — and ONLY for those",
+        "ess/domains/discovery_state.yaml:85-89",
+    ] {
+        assert!(
+            text.contains(scope),
+            "the cardinality rule is stated without `{scope}`. Unscoped, the rule reads \
+             on `kind: owns` relations too, where a scalar `via` carries `many` — and it \
+             would condemn two correct shared declarations, one of them the very block \
+             the same paragraph withdraws"
+        );
+    }
+}
+
+/// `domains/protocol.yaml` says it makes no selection. That sentence is what tells the
+/// next nine stories that an enum here is the specification's option space and not this
+/// repository's support claim, and `story:mcp-profile-selection-matrix` is written
+/// against it.
+///
+/// **This case guards the disclaimer, not the property.** Nothing in this repository
+/// stops a selection being *added* — a new `SelectedTransport` enum would validate,
+/// compile and pass every case here. `adapters/mcp/design.md` says so in the same words,
+/// so that a green suite is not read as evidence of something no case establishes.
+#[test]
+fn the_protocol_domain_still_disclaims_making_a_selection() {
+    let text = read("domains/protocol.yaml");
+    assert!(
+        text.contains("no selection is made")
+            && text.contains("story:mcp-profile-selection-matrix"),
+        "domains/protocol.yaml no longer disclaims making a selection, or no longer \
+         names the story that owns one. Every enum in that file is the pinned \
+         specification's option space; without the disclaimer a reader takes it for a \
+         list of what this repository supports"
+    );
 }
 
 /// Three credential kinds, three declared types, never one polymorphic value.
