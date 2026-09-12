@@ -7,8 +7,8 @@ had checked what `main` actually holds.
 | | |
 |---|---|
 | command | `cargo run --locked -p connectors-build -- gate --msrv` |
-| branch | `main` |
-| result | **34 gate steps, 76 test targets, every step exit 0** |
+| branch | `main` at `1faf4cc`, the commit `v0.8.0` tags |
+| result | **35 gate steps, 85 test targets, every step exit 0** |
 | log | [gate.log](gate.log), ending `GATE-EXIT:0` |
 
 `CARGO_BUILD_JOBS=1`, `RUSTC_WRAPPER=""`, `TMPDIR` task-owned under `.local/tmp`.
