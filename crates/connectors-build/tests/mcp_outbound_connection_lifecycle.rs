@@ -897,6 +897,126 @@ fn binding_fields() -> Vec<String> {
         .collect()
 }
 
+/// The bullets of one scenario field, flattened. A field may be a string or a block
+/// sequence, and a bullet is the unit a claim is made in.
+fn scenario_bullets(value: &serde_yaml_ng::Value, key: &str) -> Vec<String> {
+    match &value[key] {
+        serde_yaml_ng::Value::Sequence(items) => items
+            .iter()
+            .filter_map(|item| item.as_str())
+            .map(flat)
+            .collect(),
+        serde_yaml_ng::Value::String(text) => vec![flat(text)],
+        _ => Vec::new(),
+    }
+}
+
+/// The revisions whose archives a text cites, read off the archived file names: an
+/// archive is `mcp-<revision>-…`, so a citation is a claim about that revision.
+fn revisions_cited(text: &str) -> BTreeSet<String> {
+    regex::Regex::new(r"mcp-(\d{4}-\d{2}-\d{2})-")
+        .unwrap()
+        .captures_iter(text)
+        .map(|capture| capture[1].to_string())
+        .collect()
+}
+
+/// One revision's archived bytes, concatenated: every file of the pin's manifest whose
+/// name carries that revision.
+fn archives_of(revision: &str) -> String {
+    let mut joined = String::new();
+    for file in manifest_files() {
+        if !file.contains(revision) {
+            continue;
+        }
+        let archive = evidence_dir().join("vendor").join(format!("{file}.gz"));
+        let output = Command::new("gzip")
+            .arg("-dc")
+            .arg(&archive)
+            .output()
+            .unwrap_or_else(|e| panic!("run gzip -dc {}: {e}", archive.display()));
+        assert!(
+            output.status.success(),
+            "gzip -dc {} exited {}",
+            archive.display(),
+            output.status
+        );
+        joined.push_str(&String::from_utf8_lossy(&output.stdout));
+    }
+    assert!(
+        !joined.is_empty(),
+        "no archived file of the pin carries `{revision}`, so a term cannot be attributed \
+         to it"
+    );
+    joined
+}
+
+/// The code spans the scenarios use that occur in exactly one supported revision's
+/// archives, as `span -> revision`.
+///
+/// Nothing here is a list of protocol terms: the spans come from the scenarios and the
+/// attribution from the archived bytes, so a term that stops being exclusive — or a
+/// scenario that introduces a new one — is classified on the next run rather than on the
+/// next time somebody remembers this file exists.
+fn revision_exclusive_spans(supported: &BTreeSet<String>) -> BTreeMap<String, String> {
+    let span = regex::Regex::new(r"`([^`]+)`").unwrap();
+    let mut spans: BTreeSet<String> = BTreeSet::new();
+    for (_, value) in owned_scenarios() {
+        for key in ["summary", "given", "when", "then", "never"] {
+            for bullet in scenario_bullets(&value, key) {
+                for found in span.captures_iter(&bullet) {
+                    let text = found[1].trim().to_string();
+                    // A citation, a planning id or a file name is not a protocol term.
+                    if text.len() < 3
+                        || text.contains(".mdx")
+                        || text.contains(".ts")
+                        || text.contains(".yaml")
+                        || text.contains(':') && !text.contains('/')
+                    {
+                        continue;
+                    }
+                    spans.insert(text);
+                }
+            }
+        }
+    }
+    let corpus: BTreeMap<&String, String> = supported
+        .iter()
+        .map(|revision| (revision, archives_of(revision)))
+        .collect();
+    let mut exclusive = BTreeMap::new();
+    for text in spans {
+        let carried: Vec<&String> = corpus
+            .iter()
+            .filter(|(_, archives)| archives.contains(&text))
+            .map(|(revision, _)| *revision)
+            .collect();
+        if carried.len() == 1 {
+            exclusive.insert(text, carried[0].clone());
+        }
+    }
+    exclusive
+}
+
+/// The revisions one bullet rests on: those whose archives it cites, and those whose
+/// archives alone carry a term it uses.
+fn revisions_a_bullet_rests_on(
+    bullet: &str,
+    supported: &BTreeSet<String>,
+    exclusive: &BTreeMap<String, String>,
+) -> BTreeSet<String> {
+    let mut rests_on: BTreeSet<String> = revisions_cited(bullet)
+        .into_iter()
+        .filter(|revision| supported.contains(revision))
+        .collect();
+    for (text, revision) in exclusive {
+        if bullet.contains(&format!("`{text}`")) {
+            rests_on.insert(revision.clone());
+        }
+    }
+    rests_on
+}
+
 /// **The class behind three of the adversary's findings.** The matrix dispositions two
 /// revisions `supported` outbound; where they disagree, a passage that names neither
 /// states one of them as the transport's rule. Sections 3, 10 and 11 said which revision
@@ -958,29 +1078,51 @@ fn every_section_and_scenario_resolves_which_revision_it_holds_for() {
             }
         }
     }
+    // A scenario's `given` names the binding it is about — and, where it admits both
+    // revisions, every bullet of it that states one revision's wire has to say so. Pass 1
+    // asked only the first question, which a scenario widened to admit both revisions and
+    // left specifying one answers vacuously: that is this round's root cause, and it is
+    // the same class the sections are held to, applied to the file that decides them.
+    let exclusive = revision_exclusive_spans(&supported);
     for (path, value) in owned_scenarios() {
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
-            .expect("scenario file name");
-        let given = match &value["given"] {
-            serde_yaml_ng::Value::Sequence(items) => items
-                .iter()
-                .filter_map(|item| item.as_str())
-                .collect::<Vec<_>>()
-                .join(" "),
-            serde_yaml_ng::Value::String(text) => text.clone(),
-            _ => String::new(),
-        };
-        if !supported
+            .expect("scenario file name")
+            .to_string();
+        let given = scenario_bullets(&value, "given").join(" ");
+        let admitted: Vec<&String> = supported
             .iter()
-            .any(|revision| names_the_revision(&given, revision))
-        {
+            .filter(|revision| names_the_revision(&given, revision))
+            .collect();
+        if admitted.is_empty() {
             unresolved.push(format!(
                 "{name} names no revision in its `given`, so it reads as a case about \
                  every binding this repository selects: {:?}",
                 flat(&given)
             ));
+            continue;
+        }
+        if admitted.len() < 2 {
+            continue;
+        }
+        for key in ["summary", "given", "when", "then", "never"] {
+            for bullet in scenario_bullets(&value, key) {
+                let evidence = revisions_a_bullet_rests_on(&bullet, &supported, &exclusive);
+                if evidence.len() != 1 {
+                    continue;
+                }
+                let revision = evidence.iter().next().expect("one revision");
+                if names_the_revision(&bullet, revision) {
+                    continue;
+                }
+                unresolved.push(format!(
+                    "{name} `{key}` rests on `{revision}` alone — by the archive it cites \
+                     or by a term only that revision's archives carry — while its `given` \
+                     admits both, so it reads as true for a binding it is false for: \
+                     {bullet:?}"
+                ));
+            }
         }
     }
     assert!(
@@ -989,6 +1131,35 @@ fn every_section_and_scenario_resolves_which_revision_it_holds_for() {
         unresolved.len(),
         unresolved.join("\n  ")
     );
+}
+
+/// A text's sentences, which is the unit a claim is made in. A paragraph naming a field
+/// in one sentence and using a writing verb about something else in another says nothing
+/// about the field, and reading whole paragraphs made that a finding three times.
+fn sentences(text: &str) -> Vec<String> {
+    flat(text)
+        .split(". ")
+        .map(|sentence| sentence.trim().to_string())
+        .filter(|sentence| !sentence.is_empty())
+        .collect()
+}
+
+/// The writing verb a sentence uses, in either voice, or `None`.
+///
+/// `record`, `set` and `record`'s plural are nouns as often as verbs in this contract —
+/// "a durable record", "that set" — so a match introduced by a determiner is not read as
+/// a verb.
+fn writing_verb(sentence: &str) -> Option<String> {
+    let writes = regex::Regex::new(
+        r"(?i)\b(a|an|the|that|this|its|their|no|one|any|every|own|durable|permanent|second)?\s*\b((?:is|are|was|were|gets?|becomes?)\s+(?:then\s+)?(?:recorded|set|written|stored|saved|persisted|updated|assigned|remembered)|records?|sets?|writes?|stores?|saves?|persists?|updates?|assigns?|remembers?)\b",
+    )
+    .unwrap();
+    writes.captures_iter(sentence).find_map(|capture| {
+        if capture.get(1).is_some_and(|word| !word.as_str().is_empty()) {
+            return None;
+        }
+        Some(capture[2].trim().to_string())
+    })
 }
 
 /// **The class behind the durable-record finding.** `determined_era` was declared
@@ -1009,36 +1180,109 @@ fn no_sentence_writes_a_field_of_the_binding_entity() {
          the wrong entity: {fields:?}",
         fields.len()
     );
-    let writes = regex::Regex::new(
-        r"(?i)\b(?:is|are|was|were|gets?|becomes?)\s+(?:then\s+)?(?:recorded|set|written|stored|saved|persisted|updated|assigned|remembered)\b",
-    )
-    .unwrap();
-
-    let document = semantics();
-    let mut broken = Vec::new();
-    for (line, text) in paragraphs(&document) {
-        let named: Vec<&String> = fields
+    // Three narrownesses a second pass found in this case's first shape: it read only
+    // `semantics.md`, while the story's acceptance is that document **and its scenarios**;
+    // it matched the passive voice only, while the contract writes "a probe records the
+    // determined era" in the active; and it matched the model's spelling only, while prose
+    // says "the determined era" with a space.
+    let named_in = |text: &str| -> Vec<String> {
+        fields
             .iter()
-            .filter(|field| text.contains(*field))
-            .collect();
-        if named.is_empty() {
-            continue;
+            .filter(|field| {
+                let spelt = field.replace('_', "[_ ]");
+                regex::Regex::new(&format!(r"(?i)\b{spelt}\b"))
+                    .unwrap()
+                    .is_match(text)
+            })
+            .cloned()
+            .collect()
+    };
+
+    let mut broken = Vec::new();
+    let document = semantics();
+    for (line, text) in paragraphs(&document) {
+        for sentence in sentences(&text) {
+            let named = named_in(&sentence);
+            if named.is_empty() {
+                continue;
+            }
+            if let Some(verb) = writing_verb(&sentence) {
+                broken.push(format!(
+                    "semantics.md:{line} says `{verb}` of {named:?}, which are fields of \
+                     the `McpServerBinding` entity; this contract specifies a live \
+                     connection and implies no durable record of one: {sentence:?}"
+                ));
+            }
         }
-        if let Some(verb) = writes.find(&text) {
-            broken.push(format!(
-                "semantics.md:{line} says `{}` of {named:?}, which are fields of the \
-                 `McpServerBinding` entity; this document specifies a live connection and \
-                 implies no durable record of one",
-                verb.as_str().trim()
-            ));
+    }
+    for (path, value) in owned_scenarios() {
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .expect("scenario file name")
+            .to_string();
+        // `never:` states a prohibition, so a writing verb there is the opposite of a
+        // write and is not read.
+        for key in ["summary", "given", "when", "then"] {
+            for bullet in scenario_bullets(&value, key) {
+                for sentence in sentences(&bullet) {
+                    let named = named_in(&sentence);
+                    if named.is_empty() {
+                        continue;
+                    }
+                    if let Some(verb) = writing_verb(&sentence) {
+                        broken.push(format!(
+                            "{name} `{key}` says `{verb}` of {named:?}, which are fields \
+                             of the `McpServerBinding` entity: {sentence:?}"
+                        ));
+                    }
+                }
+            }
         }
     }
     assert!(
         broken.is_empty(),
-        "{} paragraphs write a field of the binding entity:\n  {}",
+        "{} passages of this contract write a field of the binding entity:\n  {}",
         broken.len(),
         broken.join("\n  ")
     );
+}
+
+/// The `###` section that defines one outcome, heading included.
+fn outcome_section(document: &str, outcome: &str) -> String {
+    let heading = format!("### `{outcome}`");
+    let start = document
+        .find(&heading)
+        .unwrap_or_else(|| panic!("semantics.md defines no outcome `{outcome}`"));
+    let rest = &document[start + heading.len()..];
+    let end = rest
+        .find("\n### ")
+        .into_iter()
+        .chain(rest.find("\n## "))
+        .min()
+        .unwrap_or(rest.len());
+    format!("{heading}{}", &rest[..end])
+}
+
+/// The variants `connectors.service_wire.ErrorCode` declares, read out of the shared
+/// model.
+fn wire_code_variants() -> Vec<&'static str> {
+    let model = read(&repository_root().join("ess/domains/service_wire.yaml"));
+    let declaration = model
+        .lines()
+        .skip_while(|line| !line.contains("connectors.service_wire.ErrorCode"))
+        .find(|line| line.trim_start().starts_with("variants:"))
+        .expect("ess/domains/service_wire.yaml declares no ErrorCode variants")
+        .to_string();
+    declaration
+        .trim()
+        .trim_start_matches("variants:")
+        .trim()
+        .trim_matches(|c| c == '[' || c == ']')
+        .split(',')
+        .map(|variant| Box::leak(variant.trim().to_string().into_boxed_str()) as &'static str)
+        .filter(|variant| !variant.is_empty())
+        .collect()
 }
 
 /// **The class behind the wrong wire code.** `-32020` was filed under `upstream_protocol`
@@ -1054,20 +1298,33 @@ fn no_sentence_writes_a_field_of_the_binding_entity() {
 #[test]
 fn every_refusal_names_whose_act_it_reports() {
     const ACTORS: [&str; 5] = ["n/a", "peer", "client", "operator", "unobserved"];
-    /// A code that names a side may only be reported as that side's act. `peer` carries
-    /// several codes and `operator` one, so only these three are fixed by their code.
+    /// A code that names a side may only be reported as that side's act.
     const CODE_NAMES_THE_ACT_OF: [(&str, &str); 3] = [
         ("upstream_protocol", "peer"),
         ("internal", "client"),
         ("outcome_unknown", "unobserved"),
     ];
-    /// The other direction, for the two acts that have exactly one code: a refusal that
-    /// reports this client's own act is `internal`, and one that reports nothing observed
-    /// is `outcome_unknown`. Saying so in both directions is what makes the code that
-    /// blames the wrong side fail rather than read plausibly.
-    const ACT_IS_CARRIED_BY: [(&str, &str); 2] =
-        [("client", "internal"), ("unobserved", "outcome_unknown")];
+    /// The other direction, for the one act that has exactly one code: a refusal
+    /// reporting this client's own act is `internal`.
+    ///
+    /// `unobserved` was bound to `outcome_unknown` here in the first correction, and a
+    /// second pass showed the binding was wrong rather than strong: an endpoint that never
+    /// answered is a refusal in which nothing was seen, and its code is `unavailable`, not
+    /// uncertainty about an effect. What replaces the binding is the rule below, which
+    /// holds every refusal's column against its own prose — the thing that was unchecked
+    /// when the column disagreed with the section it labels.
+    const ACT_IS_CARRIED_BY: [(&str, &str); 1] = [("client", "internal")];
+    /// How each act is written where a section declares it.
+    const DECLARED_AS: [(&str, &str); 4] = [
+        ("peer", "The act reported is the peer's"),
+        ("client", "The act reported is this client's"),
+        ("operator", "The act reported is the operator's"),
+        ("unobserved", "The act reported is nobody's"),
+    ];
 
+    let variants = wire_code_variants();
+    let another_outcome = regex::Regex::new(r"`mcp\.outbound\.[a-z-]+`").unwrap();
+    let document = semantics();
     let rows = rows();
     let mut broken = Vec::new();
     for row in &rows {
@@ -1109,6 +1366,61 @@ fn every_refusal_names_whose_act_it_reports() {
                      `{code}`, and carries `{}`",
                     row.line, row.outcome, row.wire_code
                 ));
+            }
+        }
+
+        // The column against the prose it labels. A refusal declares its act in the
+        // section that defines it, in one of four sentences, and the sentence is the one
+        // the column names; an observation declares none, because it reports no act.
+        let section = outcome_section(&document, &row.outcome);
+        let flat_section = flat(&section);
+        let declared: Vec<&str> = DECLARED_AS
+            .iter()
+            .filter(|(_, sentence)| flat_section.contains(sentence))
+            .map(|(actor, _)| *actor)
+            .collect();
+        if row.wire_code == "n/a" {
+            if !declared.is_empty() {
+                broken.push(format!(
+                    "semantics.md:{} `{}` is an observation and its section declares the \
+                     act of {declared:?}",
+                    row.line, row.outcome
+                ));
+            }
+        } else if declared != [row.actor.as_str()] {
+            broken.push(format!(
+                "semantics.md:{} `{}` reports the act of `{}` and its own section declares \
+                 {declared:?}; a refusal says whose act it reports in the words the \
+                 register uses, or the column is a label nobody checked",
+                row.line, row.outcome, row.actor
+            ));
+        }
+
+        // An observation that names a refusal's code is describing another row's outcome,
+        // and has to say which row. This is where a register row carrying `n/a` while its
+        // prose produces an error stops being invisible.
+        if row.wire_code == "n/a" {
+            for sentence in flat_section.split(". ") {
+                let named: Vec<&&str> = variants
+                    .iter()
+                    .filter(|variant| {
+                        sentence.contains(&format!("`{variant}`")) && **variant != "n/a"
+                    })
+                    .collect();
+                if named.is_empty() {
+                    continue;
+                }
+                let cross_reference = another_outcome
+                    .find_iter(sentence)
+                    .any(|found| found.as_str() != format!("`{}`", row.outcome));
+                if !cross_reference {
+                    broken.push(format!(
+                        "semantics.md:{} `{}` carries no code, and a sentence of its \
+                         section names {named:?} without naming the outcome that carries \
+                         it: {sentence:?}",
+                        row.line, row.outcome
+                    ));
+                }
             }
         }
     }

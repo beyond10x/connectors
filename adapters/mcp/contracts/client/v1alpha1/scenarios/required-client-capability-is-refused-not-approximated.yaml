@@ -13,12 +13,17 @@ given:
   - A binding whose declared client capabilities are empty, because the selection matrix
     refuses `roots`, `sampling` and `elicitation`.
 when:
-  - The server answers `MissingRequiredClientCapabilityError` (-32021,
-    mcp-2026-07-28-schema.ts:442) naming the capabilities it required
-    (mcp-2026-07-28-basic-index.mdx:387-392).
+  - Under the primary revision (2026-07-28) the server answers
+    `MissingRequiredClientCapabilityError` (-32021, mcp-2026-07-28-schema.ts:442) naming
+    the capabilities it required (mcp-2026-07-28-basic-index.mdx:387-392).
+  - Under the interoperability revision (2025-11-25) there is no such code, and the same
+    demand arrives as a request or an answer that relies on a capability the handshake
+    did not negotiate (mcp-2025-11-25-basic-lifecycle.mdx:186-212).
 then:
-  - The observable outcome is `unsupported`, carrying the endpoint, the refused method and
-    the `requiredCapabilities` list.
+  - The observable outcome is `unsupported` on either revision, carrying the endpoint and
+    the refused method — with the `requiredCapabilities` list the primary revision's error
+    names, or, where the interoperability revision named no list, the capability the
+    server relied on.
   - The caller learns which capability the server wanted.
 never:
   - An elicitation is answered on a user's behalf, a default is supplied, a model is
