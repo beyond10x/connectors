@@ -177,8 +177,17 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "contracts/operations/v1alpha1/scenarios",
         "contracts/auth/acquisition/v1alpha1/scenarios",
         "contracts/auth/evidence/v1alpha1/scenarios",
+        // Inbound only. These are `ess-scenario/1` and ESS owns them, so synthesising them
+        // against the shared IR is a real check.
+        //
+        // The outbound directory beside it is deliberately absent. Those files are
+        // `mcp-outbound-lifecycle/1`, a format this repository defined and ESS does not
+        // know — and ESS refuses an unknown key rather than ignoring it, so collecting
+        // them here fails the gate on every one of them. They are held by
+        // `mcp_outbound_connection_lifecycle`'s own package-scoped cases instead, which is
+        // a weaker guarantee than the shared IR gives the inbound set, and saying so here
+        // is the point: adding the directory would turn a stated gap into a broken gate.
         "adapters/mcp/contracts/server/v1alpha1/scenarios",
-        "adapters/mcp/contracts/client/v1alpha1/scenarios",
     ]
     .iter()
     .enumerate()
