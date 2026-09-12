@@ -424,8 +424,19 @@ refusal in the third column, never a silent approximation.
 Three whole transports are outside this binding, and the matrix disposed each of them
 already:
 
-- `transport:streamable-http` inbound is `deferred`, held by
-  `decision-blocker:mcp-caller-connection-assignment`.
+- `transport:streamable-http` inbound is `supported`, and it is **not this binding's**.
+  This binding does not offer that placement, names no service it would need, and does
+  not own it — the cloud placement belongs to `story:mcp-inbound-cloud-profile` and not
+  here. This document specifies the local-client binding only and says nothing about how
+  a caller reaches that placement, nor which connection such a caller may use — the
+  second question is
+  `decision-blocker:mcp-caller-connection-assignment`, which remains open and which this
+  document does not answer.
+
+  *(This bullet read `deferred`, held by that blocker, until the selection matrix's own
+  correction re-dispositioned the row. The blocker's record never named a transport; a
+  deferral resting on it withdrew a story the blocker does not claim. The disposition
+  moved, so this statement of it moves with it.)*
 - `transport:custom-transports` inbound is explicitly refused; this binding offers no
   transport of its own, and the local owner's protected Unix-domain socket is not
   offered as one either.

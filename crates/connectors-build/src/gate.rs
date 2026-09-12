@@ -177,6 +177,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "contracts/operations/v1alpha1/scenarios",
         "contracts/auth/acquisition/v1alpha1/scenarios",
         "contracts/auth/evidence/v1alpha1/scenarios",
+        "adapters/mcp/contracts/server/v1alpha1/scenarios",
+        "adapters/mcp/contracts/client/v1alpha1/scenarios",
     ]
     .iter()
     .enumerate()
