@@ -1,0 +1,28 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:framing
+outcome: mcp.outbound.framing-refused
+wire_code: upstream_protocol
+summary: An answer that cannot be read as the transport defines is the peer's act, and
+  still not the caller's input.
+given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); both define the same two answer media types and the client
+    offers both (mcp-2026-07-28-basic-transports-streamable-http.mdx:70-91,
+    mcp-2025-11-25-basic-transports.mdx:90-106).
+  - A request framed and sent by this client.
+when:
+  - The answer's body is not readable as JSON-RPC, or its media type is neither
+    `application/json` nor `text/event-stream`.
+then:
+  - The observable outcome is `upstream_protocol`, carrying the endpoint, the HTTP status
+    and what could not be read.
+  - The act reported is the peer's, because the client asked for both media types the
+    transport defines and the answer was neither of them, nor readable.
+  - The caller's request is not carried out, and the outcome is reported on both
+    revisions alike.
+never:
+  - The outcome is `invalid_input`; the caller supplied no framing.
+  - The outcome is `internal`; nothing about this answer was produced by this client.
+  - A decoding failure is reported as evidence about a provider effect.

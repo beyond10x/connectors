@@ -1,0 +1,32 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:capability-mismatch
+outcome: mcp.outbound.required-client-capability-refused
+wire_code: unsupported
+summary: A server that needs a client capability Connectors does not declare gets a
+  refusal the caller can read, not an approximation.
+given:
+  - A binding configured for the primary revision (2026-07-28); the interoperability
+    revision (2025-11-25) refuses the same demand without that code, because a server
+    may rely only on capabilities the handshake negotiated.
+  - A binding whose declared client capabilities are empty, because the selection matrix
+    refuses `roots`, `sampling` and `elicitation`.
+when:
+  - Under the primary revision (2026-07-28) the server answers
+    `MissingRequiredClientCapabilityError` (-32021, mcp-2026-07-28-schema.ts:442) naming
+    the capabilities it required (mcp-2026-07-28-basic-index.mdx:387-392).
+  - Under the interoperability revision (2025-11-25) there is no such code, and the same
+    demand arrives as a request or an answer that relies on a capability the handshake
+    did not negotiate (mcp-2025-11-25-basic-lifecycle.mdx:186-212).
+then:
+  - The observable outcome is `unsupported` on either revision, carrying the endpoint and
+    the refused method — with the `requiredCapabilities` list the primary revision's error
+    names, or, where the interoperability revision named no list, the capability the
+    server relied on.
+  - The caller learns which capability the server wanted.
+never:
+  - An elicitation is answered on a user's behalf, a default is supplied, a model is
+    sampled or a filesystem root is invented.
+  - The refused capability is declared in order to get past the refusal; whether it is
+    declared at all is the selection matrix's decision.

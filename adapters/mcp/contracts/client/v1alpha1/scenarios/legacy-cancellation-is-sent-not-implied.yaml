@@ -1,0 +1,30 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:cancellation
+outcome: mcp.outbound.legacy-cancellation-notified
+wire_code: n/a
+summary: On the revision where disconnecting means nothing, cancelling is a message that
+  was sent, and the effect at the server is still unobserved.
+given:
+  - A binding configured for the interoperability revision (2025-11-25), whose transport
+    says disconnection SHOULD NOT be read as the client cancelling, and that to cancel the
+    client SHOULD send a `CancelledNotification`
+    (mcp-2025-11-25-basic-transports.mdx:128-133).
+  - One in-flight request that is not `initialize`.
+when:
+  - The caller cancels, or the request's maximum bound expires
+    (mcp-2025-11-25-basic-lifecycle.mdx:248-262).
+then:
+  - A `notifications/cancelled` naming that request id, and the reason where there is one,
+    is sent (mcp-2025-11-25-basic-utilities-cancellation.mdx:15-19).
+  - The request is reported as cancelled by this client, and any effect at the server as
+    unobserved, because a receiver MAY ignore the notification when the work has already
+    finished (mcp-2025-11-25-basic-utilities-cancellation.mdx:43-46).
+  - A response arriving after the notification is recorded as late and does not become the
+    request's result (mcp-2025-11-25-basic-utilities-cancellation.mdx:47-48).
+never:
+  - Closing the connection is reported as having cancelled anything on this revision.
+  - An `initialize` request is cancelled this way, which this revision forbids
+    (mcp-2025-11-25-basic-utilities-cancellation.mdx:37).
+  - Cancellation is reported as a failure of the server.
