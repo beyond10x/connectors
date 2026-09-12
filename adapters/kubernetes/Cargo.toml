@@ -18,6 +18,8 @@ required-features = ["service"]
 connectors-core.workspace = true
 connectors-contracts.workspace = true
 connectors-sdk.workspace = true
+base64.workspace = true
+flate2.workspace = true
 connectors-host = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
