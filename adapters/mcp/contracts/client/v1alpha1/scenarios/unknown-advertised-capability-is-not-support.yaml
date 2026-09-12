@@ -7,6 +7,9 @@ wire_code: n/a
 summary: A capability key this repository does not consume is recorded as advertised and
   projected into nothing; it is neither an error nor support.
 given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); an advertised key is recorded and projected into nothing on
+    both.
   - A server advertising a key the selection matrix refuses, such as `logging`, and a key
     no archived byte names at all, which the schema permits
     (mcp-2026-07-28-schema.ts:789).

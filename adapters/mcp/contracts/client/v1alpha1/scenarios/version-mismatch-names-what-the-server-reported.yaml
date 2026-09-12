@@ -7,7 +7,9 @@ wire_code: unsupported
 summary: An `UnsupportedProtocolVersionError` is surfaced with the versions the server
   reported, and no other version is declared on the request's behalf.
 given:
-  - A binding configured for one revision.
+  - A binding configured for the primary revision (2026-07-28), whose error carries a
+    supported list; under the interoperability revision (2025-11-25) the same refusal
+    arrives as a bare 400 and carries none.
   - A server that does not implement it.
 when:
   - The client sends a request declaring the configured version.

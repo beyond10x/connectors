@@ -7,6 +7,8 @@ wire_code: unavailable
 summary: An endpoint that cannot be reached is `unavailable`, and nothing about a session
   or a provider effect is claimed by it.
 given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); an endpoint that cannot be reached says nothing about which.
   - A configured binding whose endpoint does not answer.
 when:
   - The name does not resolve, the connection is refused, the TLS handshake fails, or
