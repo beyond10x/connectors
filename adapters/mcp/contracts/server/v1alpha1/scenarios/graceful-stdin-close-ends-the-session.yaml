@@ -1,0 +1,137 @@
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.5.
+# Behaviour: connection and session loss (graceful close)
+# Outcome: graceful-stdin-close-ends-the-session
+# Transition: connectors.sessions.Session.begin_close (Ready → Closing)
+#
+# The other route of the same behaviour, the drop that ends in Lost, is
+# transport-drop-loses-the-session.yaml. The document describes both endings and says the
+# binding distinguishes them; a table row that named only the drop left the graceful one —
+# the one the revision calls "the primary graceful-shutdown signal and the only portable
+# one" — with no trace that fails when an implementation gets it wrong.
+#
+# Compiled supervisor decisions, not an executed trace, and not an MCP message: the
+# pinned toolchain "compiles obligations but does NOT execute a sequential trace"
+# (ess/domains/sessions.yaml, closing note). Whole-second acts express causal order.
+#
+# One instance_ref, one connection_ref, one authority_ref, in every trace of this story:
+# the single principal contracts/cli/v1alpha1/semantics.md §1 admits. A second value of
+# any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
+type: ess-scenario/1
+domain: connectors.sessions
+scenario: graceful-stdin-close-ends-the-session
+summary: 'The caller closes stdin, the supervisor records one terminal and cuts data off by the live lease deadline rather than a later one, and teardown completes at Closed.'
+arrange:
+- instance: session
+  entity: connectors.sessions.Session
+timeline:
+- at: '2026-09-12T12:00:00Z'
+  command: connectors.sessions.OfferSession
+  input:
+    binding:
+      instance_ref: connectors-local
+      connection_ref: local-owner
+      admitted_revision: config-revision-a
+      authority_ref: local-owner-uid
+    profile: inbound_offer
+    placement: local
+    streams:
+    - stdio
+  outcome: offered
+  events:
+  - event: connectors.sessions.SessionOffered
+  capture:
+    instance: session
+    event: connectors.sessions.SessionOffered
+    field: session_id
+- at: '2026-09-12T12:00:01Z'
+  command: connectors.sessions.AcceptOffer
+  input:
+    session_id:
+      $instance: session
+  outcome: accepted
+  events:
+  - event: connectors.sessions.OfferAccepted
+- at: '2026-09-12T12:00:02Z'
+  command: connectors.sessions.EstablishReady
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    # Lifetime 2,000 ms: the ceiling contracts/sessions/v1alpha1/semantics.md §4.1 sets on
+    # the effective deadline of a data lease, which ess/domains/sessions.yaml repeats as
+    # "lease lifetime <= 2000 ms including uncertainty".
+    lease:
+      issued_at: '2026-09-12T12:00:02Z'
+      effective_expiry: '2026-09-12T12:00:04Z'
+      sequence: 1
+  outcome: ready
+  events:
+  - event: connectors.sessions.SessionReady
+# The caller closes the binding's stdin and the reader returns end-of-file. The revision
+# makes that the shutdown signal: "Servers SHOULD exit promptly when their standard input
+# is closed or reads return end-of-file" (mcp-2026-07-28-basic-transports-stdio.mdx:102-104).
+# The peer closed the stream and waited (:89-94), so its shutdown is confirmed below.
+#
+# cutoff_due_at is 12:00:04, not 12:00:05. §4.1 allows 2,000 ms from the terminal to data
+# cutoff, but the live lease's own deadline is earlier and dominates: the model says the
+# close deadlines "are bounded by §4.1; earlier expiry/drain deadlines dominate", and §4.1
+# forbids adding grace past an effective expiry. teardown_due_at is within the 5,000 ms
+# §4.1 allows from the terminal fact to completion of local teardown and accounting.
+- at: '2026-09-12T12:00:03Z'
+  command: connectors.sessions.BeginClose
+  input:
+    session_id:
+      $instance: session
+    terminal:
+      reason: remote_hangup
+      by: adapter
+      accepted_at: '2026-09-12T12:00:03Z'
+    cutoff_due_at: '2026-09-12T12:00:04Z'
+    teardown_due_at: '2026-09-12T12:00:06Z'
+  outcome: closing
+  events:
+  - event: connectors.sessions.ClosingBegun
+# Nothing is written to a closed stdout afterwards. §4.1 leaves zero data-drain allowance
+# after cutoff; the closing period is for bounded control cleanup only.
+- at: '2026-09-12T12:00:04Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: output
+  outcome: wrong-state
+  error:
+    name: connectors.sessions.StateConflict
+    fields:
+      state: Closing
+  no_events:
+  - connectors.sessions.DataPermitted
+# Teardown completes inside the deadline the close itself recorded, and records released on
+# local task and resource evidence, which is the only thing FinishTeardown may claim it on.
+#
+# peer_shutdown is unconfirmed, and EOF is not evidence otherwise. Closing that stream is
+# step one of the client's three: "1. Closing the input stream to the child process (the
+# server). 2. Waiting for the server to exit. 3. If the server does not exit within a
+# reasonable time, forcibly terminating the process"
+# (mcp-2026-07-28-basic-transports-stdio.mdx:89-94). At EOF the peer has not shut down — it
+# is waiting on this process, holding the escalation. The sessions contract records the
+# same shape: closed "records confirmed local release; it does not assert remote
+# cooperation", and "peer protocol shutdown is recorded as confirmed or unconfirmed
+# independently of local cutoff" (contracts/sessions/v1alpha1/semantics.md §4.1).
+- at: '2026-09-12T12:00:06Z'
+  command: connectors.sessions.FinishTeardown
+  input:
+    session_id:
+      $instance: session
+    decision: released
+    peer_shutdown: unconfirmed
+  outcome: closed
+  events:
+  - event: connectors.sessions.LocalResourcesReleased
+assert:
+- view: connectors.sessions.SessionStates
+  contains:
+    session_id:
+      $instance: session
+    state: Closed
