@@ -1,16 +1,29 @@
 ---
 format: aep.planning-md/1
-id: release-plan:connectors-v030
+id: release-plan:connectors-v080
 kind: release-plan
-status: superseded
-title: Release v0.3.0 from the merged local Connectors increment
+status: draft
+title: Release v0.8.0 from the merged local Connectors increment
 relations:
 - informed_by: initiative:complete-local-connectors
-revision: 2
+- supersedes: release-plan:connectors-v030
+revision: 1
 ---
 ## Scope
 
-Connectors v0.3.0, cut from `main` on 2026-09-12, 74 commits after v0.2.0.
+Connectors v0.8.0, cut from `main` on 2026-09-12.
+
+**Numbered 0.8.0 rather than 0.3.0.** This work lands in `beyond10x/connectors`,
+whose published tags already reach `v0.7.2` from the implementation it replaces.
+Two version lines in one repository would make `v0.3.0` ambiguous between a
+2026-09-01 release of the old code and this one, so the line continues. Nothing
+was published under 0.3.0, and `release-plan:connectors-v030` is archived in
+favour of this record.
+
+The destination branch is `next` at `beyond10x/connectors`, carrying all 160
+commits of this codebase with its own root. Its tree is byte-identical to this
+repository's, and none of the 1251 paths unique to the previous implementation
+appears on it.
 
 Guarded GitLab writes, Kubernetes and PostgreSQL through the persistent local
 lifecycle, Helm release reads, the catalog ingest-to-bundle track, source-identity
@@ -20,7 +33,7 @@ carries the user-visible list.
 ## Evidence
 
 The full repository gate with `--msrv` on the merged `main`, every step exit 0.
-Retained at `docs/evidence/release-v030-20260912/gate.log`.
+Retained at `docs/evidence/release-v080-20260912/gate.log`.
 
 Two constituent waves gated separately before merging, and both logs are retained
 in the repository: `docs/evidence/helm-reads-20260912/gate.log` (33 steps, 71 test
