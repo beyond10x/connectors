@@ -1,0 +1,95 @@
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.1.
+# Behaviour: message framing
+# Outcome: framing-refusal-keeps-the-session-ready
+# Transition: connectors.sessions.Session.permit_data (Ready → Ready)
+#
+# Compiled supervisor decisions, not an executed trace, and not an MCP message: the
+# pinned toolchain "compiles obligations but does NOT execute a sequential trace"
+# (ess/domains/sessions.yaml, closing note). Whole-second acts express causal order.
+#
+# One instance_ref, one connection_ref, one authority_ref, in every trace of this story:
+# the single principal contracts/cli/v1alpha1/semantics.md §1 admits. A second value of
+# any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
+type: ess-scenario/1
+domain: connectors.sessions
+scenario: framing-refusal-keeps-the-session-ready
+summary: 'A malformed or truncated inbound line is refused and answered; the session keeps carrying data and stays Ready.'
+arrange:
+- instance: session
+  entity: connectors.sessions.Session
+timeline:
+- at: '2026-09-12T12:00:00Z'
+  command: connectors.sessions.OfferSession
+  input:
+    binding:
+      instance_ref: connectors-local
+      connection_ref: local-owner
+      admitted_revision: config-revision-a
+      authority_ref: local-owner-uid
+    profile: inbound_offer
+    placement: local
+    streams:
+    - stdio
+  outcome: offered
+  events:
+  - event: connectors.sessions.SessionOffered
+  capture:
+    instance: session
+    event: connectors.sessions.SessionOffered
+    field: session_id
+- at: '2026-09-12T12:00:01Z'
+  command: connectors.sessions.AcceptOffer
+  input:
+    session_id:
+      $instance: session
+  outcome: accepted
+  events:
+  - event: connectors.sessions.OfferAccepted
+- at: '2026-09-12T12:00:02Z'
+  command: connectors.sessions.EstablishReady
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    # Lifetime 2,000 ms: the ceiling contracts/sessions/v1alpha1/semantics.md §4.1 sets on
+    # the effective deadline of a data lease, which ess/domains/sessions.yaml repeats as
+    # "lease lifetime <= 2000 ms including uncertainty".
+    lease:
+      issued_at: '2026-09-12T12:00:02Z'
+      effective_expiry: '2026-09-12T12:00:04Z'
+      sequence: 1
+  outcome: ready
+  events:
+  - event: connectors.sessions.SessionReady
+# The refusal is written back on the same single channel, and the supervisor's decision is
+# permit_data: the connection keeps carrying traffic rather than being denied, because a
+# caller may interleave unrelated requests on this transport
+# (mcp-2026-07-28-basic-index.mdx:204-209).
+#
+# One admitted act, and that is arithmetic rather than brevity. ESS instants are whole
+# seconds and must strictly increase (ESS-AUTHOR-001, ESS-AUTHOR-023), a lease may not
+# outlive 2,000 ms from its issuance, and an act admitted *on* the effective expiry is
+# refused by the contract — so exactly one whole second lies strictly inside a lease
+# window, and a trace records the decision the outcome is about. The inbound line's own
+# admission, one instant earlier under the same lease, is that same decision for the other
+# direction; nothing here turns on it.
+- at: '2026-09-12T12:00:03Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: output
+  outcome: permitted
+  events:
+  - event: connectors.sessions.DataPermitted
+  no_events:
+  - connectors.sessions.ClosingBegun
+  - connectors.sessions.ContinuityLost
+  - connectors.sessions.DataAuthorityTerminated
+assert:
+- view: connectors.sessions.SessionStates
+  contains:
+    session_id:
+      $instance: session
+    state: Ready
