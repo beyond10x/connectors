@@ -2,8 +2,11 @@
 
 **Status:** specification-only owner directory. It holds a pinned upstream specification
 and, since `story:mcp-domain-model`, an authored native ESS model at
-[`spec/ess/`](spec/ess/system.yaml). There is no adapter service, package, generated
-projection or runtime declaration, and no behaviour here is implemented.
+[`spec/ess/`](spec/ess/system.yaml), and, since `story:mcp-profile-selection-matrix`,
+the protocol selection at
+[`contracts/protocol/v1alpha1/selection.md`](contracts/protocol/v1alpha1/selection.md).
+There is no adapter service, package, generated projection or runtime declaration, and
+no behaviour here is implemented.
 
 ## Scope and dependencies
 
@@ -56,8 +59,9 @@ Four things about it are load-bearing and are stated in the files themselves:
   causes (`ESS-ENTITY-005`), and this story declares no behaviour, so each entity carries
   the single-state shape `connectors.auth_bindings.AuthProfile` uses.
 - **It selects nothing.** The four transport bindings and the capability kinds are what
-  the pinned revisions declare, not what this repository supports; that selection is
-  `story:mcp-profile-selection-matrix`, which reads the markers row by row.
+  the pinned revisions declare, not what this repository supports. That selection now
+  exists, in [`contracts/protocol/v1alpha1/selection.md`](contracts/protocol/v1alpha1/selection.md),
+  and it reads the markers row by row rather than being made here.
 - **No carrier closes a set the pinned schema leaves open.** Every enum in
   `domains/protocol.yaml` was checked against its own source and every carrier typed to
   one was enumerated; the sweep and its per-enum verdicts are recorded in that file's
@@ -72,12 +76,15 @@ one of them is not held at all:**
 | No ESS relation; every unreadable edge marked at every site, at either end | `crates/connectors-build/tests/mcp_domain_model_census.rs`. `ess specify validate` cannot: a guessed cardinality on an `UNMAPPED:` row validates at exit 0, and so does a flat carrier that means the same thing. |
 | Single-state lifecycles | **ESS itself**, not that case — `ESS-ENTITY-005 missing_causation` and `ESS-ENTITY-011 dead_end_state`/`unreachable_state` refuse the alternatives. |
 | No carrier closes an open set | `mcp_domain_model_adversary_pass2.rs`, which reads the openness out of `domains/protocol.yaml` rather than hard-coding it. |
-| **It selects nothing** | **Nothing.** A new `SelectedTransport` enum would validate, compile and pass every case in this repository. The census case asserts that `domains/protocol.yaml` still carries its no-selection disclaimer, which stops the disclaimer being deleted quietly — it does not stop a selection being added. Until `story:mcp-profile-selection-matrix` lands, this property is held by review alone, and this row exists so that nobody reads the green suite as evidence of it. |
+| **It selects nothing** | **Partly.** A new `SelectedTransport` enum would still validate, compile and pass every case in this repository, and the census case only asserts that `domains/protocol.yaml` still carries its no-selection disclaimer. What changed with `story:mcp-profile-selection-matrix` is that the selection now exists elsewhere and is itself checked: `crates/connectors-build/tests/mcp_profile_selection_matrix.rs` derives every revision, transport and capability from the archived bytes and fails if `contracts/protocol/v1alpha1/selection.md` does not disposition each exactly once per direction. Nothing still stops a second, contradicting selection being added to this domain. |
 
 ## What is deliberately not decided here
 
-- Which transports and capability profiles this repository supports. The pinned revisions
-  specify **four** transport bindings, not two:
+- The pinned revisions specify **four** transport bindings, not two. Which of them this
+  repository selects is no longer open — see
+  [`contracts/protocol/v1alpha1/selection.md`](contracts/protocol/v1alpha1/selection.md),
+  which carries a row per binding per direction — but the option space this document
+  tabulates is what that selection had to cover:
 
   | Binding | Status in the pinned revisions | Cited in the archives |
   |---|---|---|
@@ -152,7 +159,8 @@ adopted upstream source/license packaging, a build dependency or a vendored libr
 [the authored native model](#the-authored-native-model). `upstream/`, `generated/` and
 `src/` do not exist here and are not implied.
 
-Remaining obligations, all unstarted: the protocol contract documents under
-`contracts/`, the transport and capability profile selection, and every runtime, fixture
-and conformance artifact. No MCP connection has been made from this repository and no
-executable has been added.
+The transport and capability profile selection is no longer an obligation:
+[`contracts/protocol/v1alpha1/selection.md`](contracts/protocol/v1alpha1/selection.md)
+holds it. Remaining obligations, all unstarted: the rest of the protocol contract
+documents under `contracts/`, and every runtime, fixture and conformance artifact. No
+MCP connection has been made from this repository and no executable has been added.
