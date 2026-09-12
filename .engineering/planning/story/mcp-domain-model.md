@@ -15,7 +15,7 @@ scope:
   path: adapters/mcp/spec/ess/domains/state.yaml
 - confidence: inferred
   path: adapters/mcp/spec/ess/system.yaml
-revision: 6
+revision: 7
 ---
 ## Acceptance
 
@@ -72,12 +72,24 @@ This story is where the relation census lands, so it carries the whole of it.
   `AdapterSpecification.operations` — `AdapterSpecification owns many
   OperationDeclaration` — which is a different pair, so it answers this edge
   neither way and `many` was chosen rather than read. The cardinality that is
-  readable is the one this repository's own invariant gives: a `cardinality: many`
-  relation carries a `List<…>` via field and a `cardinality: one` carries a scalar,
-  without exception across `ess/domains/artifact_provenance.yaml:85-89`,
+  readable is the one this repository's own invariant gives — **for a `references`
+  relation**, which this edge is: a `cardinality: many` reference carries a
+  `List<…>` via field and a `cardinality: one` carries a scalar, across
+  `ess/domains/artifact_provenance.yaml:85-89`,
   `ess/domains/auth_bindings.yaml:102-107` and
   `ess/domains/credentials.yaml:40-45`. The carrier is scalar, so the edge is
   `one`.)*
+
+  *(The `references` scope was added at revision 7 and it is load-bearing. The
+  second adversary pass over this story enumerated all 40 `via` relations in
+  shared ESS and found two that carry `cardinality: many` through a scalar:
+  `ess/domains/declarations.yaml:119-123` and
+  `ess/domains/discovery_state.yaml:85-89`. Both are `kind: owns`, where `via`
+  names the child's back-reference to the owner's identity — `adapter_id` and
+  `collection_ref`, both `String` — so the carrier says nothing about how many
+  children there are. Stated unscoped at revision 6, the invariant condemned two
+  correct shared declarations, one of them the very block this paragraph
+  withdraws.)*
 
 - `McpSession → connectors.auth_bindings.Connection` is **deliberately absent**,
   and that absence is itself cited: `ess/domains/sessions.yaml:89-91` says
