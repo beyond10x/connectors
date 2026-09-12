@@ -1,0 +1,1137 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running `target/debug/connectors-build gate --msrv`
+gate: shared ESS provider vocabulary and source ownership hold; exit=0
+connectors v1 — 23 file(s), valid
+connectors v1 — 23 file(s), 446 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-0.json
+connectors_atlassian v1 — 2 file(s), valid
+connectors_atlassian v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-1.json
+connectors_docker v1 — 2 file(s), valid
+connectors_docker v1 — 2 file(s), 3 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-2.json
+connectors_gitlab v1 — 4 file(s), valid
+connectors_gitlab v1 — 4 file(s), 17 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-3.json
+connectors_grafana v1 — 2 file(s), valid
+connectors_grafana v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-4.json
+connectors_kubernetes v1 — 4 file(s), valid
+connectors_kubernetes v1 — 4 file(s), 11 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-5.json
+connectors_loki v1 — 2 file(s), valid
+connectors_loki v1 — 2 file(s), 4 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-6.json
+connectors_mcp v1 — 3 file(s), valid
+connectors_mcp v1 — 3 file(s), 22 declaration(s), compiled to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/ess-boundary-7.json
+gate: shared and 7 adapter ESS models validated and compiled independently; exit=0
+gate: 84 archived upstream source(s) across 6 manifest(s) match their recorded uncompressed digests and lengths; exit=0
+10 CLI artifact(s), current in apps/connectors-cli-contract
+CLI values: 81 structural, 2 cached expectations, 5 acquisition and 3 page consistency cases passed; runtime lifecycle/custody traces remain obligations
+CLI contract fixture matches; custody and lifecycle runtime conformance remain obligations
+gate: ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-catalog", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "gitlab_writes-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: exit=exit status: 0 ["fmt", "--package", "connectors-build", "--package", "connectors-spec", "--package", "connectors-core", "--package", "connectors-host", "--package", "connectors-client", "--package", "connectors-sdk", "--package", "connectors-contracts", "--package", "connectors-catalog", "--package", "connectors-conformance", "--package", "connectors-gitlab", "--package", "gitlab-types", "--package", "gitlab_writes-types", "--package", "connectors-kubernetes", "--package", "connectors-sql", "--package", "connectors", "--", "--check"]
+gate: gitlab descriptor matches; exit=0
+gate: kubernetes descriptor matches; exit=0
+gate: sql descriptor matches; exit=0
+gate: ["build", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-client)
+   Compiling connectors-host v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-host)
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-spec v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-spec)
+   Compiling connectors-kubernetes v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/kubernetes)
+   Compiling connectors-gitlab v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/gitlab)
+   Compiling connectors-sql v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/sql)
+   Compiling connectors-conformance v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-conformance)
+   Compiling connectors-build v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-build)
+   Compiling connectors v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/apps/connectors)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.29s
+gate: exit=exit status: 0 ["build", "--workspace", "--locked", "--offline"]
+gate: ["test", "--workspace", "--locked", "--offline"]
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.44
+   Compiling rustls-webpki v0.103.15
+   Compiling rcgen v0.14.10
+   Compiling tokio-rustls v0.26.5
+   Compiling hyper-rustls v0.27.9
+   Compiling reqwest v0.12.28
+   Compiling connectors-client v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-client)
+   Compiling connectors-host v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-host)
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-spec v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-spec)
+   Compiling connectors-gitlab v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/gitlab)
+   Compiling connectors-sql v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/sql)
+   Compiling connectors-kubernetes v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/kubernetes)
+   Compiling connectors-build v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-build)
+   Compiling connectors v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/apps/connectors)
+   Compiling connectors-conformance v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-conformance)
+    Finished `test` profile [unoptimized] target(s) in 28.37s
+     Running unittests src/main.rs (target/debug/deps/connectors-14ae4dc01b729c82)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compatibility.rs (target/debug/deps/compatibility-4601a67dc4ee4b3e)
+
+running 2 tests
+test legacy_describe_is_complete_and_invoke_prints_raw_result_once ... ok
+test compatibility_inventory_matches_existing_help ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/input.rs (target/debug/deps/input-886e65dd74d24cae)
+
+running 1 test
+test duplicate_input_keys_are_refused_before_service_contact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/local_cli.rs (target/debug/deps/local_cli-0e4510a9d990b440)
+
+running 4 tests
+test protected_sources_are_not_consumed_before_configuration_admission ... ok
+test clock_check_uses_current_configured_key_without_metadata_or_service_start ... ok
+test production_parser_initializes_and_inspects_across_processes ... ok
+test inventory_and_unavailable_status_never_launch_configured_executable ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_build-17442ee6bfdb9c9a)
+
+running 22 tests
+test cli::tests::cache_labels_and_page_deadlines_cannot_assert_unobserved_freshness ... ok
+test cli::tests::public_acquisition_examples_cannot_expose_internal_states_or_wrong_terminal_fields ... ok
+test docs::tests::refuses_unknown_projection_nodes ... ok
+test docs::tests::public_audit_checks_embedded_binary_paths ... ok
+test docs::tests::rejects_duplicate_and_escaping_routes ... ok
+test docs::tests::cannot_publish_a_source_outside_its_owner ... ok
+test docs::tests::resolves_only_selected_local_links ... ok
+test ess_boundary::tests::matches_case_and_separator_variants_without_substring_false_positives ... ok
+test aep_toolchain::tests::source_patch_and_binary_must_all_match_before_execution ... ok
+test source_hashes::tests::a_manifest_without_retained_archives_is_not_this_check ... ok
+test docs::tests::preserves_rules_and_stable_heading_anchors ... ok
+test docs::tests::reference_title_keeps_anchor_and_text_without_a_second_h1 ... ok
+test docs::tests::imported_markdown_cannot_execute_html_or_script_links ... ok
+test ess_boundary::tests::allows_shared_protocols_and_separate_provider_models ... ok
+test ess_boundary::tests::refuses_linked_source_files_and_directories ... ok
+test ess_boundary::tests::protocol_adapter_does_not_ban_shared_protocol_or_suppress_native_leaks ... ok
+test ess_boundary::tests::rejects_malformed_optional_alias_inputs_and_model_sources ... ok
+test ess_boundary::tests::discovers_design_only_and_spec_only_owners_without_runtime_declarations ... ok
+test ess_boundary::tests::checks_all_paths_and_requires_complete_local_domain_inventory ... ok
+test source_hashes::tests::recorded_digests_are_rederived_from_the_archived_bytes ... ok
+test ess_boundary::tests::rejects_names_comments_fields_encoded_values_and_new_adapter_ids ... ok
+test docs::tests::walkthrough_fixtures_follow_the_real_descriptor ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/mcp_domain_model_adversary.rs (target/debug/deps/mcp_domain_model_adversary-4d16eddcf3d7ca11)
+
+running 3 tests
+test the_adapter_owner_document_does_not_deny_the_model_this_unit_added ... ok
+test the_one_stated_census_edge_agrees_with_the_field_that_realises_it ... ok
+test a_binding_can_select_every_version_a_server_can_report_as_supported ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mcp_domain_model_adversary_pass2.rs (target/debug/deps/mcp_domain_model_adversary_pass2-a56a8dc3202c609c)
+
+running 3 tests
+test every_relation_no_source_answers_carries_the_marker_the_acceptance_names ... ok
+test a_census_rows_verdict_cannot_be_supplied_by_the_row_beside_it ... ok
+test no_state_carrier_closes_a_set_the_pinned_schema_leaves_open ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mcp_domain_model_census.rs (target/debug/deps/mcp_domain_model_census-e104b482bddd8058)
+
+running 4 tests
+test the_protocol_domain_still_disclaims_making_a_selection ... ok
+test the_protocol_revision_values_are_the_negotiated_strings_not_the_trap_constants ... ok
+test the_three_credential_kinds_are_three_distinct_declared_types ... ok
+test every_census_edge_is_marked_and_no_unreadable_one_is_realised ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/mcp_specification_pin_adversary.rs (target/debug/deps/mcp_specification_pin_adversary-d1ff71608c552e06)
+
+running 4 tests
+test version_negotiation_row_cites_the_interop_revisions_negotiation_section ... ok
+test manifest_provenance_fields_agree_with_the_revision_each_entry_claims ... ok
+test interop_revision_names_its_own_version_string_outside_a_documentation_path ... ok
+test every_recorded_digest_and_byte_length_rederives_from_the_archived_bytes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/mcp_specification_pin_adversary_pass2.rs (target/debug/deps/mcp_specification_pin_adversary_pass2-7e80a7af343fa1d8)
+
+running 4 tests
+test record_does_not_count_a_banner_document_twice_when_naming_running_text_mentions ... ok
+test documented_provenance_check_refuses_a_path_repointed_within_its_own_revision ... ok
+test documented_provenance_check_refuses_a_wholesale_revision_to_commit_swap ... ok
+test design_document_accounts_for_every_transport_binding_the_pinned_revisions_specify ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_catalog-e56ddc312aab1b79)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/authored.rs (target/debug/deps/authored-8c5cc898a98baac1)
+
+running 28 tests
+test a_document_over_the_bounded_size_is_refused_rather_than_read_in_part ... ok
+test a_document_that_is_not_toml_is_refused_as_malformed ... ok
+test a_cookie_is_read_as_a_cookie_and_left_to_the_template_to_refuse ... ok
+test a_file_this_reader_may_not_open_is_refused_as_forbidden ... ok
+test a_method_is_read_regardless_of_the_case_it_is_written_in ... ok
+test a_media_type_offered_twice_is_refused ... ok
+test a_path_that_does_not_begin_with_a_slash_is_refused_by_its_path ... ok
+test a_parameter_location_the_model_does_not_carry_is_refused_by_its_value ... ok
+test a_path_that_exists_and_is_not_a_document_is_not_reported_as_absent ... ok
+test a_field_of_the_wrong_type_is_refused_by_its_dotted_name ... ok
+test a_placeholder_with_no_declared_parameter_refuses_as_the_template_says ... ok
+test a_parameter_repeated_under_one_name_and_location_is_refused ... ok
+test an_empty_action_array_is_refused_by_what_the_document_actually_did ... ok
+test a_template_refusal_is_reported_as_itself_rather_than_rewritten ... ok
+test an_unknown_method_is_refused_by_the_value_as_written ... ok
+test an_authored_action_binds_exactly_as_the_equivalent_operation ... ok
+test the_offered_media_types_are_the_set_the_equivalent_import_offers ... ok
+test a_missing_required_field_is_refused_by_its_dotted_name ... ok
+test find_names_one_action_and_reports_the_rest_absent ... ok
+test two_actions_with_one_name_are_refused_rather_than_the_last_kept ... ok
+test a_file_reads_as_its_bytes_do_and_an_absent_one_is_not_found ... ok
+test one_name_in_two_locations_is_not_a_repeat ... ok
+test each_location_the_model_carries_reaches_the_part_of_the_request_it_names ... ok
+test an_unknown_field_is_refused_rather_than_ignored ... ok
+test an_action_names_the_auth_profile_it_authenticates_under ... ok
+test every_published_operation_is_one_the_inventory_could_have_emitted ... ok
+test every_refusal_names_its_subject_in_the_reason_it_gives ... ok
+test a_document_of_exactly_the_limit_is_read_and_one_byte_more_is_not ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/authored_adversarial.rs (target/debug/deps/authored_adversarial-79824929f669d519)
+
+running 4 tests
+test a_document_that_exists_but_cannot_be_read_is_not_reported_as_absent ... ok
+test a_repeated_parameter_does_not_lose_the_required_it_declares ... ok
+test an_authored_operation_declares_each_parameter_once ... ok
+test the_default_request_media_type_is_the_one_the_equivalent_import_picks ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/bundle.rs (target/debug/deps/bundle-34c4e33502bae7fd)
+
+running 6 tests
+test an_empty_directory_reads_as_an_empty_index_rather_than_an_error ... ok
+test an_unknown_provider_and_a_missing_file_refuse_differently ... ok
+test a_written_bundle_loads_back_unchanged ... ok
+test one_altered_byte_makes_the_load_refuse ... ok
+test replacing_an_indexed_provider_needs_asking ... ok
+test the_index_lists_providers_in_a_stable_order ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/coverage.rs (target/debug/deps/coverage-e4f8df6729817424)
+
+running 15 tests
+test an_empty_bundle_reports_zeroes_rather_than_refusing ... ok
+test a_file_name_cannot_forge_the_digest_beside_it ... ok
+test neither_rendering_computes_a_percentage ... ok
+test a_written_backslash_n_and_a_newline_do_not_render_alike ... ok
+test the_text_form_states_the_unsupported_count_even_when_it_is_zero ... ok
+test no_line_states_one_count_without_the_other ... ok
+test the_methods_present_are_reported_with_a_count_each ... ok
+test one_reason_carries_every_designation_under_it_in_a_stable_order ... ok
+test the_text_form_carries_the_provenance_and_the_grouped_reasons ... ok
+test no_string_a_report_carries_can_add_a_line_to_the_text_form ... ok
+test the_report_round_trips_through_json ... ok
+test the_two_reasons_are_grouped_with_the_designations_they_were_raised_against ... ok
+test three_operations_and_two_unsupported_entries_report_both_counts ... ok
+test a_bundle_the_document_order_permuted_renders_byte_identically ... ok
+test no_document_can_add_a_line_through_the_ingest_or_the_inventory ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/coverage_adversarial.rs (target/debug/deps/coverage_adversarial-ade191dc71eaa597)
+
+running 4 tests
+test an_info_version_cannot_add_a_line_that_states_one_count_alone ... ok
+test no_document_can_put_a_percentage_in_the_text_form ... ok
+test a_parameter_name_cannot_add_a_line_that_states_one_count_alone ... ok
+test the_text_form_and_the_serialised_form_agree_on_how_many_reasons_there_are ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ingest.rs (target/debug/deps/ingest-6a72088a5c15d27d)
+
+running 6 tests
+test a_missing_file_is_refused_rather_than_panicking ... ok
+test both_supported_dialects_report_their_own_version ... ok
+test each_unsupported_shape_is_refused_by_its_own_reason ... ok
+test a_file_records_its_own_name_and_not_its_path ... ok
+test the_same_bytes_ingest_to_the_same_record ... ok
+test a_document_over_the_limit_is_refused_without_parsing ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/inventory.rs (target/debug/deps/inventory-0e51c939ceee38e3)
+
+running 8 tests
+test a_document_without_paths_is_empty_rather_than_an_error ... ok
+test an_operation_without_an_id_is_still_inventoried ... ok
+test a_parameter_in_another_location_is_not_an_override ... ok
+test every_unrepresentable_thing_is_named_with_its_operation ... ok
+test an_operation_level_parameter_replaces_the_path_level_one_it_overrides ... ok
+test path_level_parameters_reach_the_operations_under_them ... ok
+test coverage_reports_its_two_numbers_apart ... ok
+test the_same_document_yields_a_byte_identical_inventory_twice ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pipeline.rs (target/debug/deps/pipeline-3c4fe09cd196137c)
+
+running 8 tests
+test a_failure_carries_through_the_question_mark_operator ... ok
+test an_absent_source_names_the_read_step ... ok
+test an_ingest_refusal_leaves_the_bundle_directory_uncreated ... ok
+test a_refusal_leaves_an_existing_index_byte_identical ... ok
+test a_bundle_write_refusal_leaves_the_index_exactly_as_it_was ... ok
+test a_valid_document_is_written_indexed_and_recorded ... ok
+test two_runs_over_the_same_bytes_record_the_same_thing ... ok
+test an_indexed_provider_refuses_at_the_write_step_with_the_earlier_results ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pipeline_adversarial.rs (target/debug/deps/pipeline_adversarial-08b4494f8ad695d8)
+
+running 8 tests
+test a_directory_as_the_source_names_the_read_step ... ok
+test every_step_label_is_its_serialised_name ... ok
+test a_symlinked_source_records_the_link_name ... ok
+test a_write_step_refusal_leaves_a_bundle_file_behind ... ok
+test a_provider_named_index_does_not_collide_with_the_index_file ... ok
+test a_second_provider_leaves_the_first_bundle_intact ... ok
+test replacement_restores_an_indexed_bundle_whose_file_is_missing ... ok
+test concurrent_runs_into_one_directory_lose_index_entries ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/template.rs (target/debug/deps/template-c5bb4de4717236ac)
+
+running 29 tests
+test a_cookie_parameter_is_declared_unsupported_rather_than_dropped ... ok
+test a_declared_path_carrying_a_dot_segment_is_refused_when_the_template_is_bound ... ok
+test a_header_name_the_document_wrote_with_a_control_byte_is_refused_by_name ... ok
+test a_declared_path_parameter_with_no_placeholder_is_refused_by_name ... ok
+test a_document_header_name_that_is_not_a_token_is_refused_by_name ... ok
+test a_header_value_holding_a_line_break_is_refused_by_name ... ok
+test a_key_no_parameter_is_left_to_read_is_refused_by_name ... ok
+test a_media_type_the_operation_does_not_offer_is_refused_by_name ... ok
+test a_dot_segment_path_value_is_refused_by_name ... ok
+test a_name_in_two_locations_is_reached_by_qualifying_the_key ... ok
+test a_parameter_declared_twice_in_one_location_binds_once ... ok
+test a_parameter_named_like_a_qualified_key_takes_that_key_for_itself ... ok
+test a_parameter_no_key_can_reach_is_refused_at_construction ... ok
+test a_path_placeholder_with_no_parameter_is_refused_by_name ... ok
+test a_qualified_key_claims_its_parameter_and_the_bare_key_falls_to_the_next ... ok
+test a_request_media_type_holding_a_control_byte_is_refused_by_name ... ok
+test a_request_media_type_that_is_not_a_type_and_subtype_is_refused_by_name ... ok
+test a_required_parameter_a_bare_key_cannot_reach_is_named_by_its_qualified_key ... ok
+test a_required_parameter_without_a_value_is_refused_by_name ... ok
+test a_slash_or_a_space_is_encoded_rather_than_changing_the_path ... ok
+test a_supplied_map_binds_to_an_exact_path_query_and_header_set ... ok
+test a_value_for_an_undeclared_parameter_is_refused_by_name ... ok
+test an_empty_path_value_is_refused_by_name ... ok
+test an_offered_media_type_is_selected_as_asked ... ok
+test an_operation_offering_no_request_media_type_binds_without_one ... ok
+test an_optional_parameter_without_a_value_is_simply_absent ... ok
+test an_unterminated_placeholder_refuses_as_a_malformed_path ... ok
+test the_media_types_a_document_really_writes_are_accepted ... ok
+test the_same_inputs_bind_byte_identically_twice ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/template_adversarial.rs (target/debug/deps/template_adversarial-8cff8341ab51e016)
+
+running 7 tests
+test a_header_value_holding_a_line_break_is_not_carried_verbatim ... ok
+test a_name_shared_across_two_locations_does_not_leak_one_value_into_both ... ok
+test a_dot_segment_value_cannot_move_the_path_the_operation_identifies ... ok
+test a_path_parameter_with_no_placeholder_is_not_silently_dropped ... ok
+test an_operation_level_override_of_required_is_honoured ... ok
+test an_unterminated_placeholder_is_not_reported_as_an_undeclared_parameter ... ok
+test an_operation_level_parameter_replaces_the_path_level_one_it_overrides ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/template_adversarial_two.rs (target/debug/deps/template_adversarial_two-54db72122135b3a6)
+
+running 4 tests
+test a_document_header_name_that_is_not_an_http_token_is_refused ... ok
+test a_value_absent_refusal_names_a_key_the_caller_has_not_already_supplied ... ok
+test a_value_under_an_accepted_key_is_not_silently_dropped ... ok
+test one_supplied_value_never_populates_two_parameters ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_client-d44836372aa2ac38)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_conformance-3909a5019a5eaa53)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_surface.rs (target/debug/deps/cli_surface-3be0a944fda59341)
+
+running 7 tests
+test inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result ... ok
+test the_selected_inventory_has_twenty_seven_grouped_commands_and_explicit_runtime_obligations ... ok
+test typed_application_usage_operational_and_interrupt_outcomes_use_distinct_exits ... ok
+test protected_source_conflicts_and_parser_errors_never_capture_or_echo_values ... ok
+test dynamic_business_sources_are_acquired_once_and_validate_both_directions ... ok
+test native_schema_refusals_prevent_handler_dispatch_and_bad_results_never_reach_stdout ... ok
+test every_local_action_dispatches_once_with_its_declared_result_type ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_contracts-05ec1539a06e37fc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_core-1af1b709dedeba84)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire.rs (target/debug/deps/wire-789b76db45de984b)
+
+running 4 tests
+test contradictory_response_payloads_are_refused ... ok
+test canonicalization_is_recursive_and_order_independent ... ok
+test duplicate_keys_are_refused_at_every_depth ... ok
+test response_roundtrips_success_and_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_gitlab-890992e9108cc1d4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_gitlab-8b283e3c720ce300)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/auth.rs (target/debug/deps/auth-24865a7d1e3c0179)
+
+running 6 tests
+test both_reads_use_the_same_capability_and_evidence_has_an_absolute_expiry ... ok
+test validation_does_not_extend_time_budgets_or_expiry ... ok
+test provider_failures_and_invalid_json_do_not_trigger_retries ... ok
+test native_identity_grants_and_required_fields_cannot_be_inferred ... ok
+test protected_entry_validates_through_production_scoped_http ... ok
+test protected_document_is_strict_bounded_and_not_trimmed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ci.rs (target/debug/deps/ci-07eed72ed10f45f2)
+
+running 6 tests
+test invalid_selection_and_unknown_fields_refuse_before_any_transport ... ok
+test continuations_bind_every_selection_and_connection_partition ... ok
+test exact_commit_polling_job_pages_and_failed_trace_use_generated_mappings ... ok
+test paging_and_provider_errors_are_explicit_without_retry ... ok
+test inconsistent_targets_and_malformed_native_shapes_cannot_satisfy_ci ... ok
+test trace_bytes_utf8_boundaries_and_completeness_are_preserved ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/local_runtime.rs (target/debug/deps/local_runtime-f0fa3cabd0b52029)
+
+running 20 tests
+test cli_journey::ci::gitlab_cli_exact_commit_ci_job_pages_and_bounded_traces ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test cli_journey::gitlab_cli_explicit_revalidation_after_real_expiry_without_reentry ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::gitlab_cli_failed_repair_and_busy_stop_preserve_authority ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test cli_journey::guarded_merge::adversary_revoked_disclosure_of_an_applied_merge_never_answers_not_attempted ... ignored, requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR
+test cli_journey::guarded_merge::gitlab_cli_background_recovers_revoked_removed_target_without_disclosure ... ignored, requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR
+test cli_journey::guarded_merge::gitlab_cli_background_recovery_waits_for_live_work_and_recovers_unkeyed_attempts ... ignored, requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR
+test cli_journey::guarded_merge::gitlab_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively ... ignored, requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR
+test cli_journey::guarded_merge::gitlab_cli_guarded_merge_applied_refused_and_lost_response_restart ... ignored, requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR
+test cli_journey::guarded_merge::gitlab_cli_guarded_merge_revocation_finishes_admitted_audit ... ignored, requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR
+test cli_journey::guarded_merge::gitlab_cli_recovers_abandoned_preparation_only_with_trusted_time ... ignored, requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR
+test cli_journey::guarded_merge::prepared_attempt_exit_fixture ... ignored, subprocess fixture; no action without its explicit task-owned root
+test cli_journey::merge_requests::gitlab_cli_mr_window_exhaustion_saved_connection_and_current_policy ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test cli_journey::mr_validation::gitlab_cli_validation_changed_head_after_saved_connection_restart ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test cli_journey::persistent_gitlab_cli_owner_and_keyring_restart ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test the_disclosure_row_records_the_post_effect_revocation_journey_that_exists ... ok
+test the_failure_matrix_row_stops_demanding_the_settlement_journey_that_exists ... ok
+test a_held_refusal_survives_the_release_the_settlement_journey_performs ... ok
+test lost_validation_response_closes_the_owned_channel_without_replay ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_provider_work ... ok
+test private_gitlab_validates_and_reads_with_exact_caps_and_cursor_partitions ... ok
+
+test result: ok. 6 passed; 0 failed; 14 ignored; 0 measured; 0 filtered out; finished in 6.88s
+
+     Running tests/merge_requests.rs (target/debug/deps/merge_requests-f1b916a048e27c8f)
+
+running 14 tests
+test validation::validation_schema_and_allowlist_refuse_before_provider_io ... ok
+test invalid_selections_refuse_before_transport ... ok
+test provider_failures_are_safe_and_never_empty_success ... ok
+test window_traversal_and_project_local_get_preserve_observations ... ok
+test validation::validation_provider_failure_does_not_become_negative_check_success ... ok
+test guarded_merge::guarded_merge_requires_fresh_head_pipeline_and_allowlisted_target ... ok
+test cursors_bind_every_window_axis_and_authenticated_partition ... ok
+test validation::malformed_pipeline_or_wrong_mr_identity_is_a_protocol_error ... ok
+test pages_refuse_filter_window_order_duplicates_and_invalid_continuations ... ok
+test validation::blockers_are_ordered_and_sha256_and_target_project_pipelines_are_supported ... ok
+test validation::pinned_validation_passes_then_changed_head_blocks_without_claiming_merge ... ok
+test malformed_identity_and_projection_never_become_partial_success ... ok
+test guarded_merge::guarded_merge_classifies_exact_target_and_never_repeats_put ... ok
+test validation::all_missing_changed_and_unsuccessful_checks_remain_blockers ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+     Running tests/obligations.rs (target/debug/deps/obligations-715be8b1d868e4de)
+
+running 4 tests
+test generated_file_mapping_passes_unencoded_segments_to_the_scoped_transport ... ok
+test generated_dispatch_rejects_invalid_inputs_before_transport ... ok
+test empty_pages_with_continuation_and_full_pages_without_headers_are_partial ... ok
+test response_failures_and_nonadvancing_pagination_remain_explicit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/provider.rs (target/debug/deps/provider-8ad43ae72af85d25)
+
+running 1 test
+test project_issue_pagination_and_file_reads_use_scoped_auth_over_http ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_host-6f191c58d701bc4b)
+
+running 156 tests
+test local::approval_keys::tests::durable_key_management_with_qualified_custody ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::key_crash_child ... ignored, auxiliary child entry; parent invokes exact phases
+test local::approval_keys::tests::key_use_excludes_rotation_and_concurrent_init_has_one_winner ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::process_exits_keep_pre_and_post_publication_distinct ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::production_cli_key_journey ... ignored, requires built production CLI and qualified disposable GNOME Secret Service
+test local::approval_keys::tests::purpose_isolation_for_identical_private_uuid_tuples ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::restart_failed_rotation_recovery_and_revocation_fences ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::uncertain_deletion_keeps_retirement_fence_and_exact_retry ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::unknown_storage_acknowledgement_requires_exact_reconfirmation ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::wrong_recovery_material_never_publishes ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test http::tests::a_probe_endpoint_is_one_bounded_fixed_path ... ok
+test local::approval_policy::tests::policy_child ... ignored, child fixture; launched by process serialization tests
+test http::tests::an_oversized_probe_document_is_refused_without_any_request ... ok
+test local::approvals::tests::canonical_framing_rejects_omission_duplicates_unknown_fields_and_alternate_spellings ... ok
+test local::approvals::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+test local::approvals::tests::all_subject_coordinates_and_unicode_identity_are_bound ... ok
+
+running 1 test
+test local::approval_keys::tests::passive_status_does_not_migrate_or_touch_custody ... ok
+test local::approvals::tests::issuer_audience_time_key_and_clock_refusals_are_current ... ok
+test local::approval_policy::tests::passive_status_and_missing_issuer_never_install_policy ... ok
+test local::approval_policy::tests::invalid_publication_cannot_replace_a_valid_policy ... ok
+test local::approval_policy::tests::inherited_policy_use_is_not_valid_in_a_forked_process ... ok
+test local::approvals::tests::protected_document_decoding_is_closed_bounded_and_verifiable ... ok
+test local::approvals::tests::rfc8032_vector_and_exact_fixed_algorithm_round_trip ... ok
+test local::approvals::tests::concurrent_substituted_reference_cannot_rebind_one_attempt ... ok
+
+running 1 test
+test local::approval_keys::tests::unavailable_write_leaves_exact_candidate_and_no_duplicate_allocation ... ok
+test local::approval_policy::tests::status_and_snapshot_exclude_private_authority_and_custody_coordinates ... ok
+
+running 1 test
+
+running 1 test
+test local::approval_policy::tests::concurrent_initial_publication_has_one_winner ... ok
+test local::approvals::tests::expiry_during_acknowledgement_retains_spend_without_granting_receipt ... ok
+test local::approval_policy::tests::exact_selections_and_operations_are_required_for_use ... ok
+test local::approval_policy::tests::durable_guards_retain_identity_revision_and_instance_binding ... ok
+test local::approval_policy::tests::exhausted_revision_never_wraps_or_reuses_identity ... ok
+
+running 1 test
+test local::approval_policy::tests::restart_preserves_identity_revision_principal_and_snapshot ... ok
+test local::approval_policy::tests::child_exit_releases_lease_and_committed_unacknowledged_revision_survives ... ok
+test local::approval_policy::tests::failed_sql_write_preserves_policy_but_lost_ack_requires_observation ... ok
+test local::audit::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+
+running 1 test
+test local::approvals::tests::policy_guard_survives_commit_and_clock_is_rechecked_after_storage ... ok
+test local::audit::tests::exact_private_identity_is_injective_bounded_and_strictly_decoded ... ok
+test local::approvals::tests::unavailable_live_binding_is_storage_failure_without_receipt_or_retry ... ok
+test local::approvals::tests::approved_gate_requires_original_spend_and_abort_never_refunds ... ok
+test local::approvals::tests::unavailable_redemption_evidence_cannot_open_dispatch ... ok
+test local::audit::tests::byte_bounds_safe_shapes_and_aggregate_budget_are_enforced ... ok
+test local::approvals::tests::tombstone_capacity_and_migrations_survive_restart_without_secret_storage ... ok
+test local::approvals::tests::unkeyed_preparation_retains_authority_and_old_records_cannot_gain_it ... ok
+
+running 1 test
+test local::audit::tests::anchor_failure_or_lost_ack_never_returns_an_admission_receipt ... ok
+test local::approvals::tests::mismatched_receipt_missing_subject_and_existing_key_never_open_new_gate ... ok
+test local::approvals::tests::policy_schema_supports_audit_spend_dispatch_and_restart_observation ... ok
+test local::clock::protocol::tests::authentic_unknown_fields_versions_and_both_merkle_directions_work ... ok
+test local::clock::protocol::tests::duplicate_tags_bad_offsets_nested_lengths_and_signature_substitutions_refuse ... ok
+test local::audit::tests::corrupted_or_unavailable_metadata_is_not_absence_or_recovered_acknowledgement ... ok
+test local::clock::protocol::tests::independent_signed_fixture_verifies_without_a_wall_clock ... ok
+test local::clock::protocol::tests::signed_semantic_errors_do_not_supply_time ... ok
+test local::clock::tests::authenticated_acquisition_and_wrong_key_refusal ... ok
+test local::clock::tests::configuration_never_discovers_or_defaults_trust ... ok
+test local::clock::tests::elapsed_bounds_cover_both_rate_extremes_with_outward_rounding ... ok
+test local::clock::tests::independent_live_source ... ignored, Explicit public Roughtime network interoperability; no physical clock guarantee
+test local::clock::tests::inherited_clock_refuses_in_an_actual_fork ... ok
+test local::clock::tests::interval_includes_full_network_delay_and_ages_without_sliding ... ok
+test local::clock::tests::no_estimate_extrapolates_through_a_possible_utc_leap ... ok
+test local::clock::tests::oversized_and_unavailable_peers_refuse ... ok
+test local::clock::tests::process_suspend_backward_time_and_unsafe_bounds_refuse ... ok
+
+running 1 test
+test local::audit::tests::concurrent_finalization_has_one_immutable_winner_and_exact_retry ... ok
+test local::keyring::custody::gnome::tests::daemon_environment_mapping_refuses_ambiguous_or_injected_layouts ... ok
+test local::keyring::custody::tests::disposable_changed_keyring_format_is_refused_before_transfer ... ignored, requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR
+test local::keyring::custody::tests::disposable_registry_publication_cli_and_retirement_restart ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test local::keyring::custody::tests::disposable_secret_service_restart_and_failures ... ignored, requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR
+test local::keyring::custody::tests::private_custody_identities_are_non_nil ... ok
+test local::clock::protocol::tests::every_truncation_and_single_byte_change_in_known_reply_refuses ... ok
+test local::audit::tests::failed_final_append_preserves_live_answer_and_unknown_ack_recovers_exactly ... ok
+test local::audit::tests::recovering_append_requires_a_readable_exact_original_anchor ... ok
+test local::audit::tests::recovering_append_stops_after_one_failed_retry ... ok
+test local::audit::tests::passive_old_schema_inspection_never_installs_audit_and_migration_preserves_history ... ok
+test local::approvals::tests::rollback_or_lost_ack_never_reconstructs_receipt ... ok
+
+running 1 test
+test local::metadata::tests::passive_v1_inspection_cannot_migrate_or_claim_an_empty_registry ... ok
+
+running 1 test
+test local::audit::tests::capacity_is_atomic_per_instance_without_eviction_or_append_restriction ... ok
+test local::audit::tests::expired_recovery_budget_performs_no_extra_storage_calls ... ok
+test local::mutations::tests::crash_child ... ignored, subprocess entry point, exercised by abrupt_process_exit
+test local::audit::tests::same_public_ref_is_independent_per_instance_and_gateway_and_leaf ... ok
+test local::metadata::tests::runtime_migration_is_admitted_and_retains_the_v2_authority ... ok
+test local::approvals::tests::fresh_spend_rechecks_policy_key_time_and_exact_initial_proof ... ok
+test local::audit::tests::retained_cross_owner_references_are_checked_and_never_cascade_deleted ... ok
+test local::approvals::tests::abrupt_process_exits_recover_without_refunding_or_resending ... ok
+test local::approvals::tests::concurrent_reference_and_attempt_spend_produce_one_receipt ... ok
+
+running 1 test
+test local::mutations::tests::capacity_and_corrupt_or_unavailable_reads_do_not_become_absence ... ok
+test local::audit::tests::early_refusal_and_malformed_or_mismatched_facts_cannot_satisfy_the_gate ... ok
+test local::mutations::tests::pending_scan_does_not_install_mutation_state ... ok
+test local::audit::tests::abrupt_process_exits_preserve_acknowledgement_boundaries_without_resend ... ok
+test local::mutations::tests::instance_recovery_preserves_fault_uncertainty_and_ignores_revoked_business_grants ... ok
+test local::mutations::tests::concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation ... ok
+test local::audit::tests::recovering_append_reuses_exact_fields_and_reads_a_lost_acknowledgement ... ok
+test local::mutations::tests::every_fingerprint_coordinate_conflicts_including_exact_route_revisions ... ok
+test local::mutations::tests::terminal_first_fact_is_immutable_and_unknown_never_expires ... ok
+test local::owner::approval_issuance::tests::production_cli_approval_issuance_and_restart ... ignored, requires built production CLI and qualified disposable GNOME Secret Service
+test local::owner::approval_issuance::tests::publication_refusal_and_unknown_acknowledgement_preserve_the_protected_file ... ok
+test local::mutations::tests::unkeyed_attempts_still_require_the_gate_and_retain_outcome ... ok
+test local::owner::supervisor::maintenance_tests::a_live_worker_with_an_idle_hint_queues_one_recovery_instead_of_taking_ownership ... ok
+test local::protected::tests::bounded_document_uses_original_deadline_and_rejects_links_and_excess_input ... ok
+test local::mutations::tests::retention_uses_trusted_bounds_and_cas_cannot_retire_a_replacement ... ok
+test local::protected::tests::source_admission_rejects_links_modes_and_oversized_files ... ok
+test local::protected::tests::terminal_fixture ... ok
+test local::mutations::tests::atomic_prepare_faults_never_return_a_handle_or_leave_a_half_reservation ... ok
+test local::mutations::tests::version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authority ... ok
+test local::audit::tests::recovering_append_never_substitutes_a_different_final_observation ... ok
+test local::mutations::tests::namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys ... ok
+test local::approval_policy::tests::policy_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 155 filtered out; finished in 2.01s
+
+test local::approval_policy::tests::held_use_blocks_cross_process_revocation_until_release ... ok
+test local::registry::tests::abandoned_candidates_require_acknowledged_retirement_and_full_retention ... ok
+test local::owner::approval_issuance::tests::changed_clock_or_connection_refuses_without_issuing_or_contacting_services ... ok
+test local::owner::approval_issuance::tests::preparation_bounds_the_target_envelope_and_keeps_original_deadline ... ok
+test local::registry::tests::allocation_custody_and_publication_are_distinct_and_restartable ... ok
+test local::owner::approval_issuance::tests::clock_exchange_precedes_leases_and_policy_is_rechecked_after_network ... ok
+test local::registry::tests::approval_target_is_passive_but_requires_exact_retained_admission ... ok
+test local::owner::approval_issuance::tests::prepare_is_passive_and_digests_the_strict_input_and_current_policy ... ok
+test local::owner::approval_issuance::tests::policy_and_prepare_refuse_wrong_permissions_pins_input_and_revision ... ok
+test local::mutations::tests::ambiguous_gate_is_unknown_and_ambiguous_terminal_preserves_known_live_answer ... ok
+test local::mutations::tests::pending_scan_pages_existing_instances_and_keyed_or_unkeyed_attempts ... ok
+test local::mutations::tests::abrupt_process_exit_preserves_each_durable_boundary_without_resend ... ok
+test local::runtime::artifact::tests::admitted_snapshot_survives_source_changes_and_refuses_mutation ... ok
+test local::runtime::artifact::tests::configured_capture_requires_both_path_admission_and_matching_content ... ok
+test local::registry::tests::production_clock_samples_after_locking_and_still_rejects_regression ... ok
+test local::runtime::channel::tests::malformed_frames_are_refused_without_unbounded_reads ... ok
+test local::runtime::channel::tests::separate_protected_section_and_bounded_document_depth ... ok
+test local::runtime::channel::tests::stalled_partial_frame_uses_the_original_deadline ... ok
+test local::runtime::failure_tests::provider_codes_survive_the_private_boundary_without_raw_error_data ... ok
+test local::registry::tests::approval_target_refuses_known_invalid_material_without_custody_access ... ok
+test local::runtime::process::tests::protocol_fixture ... ok
+test local::mutations::tests::malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention ... ok
+test local::protected::tests::controlling_terminal_hides_input_and_restores_echo_after_sigint ... ok
+test local::runtime::process::write_tests::fixture ... ok
+test local::clock::tests::timeout_and_excessive_signed_radius_supply_no_capability ... ok
+test local::registry::tests::competing_repairs_have_one_winner_and_old_dispatch_is_fenced ... ok
+test local::runtime::channel::tests::cancellation_observes_a_stalled_partial_reply_without_resetting_the_deadline ... ok
+test local::registry::tests::lost_publication_acknowledgement_is_resolved_without_repeating_capture ... ok
+test local::registry::tests::identity_scope_and_expiry_failures_preserve_the_usable_generation ... ok
+test local::registry::tests::receipt_identity_and_known_missing_material_cannot_be_substituted ... ok
+test local::registry::tests::revalidation_capture_and_completion_are_one_use_and_keep_original_deadline ... ok
+test local::registry::tests::revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledgement ... ok
+test server::tests::service_deadline_cancels_the_adapter_and_releases_capacity ... ok
+test server::tests::thirty_two_inflight_calls_refuse_the_next_until_one_is_dropped ... ok
+test local::registry::tests::cursors_are_scoped_bounded_and_invalidated_by_metadata_change ... ok
+test server::tests::oversized_adapter_result_is_refused_after_schema_validation ... ok
+test local::registry::tests::terminal_revoke_invalidates_repair_and_dispatch_without_custody ... ok
+test local::mutations::tests::connection_fences_authority_and_process_identity_refuse_stale_handles ... ok
+test local::runtime::writes::tests::old_codecs_refuse_new_variants_and_result_documents_remain_closed_and_bounded ... ok
+test local::registry::tests::revalidation_orders_competing_recollection_repair_revoke_and_pending_reads ... ok
+test local::registry::tests::revalidation_preserves_transient_failures_but_cannot_resurrect_known_invalidity ... ok
+test local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt ... ok
+test local::registry::tests::concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence ... ok
+test local::runtime::process::write_tests::schema_preflight_and_read_path_refusals_have_no_write ... ok
+test local::runtime::process::write_tests::prepared_request_does_not_send_until_commit_and_cancel_destroys_before_ack ... ok
+test local::owner::mutation::tests::final_audit_recovery_preserves_every_live_business_result ... ok
+test local::runtime::process::tests::malformed_replies_terminate_and_reap_only_the_owned_child ... ok
+test local::runtime::process::write_tests::duplicate_commit_refuses_and_legacy_selection_never_exposes_a_write ... ok
+test local::runtime::process::write_tests::drop_eof_and_original_deadline_destroy_pending_without_a_write ... ok
+test local::runtime::process::write_tests::mismatched_readiness_refuses_before_any_credential_frame ... ok
+test local::runtime::process::write_tests::replacement_material_wrong_ids_and_other_requests_close_pending_without_send ... ok
+test local::runtime::process::write_tests::native_outcomes_and_lost_replies_never_repeat_a_send ... ok
+test local::runtime::process::write_tests::malformed_preparation_cancel_and_result_replies_reap_the_exact_child ... ok
+
+test result: ok. 137 passed; 0 failed; 19 ignored; 0 measured; 0 filtered out; finished in 26.03s
+
+     Running tests/http.rs (target/debug/deps/http-ba262bbd4566f605)
+
+running 3 tests
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+test custom_ca_accepts_its_endpoint_and_refuses_other_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/http_prefix.rs (target/debug/deps/http_prefix-4b4c5015d50bca51)
+
+running 6 tests
+test invalid_limits_and_unsupported_ports_refuse_before_work ... ok
+test excess_bytes_return_without_waiting_for_a_stalled_remainder ... ok
+test prefix_header_bytes_are_bounded_and_errors_do_not_include_provider_secrets ... ok
+test premature_fixed_or_chunked_closure_is_an_error_even_after_exact_prefix ... ok
+test prefix_distinguishes_eof_from_omitted_bytes_for_fixed_and_chunked_bodies ... ok
+test exact_prefix_still_obeys_original_deadline_and_caller_cancellation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/http_write.rs (target/debug/deps/http_write-66b6378b6fb7eeb5)
+
+running 4 tests
+test invalid_target_segments_refuse_before_credential_resolution ... ok
+test put_preserves_exact_segments_body_and_native_response_without_redirect ... ok
+test native_failures_are_returned_once_and_body_limits_remain_errors ... ok
+test lost_reply_after_complete_put_is_never_retried ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/local_foundation.rs (target/debug/deps/local_foundation-d81ae779b7695b52)
+
+running 8 tests
+test sidecar_symlink_is_refused_without_touching_its_target ... ok
+test symlinks_hardlinks_and_broad_permissions_are_refused ... ok
+test exclusive_setup_persists_private_metadata_and_refuses_overwrite ... ok
+test private_protocol_requires_explicit_v2_configuration_without_rewriting_v1 ... ok
+test unavailable_or_unrecognized_metadata_is_never_reinitialized ... ok
+test owner_and_migration_tampering_refuse_inspection ... ok
+test concurrent_initialization_has_one_authority_and_one_configuration ... ok
+test contending_metadata_open_refuses_at_its_bound_and_recovers_after_release ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s
+
+     Running tests/service.rs (target/debug/deps/service-ab67f82b38041d04)
+
+running 7 tests
+test credential_stores_are_substitutable_and_file_permissions_are_enforced ... ok
+test invalid_identifiers_cannot_inject_log_lines_or_terminal_controls ... ok
+test configuration_yaml_and_json_remain_strict ... ok
+test environment_credentials_apply_the_same_value_bounds_as_files ... ok
+test wire_admission_and_freshness_refuse_before_dispatch ... ok
+test federation_refreshes_atomically_without_replaying_and_rotates_credentials ... ok
+test federation_preserves_result_and_reports_downstream_failure ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_kubernetes-4f83040447f11afa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_kubernetes-538d5b6c0a2814c6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/local_runtime.rs (target/debug/deps/local_runtime-b5fd15004b4dcb97)
+
+running 11 tests
+test cli_journey::a_real_cluster_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_K8S_SANDBOX, a built production CLI and qualified disposable Secret Service
+test cli_journey::kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_credential ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::persistent_kubernetes_cli_owner_and_keyring_restart ... ignored, requires built production CLI and qualified disposable Secret Service
+test an_unaccepted_credential_refuses_before_any_business_read ... ok
+test an_accepted_anonymous_request_is_refused_rather_than_saved_as_an_identity ... ok
+test configured_host_discovery_is_advertised_and_reads_nodes ... ok
+test a_backendless_endpointslice_reads_as_no_observations_rather_than_malformed ... ok
+test review_status_codes_map_to_distinct_failures_without_a_business_read ... ok
+test lost_validation_response_closes_the_owned_channel_without_replay ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_provider_work ... ok
+test private_kubernetes_validates_through_selfsubjectreview_and_reads_scoped_resources ... ok
+
+test result: ok. 8 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 6.08s
+
+     Running tests/provider.rs (target/debug/deps/provider-b62dd6268c809b80)
+
+running 3 tests
+test disabled_host_discovery_is_not_advertised_or_dispatched ... ok
+test endpoint_cross_product_is_bounded_even_for_one_source_slice ... ok
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sdk-0747bd49ed6000af)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cursor.rs (target/debug/deps/cursor-e6752aba56763621)
+
+running 1 test
+test cursors_cannot_be_rebound_forged_or_reused_after_restart ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_spec-f97978e16cd330c5)
+
+running 10 tests
+test toolchain::tests::committed_manifest_uses_the_repository_pin ... ok
+test toolchain::tests::altered_binary_is_refused_before_it_can_execute ... ok
+test toolchain::tests::exact_source_pin_refuses_same_version_without_receipt ... ok
+test toolchain::tests::explicit_overrides_win_and_wrong_paths_do_not_fall_back ... ok
+test toolchain::tests::exact_source_pin_rejects_wrong_source_with_the_same_version ... ok
+test toolchain::tests::invalid_receipts_are_closed_and_cannot_admit_a_tool ... ok
+test toolchain::tests::default_search_is_independent_of_path_version_order ... ok
+test toolchain::tests::legacy_release_records_remain_explicit_and_source_records_are_strict ... ok
+test toolchain::tests::missing_pin_reports_record_and_search_locations_and_cache_is_supported ... ok
+test toolchain::tests::source_admission_requires_the_exact_clean_root_and_keeps_ignored_scratch_separate ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_spec-74f88184d43a37f7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/compiler.rs (target/debug/deps/compiler-4bc8fb143e061719)
+
+running 4 tests
+test configuration_examples_are_data_not_imports ... ok
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test shared_configuration_imports_keep_constraints_and_reject_unknown_versions ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+
+     Running tests/generation.rs (target/debug/deps/generation-63134b5d8b464608)
+
+running 8 tests
+test response_prefix_is_explicit_bounded_and_absent_in_legacy_serialization ... ok
+test mapped_date_time_is_preserved_and_other_format_semantics_refuse ... ok
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test public_import_refuses_specs_changed_after_validation ... ok
+test checked_in_bundle_matches_its_pinned_sources_and_toolchain ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift has been running for over 60 seconds
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 61.32s
+
+     Running tests/toolchain_adversary.rs (target/debug/deps/toolchain_adversary-bafb9e809de6235b)
+
+running 4 tests
+test source_pin_parser_preserves_legacy_and_rejects_incomplete_source_records ... ok
+test explicit_wrong_source_refuses_even_when_it_reports_the_pinned_release ... ok
+test symlink_alias_cannot_supply_a_receipt_for_an_unproven_target ... ok
+test malformed_or_wrong_identity_receipt_never_executes_matching_bytes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/write_generation.rs (target/debug/deps/write_generation-0833f82396c503dd)
+
+running 5 tests
+test old_readers_reject_the_write_extension_before_activation ... ok
+test separate_projection_and_closed_schema_refusals ... ok
+test pinned_import_refuses_missing_requirements_and_unsupported_meaning ... ok
+test gitlab_merge_mapping_admits_the_existing_pinned_vendor_source ... ok
+test generated_bundle_is_reproducible_and_executes_without_read_authority ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 57.80s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sql-d46ae6bb6de50f7b)
+
+running 1 test
+test tls_tests::configured_ca_replaces_public_roots_and_requires_certificates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_sql-86742137eb3f41f9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/local_runtime.rs (target/debug/deps/local_runtime-12b796b90392f1d9)
+
+running 5 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.58s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-c8c028fd167e05da)
+
+running 7 tests
+test parsing_and_limits_refuse_before_credentials_or_connection ... ok
+test dropping_the_invocation_still_cancels_the_database ... ok
+test text_null_and_empty_parameters_reach_bind_without_interpolation ... ok
+test rows_nulls_native_types_and_truncation_are_preserved ... ok
+test authentication_database_errors_and_row_capacity_are_sanitized ... ok
+test unresponsive_database_cannot_extend_the_cleanup_budget ... ok
+test deadline_sends_the_backend_cancel_key_and_drains_the_connection ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.35s
+
+     Running unittests src/lib.rs (target/debug/deps/gitlab_types-96fbf12e70c3ad9b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/gitlab_writes_types-99fc8e02a30b2504)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_catalog
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_gitlab
+
+running 1 test
+test adapters/gitlab/src/lib.rs - (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests connectors_host
+
+running 3 tests
+test crates/connectors-host/src/local/runtime/process.rs - local::runtime::process::PreparedInvocation (line 456) - compile fail ... ok
+test crates/connectors-host/src/http.rs - http::ScopedHttp::into_write (line 162) - compile fail ... ok
+test crates/connectors-host/src/http.rs - http::ScopedHttp::probe_capability (line 179) - compile fail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gitlab_types
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests gitlab_writes_types
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+gate: exit=exit status: 0 ["test", "--workspace", "--locked", "--offline"]
+gate: ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+    Checking ring v0.17.14
+    Checking rustls-webpki v0.103.15
+    Checking rcgen v0.14.10
+    Checking rustls v0.23.44
+    Checking tokio-rustls v0.26.5
+    Checking hyper-rustls v0.27.9
+    Checking tokio-postgres-rustls v0.14.0
+    Checking reqwest v0.12.28
+    Checking connectors-client v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-client)
+    Checking connectors-host v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-host)
+    Checking connectors-spec v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-spec)
+    Checking connectors-gitlab v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/gitlab)
+    Checking connectors-sql v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/sql)
+    Checking connectors-kubernetes v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/kubernetes)
+    Checking connectors-build v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-build)
+    Checking connectors v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/apps/connectors)
+    Checking connectors-conformance v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-conformance)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.04s
+gate: exit=exit status: 0 ["clippy", "--workspace", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"]
+gate: ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-gitlab", "--lib", "--no-default-features"]
+gate: connectors-gitlab library boundary holds; exit=0
+gate: ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-kubernetes", "--lib", "--no-default-features"]
+gate: connectors-kubernetes library boundary holds; exit=0
+gate: ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+   Compiling rustls v0.23.44
+   Compiling tokio-rustls v0.26.5
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling connectors-sql v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/adapters/sql)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.06s
+gate: exit=exit status: 0 ["build", "--locked", "--offline", "-p", "connectors-sql", "--lib", "--no-default-features"]
+gate: connectors-sql library boundary holds; exit=0
+gate: generic CLI boundary holds; exit=0
+gate: ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+    Checking connectors-build v0.2.0 (/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/crates/connectors-build)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s
+gate: exit=exit status: 0 ["+1.88.0", "check", "--workspace", "--all-targets", "--locked", "--offline"]
+gate: collected 15 authored scenarios from contracts/operations/v1alpha1/scenarios; exit=0
+gate: collected 13 authored scenarios from contracts/auth/acquisition/v1alpha1/scenarios; exit=0
+gate: collected 6 authored scenarios from contracts/auth/evidence/v1alpha1/scenarios; exit=0
+gate: ["verify", "conform", "synthesize", "--path", "ess", "--target", "ir", "--scenarios", "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/authored-scenarios", "--out", "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/contract-conformance.json"]
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.ConfirmKeyDeletion/deleted has no scenario `connectors.approval_issuers.ConfirmKeyDeletion/outcome/deleted`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `confirm_deletion`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.PublishKey/published has no scenario `connectors.approval_issuers.PublishKey/outcome/published`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `publish`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.RetireKey/retiring has no scenario `connectors.approval_issuers.RetireKey/outcome/retiring`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `retire`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: outcome connectors.approval_issuers.RevokeKey/revoked has no scenario `connectors.approval_issuers.RevokeKey/outcome/revoked`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `revoke`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/publish has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/publish/by/connectors.approval_issuers.PublishKey/published`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `publish`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/revoke has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/revoke/by/connectors.approval_issuers.RevokeKey/revoked`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `revoke`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/retire has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/retire/by/connectors.approval_issuers.RetireKey/retiring`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `retire`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: transition connectors.approval_issuers.ApprovalSigningKey/confirm_deletion has no scenario `connectors.approval_issuers.ApprovalSigningKey/transition/confirm_deletion/by/connectors.approval_issuers.ConfirmKeyDeletion/deleted`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` to move along `confirm_deletion`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Active/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Active`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Active/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Active`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Active/refuses/connectors.approval_issuers.RetireKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Active`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Candidate/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Candidate`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.RetireKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Deleted/refuses/connectors.approval_issuers.RevokeKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Deleted`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retired/refuses/connectors.approval_issuers.ConfirmKeyDeletion`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retired`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retired/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retired`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retired/refuses/connectors.approval_issuers.RevokeKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retired`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retiring/refuses/connectors.approval_issuers.PublishKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retiring`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retiring/refuses/connectors.approval_issuers.RetireKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retiring`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+refused: refusal[ESS-SYNTH-004]: entity connectors.approval_issuers.ApprovalSigningKey has no scenario `connectors.approval_issuers.ApprovalSigningKey/state/Retiring/refuses/connectors.approval_issuers.RevokeKey`
+  it needs an instance of `connectors.approval_issuers.ApprovalSigningKey` resting in `Retiring`, and no outcome creates one
+  help: give some command outcome `creates:` for this entity; nothing can act on an instance nothing brings into existence
+315 scenario(s) (34 authored), 22 refusal(s), written to /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/contract-conformance.json
+gate: exit=exit status: 0 ["verify", "conform", "synthesize", "--path", "ess", "--target", "ir", "--scenarios", "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/authored-scenarios", "--out", "/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.local/tmp/gate-9IVXI6/contract-conformance.json"]
+gate: ["plan", "artifact", "validate"]
+331 file(s) in /home/timo/.local/state/worktree/trees/b10x/connectors_v2/cv2-mcp-w1-20260912/.engineering/planning: 331 artifact(s)
+1 review(s) recorded no findings block:
+  - review-result:catalog-declared-dot-segment-resolution states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
+valid
+gate: exit=exit status: 0 ["plan", "artifact", "validate"]
+gate: all checks passed
+GATE-EXIT:0
