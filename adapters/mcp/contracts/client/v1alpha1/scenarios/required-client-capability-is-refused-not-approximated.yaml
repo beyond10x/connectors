@@ -7,6 +7,9 @@ wire_code: unsupported
 summary: A server that needs a client capability Connectors does not declare gets a
   refusal the caller can read, not an approximation.
 given:
+  - A binding configured for the primary revision (2026-07-28); the interoperability
+    revision (2025-11-25) refuses the same demand without that code, because a server
+    may rely only on capabilities the handshake negotiated.
   - A binding whose declared client capabilities are empty, because the selection matrix
     refuses `roots`, `sampling` and `elicitation`.
 when:

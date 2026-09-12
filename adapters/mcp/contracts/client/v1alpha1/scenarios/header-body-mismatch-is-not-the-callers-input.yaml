@@ -2,21 +2,28 @@ type: mcp-outbound-lifecycle/1
 story: story:mcp-outbound-connection-lifecycle
 document: adapters/mcp/contracts/client/v1alpha1/semantics.md
 state: state:framing
-outcome: mcp.outbound.framing-refused
-wire_code: upstream_protocol
-summary: A framing refusal is reported as a protocol disagreement with the peer, not as
-  the caller's bad input.
+outcome: mcp.outbound.header-mismatch-reported-by-the-server
+wire_code: internal
+summary: A server correctly reporting that this client's header and body disagreed is not
+  the server's fault, and not the caller's either.
 given:
-  - A request framed by this client.
+  - A binding configured for the primary revision (2026-07-28), the only one whose
+    headers mirror body fields and whose schema carries a code for their disagreeing.
+  - A request framed by this client, or rewritten in flight by an intermediary.
 when:
-  - The peer answers `HeaderMismatch` (-32020, mcp-2026-07-28-schema.ts:434,
-    mcp-2026-07-28-basic-transports-streamable-http.mdx:580-607), or answers with a body
-    that is not readable as JSON-RPC, or with a media type the transport does not define.
+  - The server answers `400 Bad Request` with `HeaderMismatch` (-32020,
+    mcp-2026-07-28-schema.ts:434,
+    mcp-2026-07-28-basic-transports-streamable-http.mdx:580-607).
 then:
-  - The observable outcome is `upstream_protocol`, carrying the endpoint, the HTTP status
-    and the JSON-RPC code the peer returned.
+  - The observable outcome is `internal`, carrying the endpoint, the header and the body
+    value that disagreed, and the code the server returned.
+  - The act reported is this repository's own, or that of an intermediary on its side,
+    because the framing outcome says a request of this client never carries a mismatch
+    (mcp-2026-07-28-basic-transports-streamable-http.mdx:250-261).
   - The caller's request is not carried out.
 never:
+  - The outcome is `upstream_protocol`; the peer answered exactly as its revision requires
+    and blaming it would name the wrong side.
   - The outcome is `invalid_input`; the caller supplied no header, so the caller's input
     is not what disagreed.
-  - A decoding failure is reported as evidence about a provider effect.
+  - A mismatch is corrected and the same request sent under a second framing.

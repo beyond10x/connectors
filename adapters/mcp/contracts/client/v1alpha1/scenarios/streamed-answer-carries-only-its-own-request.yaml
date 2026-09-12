@@ -7,6 +7,9 @@ wire_code: n/a
 summary: An SSE answer is scoped to the request that opened it, and a subscription stream
   carries only what its filter named.
 given:
+  - A binding configured for the primary revision (2026-07-28), where no server request
+    may arrive on the stream; the interoperability revision (2025-11-25) is
+    `legacy-ping-on-the-stream-is-answered.yaml`.
   - A request whose answer the server chooses to stream.
 when:
   - The server opens `text/event-stream` and sends notifications before the final response

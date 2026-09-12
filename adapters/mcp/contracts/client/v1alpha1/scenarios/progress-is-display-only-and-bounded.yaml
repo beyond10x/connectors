@@ -6,6 +6,9 @@ outcome: mcp.outbound.progress-observed
 wire_code: n/a
 summary: Progress is shown, bounded by a maximum timeout, and never becomes a result.
 given:
+  - A binding configured for the primary revision (2026-07-28); under the
+    interoperability revision (2025-11-25) the same tokens apply and an expired bound
+    ends in a sent notification rather than a closed connection.
   - A request carrying a `progressToken` unique across this client's active requests
     (mcp-2026-07-28-basic-patterns-progress.mdx:13-18).
 when:
