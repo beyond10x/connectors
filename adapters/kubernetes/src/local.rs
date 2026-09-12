@@ -10,7 +10,7 @@ use connectors_host::{
         runtime::{Baseline, Bootstrap, Effect, EntryField, Failure, Profile, Requirement, Result},
     },
 };
-use connectors_kubernetes::{Config, Kubernetes, auth};
+use connectors_kubernetes::{Config, HelmReleaseReads, Kubernetes, auth};
 use connectors_sdk::{Adapter as _, AuthProbe, Credential, Secret};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -31,6 +31,11 @@ struct Configuration {
     resource_kinds: Vec<String>,
     #[serde(default)]
     discover_hosts: bool,
+    /// Absent means no Helm release read is advertised at all. Disclosure of a
+    /// release's recorded values or rendered manifest is a separate, explicit
+    /// step above that, and even then only as a redacted projection.
+    #[serde(default)]
+    helm_release_reads: HelmReleaseReads,
 }
 
 pub struct Local {
@@ -79,7 +84,8 @@ impl Local {
         let effective = json!({"format":config.format,"instance":config.instance,"api_base":base,
             "ca_digest":ca.as_ref().map(|b|connectors_core::digest(&json!(b))),
             "namespaces":config.namespaces,"resource_kinds":config.resource_kinds,
-            "discover_hosts":config.discover_hosts});
+            "discover_hosts":config.discover_hosts,
+            "helm_release_reads":config.helm_release_reads});
         let configuration_revision = connectors_core::digest(&effective);
         let http = Arc::new(
             ScopedHttp::new_with_ca_bytes(
@@ -107,6 +113,7 @@ impl Local {
                 namespaces: config.namespaces,
                 resource_kinds: config.resource_kinds,
                 discover_hosts: config.discover_hosts,
+                helm_release_reads: config.helm_release_reads,
             },
             effective,
             http.clone(),
@@ -150,7 +157,13 @@ impl Local {
                     profile: auth::PROFILE_ID.into(),
                     scopes: BTreeSet::new(),
                     effect: match o.id.as_str() {
-                        "resources.list" | "endpoints.discover" | "hosts.discover" => Effect::Read,
+                        "resources.list"
+                        | "endpoints.discover"
+                        | "hosts.discover"
+                        | "helm_releases.history"
+                        | "helm_releases.status"
+                        | "helm_releases.values"
+                        | "helm_releases.manifest" => Effect::Read,
                         _ => Effect::Unknown,
                     },
                 })
