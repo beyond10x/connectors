@@ -1,4 +1,4 @@
-# Connectors v0.3.0 — release gate
+# Connectors v0.8.0 — release gate
 
 The first gate run on the **merged** state of `main`. Both constituent waves gated
 on their integration branches, below the merge commits, so until this run nothing
@@ -15,8 +15,8 @@ had checked what `main` actually holds.
 
 ## Scope
 
-74 commits after v0.2.0. `CHANGELOG.md` § 0.3.0 has the user-visible list;
-`release-plan:connectors-v030` holds the scope and its limits.
+74 commits after this line's v0.2.0. Numbered 0.8.0 because the destination repository's published tags already reach v0.7.2. `CHANGELOG.md` § 0.3.0 has the user-visible list;
+`release-plan:connectors-v080` holds the scope and its limits.
 
 ## What this run establishes
 
@@ -40,5 +40,5 @@ is separate, at `docs/evidence/provider-sandboxes-20260911/`.
 Not published. `configuration-blocker:gitlab-v020-publication-target` is open —
 this checkout has no publication remote, and the only configured remote is a local
 recovery repository. `AGENTS.md` § Cutting a release is explicit that a local
-commit or local tag alone is not a cut release, so **v0.3.0 is cut locally and
+commit or local tag alone is not a cut release, so **v0.8.0 is cut locally and
 incomplete** until a destination exists.
