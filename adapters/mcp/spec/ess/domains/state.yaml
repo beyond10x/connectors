@@ -16,8 +16,12 @@ summary: MCP-owned nouns, the three distinct credential kinds, and the relations
 #   1. citable, but undeclarable in this root — McpAdvertisedCapability → the
 #      OperationDeclaration an AdapterSpecification already owns;
 #   2. deliberately absent, with the absence itself cited — McpSession → Connection;
-#   3. unreadable, so carried as an `UNMAPPED:` marker — six of them;
-#   4. filed as a decision nobody has taken — two open decision-blockers.
+#   3. unreadable, so carried as an `UNMAPPED:` marker — EIGHT of them;
+#   4. of those eight, two are also filed against an open decision-blocker, which names
+#      who answers them. Filed is not a second vocabulary standing in for `UNMAPPED:`;
+#      a filed decision is a relation the model could not read, so it carries both.
+#
+# One and two, plus eight, is the whole census: ten rows, listed at the foot of this file.
 #
 # The ESS validator does NOT protect any of this. It accepts a guessed `cardinality:
 # one` exactly as readily as a correct one; only the markers below distinguish them.
@@ -27,14 +31,26 @@ summary: MCP-owned nouns, the three distinct credential kinds, and the relations
 # Two conventions make the markers checkable rather than merely present, and
 # `crates/connectors-build/tests/mcp_domain_model_census.rs` enforces both:
 #
-#   · Every mention of an edge carries its own verdict — `UNMAPPED:`, `FILED` with the
-#     blocker id, or `ABSENT` with the citation — within two lines of the edge itself. A
-#     marker in a heading above a list of five edges is not a marker for any of them.
-#   · An edge is realised by a FIELD as surely as by a `relations:` block. A field on the
-#     source entity named for the target, or typed as the target, is the same claim in a
-#     weaker syntax — `binding_ref: String` on `McpOutboundSession` says one-to-one just
-#     as loudly as `cardinality: one` does. Neither form may appear for an edge whose
-#     verdict is `UNMAPPED`, `FILED` or `ABSENT`.
+#   · Every mention of an edge carries its own verdict — `UNMAPPED:` always, plus the
+#     blocker id where it is filed and the citation where it is absent — on the line
+#     that names the edge or the one beside it. ONE line, not two: the census footer
+#     lists its rows two lines apart, so at two every row sits inside its neighbours'
+#     markers and a row can lose its verdict everywhere while the guard stays green.
+#     That was measured, not feared. A marker in a heading above a list of five edges is
+#     not a marker for any of them, and at two lines the footer IS that list.
+#   · `UNMAPPED:` is the word, including on the two rows that are also filed. A filed
+#     decision is a relation the model could not read — that is why it is filed — so the
+#     acceptance's sentence covers it, and story:mcp-profile-selection-matrix greps for
+#     exactly that word. The blocker id is the stronger half of the verdict and stays;
+#     it is not a substitute for the half the acceptance names.
+#   · An edge is realised by a FIELD as surely as by a `relations:` block, and the rule
+#     is SYMMETRIC and covers VALUES as well as entities. A carrier named for the other
+#     end, or typed as it, is the same claim in a weaker syntax, and it does not matter
+#     which end declares it or whether that end is an `entities:` record or a `types:`
+#     value: `binding_ref: String` on `McpOutboundSession` and `binding_ref: String` on
+#     `McpCapabilitySnapshot` both say one-to-one as loudly as `cardinality: one` does,
+#     and both validate at exit 0. Plurals count too — `bindings`, `binding_refs`. No
+#     such carrier may appear at either end of an edge whose verdict is `UNMAPPED`.
 #
 # ── Why no lifecycle below has more than one state ─────────────────────────────────
 #
@@ -94,10 +110,10 @@ types:
   # security-considerations.mdx:120,124 and authorization-index.mdx:285-286 (a server
   # MUST validate that a token was issued specifically for it).
   #
-  # UNMAPPED: `McpInboundSession → McpCaller`, and filed under
-  # `decision-blocker:mcp-caller-connection-assignment`:
-  # `McpCaller → connectors.auth_bindings.Connection`. See the census at the foot of this
-  # file. This type is the credential, not the caller, and declares no caller.
+  # UNMAPPED: `McpInboundSession → McpCaller`, and also
+  # UNMAPPED: `McpCaller → connectors.auth_bindings.Connection`, filed under
+  # `decision-blocker:mcp-caller-connection-assignment`. See the census at the foot of
+  # this file. This type is the credential, not the caller, and declares no caller.
   - name: connectors_mcp.state.McpInboundCallerCredential
     kind: struct
     fields:
@@ -185,10 +201,20 @@ types:
       # server is not limited to one. List<String> and not List<ProtocolRevision>
       # because a server may name versions neither pinned revision covers.
       - {name: supported_versions, type: "List<String>"}
-      # server-discover.mdx:45-48 and :96-97. The known kinds only; protocol.yaml records
-      # that mcp-2026-07-28-schema.ts:789 declares the capability set open, so an unknown
-      # advertised key has no carrier here.
-      - {name: server_capabilities, type: "List<connectors_mcp.protocol.ServerCapabilityKind>"}
+      # server-discover.mdx:45-48 and :96-97: the keys of the `capabilities` object the
+      # server sent. `List<String>` and not `List<ServerCapabilityKind>`, for the reason
+      # `selected_revision` is a String below and by the sweep at domains/protocol.yaml.
+      # mcp-2026-07-28-schema.ts:789: "Known capabilities are defined here, in this
+      # schema, but this is not a closed set: any server can define its own, additional
+      # capabilities." A snapshot of what a server advertised has to be able to hold what
+      # it advertised, including a key this repository has never heard of; the enum names
+      # the seven the schema names and is the wrong type for the record of a reply.
+      #
+      # The other shape this model considered was keeping the enum and adding a sibling
+      # `unknown_capability_keys: List<String>`. It was not taken: which key lands in
+      # which carrier is a rule no source states, and a reader of two carriers must
+      # reconstruct it. One list of keys is what the wire carries.
+      - {name: server_capabilities, type: "List<String>"}
       # Optional because server-discover.mdx:98-99 is SHOULD, not MUST — and unverified
       # even when present (:103-107).
       - {name: server_identity, type: "Optional<connectors_mcp.protocol.ServerIdentity>"}
@@ -224,7 +250,7 @@ entities:
   #     `via: connection_ref`) or a custody record with no connection owner. The shared
   #     model's shape is cited so a reader can see exactly which of the two is open — it
   #     is not adopted here.
-  #   · FILED: `McpServerBinding → supervised OS process` is held by
+  #   · UNMAPPED: `McpServerBinding → supervised OS process`, and filed —
   #     `decision-blocker:mcp-outbound-stdio-process-ownership`, open. The protocol says
   #     who launches — mcp-2026-07-28-basic-transports-stdio.mdx:7, "the client launches
   #     the MCP server as a subprocess", and mcp-2025-11-25-basic-transports.mdx:26 the
@@ -265,10 +291,17 @@ entities:
       # because a server may name versions neither pinned revision covers — so a closed
       # selection type makes a reportable version unselectable, `2025-06-18` and
       # `2024-11-05` among them, and `http-sse-2024-11-05` is a declared TransportBinding
-      # variant whose revision is one of those. domains/protocol.yaml:36-39 declares the
-      # revision set open in as many words. And domains/protocol.yaml:18-20 says that file
-      # makes no selection: typing this field to a closed two-variant enum would BE that
-      # selection, made here instead.
+      # variant whose revision is one of those. domains/protocol.yaml declares the
+      # revision set open in as many words — "the protocol's version set is not closed by
+      # these two" — and says of itself that "no selection is made here": typing this
+      # field to a closed two-variant enum would BE that selection, made here instead.
+      #
+      # Cited by phrase and not by line: this comment read `protocol.yaml:36-39` until
+      # the open-set sweep was added to that file's header and moved the sentence. That
+      # was the fourth instance of the drift adapters/mcp/design.md warns about, under
+      # "Citing this document: use a heading, not a line number" — and this file created
+      # it. A line number is only safe into the archived `vendor/*.gz` bytes, whose lines
+      # a digest pins.
       #
       # The enum still states what the pinned revisions are; it is a protocol value, not
       # the type of a runtime choice.
@@ -286,18 +319,33 @@ entities:
   #   McpAdvertisedCapability → connectors.declarations.OperationDeclaration, ONE — one
   #   advertised capability projects exactly one already-declared operation.
   #
-  # ONE is read off the carrier, under a binding this repository keeps without exception:
-  # a `references` relation whose `cardinality` is `one` carries a SCALAR `via` field, and
-  # one whose `cardinality` is `many` carries a `List<…>`. Four sibling blocks, checked:
+  # ONE is read off the carrier, under a binding this repository keeps for every
+  # `kind: references` relation — and ONLY for those. The scope is load-bearing, not
+  # hedging: a `references` relation whose `cardinality` is `one` carries a SCALAR `via`
+  # field, and one whose `cardinality` is `many` carries a `List<…>`. Four sibling
+  # blocks, checked:
   #
   #   · one  — ess/domains/credentials.yaml:40-45, `cardinality: one`,
   #     `via: connection_ref`, itself `{name: connection_ref, type: String}` at :32; and
   #     ess/domains/auth_bindings.yaml:102-106, five `cardinality: one` relations, each
-  #     `via` a scalar `String` field.
+  #     `via` a SCALAR field. Scalar, not `String`: two are `String` (`instance_id` at
+  #     :83, `profile_record_ref` at :56) and three are not — `parent_connection_ref`
+  #     and `active_custody_version_ref` are `Optional<String>` (:94, :98) and
+  #     `active_generation_id` is
+  #     `Optional<connectors.credentials.CredentialGenerationId>` (:96), which is not a
+  #     string at all. The rule is scalar-against-list; the element type is free.
   #   · many — ess/domains/artifact_provenance.yaml:85-89, `cardinality: many`,
   #     `via: source_refs`, itself `{name: source_refs, type: "List<String>"}` at :78; and
   #     ess/domains/auth_bindings.yaml:107, `cardinality: many`,
   #     `via: superseded_custody_version_refs`, itself `List<String>` at :99.
+  #
+  # Why the `references` scope is not decoration: two `kind: owns` relations in shared
+  # ESS carry `cardinality: many` through a SCALAR `via` —
+  # ess/domains/declarations.yaml:119-123 (`via: adapter_id`) and
+  # ess/domains/discovery_state.yaml:85-89 (`via: collection_ref`). Both are correct.
+  # Under `owns`, `via` names the CHILD's back-reference to the owner's identity, which
+  # is one value per child however many children there are, so the carrier says nothing
+  # about the cardinality. Stated without the scope, this rule would condemn both.
   #
   # `operation_ref` below is a scalar `String`, so this edge is ONE. Where a cardinality
   # and its carrier disagree, one of them is wrong; here the carrier is the thing a reader
@@ -324,7 +372,13 @@ entities:
       # The owned `connectors.declarations.OperationDeclaration` this projects. A String
       # carrier, not an ESS relation — the relation lives in the cited shared block above.
       - {name: operation_ref, type: String}
-      - {name: capability_kind, type: connectors_mcp.protocol.ServerCapabilityKind}
+      # The capability key this is advertised under. `String`, by the same sweep: the
+      # seven kinds `ServerCapabilityKind` names are the seven the schema names, and
+      # mcp-2026-07-28-schema.ts:789 says a server may define its own besides. Nothing
+      # states that this repository advertises only within the named seven, and typing
+      # the field to them would decide it — which is
+      # story:mcp-inbound-capability-projection's to decide, on a source.
+      - {name: capability_kind, type: String}
       # The name this capability is advertised under on the wire. Distinct from the
       # operation's own identifier: nothing states they are equal, and assuming so would
       # be a mapping decision this model does not own.
@@ -396,7 +450,7 @@ entities:
   # declaring one would answer that question, and declaring a `caller_ref: String` would
   # answer it while pretending not to.
   #
-  # FILED, not modelled: `McpCaller → connectors.auth_bindings.Connection` is
+  # UNMAPPED: `McpCaller → connectors.auth_bindings.Connection`, and filed as
   # `decision-blocker:mcp-caller-connection-assignment`, open — which connection's
   # provider credential carries out an inbound invocation. Its own record notes that
   # ess/domains/declarations.yaml:180-181 declines the same question in an `ess/1`
@@ -456,10 +510,10 @@ entities:
 #      — whether a caller is an entity in this repository at all.
 #
 # Filed as decisions, not modelling gaps — a cardinality written here would answer them:
-#   9. FILED: McpCaller → connectors.auth_bindings.Connection
-#      — decision-blocker:mcp-caller-connection-assignment (open).
-#  10. FILED: McpServerBinding → supervised OS process
-#      — decision-blocker:mcp-outbound-stdio-process-ownership (open).
+#   9. UNMAPPED: McpCaller → connectors.auth_bindings.Connection — and FILED:
+#      decision-blocker:mcp-caller-connection-assignment (open).
+#  10. UNMAPPED: McpServerBinding → supervised OS process — and FILED:
+#      decision-blocker:mcp-outbound-stdio-process-ownership (open).
 #
 # Nothing above is a cardinality this model chose. Ten stories read this file; a guessed
 # one-to-many and a guessed one-to-one produce different schemas, different lifecycles
