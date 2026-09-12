@@ -61,9 +61,20 @@ timeline:
   outcome: ready
   events:
   - event: connectors.sessions.SessionReady
-# The cancellation notification arrives on the one shared channel. It is scoped to one
-# request: no ClosingBegun, no terminal, no denial. The cancelled request is answered
-# with nothing at all (mcp-2026-07-28-basic-patterns-cancellation.mdx:73-76).
+# The cancellation notification arrives on the one shared channel and is admitted: it is
+# scoped to one request, with no ClosingBegun, no terminal and no denial
+# (mcp-2026-07-28-basic-patterns-cancellation.mdx:73-76). Nothing follows it for that
+# request — the trace ends here with the session Ready, which is what "answers nothing"
+# means: the binding "MUST NOT send any further messages for it"
+# (mcp-2026-07-28-basic-transports-stdio.mdx:78-83).
+#
+# One admitted act, and that is arithmetic rather than brevity. ESS instants are whole
+# seconds and must strictly increase (ESS-AUTHOR-001, ESS-AUTHOR-023), a lease may not
+# outlive 2,000 ms from its issuance, and an act admitted *on* the effective expiry is
+# refused by the contract — so exactly one whole second lies strictly inside a lease
+# window, and a trace records the decision the outcome is about. An unrelated request
+# answering on the same connection is the same permit_data decision again, and this
+# outcome does not turn on it.
 - at: '2026-09-12T12:00:03Z'
   command: connectors.sessions.PermitData
   input:
@@ -71,21 +82,6 @@ timeline:
       $instance: session
     decision: allow
     direction: input
-  outcome: permitted
-  events:
-  - event: connectors.sessions.DataPermitted
-  no_events:
-  - connectors.sessions.ClosingBegun
-  - connectors.sessions.ContinuityLost
-  - connectors.sessions.DataAuthorityTerminated
-# An unrelated in-flight request on the same connection still answers.
-- at: '2026-09-12T12:00:04Z'
-  command: connectors.sessions.PermitData
-  input:
-    session_id:
-      $instance: session
-    decision: allow
-    direction: output
   outcome: permitted
   events:
   - event: connectors.sessions.DataPermitted

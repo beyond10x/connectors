@@ -70,25 +70,16 @@ timeline:
 # The refusal itself: MissingRequiredClientCapabilityError, -32021, naming what was missing
 # in data.requiredCapabilities (mcp-2026-07-28-basic-index.mdx:387-392). It is written to
 # the same shared channel as any other reply, so it is outbound data on a Ready session and
-# the supervisor's decision is permit_data — no denial, and no terminal.
+# the supervisor's decision is permit_data — no denial, and no terminal. The refusal is
+# scoped to one request, because version and capabilities are per-request facts on this
+# revision (mcp-2026-07-28-basic-versioning.mdx:12-13).
+#
+# One admitted act, and that is arithmetic rather than brevity. ESS instants are whole
+# seconds and must strictly increase (ESS-AUTHOR-001, ESS-AUTHOR-023), a lease may not
+# outlive 2,000 ms from its issuance, and an act admitted *on* the effective expiry is
+# refused by the contract — so exactly one whole second lies strictly inside a lease
+# window, and a trace records the decision the outcome is about.
 - at: '2026-09-12T12:00:03Z'
-  command: connectors.sessions.PermitData
-  input:
-    session_id:
-      $instance: session
-    decision: allow
-    direction: output
-  outcome: permitted
-  events:
-  - event: connectors.sessions.DataPermitted
-  no_events:
-  - connectors.sessions.ClosingBegun
-  - connectors.sessions.DataAuthorityTerminated
-  - connectors.sessions.ContinuityLost
-# An unrelated request already in flight on the same connection is answered normally: the
-# refusal was scoped to one request, because version and capabilities are per-request facts
-# on this revision (mcp-2026-07-28-basic-versioning.mdx:12-13).
-- at: '2026-09-12T12:00:04Z'
   command: connectors.sessions.PermitData
   input:
     session_id:

@@ -13,7 +13,7 @@
 type: ess-scenario/1
 domain: connectors.sessions
 scenario: progress-stops-at-the-result
-summary: 'Progress notifications ride the live session as outbound data and renew nothing; the supervisor renews the lease the request outlives, and the notifications stop at the result with the session Ready.'
+summary: 'Progress notifications ride the live session as outbound data and renew nothing; the response is the last data decision admitted for the request, and the session stays Ready.'
 arrange:
 - instance: session
   entity: connectors.sessions.Session
@@ -61,61 +61,20 @@ timeline:
   outcome: ready
   events:
   - event: connectors.sessions.SessionReady
-# First notifications/progress against the caller's progressToken. It is outbound data on
-# a session that is already Ready; no lease is renewed by it, which the no_events below
-# states rather than leaves to be read into the trace.
+# The response, and progress stops at it: "Progress notifications MUST stop after
+# completion" (mcp-2026-07-28-basic-patterns-progress.mdx:90), so this is the last data
+# decision the supervisor admits for the request, and the session stays Ready. No lease is
+# renewed by a notification or by the response — the no_events below states that rather
+# than leaving it to be read in — and a request that outlives its lease is the separate
+# route renewed-lease-keeps-a-long-request-ready.yaml carries.
+#
+# One admitted act, and that is arithmetic rather than brevity. ESS instants are whole
+# seconds and must strictly increase (ESS-AUTHOR-001, ESS-AUTHOR-023), a lease may not
+# outlive 2,000 ms from its issuance, and an act admitted *on* the effective expiry is
+# refused by the contract — so exactly one whole second lies strictly inside a lease
+# window. The notifications that preceded this response rode the same lease under the same
+# decision; what this outcome turns on is that nothing follows the response.
 - at: '2026-09-12T12:00:03Z'
-  command: connectors.sessions.PermitData
-  input:
-    session_id:
-      $instance: session
-    decision: allow
-    direction: output
-  outcome: permitted
-  events:
-  - event: connectors.sessions.DataPermitted
-  no_events:
-  - connectors.sessions.DataLeaseRenewed
-  - connectors.sessions.ClosingBegun
-  - connectors.sessions.ContinuityLost
-# The request outlives the lease that admits it, and the only thing that keeps it Ready is
-# the supervisor's own renewal — taken at the deadline of lease 1, not after it, "under the
-# same serialized authority check as revocation" (contracts/sessions/v1alpha1/semantics.md
-# §4.1). No progress notification causes this act: a peer-visible notification is not a
-# lease input. Had the supervisor not renewed, the lease would have expired, and the model
-# fixes that terminal to lease_expired with no grace — which is ../semantics.md §3.3.
-- at: '2026-09-12T12:00:04Z'
-  command: connectors.sessions.RenewDataLease
-  input:
-    session_id:
-      $instance: session
-    decision: allow
-    lease:
-      issued_at: '2026-09-12T12:00:04Z'
-      effective_expiry: '2026-09-12T12:00:06Z'
-      sequence: 2
-  outcome: renewed
-  events:
-  - event: connectors.sessions.DataLeaseRenewed
-# Second notification, with an increased progress value
-# (mcp-2026-07-28-basic-patterns-progress.mdx:53-54). It rides lease 2.
-- at: '2026-09-12T12:00:05Z'
-  command: connectors.sessions.PermitData
-  input:
-    session_id:
-      $instance: session
-    decision: allow
-    direction: output
-  outcome: permitted
-  events:
-  - event: connectors.sessions.DataPermitted
-  no_events:
-  - connectors.sessions.DataLeaseRenewed
-  - connectors.sessions.ClosingBegun
-  - connectors.sessions.ContinuityLost
-# The response. Progress stops here: "Progress notifications MUST stop after completion"
-# (mcp-2026-07-28-basic-patterns-progress.mdx:90). Still within lease 2.
-- at: '2026-09-12T12:00:06Z'
   command: connectors.sessions.PermitData
   input:
     session_id:
