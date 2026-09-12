@@ -35,8 +35,17 @@ here.
 
 ## Reproducing this record
 
+Two checks, because the record makes two different claims. The first is about content —
+the archived bytes are the bytes the digests describe. The second is about provenance —
+each entry's `url`, `commit`, `path` and `archive` agree with the revision it claims. A
+content check alone passes an entry repointed at the other revision's file, and this
+record says the archives rather than the network are the retained authority from here on,
+so nothing else would ever catch that.
+
 ```sh
 cd adapters/mcp/contracts/protocol/v1alpha1/evidence/20260912
+
+# 1. content
 diff \
   <(jq -r '.[] | [.sha256, .bytes, .archive] | @tsv' specification-source-hashes.json | LC_ALL=C sort) \
   <(for archive in vendor/*.gz; do
@@ -46,11 +55,33 @@ diff \
         "$archive"
     done | LC_ALL=C sort) \
   && echo "verified $(jq length specification-source-hashes.json) archived specification sources"
+
+# 2. provenance
+jq -e -r '
+  "https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/" as $prefix
+  | [ .[] | . as $e
+      | select(($e.url != ($prefix + $e.commit + "/" + $e.path))
+            or (($e.path | startswith("docs/specification/" + $e.revision + "/"))
+             or ($e.path | startswith("schema/" + $e.revision + "/")) | not)
+            or ($e.archive != ("vendor/" + $e.file + ".gz")))
+      | $e.file ] as $broken
+  | ([ .[] | {revision, commit} ] | unique | length) as $pairs
+  | if ($broken | length) == 0 and $pairs == 2
+    then "provenance holds for \(length) entries: url = prefix + commit + path, path under its own revision, archive named after its file, one commit per revision"
+    else error("provenance disagrees for \($broken | join(", ")) with \($pairs) revision/commit pair(s)")
+    end
+' specification-source-hashes.json
 ```
 
-On 2026-09-12 this printed `verified 54 archived specification sources` and exited 0. It
-compares both directions: a missing archive, an unrecorded archive, an altered digest and
-an altered byte length each fail the diff with a non-zero exit.
+On 2026-09-12 these printed `verified 54 archived specification sources` and `provenance
+holds for 54 entries: …`, both exit 0. The content check compares both directions: a
+missing archive, an unrecorded archive, an altered digest and an altered byte length each
+fail the diff with a non-zero exit. The provenance check fails, exit 5, naming the file,
+when an entry's `path`, `commit` and `url` are repointed at the other revision — a
+mutation the content check passes unchanged, because the bytes are untouched. The same
+four rules are asserted in Rust by
+`crates/connectors-build/tests/mcp_specification_pin_adversary.rs::manifest_provenance_fields_agree_with_the_revision_each_entry_claims`,
+so a reader following this record runs the check the suite runs.
 
 ## What is archived, and what is deliberately not
 
@@ -62,9 +93,20 @@ Not archived, with the reason:
 - `docs/specification/<revision>/schema.mdx` — a generated typedoc rendering of
   `schema.ts` (726,080 and 442,839 bytes); the normative source it is generated from is
   archived instead.
+- `schema/<revision>/schema.mdx` — the typedoc template that rendering is produced from
+  (1,771 bytes at `2026-07-28`, 2,316 bytes at `2025-11-25`): frontmatter, `##` headings
+  and `{/* @category … */}` markers only, with no prose and no occurrence of MUST, SHOULD
+  or MAY. Both were fetched and read at their pinned commits before being excluded.
 - `schema/<revision>/schema.json` — generated from `schema.ts`.
 - `schema/<revision>/examples/**` — non-normative example payloads.
 - `docs/specification/<revision>/server/*.png` — illustrations, not normative text.
+
+The second entry is also a warning for whoever extends this manifest. The archive name is
+derived by flattening the upstream path *below* its revision directory, so
+`docs/specification/<revision>/schema.mdx` and `schema/<revision>/schema.mdx` both flatten
+to `mcp-<revision>-schema.mdx` and cannot both be archived under the current naming rule.
+Adding either one means extending the rule — carrying the `docs/` or `schema/` prefix into
+the name — not overwriting the other.
 
 Each of these remains retrievable at the same pinned commit through the URL prefix
 recorded in the manifest. Adding one is a later append to this directory, not a refetch
@@ -78,7 +120,7 @@ Line numbers are lines of the archived uncompressed file.
 |---|---|---|
 | Nouns, message shapes and error codes | `mcp-2026-07-28-schema.ts` (30, 450), `mcp-2025-11-25-schema.ts` (14) | `LATEST_PROTOCOL_VERSION`, `UNSUPPORTED_PROTOCOL_VERSION`; read the version-string trap below before citing either constant |
 | Transport profiles | `mcp-2026-07-28-basic-transports-index.mdx` (27, 38, 52, 81), `mcp-2026-07-28-basic-transports-stdio.mdx`, `mcp-2026-07-28-basic-transports-streamable-http.mdx`, `mcp-2025-11-25-basic-transports.mdx` (22, 54) | Messages, Request Metadata, Cancellation, Backward Compatibility |
-| Version negotiation and the 2025-11-25 seam | `mcp-2026-07-28-basic-versioning.mdx` (41, 80, 126), `mcp-2026-07-28-server-discover.mdx` (11, 33, 62), `mcp-2025-11-25-basic-lifecycle.mdx` (38, 248, 265) | Protocol Version Negotiation, Extension Negotiation, Backward Compatibility with Initialization-Based Versions, Lifecycle Phases |
+| Version negotiation and the 2025-11-25 seam | `mcp-2026-07-28-basic-versioning.mdx` (41, 80, 126), `mcp-2026-07-28-server-discover.mdx` (11, 33, 62), `mcp-2025-11-25-basic-lifecycle.mdx` (38, 167, 248, 265) | Protocol Version Negotiation, Extension Negotiation, Backward Compatibility with Initialization-Based Versions; Lifecycle Phases, **Version Negotiation** (167, the legacy `initialize` handshake this seam is against), Timeouts, Error Handling |
 | Outbound auth lifecycle | `mcp-2026-07-28-basic-authorization-index.mdx` (47, 136, 254), `mcp-2026-07-28-basic-authorization-authorization-server-discovery.mdx`, `mcp-2026-07-28-basic-authorization-client-registration.mdx`, `mcp-2025-11-25-basic-authorization.mdx` (41, 74, 198, 352) | Roles, Authorization Flow Steps, Access Token Usage |
 | Invocation results and errors | `mcp-2026-07-28-server-tools.mdx` (45, 76, 280, 738), `mcp-2025-11-25-server-tools.mdx` (38, 55, 449) | Capabilities, Protocol Messages, Data Types, Error Handling |
 | Capability projection | `mcp-2026-07-28-server-resources.mdx` (39, 83), `mcp-2026-07-28-server-prompts.mdx` (39, 66), `mcp-2026-07-28-server-discover.mdx` (33) | Capabilities, Protocol Messages, Response |
@@ -90,14 +132,29 @@ Line numbers are lines of the archived uncompressed file.
 
 ## The version-string trap this pin makes checkable
 
-`2025-11-25` identifies the revision by its upstream directory and release tag. Its own
-archived text does not say so in the places a reader would look first:
-`mcp-2025-11-25-schema.ts` line 14 declares `LATEST_PROTOCOL_VERSION = "DRAFT-2025-v3"`,
-and the initialization examples in `mcp-2025-11-25-basic-lifecycle.mdx` lines 61 and 107
-carry `"protocolVersion": "2024-11-05"`, while `mcp-2025-11-25-basic-transports.mdx`
-line 271 gives `MCP-Protocol-Version: 2025-06-18` as its header example. Within that
-revision the string `2025-11-25` appears only in documentation paths such as
-`/specification/2025-11-25/basic/index#meta`.
+`2025-11-25` identifies the revision by its upstream directory and release tag, and the
+revision does declare that string in its own prose: 18 of the 22 archived `.mdx`
+documents of that revision carry an `<Info>**Protocol Revision**: 2025-11-25</Info>`
+banner in their opening lines — line 7 of most, line 5 of
+`mcp-2025-11-25-server-index.mdx` — and two more name it in running text,
+`mcp-2025-11-25-basic-utilities-tasks.mdx` line 11 ("Tasks were introduced in version
+2025-11-25 of the MCP specification") and `mcp-2025-11-25-client-elicitation.mdx` line
+329. The four without the banner are `architecture-index`, `basic-security_best_practices`,
+`changelog` and `index`. The banner is the revision's self-identification, not a
+documentation path, and an earlier draft of this record claimed the opposite; that claim
+was wrong and is withdrawn here rather than left for the eleven stories that read this
+pin. The archived bytes are unchanged — only this description of them is corrected.
+
+What is true, and is the trap worth carrying, is that the *machine-readable* places a
+reader would look first disagree with the banner. `mcp-2025-11-25-schema.ts` line 14
+declares `LATEST_PROTOCOL_VERSION = "DRAFT-2025-v3"`; the initialization examples in
+`mcp-2025-11-25-basic-lifecycle.mdx` lines 61 and 107 carry
+`"protocolVersion": "2024-11-05"`; and `mcp-2025-11-25-basic-transports.mdx` line 271
+gives `MCP-Protocol-Version: 2025-06-18` as its header example. So a contract statement
+that reads the version string out of that revision's schema constant or its examples gets
+a different answer from the one its own banner gives. The primary revision carries no
+such banner in any of its 30 archived `.mdx` documents; it states versions through
+`mcp-2026-07-28-basic-versioning.mdx` instead.
 
 The negotiable wire version string `2025-11-25` is stated by the primary revision:
 `mcp-2026-07-28-basic-versioning.mdx` lines 41–68 show
