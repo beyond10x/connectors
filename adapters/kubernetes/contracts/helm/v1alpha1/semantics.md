@@ -36,7 +36,10 @@ labels, or one exact object named `sh.helm.release.v1.<release>.v<revision>`.
 Helm's own release-name rule, at most 53 bytes; a name Helm would refuse is
 `invalid_input` before any request rather than a lookup that cannot succeed.
 `limit` is 1–100 for the collection reads and 1–500 for the projections.
-`revision` is a positive integer naming one stored object.
+`revision` is an integer in 1..=2,147,483,647 — Helm's own `Version int` domain
+— naming one stored object. The bound is enforced by this binding and not only
+by the host's input validation: a bound that only an outer layer checks is not
+enforced by the layer that publishes it.
 
 Input is closed. There is no all-namespaces mode, no cross-release listing, no
 label selector a caller supplies and no free-form field selector. `helm list`
@@ -84,31 +87,46 @@ the bodies of every Secret the release applied. Neither is disclosed.
 `helm_releases.values` returns one item per node of the recorded value
 structure: its dotted path, its JSON shape and a SHA-256 over the canonical JSON
 of its value. `helm_releases.manifest` returns one item per document of the
-rendered text: its position, its UTF-8 byte length and a SHA-256 over exactly
-the bytes that length counts. No stored scalar and no manifest byte appears in
-either result, at any depth, for any shape. There is no configuration, input or
+rendered text: its position, its UTF-8 byte length **as stored**, and a SHA-256
+over exactly those stored bytes. Nothing is stripped from a document — Helm's
+writer terminates every document with a newline, including the last
+(`action.go:358,476` in v4.3.0, `action.go:183` in v3.22.0, both pinned), so a
+document whose trailing newline were removed would not reproduce under
+`sha256sum` and the final document would be framed differently from every
+other. No stored scalar and no manifest byte appears in either result, at any
+depth, for any shape. There is no configuration, input or
 mode that discloses one; the projection **is** the disclosure, and a caller that
 needs the literal is asking for something this binding does not do.
 
 The two digests deliberately cover different bytes, because they exist for
 different things. `content_digest` exists to be **reproduced**: a reader holding
 the rendered document must get the same value from `sha256sum`, so it covers the
-document text itself and nothing else. `value_digest` exists to be **compared**:
+document exactly as stored between its separators and nothing else. `value_digest` exists to be **compared**:
 a recorded value is a JSON value, not a byte string, so it covers the canonical
 JSON of that value and two equal values therefore digest equally across
 revisions and across releases. Neither is a digest of the other's bytes, and
 neither is salted.
 
-**Unsalted means a digest confirms a guess.** A `value_digest` is a plain
-SHA-256 over a canonicalisation anyone can compute, so a holder of the
-projection can test a candidate literal offline and learn whether it is
-correct. This is a property of the comparison the projection is for, not an
-oversight: the two cannot both hold. What the projection therefore bounds is
-disclosure of a value an attacker cannot enumerate; what it does not do is
-protect a short, low-entropy or already-suspected value. A consumer must treat
-the result as it would treat the key names of a values file — safe to hold, not
-a secret — and an operator who needs a guessable credential kept from a reader
-of this output must not grant that reader `redacted_content`.
+**Both digests are unsalted, and an unsalted digest confirms a guess.** Each is
+a plain SHA-256 over a byte sequence anyone can compute, so a holder of either
+projection can test a candidate offline and learn whether it is correct. This
+is a property of the comparison and reproduction they exist for, not an
+oversight: a salted digest would do neither.
+
+For `value_digest` the guess is a recorded literal. For `content_digest` the
+guess is a whole rendered document, which sounds harder and is not always:
+a chart's templates are usually public, so the unknown part of a rendered
+document may be only the value injected into it — and `bytes` publishes that
+document's exact length, which narrows the search further. The manifest
+projection is therefore no stronger than the values projection, and in a public
+chart it can be weaker.
+
+What both projections bound is disclosure of something an attacker cannot
+enumerate; what neither does is protect a short, low-entropy or
+already-suspected value. A consumer must treat either result as it would treat
+the key names of a values file — safe to hold, not a secret — and an operator
+who needs a guessable credential kept from a reader of this output must not
+grant that reader `redacted_content`.
 
 The path is a display projection, not a selector: a recorded key containing `.`
 or `[` produces a path that cannot be parsed back unambiguously. The digest is
@@ -138,7 +156,13 @@ before the JSON is parsed, so a compressed payload cannot expand without bound.
 A single recorded container with more than 65,536 entries refuses the same way.
 The object is validated as a release record — type, owner, name, labels — before
 its payload is decompressed, so a foreign object under that name is never
-expanded. The decoded body must itself be a JSON object: a payload decoding to
+expanded. `metadata.namespace` and `metadata.resourceVersion` are read the same
+way: absent is an omission, and present in a shape this binding has not
+established is not. A numeric `metadata.namespace` does not fall back to the
+admitted selection, because that would report the caller's own input under a
+field this contract says is observed, and a numeric `metadata.resourceVersion`
+does not become a null `source_revision`, because that would report an absence
+nothing established. Both refuse. The decoded body must itself be a JSON object: a payload decoding to
 `null`, an array or a scalar refuses, because projecting it would report an
 empty, complete recorded-value set over a body nothing observed, which is the
 same unsound completeness claim this contract refuses one layer up. Where the
@@ -152,7 +176,18 @@ naming a different release must not be served under them.
 The two collection reads carry the provider's own continuation: a returned
 cursor is bound to the operation, namespace, release, deployed selection, limit
 and connection partition, and is unreadable under another. `complete` is true
-exactly when the provider issued no continuation. A page is an observation of a
+exactly when the provider issued no continuation.
+
+"Issued no continuation" means the key is absent or empty, and nothing else. A
+continuation the provider sent in a shape this binding has not established, and
+one whose issued cursor would exceed the bound the output schema declares for
+`next_cursor`, are both continuations: the page reports `complete:false` with a
+null cursor. That is truthful on both counts — the selection was not observed
+in full, and this binding cannot hand back a way to continue it. Reading either
+as "no continuation" would claim the whole selection was observed while the
+provider said otherwise. The collection's own `resourceVersion` has no such
+vocabulary — a page cannot say "the revision is unreadable" — so a present but
+unreadable value refuses instead of being attributed as no revision observed. A page is an observation of a
 mutable collection, and `complete` does not mean the history is the whole
 history Helm ever wrote — a storage driver prunes by max history, and this
 binding observes what is stored now.

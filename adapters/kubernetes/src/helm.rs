@@ -143,6 +143,20 @@ fn label<'a>(secret: &'a Value, name: &str) -> Option<&'a str> {
     secret["metadata"]["labels"][name].as_str()
 }
 
+/// One optional provider string, distinguishing three states the rest of this
+/// module must not conflate: `Some(Some(text))` present and readable,
+/// `Some(None)` genuinely absent, and `None` present in a shape this binding
+/// has not established — which is not an absence and must refuse. An explicit
+/// JSON null counts as present: the provider wrote something, and reporting it
+/// as "not recorded" would claim an absence nothing established.
+pub fn optional_string<'a>(object: &'a Value, key: &str) -> Option<Option<&'a str>> {
+    match object.get(key) {
+        None => Some(None),
+        Some(Value::String(text)) => Some(Some(text.as_str())),
+        Some(_) => None,
+    }
+}
+
 /// Read one release-Secret's metadata as a revision observation. Every field
 /// comes from the object's own name, type and labels; the payload is not
 /// decoded, because a revision record needs none of it.
@@ -160,8 +174,11 @@ pub fn revision(secret: &Value, namespace: &str, release: &str) -> Result<Revisi
     }
     // The observed namespace is what the object says it is. A mismatch with the
     // admitted selection still refuses, but an object that reports its own
-    // namespace is never re-labelled with the caller's input.
-    let observed = secret["metadata"]["namespace"].as_str();
+    // namespace is never re-labelled with the caller's input. A value that is
+    // present in a shape this binding has not established is not an omission,
+    // so the fallback is reached only when the key is genuinely absent.
+    let observed = optional_string(&secret["metadata"], "namespace")
+        .ok_or_else(|| protocol("release Secret namespace is not a string"))?;
     if observed.is_some_and(|value| value != namespace) {
         return Err(protocol("release Secret reports a different namespace"));
     }
@@ -185,7 +202,9 @@ pub fn revision(secret: &Value, namespace: &str, release: &str) -> Result<Revisi
     if name != object_name(release, number) || name.len() > MAX_OBJECT_NAME_BYTES {
         return Err(protocol("release Secret name does not match its labels"));
     }
-    let source_revision = match secret["metadata"]["resourceVersion"].as_str() {
+    let source_revision = match optional_string(&secret["metadata"], "resourceVersion")
+        .ok_or_else(|| protocol("release Secret resourceVersion is not a string"))?
+    {
         Some(value) if value.len() > MAX_SOURCE_REVISION_BYTES => {
             return Err(protocol(
                 "release Secret resourceVersion exceeds its declared bound",
@@ -408,11 +427,11 @@ pub fn manifest_documents(
         Some(_) => return Err(protocol("rendered release manifest is not text")),
     };
     let mut items = Vec::new();
-    let mut document = String::new();
     let mut complete = true;
-    let emit = |text: &str, items: &mut Vec<ManifestDocument>| -> bool {
-        let text = text.trim();
-        if text.is_empty() {
+    let emit = |stored: &str, items: &mut Vec<ManifestDocument>| -> bool {
+        // A chunk that is only whitespace is framing, not a document: the
+        // leading separator of every Helm-written manifest produces one.
+        if stored.trim().is_empty() {
             return true;
         }
         if items.len() == limit {
@@ -421,28 +440,40 @@ pub fn manifest_documents(
         items.push(ManifestDocument {
             source_secret: source_secret.to_owned(),
             index: items.len() as u32,
-            bytes: text.len() as u64,
-            // A SHA-256 over exactly the bytes `bytes` counts, so a consumer
-            // running sha256sum over the document reproduces it. This is the
-            // one digest in this module that exists to be reproduced; see
-            // `value_digest`, which exists to be compared.
-            content_digest: hex::encode(Sha256::digest(text.as_bytes())),
+            // Exactly the stored bytes between the separators, with nothing
+            // stripped — including the newline that terminates the document's
+            // last line, which Helm's writer emits for every document
+            // including the final one (`pkg/action/action.go:476`, pinned).
+            // A reader that extracts the document and runs sha256sum over it
+            // therefore reproduces `content_digest`, and `bytes` is the length
+            // of those same bytes. This is the one digest in this module that
+            // exists to be reproduced; see `value_digest`, which exists to be
+            // compared.
+            bytes: stored.len() as u64,
+            content_digest: hex::encode(Sha256::digest(stored.as_bytes())),
         });
         true
     };
-    for line in manifest.split('\n') {
-        if line.trim_end_matches('\r') == "---" {
-            if !emit(&document, &mut items) {
+    // Split on separator lines by byte range rather than by rebuilding lines,
+    // so each document is the stored bytes and not a reconstruction of them.
+    let mut start = 0usize;
+    let mut cursor = 0usize;
+    loop {
+        let newline = manifest[cursor..].find('\n').map(|offset| cursor + offset);
+        let line_end = newline.unwrap_or(manifest.len());
+        if manifest[cursor..line_end].trim_end_matches('\r') == "---" {
+            if !emit(&manifest[start..cursor], &mut items) {
                 complete = false;
                 break;
             }
-            document.clear();
-        } else {
-            document.push_str(line);
-            document.push('\n');
+            start = newline.map_or(manifest.len(), |at| at + 1);
+        }
+        match newline {
+            Some(at) => cursor = at + 1,
+            None => break,
         }
     }
-    if complete && !emit(&document, &mut items) {
+    if complete && !emit(&manifest[start..], &mut items) {
         complete = false;
     }
     Ok((items, complete))
@@ -532,7 +563,7 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].index, 0);
         assert_eq!(items[1].index, 1);
-        assert_eq!(items[1].bytes, "kind: Service".len() as u64);
+        assert_eq!(items[1].bytes, "kind: Service\n".len() as u64);
         let rendered = serde_json::to_string(&items).unwrap();
         for literal in ["literal", "kind: Secret", "Service"] {
             assert!(!rendered.contains(literal), "{literal} was disclosed");
@@ -553,16 +584,30 @@ mod tests {
     /// a case that names the bytes rather than a case that mirrors the code.
     #[test]
     fn each_published_digest_covers_exactly_the_bytes_its_documents_name() {
-        // content_digest: the document text, reproducible with sha256sum.
-        let text = "kind: Service\nmetadata:\n  name: api";
-        let (documents, _) =
-            manifest_documents("s", &json!({ "manifest": format!("---\n{text}\n") }), 10).unwrap();
-        assert_eq!(documents[0].bytes, text.len() as u64);
-        assert_eq!(
-            documents[0].content_digest,
-            hex::encode(Sha256::digest(text.as_bytes())),
-            "content_digest must be a SHA-256 over the document text itself"
-        );
+        // content_digest: the document exactly as stored between its
+        // separators, reproducible with sha256sum. Helm terminates every
+        // document with a newline, including the last, so the stored document
+        // includes it and this test names both stored documents in full.
+        let first = "# Source: a.yaml\napiVersion: v1\nkind: Secret\n";
+        let last = "# Source: b.yaml\napiVersion: v1\nkind: Service\n";
+        let manifest = format!("---\n{first}---\n{last}");
+        let (documents, _) = manifest_documents("s", &json!({ "manifest": manifest }), 10).unwrap();
+        assert_eq!(documents.len(), 2);
+        for (document, stored) in documents.iter().zip([first, last]) {
+            assert_eq!(
+                document.bytes,
+                stored.len() as u64,
+                "bytes must count the document as stored, trailing newline included"
+            );
+            assert_eq!(
+                document.content_digest,
+                hex::encode(Sha256::digest(stored.as_bytes())),
+                "content_digest must be a SHA-256 over the stored document bytes"
+            );
+        }
+        // The last document is framed exactly like the others: nothing about
+        // reaching end-of-file changes what its bytes are.
+        assert_eq!(documents[1].bytes, last.len() as u64);
 
         // value_digest: the canonical JSON of the value, comparable across
         // revisions. Key order in the source must not change it.
@@ -579,7 +624,7 @@ mod tests {
         let (again, _) = recorded_values("s", &json!({ "config": {"k": reordered} }), 10).unwrap();
         assert_eq!(values[0].value_digest, again[0].value_digest);
 
-        // The two are deliberately different functions of the same string.
+        // The two are deliberately different functions of the same input.
         let (one, _) = manifest_documents("s", &json!({"manifest": "---\nx\n"}), 10).unwrap();
         let (other, _) = recorded_values("s", &json!({"config": {"k": "x"}}), 10).unwrap();
         assert_ne!(one[0].content_digest, other[0].value_digest);
@@ -685,9 +730,22 @@ mod tests {
         assert!(revision(&at, "ns", "api").is_ok());
 
         let long = "n".repeat(64);
-        let mut wide = base;
+        let mut wide = base.clone();
         wide["metadata"]["namespace"] = json!(long.clone());
         assert!(revision(&wide, &long, "api").is_err());
+
+        // Present in a shape this binding has not established is not an
+        // omission, for either field, for any non-string shape.
+        for shape in [json!(123), json!(null), json!(true), json!([]), json!({})] {
+            for key in ["namespace", "resourceVersion"] {
+                let mut unreadable = base.clone();
+                unreadable["metadata"][key] = shape.clone();
+                assert!(
+                    revision(&unreadable, "ns", "api").is_err(),
+                    "{key} = {shape} was read as an omission"
+                );
+            }
+        }
     }
 
     /// A body that disagrees with the labels its provenance is built from is
