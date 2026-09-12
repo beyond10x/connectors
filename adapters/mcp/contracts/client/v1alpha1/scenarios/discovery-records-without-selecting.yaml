@@ -1,0 +1,33 @@
+# A lifecycle scenario of the outbound Streamable HTTP profile. Not an `ess-scenario/1`
+# trace: `connectors_mcp` declares no command, so there is no command outcome to name.
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:discovery
+outcome: mcp.outbound.server-described
+wire_code: n/a
+summary: A `server/discover` result is recorded exactly as reported and changes no field
+  of the binding.
+given:
+  - A binding configured for the primary revision (2026-07-28), the only revision that
+    defines a description request at all.
+  - An operator-configured binding whose endpoint, transport binding and revision are
+    already selected.
+  - A reachable server that answers `server/discover`.
+when:
+  - The client calls `server/discover`, which the server must implement
+    (mcp-2026-07-28-basic-versioning.mdx:73-78).
+  - The result names supported versions, advertised capability keys, a self-reported
+    identity and caching hints (mcp-2026-07-28-server-discover.mdx:33-60).
+then:
+  - Every reported string is recorded verbatim, including a version or capability key
+    neither pinned revision covers.
+  - The reported values are shown to the operator labelled as reported by the server.
+  - The binding's canonical_uri, transport_binding, determined_era and
+    selected_revision are unchanged.
+never:
+  - The self-reported identity changes what the client does; it is display data by its
+    own specification (mcp-2026-07-28-server-discover.mdx:103-107).
+  - A reported version becomes the selected revision.
+  - The observation implies a durable record; `McpServerBinding -> McpCapabilitySnapshot`
+    is UNMAPPED in story:mcp-domain-model.

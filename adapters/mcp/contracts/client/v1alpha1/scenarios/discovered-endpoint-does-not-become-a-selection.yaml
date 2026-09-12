@@ -1,0 +1,27 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:explicit-selection
+outcome: mcp.outbound.selection-refused-unconfigured-endpoint
+wire_code: route_refused
+summary: An endpoint proposed by anything other than operator configuration is refused,
+  and nothing is sent to it.
+given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); the refusal is the same on either.
+  - A configured binding for endpoint A.
+  - A discovery result, a redirect or a server instruction naming endpoint B.
+when:
+  - The client is offered endpoint B as the place to continue.
+then:
+  - The observable outcome is `route_refused`, naming endpoint B as declined and endpoint
+    A as the binding in force.
+  - No request is framed for endpoint B and no credential is offered to it.
+  - The binding's configuration is unchanged.
+never:
+  - An `endpoint` event of the deprecated HTTP+SSE transport is followed; the selection
+    matrix refuses `transport:http-sse-transport` outbound, and the fallback procedure
+    each revision describes — (mcp-2026-07-28-basic-transports-streamable-http.mdx:710-737)
+    and (mcp-2025-11-25-basic-transports.mdx:297-311) — stops at its first step on both.
+  - Discovered metadata escalates authority, which epic:mcp-contracts prohibits in as many
+    words.

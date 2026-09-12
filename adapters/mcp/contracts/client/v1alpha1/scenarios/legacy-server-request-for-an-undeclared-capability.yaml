@@ -1,0 +1,34 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:streaming
+outcome: mcp.outbound.legacy-server-request-refused
+wire_code: unsupported
+summary: A server request for a capability this client never declared is refused with a
+  code and an answer, not ignored and not performed.
+given:
+  - A binding configured for the interoperability revision (2025-11-25), where a server
+    MAY send JSON-RPC requests on the response stream
+    (mcp-2025-11-25-basic-transports.mdx:121-123).
+  - A client that declared no client capability at the handshake, because the selection
+    matrix refuses `roots`, `sampling` and `elicitation`.
+when:
+  - A server request that is not `ping` arrives on that stream — a sampling request, an
+    elicitation, a roots listing, or anything else the handshake did not negotiate.
+then:
+  - The observable outcome is `unsupported`, naming the method the server asked for and
+    the empty capability set this binding declared.
+  - A JSON-RPC error goes back in answer, so the server is not left waiting for a reply
+    this revision lets it expect.
+  - The act reported is the peer's, because a server may rely only on the capabilities
+    the handshake negotiated (mcp-2025-11-25-basic-lifecycle.mdx:186-212) and this one
+    relied on a capability that was never offered.
+  - The client's own request keeps whatever outcome its own answer produces.
+never:
+  - A model is sampled, an elicitation form is shown to a user, or a filesystem root is
+    disclosed because a server asked for one.
+  - The refusal is reported as this client's fault; the capability set was declared
+    openly at the handshake and the server asked past it.
+  - The same arrival reaches this outcome under the primary revision (2026-07-28), which
+    defines no channel for a server request and refuses it as
+    `mcp.outbound.framing-refused`.

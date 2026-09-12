@@ -1,0 +1,24 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:transport-unreachable
+outcome: mcp.outbound.transport-unavailable
+wire_code: unavailable
+summary: An endpoint that cannot be reached is `unavailable`, and nothing about a session
+  or a provider effect is claimed by it.
+given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); an endpoint that cannot be reached says nothing about which.
+  - A configured binding whose endpoint does not answer.
+when:
+  - The name does not resolve, the connection is refused, the TLS handshake fails, or
+    nothing answers within the connect bound.
+then:
+  - The observable outcome is `unavailable`, naming the configured endpoint and the
+    transport-level reason.
+  - No request was framed, so no outcome is uncertain.
+never:
+  - The outcome is `session_lost`; no session was involved, and the shared model declares
+    the two as separate variants of `connectors.service_wire.ErrorCode`.
+  - Unreachability is read as a statement about the versions or capabilities the endpoint
+    would have supported.
