@@ -78,49 +78,83 @@ fn archived(file: &str) -> String {
 
 // ── Derivation 1: protocol revisions ────────────────────────────────────────────────
 //
-// A revision is a protocol version string the archives state in a version-declaring
-// position. Four such positions exist across the 54 archived files, and they do not
-// agree with one another — that disagreement is the trap `specification-sources.md`
-// records, and a derivation that read only one of them would state the wrong version.
+// EVERY version-shaped token in the 54 archived files, minus the three kinds of token
+// that are stated not to be a protocol version.
+//
+// This derivation was rewritten after the adversary pass. It read four version-declaring
+// positions before — a schema constant, a `"protocolVersion"` field, an
+// `MCP-Protocol-Version` header value and the `supported` list — chosen by the same hand
+// that wrote the prose naming those four, so the prose and the code agreed with each
+// other by construction and neither could notice a fifth. One was missing: both pinned
+// revisions tell a peer to treat a request with no version header AS `2025-03-26`, and
+// that revision had no row while `2025-06-18`, which the archives state only as a header
+// example, had one. The instance was one absent row; the class is a hand-picked list of
+// positions that cannot report what it does not look at.
+//
+// So the list of positions is gone and an exhaustive scan with three stated exclusions
+// replaces it. A token matching no exclusion and having no row fails
+// `every_feature_the_pinned_specification_names_is_dispositioned_once_per_direction`,
+// which means a new token upstream gets a row or gets an exclusion rule and there is no
+// third outcome.
 
-fn derived_revisions() -> BTreeSet<String> {
+/// A stated reason a version-shaped token is not a protocol revision. Each is a property
+/// of where the token sits, not a denylisted string, and the matrix states all three.
+const EXCLUSIONS: [(&str, &str); 3] = [
+    ("ISO 8601 timestamp", "the next character is `T`"),
+    (
+        "feature-lifecycle date",
+        "the token is preceded by `on or after `",
+    ),
+    (
+        "deliberately unsupported version",
+        "the token is preceded by `\"requested\": \"`",
+    ),
+];
+
+/// `Some(index into EXCLUSIONS)` when this occurrence is not a protocol version.
+fn excluded_at(text: &str, start: usize, end: usize) -> Option<usize> {
+    if text[end..].starts_with('T') {
+        return Some(0);
+    }
+    if text[..start].ends_with("on or after ") {
+        return Some(1);
+    }
+    if text[..start].ends_with("\"requested\": \"") {
+        return Some(2);
+    }
+    None
+}
+
+fn version_shaped() -> regex::Regex {
+    regex::Regex::new(r"\d{4}-\d{2}-\d{2}|DRAFT-[0-9A-Za-z][0-9A-Za-z-]*").unwrap()
+}
+
+/// `(revisions, how many occurrences each exclusion removed)`.
+fn scanned_revisions() -> (BTreeSet<String>, [usize; 3]) {
+    let token = version_shaped();
     let mut found = BTreeSet::new();
-
-    // (a) The negotiable strings, as the PRIMARY revision states them: the `supported`
-    //     list of its `UnsupportedProtocolVersionError` example.
-    let versioning = archived("mcp-2026-07-28-basic-versioning.mdx");
-    let start = versioning
-        .find("\"supported\": [")
-        .expect("the primary revision's versioning document has no `supported` list")
-        + "\"supported\": [".len();
-    let tail = &versioning[start..];
-    let end = tail.find(']').expect("unterminated `supported` list");
-    for (index, quoted) in tail[..end].split('"').enumerate() {
-        if index % 2 == 1 {
-            found.insert(quoted.to_string());
+    let mut removed = [0usize; 3];
+    for entry in manifest_entries() {
+        let text = archived(&manifest_field(&entry, "file"));
+        for matched in token.find_iter(&text) {
+            match excluded_at(&text, matched.start(), matched.end()) {
+                Some(rule) => removed[rule] += 1,
+                None => {
+                    found.insert(matched.as_str().to_string());
+                }
+            }
         }
     }
     assert!(
         found.len() >= 2,
-        "the `supported` list parsed to {found:?}, which cannot be the negotiable set"
+        "the archives yielded {found:?}, which cannot be the revision set; the scan is \
+         broken and every case that reads it proves nothing"
     );
+    (found, removed)
+}
 
-    // (b) Every version string any archived file declares as a schema constant, as the
-    //     `protocolVersion` of a message, or as an `MCP-Protocol-Version` header value.
-    let constant = regex::Regex::new(r#"LATEST_PROTOCOL_VERSION\s*=\s*"([^"]+)""#).unwrap();
-    let body = regex::Regex::new(r#""protocolVersion"\s*:\s*"([^"]+)""#).unwrap();
-    let header =
-        regex::Regex::new(r"MCP-Protocol-Version:[ \t]+([0-9A-Za-z][0-9A-Za-z._-]*)").unwrap();
-    for entry in manifest_entries() {
-        let text = archived(&manifest_field(&entry, "file"));
-        for pattern in [&constant, &body, &header] {
-            for capture in pattern.captures_iter(&text) {
-                found.insert(capture[1].to_string());
-            }
-        }
-    }
-
-    found
+fn derived_revisions() -> BTreeSet<String> {
+    scanned_revisions().0
 }
 
 // ── Derivation 2: transports ────────────────────────────────────────────────────────
@@ -306,22 +340,28 @@ fn declared_fields(body: &str, prefix: &str, found: &mut BTreeSet<String>) {
     }
 }
 
-/// `(row keys, nested settings paths)`.
-fn derived_capabilities() -> (BTreeSet<String>, BTreeSet<String>) {
+/// `(row keys, nested settings paths per side)`.
+///
+/// The nested half is keyed by **side**, not unioned across the two. Unioning satisfied a
+/// path declared by both interfaces for both sides from one mention on either, which let
+/// `tasks.list` and `tasks.cancel` be declared by `ClientCapabilities` and named only in
+/// the server paragraph. The matrix's own promise is that a setting is named in the row
+/// that carries it, and a row on the other side does not carry it.
+fn derived_capabilities() -> (BTreeSet<String>, BTreeMap<&'static str, BTreeSet<String>>) {
     let mut keys = BTreeSet::new();
-    let mut nested = BTreeSet::new();
-    for side in ["server", "client"] {
+    let mut nested: BTreeMap<&'static str, BTreeSet<String>> = BTreeMap::new();
+    for (side, interface) in [
+        ("server", "ServerCapabilities"),
+        ("client", "ClientCapabilities"),
+    ] {
+        let per_side = nested.entry(side).or_default();
         for revision in [PRIMARY, INTEROP] {
             let schema = strip_comments(&archived(&format!("mcp-{revision}-schema.ts")));
-            let interface = match side {
-                "server" => "ServerCapabilities",
-                _ => "ClientCapabilities",
-            };
             let mut fields = BTreeSet::new();
             declared_fields(&interface_body(&schema, interface), "", &mut fields);
             for path in fields {
                 if path.contains('.') {
-                    nested.insert(path);
+                    per_side.insert(path);
                 } else {
                     keys.insert(format!("capability:{side}/{path}"));
                 }
@@ -329,6 +369,84 @@ fn derived_capabilities() -> (BTreeSet<String>, BTreeSet<String>) {
         }
     }
     (keys, nested)
+}
+
+/// Every authored model file of the `connectors_mcp` root, as one normalised string.
+///
+/// `story:mcp-domain-model` carries the `UNMAPPED:` markers this matrix quotes, in YAML
+/// comments, wrapped across lines with backticks around identifiers. Normalising both
+/// sides is what lets a marker quoted in a table cell be compared with the marker as the
+/// model wrote it.
+fn model_text() -> String {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../adapters/mcp/spec/ess");
+    let mut joined = String::new();
+    let mut files = 0usize;
+    let mut stack = vec![root.clone()];
+    while let Some(directory) = stack.pop() {
+        let entries = std::fs::read_dir(&directory)
+            .unwrap_or_else(|e| panic!("read dir {}: {e}", directory.display()));
+        for entry in entries {
+            let path = entry.expect("directory entry").path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|kind| kind == "yaml") {
+                joined.push_str(
+                    &std::fs::read_to_string(&path)
+                        .unwrap_or_else(|e| panic!("read {}: {e}", path.display())),
+                );
+                joined.push('\n');
+                files += 1;
+            }
+        }
+    }
+    assert!(
+        files >= 3,
+        "only {files} authored model file(s) were read under {}; the marker check would \
+         pass vacuously",
+        root.display()
+    );
+    normalise(&joined)
+}
+
+/// Lowercased, backticks and YAML comment markers removed, unicode arrows written `->`,
+/// and every run of whitespace collapsed to one space.
+fn normalise(text: &str) -> String {
+    let flattened: String = text
+        .replace('→', "->")
+        .replace('`', "")
+        .lines()
+        .map(|line| line.trim().trim_start_matches('#').trim())
+        .collect::<Vec<_>>()
+        .join(" ");
+    flattened
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The `## <heading>` section of the matrix, up to the next `## ` heading.
+fn section(document: &str, heading: &str) -> String {
+    let mut collecting = false;
+    let mut collected = String::new();
+    for line in document.lines() {
+        if line.starts_with("## ") {
+            if collecting {
+                break;
+            }
+            collecting = line.trim() == heading;
+            continue;
+        }
+        if collecting {
+            collected.push_str(line);
+            collected.push('\n');
+        }
+    }
+    assert!(
+        !collected.trim().is_empty(),
+        "selection.md has no `{heading}` section"
+    );
+    collected
 }
 
 fn derived_keys() -> BTreeSet<String> {
@@ -556,33 +674,225 @@ fn each_row_carries_a_named_disposition_a_reason_and_a_resolvable_source_line() 
     );
 }
 
-/// Nested capability settings are not dropped on the way to a row.
+/// Nested capability settings are not dropped on the way to a row, **on their own side**.
 ///
-/// A top-level capability takes a row; `resources.subscribe` and its fifteen siblings are
+/// A top-level capability takes a row; `resources.subscribe` and its twenty siblings are
 /// settings of an advertised capability rather than separately advertisable capabilities,
-/// so the matrix names them inside the rows that carry them. This case holds that
-/// distinction to the same standard as the rows: every nested field either pinned schema
-/// declares must appear in the document as an inline-code path, which a longer path
-/// containing it as a substring does not satisfy.
+/// so the matrix names them inside the rows that carry them. Each must appear as an
+/// inline-code path, which a longer path containing it as a substring does not satisfy,
+/// **in the section for the side whose schema declares it**.
+///
+/// The side qualification is the correction. Unioning the two sides into one flat set of
+/// eighteen bare paths let a path declared by both interfaces be satisfied for both by one
+/// mention on either, and `tasks.list` and `tasks.cancel` — declared by
+/// `ClientCapabilities` — were named only in the server paragraph. Twenty-one
+/// side-qualified paths replace the eighteen unioned ones.
 #[test]
-fn every_nested_capability_setting_the_pinned_schemas_declare_is_named_by_the_matrix() {
+fn every_nested_capability_setting_is_named_in_the_section_of_the_side_that_declares_it() {
     let document = matrix();
     let (_, nested) = derived_capabilities();
+    let derived: usize = nested.values().map(BTreeSet::len).sum();
     assert!(
-        !nested.is_empty(),
-        "no nested capability setting was derived; the schema parse is broken"
+        derived >= 18,
+        "only {derived} nested capability settings were derived; the schema parse is \
+         broken and this case proves nothing"
     );
-    let unnamed: Vec<&String> = nested
-        .iter()
-        .filter(|path| !document.contains(&format!("`{path}`")))
-        .collect();
+
+    let sections = BTreeMap::from([
+        ("server", section(&document, "## Server capabilities")),
+        ("client", section(&document, "## Client capabilities")),
+    ]);
+    let mut unnamed = Vec::new();
+    for (side, paths) in &nested {
+        for path in paths {
+            if !sections[side].contains(&format!("`{path}`")) {
+                unnamed.push(format!(
+                    "`{path}` is declared by a {side} capability interface and is named \
+                     nowhere in the matrix's `## {} capabilities` section",
+                    if *side == "server" {
+                        "Server"
+                    } else {
+                        "Client"
+                    }
+                ));
+            }
+        }
+    }
     assert!(
         unnamed.is_empty(),
-        "{} of the {} nested capability settings the pinned schemas declare are named \
-         nowhere in the matrix: {:?}",
+        "{} of the {derived} side-qualified nested settings are named outside the section \
+         that dispositions them:\n  {}",
         unnamed.len(),
-        nested.len(),
-        unnamed
+        unnamed.join("\n  ")
+    );
+}
+
+/// Every `UNMAPPED:` marker the matrix quotes exists verbatim in the authored model, and
+/// every `deferred` row rests on a record that is opened and checked.
+///
+/// This is the other half of the document's own definition of `deferred` — "an open
+/// `decision-blocker:`, **or** an `UNMAPPED:` marker" — which for one round was enforced
+/// nowhere while the blocker half was enforced here. The blocker half is now held by
+/// `mcp_profile_selection_matrix_adversary.rs`, which opens the blocker's record in the
+/// planning store; this case holds the marker half against the model, so a deferral can no
+/// longer rest on a marker that was paraphrased, misattributed or invented.
+///
+/// Three `supported` rows also quote a marker. There it is a scope disclaimer — which
+/// question the row does not answer, not which question stops it — so the
+/// verbatim-existence rule applies to every quoted marker and the names-the-feature rule
+/// applies only to deferred rows. The matrix states that split under its definition of
+/// `deferred`.
+#[test]
+fn every_deferred_row_names_a_record_and_every_quoted_marker_exists_in_the_model() {
+    let model = model_text();
+    let quoted = regex::Regex::new(r"`(UNMAPPED: [^`]+)`").unwrap();
+
+    let mut broken = Vec::new();
+    let mut deferred_rows = 0usize;
+    let mut markers_checked = 0usize;
+    for row in rows() {
+        let markers: Vec<String> = quoted
+            .captures_iter(&row.reason)
+            .map(|capture| normalise(&capture[1]))
+            .filter(|marker| marker != "unmapped:")
+            .collect();
+        for marker in &markers {
+            markers_checked += 1;
+            if !model.contains(marker) {
+                broken.push(format!(
+                    "selection.md:{} `{}` quotes `{marker}`, which appears in no file \
+                     under adapters/mcp/spec/ess/",
+                    row.line, row.key
+                ));
+            }
+        }
+        if row.disposition != "deferred" {
+            continue;
+        }
+        deferred_rows += 1;
+        let names_blocker = row.reason.contains("decision-blocker:");
+        if !names_blocker && markers.is_empty() {
+            broken.push(format!(
+                "selection.md:{} `{}` ({}) is deferred and names neither an open \
+                 decision-blocker nor an UNMAPPED marker, so nothing says who decides it",
+                row.line, row.key, row.direction
+            ));
+            continue;
+        }
+        if names_blocker {
+            // The blocker half is checked against the planning store by
+            // mcp_profile_selection_matrix_adversary.rs.
+            continue;
+        }
+        // The marker has to reach the feature, not merely exist. `tasks` matches a marker
+        // naming tasks; `extensions` matches one naming an extension identifier.
+        let feature = row.key.rsplit('/').next().unwrap_or(&row.key);
+        let stem = feature.strip_suffix('s').unwrap_or(feature);
+        if !markers.iter().any(|marker| marker.contains(stem)) {
+            broken.push(format!(
+                "selection.md:{} `{}` ({}) is deferred against {markers:?}, none of which \
+                 names {stem:?} — the marker does not reach the feature it defers",
+                row.line, row.key, row.direction
+            ));
+        }
+    }
+
+    assert!(
+        deferred_rows > 0 && markers_checked > 0,
+        "no deferred row and no quoted marker were seen ({deferred_rows} deferred, \
+         {markers_checked} markers); this case proves nothing"
+    );
+    assert!(
+        broken.is_empty(),
+        "{} deferrals or quoted markers do not hold:\n  {}",
+        broken.len(),
+        broken.join("\n  ")
+    );
+}
+
+/// The capability derivation's own premise: each pinned schema declares exactly the two
+/// capability interfaces this matrix reads, and every field of both is optional.
+///
+/// Derivation 3 takes optional fields of `ServerCapabilities` and `ClientCapabilities`. If
+/// a schema declared a third capability interface, or a required field, the rule would
+/// miss a capability and no other case would notice — the same shape of hole the revision
+/// derivation had. The adversary established both by hand for this pin; this case
+/// establishes them from the bytes, so they hold for the next pin too.
+#[test]
+fn each_pinned_schema_declares_exactly_two_capability_interfaces_with_optional_fields() {
+    let declaration =
+        regex::Regex::new(r"export interface ([A-Za-z0-9_]*Capabilities) \{").unwrap();
+    let index_signature = regex::Regex::new(r"\[[^\]]*\]").unwrap();
+    let required_field = regex::Regex::new(r"[A-Za-z0-9_$][ \t]*:").unwrap();
+
+    let mut broken = Vec::new();
+    for revision in [PRIMARY, INTEROP] {
+        let schema = strip_comments(&archived(&format!("mcp-{revision}-schema.ts")));
+        let declared: BTreeSet<String> = declaration
+            .captures_iter(&schema)
+            .map(|capture| capture[1].to_string())
+            .collect();
+        let expected = BTreeSet::from([
+            "ClientCapabilities".to_string(),
+            "ServerCapabilities".to_string(),
+        ]);
+        if declared != expected {
+            broken.push(format!(
+                "mcp-{revision}-schema.ts declares capability interfaces {declared:?}, not \
+                 the two derivation 3 reads"
+            ));
+            continue;
+        }
+        for interface in &expected {
+            let body = interface_body(&schema, interface);
+            let without_indexes = index_signature.replace_all(&body, "[]");
+            for found in required_field.find_iter(&without_indexes) {
+                let context = &without_indexes[found.start().saturating_sub(40)..found.end()];
+                broken.push(format!(
+                    "mcp-{revision}-schema.ts `{interface}` declares a field that is not \
+                     optional, so the optional-field rule would miss it: …{}",
+                    context.replace('\n', " ").trim()
+                ));
+            }
+        }
+    }
+    assert!(
+        broken.is_empty(),
+        "{} premises of the capability derivation do not hold:\n  {}",
+        broken.len(),
+        broken.join("\n  ")
+    );
+}
+
+/// The three revision exclusions the matrix states are the three the scan applies, and
+/// each still removes something.
+///
+/// The exhaustive scan is only as good as its exclusions being stated and load-bearing. A
+/// rule that stopped matching would silently widen the revision set; a rule the document
+/// dropped would leave the code excluding a token on no stated authority.
+#[test]
+fn every_revision_exclusion_is_stated_by_the_matrix_and_still_removes_a_token() {
+    let normalised = normalise(&matrix());
+    let (_, removed) = scanned_revisions();
+    let mut broken = Vec::new();
+    for (index, (name, rule)) in EXCLUSIONS.iter().enumerate() {
+        if !normalised.contains(&normalise(rule)) {
+            broken.push(format!(
+                "the scan excludes a token when {rule}, and the matrix states no such rule"
+            ));
+        }
+        if removed[index] == 0 {
+            broken.push(format!(
+                "the `{name}` exclusion removed no token from the archives; it is dead and \
+                 either the archives changed or the rule is wrong"
+            ));
+        }
+    }
+    assert!(
+        broken.is_empty(),
+        "{} revision exclusions do not hold:\n  {}",
+        broken.len(),
+        broken.join("\n  ")
     );
 }
 
