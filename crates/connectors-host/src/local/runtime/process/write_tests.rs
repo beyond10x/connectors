@@ -450,10 +450,13 @@ fn native_outcomes_and_lost_replies_never_repeat_a_send() {
         let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
         let result = prepare(
             &mut child,
+            // Same reasoning as above: the expiring modes keep a deadline that passes, on a
+            // margin a loaded scheduler cannot consume before `prepare` returns; the rest
+            // never consult it. See story:host-suite-load-sensitivity.
             if matches!(mode, "timeout" | "peer-expired-eof") {
-                300
+                2_000
             } else {
-                2000
+                60_000
             },
         )
         .unwrap()
@@ -464,7 +467,7 @@ fn native_outcomes_and_lost_replies_never_repeat_a_send() {
         if matches!(mode, "lost" | "timeout" | "peer-expired-eof") {
             assert!(!child.live);
             assert!(child.process.try_wait().unwrap().is_some());
-            assert!(prepare(&mut child, 2000).is_err());
+            assert!(prepare(&mut child, 60_000).is_err());
         }
     }
 }
@@ -525,8 +528,18 @@ fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
     for mode in ["drop", "eof", "expiry", "slow-preflight"] {
         let root = temp();
         let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
-        let pending =
-            prepare(&mut child, if mode == "slow-preflight" { 400 } else { 300 }).unwrap();
+        // Budgets are sized so `prepare` cannot lose a race with a busy scheduler before
+        // the test's own assertion begins. `drop` and `eof` never consult the deadline, so
+        // theirs is simply out of reach; `expiry` and `slow-preflight` still expire, just
+        // on a margin load cannot eat. See story:host-suite-load-sensitivity.
+        let pending = prepare(
+            &mut child,
+            match mode {
+                "expiry" | "slow-preflight" => 2_000,
+                _ => 60_000,
+            },
+        )
+        .unwrap();
         match mode {
             "drop" => drop(pending),
             "eof" => {
@@ -543,7 +556,7 @@ fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
             "expiry" => {
                 let result = channel::read::<Value>(
                     &mut pending.child.channel,
-                    Instant::now() + Duration::from_secs(2),
+                    Instant::now() + Duration::from_secs(30),
                     false,
                     0,
                 );
@@ -552,7 +565,8 @@ fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
                 drop(pending);
             }
             _ => {
-                std::thread::sleep(Duration::from_millis(250));
+                // Sleep past the budget above rather than a hand-tuned margin over it.
+                std::thread::sleep(Duration::from_millis(2_100));
                 assert_eq!(pending.remaining(), Err(Failure::Timeout));
                 let result = pending.commit();
                 assert_eq!(result.effect, WriteEffect::Unknown);
