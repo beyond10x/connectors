@@ -4,24 +4,33 @@ document: adapters/mcp/contracts/client/v1alpha1/semantics.md
 state: state:framing
 outcome: mcp.outbound.request-framed
 wire_code: n/a
-summary: One JSON-RPC message is one POST whose mirrored headers agree with the body they
-  mirror.
+summary: One JSON-RPC message is one POST, and what its headers must agree with is one
+  thing under the primary revision and another under the interoperability revision.
 given:
   - A binding configured for the primary revision (2026-07-28); under the
     interoperability revision (2025-11-25) the mirrored headers are `MCP-Protocol-Version`
     and any assigned `MCP-Session-Id` instead.
   - A binding configured for `transport:streamable-http`.
 when:
-  - The client sends a request and, separately, a notification
-    (mcp-2026-07-28-basic-transports-streamable-http.mdx:70-91).
+  - The client sends a request and, separately, a notification — one POST each on either
+    revision (mcp-2026-07-28-basic-transports-streamable-http.mdx:70-91,
+    mcp-2025-11-25-basic-transports.mdx:90-106).
 then:
   - Each message is its own POST, and its `Accept` header offers both of the media types
     the transport defines.
-  - The three mirrored headers `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` agree
-    byte-for-byte with the body they mirror (mcp-2026-07-28-basic-transports-streamable-http.mdx:250-261 and 286-293).
-  - The body `_meta` carries the required protocol version and client capabilities on
-    every request (mcp-2026-07-28-basic-index.mdx:373-382).
+  - Under the primary revision (2026-07-28) the three mirrored headers
+    `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` agree byte-for-byte with the body
+    they mirror (mcp-2026-07-28-basic-transports-streamable-http.mdx:250-261 and 286-293),
+    whose metadata carries the protocol version and the client capabilities on every
+    request (mcp-2026-07-28-basic-index.mdx:373-382).
+  - Under the interoperability revision (2025-11-25) there is no such mirror. The headers
+    are `MCP-Protocol-Version` on every request after the handshake
+    (mcp-2025-11-25-basic-transports.mdx:267-274) and the `MCP-Session-Id` the server
+    assigned, echoed on all of them (mcp-2025-11-25-basic-transports.mdx:208-210).
   - The notification is answered `202 Accepted` with no body.
 never:
-  - A JSON-RPC response is sent as a request body.
+  - A JSON-RPC response is sent as a request body under the primary revision (2026-07-28),
+    which forbids it (mcp-2026-07-28-basic-transports-streamable-http.mdx:70-91); under
+    the interoperability revision (2025-11-25) exactly one kind is, the answer to a server
+    request (mcp-2025-11-25-basic-transports.mdx:96-102).
   - Two JSON-RPC messages share one POST.

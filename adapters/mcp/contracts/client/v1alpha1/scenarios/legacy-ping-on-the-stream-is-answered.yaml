@@ -2,10 +2,11 @@ type: mcp-outbound-lifecycle/1
 story: story:mcp-outbound-connection-lifecycle
 document: adapters/mcp/contracts/client/v1alpha1/semantics.md
 state: state:streaming
-outcome: mcp.outbound.legacy-server-request-answered
+outcome: mcp.outbound.legacy-ping-answered
 wire_code: n/a
-summary: A server request this revision makes the client answer is answered, and nothing
-  a server did not ask for is answered on a user's behalf.
+summary: The one server request this revision makes the client answer is answered, and
+  a server request of any other kind is a different outcome, not a second half of this
+  one.
 given:
   - A binding configured for the interoperability revision (2025-11-25), where the server
     MAY send JSON-RPC requests on the response stream before the response
@@ -18,16 +19,13 @@ when:
 then:
   - An empty result goes back promptly, as a JSON-RPC response in the body of its own
     POST, carrying nothing else (mcp-2025-11-25-basic-utilities-ping.mdx:31-39).
-  - A server request that is not `ping` is answered with a JSON-RPC error naming the
-    client capability that was never declared, because a server may rely only on the
-    capabilities the handshake negotiated
-    (mcp-2025-11-25-basic-lifecycle.mdx:186-212).
   - The client's own request keeps whatever outcome its own answer produces; answering a
     server is not an answer to it.
 never:
-  - A model is sampled, an elicitation form is shown to a user, or a filesystem root is
-    disclosed because a server asked for one.
-  - A server request is silently dropped, leaving the server waiting for an answer this
-    revision says it may expect.
+  - A server request that is not `ping` reaches this outcome; it is
+    `mcp.outbound.legacy-server-request-refused`, which carries a code and names whose
+    act it reports.
+  - A `ping` is silently dropped, leaving the server waiting for an answer this revision
+    says it may expect.
   - The same arrival is answered under the primary revision (2026-07-28), which defines no
     channel for it and refuses it as `mcp.outbound.framing-refused`.

@@ -23,7 +23,9 @@ owned by `contracts/service/compatibility.md`. An outcome that is not a refusal 
 **whose act it reports**, because a code that blames the wrong party is a truthful-looking
 lie: `peer` for something the server did, `client` for something this repository or an
 intermediary on its side did, `operator` for something only configuration decides,
-`unobserved` where nothing was seen at all.
+`unobserved` where nothing was seen at all. Each refusal below says the same thing in its
+own section, in one sentence beginning *The act reported is* — a column no prose repeats
+is a label nobody has checked.
 
 ## Which revision a passage holds for
 
@@ -61,14 +63,15 @@ is a defect in this table rather than a silent gap.
 | `state:framing` | `mcp.outbound.framing-refused` | `upstream_protocol` | peer | [`unreadable-answer-is-not-the-callers-input.yaml`](scenarios/unreadable-answer-is-not-the-callers-input.yaml) |
 | `state:framing` | `mcp.outbound.header-mismatch-reported-by-the-server` | `internal` | client | [`header-body-mismatch-is-not-the-callers-input.yaml`](scenarios/header-body-mismatch-is-not-the-callers-input.yaml) |
 | `state:streaming` | `mcp.outbound.stream-opened` | `n/a` | n/a | [`streamed-answer-carries-only-its-own-request.yaml`](scenarios/streamed-answer-carries-only-its-own-request.yaml) |
-| `state:streaming` | `mcp.outbound.legacy-server-request-answered` | `n/a` | n/a | [`legacy-ping-on-the-stream-is-answered.yaml`](scenarios/legacy-ping-on-the-stream-is-answered.yaml) |
+| `state:streaming` | `mcp.outbound.legacy-ping-answered` | `n/a` | n/a | [`legacy-ping-on-the-stream-is-answered.yaml`](scenarios/legacy-ping-on-the-stream-is-answered.yaml) |
+| `state:streaming` | `mcp.outbound.legacy-server-request-refused` | `unsupported` | peer | [`legacy-server-request-for-an-undeclared-capability.yaml`](scenarios/legacy-server-request-for-an-undeclared-capability.yaml) |
 | `state:streaming` | `mcp.outbound.stream-ended-without-an-answer` | `outcome_unknown` | unobserved | [`stream-ends-without-a-final-response.yaml`](scenarios/stream-ends-without-a-final-response.yaml) |
 | `state:progress` | `mcp.outbound.progress-observed` | `n/a` | n/a | [`progress-is-display-only-and-bounded.yaml`](scenarios/progress-is-display-only-and-bounded.yaml) |
 | `state:cancellation` | `mcp.outbound.cancelled-by-closing-the-stream` | `n/a` | n/a | [`cancellation-closes-the-response-stream.yaml`](scenarios/cancellation-closes-the-response-stream.yaml) |
 | `state:cancellation` | `mcp.outbound.legacy-cancellation-notified` | `n/a` | n/a | [`legacy-cancellation-is-sent-not-implied.yaml`](scenarios/legacy-cancellation-is-sent-not-implied.yaml) |
 | `state:session-loss` | `mcp.outbound.session-lost` | `session_lost` | peer | [`legacy-session-loss-is-not-a-new-session.yaml`](scenarios/legacy-session-loss-is-not-a-new-session.yaml) |
-| `state:transport-unreachable` | `mcp.outbound.transport-unavailable` | `unavailable` | peer | [`unreachable-endpoint-is-unavailable-not-loss.yaml`](scenarios/unreachable-endpoint-is-unavailable-not-loss.yaml) |
-| `state:transport-unreachable` | `mcp.outbound.answer-never-arrived` | `outcome_unknown` | unobserved | [`single-object-answer-lost-in-flight.yaml`](scenarios/single-object-answer-lost-in-flight.yaml) |
+| `state:transport-unreachable` | `mcp.outbound.transport-unavailable` | `unavailable` | unobserved | [`unreachable-endpoint-is-unavailable-not-loss.yaml`](scenarios/unreachable-endpoint-is-unavailable-not-loss.yaml) |
+| `state:connection-lost-in-flight` | `mcp.outbound.answer-never-arrived` | `outcome_unknown` | unobserved | [`single-object-answer-lost-in-flight.yaml`](scenarios/single-object-answer-lost-in-flight.yaml) |
 | `state:shutdown` | `mcp.outbound.shutdown-completed` | `n/a` | n/a | [`shutdown-closes-every-stream-it-opened.yaml`](scenarios/shutdown-closes-every-stream-it-opened.yaml) |
 
 The scenario files are not `ess-scenario/1` traces. `connectors_mcp` declares no command
@@ -153,8 +156,10 @@ configured binding that was in force. This is what happens when anything other t
 operator configuration proposes an endpoint: a URL inside a discovery result, a redirect
 to a second origin, a server-supplied instruction, an `endpoint` event of the deprecated
 HTTP+SSE transport. No request is sent to the declined endpoint, no credential is
-offered to it, and the configured binding is left exactly as it was. An operator
-reconfiguration is a new interaction, not a continuation of this one.
+offered to it, and the configured binding is left exactly as it was. The act reported is
+the operator's: an endpoint is in the binding or it is not, and only a configuration an
+operator wrote puts it there. An operator reconfiguration is a new interaction, not a
+continuation of this one.
 
 ## 3. What `initialize` negotiates
 
@@ -197,8 +202,9 @@ An observer sees `unsupported`, naming the revision the server answered with and
 revision the binding is configured for, and the connection closed. The interoperability
 revision permits the server to answer with a different version of its own choosing and
 tells a client that cannot use it to disconnect (`mcp-2025-11-25-basic-lifecycle.mdx:167-177`);
-Connectors disconnects for a stricter reason as well — the answered revision was not
-selected by an operator, and a server's answer is not a selection. No second handshake is
+The act reported is the peer's: the server chose a version of its own. Connectors
+disconnects for a stricter reason as well — the answered revision was not selected by an
+operator, and a server's answer is not a selection. No second handshake is
 opened, no second revision is offered, and no request is carried out under the revision
 the server named.
 
@@ -236,8 +242,9 @@ and — where the revision defines one, which is the primary revision alone — 
 `supported` list the server reported, shown as empty where the interoperability revision's
 bare `400` carried none. A reported list may name strings no pinned revision covers, such
 as `2025-06-18` or `2024-11-05`, which are shown as reported and are not offered as
-choices the client will take on its own. The request that met the mismatch is
-not carried out and no other version is declared on its behalf. An operator who wants one
+choices the client will take on its own. The act reported is the peer's: a server that
+does not implement the version it was asked for said so. The request that met the mismatch
+is not carried out and no other version is declared on its behalf. An operator who wants one
 of the reported versions changes the binding's configuration, and that is a new
 interaction with its own record.
 
@@ -249,10 +256,11 @@ dual-era client to inspect before deciding what the server is
 (`mcp-2026-07-28-basic-transports-streamable-http.mdx:650-668`,
 `mcp-2026-07-28-basic-versioning.mdx:126-146`). Connectors reads the body for the same
 reason and stops at the same point: a recognised modern error is the refusal above, and
-anything else is this outcome. A binding configured for one revision does not begin
-speaking another because an answer was unreadable, and the deprecated HTTP+SSE transport
-is never reached — the selection matrix refuses `transport:http-sse-transport` outbound,
-and the fallback that would have landed there
+anything else is this outcome. The act reported is the peer's: it answered, and what it
+answered was not readable as this protocol. A binding configured for one revision does not
+begin speaking another because an answer was unreadable, and the deprecated HTTP+SSE
+transport is never reached — the selection matrix refuses `transport:http-sse-transport`
+outbound, and the fallback that would have landed there
 (`mcp-2026-07-28-basic-transports-streamable-http.mdx:710-737`) is declined at its first
 step. Era remains a property of the server rather than of a request
 (`mcp-2026-07-28-basic-versioning.mdx:148-152`), and this outcome is where a probe of it
@@ -292,8 +300,9 @@ the `requiredCapabilities` list the server named. Nothing is auto-answered on a 
 behalf: no elicitation form is filled in, no default is supplied, no model is sampled,
 and no filesystem root is invented. The capability is not declared on a second attempt in
 order to get past the refusal, because whether Connectors declares it at all is the
-selection matrix's decision and not this document's. The caller learns which capability
-the server wanted, which is the actionable half.
+selection matrix's decision and not this document's. The act reported is the peer's: the
+server required something of a client that never offered it. The caller learns which
+capability the server wanted, which is the actionable half.
 
 ### `mcp.outbound.advertised-capability-recorded-not-projected`
 
@@ -351,8 +360,9 @@ and it carries nothing else.
 
 An observer sees `upstream_protocol`, carrying the endpoint, the HTTP status and what was
 unreadable: a body that is not readable as JSON-RPC, or an answer whose media type is
-neither of the two the transport defines. Both are the peer's act, on either revision —
-the client offered both media types and the answer was neither one of them nor readable —
+neither of the two the transport defines. The act reported is the peer's, on either
+revision — the client offered both media types and the answer was neither one of them nor
+readable —
 and it is deliberately **not** `invalid_input`: the caller supplied no framing, so blaming
 the caller's input for a framing disagreement would be a false attribution. The caller's
 request is not carried out. What a truthful result looks like once an answer *is* readable
@@ -365,11 +375,11 @@ the body value that disagreed, and the `-32020` the server returned. A server an
 that has spoken the protocol correctly: it is reporting that *this client's* header and
 its own body did not agree — a condition `mcp.outbound.request-framed` says this client
 never produces, so it arises only from this repository or from an intermediary that
-rewrote a header in flight. `upstream_protocol` would blame a peer for its own correct
-report, and `invalid_input` would blame a caller who supplied no header; `internal` is the
-code that names the side that can fix it. The interoperability revision defines no header
-mirror and no code for a disagreement between one and a body, so nothing reaches this
-outcome there.
+rewrote a header in flight. The act reported is this client's. `upstream_protocol` would
+blame a peer for its own correct report, and `invalid_input` would blame a caller who
+supplied no header; `internal` is the code that names the side that can fix it. The
+interoperability revision defines no header mirror and no code for a disagreement between
+one and a body, so nothing reaches this outcome there.
 
 ## 7. Streaming
 
@@ -427,18 +437,30 @@ outcome below. A `subscriptions/listen` stream carries only the notification typ
 filter named, each tagged with its subscription id, and its acknowledgment arrives before
 any notification of that subscription.
 
-### `mcp.outbound.legacy-server-request-answered`
+### `mcp.outbound.legacy-ping-answered`
 
 Interoperability revision only. An observer sees a `ping` arrive on the response stream of
 a request this client sent, and an empty result go back promptly on its own POST as a
 JSON-RPC response body, carrying nothing else
-(`mcp-2025-11-25-basic-utilities-ping.mdx:31-39`). Any other server request is answered
-with a JSON-RPC error naming the client capability this client never declared: no model is
-sampled, no elicitation form is shown to a user, no filesystem root is disclosed, and
-nothing is answered on a caller's behalf — the same refusal
-`mcp.outbound.required-client-capability-refused` states for the other direction of the
-same rule. The client's own request is untouched by either: its outcome is still whatever
-its own stream produces, and having answered a `ping` is not an answer to it.
+(`mcp-2025-11-25-basic-utilities-ping.mdx:31-39`). That is the whole of this outcome: an
+answer this revision requires, given. The client's own request is untouched by it — its
+outcome is still whatever its own answer produces, and having answered a `ping` is not an
+answer to it. A server request that is *not* a `ping` is a different event with a
+different answer: it carries a code and names whose act it reports, and it is the refusal
+below. One row cannot hold both, because a row carrying `n/a` says that no refusal
+happened.
+
+### `mcp.outbound.legacy-server-request-refused`
+
+Interoperability revision only. An observer sees `unsupported`, naming the method the
+server asked for and the empty set of client capabilities this binding declared at the
+handshake, and a JSON-RPC error going back in answer — never silence, because that
+revision lets a server wait for one. The act reported is the peer's: a server may rely
+only on the capabilities the handshake negotiated
+(`mcp-2025-11-25-basic-lifecycle.mdx:186-212`), and this repository negotiates none, so
+any server request other than `ping` is one it was told not to send. Nothing is answered
+on a caller's behalf: no model is sampled, no elicitation form is shown to a user and no
+filesystem root is disclosed. The client's own request keeps its own outcome.
 
 ### `mcp.outbound.stream-ended-without-an-answer`
 
@@ -446,8 +468,10 @@ An observer sees `outcome_unknown`, naming the request whose stream closed befor
 final response arrived, and the last progress value observed if there was one. The
 specification calls this an unexpected disconnect and distinguishes it from the graceful
 closure that carries a response (`mcp-2026-07-28-basic-patterns-subscriptions.mdx:128-135`
-and `:155-157`). Connectors reports the uncertainty as uncertainty: it does not report
-success, does not report failure, and does not send the request again, because a request
+and `:155-157`). The act reported is nobody's: the answer that would have said what
+happened is the thing that did not arrive. Connectors reports the uncertainty as
+uncertainty: it does not report success, does not report failure, and does not send the
+request again, because a request
 whose answer was never seen may already have had its effect.
 `story:mcp-outbound-invocation-results` owns what a caller does with an unknown outcome;
 this document owns the observation that produced it.
@@ -530,11 +554,11 @@ either revision (`mcp-2026-07-28-basic-patterns-cancellation.mdx:81-82`,
 
 Primary revision only. An observer sees the request reported as cancelled by this client,
 with the reason — caller cancellation or timeout expiry — and with the fact that the
-effect at the server was not observed. A cancelled mutation is `outcome_unknown` to its
-caller for the same reason a truncated stream is: cancellation stops the client's waiting,
-not the server's work. An answer that arrives after cancellation is recorded as late and
-does not become the request's result, and a subscription is ended the same way, by closing
-its stream
+effect at the server was not observed. A cancelled mutation leaves its caller exactly
+where `mcp.outbound.stream-ended-without-an-answer` does, holding `outcome_unknown`:
+cancellation stops the client's waiting, not the server's work. An answer that arrives
+after cancellation is recorded as late and does not become the request's result, and a
+subscription is ended the same way, by closing its stream
 (`mcp-2026-07-28-basic-patterns-subscriptions.mdx:118-126`).
 
 ### `mcp.outbound.legacy-cancellation-notified`
@@ -567,31 +591,41 @@ not one, and which it is depends on how far the request got rather than on what 
 connection was carrying. Nothing framed is `mcp.outbound.transport-unavailable`. An answer
 being streamed that stops is `mcp.outbound.stream-ended-without-an-answer`. A request
 framed and sent whose single-object answer — the other shape section 6 says a server may
-choose — never arrived is `mcp.outbound.answer-never-arrived`; without that row half the
-answer shapes this document accepts would reach no row at all. A `404` repudiating a
-session is a fourth thing, `mcp.outbound.session-lost`, and exists only on the revision
-that has sessions.
+choose — never arrived is `mcp.outbound.answer-never-arrived`, under
+`state:connection-lost-in-flight`; without that row half the answer shapes this document
+accepts would reach no row at all. It is deliberately not filed under
+`state:transport-unreachable` beside the row above: that state's name asserts the
+endpoint could not be reached, and this outcome exists only because it was. A `404`
+repudiating a session is a fourth thing, `mcp.outbound.session-lost`, and exists only on
+the revision that has sessions.
 
 ### `mcp.outbound.session-lost`
 
 An observer sees `session_lost`, naming the endpoint and the session the server
 repudiated, and — separately — `outcome_unknown` for any request that was in flight when
 the `404` arrived. The two facts are reported as two facts: the session is gone, and what
-happened to the in-flight request was not observed. The lost session's requests are not
-sent again on a fresh session. A new session is established when a caller makes a new
-request that needs one, which is a new interaction with its own record, and the
-interoperability revision's instruction to open a new session is satisfied by that — it
-asks for a new `InitializeRequest`, not for the lost request to be sent a second time.
+happened to the in-flight request was not observed. The act reported is the peer's: a
+server terminated a session it had assigned, which its own revision permits it to do at
+any time. The lost session's requests are not sent again on a fresh session. A new session
+is established when a caller makes a new request that needs one, which is a new
+interaction with its own record, and the interoperability revision's instruction to open a
+new session is satisfied by that — it asks for a new `InitializeRequest`, not for the lost
+request to be sent a second time.
 
 ### `mcp.outbound.transport-unavailable`
 
 An observer sees `unavailable`, naming the configured endpoint and the transport-level
 reason: the name did not resolve, the connection was refused, the TLS handshake failed,
-or nothing answered within the connect bound. No session was involved, so none is
-reported lost, and no request was ever framed, so no outcome is uncertain — this is the
-one connection failure that is *not* ambiguous about a provider effect. It is also not a
-version fact and not a capability fact: an endpoint that cannot be reached says nothing
-about what it would have supported.
+or nothing answered within the connect bound. The act reported is nobody's — and that is
+the whole of what `unavailable` claims. Not one of those four is something an MCP server
+did: a name resolves in a resolver, a refusal and an alert come from whatever holds the
+address, and a bound that expires is the absence of an answer rather than an answer. The
+endpoint is a server's address, which is what makes `peer` the tempting answer and the
+wrong one — the address is not the server, and nothing of the server was heard. No session
+was involved, so none is reported lost, and no request was ever framed, so no
+outcome is uncertain — this is the one connection failure that is *not* ambiguous about a
+provider effect. It is also not a version fact and not a capability fact: an endpoint
+that cannot be reached says nothing about what it would have supported.
 
 ### `mcp.outbound.answer-never-arrived`
 
@@ -599,11 +633,13 @@ An observer sees `outcome_unknown`, naming the request that was framed and sent 
 connection that died before any answer to it was seen. This is the half of loss that never
 involved a stream: section 6 says the server may answer with one JSON object rather than
 opening one, and that this client supports both, so an answer can be lost with nothing
-ever having been opened to lose. At this client it is indistinguishable from an answer
-that was computed, applied at the server and delivered into a broken socket, which is
-exactly why it is uncertainty rather than failure. It is not `unavailable`, because the
-endpoint was reachable enough to take the request, and it is not `session_lost`, because
-nothing repudiated a session. It holds on either revision.
+ever having been opened to lose. The act reported is nobody's: the endpoint did take the
+request, which is why this is not `mcp.outbound.transport-unavailable`, but what it did
+with it was never seen. At this client it is indistinguishable from an answer that was
+computed, applied at the server and delivered into a broken socket, which is exactly why
+it is uncertainty rather than failure. It is not `unavailable`, because the endpoint was
+reachable enough to take the request, and it is not `session_lost`, because nothing
+repudiated a session. It holds on either revision.
 
 ## 11. Shutdown
 
@@ -620,11 +656,12 @@ answers `405` to a DELETE
 ### `mcp.outbound.shutdown-completed`
 
 An observer sees every stream this client opened closed, each in-flight request reported
-under its own outcome — `outcome_unknown` where an answer was never seen — and, for a
-session-bearing binding, one DELETE attempt whose `405` is recorded as a permitted answer
-rather than an error. Shutdown invents no results: it does not report a request as
-successful because the process is ending, and it does not report one as failed when its
-effect was not observed. After it, the binding's configuration is unchanged and
+under its own outcome — `mcp.outbound.stream-ended-without-an-answer` or
+`mcp.outbound.answer-never-arrived`, both carrying `outcome_unknown`, where an answer was
+never seen — and, for a session-bearing binding, one DELETE attempt whose `405` is a
+permitted answer rather than an error. Shutdown invents no results: it does not report a
+request as successful because the process is ending, and it does not report one as failed
+when its effect was not observed. After it, the binding's configuration is unchanged and
 reusable; `story:mcp-outbound-auth-lifecycle` owns what persists of the credential.
 
 ## Why no outcome above sends the request a second time

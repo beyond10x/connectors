@@ -11,11 +11,14 @@ given:
     revision (2025-11-25); an advertised key is recorded and projected into nothing on
     both.
   - A server advertising a key the selection matrix refuses, such as `logging`, and a key
-    no archived byte names at all, which the schema permits
-    (mcp-2026-07-28-schema.ts:789).
+    no archived byte names at all, which both revisions' schemas permit
+    (mcp-2026-07-28-schema.ts:789, mcp-2025-11-25-schema.ts:380).
 when:
-  - The advertised capability set is recorded from the discover result
-    (mcp-2026-07-28-server-discover.mdx:94-95).
+  - The server reports its advertised capability keys — under the primary revision
+    (2026-07-28) in the description result section 1 names
+    (mcp-2026-07-28-server-discover.mdx:94-95), under the interoperability revision
+    (2025-11-25) in the `InitializeResult` of the handshake, which is the only place that
+    revision reports them (mcp-2025-11-25-basic-lifecycle.mdx:42-53).
 then:
   - Both keys appear exactly as sent, marked advertised and not consumed.
   - No Connectors capability exists because of either key.
