@@ -6,6 +6,7 @@ status: open
 title: The GitLab v0.2.0 source publication destination is missing
 relations:
 - blocks: release-plan:gitlab-v020
+- blocks: release-plan:connectors-v030
 revision: 1
 ---
 ## Missing input
