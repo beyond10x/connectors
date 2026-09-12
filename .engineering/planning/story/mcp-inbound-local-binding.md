@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:mcp-inbound-local-binding
 kind: story
-status: draft
+status: active
 title: Specify the local-client inbound MCP binding exposed by the CLI
 relations:
 - decomposes: epic:mcp-contracts
@@ -13,7 +13,7 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1/scenarios
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/semantics.md
-revision: 4
+revision: 6
 ---
 ## Acceptance
 

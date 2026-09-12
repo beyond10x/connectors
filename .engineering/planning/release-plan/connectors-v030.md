@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: release-plan:connectors-v030
 kind: release-plan
-status: draft
+status: superseded
 title: Release v0.3.0 from the merged local Connectors increment
 relations:
 - informed_by: initiative:complete-local-connectors
-revision: 1
+revision: 2
 ---
 ## Scope
 
