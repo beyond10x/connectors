@@ -1,7 +1,13 @@
-# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.4.
-# Behaviour: cancellation
-# Outcome: cancelled-request-answers-nothing
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.6.
+# Behaviour: version and capability mismatch (per-request refusal)
+# Outcome: capability-refusal-keeps-the-session-ready
 # Transition: connectors.sessions.Session.permit_data (Ready → Ready)
+#
+# The other route of the same behaviour, the legacy initialize that denies readiness, is
+# unsupported-version-denies-readiness.yaml. Both exist because the document describes
+# both: on the primary revision a version or capability mismatch is one request's refusal
+# and closes nothing, and a table row that named only the connection-level denial left a
+# reader implementing this route with nothing that fails.
 #
 # Compiled supervisor decisions, not an executed trace, and not an MCP message: the
 # pinned toolchain "compiles obligations but does NOT execute a sequential trace"
@@ -12,8 +18,8 @@
 # any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
 type: ess-scenario/1
 domain: connectors.sessions
-scenario: cancelled-request-answers-nothing
-summary: 'A notifications/cancelled for one in-flight request produces no response for it and no session terminal; the session stays Ready and its other work continues.'
+scenario: capability-refusal-keeps-the-session-ready
+summary: 'A request needing a capability the caller did not declare is refused on the same channel; the connection keeps carrying traffic and the session stays Ready.'
 arrange:
 - instance: session
   entity: connectors.sessions.Session
@@ -61,24 +67,27 @@ timeline:
   outcome: ready
   events:
   - event: connectors.sessions.SessionReady
-# The cancellation notification arrives on the one shared channel. It is scoped to one
-# request: no ClosingBegun, no terminal, no denial. The cancelled request is answered
-# with nothing at all (mcp-2026-07-28-basic-patterns-cancellation.mdx:73-76).
+# The refusal itself: MissingRequiredClientCapabilityError, -32021, naming what was missing
+# in data.requiredCapabilities (mcp-2026-07-28-basic-index.mdx:387-392). It is written to
+# the same shared channel as any other reply, so it is outbound data on a Ready session and
+# the supervisor's decision is permit_data — no denial, and no terminal.
 - at: '2026-09-12T12:00:03Z'
   command: connectors.sessions.PermitData
   input:
     session_id:
       $instance: session
     decision: allow
-    direction: input
+    direction: output
   outcome: permitted
   events:
   - event: connectors.sessions.DataPermitted
   no_events:
   - connectors.sessions.ClosingBegun
-  - connectors.sessions.ContinuityLost
   - connectors.sessions.DataAuthorityTerminated
-# An unrelated in-flight request on the same connection still answers.
+  - connectors.sessions.ContinuityLost
+# An unrelated request already in flight on the same connection is answered normally: the
+# refusal was scoped to one request, because version and capabilities are per-request facts
+# on this revision (mcp-2026-07-28-basic-versioning.mdx:12-13).
 - at: '2026-09-12T12:00:04Z'
   command: connectors.sessions.PermitData
   input:
@@ -91,8 +100,8 @@ timeline:
   - event: connectors.sessions.DataPermitted
   no_events:
   - connectors.sessions.ClosingBegun
-  - connectors.sessions.ContinuityLost
   - connectors.sessions.DataAuthorityTerminated
+  - connectors.sessions.ContinuityLost
 assert:
 - view: connectors.sessions.SessionStates
   contains:

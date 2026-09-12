@@ -1,7 +1,13 @@
-# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.2.
-# Behaviour: streaming
-# Outcome: partial-result-never-reported-complete
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.5.
+# Behaviour: connection and session loss (graceful close)
+# Outcome: graceful-stdin-close-ends-the-session
 # Transition: connectors.sessions.Session.begin_close (Ready → Closing)
+#
+# The other route of the same behaviour, the drop that ends in Lost, is
+# transport-drop-loses-the-session.yaml. The document describes both endings and says the
+# binding distinguishes them; a table row that named only the drop left the graceful one —
+# the one the revision calls "the primary graceful-shutdown signal and the only portable
+# one" — with no trace that fails when an implementation gets it wrong.
 #
 # Compiled supervisor decisions, not an executed trace, and not an MCP message: the
 # pinned toolchain "compiles obligations but does NOT execute a sequential trace"
@@ -12,8 +18,8 @@
 # any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
 type: ess-scenario/1
 domain: connectors.sessions
-scenario: partial-result-never-reported-complete
-summary: 'A partially delivered outbound result ends with a recorded terminal and the graceful empty response; no further result content follows and nothing partial is reported complete.'
+scenario: graceful-stdin-close-ends-the-session
+summary: 'The caller closes stdin, the supervisor records one terminal and cuts data off by the live lease deadline rather than a later one, and teardown completes at Closed.'
 arrange:
 - instance: session
   entity: connectors.sessions.Session
@@ -61,37 +67,33 @@ timeline:
   outcome: ready
   events:
   - event: connectors.sessions.SessionReady
-# Notifications of a long-lived subscriptions/listen result are delivered on the one
-# shared channel (mcp-2026-07-28-basic-transports-stdio.mdx:41-42). The result is partial.
+# The caller closes the binding's stdin and the reader returns end-of-file. The revision
+# makes that the shutdown signal: "Servers SHOULD exit promptly when their standard input
+# is closed or reads return end-of-file" (mcp-2026-07-28-basic-transports-stdio.mdx:102-104).
+# The peer closed the stream and waited (:89-94), so its shutdown is confirmed below.
+#
+# cutoff_due_at is 12:00:04, not 12:00:05. §4.1 allows 2,000 ms from the terminal to data
+# cutoff, but the live lease's own deadline is earlier and dominates: the model says the
+# close deadlines "are bounded by §4.1; earlier expiry/drain deadlines dominate", and §4.1
+# forbids adding grace past an effective expiry. teardown_due_at is within the 5,000 ms
+# §4.1 allows from the terminal fact to completion of local teardown and accounting.
 - at: '2026-09-12T12:00:03Z'
-  command: connectors.sessions.PermitData
-  input:
-    session_id:
-      $instance: session
-    decision: allow
-    direction: output
-  outcome: permitted
-  events:
-  - event: connectors.sessions.DataPermitted
-# The binding ends the partially delivered result on its own initiative and records the
-# first terminal once. The graceful empty subscriptions/listen response goes out before
-# teardown (mcp-2026-07-28-basic-patterns-subscriptions.mdx:128-135); no complete result does.
-- at: '2026-09-12T12:00:04Z'
   command: connectors.sessions.BeginClose
   input:
     session_id:
       $instance: session
     terminal:
-      reason: local_close
-      by: host
-      accepted_at: '2026-09-12T12:00:04Z'
+      reason: remote_hangup
+      by: adapter
+      accepted_at: '2026-09-12T12:00:03Z'
     cutoff_due_at: '2026-09-12T12:00:04Z'
-    teardown_due_at: '2026-09-12T12:00:07Z'
+    teardown_due_at: '2026-09-12T12:00:06Z'
   outcome: closing
   events:
   - event: connectors.sessions.ClosingBegun
-# After the terminal is recorded no further result content is emitted for that request.
-- at: '2026-09-12T12:00:05Z'
+# Nothing is written to a closed stdout afterwards. §4.1 leaves zero data-drain allowance
+# after cutoff; the closing period is for bounded control cleanup only.
+- at: '2026-09-12T12:00:04Z'
   command: connectors.sessions.PermitData
   input:
     session_id:
@@ -105,14 +107,16 @@ timeline:
       state: Closing
   no_events:
   - connectors.sessions.DataPermitted
-  - connectors.sessions.SessionReady
-- at: '2026-09-12T12:00:07Z'
+# Teardown completes inside the deadline the close itself recorded, and records released on
+# local evidence. peer_shutdown is confirmed here — unlike the drop, this ending observed
+# the peer's own close — and that is recorded independently of the local cutoff.
+- at: '2026-09-12T12:00:06Z'
   command: connectors.sessions.FinishTeardown
   input:
     session_id:
       $instance: session
     decision: released
-    peer_shutdown: unconfirmed
+    peer_shutdown: confirmed
   outcome: closed
   events:
   - event: connectors.sessions.LocalResourcesReleased
