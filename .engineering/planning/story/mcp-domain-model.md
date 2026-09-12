@@ -15,7 +15,7 @@ scope:
   path: adapters/mcp/spec/ess/domains/state.yaml
 - confidence: inferred
   path: adapters/mcp/spec/ess/system.yaml
-revision: 8
+revision: 9
 ---
 ## Acceptance
 
@@ -139,3 +139,31 @@ adapters/*/spec/ess/domains/*.yaml` returns nothing (inferred from that grep ove
 relations above could not be declared here even if somebody decided them; the
 projection is an adapter binding obligation recorded in prose in the contract
 documents, and the markers say so.
+
+## The marker this model still owes
+
+A second `UNMAPPED:` marker is owed on `ServerCapabilityKind`, and this story owns
+it.
+
+`story:mcp-profile-selection-matrix` defers `capability:server/tasks` and
+`capability:server/extensions` against the marker this model attaches to
+`ClientCapabilityKind` — "whether `tasks` is modelled as a client capability of
+this root or as an extension identifier". Its adversary pass 2 measured what that
+costs: the marker poses only the client-side question, `ServerCapabilityKind`
+omits `tasks` with no marker of its own, and the interop schema declares
+`ServerCapabilities.tasks` with **different children** from the client one. So
+answering the client-side question clears the client row and settles neither
+server row, while both read as cleared.
+
+The matrix has recorded the inheritance in a stated table with a check that
+derives the set from this model and requires exact equality, so a future
+cross-side deferral fails. That records the debt; it does not pay it.
+
+The durable fix is a second marker on `ServerCapabilityKind` posing the
+server-side question in its own words. That text is this story's, not the
+matrix's, and it is filed here rather than written into the matrix so the model
+stays the single place a reader looks for what this root could not read.
+
+*Recorded 2026-09-12, after this story reached `implemented`. It is an obligation
+this model carries, not a defect in the work that closed — the marker that exists
+is correct for the side it names.*

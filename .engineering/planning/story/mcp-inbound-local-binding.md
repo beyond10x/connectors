@@ -13,7 +13,7 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1/scenarios
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/semantics.md
-revision: 6
+revision: 7
 ---
 ## Acceptance
 
@@ -23,21 +23,35 @@ MCP client uses to reach it, which principal it admits before any capability is
 named, and how message framing, streaming, progress, cancellation, connection and
 session loss, and version and capability mismatch behave on that binding — such
 that **every one of those six behaviours has a named observable outcome, the state
-transition it turns on in the `connectors.sessions.Session` vocabulary, and a
-scenario file under `adapters/mcp/contracts/server/v1alpha1/scenarios/` named after
-it**; such that the whole binding is described without reference to any cloud
-control plane, identity service or network service this repository does not already
-have; and such that a behaviour the selected transport does not offer appears in
-that same enumeration as refused with its reason rather than absent.
+transition it turns on in the `connectors.sessions.Session` vocabulary, and one
+scenario file per observable route**; such that the whole binding is described
+without reference to any cloud control plane, identity service or network service
+this repository does not already have; and such that a behaviour the selected
+transport does not offer appears in that same enumeration as refused with its
+reason rather than absent.
 
 Framing covers a malformed or truncated inbound message; streaming covers a
-partially delivered outbound result. Both are named that way in the document so the
-six behaviours and their six scenario files correspond one to one.
+partially delivered outbound result. Both are named that way in the document so
+the behaviours and their scenario files correspond.
+
+**A behaviour may carry more than one observable route, and each route gets its own
+row and its own file.** A behaviour whose outcome differs by which side acted, or
+by whether the session survives, is two routes and not one — the count of files is
+therefore derived from the enumeration rather than fixed here.
 
 Lost replies and mutation uncertainty are `story:mcp-inbound-mutation-replay`.
 Error mapping onto `connectors.service_wire.ErrorCode` is
-`story:mcp-inbound-capability-projection`. Those two plus the six scenario files
-above are the inbound half of the epic's acceptance criterion 5.
+`story:mcp-inbound-capability-projection`. Those two plus the scenario files above
+are the inbound half of the epic's acceptance criterion 5.
+
+*(Amended at revision 7. This section stated a fixed count of scenario files, one
+per behaviour. The count was correct when written and stopped being correct when
+the coordinator directed two behaviours to be split into routes — an instruction
+that changed the countable thing this statement counts, without the statement
+moving with it. The adversary measured the gap; the fix is here rather than in the
+deliverable, because the split was right and the number was the thing that had gone
+stale. No literal count appears above, deliberately: a later route adds a file and
+no amendment.)*
 
 ## Scope
 
