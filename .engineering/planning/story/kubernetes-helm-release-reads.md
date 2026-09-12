@@ -24,7 +24,7 @@ scope:
   path: adapters/kubernetes/tests
 - confidence: cited
   path: docs/local-kubernetes-cli.md
-revision: 5
+revision: 9
 ---
 ## Acceptance
 
@@ -55,7 +55,7 @@ semantics the repository already has. Families B and C are held under
 `docs/recent-adapter-usage-20260909.md:147` already records the position this
 follows: "Helm rendering/linting are local tool work; release operations need
 their own explicit semantics, not an implied Kubernetes list capability."
-`initiative:complete-local-connectors` line 35 assigns C15 and the Helm actions to
+`initiative:complete-local-connectors` assigns, in its Acceptance paragraph, C15 and the Helm actions to
 Kubernetes.
 
 ## What must be established before implementation
@@ -72,7 +72,7 @@ exists, every statement about the storage format is a hypothesis.
 
 **Release Secrets are outside the current configured scope.** `resource_kinds` is
 a closed enum of `pods`, `services`, `deployments`, `endpointslices` in both
-`adapters/kubernetes/spec/adapter.json` and `adapters/kubernetes/src/lib.rs:38`.
+`adapters/kubernetes/spec/adapter.json` and `adapters/kubernetes/src/lib.rs`, in the resource-kind match.
 Release storage is not among them, and this story must not widen that enum into a
 general Secret read: a Helm release read is a distinct operation with its own
 admitted target, not a resource kind a caller selects.
@@ -117,6 +117,33 @@ widening `resource_kinds`; and any general Secret read operation.
 
 ## Current state
 
-Draft. Nothing is implemented and no upstream source is pinned. This story is not
-scheduled and is not part of the increment currently sitting uncommitted in
-`kubernetes-local-cli-20260911`.
+**Implemented**, 2026-09-12, on a green gate: 33 steps, 71 test targets, every
+step exit 0. Evidence retained in
+[`docs/evidence/helm-reads-20260912/`](../../../docs/evidence/helm-reads-20260912/README.md).
+
+Sixteen upstream Helm sources are pinned with URL, uncompressed SHA-256 and byte
+length across both lines — v4.3.0 at `bec5b06` and v3.22.0 at `144ca65`. The
+adapter carries four `helm_releases.*` operations, an adapter-owned ESS domain and
+a native contract with a safe projection whose default is refusal. `resource_kinds`
+is untouched and the fixture proves it.
+
+Two adversary passes, eight findings then seven, carried 0 both times and resolved
+8 both times.
+
+**The cardinality this story instructed be left `UNMAPPED:` was read instead.** The
+instruction was conditional — it said the relation could not be drafted honestly
+before an upstream source was pinned — and once the source was pinned it became
+readable and was cited: one release name to many version-keyed records, more than
+one of which may be deployed at once. Six relations stayed `UNMAPPED:`.
+
+**Dedicated sandbox acceptance remains open.** The evidence is a fixture cluster;
+no real cluster has answered these operations. The website entry says so.
+
+**`helm list` is the one family-A site not implemented** — it lists every release
+in a scope rather than one release's revisions and needs its own selection and
+admission. The contract and the CLI document say so rather than leaving it implied.
+
+*(This section read "Draft. Nothing is implemented and no upstream source is
+pinned" until revision 6, which was 26 minutes after the story closed. A body that
+contradicts its own status is the failure this story's own wave produced three
+other instances of, in documents rather than in the store.)*
