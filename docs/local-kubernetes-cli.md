@@ -232,25 +232,40 @@ concurrently written store can hold more than one.
 `helm_releases.values` and `helm_releases.manifest` read one revision and return
 a **redacted projection, never the stored content**. A release's recorded values
 routinely contain credentials, and its rendered manifest contains the body of
-every Secret the release applied. `values` returns one entry per recorded path
-with its JSON shape and a SHA-256 over the canonical JSON of its value;
-`manifest` returns one entry per rendered document with its position, byte
-length and a SHA-256 over exactly the document text those bytes count, which
-`sha256sum` on the document reproduces. No recorded scalar and no manifest byte
+every Secret the release applied. `values` returns one entry per recorded path it
+can represent, with its JSON shape and a SHA-256 over the canonical JSON of its
+value; `manifest` returns one entry per rendered document with its position,
+its byte length as stored and a SHA-256 over exactly those stored bytes, which
+`sha256sum` on the extracted document reproduces — nothing is stripped, so the
+newline Helm writes at the end of every document is counted and digested. No recorded scalar and no manifest byte
 is returned, and there is no setting that returns one. Use the digests to tell
 whether something changed between revisions; to read the value itself, use your
 own cluster credentials directly.
 
-Both digests are unsalted, which is what makes them comparable — and means
-**a digest confirms a guess**. Anyone holding a `value_digest` can test a
-candidate literal offline with one `sha256sum` and learn whether it is right.
-The projection therefore bounds disclosure of a value nobody can enumerate; it
-does not protect a short, guessable or already-suspected one. Treat the output
-as you would treat the list of keys in a values file, not as a secret.
+Both digests are unsalted, which is what makes one comparable and the other
+reproducible — and means **either digest confirms a guess**. Anyone holding a
+`value_digest` can test a candidate literal offline with one `sha256sum` and
+learn whether it is right. The same is true of `content_digest`: a chart's
+templates are usually public, so the unknown part of a rendered document may be
+just the value injected into it, and the `bytes` field publishes that
+document's exact length, which narrows the search further. Both projections
+therefore bound disclosure of something nobody can enumerate; neither protects
+a short, guessable or already-suspected value. Treat the output as you would
+treat the list of keys in a values file, not as a secret.
 
 Both projections read a single object, so they never issue a cursor: a
 projection larger than `limit` comes back with `complete: false` and
 `next_cursor: null`.
+
+**Raising `limit` is not the only reason a projection is incomplete.**
+`helm_releases.values` also reports `complete: false` when a recorded path
+cannot be represented inside the 1024-byte bound the operation publishes for
+`path` — an empty recorded key, or keys that concatenate past that length. Such
+a node is dropped together with everything under it, because returning it would
+produce a result the adapter's own published schema rejects. Raising `limit`
+will not bring it back. A `complete: false` page is evidence about what you
+did receive and none at all about what you did not: a path that is missing from
+an incomplete page is not an unset value.
 
 A namespace outside the configured scope is refused with no request at all. A
 namespace whose release Secrets the credential may not read is refused too,
