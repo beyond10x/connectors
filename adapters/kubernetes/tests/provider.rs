@@ -10,7 +10,7 @@ use connectors_host::{
     http::{HttpConfig, ScopedHttp},
     server::router,
 };
-use connectors_kubernetes::{Config, Kubernetes};
+use connectors_kubernetes::{Config, HelmReleaseReads, Kubernetes};
 use connectors_sdk::{Adapter, AuthenticatedHttp, Credential, HttpResponse, Secret};
 use serde_json::json;
 use std::{
@@ -83,6 +83,7 @@ async fn discovery_is_attributed_paged_and_does_not_activate_observed_endpoints(
         namespaces: vec!["engineering".into()],
         resource_kinds: vec!["services".into()],
         discover_hosts: true,
+        helm_release_reads: HelmReleaseReads::Off,
     };
     let effective = json!({"service":{"instance":"cluster-test","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED_FIXTURE_BINDING"}},"http":http,"adapter":config});
     let adapter = Kubernetes::new(
@@ -200,6 +201,7 @@ fn expansion_adapter(addresses: usize) -> (Kubernetes, Arc<AtomicUsize>) {
         namespaces: vec!["engineering".into()],
         resource_kinds: vec!["services".into()],
         discover_hosts: false,
+        helm_release_reads: HelmReleaseReads::Off,
     };
     let effective = json!({"service":{"instance":"bounded","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED"}},"http":{"base_url":"https://fixture.invalid/"},"adapter":config});
     let adapter = Kubernetes::new(

@@ -18,6 +18,10 @@ required-features = ["service"]
 connectors-core.workspace = true
 connectors-contracts.workspace = true
 connectors-sdk.workspace = true
+base64.workspace = true
+flate2.workspace = true
+hex.workspace = true
+sha2.workspace = true
 connectors-host = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
@@ -30,7 +34,5 @@ tokio = { workspace = true, optional = true }
 connectors-client.workspace = true
 axum.workspace = true
 tempfile.workspace = true
-hex.workspace = true
-sha2.workspace = true
 rcgen = "0.14"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
