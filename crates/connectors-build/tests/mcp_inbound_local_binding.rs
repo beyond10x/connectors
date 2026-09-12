@@ -165,10 +165,20 @@ fn behaviour_rows() -> BTreeMap<String, Vec<Vec<String>>> {
     let document = binding();
     let enumeration = section(&document, "the six behaviours");
     let mut rows: BTreeMap<String, Vec<Vec<String>>> = BTreeMap::new();
-    for cells in table_rows(&enumeration) {
-        let Some(key) = behaviour_of(&cells[0]) else {
+    for (index, cells) in table_rows(&enumeration).into_iter().enumerate() {
+        // The header row is the one row that names no behaviour. Every other row must:
+        // skipping a row this function does not recognise is how a typo'd behaviour name
+        // becomes an unenumerated route.
+        if index == 0 {
             continue;
-        };
+        }
+        let key = behaviour_of(&cells[0]).unwrap_or_else(|| {
+            panic!(
+                "the enumeration carries a row for {:?}, which is none of the behaviours the \
+                 acceptance names: {BEHAVIOURS:?}",
+                cells[0]
+            )
+        });
         assert_eq!(
             cells.len(),
             4,
@@ -230,10 +240,17 @@ fn refusal_rows() -> BTreeMap<String, Vec<String>> {
     let document = binding();
     let refusals = section(&document, "does not offer");
     let mut rows = BTreeMap::new();
-    for cells in table_rows(&refusals) {
-        let Some(key) = behaviour_of(&cells[0]) else {
+    for (index, cells) in table_rows(&refusals).into_iter().enumerate() {
+        if index == 0 {
             continue;
-        };
+        }
+        let key = behaviour_of(&cells[0]).unwrap_or_else(|| {
+            panic!(
+                "the enumeration of what inbound stdio does not offer carries a row for {:?}, \
+                 which is none of the behaviours the acceptance names: {BEHAVIOURS:?}",
+                cells[0]
+            )
+        });
         rows.insert(key.to_string(), cells);
     }
     rows
@@ -357,9 +374,18 @@ fn scenario_files() -> Vec<(String, String)> {
 fn owned_scenarios() -> BTreeMap<String, String> {
     scenario_files()
         .into_iter()
-        .filter(|(_, text)| {
-            marker_value(text, "Owner")
-                .is_some_and(|owner| owner.split_whitespace().next() == Some(OWNER))
+        .filter(|(stem, text)| {
+            let marked = marker_value(text, "Owner");
+            // A file that cites this story but carries no marker is the adoption hazard
+            // the marker replaced, read from the other side: it would silently drop out
+            // of every rule below instead of silently joining them.
+            assert!(
+                marked.is_some() || !text.contains(OWNER),
+                "scenarios/{stem}.yaml names {OWNER} but carries no `# Owner:` marker, so no \
+                 rule in this file can tell whether it is this story's deliverable or a \
+                 sibling's file citing it"
+            );
+            marked.is_some_and(|owner| owner.split_whitespace().next() == Some(OWNER))
         })
         .collect()
 }
@@ -490,7 +516,8 @@ fn no_scenario_this_story_owns_names_an_outcome_the_document_does_not() {
         owned.len(),
         declared.len(),
         "this story owns {} scenario files and its enumeration carries {} rows, each of which \
-         names one: {:?}",
+         names one: {:?}. What that number has to be is not settled here — it is settled by \
+         the acceptance, in `the_directory_ships_what_the_story_acceptance_states`",
         owned.len(),
         declared.len(),
         owned.keys().collect::<Vec<_>>()
@@ -972,8 +999,21 @@ fn timeline(stem: &str, text: &str) -> Vec<Act> {
                     .as_str()
                     .unwrap_or_else(|| panic!("scenarios/{stem}.yaml act {index} has no `at:`")),
             ),
-            command: act["command"].as_str().unwrap_or_default().to_string(),
-            outcome: act["outcome"].as_str().unwrap_or_default().to_string(),
+            // Neither defaults to the empty string: an act with no command or no outcome
+            // matches no rule below, so a silent default reads as a clean act to every
+            // timing case in this file.
+            command: act["command"]
+                .as_str()
+                .unwrap_or_else(|| {
+                    panic!("scenarios/{stem}.yaml act {index} declares no `command:`")
+                })
+                .to_string(),
+            outcome: act["outcome"]
+                .as_str()
+                .unwrap_or_else(|| {
+                    panic!("scenarios/{stem}.yaml act {index} declares no `outcome:`")
+                })
+                .to_string(),
             input: act["input"].clone(),
         })
         .collect()
@@ -1030,6 +1070,17 @@ fn no_trace_issues_a_lease_longer_than_the_contract_ceiling() {
                     act.command,
                 ));
             }
+            // A lease that expires at or before its own issuance admits nothing and would
+            // pass the ceiling above, being at most as long as it allows.
+            if expiry <= issued {
+                offending.push(format!(
+                    "scenarios/{stem}.yaml:{} — act {} `{}` issues a lease whose effective \
+                     expiry is not after its issuance, so it admits no data path at all",
+                    line_of(&text, &format!("effective_expiry: '{expiry_text}'")),
+                    act.index,
+                    act.command,
+                ));
+            }
         }
     }
     assert!(
@@ -1061,18 +1112,40 @@ fn no_trace_admits_data_or_renews_after_its_live_lease_deadline() {
                         .map(String::from))
                     .unwrap_or_default()
             );
+            // `>=`, not `>`. The effective deadline is defined *including* delivery delay
+            // and already-buffered output, so it is the moment by which admitted output
+            // has already left, and the expiry is itself a terminal fact that atomically
+            // enters `closing`. An admission placed on it delivers past it by
+            // construction. This document says the same thing twice — the supervisor
+            // renews *before* the effective deadline — and this is the guard that holds
+            // the traces to it.
             if admitted
                 && let Some(live) = deadline
-                && act.at > live
+                && act.at >= live
             {
                 offending.push(format!(
                     "scenarios/{stem}.yaml:{} — act {} `{}` is admitted ({}) {} ms after the \
-                     last moment the lease that admits it can legally be live",
+                     last moment the lease that admits it can legally be live, and the last \
+                     admissible moment is strictly before the effective expiry, not on it",
                     line_of(&text, &at_text),
                     act.index,
                     act.command,
                     act.outcome,
                     (act.at - live) * 1_000,
+                ));
+            }
+            // The hole pass 2 named: every bound below is reached through `deadline`, so a
+            // trace that never issued a lease at all used to pass every timing case here.
+            // §4.1 makes a live data lease mandatory for every admitted data path.
+            if admitted && deadline.is_none() {
+                offending.push(format!(
+                    "scenarios/{stem}.yaml:{} — act {} `{}` is admitted ({}) with no data lease \
+                     issued anywhere before it, and §4.1 makes a live lease mandatory for every \
+                     admitted data path",
+                    line_of(&text, &at_text),
+                    act.index,
+                    act.command,
+                    act.outcome,
                 ));
             }
             if admitted && let Some((index, fact)) = &terminal {
@@ -1229,31 +1302,70 @@ fn every_close_deadline_a_trace_records_is_bounded_by_the_contract_and_the_live_
     );
 }
 
+/// The sentences of a document, flattened so a sentence survives the author's hard wrap.
+/// Sentence ends are `. ` — the citations in this document are `file.md:12` and `§4.1`,
+/// neither of which carries a period followed by a space.
+fn sentences(document: &str) -> Vec<String> {
+    flattened(document)
+        .split(". ")
+        .map(|sentence| sentence.trim().to_string())
+        .filter(|sentence| !sentence.is_empty())
+        .collect()
+}
+
 #[test]
 fn the_document_states_the_lease_obligation_its_traces_inherit() {
     let document = binding();
-    let ceiling = lease_ceiling_ms();
-    let spelled = format!("{},{:03} ms", ceiling / 1_000, ceiling % 1_000);
+    let sentences = sentences(&document);
+    let spelled = |ms: i64| format!("{},{:03} ms", ms / 1_000, ms % 1_000);
+    let lease = spelled(lease_ceiling_ms());
+    let teardown = spelled(teardown_ceiling_ms());
+
+    // Each of these is a sentence the document has to carry, not a literal it has to
+    // contain somewhere. Pass 2, finding 5: the lease ceiling and the cutoff ceiling are
+    // the same number two lines apart, so `contains("2,000 ms")` went on passing with §2's
+    // lease sentence deleted. A statement is a subject and a bound in one sentence.
+    let required: [(&str, Vec<String>); 5] = [
+        (
+            "the ceiling on a live data lease, with what it bounds",
+            vec!["data lease".into(), lease.clone(), "issuance".into()],
+        ),
+        (
+            "the section of the sessions contract that owns these obligations",
+            vec![
+                "contracts/sessions/v1alpha1/semantics.md".into(),
+                "§4.1".into(),
+            ],
+        ),
+        (
+            "the renewal that keeps a request alive past one lease, and that it is the \
+             supervisor's",
+            vec!["RenewDataLease".into(), "before".into()],
+        ),
+        (
+            "what happens when a lease is not renewed in time",
+            vec!["lease_expired".into()],
+        ),
+        (
+            "the ceiling on local teardown after a terminal fact",
+            vec!["teardown".into(), teardown.clone()],
+        ),
+    ];
+    let mut missing = Vec::new();
+    for (what, needles) in &required {
+        if !sentences
+            .iter()
+            .any(|sentence| needles.iter().all(|needle| sentence.contains(needle)))
+        {
+            missing.push(format!("{what} — no sentence carries all of {needles:?}"));
+        }
+    }
     assert!(
-        document.contains(&spelled) || document.contains(&format!("{ceiling} ms")),
-        "the document never states the live data-lease ceiling its traces inherit ({spelled}); \
-         a reader implementing this binding from the document alone would not know a data path \
-         has to be gated by a lease no longer than that"
-    );
-    assert!(
-        document.contains("contracts/sessions/v1alpha1/semantics.md") && document.contains("§4.1"),
-        "the document never cites the section that owns the timing obligations its traces \
-         inherit by reusing `connectors.sessions.Session`"
-    );
-    assert!(
-        document.contains("lease_expired"),
-        "the document never says what happens when a data lease is not renewed before its \
-         deadline; `lease_expired` is the terminal the model records for it"
-    );
-    assert!(
-        document.contains("RenewDataLease") || document.contains("`renew`"),
-        "the document never names the transition by which an inbound request that outlives one \
-         data lease stays `Ready`, and it is the only one the vocabulary offers"
+        missing.is_empty(),
+        "the document does not state, in its own sentences, the timing obligations its traces \
+         are held to; a reader implementing from the document alone would not be told them, and \
+         every one of these is a bound the cases above enforce on the traces:\n{}",
+        missing.join("\n")
     );
 }
 
@@ -1261,8 +1373,6 @@ fn the_document_states_the_lease_obligation_its_traces_inherit() {
 fn every_transition_a_behaviour_section_asserts_is_bound_to_one_of_its_traces() {
     let document = binding();
     let declared = declared_transitions();
-    let movers = movers();
-    let owned = owned_scenarios();
     let rows = behaviour_rows();
     let negation = regex::Regex::new(r"(?i)\b(not|never|no|cannot|instead of|rather than)\b")
         .expect("a valid pattern");
@@ -1285,15 +1395,11 @@ fn every_transition_a_behaviour_section_asserts_is_bound_to_one_of_its_traces() 
                     .collect()
             })
             .unwrap_or_default();
-        let traces: Vec<&String> = rows
-            .get(&behaviour)
-            .map(|rows| {
-                rows.iter()
-                    .filter_map(|cells| owned.get(cells[1].trim_matches('`')))
-                    .collect()
-            })
-            .unwrap_or_default();
         for (name, line) in named {
+            // Row membership, not row *or* trace. A transition a trace happens to perform
+            // is not a transition the table tells a reader to implement, and the table is
+            // what a reader implements from: answering adversary pass 2, finding 3, where
+            // `renew` was asserted in prose, performed by one trace, and named by no row.
             if bound.contains(&name) {
                 continue;
             }
@@ -1309,21 +1415,16 @@ fn every_transition_a_behaviour_section_asserts_is_bound_to_one_of_its_traces() 
             if negation.is_match(&tail) {
                 continue;
             }
-            let pairs = movers.get(&name).cloned().unwrap_or_default();
-            let performed = traces.iter().any(|text| {
-                timeline(&behaviour, text)
-                    .iter()
-                    .any(|act| pairs.contains(&(act.command.clone(), act.outcome.clone())))
-            });
-            if !performed {
-                offending.push(format!(
-                    "`{behaviour}` asserts `{name}` in its prose, and neither a row of the \
-                     enumeration nor a trace of that behaviour performs it: {}",
-                    line.trim()
-                ));
-            }
+            offending.push(format!(
+                "`{behaviour}` asserts `{name}` in its prose and no row of the enumeration \
+                 names it, so the table sends a reader down a route without it: {}",
+                line.trim()
+            ));
         }
     }
+    // Every row's transition must also be performed by that row's own trace, which is
+    // `each_scenario_performs_the_transition_its_behaviour_names`; the two together are
+    // what make a row an obligation rather than a label.
     assert!(
         offending.is_empty(),
         "a behaviour section states that the binding performs a transition that the \
@@ -1331,5 +1432,203 @@ fn every_transition_a_behaviour_section_asserts_is_bound_to_one_of_its_traces() 
          the prose describes and has nothing that fails when the implementation takes the \
          other one:\n{}",
         offending.join("\n")
+    );
+}
+
+// ── The deliverable against the statement that governs it ───────────────────────────
+//
+// Added 2026-09-12 answering adversary pass 2, finding 2. The scenario count used to be
+// pinned at six here and, when the routes were split, became a comparison between the
+// directory and the row count of the document the same unit wrote — both halves this
+// unit's, with nothing comparing either to the acceptance. What the deliverable has to
+// contain is the story's to say, so it is read from the story.
+
+/// The `## Acceptance` section of the story that owns this document, without its heading.
+/// Read-only: the planning store is the CLI's to write.
+fn acceptance_statement() -> String {
+    let story = read(".engineering/planning/story/mcp-inbound-local-binding.md");
+    let mut collecting = false;
+    let mut found = String::new();
+    for line in story.lines() {
+        if line.starts_with("## ") {
+            if collecting {
+                break;
+            }
+            collecting = line.trim() == "## Acceptance";
+            continue;
+        }
+        if collecting {
+            found.push_str(line);
+            found.push('\n');
+        }
+    }
+    assert!(
+        !found.trim().is_empty(),
+        "{OWNER} has no `## Acceptance` section, and the deliverable below is measured against it"
+    );
+    found
+}
+
+/// Any document as one line, so a sentence survives whatever column the author wrapped at.
+fn flattened(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn number_word(word: &str) -> Option<usize> {
+    Some(match word {
+        "one" => 1,
+        "two" => 2,
+        "three" => 3,
+        "four" => 4,
+        "five" => 5,
+        "six" => 6,
+        "seven" => 7,
+        "eight" => 8,
+        "nine" => 9,
+        "ten" => 10,
+        "eleven" => 11,
+        "twelve" => 12,
+        _ => return None,
+    })
+}
+
+/// What an acceptance statement says the scenario directory has to contain.
+#[derive(Debug, PartialEq, Eq)]
+enum Deliverable {
+    /// "… six scenario files …" — a fixed count, whatever the document's table does.
+    Files(usize),
+    /// "… one scenario per observable route …" — as many as the enumeration has routes,
+    /// which the row-to-file correspondence above then pins exactly.
+    OnePerRoute,
+}
+
+/// Read the rule out of an acceptance statement. A literal count wins where one is
+/// stated, because a statement that counts files is measured by counting files.
+fn deliverable_rule(acceptance: &str) -> Deliverable {
+    let flat = flattened(acceptance);
+    let counted = regex::Regex::new(r"([a-z]+) scenario files")
+        .expect("a valid pattern")
+        .captures_iter(&flat)
+        .find_map(|capture| number_word(&capture[1]));
+    let per_route =
+        regex::Regex::new(r"(?i)one scenario (file )?per (observable )?(route|outcome)")
+            .expect("a valid pattern")
+            .is_match(&flat);
+    match (counted, per_route) {
+        (Some(files), false) => Deliverable::Files(files),
+        (None, true) => Deliverable::OnePerRoute,
+        // Preferring one of the two here would resolve the contradiction silently, and a
+        // statement amended in one sentence and left standing in another is how this
+        // unit's deliverable and its acceptance came apart in the first place.
+        (Some(files), true) => panic!(
+            "{OWNER}'s acceptance states both a fixed count of {files} scenario files and a rule \
+             of one scenario per observable route; they cannot both govern the directory, and \
+             this case will not pick one:\n{flat}"
+        ),
+        (None, false) => panic!(
+            "{OWNER}'s acceptance states neither a number of scenario files nor a rule for how \
+             many there are, so nothing outside this unit says what the directory has to \
+             contain:\n{flat}"
+        ),
+    }
+}
+
+/// How many behaviours the acceptance enumerates, so the list this file carries is
+/// checked against the statement rather than trusted.
+fn stated_behaviour_count(acceptance: &str) -> usize {
+    let flat = flattened(acceptance);
+    regex::Regex::new(r"those ([a-z]+) behaviours|([a-z]+) behaviours")
+        .expect("a valid pattern")
+        .captures_iter(&flat)
+        .find_map(|capture| {
+            capture
+                .get(1)
+                .or_else(|| capture.get(2))
+                .and_then(|word| number_word(word.as_str()))
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "{OWNER}'s acceptance no longer states how many behaviours it enumerates, and \
+                 the list of behaviour names in this file is checked against that number"
+            )
+        })
+}
+
+#[test]
+fn the_directory_ships_what_the_story_acceptance_states() {
+    let acceptance = acceptance_statement();
+    let stated = stated_behaviour_count(&acceptance);
+    assert_eq!(
+        BEHAVIOURS.len(),
+        stated,
+        "{OWNER}'s acceptance enumerates {stated} behaviours and this file carries {}: {:?}",
+        BEHAVIOURS.len(),
+        BEHAVIOURS
+    );
+
+    let owned = owned_scenarios();
+    let rows = behaviour_rows();
+    let route_count: usize = rows.values().map(Vec::len).sum();
+    match deliverable_rule(&acceptance) {
+        Deliverable::Files(expected) => assert_eq!(
+            owned.len(),
+            expected,
+            "{OWNER}'s acceptance says this story ships {expected} scenario files and the \
+             directory carries {}: {:?}. Either the deliverable or the statement is wrong, and \
+             the statement is the planning store's to amend, not this unit's",
+            owned.len(),
+            owned.keys().collect::<Vec<_>>()
+        ),
+        Deliverable::OnePerRoute => {
+            assert_eq!(
+                owned.len(),
+                route_count,
+                "{OWNER}'s acceptance says one scenario per observable route, the enumeration \
+                 carries {route_count} routes and the directory carries {} files: {:?}",
+                owned.len(),
+                owned.keys().collect::<Vec<_>>()
+            );
+            for behaviour in BEHAVIOURS {
+                assert!(
+                    rows.get(*behaviour).is_some_and(|rows| !rows.is_empty()),
+                    "`{behaviour}` is one of the behaviours the acceptance enumerates and the \
+                     document gives it no route at all"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn the_acceptance_rule_is_read_from_the_statement_in_either_form_it_can_take() {
+    assert_eq!(
+        deliverable_rule(
+            "such that every one of those six behaviours has a named observable outcome … so the\n\
+             six behaviours and their six scenario files correspond one to one."
+        ),
+        Deliverable::Files(6),
+        "a statement that counts scenario files has to be measured by counting them"
+    );
+    assert_eq!(
+        deliverable_rule(
+            "such that every one of those six behaviours has a named observable outcome, and one\n\
+             scenario per observable route under `…/scenarios/` named after it."
+        ),
+        Deliverable::OnePerRoute,
+        "a statement that states a rule per route has to be measured by the routes"
+    );
+    assert_eq!(
+        stated_behaviour_count("… every one of those six behaviours has a named outcome …"),
+        6
+    );
+}
+
+#[test]
+#[should_panic(expected = "cannot both govern")]
+fn an_acceptance_that_states_both_a_count_and_a_rule_is_refused_rather_than_resolved() {
+    deliverable_rule(
+        "… every one of those six behaviours has a named observable outcome, and one scenario \
+         per observable route named after it … Those two plus the six scenario files above are \
+         the inbound half of the epic's acceptance criterion 5.",
     );
 }
