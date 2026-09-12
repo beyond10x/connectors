@@ -33,11 +33,17 @@ pinned here. The two revisions are named by `initiative:complete-local-connector
 
 ## What is deliberately not decided here
 
-- Which transports and capability profiles this repository supports. stdio and Streamable
-  HTTP are the transports the pinned revisions define and the initiative names as
-  implementation targets; selecting, bounding and specifying them — framing, streaming,
-  cancellation, progress, session loss and version mismatch — is a separate authoring
-  obligation that reads this pin.
+- Which transports and capability profiles this repository supports. The pinned revisions
+  define **three** transport families, not two: stdio, Streamable HTTP, and custom
+  transports, which carry their own MUST-level requirement — `2026-07-28`
+  `basic/transports/index.mdx` §Custom Transports (line 60, "Implementers who choose to
+  support custom transports **MUST** preserve the … metadata model") and `2025-11-25`
+  `basic/transports.mdx` §Custom Transports (line 313). The initiative names stdio and
+  Streamable HTTP as implementation targets; that is a target list, not the option space.
+  Selecting, bounding and specifying transports — including an explicit refusal of custom
+  transports, if that is the selection — together with framing, streaming, cancellation,
+  progress, session loss and version mismatch, is a separate authoring obligation that
+  reads this pin.
 - Any MCP noun, its identity, cardinality or lifecycle. No entity or relation is declared
   by this directory, and none may be inferred from the pinned documents without its own
   modelled and reviewed record.
@@ -48,6 +54,25 @@ A capability listed in a pinned specification document is a protocol declaration
 not evidence that any MCP server implements it and it is not a support claim by this
 repository. That distinction is the reason the revisions are pinned before anything is
 authored.
+
+## The boundary obligation this directory creates
+
+Creating `adapters/mcp/` made `mcp` a forbidden term in **shared** ESS, silently and as a
+side effect of the directory name. `crates/connectors-build/src/ess_boundary.rs` lines
+300-302 insert every adapter owner's words into the boundary gate's forbidden term set
+unless that name is listed in the reviewed `shared_protocol_names` policy, and
+`crates/connectors-build/ess-boundary.json` line 3 lists exactly one name there: `sip`.
+
+Nothing is red today — shared `ess/` and `contracts/` name MCP nowhere, and the gate
+exits 0 with this directory present. The obligation is for later: a story in this epic
+that needs *shared* vocabulary to say MCP will be refused by the boundary gate, and the
+refusal will read as that story's own bug rather than as this one's consequence. `sip` is
+the precedent for what the exception has to look like — an entry in the reviewed
+`shared_protocol_names` policy, justified by the term being genuine shared protocol
+vocabulary rather than native provider semantics. Per
+[the adapter index](../README.md#boundary-gate), such an entry cannot suppress a
+forbidden native term or an adapter-path dependency, and no per-file suppression exists.
+Native MCP vocabulary stays in this directory and needs no exception at all.
 
 ## Sources and remaining obligations
 
