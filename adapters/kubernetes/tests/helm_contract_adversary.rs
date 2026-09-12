@@ -104,18 +104,38 @@ async fn invoke_and_validate(secret: Value, operation: &str, input: Value) -> Re
 #[test]
 fn manifest_content_digest_is_sha256_over_the_document_text() {
     let text = "kind: Service\nmetadata:\n  name: api";
-    let body = json!({ "manifest": format!("---\n{text}\n") });
+    // AMENDED by the coordinator, story:kubernetes-helm-release-reads.
+    //
+    // This fixture appends a newline after `text`, so the document as Helm
+    // stores it is `text` plus that newline — 36 bytes, not 35. When this case
+    // was written the defect under test was a digest over the JSON encoding
+    // rather than the text, and the implementation trimmed, so both readings
+    // agreed at 35 and the distinction did not matter. The correction stopped
+    // trimming, and the two readings separated.
+    //
+    // As-stored is the right reading and it is pinned, not assumed:
+    // vendor/helm-v4.3.0-action.go:358,476 and vendor/helm-v3.22.0-action.go:183
+    // write every document, the last one included, as "---\n# Source: %s\n%s\n".
+    // Under a rule that stripped the newline at end-of-input, the final
+    // document of every real Helm manifest would fail `sha256sum` — which is
+    // the very defect adversary pass 2 filed as F1, relocated rather than
+    // fixed.
+    //
+    // The assertion now names the stored document. If the projection ever
+    // trims again, this goes red.
+    let document = format!("{text}\n");
+    let body = json!({ "manifest": format!("---\n{document}") });
     let (items, complete) =
         helm::manifest_documents("sh.helm.release.v1.api.v1", &body, 10).unwrap();
     assert!(complete);
     assert_eq!(items.len(), 1);
     // The byte length the same sentence promises does hold, which fixes which
     // bytes "that text" names: exactly these.
-    assert_eq!(items[0].bytes, text.len() as u64);
+    assert_eq!(items[0].bytes, document.len() as u64);
 
-    let over_the_text = hex::encode(Sha256::digest(text.as_bytes()));
+    let over_the_text = hex::encode(Sha256::digest(document.as_bytes()));
     let over_the_json_encoding = hex::encode(Sha256::digest(
-        serde_json::to_vec(&json!(text)).unwrap().as_slice(),
+        serde_json::to_vec(&json!(document)).unwrap().as_slice(),
     ));
     assert_eq!(
         items[0].content_digest, over_the_text,
