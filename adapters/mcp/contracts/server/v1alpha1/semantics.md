@@ -141,18 +141,29 @@ host records a terminal and stops admitting data", which both a graceful close a
 of a partial result are. What distinguishes rows is the observable outcome, and no two
 rows share one.
 
-**Two behaviours have two routes, and each route is its own row.** A behaviour whose
-answer differs by *where* the mismatch or the ending happens does not have one transition,
-and collapsing it into one row picks a winner silently: a reader implementing from the
-table would deny readiness for a per-request capability refusal, or would have nothing to
-implement for a graceful shutdown. Each route therefore carries its own observable
-outcome, its own transition and its own trace, and the prose section says which is which.
+**Where a behaviour has more than one observable route, each route is its own row.** A
+behaviour whose answer differs by *where* the mismatch happens, by *how* the connection
+ends, or by whether the request outlives the lease admitting it does not have one
+transition, and collapsing it into one row picks a winner silently: a reader implementing
+from the table would deny readiness for a per-request capability refusal, have nothing to
+implement for a graceful shutdown, and renew no lease at all. Each route therefore carries
+its own observable outcome, its own transition and its own trace, and the prose section
+says which is which.
+
+**Each trace records one admitted data decision, and that is arithmetic, not brevity.**
+ESS instants are whole seconds and must strictly increase, a data lease may not outlive
+2,000 ms from its issuance (§2), and an act admitted *on* the effective expiry is admitted
+after the gate has stopped — so exactly one whole second falls strictly inside a lease
+window. A trace therefore records the decision its outcome turns on, and a renewal where
+the request outlives the lease; the messages either side of it are the same decision
+again, and nothing in the enumeration rests on them.
 
 | Behaviour | Observable outcome | Session transition | Scenario |
 |---|---|---|---|
 | message framing | `framing-refusal-keeps-the-session-ready` | `permit_data` (`Ready` → `Ready`) | [`framing-refusal-keeps-the-session-ready.yaml`](scenarios/framing-refusal-keeps-the-session-ready.yaml) |
 | streaming | `partial-result-never-reported-complete` | `begin_close` (`Ready` → `Closing`) | [`partial-result-never-reported-complete.yaml`](scenarios/partial-result-never-reported-complete.yaml) |
 | progress | `progress-stops-at-the-result` | `permit_data` (`Ready` → `Ready`) | [`progress-stops-at-the-result.yaml`](scenarios/progress-stops-at-the-result.yaml) |
+| progress (lease renewal) | `renewed-lease-keeps-a-long-request-ready` | `renew` (`Ready` → `Ready`) | [`renewed-lease-keeps-a-long-request-ready.yaml`](scenarios/renewed-lease-keeps-a-long-request-ready.yaml) |
 | cancellation | `cancelled-request-answers-nothing` | `permit_data` (`Ready` → `Ready`) | [`cancelled-request-answers-nothing.yaml`](scenarios/cancelled-request-answers-nothing.yaml) |
 | connection and session loss (graceful close) | `graceful-stdin-close-ends-the-session` | `begin_close` (`Ready` → `Closing`) | [`graceful-stdin-close-ends-the-session.yaml`](scenarios/graceful-stdin-close-ends-the-session.yaml) |
 | connection and session loss (transport drop) | `transport-drop-loses-the-session` | `continuity_lost` (`Ready` → `Lost`) | [`transport-drop-loses-the-session.yaml`](scenarios/transport-drop-loses-the-session.yaml) |
@@ -233,7 +244,7 @@ refused with `connectors.sessions.StateConflict`. A partial result ended by the 
 is §3.4, and one ended by a drop is §3.5; both leave the same guarantee, that nothing
 partial is presented as complete.
 
-### 3.3 Progress — `progress-stops-at-the-result`
+### 3.3 Progress — `progress-stops-at-the-result` and `renewed-lease-keeps-a-long-request-ready`
 
 Progress is opt-in and caller-keyed: a caller that wants it includes a `progressToken` in
 `_meta` (`mcp-2026-07-28-basic-patterns-progress.mdx:13-18`), and a caller that sends none
@@ -270,10 +281,15 @@ If it does not, the lease expires at its deadline: that expiry is itself the ter
 recorded `lease_expired`, with no grace period after it and no way for a later renewal to
 reopen the session. The caller then observes what §3.5 describes for any ending —
 notifications stop, no result arrives, and whether the work took effect is unknown.
-[`scenarios/progress-stops-at-the-result.yaml`](scenarios/progress-stops-at-the-result.yaml)
-carries both halves: two notifications and a result across a request that outlives its
-first lease, and the supervisor's renewal in between, performed by the host and by nothing
-the caller sent.
+
+That renewal is a route of this behaviour and has its own row, its own outcome
+`renewed-lease-keeps-a-long-request-ready`, and its own trace,
+[`scenarios/renewed-lease-keeps-a-long-request-ready.yaml`](scenarios/renewed-lease-keeps-a-long-request-ready.yaml):
+the supervisor renews at `12:00:03`, strictly before the `12:00:04` deadline of the lease
+that admitted the request, and the response goes out under the renewed one. A reader
+implementing only the `permit_data` row would implement no renewal, and every request
+outliving one lease would die at its deadline — which is why the row exists rather than
+the prose alone.
 
 ### 3.4 Cancellation — `cancelled-request-answers-nothing`
 
@@ -316,8 +332,18 @@ and waited before any forced termination (`:89-94`); the interoperability revisi
 specifies the same sequence (`mcp-2025-11-25-basic-lifecycle.mdx:232-241`). The supervisor
 records one terminal by `begin_close` (`Ready` → `Closing`) with reason `remote_hangup`,
 cuts data off by the earlier of the §4.1 ceiling and the live lease's own deadline, and
-finishes at `Closed` with the peer's shutdown recorded as confirmed — which, unlike the
-drop below, this ending actually observed.
+finishes at `Closed`.
+
+**The peer's shutdown is recorded `unconfirmed`, and end-of-file is not evidence
+otherwise.** Closing that stream is step one of the client's three — "1. Closing the input
+stream to the child process (the server). 2. Waiting for the server to exit. 3. If the
+server does not exit within a reasonable time, forcibly terminating the process"
+(`mcp-2026-07-28-basic-transports-stdio.mdx:89-94`) — so at EOF the peer has not exited;
+it is waiting on this process with the escalation in hand. `Closed` therefore records
+confirmed *local* release and nothing about the caller: the sessions contract says
+`closed` "does not assert remote cooperation", and peer shutdown is recorded confirmed or
+unconfirmed independently of the local cutoff. A binding that read EOF as the peer's exit
+would be reporting an observation it never made.
 
 **Lost — `transport-drop-loses-the-session`.** The connection drops with no graceful close — the caller's process dies, the
 pipe breaks mid-write, the child is force-terminated. The outcome is unknown, which is

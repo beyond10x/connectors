@@ -1,13 +1,13 @@
-# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.6.
-# Behaviour: version and capability mismatch (per-request refusal)
-# Outcome: capability-refusal-keeps-the-session-ready
-# Transition: connectors.sessions.Session.permit_data (Ready → Ready)
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.3.
+# Behaviour: progress (lease renewal)
+# Outcome: renewed-lease-keeps-a-long-request-ready
+# Transition: connectors.sessions.Session.renew (Ready → Ready)
 #
-# The other route of the same behaviour, the legacy initialize that denies readiness, is
-# unsupported-version-denies-readiness.yaml. Both exist because the document describes
-# both: on the primary revision a version or capability mismatch is one request's refusal
-# and closes nothing, and a table row that named only the connection-level denial left a
-# reader implementing this route with nothing that fails.
+# The other route of the same behaviour is progress-stops-at-the-result.yaml, where the
+# request finishes inside the lease that admitted it. This one is the request that does
+# not: it stays Ready only because the supervisor renews, and the row exists because a
+# reader implementing from the enumeration alone would otherwise implement no renewal and
+# kill every request that outlives one lease.
 #
 # Compiled supervisor decisions, not an executed trace, and not an MCP message: the
 # pinned toolchain "compiles obligations but does NOT execute a sequential trace"
@@ -18,8 +18,8 @@
 # any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
 type: ess-scenario/1
 domain: connectors.sessions
-scenario: capability-refusal-keeps-the-session-ready
-summary: 'A request needing a capability the caller did not declare is refused on the same channel; the connection keeps carrying traffic and the session stays Ready.'
+scenario: renewed-lease-keeps-a-long-request-ready
+summary: 'A request that outlives the lease admitting it stays Ready only because the supervisor renews before the effective deadline, under its own serialized authority and on no peer message.'
 arrange:
 - instance: session
   entity: connectors.sessions.Session
@@ -67,19 +67,35 @@ timeline:
   outcome: ready
   events:
   - event: connectors.sessions.SessionReady
-# The refusal itself: MissingRequiredClientCapabilityError, -32021, naming what was missing
-# in data.requiredCapabilities (mcp-2026-07-28-basic-index.mdx:387-392). It is written to
-# the same shared channel as any other reply, so it is outbound data on a Ready session and
-# the supervisor's decision is permit_data — no denial, and no terminal. The refusal is
-# scoped to one request, because version and capabilities are per-request facts on this
-# revision (mcp-2026-07-28-basic-versioning.mdx:12-13).
-#
-# One admitted act, and that is arithmetic rather than brevity. ESS instants are whole
-# seconds and must strictly increase (ESS-AUTHOR-001, ESS-AUTHOR-023), a lease may not
-# outlive 2,000 ms from its issuance, and an act admitted *on* the effective expiry is
-# refused by the contract — so exactly one whole second lies strictly inside a lease
-# window, and a trace records the decision the outcome is about.
+# The request is still running as lease 1 approaches its deadline. The supervisor renews
+# strictly before that deadline — 12:00:03, not 12:00:04 — "under the same serialized
+# authority check as revocation" and never past an earlier deadline
+# (contracts/sessions/v1alpha1/semantics.md §4.1). Nothing the caller sent causes this act:
+# a progress notification is outbound data, not a lease input. A renewal arriving at or
+# after the expiry could not reopen the session, and the sequence advances, because §4.1
+# rejects reordered or replayed authority.
 - at: '2026-09-12T12:00:03Z'
+  command: connectors.sessions.RenewDataLease
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    lease:
+      issued_at: '2026-09-12T12:00:03Z'
+      effective_expiry: '2026-09-12T12:00:05Z'
+      sequence: 2
+  outcome: renewed
+  events:
+  - event: connectors.sessions.DataLeaseRenewed
+  no_events:
+  - connectors.sessions.ClosingBegun
+  - connectors.sessions.DataAuthorityTerminated
+  - connectors.sessions.ContinuityLost
+# The response goes out under lease 2, strictly inside its window. Had the supervisor not
+# renewed, this act could not have been admitted at all: the lease would have expired at
+# 12:00:04, which the model records as the terminal lease_expired with no grace after it,
+# and the outcome of the request would be unknown.
+- at: '2026-09-12T12:00:04Z'
   command: connectors.sessions.PermitData
   input:
     session_id:

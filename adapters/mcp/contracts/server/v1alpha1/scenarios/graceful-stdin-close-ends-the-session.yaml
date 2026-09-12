@@ -108,15 +108,24 @@ timeline:
   no_events:
   - connectors.sessions.DataPermitted
 # Teardown completes inside the deadline the close itself recorded, and records released on
-# local evidence. peer_shutdown is confirmed here — unlike the drop, this ending observed
-# the peer's own close — and that is recorded independently of the local cutoff.
+# local task and resource evidence, which is the only thing FinishTeardown may claim it on.
+#
+# peer_shutdown is unconfirmed, and EOF is not evidence otherwise. Closing that stream is
+# step one of the client's three: "1. Closing the input stream to the child process (the
+# server). 2. Waiting for the server to exit. 3. If the server does not exit within a
+# reasonable time, forcibly terminating the process"
+# (mcp-2026-07-28-basic-transports-stdio.mdx:89-94). At EOF the peer has not shut down — it
+# is waiting on this process, holding the escalation. The sessions contract records the
+# same shape: closed "records confirmed local release; it does not assert remote
+# cooperation", and "peer protocol shutdown is recorded as confirmed or unconfirmed
+# independently of local cutoff" (contracts/sessions/v1alpha1/semantics.md §4.1).
 - at: '2026-09-12T12:00:06Z'
   command: connectors.sessions.FinishTeardown
   input:
     session_id:
       $instance: session
     decision: released
-    peer_shutdown: confirmed
+    peer_shutdown: unconfirmed
   outcome: closed
   events:
   - event: connectors.sessions.LocalResourcesReleased
