@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:mcp-profile-selection-matrix
 kind: story
-status: active
+status: implemented
 title: Select the supported MCP revisions, transports and capabilities as a coverage matrix
 relations:
 - decomposes: epic:mcp-contracts
@@ -12,7 +12,7 @@ relations:
 scope:
 - confidence: inferred
   path: adapters/mcp/contracts/protocol/v1alpha1/selection.md
-revision: 5
+revision: 6
 ---
 ## Acceptance
 
