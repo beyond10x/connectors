@@ -171,7 +171,15 @@ fn describe(output: &Output) -> String {
 /// registry that keeps it part of the specification rather than removed from it.
 ///
 /// The count is the sentence a selection matrix reads, and it was already wrong once
-/// (pass 1 found it reading "two"). `adapters/mcp/design.md:36-42`.
+/// (pass 1 found it reading "two"). `adapters/mcp/design.md`, under
+/// `## What is deliberately not decided here`.
+///
+/// Cited by heading and not by line on purpose. This citation read
+/// `adapters/mcp/design.md:36-42` until `story:mcp-domain-model` inserted a section
+/// above that table and moved it to `:82-87`, at which point the numbers pointed into
+/// the new section and nothing noticed — this case matches text, not lines. That is the
+/// third instance of the citation half-life `story:mcp-domain-model` documents; a
+/// heading does not drift when a sibling unit edits the file above it.
 #[test]
 fn design_document_accounts_for_every_transport_binding_the_pinned_revisions_specify() {
     let mut headings = Vec::new();
