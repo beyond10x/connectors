@@ -1,0 +1,28 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:cancellation
+outcome: mcp.outbound.cancelled-by-closing-the-stream
+wire_code: n/a
+summary: Under the primary revision (2026-07-28) cancelling is closing that request's
+  stream, and what the server did with the work is not thereby known. Under the
+  interoperability revision (2025-11-25) closing signals nothing and
+  `legacy-cancellation-is-sent-not-implied.yaml` decides it.
+given:
+  - A binding configured for the primary revision (2026-07-28).
+  - An in-flight request with an open SSE response stream.
+when:
+  - The caller cancels, or the request's timeout expires
+    (mcp-2026-07-28-basic-patterns-cancellation.mdx:45-64).
+then:
+  - The client closes that request's stream, which the server must treat as cancellation
+    of it (mcp-2026-07-28-basic-transports-streamable-http.mdx:233-240,
+    mcp-2026-07-28-basic-patterns-cancellation.mdx:39-41).
+  - The request is reported as cancelled by this client, with the reason.
+  - Any effect at the server is reported as unobserved, `outcome_unknown`, for the same
+    reason a truncated stream is.
+  - A subscription is ended the same way (mcp-2026-07-28-basic-patterns-subscriptions.mdx:118-126).
+never:
+  - An answer arriving after cancellation becomes the request's result; it is recorded as
+    late and ignored (mcp-2026-07-28-basic-patterns-cancellation.mdx:81-82).
+  - Cancellation is reported as a failure of the server.

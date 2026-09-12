@@ -1,0 +1,39 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:progress
+outcome: mcp.outbound.progress-observed
+wire_code: n/a
+summary: Progress is shown, bounded by a maximum timeout, and never becomes a result.
+given:
+  - A binding configured for the primary revision (2026-07-28); under the
+    interoperability revision (2025-11-25) the same tokens apply and an expired bound
+    ends in a sent notification rather than a closed connection.
+  - A request carrying a `progressToken` unique across this client's active requests,
+    which both revisions require of it
+    (mcp-2026-07-28-basic-patterns-progress.mdx:13-18,
+    mcp-2025-11-25-basic-utilities-progress.mdx:15-20).
+when:
+  - The server sends progress notifications whose `progress` value does not go backwards
+    (mcp-2026-07-28-basic-patterns-progress.mdx:53-56,
+    mcp-2025-11-25-basic-utilities-progress.mdx:55-58), or sends none at all, which either
+    revision lets it choose (mcp-2026-07-28-basic-patterns-progress.mdx:60-62,
+    mcp-2025-11-25-basic-utilities-progress.mdx:66-69).
+then:
+  - Progress lines are shown for the request that asked for them, and the server's own
+    message text is marked as server-supplied.
+  - A notification whose token belongs to no active request is ignored and recorded.
+  - Progress may reset the request's timeout clock, and a maximum timeout is enforced
+    regardless (mcp-2026-07-28-basic-patterns-cancellation.mdx:45-64,
+    mcp-2025-11-25-basic-lifecycle.mdx:248-262).
+  - When that maximum expires the bounded outcome is the one the binding's revision
+    carries — under the primary revision (2026-07-28) a closed stream,
+    `mcp.outbound.cancelled-by-closing-the-stream`, and under the interoperability
+    revision (2025-11-25) a sent notification,
+    `mcp.outbound.legacy-cancellation-notified`.
+never:
+  - A progress value is treated as a result or as a partial result the caller may act on.
+  - Absence of progress is read as absence of work.
+  - Progress arrives after completion, which neither revision permits
+    (mcp-2026-07-28-basic-patterns-progress.mdx:86-90,
+    mcp-2025-11-25-basic-utilities-progress.mdx:96).
