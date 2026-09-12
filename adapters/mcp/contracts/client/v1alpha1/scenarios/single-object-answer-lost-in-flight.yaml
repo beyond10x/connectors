@@ -1,7 +1,7 @@
 type: mcp-outbound-lifecycle/1
 story: story:mcp-outbound-connection-lifecycle
 document: adapters/mcp/contracts/client/v1alpha1/semantics.md
-state: state:transport-unreachable
+state: state:connection-lost-in-flight
 outcome: mcp.outbound.answer-never-arrived
 wire_code: outcome_unknown
 summary: A request that was sent and answered with one JSON object, lost before the object

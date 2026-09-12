@@ -11,9 +11,12 @@ given:
     revision (2025-11-25); this client continues a broken stream on neither.
   - A request being answered on an open SSE stream, possibly after progress notifications.
 when:
-  - The stream closes with no JSON-RPC response for that request, which the specification
-    calls an unexpected disconnect as opposed to a graceful closure carrying a response
-    (mcp-2026-07-28-basic-patterns-subscriptions.mdx:128-135 and 155-157).
+  - The stream closes with no JSON-RPC response for that request. Under the primary
+    revision (2026-07-28) that is an unexpected disconnect as opposed to a graceful
+    closure carrying a response (mcp-2026-07-28-basic-patterns-subscriptions.mdx:128-135
+    and 155-157); under the interoperability revision (2025-11-25) a server MAY also
+    terminate the stream when the session expires
+    (mcp-2025-11-25-basic-transports.mdx:124-125), and this client continues neither.
 then:
   - The observable outcome is `outcome_unknown`, naming the request and the last progress
     value observed if there was one.
@@ -22,5 +25,8 @@ never:
   - The outcome is reported as success or as failure.
   - The request is sent a second time, which could duplicate an effect that already
     happened.
-  - The truncation is reported as session loss; under the primary revision there is no
-    session (mcp-2026-07-28-basic-index.mdx:204-209).
+  - The truncation is reported as session loss. Under the primary revision (2026-07-28)
+    there is no session to lose (mcp-2026-07-28-basic-index.mdx:204-209); under the
+    interoperability revision (2025-11-25) a session is lost only when the server says so
+    with a `404`, which is `mcp.outbound.session-lost`
+    (mcp-2025-11-25-basic-transports.mdx:213-217).
