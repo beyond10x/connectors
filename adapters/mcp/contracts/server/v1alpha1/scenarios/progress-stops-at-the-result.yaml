@@ -1,0 +1,115 @@
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.3.
+# Behaviour: progress
+# Outcome: progress-stops-at-the-result
+# Transition: connectors.sessions.Session.permit_data (Ready → Ready)
+#
+# Compiled supervisor decisions, not an executed trace, and not an MCP message: the
+# pinned toolchain "compiles obligations but does NOT execute a sequential trace"
+# (ess/domains/sessions.yaml, closing note). Whole-second acts express causal order.
+#
+# One instance_ref, one connection_ref, one authority_ref, in every trace of this story:
+# the single principal contracts/cli/v1alpha1/semantics.md §1 admits. A second value of
+# any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
+type: ess-scenario/1
+domain: connectors.sessions
+scenario: progress-stops-at-the-result
+summary: 'Progress notifications ride the live session as outbound data, renew no lease, and stop at the result; the session stays Ready.'
+arrange:
+- instance: session
+  entity: connectors.sessions.Session
+timeline:
+- at: '2026-09-12T12:00:00Z'
+  command: connectors.sessions.OfferSession
+  input:
+    binding:
+      instance_ref: connectors-local
+      connection_ref: local-owner
+      admitted_revision: config-revision-a
+      authority_ref: local-owner-uid
+    profile: inbound_offer
+    placement: local
+    streams:
+    - stdio
+  outcome: offered
+  events:
+  - event: connectors.sessions.SessionOffered
+  capture:
+    instance: session
+    event: connectors.sessions.SessionOffered
+    field: session_id
+- at: '2026-09-12T12:00:01Z'
+  command: connectors.sessions.AcceptOffer
+  input:
+    session_id:
+      $instance: session
+  outcome: accepted
+  events:
+  - event: connectors.sessions.OfferAccepted
+- at: '2026-09-12T12:00:02Z'
+  command: connectors.sessions.EstablishReady
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    lease:
+      issued_at: '2026-09-12T12:00:02Z'
+      effective_expiry: '2026-09-12T12:00:06Z'
+      sequence: 1
+  outcome: ready
+  events:
+  - event: connectors.sessions.SessionReady
+# First notifications/progress against the caller's progressToken. It is outbound data on
+# a session that is already Ready; no lease is renewed by it, which the no_events below
+# states rather than leaves to be read into the trace.
+- at: '2026-09-12T12:00:03Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: output
+  outcome: permitted
+  events:
+  - event: connectors.sessions.DataPermitted
+  no_events:
+  - connectors.sessions.DataLeaseRenewed
+  - connectors.sessions.ClosingBegun
+  - connectors.sessions.ContinuityLost
+# Second notification, with an increased progress value
+# (mcp-2026-07-28-basic-patterns-progress.mdx:53-54).
+- at: '2026-09-12T12:00:04Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: output
+  outcome: permitted
+  events:
+  - event: connectors.sessions.DataPermitted
+  no_events:
+  - connectors.sessions.DataLeaseRenewed
+  - connectors.sessions.ClosingBegun
+  - connectors.sessions.ContinuityLost
+# The response. Progress stops here: "Progress notifications MUST stop after completion"
+# (mcp-2026-07-28-basic-patterns-progress.mdx:90).
+- at: '2026-09-12T12:00:05Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: output
+  outcome: permitted
+  events:
+  - event: connectors.sessions.DataPermitted
+  no_events:
+  - connectors.sessions.DataLeaseRenewed
+  - connectors.sessions.ClosingBegun
+  - connectors.sessions.ContinuityLost
+assert:
+- view: connectors.sessions.SessionStates
+  contains:
+    session_id:
+      $instance: session
+    state: Ready
