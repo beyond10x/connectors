@@ -30,7 +30,8 @@ Replace the example target and scope with your cluster coordinates:
   "api_base": "https://cluster.example:6443/",
   "namespaces": ["default"],
   "resource_kinds": ["pods", "services", "deployments", "endpointslices"],
-  "discover_hosts": false
+  "discover_hosts": false,
+  "helm_release_reads": "off"
 }
 ```
 
@@ -43,6 +44,21 @@ certificate file; supply the cluster CA there when it is not in the system store
 
 `discover_hosts` is optional and defaults to false. While it is false the adapter
 does not advertise `hosts.discover` at all, so node reads cannot be requested.
+
+`helm_release_reads` is optional and defaults to `"off"`. It selects how much of
+a Helm release this binding may read:
+
+| Value | Advertised release operations |
+|---|---|
+| `"off"` | none |
+| `"metadata"` | `helm_releases.history`, `helm_releases.status` |
+| `"redacted_content"` | those two plus `helm_releases.values`, `helm_releases.manifest` |
+
+Release reads do not touch `resource_kinds`: that enum stays `pods`, `services`,
+`deployments` and `endpointslices`, and no setting adds a general Secret read.
+Adding or changing this field changes the effective document, so the
+`configuration_revision` changes with it and must be copied from
+`--print-local-bootstrap` again.
 
 The block above is the file format. The adapter's published
 `configuration_schema` has two branches, and the local one describes the
@@ -176,6 +192,10 @@ revision, then invoke with the saved connection as above. The request shapes are
 | `resources.list` | `{"namespace":"default","kind":"pods","limit":50}` |
 | `endpoints.discover` | `{"namespace":"default","limit":50}` |
 | `hosts.discover` | `{"limit":50}` |
+| `helm_releases.history` | `{"namespace":"default","release":"api","limit":50}` |
+| `helm_releases.status` | `{"namespace":"default","release":"api","limit":50}` |
+| `helm_releases.values` | `{"namespace":"default","release":"api","revision":3,"limit":200}` |
+| `helm_releases.manifest` | `{"namespace":"default","release":"api","revision":3,"limit":200}` |
 
 `limit` is between 1 and 100. List results contain `items`, `next_cursor` and
 `complete`. Pass a returned cursor alongside unchanged selectors, limit and
@@ -190,11 +210,56 @@ slices per page.
 
 `hosts.discover` reads nodes and is available only while `discover_hosts` is true.
 
+## Read Helm releases
+
+The four `helm_releases.*` operations read the Secrets a Helm release is stored
+in, one per revision, named `sh.helm.release.v1.<release>.v<revision>`. The
+[native contract](../adapters/kubernetes/contracts/helm/v1alpha1/semantics.md)
+states the behaviour and the
+[pinned Helm sources](../adapters/kubernetes/contracts/helm/v1alpha1/evidence/20260912/provider-sources.md)
+state where every field comes from.
+
+`helm_releases.history` returns the release's revisions, each carrying the exact
+Secret it was read from, its revision number, its status and the timestamps Helm
+recorded. It pages with `limit` and a cursor like the other list reads.
+`helm_releases.status` is the same read restricted to the revisions the store
+marks `deployed`; it reports all of them rather than choosing one, because a
+concurrently written store can hold more than one.
+
+`helm_releases.values` and `helm_releases.manifest` read one revision and return
+a **redacted projection, never the stored content**. A release's recorded values
+routinely contain credentials, and its rendered manifest contains the body of
+every Secret the release applied. `values` returns one entry per recorded path
+with its JSON shape and a SHA-256 of its value; `manifest` returns one entry per
+rendered document with its position, byte length and a SHA-256 of its text. No
+recorded scalar and no manifest byte is returned, and there is no setting that
+returns one. Use the digests to tell whether something changed between
+revisions; to read the value itself, use your own cluster credentials directly.
+
+Both projections read a single object, so they never issue a cursor: a
+projection larger than `limit` comes back with `complete: false` and
+`next_cursor: null`.
+
+A namespace outside the configured scope is refused with no request at all. A
+namespace whose release Secrets the credential may not read is refused too,
+after one request, by the cluster's own RBAC. Neither is ever reported as an
+empty history — a release with no stored revisions returns an empty, complete
+page.
+
 ## Limitations
 
-This binding advertises three read operations. Kubernetes events, conditions, pod
-logs, exec, copy, port forwarding and every mutation are not implemented, and
-neither are Helm workflows.
+This binding advertises up to seven read operations. Kubernetes events,
+conditions, pod logs, exec, copy, port forwarding and every mutation are not
+implemented.
+
+Of the Helm surface, only release-state reads exist. Installing, upgrading,
+uninstalling and rolling back a release are not implemented; neither are chart
+rendering, linting, packaging and registry access, which are local tool work
+that never reaches a cluster. `helm list` — every release in a scope, rather
+than one release's revisions — is not implemented either and would need its own
+selection and admission. A release's stored chart and hooks are not read, and a
+manifest document's own resource identity is not reported, because this binding
+has no YAML reader and will not guess one from lines.
 
 Per-operation permission pre-checks are not performed. The native
 [authorization contract](../adapters/kubernetes/contracts/auth/v1alpha1/semantics.md)

@@ -1,5 +1,6 @@
 //! Deterministic private-runtime journey against a local TLS fixture cluster.
 //! No real Kubernetes cluster is contacted and no real credential is used.
+use base64::Engine as _;
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
@@ -86,8 +87,153 @@ fn nodes() -> Value {
     }]})
 }
 
+/// Fictional fixture material standing in for the credentials a real Helm
+/// release routinely records. Neither literal may leave the adapter.
+const RECORDED_VALUE_SECRET: &str = "fixture-helm-recorded-password";
+const RENDERED_MANIFEST_SECRET: &str = "fixture-helm-manifest-password";
+
+/// The stored release body, in the pinned Helm shape: the fields this binding
+/// reads plus the chart and hooks it deliberately does not.
+fn release_body(revision: u64, status: &str) -> Value {
+    json!({
+        "name":"api","namespace":"fixture","version":revision,
+        "info":{"first_deployed":"2026-09-01T10:00:00Z","last_deployed":"2026-09-05T11:00:00Z",
+                "deleted":"","description":"Upgrade complete","status":status,
+                "notes":"fixture NOTES.txt"},
+        "config":{"replicaCount":3,"image":{"tag":"1.4.2"},"tls":{"enabled":true},
+                  "postgresql":{"auth":{"password":RECORDED_VALUE_SECRET}},
+                  "hosts":["a.example","b.example"],"unset":null},
+        "manifest":format!("---\napiVersion: v1\nkind: Secret\nmetadata:\n  name: api-db\nstringData:\n  password: {RENDERED_MANIFEST_SECRET}\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: api\n"),
+        "chart":{"metadata":{"name":"api","version":"0.3.1"}},
+        "hooks":[]
+    })
+}
+
+/// Helm stores base64(gzip(json)) as the Secret's raw bytes; the Kubernetes API
+/// then base64-encodes those bytes again for the wire. `compress` exercises the
+/// documented backwards-compatible path where the gzip magic is absent.
+fn stored_release(body: &Value, compress: bool) -> String {
+    let json = serde_json::to_vec(body).unwrap();
+    let inner = if compress {
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+        std::io::Write::write_all(&mut encoder, &json).unwrap();
+        encoder.finish().unwrap()
+    } else {
+        json
+    };
+    let helm = base64::engine::general_purpose::STANDARD.encode(inner);
+    base64::engine::general_purpose::STANDARD.encode(helm.as_bytes())
+}
+
+fn release_secret(revision: u64, status: &str, compress: bool) -> Value {
+    let mut labels = json!({"name":"api","owner":"helm","status":status,
+        "version":revision.to_string(),"app.kubernetes.io/managed-by":"Helm"});
+    // createdAt and modifiedAt come from separate Helm code paths, so a stored
+    // revision carries one, the other, both or neither.
+    if revision == 1 {
+        labels["createdAt"] = json!("1757000000");
+    } else {
+        labels["modifiedAt"] = json!(format!("175700{}00", revision));
+    }
+    json!({
+        "metadata":{"name":format!("sh.helm.release.v1.api.v{revision}"),
+                    "namespace":"fixture","resourceVersion":format!("7{revision}"),
+                    "labels":labels},
+        "type":"helm.sh/release.v1",
+        "data":{"release":stored_release(&release_body(revision, status), compress)}
+    })
+}
+
+/// One release with three revisions. Revision 2 is stored uncompressed.
+fn release_revisions() -> Vec<Value> {
+    vec![
+        release_secret(1, "superseded", true),
+        release_secret(2, "failed", false),
+        release_secret(3, "deployed", true),
+    ]
+}
+
+fn secret_list(items: Vec<Value>, continuation: &str) -> Value {
+    json!({"metadata":{"resourceVersion":"79","continue":continuation},"items":items})
+}
+
+/// An object carrying Helm's own labels whose type is not a release Secret.
+fn foreign_labelled_secret() -> Value {
+    json!({"metadata":{"name":"sh.helm.release.v1.api.v1","namespace":"foreign",
+                       "resourceVersion":"80",
+                       "labels":{"name":"api","owner":"helm","status":"deployed","version":"1"}},
+           "type":"Opaque","data":{"release":"" }})
+}
+
+/// Percent-decode one query parameter of an observed request line.
+fn query_value(path: &str, key: &str) -> Option<String> {
+    let query = path.split_once('?')?.1;
+    for pair in query.split('&') {
+        let (name, value) = pair.split_once('=')?;
+        if name != key {
+            continue;
+        }
+        let raw = value.replace('+', " ");
+        let bytes = raw.as_bytes();
+        let mut out = Vec::new();
+        let mut index = 0;
+        while index < bytes.len() {
+            if bytes[index] == b'%' && index + 2 < bytes.len() {
+                out.push(u8::from_str_radix(&raw[index + 1..index + 3], 16).unwrap());
+                index += 3;
+            } else {
+                out.push(bytes[index]);
+                index += 1;
+            }
+        }
+        return Some(String::from_utf8(out).unwrap());
+    }
+    None
+}
+
+/// Serve the Helm release-Secret collection the way the pinned storage driver
+/// selects it: by `owner=helm` plus `name`, optionally plus `status`.
+fn release_collection(path: &str) -> Value {
+    let selector = query_value(path, "labelSelector").unwrap_or_default();
+    let mut items: Vec<Value> = release_revisions()
+        .into_iter()
+        .filter(|item| {
+            selector
+                .split(',')
+                .filter(|term| !term.is_empty())
+                .all(|term| match term.split_once('=') {
+                    Some(("owner", value)) => value == "helm",
+                    Some(("name", value)) => item["metadata"]["labels"]["name"] == value,
+                    Some(("status", value)) => item["metadata"]["labels"]["status"] == value,
+                    _ => false,
+                })
+        })
+        .collect();
+    let total = items.len();
+    let limit: usize = query_value(path, "limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(total);
+    let start: usize = query_value(path, "continue")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let start = start.min(total);
+    let end = (start + limit).min(total);
+    items = items[start..end].to_vec();
+    secret_list(
+        items,
+        &if end < total {
+            end.to_string()
+        } else {
+            String::new()
+        },
+    )
+}
+
 impl Cluster {
     fn new(discover_hosts: bool) -> Self {
+        Self::with(discover_hosts, "off")
+    }
+    fn with(discover_hosts: bool, helm_release_reads: &str) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -217,6 +363,26 @@ impl Cluster {
                         (200, slices())
                     } else if route == "/api/v1/nodes" {
                         (200, nodes())
+                    } else if route.starts_with("/api/v1/namespaces/denied/secrets") {
+                        // A namespace the credential may not read release
+                        // Secrets in. The cluster answers, and the answer is a
+                        // denial rather than an empty collection.
+                        (403, json!({"kind":"Status","code":403}))
+                    } else if route == "/api/v1/namespaces/backendless/secrets" {
+                        (200, secret_list(Vec::new(), ""))
+                    } else if route == "/api/v1/namespaces/foreign/secrets" {
+                        (200, secret_list(vec![foreign_labelled_secret()], ""))
+                    } else if route == "/api/v1/namespaces/fixture/secrets" {
+                        (200, release_collection(&path))
+                    } else if let Some(name) =
+                        route.strip_prefix("/api/v1/namespaces/fixture/secrets/")
+                    {
+                        match release_revisions().into_iter().find(|item| {
+                            item["metadata"]["name"] == name
+                        }) {
+                            Some(item) => (200, item),
+                            None => (404, json!({"kind":"Status","code":404})),
+                        }
                     } else {
                         (404, json!({"kind":"Status","code":404}))
                     };
@@ -232,19 +398,21 @@ impl Cluster {
         });
         let address = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         let config = directory.join("kubernetes.json");
-        private(
-            &config,
-            &serde_json::to_vec(&json!({
-                "format":"connectors-kubernetes-local/1",
-                "instance":"fixture-kubernetes",
-                "api_base":format!("https://localhost:{}/", address.port()),
-                "ca_file":ca,
-                "namespaces":["backendless","fixture"],
-                "resource_kinds":["pods","endpointslices"],
-                "discover_hosts":discover_hosts
-            }))
-            .unwrap(),
-        );
+        let mut document = json!({
+            "format":"connectors-kubernetes-local/1",
+            "instance":"fixture-kubernetes",
+            "api_base":format!("https://localhost:{}/", address.port()),
+            "ca_file":ca,
+            "namespaces":["backendless","denied","fixture","foreign"],
+            "resource_kinds":["pods","endpointslices"],
+            "discover_hosts":discover_hosts
+        });
+        // The field is optional on disk and defaults to no Helm release read at
+        // all, so the default fixture writes a file that does not mention it.
+        if helm_release_reads != "off" {
+            document["helm_release_reads"] = json!(helm_release_reads);
+        }
+        private(&config, &serde_json::to_vec(&document).unwrap());
         Self {
             stop: Some(stop),
             thread: Some(thread),
@@ -708,4 +876,326 @@ fn a_backendless_endpointslice_reads_as_no_observations_rather_than_malformed() 
     });
     assert_eq!(page["items"].as_array().map(|i| i.len()), Some(0));
     assert_eq!(page["complete"], true);
+}
+
+/// Every value observed anywhere in a response, as text. A projection that
+/// carries a recorded scalar or a rendered manifest byte fails this.
+fn discloses(value: &Value, literal: &str) -> bool {
+    serde_json::to_string(value).unwrap().contains(literal)
+}
+
+#[test]
+fn helm_release_history_status_values_and_manifest_come_from_named_release_secrets() {
+    let cluster = Cluster::with(false, "redacted_content");
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+
+    // Revision history is a bounded page over the release's own Secrets.
+    let first = invoke(
+        &mut child,
+        "helm_releases.history",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","limit":2}),
+    )
+    .unwrap_or_else(|failure| panic!("history {failure:?}; paths {:?}", cluster.routes()));
+    assert_eq!(first["items"].as_array().map(Vec::len), Some(2));
+    assert_eq!(first["items"][0]["revision"], 1);
+    assert_eq!(first["items"][0]["status"], "superseded");
+    assert_eq!(
+        first["items"][0]["source_secret"],
+        "sh.helm.release.v1.api.v1"
+    );
+    assert_eq!(first["items"][0]["source_revision"], "71");
+    assert_eq!(first["items"][0]["created_at_unix_s"], 1_757_000_000_i64);
+    assert_eq!(first["items"][0]["modified_at_unix_s"], Value::Null);
+    assert_eq!(first["items"][1]["revision"], 2);
+    assert_eq!(first["items"][1]["status"], "failed");
+    assert_eq!(first["complete"], false);
+    let cursor = first["next_cursor"].as_str().unwrap().to_owned();
+    let second = invoke(
+        &mut child,
+        "helm_releases.history",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","limit":2,"cursor":cursor}),
+    )
+    .unwrap();
+    assert_eq!(second["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(second["items"][0]["revision"], 3);
+    assert_eq!(second["complete"], true);
+    assert_eq!(second["next_cursor"], Value::Null);
+
+    // The deployed revision is selected by Helm's own label triple.
+    let status = invoke(
+        &mut child,
+        "helm_releases.status",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","limit":10}),
+    )
+    .unwrap();
+    assert_eq!(status["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(status["items"][0]["revision"], 3);
+    assert_eq!(status["items"][0]["status"], "deployed");
+    assert_eq!(
+        status["items"][0]["source_secret"],
+        "sh.helm.release.v1.api.v3"
+    );
+    assert_eq!(status["complete"], true);
+
+    // Recorded values are disclosed as structure and digests, never literals.
+    let values = invoke(
+        &mut child,
+        "helm_releases.values",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","revision":3,"limit":100}),
+    )
+    .unwrap_or_else(|failure| panic!("values {failure:?}; paths {:?}", cluster.routes()));
+    assert_eq!(values["complete"], true);
+    assert_eq!(values["next_cursor"], Value::Null);
+    assert_eq!(
+        values["provenance"]["resource"],
+        "fixture/sh.helm.release.v1.api.v3/values"
+    );
+    assert_eq!(values["provenance"]["source_revision"], "73");
+    let recorded: Vec<(String, String)> = values["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| {
+            (
+                item["path"].as_str().unwrap().to_owned(),
+                item["kind"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert!(recorded.contains(&("replicaCount".into(), "number".into())));
+    assert!(recorded.contains(&("image".into(), "object".into())));
+    assert!(recorded.contains(&("image.tag".into(), "string".into())));
+    assert!(recorded.contains(&("postgresql.auth.password".into(), "string".into())));
+    assert!(recorded.contains(&("hosts".into(), "array".into())));
+    assert!(recorded.contains(&("hosts[1]".into(), "string".into())));
+    assert!(recorded.contains(&("tls.enabled".into(), "boolean".into())));
+    assert!(recorded.contains(&("unset".into(), "null".into())));
+    for item in values["items"].as_array().unwrap() {
+        assert_eq!(item["source_secret"], "sh.helm.release.v1.api.v3");
+        let digest = item["value_digest"].as_str().unwrap();
+        assert_eq!(digest.len(), 64);
+        assert!(digest.bytes().all(|b| b.is_ascii_hexdigit()));
+    }
+    assert!(
+        !discloses(&values, RECORDED_VALUE_SECRET),
+        "a recorded value literal crossed the boundary"
+    );
+    // Neither does the non-secret scalar: the rule is no literal at all.
+    assert!(!discloses(&values, "1.4.2"));
+
+    // The rendered manifest is disclosed as bounded per-document digests.
+    let manifest = invoke(
+        &mut child,
+        "helm_releases.manifest",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","revision":3,"limit":100}),
+    )
+    .unwrap();
+    assert_eq!(manifest["items"].as_array().map(Vec::len), Some(2));
+    assert_eq!(manifest["complete"], true);
+    assert_eq!(
+        manifest["provenance"]["resource"],
+        "fixture/sh.helm.release.v1.api.v3/manifest"
+    );
+    for (index, item) in manifest["items"].as_array().unwrap().iter().enumerate() {
+        assert_eq!(item["index"], index as u64);
+        assert_eq!(item["source_secret"], "sh.helm.release.v1.api.v3");
+        assert!(item["bytes"].as_u64().unwrap() > 0);
+        assert_eq!(item["content_digest"].as_str().unwrap().len(), 64);
+    }
+    assert!(
+        !discloses(&manifest, RENDERED_MANIFEST_SECRET),
+        "a rendered manifest literal crossed the boundary"
+    );
+    assert!(!discloses(&manifest, "kind: Secret"));
+
+    // A revision with no stored Secret is a provider absence, not an empty read.
+    assert_eq!(
+        invoke(
+            &mut child,
+            "helm_releases.manifest",
+            "one",
+            &token(true),
+            json!({"namespace":"fixture","release":"api","revision":9,"limit":100})
+        ),
+        Err(Failure::ProviderNotFound)
+    );
+}
+
+#[test]
+fn an_out_of_scope_release_and_an_unreadable_namespace_are_distinct_from_an_empty_history() {
+    let cluster = Cluster::with(false, "metadata");
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+
+    // Outside the configured namespace scope: refused with no provider request.
+    let before = cluster.count();
+    assert_eq!(
+        invoke(
+            &mut child,
+            "helm_releases.history",
+            "one",
+            &token(true),
+            json!({"namespace":"kube-system","release":"api","limit":10})
+        ),
+        Err(Failure::Forbidden)
+    );
+    assert_eq!(cluster.count(), before);
+
+    // In scope, but the credential cannot read that namespace's release
+    // Secrets: the cluster is asked and answers with a denial.
+    let before = cluster.count();
+    assert_eq!(
+        invoke(
+            &mut child,
+            "helm_releases.history",
+            "one",
+            &token(true),
+            json!({"namespace":"denied","release":"api","limit":10})
+        ),
+        Err(Failure::Forbidden)
+    );
+    assert_eq!(cluster.count(), before + 1);
+
+    // An empty history is a successful, complete, empty page.
+    let empty = invoke(
+        &mut child,
+        "helm_releases.history",
+        "one",
+        &token(true),
+        json!({"namespace":"backendless","release":"api","limit":10}),
+    )
+    .unwrap();
+    assert_eq!(empty["items"].as_array().map(Vec::len), Some(0));
+    assert_eq!(empty["complete"], true);
+    assert_eq!(empty["next_cursor"], Value::Null);
+
+    // A labelled object that is not a release Secret is refused, not skipped:
+    // skipping it would report a page as complete that is missing a row.
+    assert_eq!(
+        invoke(
+            &mut child,
+            "helm_releases.history",
+            "one",
+            &token(true),
+            json!({"namespace":"foreign","release":"api","limit":10})
+        ),
+        Err(Failure::Protocol)
+    );
+}
+
+#[test]
+fn helm_reads_are_unadvertised_until_configured_and_content_needs_its_own_disclosure() {
+    let advertised = |cluster: &Cluster| -> Vec<String> {
+        let child = Child::spawn(&cluster.selection()).unwrap();
+        let mut ids: Vec<String> = child
+            .bootstrap()
+            .descriptor()
+            .unwrap()
+            .operations
+            .iter()
+            .filter(|o| o.id.starts_with("helm_releases."))
+            .map(|o| o.id.clone())
+            .collect();
+        ids.sort();
+        ids
+    };
+    assert!(advertised(&Cluster::with(false, "off")).is_empty());
+    assert_eq!(
+        advertised(&Cluster::with(false, "metadata")),
+        ["helm_releases.history", "helm_releases.status"]
+    );
+    assert_eq!(
+        advertised(&Cluster::with(false, "redacted_content")),
+        [
+            "helm_releases.history",
+            "helm_releases.manifest",
+            "helm_releases.status",
+            "helm_releases.values"
+        ]
+    );
+
+    // An unadvertised operation is refused by the host before the adapter, and
+    // no provider request is made for it.
+    let cluster = Cluster::with(false, "metadata");
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+    assert_eq!(
+        invoke(
+            &mut child,
+            "helm_releases.values",
+            "one",
+            &token(true),
+            json!({"namespace":"fixture","release":"api","revision":3,"limit":10})
+        ),
+        Err(Failure::NotFound)
+    );
+    assert_eq!(cluster.count(), 0);
+}
+
+#[test]
+fn an_uncompressed_release_body_reads_and_bounded_pages_report_their_own_completeness() {
+    let cluster = Cluster::with(false, "redacted_content");
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+
+    // Revision 2 is stored without the gzip magic, which the pinned decoder
+    // treats as an uncompressed body rather than a malformed one.
+    let values = invoke(
+        &mut child,
+        "helm_releases.values",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","revision":2,"limit":100}),
+    )
+    .unwrap_or_else(|failure| panic!("uncompressed body {failure:?}"));
+    assert_eq!(values["complete"], true);
+    assert!(!values["items"].as_array().unwrap().is_empty());
+    assert!(!discloses(&values, RECORDED_VALUE_SECRET));
+
+    // A projection larger than the requested page is reported incomplete, and
+    // no cursor is fabricated for a collection the provider cannot continue.
+    let clipped = invoke(
+        &mut child,
+        "helm_releases.values",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","revision":3,"limit":2}),
+    )
+    .unwrap();
+    assert_eq!(clipped["items"].as_array().map(Vec::len), Some(2));
+    assert_eq!(clipped["complete"], false);
+    assert_eq!(clipped["next_cursor"], Value::Null);
+
+    let clipped = invoke(
+        &mut child,
+        "helm_releases.manifest",
+        "one",
+        &token(true),
+        json!({"namespace":"fixture","release":"api","revision":3,"limit":1}),
+    )
+    .unwrap();
+    assert_eq!(clipped["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(clipped["complete"], false);
+    assert_eq!(clipped["next_cursor"], Value::Null);
+
+    // A release name Helm itself would refuse never reaches the provider.
+    let before = cluster.count();
+    assert_eq!(
+        invoke(
+            &mut child,
+            "helm_releases.history",
+            "one",
+            &token(true),
+            json!({"namespace":"fixture","release":"Api","limit":10})
+        ),
+        Err(Failure::InvalidInput)
+    );
+    assert_eq!(cluster.count(), before);
 }
