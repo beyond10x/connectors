@@ -1,0 +1,23 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:initialize-negotiation
+outcome: mcp.outbound.legacy-initialize-answered-an-unconfigured-revision
+wire_code: unsupported
+summary: A server that answers `initialize` with a revision the binding does not name ends
+  the connection instead of setting the revision.
+given:
+  - A binding configured for exactly one revision.
+when:
+  - The server answers `initialize` with a different protocol version of its own choosing,
+    which the interoperability revision permits (mcp-2025-11-25-basic-lifecycle.mdx:167-177).
+then:
+  - The observable outcome is `unsupported`, naming the answered revision and the
+    configured one.
+  - The connection is closed, which is also what that revision tells a client that cannot
+    use the answered version to do.
+  - No request is carried out under the version the server named.
+never:
+  - A second handshake is opened offering a different version.
+  - The server's answer becomes the binding's `selected_revision`; a server's answer is not
+    a selection.
