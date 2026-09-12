@@ -4,8 +4,9 @@
 //! The story's acceptance is a correspondence, not a prose quality: the inbound binding
 //! document must carry **six** protocol behaviours, each with a named observable
 //! outcome, the state transition it turns on in the `connectors.sessions.Session`
-//! vocabulary, and a scenario file named after it — six behaviours, six outcomes, six
-//! scenario files, one to one. Nothing in the repository checks a correspondence like
+//! vocabulary, and a scenario file named after it. Six behaviours, and one row per route
+//! where a behaviour has two, each row complete and each with its own trace (see
+//! `behaviour_of`). Nothing in the repository checks a correspondence like
 //! that: `ess verify conform author` compiles a scenario against the shared model and
 //! says nothing about whether a document names it, and a document is prose to every
 //! other gate step. These cases are what fails when the two drift apart.
@@ -144,17 +145,30 @@ fn key_of(cell: &str) -> String {
         .to_lowercase()
 }
 
-/// The six behaviour rows of the document's enumeration, keyed by behaviour.
+/// The behaviour a table cell is filed under: one of the acceptance's six, allowing a
+/// route qualifier after it. A behaviour whose prose describes two routes — a per-request
+/// refusal and a connection-level denial — carries one row per route, and each row is
+/// complete in its own right. Answering adversary pass 1, finding 5: one row per
+/// behaviour collapsed two routes into one and left a reader implementing from the table
+/// denying readiness where the same document's prose forbids it.
+fn behaviour_of(cell: &str) -> Option<&'static str> {
+    let key = key_of(cell);
+    BEHAVIOURS
+        .iter()
+        .find(|behaviour| key == **behaviour || key.starts_with(&format!("{behaviour} (")))
+        .copied()
+}
+
+/// The behaviour rows of the document's enumeration, keyed by behaviour, in table order.
 /// Columns: behaviour, observable outcome, session transition, scenario.
-fn behaviour_rows() -> BTreeMap<String, Vec<String>> {
+fn behaviour_rows() -> BTreeMap<String, Vec<Vec<String>>> {
     let document = binding();
     let enumeration = section(&document, "the six behaviours");
-    let mut rows = BTreeMap::new();
+    let mut rows: BTreeMap<String, Vec<Vec<String>>> = BTreeMap::new();
     for cells in table_rows(&enumeration) {
-        let key = key_of(&cells[0]);
-        if !BEHAVIOURS.contains(&key.as_str()) {
+        let Some(key) = behaviour_of(&cells[0]) else {
             continue;
-        }
+        };
         assert_eq!(
             cells.len(),
             4,
@@ -162,9 +176,53 @@ fn behaviour_rows() -> BTreeMap<String, Vec<String>> {
              declares (behaviour, observable outcome, session transition, scenario)",
             cells.len()
         );
-        rows.insert(key, cells);
+        rows.entry(key.to_string()).or_default().push(cells);
     }
     rows
+}
+
+/// Every `### 3.x <behaviour> — …` section of the enumeration, as
+/// `(behaviour, section text)`. The prose of a behaviour is where a route the table does
+/// not carry can hide.
+fn behaviour_sections(document: &str) -> Vec<(String, String)> {
+    let mut sections: Vec<(String, String)> = Vec::new();
+    let mut current: Option<String> = None;
+    for line in document.lines() {
+        if let Some(heading) = line.strip_prefix("### ") {
+            let title = heading
+                .split('—')
+                .next()
+                .unwrap_or_default()
+                .trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ' ');
+            current = behaviour_of(title).map(|behaviour| {
+                sections.push((behaviour.to_string(), String::new()));
+                behaviour.to_string()
+            });
+            continue;
+        }
+        if line.starts_with("## ") {
+            current = None;
+            continue;
+        }
+        if current.is_some()
+            && let Some(last) = sections.last_mut()
+        {
+            last.1.push_str(line);
+            last.1.push('\n');
+        }
+    }
+    assert_eq!(
+        sections.len(),
+        BEHAVIOURS.len(),
+        "the document carries {} `### <behaviour>` sections and the acceptance names {}: {:?}",
+        sections.len(),
+        BEHAVIOURS.len(),
+        sections
+            .iter()
+            .map(|(behaviour, _)| behaviour)
+            .collect::<Vec<_>>()
+    );
+    sections
 }
 
 /// The refusal rows of `## … does not offer`, keyed by the same six behaviours.
@@ -173,11 +231,10 @@ fn refusal_rows() -> BTreeMap<String, Vec<String>> {
     let refusals = section(&document, "does not offer");
     let mut rows = BTreeMap::new();
     for cells in table_rows(&refusals) {
-        let key = key_of(&cells[0]);
-        if !BEHAVIOURS.contains(&key.as_str()) {
+        let Some(key) = behaviour_of(&cells[0]) else {
             continue;
-        }
-        rows.insert(key, cells);
+        };
+        rows.insert(key.to_string(), cells);
     }
     rows
 }
@@ -291,22 +348,34 @@ fn scenario_files() -> Vec<(String, String)> {
         .collect()
 }
 
-/// The scenario files this story owns, by file stem. A file that names another owner is
-/// a sibling story's and is not this document's to account for.
+/// The scenario files this story owns, by file stem. Ownership is decided by the
+/// structured `# Owner:` marker each file carries, never by searching for the story id
+/// anywhere in the text: this document tells two sibling stories to add files to the same
+/// directory, and the natural header comment of such a file cites this story — which a
+/// substring test would silently adopt, and the count below would then fail in the
+/// sibling's tree for the sibling's reason. Answering adversary pass 1, finding 6.
 fn owned_scenarios() -> BTreeMap<String, String> {
     scenario_files()
         .into_iter()
-        .filter(|(_, text)| text.contains(OWNER))
+        .filter(|(_, text)| {
+            marker_value(text, "Owner")
+                .is_some_and(|owner| owner.split_whitespace().next() == Some(OWNER))
+        })
         .collect()
 }
 
-/// A `# <Field>: <value>` marker from a scenario file's own header comment.
-fn marker(text: &str, field: &str) -> String {
+/// A `# <Field>: <value>` marker from a scenario file's own header comment, if present.
+fn marker_value(text: &str, field: &str) -> Option<String> {
     let prefix = format!("# {field}:");
     text.lines()
         .find(|line| line.starts_with(&prefix))
         .map(|line| line[prefix.len()..].trim().to_string())
-        .unwrap_or_else(|| panic!("a scenario of this story carries no `{prefix}` marker"))
+}
+
+/// The same marker, required.
+fn marker(text: &str, field: &str) -> String {
+    marker_value(text, field)
+        .unwrap_or_else(|| panic!("a scenario of this story carries no `# {field}:` marker"))
 }
 
 /// Every `<archived file>:<line>` citation in `text`, as written.
@@ -365,39 +434,40 @@ fn every_behaviour_the_acceptance_names_has_an_outcome_a_transition_and_a_scenar
     let scenario_link = regex::Regex::new(r"\(([^)]+\.ya?ml)\)").expect("a valid link pattern");
     let mut outcomes = BTreeSet::new();
     for behaviour in BEHAVIOURS {
-        let row = &rows[*behaviour];
-        let outcome = row[1].trim_matches('`').to_string();
-        assert!(
-            !outcome.is_empty() && outcome.chars().all(|c| c.is_ascii_lowercase() || c == '-'),
-            "`{behaviour}` names the observable outcome {:?}, which is not a scenario-shaped \
-             name; the outcome is what the scenario file is named after",
-            row[1]
-        );
-        assert!(
-            outcomes.insert(outcome.clone()),
-            "`{outcome}` is the observable outcome of two behaviours; the acceptance requires \
-             six outcomes and six scenario files corresponding one to one"
-        );
-        parse_transition(&row[2]);
+        for row in &rows[*behaviour] {
+            let outcome = row[1].trim_matches('`').to_string();
+            assert!(
+                !outcome.is_empty() && outcome.chars().all(|c| c.is_ascii_lowercase() || c == '-'),
+                "`{behaviour}` names the observable outcome {:?}, which is not a scenario-shaped \
+                 name; the outcome is what the scenario file is named after",
+                row[1]
+            );
+            assert!(
+                outcomes.insert(outcome.clone()),
+                "`{outcome}` is the observable outcome of two rows; every route of every \
+                 behaviour names its own outcome and its own scenario file"
+            );
+            parse_transition(&row[2]);
 
-        let link = scenario_link.captures(&row[3]).unwrap_or_else(|| {
-            panic!("`{behaviour}` links no scenario file: {:?}", row[3]);
-        })[1]
-            .to_string();
-        assert_eq!(
-            link,
-            format!("scenarios/{outcome}.yaml"),
-            "`{behaviour}` names the outcome `{outcome}` but links `{link}`; the scenario file \
-             is named after the outcome"
-        );
-        let path = root()
-            .join("adapters/mcp/contracts/server/v1alpha1")
-            .join(&link);
-        assert!(
-            path.is_file(),
-            "`{behaviour}` links {} , which does not exist",
-            path.display()
-        );
+            let link = scenario_link.captures(&row[3]).unwrap_or_else(|| {
+                panic!("`{behaviour}` links no scenario file: {:?}", row[3]);
+            })[1]
+                .to_string();
+            assert_eq!(
+                link,
+                format!("scenarios/{outcome}.yaml"),
+                "`{behaviour}` names the outcome `{outcome}` but links `{link}`; the scenario \
+                 file is named after the outcome"
+            );
+            let path = root()
+                .join("adapters/mcp/contracts/server/v1alpha1")
+                .join(&link);
+            assert!(
+                path.is_file(),
+                "`{behaviour}` links {} , which does not exist",
+                path.display()
+            );
+        }
     }
 }
 
@@ -406,27 +476,30 @@ fn no_scenario_this_story_owns_names_an_outcome_the_document_does_not() {
     let rows = behaviour_rows();
     let declared: BTreeMap<String, String> = rows
         .iter()
-        .map(|(behaviour, cells)| {
-            (
-                cells[1].trim_matches('`').to_string(),
-                behaviour.to_string(),
-            )
+        .flat_map(|(behaviour, rows)| {
+            rows.iter().map(move |cells| {
+                (
+                    cells[1].trim_matches('`').to_string(),
+                    behaviour.to_string(),
+                )
+            })
         })
         .collect();
     let owned = owned_scenarios();
     assert_eq!(
         owned.len(),
-        BEHAVIOURS.len(),
-        "this story owns {} scenario files and the acceptance requires {}: {:?}",
+        declared.len(),
+        "this story owns {} scenario files and its enumeration carries {} rows, each of which \
+         names one: {:?}",
         owned.len(),
-        BEHAVIOURS.len(),
+        declared.len(),
         owned.keys().collect::<Vec<_>>()
     );
     for (stem, text) in &owned {
         let behaviour = declared.get(stem).unwrap_or_else(|| {
             panic!(
                 "scenarios/{stem}.yaml names an outcome the document's enumeration does not \
-                 carry; every scenario of this story is named after one of its six outcomes"
+                 carry; every scenario of this story is named after an outcome one of its rows names"
             )
         });
         assert_eq!(
@@ -434,16 +507,30 @@ fn no_scenario_this_story_owns_names_an_outcome_the_document_does_not() {
             *stem,
             "scenarios/{stem}.yaml declares an `# Outcome:` marker that is not its own name"
         );
+        let declared_behaviour = marker(text, "Behaviour");
         assert_eq!(
-            key_of(&marker(text, "Behaviour")),
-            *behaviour,
-            "scenarios/{stem}.yaml declares a behaviour the document files under `{behaviour}`"
+            behaviour_of(&declared_behaviour),
+            Some(behaviour.as_str()),
+            "scenarios/{stem}.yaml declares the behaviour {declared_behaviour:?}, and the \
+             document files its outcome under `{behaviour}`"
         );
-        let scenario_name = text
-            .lines()
-            .find_map(|line| line.strip_prefix("scenario:"))
-            .unwrap_or_else(|| panic!("scenarios/{stem}.yaml declares no `scenario:` name"))
-            .trim();
+        assert_eq!(
+            key_of(&declared_behaviour),
+            key_of(
+                &rows[behaviour.as_str()]
+                    .iter()
+                    .find(|cells| cells[1].trim_matches('`') == stem.as_str())
+                    .expect("the row that names this outcome")[0]
+            ),
+            "scenarios/{stem}.yaml declares a route the enumeration does not name in the row \
+             that links it; a behaviour with two routes carries one row per route and each \
+             trace says which route it is"
+        );
+        let trace: serde_yaml_ng::Value = serde_yaml_ng::from_str(text)
+            .unwrap_or_else(|e| panic!("parse scenarios/{stem}.yaml: {e}"));
+        let scenario_name = trace["scenario"]
+            .as_str()
+            .unwrap_or_else(|| panic!("scenarios/{stem}.yaml declares no `scenario:` name"));
         assert_eq!(
             scenario_name, stem,
             "scenarios/{stem}.yaml compiles under a name that is not its file's"
@@ -454,7 +541,10 @@ fn no_scenario_this_story_owns_names_an_outcome_the_document_does_not() {
 #[test]
 fn every_named_transition_is_one_the_sessions_lifecycle_declares() {
     let declared = declared_transitions();
-    for (behaviour, cells) in behaviour_rows() {
+    for (behaviour, cells) in behaviour_rows().into_iter().flat_map(|(behaviour, rows)| {
+        rows.into_iter()
+            .map(move |cells| (behaviour.clone(), cells))
+    }) {
         let (name, from, to) = parse_transition(&cells[2]);
         let (legal_from, legal_to) = declared.get(&name).unwrap_or_else(|| {
             panic!(
@@ -480,7 +570,10 @@ fn every_named_transition_is_one_the_sessions_lifecycle_declares() {
 fn each_scenario_performs_the_transition_its_behaviour_names() {
     let movers = movers();
     let owned = owned_scenarios();
-    for (behaviour, cells) in behaviour_rows() {
+    for (behaviour, cells) in behaviour_rows().into_iter().flat_map(|(behaviour, rows)| {
+        rows.into_iter()
+            .map(move |cells| (behaviour.clone(), cells))
+    }) {
         let outcome = cells[1].trim_matches('`').to_string();
         let (transition, _, _) = parse_transition(&cells[2]);
         let text = owned
@@ -609,37 +702,107 @@ fn the_single_principal_boundary_is_stated_and_no_scenario_crosses_it() {
         "the document does not carry the `UNMAPPED:` marker the domain model holds for \
          `McpInboundSession → McpCaller`"
     );
-    let coordinates = ["instance_ref", "connection_ref", "authority_ref"];
-    let mut seen: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
+    // Read out of the parsed trace, not off line prefixes: a flow-style mapping
+    // (`binding: {instance_ref: a, …}`) writes the same fact on one line and evades a
+    // prefix scan, and a coordinate the model adds later would be covered by neither.
+    // The field set itself comes from `connectors.sessions.Binding`, so a new coordinate
+    // joins this rule the moment the model declares it.
+    let coordinates = declared_binding_fields();
+    let mut seen: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
     for (stem, text) in owned_scenarios() {
-        for coordinate in coordinates {
-            for line in text.lines() {
-                let trimmed = line.trim();
-                if let Some(value) = trimmed.strip_prefix(&format!("{coordinate}:")) {
-                    seen.entry(coordinate)
-                        .or_default()
-                        .insert(format!("{}(in {stem})", value.trim()));
-                }
+        let trace: serde_yaml_ng::Value = serde_yaml_ng::from_str(&text)
+            .unwrap_or_else(|e| panic!("parse scenarios/{stem}.yaml: {e}"));
+        for value in bindings_in(&trace) {
+            let mapping = value.as_mapping().unwrap_or_else(|| {
+                panic!(
+                    "scenarios/{stem}.yaml states a binding that is not a \
+                                           mapping of its coordinates"
+                )
+            });
+            let stated: BTreeSet<String> = mapping
+                .keys()
+                .filter_map(|key| key.as_str().map(str::to_string))
+                .collect();
+            assert_eq!(
+                stated, coordinates,
+                "scenarios/{stem}.yaml states a `connectors.sessions.Binding` whose coordinates \
+                 are not the ones the model declares; an unstated one is a principal coordinate \
+                 this rule would not see"
+            );
+            for coordinate in &coordinates {
+                let stated = mapping[coordinate.as_str()]
+                    .as_str()
+                    .unwrap_or_else(|| {
+                        panic!("scenarios/{stem}.yaml states a non-string `{coordinate}`")
+                    })
+                    .to_string();
+                seen.entry(coordinate.clone())
+                    .or_default()
+                    .entry(stated)
+                    .or_default()
+                    .insert(stem.clone());
             }
         }
     }
-    for coordinate in coordinates {
+    for coordinate in &coordinates {
         let values = seen.get(coordinate).unwrap_or_else(|| {
             panic!("no scenario of this story states a `{coordinate}` binding coordinate")
         });
-        let distinct: BTreeSet<&str> = values
-            .iter()
-            .map(|value| value.split("(in ").next().unwrap_or(value))
-            .collect();
         assert_eq!(
-            distinct.len(),
+            values.len(),
             1,
-            "the scenarios name {} distinct `{coordinate}` values, {distinct:?}; the local \
+            "the scenarios name {} distinct `{coordinate}` values, {values:?}; the local \
              placement admits exactly one principal, and a second one makes the assignment \
              `decision-blocker:mcp-caller-connection-assignment` rather than this document's",
-            distinct.len()
+            values.len()
         );
     }
+}
+
+/// The coordinates `connectors.sessions.Binding` declares, read off the model.
+fn declared_binding_fields() -> BTreeSet<String> {
+    let document: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str(&read("ess/domains/sessions.yaml")).expect("parse sessions.yaml");
+    let values = document["types"]
+        .as_sequence()
+        .expect("sessions.yaml declares types");
+    let binding = values
+        .iter()
+        .find(|value| value["name"].as_str() == Some("connectors.sessions.Binding"))
+        .expect("sessions.yaml declares connectors.sessions.Binding");
+    binding["fields"]
+        .as_sequence()
+        .expect("connectors.sessions.Binding declares fields")
+        .iter()
+        .map(|field| {
+            field["name"]
+                .as_str()
+                .expect("a named binding field")
+                .to_string()
+        })
+        .collect()
+}
+
+/// Every `binding:` value anywhere in a parsed trace, at any depth.
+fn bindings_in(value: &serde_yaml_ng::Value) -> Vec<serde_yaml_ng::Value> {
+    let mut found = Vec::new();
+    match value {
+        serde_yaml_ng::Value::Mapping(mapping) => {
+            for (key, child) in mapping {
+                if key.as_str() == Some("binding") {
+                    found.push(child.clone());
+                }
+                found.extend(bindings_in(child));
+            }
+        }
+        serde_yaml_ng::Value::Sequence(items) => {
+            for item in items {
+                found.extend(bindings_in(item));
+            }
+        }
+        _ => {}
+    }
+    found
 }
 
 #[test]
@@ -663,6 +826,510 @@ fn the_binding_names_no_cloud_identity_or_network_dependency_it_does_not_refuse(
         "the acceptance requires the whole binding to be described without reference to a cloud \
          control plane, identity service or network service this repository does not already \
          have; these lines name one without refusing it:\n{}",
+        offending.join("\n")
+    );
+}
+
+// ── The timing obligations the traces inherit with the vocabulary ───────────────────
+//
+// Added 2026-09-12 answering adversary pass 1. The class the findings are instances of:
+// these traces were authored against the session vocabulary's *lifecycle* and never
+// against its *timing obligations*. The cases above read `ess/domains/sessions.yaml` for
+// which transitions exist and which command outcomes perform them; §4.1 of the normative
+// owner that same model names was read by nothing, and ESS cannot catch the difference
+// because it "compiles obligations but does NOT execute a sequential trace". Every bound
+// below is read out of the two files that state it, never written here: a ceiling this
+// file carried itself would be a ceiling a correction could move by editing this file.
+
+/// The file `ess/domains/sessions.yaml` names as the normative owner of its timing rules,
+/// read out of its own comment rather than pinned here.
+fn sessions_contract() -> String {
+    let model = read("ess/domains/sessions.yaml");
+    let path = regex::Regex::new(r"#\s*Normative owner:\s*([A-Za-z0-9_./-]+\.md)")
+        .expect("a valid pattern")
+        .captures(&model)
+        .unwrap_or_else(|| {
+            panic!(
+                "ess/domains/sessions.yaml no longer names the normative owner of the timing \
+                 obligations these traces inherit; the cases below cannot be derived without it"
+            )
+        })[1]
+        .to_string();
+    read(&path)
+}
+
+/// Milliseconds captured by `pattern` in the sessions contract's §4.1.
+fn contract_ceiling_ms(pattern: &str, what: &str) -> i64 {
+    let contract = sessions_contract();
+    regex::Regex::new(pattern)
+        .expect("a valid pattern")
+        .captures(&contract)
+        .unwrap_or_else(|| {
+            panic!("the sessions contract §4.1 no longer states the ceiling on {what}")
+        })[1]
+        .replace(',', "")
+        .parse::<i64>()
+        .expect("a whole number of milliseconds")
+}
+
+/// The maximum lifetime of a live data lease. Stated by the contract and repeated by the
+/// model, and the two are required to agree: a fix that edits one source into agreement
+/// with a trace is caught by the other.
+fn lease_ceiling_ms() -> i64 {
+    let in_contract = contract_ceiling_ms(
+        r"effective deadline of a data lease is at most \*\*([0-9,]+)\s*ms",
+        "the effective deadline of a data lease",
+    );
+    let model = read("ess/domains/sessions.yaml");
+    let in_model = regex::Regex::new(r"lease lifetime <=\s*([0-9,]+)\s*ms")
+        .expect("a valid pattern")
+        .captures(&model)
+        .expect("ess/domains/sessions.yaml states the live data-lease ceiling")[1]
+        .replace(',', "")
+        .parse::<i64>()
+        .expect("a whole number of milliseconds");
+    assert_eq!(
+        in_model, in_contract,
+        "ess/domains/sessions.yaml bounds a live data lease at {in_model} ms and its own \
+         normative owner bounds it at {in_contract} ms; a trace cannot be held to a ceiling \
+         the two sources disagree about"
+    );
+    in_contract
+}
+
+fn cutoff_ceiling_ms() -> i64 {
+    contract_ceiling_ms(
+        r"\*\*([0-9,]+)\s*ms maximum from authoritative revocation to data cutoff\*\*",
+        "revocation-to-cutoff",
+    )
+}
+
+fn teardown_ceiling_ms() -> i64 {
+    contract_ceiling_ms(
+        r"\*\*([0-9,]+)\s*ms maximum from an accepted terminal fact to completion of local teardown",
+        "terminal-to-teardown",
+    )
+}
+
+/// Days since 1970-01-01 for a proleptic Gregorian date (Howard Hinnant's `days_from_civil`).
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let shifted = (month + 9) % 12;
+    let day_of_year = (153 * shifted + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
+/// A scenario timestamp as whole seconds since the epoch. The traces write
+/// `YYYY-MM-DDTHH:MM:SSZ` and say in their own headers that whole-second acts express
+/// causal order, so a sub-second form is rejected rather than silently truncated.
+fn instant(text: &str) -> i64 {
+    let bytes = text.as_bytes();
+    assert!(
+        text.len() == 20
+            && bytes[4] == b'-'
+            && bytes[7] == b'-'
+            && bytes[10] == b'T'
+            && bytes[13] == b':'
+            && bytes[16] == b':'
+            && bytes[19] == b'Z',
+        "a scenario timestamp is not of the form `YYYY-MM-DDTHH:MM:SSZ`: {text:?}"
+    );
+    let field = |from: usize, to: usize| {
+        text[from..to]
+            .parse::<i64>()
+            .unwrap_or_else(|_| panic!("a scenario timestamp is not numeric: {text:?}"))
+    };
+    days_from_civil(field(0, 4), field(5, 7), field(8, 10)) * 86_400
+        + field(11, 13) * 3_600
+        + field(14, 16) * 60
+        + field(17, 19)
+}
+
+/// One act of a trace's timeline, in the terms the timing rules are written in.
+struct Act {
+    index: usize,
+    at: i64,
+    command: String,
+    outcome: String,
+    input: serde_yaml_ng::Value,
+}
+
+fn timeline(stem: &str, text: &str) -> Vec<Act> {
+    let trace: serde_yaml_ng::Value = serde_yaml_ng::from_str(text)
+        .unwrap_or_else(|e| panic!("parse scenarios/{stem}.yaml: {e}"));
+    trace["timeline"]
+        .as_sequence()
+        .unwrap_or_else(|| panic!("scenarios/{stem}.yaml declares no timeline"))
+        .iter()
+        .enumerate()
+        .map(|(index, act)| Act {
+            index,
+            at: instant(
+                act["at"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("scenarios/{stem}.yaml act {index} has no `at:`")),
+            ),
+            command: act["command"].as_str().unwrap_or_default().to_string(),
+            outcome: act["outcome"].as_str().unwrap_or_default().to_string(),
+            input: act["input"].clone(),
+        })
+        .collect()
+}
+
+/// `(issued_at, effective_expiry, sequence)` of an act's lease input, if it carries one.
+fn lease_of(input: &serde_yaml_ng::Value) -> Option<(i64, i64, i64)> {
+    let lease = input.get("lease")?;
+    Some((
+        instant(lease.get("issued_at")?.as_str()?),
+        instant(lease.get("effective_expiry")?.as_str()?),
+        lease.get("sequence")?.as_i64()?,
+    ))
+}
+
+/// The 1-based line of the first line containing `needle`, so a failure opens at the act
+/// it is about.
+fn line_of(text: &str, needle: &str) -> usize {
+    text.lines()
+        .position(|line| line.contains(needle))
+        .map(|index| index + 1)
+        .unwrap_or(0)
+}
+
+#[test]
+fn no_trace_issues_a_lease_longer_than_the_contract_ceiling() {
+    let ceiling = lease_ceiling_ms();
+    let mut offending = Vec::new();
+    for (stem, text) in owned_scenarios() {
+        for act in timeline(&stem, &text) {
+            let Some((issued, expiry, _)) = lease_of(&act.input) else {
+                continue;
+            };
+            let lifetime = (expiry - issued) * 1_000;
+            let expiry_text = act.input["lease"]["effective_expiry"]
+                .as_str()
+                .unwrap_or_default();
+            let at_text = act.input["lease"]["issued_at"].as_str().unwrap_or_default();
+            if lifetime > ceiling {
+                offending.push(format!(
+                    "scenarios/{stem}.yaml:{} — act {} `{}` issues a lease of {lifetime} ms, \
+                     and the ceiling is {ceiling} ms",
+                    line_of(&text, &format!("effective_expiry: '{expiry_text}'")),
+                    act.index,
+                    act.command,
+                ));
+            }
+            if issued != act.at {
+                offending.push(format!(
+                    "scenarios/{stem}.yaml:{} — act {} `{}` issues a lease dated {at_text}, and \
+                     the act that issues it is the authoritative issuance the ceiling runs from",
+                    line_of(&text, &format!("issued_at: '{at_text}'")),
+                    act.index,
+                    act.command,
+                ));
+            }
+        }
+    }
+    assert!(
+        offending.is_empty(),
+        "a trace issues a data lease the sessions contract §4.1 does not permit — it caps the \
+         effective deadline at {ceiling} ms after authoritative issuance, including delivery \
+         delay, clock uncertainty, scheduling delay and already-buffered output, and requires a \
+         binding that cannot enforce that to refuse its own session admission:\n{}",
+        offending.join("\n")
+    );
+}
+
+#[test]
+fn no_trace_admits_data_or_renews_after_its_live_lease_deadline() {
+    let ceiling = lease_ceiling_ms() / 1_000;
+    let mut offending = Vec::new();
+    for (stem, text) in owned_scenarios() {
+        let mut deadline: Option<i64> = None;
+        let mut sequence: Option<i64> = None;
+        let mut terminal: Option<(usize, String)> = None;
+        for act in timeline(&stem, &text) {
+            let admitted = matches!(act.outcome.as_str(), "permitted" | "renewed");
+            let at_text = format!(
+                "at: '{}'",
+                serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&text)
+                    .ok()
+                    .and_then(|trace| trace["timeline"][act.index]["at"]
+                        .as_str()
+                        .map(String::from))
+                    .unwrap_or_default()
+            );
+            if admitted
+                && let Some(live) = deadline
+                && act.at > live
+            {
+                offending.push(format!(
+                    "scenarios/{stem}.yaml:{} — act {} `{}` is admitted ({}) {} ms after the \
+                     last moment the lease that admits it can legally be live",
+                    line_of(&text, &at_text),
+                    act.index,
+                    act.command,
+                    act.outcome,
+                    (act.at - live) * 1_000,
+                ));
+            }
+            if admitted && let Some((index, fact)) = &terminal {
+                offending.push(format!(
+                    "scenarios/{stem}.yaml:{} — act {} `{}` is admitted ({}) after act {index} \
+                     `{fact}` recorded a terminal, and §4.1 refuses data admission and renewals \
+                     from the moment the host accepts one",
+                    line_of(&text, &at_text),
+                    act.index,
+                    act.command,
+                    act.outcome,
+                ));
+            }
+            if let Some((issued, expiry, next)) = lease_of(&act.input)
+                && matches!(act.outcome.as_str(), "ready" | "renewed")
+            {
+                if let Some(previous) = sequence
+                    && next <= previous
+                {
+                    offending.push(format!(
+                        "scenarios/{stem}.yaml:{} — act {} `{}` renews at sequence {next}, which \
+                         does not advance on {previous}; §4.1 rejects replayed authority",
+                        line_of(&text, &at_text),
+                        act.index,
+                        act.command,
+                    ));
+                }
+                sequence = Some(next);
+                deadline = Some(std::cmp::min(expiry, issued + ceiling));
+            }
+            if matches!(
+                act.outcome.as_str(),
+                "closing" | "authority-terminated" | "lost"
+            ) && terminal.is_none()
+            {
+                terminal = Some((act.index, act.command.clone()));
+            }
+        }
+    }
+    assert!(
+        offending.is_empty(),
+        "a trace admits data, or renews, past the deadline of the live data lease that admits \
+         it. §4.1 makes a live lease mandatory for every admitted data path, caps it at \
+         {} ms from issuance and allows no grace past the effective expiry, so a request that \
+         outlives one lease has to be renewed by the supervisor before that deadline or end \
+         `lease_expired`. Shortening a trace hides this; renewing it is what the contract \
+         describes:\n{}",
+        lease_ceiling_ms(),
+        offending.join("\n")
+    );
+}
+
+#[test]
+fn every_close_deadline_a_trace_records_is_bounded_by_the_contract_and_the_live_lease() {
+    let lease_ceiling = lease_ceiling_ms() / 1_000;
+    let cutoff_ceiling = cutoff_ceiling_ms() / 1_000;
+    let teardown_ceiling = teardown_ceiling_ms() / 1_000;
+    let mut offending = Vec::new();
+    for (stem, text) in owned_scenarios() {
+        let mut deadline: Option<i64> = None;
+        let mut terminal_at: Option<i64> = None;
+        let mut teardown_due: Option<i64> = None;
+        for act in timeline(&stem, &text) {
+            if act.outcome == "closing" {
+                let cutoff = act.input["cutoff_due_at"].as_str().unwrap_or_else(|| {
+                    panic!("scenarios/{stem}.yaml act {} has no cutoff", act.index)
+                });
+                let teardown = act.input["teardown_due_at"].as_str().unwrap_or_else(|| {
+                    panic!("scenarios/{stem}.yaml act {} has no teardown", act.index)
+                });
+                let bound = match deadline {
+                    Some(live) => std::cmp::min(live, act.at + cutoff_ceiling),
+                    None => act.at + cutoff_ceiling,
+                };
+                if instant(cutoff) > bound {
+                    offending.push(format!(
+                        "scenarios/{stem}.yaml:{} — act {} records a data cutoff {} ms later \
+                         than the deadline that dominates it ({} ms after the terminal, and the \
+                         live lease's own deadline dominates a later one)",
+                        line_of(&text, &format!("cutoff_due_at: '{cutoff}'")),
+                        act.index,
+                        (instant(cutoff) - bound) * 1_000,
+                        cutoff_ceiling * 1_000,
+                    ));
+                }
+                if instant(teardown) > act.at + teardown_ceiling {
+                    offending.push(format!(
+                        "scenarios/{stem}.yaml:{} — act {} records teardown {} ms after the \
+                         terminal fact, and §4.1 requires it within {} ms",
+                        line_of(&text, &format!("teardown_due_at: '{teardown}'")),
+                        act.index,
+                        (instant(teardown) - act.at) * 1_000,
+                        teardown_ceiling * 1_000,
+                    ));
+                }
+                if instant(teardown) < instant(cutoff) {
+                    offending.push(format!(
+                        "scenarios/{stem}.yaml:{} — act {} records teardown before its own data \
+                         cutoff",
+                        line_of(&text, &format!("teardown_due_at: '{teardown}'")),
+                        act.index,
+                    ));
+                }
+                teardown_due = Some(instant(teardown));
+            }
+            if matches!(
+                act.outcome.as_str(),
+                "closing" | "authority-terminated" | "lost"
+            ) && terminal_at.is_none()
+            {
+                terminal_at = Some(act.at);
+            }
+            if act.command.ends_with("FinishTeardown") {
+                let t0 = terminal_at.unwrap_or_else(|| {
+                    panic!(
+                        "scenarios/{stem}.yaml finishes teardown at act {} with no terminal fact \
+                         before it",
+                        act.index
+                    )
+                });
+                if act.at > t0 + teardown_ceiling {
+                    offending.push(format!(
+                        "scenarios/{stem}.yaml — act {} finishes teardown {} ms after the \
+                         terminal fact, and §4.1 requires it within {} ms",
+                        act.index,
+                        (act.at - t0) * 1_000,
+                        teardown_ceiling * 1_000,
+                    ));
+                }
+                if let Some(due) = teardown_due
+                    && act.at > due
+                {
+                    offending.push(format!(
+                        "scenarios/{stem}.yaml — act {} finishes teardown {} ms after the \
+                         deadline the close itself recorded",
+                        act.index,
+                        (act.at - due) * 1_000,
+                    ));
+                }
+            }
+            if let Some((issued, expiry, _)) = lease_of(&act.input)
+                && matches!(act.outcome.as_str(), "ready" | "renewed")
+            {
+                deadline = Some(std::cmp::min(expiry, issued + lease_ceiling));
+            }
+        }
+    }
+    assert!(
+        offending.is_empty(),
+        "a trace records a close deadline the sessions contract §4.1 and its model do not \
+         permit; the model says those deadlines are bounded by §4.1 and that earlier \
+         expiry/drain deadlines dominate, and §4.1 forbids any additional grace:\n{}",
+        offending.join("\n")
+    );
+}
+
+#[test]
+fn the_document_states_the_lease_obligation_its_traces_inherit() {
+    let document = binding();
+    let ceiling = lease_ceiling_ms();
+    let spelled = format!("{},{:03} ms", ceiling / 1_000, ceiling % 1_000);
+    assert!(
+        document.contains(&spelled) || document.contains(&format!("{ceiling} ms")),
+        "the document never states the live data-lease ceiling its traces inherit ({spelled}); \
+         a reader implementing this binding from the document alone would not know a data path \
+         has to be gated by a lease no longer than that"
+    );
+    assert!(
+        document.contains("contracts/sessions/v1alpha1/semantics.md") && document.contains("§4.1"),
+        "the document never cites the section that owns the timing obligations its traces \
+         inherit by reusing `connectors.sessions.Session`"
+    );
+    assert!(
+        document.contains("lease_expired"),
+        "the document never says what happens when a data lease is not renewed before its \
+         deadline; `lease_expired` is the terminal the model records for it"
+    );
+    assert!(
+        document.contains("RenewDataLease") || document.contains("`renew`"),
+        "the document never names the transition by which an inbound request that outlives one \
+         data lease stays `Ready`, and it is the only one the vocabulary offers"
+    );
+}
+
+#[test]
+fn every_transition_a_behaviour_section_asserts_is_bound_to_one_of_its_traces() {
+    let document = binding();
+    let declared = declared_transitions();
+    let movers = movers();
+    let owned = owned_scenarios();
+    let rows = behaviour_rows();
+    let negation = regex::Regex::new(r"(?i)\b(not|never|no|cannot|instead of|rather than)\b")
+        .expect("a valid pattern");
+    let mut offending = Vec::new();
+    for (behaviour, section_text) in behaviour_sections(&document) {
+        let named: Vec<(String, String)> = section_text
+            .lines()
+            .flat_map(|line| {
+                declared
+                    .keys()
+                    .filter(|name| line.contains(&format!("`{name}`")))
+                    .map(move |name| (name.clone(), line.to_string()))
+            })
+            .collect();
+        let bound: BTreeSet<String> = rows
+            .get(&behaviour)
+            .map(|rows| {
+                rows.iter()
+                    .map(|cells| parse_transition(&cells[2]).0)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let traces: Vec<&String> = rows
+            .get(&behaviour)
+            .map(|rows| {
+                rows.iter()
+                    .filter_map(|cells| owned.get(cells[1].trim_matches('`')))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (name, line) in named {
+            if bound.contains(&name) {
+                continue;
+            }
+            let before = line.split(&format!("`{name}`")).next().unwrap_or_default();
+            let tail: String = before
+                .chars()
+                .rev()
+                .take(40)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            if negation.is_match(&tail) {
+                continue;
+            }
+            let pairs = movers.get(&name).cloned().unwrap_or_default();
+            let performed = traces.iter().any(|text| {
+                timeline(&behaviour, text)
+                    .iter()
+                    .any(|act| pairs.contains(&(act.command.clone(), act.outcome.clone())))
+            });
+            if !performed {
+                offending.push(format!(
+                    "`{behaviour}` asserts `{name}` in its prose, and neither a row of the \
+                     enumeration nor a trace of that behaviour performs it: {}",
+                    line.trim()
+                ));
+            }
+        }
+    }
+    assert!(
+        offending.is_empty(),
+        "a behaviour section states that the binding performs a transition that the \
+         enumeration binds to no trace, so a reader implementing from the table takes a route \
+         the prose describes and has nothing that fails when the implementation takes the \
+         other one:\n{}",
         offending.join("\n")
     );
 }
