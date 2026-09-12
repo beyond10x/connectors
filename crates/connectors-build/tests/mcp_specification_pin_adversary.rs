@@ -119,25 +119,94 @@ fn interop_revision_names_its_own_version_string_outside_a_documentation_path() 
         }
     }
 
-    let declaring: std::collections::BTreeSet<&str> = declarations
+    let declaring: std::collections::BTreeSet<String> = declarations
         .iter()
         .filter_map(|line| line.split(':').next())
+        .map(str::to_owned)
         .collect();
     assert!(
         !declaring.is_empty(),
         "no archived {REVISION_INTEROP} document declares its own version string; the \
          manifest or the archives changed and this case is describing neither"
     );
-    // The count comes from the archives, so removing archived documents from the manifest
-    // cannot quietly satisfy this case; it moves the number the record has to state.
+
+    // Amended after pass 2: asserting that the literal `18 of the` appears somewhere
+    // accepted a record whose denominator, named exceptions or primary-revision claim had
+    // all been changed. Every figure below is derived from the archives and bound to the
+    // subject it counts.
+    let interop: std::collections::BTreeSet<String> = documents(REVISION_INTEROP);
     assert!(
         normalised.contains("Protocol Revision")
-            && normalised.contains(&format!("{} of the", declaring.len())),
-        "the record does not state that {} archived documents of the {REVISION_INTEROP} \
-         revision declare the version string in a Protocol Revision banner:\n{}",
+            && normalised.contains(&format!(
+                "{} of the {} archived",
+                declaring.len(),
+                interop.len()
+            )),
+        "the record does not state that {} of the {} archived {REVISION_INTEROP} documents \
+         declare the version string in a Protocol Revision banner:\n{}",
         declaring.len(),
+        interop.len(),
         declarations.join("\n")
     );
+
+    // The documents the record names as carrying no banner must be exactly the ones that
+    // do not, so replacing them with banner-carrying documents is refused.
+    let marker = "carry no banner are";
+    let at = normalised.find(marker).unwrap_or_else(|| {
+        panic!("the record names no set of {REVISION_INTEROP} documents carrying no banner")
+    });
+    let clause = &normalised[at + marker.len()..];
+    let clause = clause.split(';').next().unwrap_or(clause);
+    let named: std::collections::BTreeSet<String> = clause
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .filter(|token| {
+            token.starts_with(&format!("mcp-{REVISION_INTEROP}-")) && token.ends_with(".mdx")
+        })
+        .map(str::to_owned)
+        .collect();
+    let without: std::collections::BTreeSet<String> =
+        interop.difference(&declaring).cloned().collect();
+    assert_eq!(
+        named, without,
+        "the record names {named:?} as the archived {REVISION_INTEROP} documents carrying \
+         no banner; the archives say it is {without:?}"
+    );
+
+    // And the claim about the primary revision has to match its own archives too.
+    let primary: std::collections::BTreeSet<String> = documents(REVISION_PRIMARY);
+    let primary_declaring = primary
+        .iter()
+        .filter(|file| {
+            archived(file).lines().any(|line| {
+                let trimmed = line.trim();
+                trimmed.contains("Protocol Revision") && trimmed.contains(REVISION_PRIMARY)
+            })
+        })
+        .count();
+    let expected = if primary_declaring == 0 {
+        format!("no such banner in any of its {} archived", primary.len())
+    } else {
+        format!("{primary_declaring} of the {} archived", primary.len())
+    };
+    assert!(
+        normalised.contains(&expected),
+        "the record does not state the {REVISION_PRIMARY} banner count the archives show; \
+         it must contain {expected:?} ({primary_declaring} of {} archived documents carry \
+         one)",
+        primary.len()
+    );
+}
+
+/// Archived `.mdx` files of one revision, from the manifest.
+fn documents(revision: &str) -> std::collections::BTreeSet<String> {
+    entries()
+        .iter()
+        .filter(|entry| field(entry, "revision") == revision)
+        .map(|entry| field(entry, "file").to_string())
+        .filter(|file| file.ends_with(".mdx"))
+        .collect()
 }
 
 /// RED. The record's citation table has one row for the interoperability seam. That
@@ -228,16 +297,35 @@ fn every_recorded_digest_and_byte_length_rederives_from_the_archived_bytes() {
         }
     }
 
-    let archived_files = std::fs::read_dir(evidence_dir().join("vendor"))
-        .expect("read vendor/")
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_name().to_string_lossy().ends_with(".gz"))
-        .count();
+    // Amended after pass 2: comparing the two counts accepted a manifest that records one
+    // archive twice and omits another, which the `diff` the record documents refuses.
+    // Compare the two sets, the way that `diff` does, and refuse a duplicated entry.
+    let recorded: Vec<String> = entries
+        .iter()
+        .map(|entry| field(entry, "archive").to_string())
+        .collect();
+    let recorded_set: std::collections::BTreeSet<String> = recorded.iter().cloned().collect();
     assert_eq!(
-        archived_files,
-        entries.len(),
-        "vendor/ holds {archived_files} archives for {} manifest entries",
-        entries.len()
+        recorded_set.len(),
+        recorded.len(),
+        "the manifest records the same archive more than once: {} entries, {} distinct",
+        recorded.len(),
+        recorded_set.len()
+    );
+    let present: std::collections::BTreeSet<String> =
+        std::fs::read_dir(evidence_dir().join("vendor"))
+            .expect("read vendor/")
+            .filter_map(|e| e.ok())
+            .map(|e| format!("vendor/{}", e.file_name().to_string_lossy()))
+            .filter(|name| name.ends_with(".gz"))
+            .collect();
+    assert_eq!(
+        recorded_set,
+        present,
+        "the manifest and vendor/ name different sets of archives; recorded only: {:?}, \
+         archived only: {:?}",
+        recorded_set.difference(&present).collect::<Vec<_>>(),
+        present.difference(&recorded_set).collect::<Vec<_>>()
     );
     assert!(
         wrong.is_empty(),
@@ -275,6 +363,18 @@ fn manifest_provenance_fields_agree_with_the_revision_each_entry_claims() {
                 "{file}: archive name does not follow the file name"
             ));
         }
+        // Amended after pass 2: the naming rule the record states is that `file` is the
+        // path below the revision directory, flattened. Nothing asserted it, so an entry
+        // repointed at another document of its own revision passed.
+        let below = path
+            .strip_prefix(&format!("docs/specification/{revision}/"))
+            .or_else(|| path.strip_prefix(&format!("schema/{revision}/")))
+            .unwrap_or(&path);
+        if file != format!("mcp-{revision}-{}", below.replace('/', "-")) {
+            broken.push(format!(
+                "{file}: file name does not derive from path {path}"
+            ));
+        }
         match revision.as_str() {
             REVISION_PRIMARY | REVISION_INTEROP => {}
             other => broken.push(format!("{file}: unpinned revision {other}")),
@@ -298,11 +398,25 @@ fn manifest_provenance_fields_agree_with_the_revision_each_entry_claims() {
         2,
         "expected one commit per pinned revision, found {commits:?}"
     );
+    // Amended after pass 2: asserting only that the record names the commit somewhere
+    // accepted a manifest whose two revisions had exchanged commits — the record names
+    // both, so both lookups passed. Each pair must be stated *together*, which is what
+    // the record's own revision table does, one row per revision.
     let record = record();
+    let mut revisions: Vec<&String> = commits.iter().map(|(revision, _)| revision).collect();
+    revisions.dedup();
+    assert_eq!(
+        revisions.len(),
+        commits.len(),
+        "a revision is pinned at more than one commit: {commits:?}"
+    );
     for (revision, commit) in &commits {
         assert!(
-            record.contains(commit.as_str()),
-            "the record does not name the commit {commit} that the manifest pins for {revision}"
+            record
+                .lines()
+                .any(|line| { line.contains(revision.as_str()) && line.contains(commit.as_str()) }),
+            "no line of the record binds {revision} to the commit {commit} the manifest \
+             claims for it; the record's revision table is what states that pairing"
         );
     }
 
