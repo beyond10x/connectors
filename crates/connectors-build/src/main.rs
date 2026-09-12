@@ -17,6 +17,7 @@ mod cli;
 mod docs;
 mod ess_boundary;
 mod gate;
+mod source_hashes;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[derive(Parser)]
@@ -69,6 +70,8 @@ enum Action {
     },
     /// Check shared ESS ownership and compile shared and adapter semantic models.
     EssBoundary,
+    /// Re-derive every recorded upstream source digest from its archived bytes.
+    SourceHashes,
     /// Run the local repository acceptance gates, without live provider credentials.
     Gate {
         /// Also check every target on the declared minimum Rust version.
@@ -116,6 +119,10 @@ fn main() -> Result<()> {
     }
     if let Action::DocsAudit { directory } = args.command {
         return docs::audit(&directory.unwrap_or_else(|| root.join("website/build")));
+    }
+    if let Action::SourceHashes = args.command {
+        source_hashes::run(&root)?;
+        return Ok(());
     }
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
     if let Action::Cli { check } = args.command {
