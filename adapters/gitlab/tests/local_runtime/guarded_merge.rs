@@ -244,6 +244,20 @@ fn gitlab_cli_background_recovers_revoked_removed_target_without_disclosure() {
 }
 
 #[test]
+#[ignore = "requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR"]
+fn gitlab_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively() {
+    for mode in [8, 9, 10] {
+        journey(mode);
+    }
+}
+
+#[test]
+#[ignore = "requires built production CLI, qualified GNOME, dbus-daemon and task-owned TMPDIR"]
+fn adversary_revoked_disclosure_of_an_applied_merge_never_answers_not_attempted() {
+    journey(11);
+}
+
+#[test]
 #[ignore = "subprocess fixture; no action without its explicit task-owned root"]
 fn prepared_attempt_exit_fixture() {
     use connectors_host::local::{approvals::Subject, mutations as ledger};
@@ -311,11 +325,31 @@ fn stored_attempt(cli: &Cli) -> (String, String, Option<i64>, Option<i64>) {
     db.query_row("SELECT a.state,k.state,k.settled_at_ms,k.replay_expires_at_ms FROM mutation_attempts a JOIN mutation_keys k ON k.attempt_id=a.attempt_id", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))).unwrap()
 }
 
+/// The exact original attempt and its business key, selected by identity so a
+/// later attempt under another key can never answer for it.
+fn stored_original(cli: &Cli, attempt: &Value) -> (String, String, Option<i64>, Option<i64>) {
+    let db = rusqlite::Connection::open_with_flags(
+        cli.paths.state.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    db.query_row("SELECT a.state,k.state,k.settled_at_ms,k.replay_expires_at_ms FROM mutation_attempts a JOIN mutation_keys k ON k.attempt_id=a.attempt_id WHERE a.attempt_id=?1",
+        [attempt["id"].as_str().unwrap()], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))).unwrap()
+}
+
 fn journey(mode: u8) {
     let provider = Provider::new();
-    provider
-        .merge_mode
-        .store(if mode == 6 { 3 } else { mode }, Ordering::SeqCst);
+    provider.merge_mode.store(
+        match mode {
+            6 => 3,
+            8 | 10 => 5,
+            9 => 6,
+            // Adversary pass 2 probe; the same held Applied response as mode 10.
+            11 => 5,
+            other => other,
+        },
+        Ordering::SeqCst,
+    );
     let mut custody = Custody::new(provider.root.path());
     let clock = Clock::new();
     let cli = Cli::new(provider.root.path());
@@ -485,6 +519,283 @@ fn journey(mode: u8) {
                 .unwrap()
                 .iter()
                 .any(|method| method == "PUT")
+        );
+        return;
+    }
+    if mode == 11 {
+        // Adversary pass 2 probe of the mode 10 residual. The same construction
+        // as mode 10 -- a known Applied effect held at the provider, disclosure
+        // admission withdrawn while metadata is still writable, metadata then
+        // made read-only, then the response released. What mode 10 does not say
+        // is what the refused disclosure reports about the effect that did
+        // happen, and what the durable record may become after a restart.
+        let metadata_mode = |mode: u32| {
+            for entry in fs::read_dir(&cli.paths.state).unwrap() {
+                let entry = entry.unwrap();
+                if entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with("metadata.sqlite3"))
+                {
+                    fs::set_permissions(entry.path(), fs::Permissions::from_mode(mode)).unwrap();
+                }
+            }
+        };
+        let mut running = OwnedProcess(cli.command(&invocation).spawn().unwrap());
+        let until = Instant::now() + Duration::from_secs(10);
+        while provider.merge_held.load(Ordering::SeqCst) == 0 {
+            assert!(
+                running.0.try_wait().unwrap().is_none(),
+                "merge ended before the provider held its response"
+            );
+            assert!(Instant::now() < until, "provider did not hold the merge");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(provider.merge_effects.load(Ordering::SeqCst), 1);
+        success(
+            cli.run(&[
+                "connections",
+                "revoke",
+                "--adapter",
+                "forge",
+                "--connection",
+                connection,
+                "--expected-revision",
+                connected["connection"]["summary"]["revision"]
+                    .as_str()
+                    .unwrap(),
+            ]),
+        );
+        metadata_mode(0o400);
+        provider.merge_mode.store(0, Ordering::SeqCst);
+        let refused = refusal(finish_process(running), "revoked");
+        // The merge applied. A refused disclosure may withhold the projection
+        // entirely, and it may report the known effect, but it can never answer
+        // for an applied effect with not-attempted.
+        assert!(
+            refused["mutation"].is_null() || refused["mutation"]["classification"] == "applied",
+            "a refused disclosure answered for an applied merge: {refused}"
+        );
+        metadata_mode(0o600);
+        fs::remove_file(&proof).unwrap();
+        cli.shutdown();
+        let native_calls = provider.count();
+        refusal(cli.run(&invocation), "revoked");
+        assert_eq!(provider.count(), native_calls);
+        assert_eq!(provider.merge_effects.load(Ordering::SeqCst), 1);
+        // Background maintenance may or may not have swept the abandoned
+        // attempt by now, so the reachable states are a pair. Every other state
+        // either discloses the effect or releases its business key for reuse,
+        // and that part of the invariant is deterministic across the sweep.
+        let (attempt, key, settled_at, replay_expires) = stored_attempt(&cli);
+        assert!(
+            matches!(attempt.as_str(), "dispatching" | "indeterminate"),
+            "attempt {attempt}/{key} after a revoked disclosure of an applied merge"
+        );
+        assert!(
+            matches!(key.as_str(), "pending" | "quarantined"),
+            "attempt {attempt}/{key} after a revoked disclosure of an applied merge"
+        );
+        assert_eq!((settled_at, replay_expires), (None, None));
+        // Measured: the refused disclosure starts no owner, so no background
+        // sweep can run. The record state after restart is therefore not
+        // indeterminate-by-timing; it is fixed.
+        assert!(!cli.paths.state.join("owner.sock").exists());
+        return;
+    }
+    if mode == 8 || mode == 9 || mode == 10 {
+        // Terminal settlement persistence fails after a known native response.
+        // The provider holds that response while the fixture makes host metadata
+        // read-only, so the owner cannot retain the result it is about to report.
+        let known = mode != 9;
+        // Mode 10 additionally withdraws current admission for disclosing that
+        // known effect while the response is still held.
+        let revoked = mode == 10;
+        // SQLite recreates its own journal files with the database file's
+        // permissions, so the whole metadata set moves together.
+        let metadata_mode = |mode: u32| {
+            for entry in fs::read_dir(&cli.paths.state).unwrap() {
+                let entry = entry.unwrap();
+                if entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with("metadata.sqlite3"))
+                {
+                    fs::set_permissions(entry.path(), fs::Permissions::from_mode(mode)).unwrap();
+                }
+            }
+        };
+        let mut running = OwnedProcess(cli.command(&invocation).spawn().unwrap());
+        let until = Instant::now() + Duration::from_secs(10);
+        // Wait for the hold itself. A recorded method or an effect count is a
+        // weaker witness: releasing on one of those can overtake the handler and
+        // have it answer the released mode instead of the held one.
+        while provider.merge_held.load(Ordering::SeqCst) == 0 {
+            assert!(
+                running.0.try_wait().unwrap().is_none(),
+                "merge ended before the provider held its response"
+            );
+            assert!(Instant::now() < until, "provider did not hold the merge");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            provider
+                .methods
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|method| method.as_str() == "PUT")
+                .count(),
+            1
+        );
+        assert_eq!(
+            provider.merge_effects.load(Ordering::SeqCst),
+            usize::from(known)
+        );
+        if revoked {
+            // Withdraw the connection that governs disclosure of this known
+            // effect. Metadata is still writable: this is admission, not storage.
+            success(
+                cli.run(&[
+                    "connections",
+                    "revoke",
+                    "--adapter",
+                    "forge",
+                    "--connection",
+                    connection,
+                    "--expected-revision",
+                    connected["connection"]["summary"]["revision"]
+                        .as_str()
+                        .unwrap(),
+                ]),
+            );
+        }
+        // Preparation, approval spend and the dispatch gate are already committed
+        // and the native response is still held, so only settlement can fail here.
+        metadata_mode(0o400);
+        provider.merge_mode.store(0, Ordering::SeqCst);
+        let output = finish_process(running);
+        if revoked {
+            // Final disclosure admission is checked after settlement. A known
+            // applied effect whose current admission is gone is not disclosed,
+            // and the refusal authorizes no second effect.
+            let refused = refusal(output, "revoked");
+            // The refusal carries the admission failure and nothing else: no
+            // projection, so no classification and no original attempt identity.
+            assert!(refused.get("mutation").is_none(), "{refused}");
+            assert_eq!(
+                stored_attempt(&cli),
+                ("dispatching".into(), "pending".into(), None, None)
+            );
+            assert_eq!(provider.merge_effects.load(Ordering::SeqCst), 1);
+            metadata_mode(0o600);
+            fs::remove_file(&proof).unwrap();
+            cli.shutdown();
+            let native_calls = provider.count();
+            // Restart changes nothing: current admission still governs, and the
+            // refused disclosure never replays the native write.
+            refusal(cli.run(&invocation), "revoked");
+            assert_eq!(provider.count(), native_calls);
+            assert_eq!(provider.merge_effects.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                provider
+                    .methods
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|method| method.as_str() == "PUT")
+                    .count(),
+                1
+            );
+            return;
+        }
+        let first = if known {
+            success(output)
+        } else {
+            refusal(output, "forbidden")
+        };
+        assert_eq!(
+            first["mutation"]["classification"],
+            if known { "applied" } else { "refused" },
+            "{first}"
+        );
+        assert_eq!(first["mutation"]["replayed"], false);
+        // The failure discloses its safe cause; it never replaces the known
+        // effect with uncertainty or with a not-attempted answer.
+        assert_eq!(first["mutation"]["cause"]["code"], "unavailable", "{first}");
+        assert_eq!(first["mutation"]["cause"]["stage"], "attempt_store");
+        if known {
+            let payload: Value = serde_json::from_str(first["result"].as_str().unwrap()).unwrap();
+            assert_eq!(payload["item"]["state"], "merged");
+        }
+        // The same unwritable metadata leaves the admitted audit incomplete.
+        // That cannot change the known effect either.
+        assert_eq!(first["source_audit"]["audit_status"], "incomplete");
+        // The known result was not retained: the durable record stays uncertain.
+        assert_eq!(
+            stored_original(&cli, &first["mutation"]["attempt"]),
+            ("dispatching".into(), "pending".into(), None, None)
+        );
+        assert_eq!(
+            provider.merge_effects.load(Ordering::SeqCst),
+            usize::from(known)
+        );
+        metadata_mode(0o600);
+        let original_owner = owner::Client::connect(&cli.paths, false)
+            .unwrap()
+            .host_incarnation;
+        cli.shutdown();
+        // The spend committed before dispatch: the same proof stays spent under
+        // another business key and creates no second attempt or provider effect.
+        let mut reused = invocation.clone();
+        let key_index = reused
+            .iter()
+            .position(|arg| *arg == "--idempotency-key")
+            .unwrap()
+            + 1;
+        reused[key_index] = "second-owned-merge";
+        let refused = refusal(cli.run(&reused), "approval_replayed");
+        assert_eq!(refused["mutation"]["classification"], "not_attempted");
+        assert!(refused["mutation"]["cause"].is_null(), "{refused}");
+        // The spent proof never re-enters the original uncertain attempt.
+        assert_ne!(refused["mutation"]["attempt"], first["mutation"]["attempt"]);
+        // Retaining a now-missing proof path proves recovery does not open it.
+        fs::remove_file(&proof).unwrap();
+        cli.shutdown();
+        let native_calls = provider.count();
+        let replay = refusal(cli.run(&invocation), "outcome_unknown");
+        assert_ne!(
+            owner::Client::connect(&cli.paths, false)
+                .unwrap()
+                .host_incarnation,
+            original_owner
+        );
+        assert_eq!(replay["mutation"]["classification"], "unknown");
+        assert_eq!(replay["mutation"]["replayed"], true);
+        assert_eq!(replay["source_audit"]["audit_status"], "complete");
+        assert_eq!(replay["mutation"]["attempt"], first["mutation"]["attempt"]);
+        assert_eq!(
+            replay["mutation"]["original_request_id"],
+            first["mutation"]["original_request_id"]
+        );
+        assert_eq!(
+            stored_original(&cli, &first["mutation"]["attempt"]),
+            ("indeterminate".into(), "quarantined".into(), None, None)
+        );
+        assert_eq!(provider.count(), native_calls);
+        assert_eq!(
+            provider.merge_effects.load(Ordering::SeqCst),
+            usize::from(known)
+        );
+        assert_eq!(
+            provider
+                .methods
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|method| method.as_str() == "PUT")
+                .count(),
+            1
         );
         return;
     }
