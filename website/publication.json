@@ -246,6 +246,13 @@
       "status": "Specified; runtime pending"
     },
     {
+      "route": "/adapters/kubernetes/contracts/helm",
+      "title": "Kubernetes Helm release reads",
+      "source": "adapters/kubernetes/contracts/helm/v1alpha1/semantics.md",
+      "owner": "kubernetes",
+      "status": "Read-only observation; dedicated sandbox acceptance open"
+    },
+    {
       "route": "/adapters/kubernetes/contracts/mutations",
       "title": "Kubernetes mutations",
       "source": "adapters/kubernetes/contracts/mutations/v1alpha1/semantics.md",
