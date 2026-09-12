@@ -11,7 +11,7 @@ Inventory resources and discover candidate endpoints.
 
 ## Current capabilities
 
-The current service implements `resources.list`, `endpoints.discover` and optionally `hosts.discover`. Configuration selects namespaces and resource kinds.
+The current service implements `resources.list`, `endpoints.discover` and optionally `hosts.discover`. Configuration selects namespaces and resource kinds. A separate `helm_release_reads` selection additionally advertises the `helm_releases.*` Helm release-state reads, whose values and manifests are disclosed only as redacted projections.
 
 ## Access and limits
 
