@@ -92,6 +92,25 @@ coordinates in this placement are the configured instance (`instance_ref`), the 
 configured owner's connection coordinate (`connection_ref`), the admitted configuration
 revision (`admitted_revision`) and the owner authority (`authority_ref`).
 
+**Data rides a lease, and the lease is short.** Reusing `connectors.sessions.Session`
+inherits its timing obligations, not only its states.
+[`contracts/sessions/v1alpha1/semantics.md` §4.1](../../../../../contracts/sessions/v1alpha1/semantics.md)
+makes a live data lease "mandatory for every admitted data path" and caps its effective
+deadline at **2,000 ms after authoritative issuance**, "including delivery delay, clock
+uncertainty, scheduling delay and already-buffered output" — and it requires a binding
+that cannot enforce that for every data path to **refuse session admission**. So every
+trace under [`scenarios/`](scenarios/) issues a lease of at most that, and an inbound
+request that outlives one stays `Ready` only through the supervisor's own
+`RenewDataLease` (`renew`, `Ready` → `Ready`), taken "under the same serialized authority
+check as revocation" and never past an earlier deadline. No peer-visible MCP message is a
+lease input; none of them renews anything (§3.3). If the supervisor does not renew before
+the effective deadline the lease expires, and expiry is a local terminal fact: the model
+fixes it to `lease_expired`, there is no grace past the deadline, the outcome of whatever
+was in flight is unknown, and a renewal arriving afterwards cannot reopen the session. A
+terminal fact starts the two other clocks §4.1 owns — data stops within **2,000 ms** of
+it and local teardown and accounting complete within **5,000 ms** — and where the live
+lease's own deadline is earlier than the first of those, the earlier one dominates.
+
 **`connection_ref` here is the supervisor's own coordinate, not an assignment.** Which
 connection's provider credential carries out an inbound invocation is
 `decision-blocker:mcp-caller-connection-assignment`, open. In this placement there is
@@ -113,12 +132,21 @@ Two markers the domain model carries, repeated here rather than resolved:
 ## 3. The six behaviours
 
 Each row names what a caller can observe, the transition it turns on in the
-`connectors.sessions.Session` vocabulary, and the compiled trace that carries it. Three
-rows turn on the same transition, and that is a property of the vocabulary rather than a
-gap in the enumeration: `permit_data` is the only transition `connectors.sessions.Session`
-offers for "the session carries more data and stays `Ready`", and framing, progress and
-cancellation are all per-request events on a live connection. What distinguishes them is
-the observable outcome, which is unique per behaviour.
+`connectors.sessions.Session` vocabulary, and the compiled trace that carries it. Rows
+repeat transitions, and that is a property of the vocabulary rather than a gap in the
+enumeration: `permit_data` is the only transition `connectors.sessions.Session` offers for
+"the session carries more data and stays `Ready`", which is what framing, progress,
+cancellation and a per-request refusal all are, and `begin_close` is the only one for "the
+host records a terminal and stops admitting data", which both a graceful close and the end
+of a partial result are. What distinguishes rows is the observable outcome, and no two
+rows share one.
+
+**Two behaviours have two routes, and each route is its own row.** A behaviour whose
+answer differs by *where* the mismatch or the ending happens does not have one transition,
+and collapsing it into one row picks a winner silently: a reader implementing from the
+table would deny readiness for a per-request capability refusal, or would have nothing to
+implement for a graceful shutdown. Each route therefore carries its own observable
+outcome, its own transition and its own trace, and the prose section says which is which.
 
 | Behaviour | Observable outcome | Session transition | Scenario |
 |---|---|---|---|
@@ -126,8 +154,10 @@ the observable outcome, which is unique per behaviour.
 | streaming | `partial-result-never-reported-complete` | `begin_close` (`Ready` → `Closing`) | [`partial-result-never-reported-complete.yaml`](scenarios/partial-result-never-reported-complete.yaml) |
 | progress | `progress-stops-at-the-result` | `permit_data` (`Ready` → `Ready`) | [`progress-stops-at-the-result.yaml`](scenarios/progress-stops-at-the-result.yaml) |
 | cancellation | `cancelled-request-answers-nothing` | `permit_data` (`Ready` → `Ready`) | [`cancelled-request-answers-nothing.yaml`](scenarios/cancelled-request-answers-nothing.yaml) |
-| connection and session loss | `transport-drop-loses-the-session` | `continuity_lost` (`Ready` → `Lost`) | [`transport-drop-loses-the-session.yaml`](scenarios/transport-drop-loses-the-session.yaml) |
-| version and capability mismatch | `unsupported-version-denies-readiness` | `deny_ready` (`Establishing` → `Closing`) | [`unsupported-version-denies-readiness.yaml`](scenarios/unsupported-version-denies-readiness.yaml) |
+| connection and session loss (graceful close) | `graceful-stdin-close-ends-the-session` | `begin_close` (`Ready` → `Closing`) | [`graceful-stdin-close-ends-the-session.yaml`](scenarios/graceful-stdin-close-ends-the-session.yaml) |
+| connection and session loss (transport drop) | `transport-drop-loses-the-session` | `continuity_lost` (`Ready` → `Lost`) | [`transport-drop-loses-the-session.yaml`](scenarios/transport-drop-loses-the-session.yaml) |
+| version and capability mismatch (per-request refusal) | `capability-refusal-keeps-the-session-ready` | `permit_data` (`Ready` → `Ready`) | [`capability-refusal-keeps-the-session-ready.yaml`](scenarios/capability-refusal-keeps-the-session-ready.yaml) |
+| version and capability mismatch (legacy initialize) | `unsupported-version-denies-readiness` | `deny_ready` (`Establishing` → `Closing`) | [`unsupported-version-denies-readiness.yaml`](scenarios/unsupported-version-denies-readiness.yaml) |
 
 ### 3.1 Message framing — `framing-refusal-keeps-the-session-ready`
 
@@ -139,19 +169,28 @@ not a valid MCP message (`mcp-2026-07-28-basic-transports-stdio.mdx:18-19`); its
 go to `stderr`, which a client "**SHOULD NOT** assume … indicates error conditions"
 (`mcp-2026-07-28-basic-transports-stdio.mdx:14-17`).
 
-**A malformed inbound line** — invalid UTF-8, unparseable JSON, or a JSON-RPC envelope
-whose `id` cannot be read — is answered with a JSON-RPC parse error, code `-32700`. That
-code is the revision's own: it keeps "the standard JSON-RPC 2.0 error codes (`-32700`,
-`-32600` to `-32603`) for general protocol failures"
-(`mcp-2026-07-28-basic-index.mdx:111-112`) and its schema declares `PARSE_ERROR = -32700`
-(`mcp-2026-07-28-schema.ts:312`). Selecting *which* of those four a malformed line gets is
-this document's, and unparseable bytes are what the parse error is for. The error response
-carries no `id`, which the
-revision permits only in exactly this case: "Error responses **MUST** include the same ID
+**An unparseable inbound line** — invalid UTF-8, or bytes that are not JSON — is answered
+with a JSON-RPC parse error, code `-32700`. The code is the revision's own: it keeps "the
+standard JSON-RPC 2.0 error codes (`-32700`, `-32600` to `-32603`) for general protocol
+failures" (`mcp-2026-07-28-basic-index.mdx:111-112`), and its schema declares
+`PARSE_ERROR = -32700` for exactly this condition — "invalid JSON was received by the
+server … the server cannot parse the JSON text of a message"
+(`mcp-2026-07-28-schema.ts:312`, `mcp-2026-07-28-schema.ts:319`).
+
+**A line that parses as JSON but is not a request** — no `jsonrpc`, no `method`, an `id`
+of a type the envelope does not allow — is a different refusal, and it is `-32600`, not
+`-32700`. The schema draws that line itself: `INVALID_REQUEST = -32600` is "returned when
+the message structure does not conform to the JSON-RPC 2.0 specification requirements for
+a request (e.g., missing required fields like `jsonrpc` or `method`, or using invalid
+types for these fields)" (`mcp-2026-07-28-schema.ts:313`, `mcp-2026-07-28-schema.ts:333`).
+Parsed bytes are never a parse error.
+
+Either way, **the error response carries no `id` when the `id` could not be read**, which
+the revision permits in exactly that case: "Error responses **MUST** include the same ID
 as the request they correspond to (except in error cases where the ID could not be read
-due a malformed request)" (`mcp-2026-07-28-basic-index.mdx:103`). A line that parses as
-JSON but lacks a required `_meta` field is a different refusal with a readable `id`:
-`-32602`, by `mcp-2026-07-28-basic-index.mdx:380-382`.
+due a malformed request)" (`mcp-2026-07-28-basic-index.mdx:103`). A line that parses as a
+well-formed request but lacks a required `_meta` field is a third refusal, with a readable
+`id`: `-32602`, by `mcp-2026-07-28-basic-index.mdx:380-382`.
 
 **A truncated inbound line** — bytes arriving with no terminating newline — is never
 executed. The binding holds the partial bytes and executes nothing until a newline
@@ -209,15 +248,32 @@ of the three kinds of message the server writes
 (`mcp-2026-07-28-basic-patterns-progress.mdx:90`), so the response for a request is the
 last message a caller sees for it. Rate limiting is a duty of both parties (`:88-89`).
 
-**The transition is `permit_data` (`Ready` → `Ready`), and it is not `renew`.** A progress
-notification is outbound data on a session that is already `Ready`; it is not a lease
-input and it renews nothing. The revision's licence to reset a clock on progress belongs
-to the *sender of a request* — "Implementations **MAY** choose to reset the timeout clock
-when receiving a progress notification … however, implementations **SHOULD** always
-enforce a maximum timeout" (`mcp-2026-07-28-basic-patterns-cancellation.mdx:60-64`) — which
-on this binding is the caller, not this repository. Lease authority stays where the
-shared sessions contract puts it, with the host's own authenticated decision, and a
-peer-visible notification is not one.
+**The transition is `permit_data` (`Ready` → `Ready`), and the notification itself is not
+a `renew`.** A progress notification is outbound data on a session that is already
+`Ready`; it is not a lease input and it renews nothing. The revision's licence to reset a
+clock on progress belongs to the *sender of a request* — "Implementations **MAY** choose
+to reset the timeout clock when receiving a progress notification … however,
+implementations **SHOULD** always enforce a maximum timeout"
+(`mcp-2026-07-28-basic-patterns-cancellation.mdx:60-64`) — which on this binding is the
+caller, not this repository. Lease authority stays where the shared sessions contract puts
+it, with the host's own authenticated decision, and a peer-visible notification is not
+one.
+
+**What keeps a long request alive is the supervisor's own renewal, and a request that is
+not renewed dies rather than continuing.** Progress exists because a request can run
+longer than a moment, and §2 says a data lease may not outlive 2,000 ms from issuance, so
+a request that runs longer than one lease is the normal case rather than the exotic one.
+The supervisor renews it — `RenewDataLease`, `renew` (`Ready` → `Ready`) — before the
+effective deadline, under the same serialized authority check as revocation, never past an
+earlier deadline, and never on the strength of a progress notification having been sent.
+If it does not, the lease expires at its deadline: that expiry is itself the terminal fact,
+recorded `lease_expired`, with no grace period after it and no way for a later renewal to
+reopen the session. The caller then observes what §3.5 describes for any ending —
+notifications stop, no result arrives, and whether the work took effect is unknown.
+[`scenarios/progress-stops-at-the-result.yaml`](scenarios/progress-stops-at-the-result.yaml)
+carries both halves: two notifications and a result across a request that outlives its
+first lease, and the supervisor's renewal in between, performed by the host and by nothing
+the caller sent.
 
 ### 3.4 Cancellation — `cancelled-request-answers-nothing`
 
@@ -245,20 +301,25 @@ terminal and is deliberately not what a per-request `notifications/cancelled` tu
 reading one onto the other would end a caller's whole connection because it withdrew one
 request.
 
-### 3.5 Connection and session loss — `transport-drop-loses-the-session`
+### 3.5 Connection and session loss — `graceful-stdin-close-ends-the-session` and `transport-drop-loses-the-session`
 
-Two endings, and the binding distinguishes them.
+Two endings, and the binding distinguishes them. They are two rows of the enumeration
+because they end in two different states and a reader implementing one is not implementing
+the other.
 
-**Graceful.** The caller closes the binding's `stdin`; the revision makes that the
-shutdown signal — "Servers **SHOULD** exit promptly when their standard input is closed or
-reads return end-of-file. This is the primary graceful-shutdown signal and the only
-portable one" (`mcp-2026-07-28-basic-transports-stdio.mdx:102-104`), the client having
-closed the stream and waited before any forced termination (`:89-94`); the
-interoperability revision specifies the same sequence
-(`mcp-2025-11-25-basic-lifecycle.mdx:232-241`). The supervisor records a terminal by
-`begin_close` and finishes at `Closed`.
+**Graceful — `graceful-stdin-close-ends-the-session`.** The caller closes the binding's
+`stdin`; the revision makes that the shutdown signal — "Servers **SHOULD** exit promptly
+when their standard input is closed or reads return end-of-file. This is the primary
+graceful-shutdown signal and the only portable one"
+(`mcp-2026-07-28-basic-transports-stdio.mdx:102-104`), the client having closed the stream
+and waited before any forced termination (`:89-94`); the interoperability revision
+specifies the same sequence (`mcp-2025-11-25-basic-lifecycle.mdx:232-241`). The supervisor
+records one terminal by `begin_close` (`Ready` → `Closing`) with reason `remote_hangup`,
+cuts data off by the earlier of the §4.1 ceiling and the live lease's own deadline, and
+finishes at `Closed` with the peer's shutdown recorded as confirmed — which, unlike the
+drop below, this ending actually observed.
 
-**Lost.** The connection drops with no graceful close — the caller's process dies, the
+**Lost — `transport-drop-loses-the-session`.** The connection drops with no graceful close — the caller's process dies, the
 pipe breaks mid-write, the child is force-terminated. The outcome is unknown, which is
 what `Lost` exists for: the supervisor moves `continuity_lost` (`Ready` → `Lost`) and the
 state is terminal. Nothing afterwards revives it; a later data or renewal decision is
@@ -274,13 +335,14 @@ subscription state across reconnections"
 retry a lost mutating invocation is not settled here**: lost replies and mutation
 uncertainty are `story:mcp-inbound-mutation-replay`.
 
-### 3.6 Version and capability mismatch — `unsupported-version-denies-readiness`
+### 3.6 Version and capability mismatch — `capability-refusal-keeps-the-session-ready` and `unsupported-version-denies-readiness`
 
 There is no negotiation handshake in the primary revision: "Every request carries its
 protocol version, and the server accepts or rejects each request independently"
 (`mcp-2026-07-28-basic-versioning.mdx:12-13`).
 
-**A modern request declaring a version this binding does not speak** is refused with
+**Per-request — `capability-refusal-keeps-the-session-ready`.** A modern request declaring
+a version this binding does not speak is refused with
 `UnsupportedProtocolVersionError`, code `-32022`, whose `data.supported` names the
 versions the binding does support and `data.requested` echoes what arrived
 (`mcp-2026-07-28-basic-versioning.mdx:48-67`). The supported list is exactly the two
@@ -293,8 +355,9 @@ request missing a required `_meta` field is `-32602` (`:380-382`). None of these
 connection: each is one request's refusal, and the session stays `Ready` under
 `permit_data`, because version and capabilities are per-request facts on this revision.
 
-**A legacy `initialize` is where a mismatch can refuse the whole connection**, and that is
-the transition this row names. A dual-era server "selects its behavior from how the client
+**Legacy `initialize` — `unsupported-version-denies-readiness`.** This is the one route on
+which a mismatch refuses the whole connection rather than one request, and it exists only
+here: a legacy opening, on the interoperability revision. A dual-era server "selects its behavior from how the client
 opens", and an `initialize` request "selects legacy semantics, scoped to the stdio
 process" (`mcp-2026-07-28-basic-versioning.mdx:174-180`). The interoperability revision
 then requires the binding to answer with the requested version if it supports it and
@@ -362,7 +425,7 @@ This document specifies none of them and promotes none of them.
 **Nothing here is implemented, and nothing here has been spoken to an MCP client.** No
 runtime, fixture server or executable is added by this document; a compiled scenario is
 not an executed one. The pinned toolchain's own note says it: ESS "compiles obligations
-but does NOT execute a sequential trace", so the six traces under
+but does NOT execute a sequential trace", so the traces under
 [`scenarios/`](scenarios/) establish that this binding's decisions are expressible and
 legal in the `connectors.sessions` vocabulary — not that any code takes them.
 
