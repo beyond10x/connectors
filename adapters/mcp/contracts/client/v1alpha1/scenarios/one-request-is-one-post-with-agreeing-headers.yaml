@@ -1,0 +1,24 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:framing
+outcome: mcp.outbound.request-framed
+wire_code: n/a
+summary: One JSON-RPC message is one POST whose mirrored headers agree with the body they
+  mirror.
+given:
+  - A binding configured for `transport:streamable-http`.
+when:
+  - The client sends a request and, separately, a notification
+    (mcp-2026-07-28-basic-transports-streamable-http.mdx:70-91).
+then:
+  - Each message is its own POST, and its `Accept` header offers both of the media types
+    the transport defines.
+  - The three mirrored headers `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` agree
+    byte-for-byte with the body they mirror (mcp-2026-07-28-basic-transports-streamable-http.mdx:250-261 and 286-293).
+  - The body `_meta` carries the required protocol version and client capabilities on
+    every request (mcp-2026-07-28-basic-index.mdx:373-382).
+  - The notification is answered `202 Accepted` with no body.
+never:
+  - A JSON-RPC response is sent as a request body.
+  - Two JSON-RPC messages share one POST.

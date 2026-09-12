@@ -1,0 +1,24 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:capability-mismatch
+outcome: mcp.outbound.required-client-capability-refused
+wire_code: unsupported
+summary: A server that needs a client capability Connectors does not declare gets a
+  refusal the caller can read, not an approximation.
+given:
+  - A binding whose declared client capabilities are empty, because the selection matrix
+    refuses `roots`, `sampling` and `elicitation`.
+when:
+  - The server answers `MissingRequiredClientCapabilityError` (-32021,
+    mcp-2026-07-28-schema.ts:442) naming the capabilities it required
+    (mcp-2026-07-28-basic-index.mdx:387-392).
+then:
+  - The observable outcome is `unsupported`, carrying the endpoint, the refused method and
+    the `requiredCapabilities` list.
+  - The caller learns which capability the server wanted.
+never:
+  - An elicitation is answered on a user's behalf, a default is supplied, a model is
+    sampled or a filesystem root is invented.
+  - The refused capability is declared in order to get past the refusal; whether it is
+    declared at all is the selection matrix's decision.

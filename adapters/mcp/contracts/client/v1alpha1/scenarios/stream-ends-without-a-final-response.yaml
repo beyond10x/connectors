@@ -1,0 +1,24 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:streaming
+outcome: mcp.outbound.stream-ended-without-an-answer
+wire_code: outcome_unknown
+summary: A stream that closes before its final response leaves the request's outcome
+  unobserved, and it is reported as unobserved.
+given:
+  - A request being answered on an open SSE stream, possibly after progress notifications.
+when:
+  - The stream closes with no JSON-RPC response for that request, which the specification
+    calls an unexpected disconnect as opposed to a graceful closure carrying a response
+    (mcp-2026-07-28-basic-patterns-subscriptions.mdx:128-135 and 155-157).
+then:
+  - The observable outcome is `outcome_unknown`, naming the request and the last progress
+    value observed if there was one.
+  - The caller is told the effect was not observed.
+never:
+  - The outcome is reported as success or as failure.
+  - The request is sent a second time, which could duplicate an effect that already
+    happened.
+  - The truncation is reported as session loss; under the primary revision there is no
+    session (mcp-2026-07-28-basic-index.mdx:204-209).
