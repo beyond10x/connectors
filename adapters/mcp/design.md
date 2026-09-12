@@ -34,16 +34,24 @@ pinned here. The two revisions are named by `initiative:complete-local-connector
 ## What is deliberately not decided here
 
 - Which transports and capability profiles this repository supports. The pinned revisions
-  define **three** transport families, not two: stdio, Streamable HTTP, and custom
-  transports, which carry their own MUST-level requirement — `2026-07-28`
-  `basic/transports/index.mdx` §Custom Transports (line 60, "Implementers who choose to
-  support custom transports **MUST** preserve the … metadata model") and `2025-11-25`
-  `basic/transports.mdx` §Custom Transports (line 313). The initiative names stdio and
-  Streamable HTTP as implementation targets; that is a target list, not the option space.
-  Selecting, bounding and specifying transports — including an explicit refusal of custom
-  transports, if that is the selection — together with framing, streaming, cancellation,
-  progress, session loss and version mismatch, is a separate authoring obligation that
-  reads this pin.
+  specify **four** transport bindings, not two:
+
+  | Binding | Status in the pinned revisions | Cited in the archives |
+  |---|---|---|
+  | stdio | current | `2026-07-28 basic/transports/stdio.mdx`; `2025-11-25 basic/transports.mdx` §stdio (22) |
+  | Streamable HTTP | current | `2026-07-28 basic/transports/streamable-http.mdx`; `2025-11-25 basic/transports.mdx` §Streamable HTTP (54) |
+  | custom transports | permitted, MUST-level constraints | `2026-07-28 basic/transports/index.mdx` §Custom Transports (60): "Implementers who choose to support custom transports **MUST** preserve the … metadata model"; `2025-11-25 basic/transports.mdx` §Custom Transports (313) |
+  | HTTP+SSE, from `2024-11-05` | **deprecated, not removed** | `2026-07-28 basic/transports/streamable-http.mdx` §HTTP+SSE Transport (2024-11-05) (695), "New implementations **SHOULD NOT** adopt it; existing implementations **SHOULD** migrate" (703-705) and the fallback procedure (710-737); `2026-07-28 deprecated.mdx` (31) lists it under `## Deprecated` (22) and above `## Removed` (37); `2025-11-25 basic/transports.mdx` §Backwards Compatibility (284-311), whose fallback ends "should use that transport for all subsequent communication" (309-311) |
+
+  The initiative names stdio and Streamable HTTP as implementation targets; that is a
+  target list, not the option space. HTTP+SSE matters precisely because `2025-11-25` is
+  pinned for the legacy seam: that revision's documented fallback terminates in HTTP+SSE,
+  so an outbound client that follows it lands on a binding the target list does not
+  mention. Selecting, bounding and specifying transports — including an explicit refusal
+  of custom transports or of HTTP+SSE, if that is the selection — together with framing,
+  streaming, cancellation, progress, session loss and version mismatch, is a separate
+  authoring obligation that reads this pin. A selection matrix built from this bullet has
+  a row for each of the four.
 - Any MCP noun, its identity, cardinality or lifecycle. No entity or relation is declared
   by this directory, and none may be inferred from the pinned documents without its own
   modelled and reviewed record.
