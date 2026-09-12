@@ -15,7 +15,7 @@ scope:
   path: adapters/mcp/contracts/protocol/v1alpha1/evidence
 - confidence: inferred
   path: adapters/mcp/design.md
-revision: 4
+revision: 5
 ---
 ## Acceptance
 
@@ -52,12 +52,16 @@ protocol capability listing with implemented support" — which is only checkabl
 against a fixed revision.
 
 The two revisions are already named, by the operator's recorded plan rather than
-by any judgement made here. `initiative:complete-local-connectors:35` reads: "Pin
+by any judgement made here. `initiative:complete-local-connectors:33` reads: "Pin
 that exact published MCP revision here and implement outbound and inbound
 tools/resources/prompts over stdio and Streamable HTTP, with version-specific
 2026-07-28 and explicit 2025-11-25 interoperability, caller isolation and
 authenticated local verification of the cloud-capable server profile." This story
 pins both; it does not choose them.
+
+*(This citation read `:35` at revisions 1 to 4. The implementor of this story
+grep-verified the sentence at line 33 and reported the error; corrected here. The
+companion citation `:32` below was checked at the same time and is right.)*
 
 `initiative:complete-local-connectors:32` names the source: the sibling `../mcp`
 repository, whose expansion and publication is that initiative's milestone 4
@@ -67,6 +71,15 @@ story pins a revision; it does not wait for that publication, and it does not
 publish anything. If the revision that gets pinned is an upstream specification
 document rather than a `../mcp` commit, the record says which, because the two are
 different authorities and a later reviewer must be able to tell them apart.
+
+**That question is now answered, by the implementation.** The two dates are
+upstream specification revisions, not `../mcp` releases: upstream
+`modelcontextprotocol/modelcontextprotocol` carries release tags `2026-07-28` at
+`5f5440bb26a62e2cf3440b92da5a667efa03b267` and `2025-11-25` at
+`38c84e9f93ad191d9eb26d92b945d17bd0efcaf3`, and
+`/home/timo/beyond10x/mcp/crates/b10x-mcp-types/src/lib.rs:15,17` declares those
+same two strings as `CURRENT_PROTOCOL_VERSION` and `LEGACY_PROTOCOL_VERSION` —
+a consumer's selection of them, not their source. Upstream is what is pinned.
 
 ## The discipline this follows
 

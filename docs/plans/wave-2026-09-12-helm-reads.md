@@ -246,3 +246,82 @@ applies after the adversary returns.
 | full gate with Rust 1.88 | pending |
 | store evidence and body update | pending |
 | commits | 1 unit commit made |
+
+## Unit 1 — adversary pass 1
+
+Verdict red. Executed 20 → 25, red 5. Eight findings, **all `introduced`, zero
+pre-existing, zero undecided** — so every row routes to the implementor and none
+becomes a separate story. Recorded as
+`review-result:adversary-helm-reads-pass-1-20260912`.
+
+| # | verdict | what reaches it | coordinator's row |
+|---|---|---|---|
+| 1 manifest digest over JSON encoding, not text | NEEDS-CHANGE | every `helm_releases.manifest` result | fix the code |
+| 2 CLI doc forbids its own example | NEEDS-CHANGE | an operator reading the invocation table | fix the prose |
+| 3 unbounded `path` against declared `maxLength 1024` | INFEASIBLE | *nothing found* | **fix anyway** |
+| 4 empty recorded key against `minLength 1` | INFEASIBLE | *nothing found* | **fix anyway** |
+| 5 non-object payload reports `complete:true` | INFEASIBLE | *nothing found* | **fix anyway** |
+| 6 `value_digest` is an offline confirmation oracle | CONFIRMED | every `values` result | keep the property, document its limit |
+| 7 evidence table claims ten read fields, two are read | CONFIRMED | the pinned-evidence artefact | correct the table |
+| 8 `namespace` is the requested one, not the observed | INFEASIBLE | *nothing found* | fix anyway |
+
+### Why three INFEASIBLE findings are being fixed rather than filed
+
+The adversary traced 3 and 4 to `crates/connectors-host/src/local/runtime/process.rs:248-253`:
+the host **terminates the local runtime child** when a result fails its own published
+schema. The failure mode is a killed adapter, not a bounded refusal. An adapter that
+provider-shaped input can kill is worth closing whether or not a chart in evidence
+produces one, and the fix is a bound and a refusal.
+
+5 is the unit's own argument applied one layer down. `semantics.md:68-72` refuses to
+skip a foreign labelled object because `complete:true` would then claim a history
+nobody observed; a payload decoding to `null` reports exactly that.
+
+### Finding 6 is kept, not fixed
+
+The `value_digest` equality property is what the digest is for, and the adversary said
+so itself — asserting non-reproducibility would contradict a property the contract
+states on purpose. What is missing is the warning, so the correction documents it:
+the digest bounds disclosure of an unknown value and does not protect one an attacker
+can enumerate. The two digests in this unit now differ on purpose, and the contract
+says why — one exists to be reproduced, the other to be compared.
+
+### What survived the attack
+
+All 14 pinned digests and byte lengths reproduce from the archives; roughly 50 cited
+lines say what the unit claimed, in both the v4.3.0 and v3.22.0 archives; v3 and v4
+agree field by field; `resource_kinds` is untouched in effect as well as in the enum;
+disclosure through `path`, `kind`, `bytes`, `index`, error messages and provenance is
+closed; neither paging routine reports `complete:true` over a truncation; and the
+three-outcome discrimination the acceptance turns on holds — scope refusal, RBAC denial
+and empty history are distinct.
+
+Routed to **the same implementor**, which still holds its context. No case has failed
+twice, so the fresh-implementor row does not apply.
+
+## MCP wave 1 — story:mcp-specification-pin
+
+Implementor green, committed `4192883`, 58 files, +780. 54 archived specification files
+across both revisions with URL, uncompressed SHA-256 and byte length. Adversary pass 1
+dispatched.
+
+The unit found a wrong citation in its own story: `initiative:complete-local-connectors:35`
+for a sentence at line 33. Corrected at revision 5, with the old citation named in the
+text rather than swapped silently.
+
+It also resolved the authority question the story left open: the two dates are upstream
+specification revisions, not releases of the sibling `../mcp` library, which declares
+those same two strings as its own current and legacy protocol versions — a consumer's
+selection, not their source.
+
+**One unapplied patch is held for the integration branch**, not for this unit:
+`~/.cache/cv2-mcp-waves-20260912/w1/source-hashes-gate-check.patch`, 291 lines. It
+closes a class rather than a defect — this repository has six manifests recording
+archived source digests and nothing re-derives any of them, so a manifest is evidence
+only by assertion. The implementor verified all six by hand today and all six are
+clean; the defect is the missing check. Measured with the patch applied:
+`connectors-build` tests 20 → 22, clippy 0, and a new gate step printing
+`84 archived upstream source(s) across 6 manifest(s) match their recorded uncompressed
+digests and lengths; exit=0`. It adds no dependency and no lockfile change. It applies
+after both units merge, so the full gate checks it against seven manifests including
+the Helm one this wave created.
