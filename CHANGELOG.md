@@ -2,72 +2,767 @@
 
 ## Unreleased
 
-- Pin ESS 0.22.2 and AEP 0.55.0 by source identity, with receipt-checked local
-  binaries for the repository gate and a digest-pinned AEP findings correction.
-  Global installations remain independently managed.
-- Correct 88 false empty-findings warnings and preserve 51 immutable legacy
-  reviews through source-bound structured transcriptions. These add no reviews,
-  approvals or claims of current runtime conformance.
+## 0.8.0 — 2026-09-12
 
-## 0.2.0 — 2026-09-11
+**This release replaces the implementation.** Every source file is new: the
+codebase was rebuilt from scratch beginning 2026-09-08 around contract-driven
+adapters, an explicit local lifecycle and typed semantic models, and it supersedes
+everything up to 0.7.2. Entries below 0.8.0 describe the previous implementation
+and are kept for history.
 
-Persistent local GitLab CLI and engineering reads, based on implementation commit
-`a5b399d4f790e993aa3ab76f6a61ac1ee25b6c7a`.
+The version line continues rather than restarting. Three pre-release milestones
+inside the rewrite were numbered 0.1.0, 0.2.0 and 0.3.0 during development; none
+was published, and those numbers already belong to releases of the previous
+implementation in this repository. Their content is folded into this entry.
 
-- Added local setup, adapter lifecycle, protected connection entry, repair,
-  revalidation, terminal local revocation and cached operation discovery.
-  SQLite stores metadata; qualified Linux Secret Service custody stores credentials.
-  Saved credentials survive CLI, owner and keyring restarts.
-- Expanded GitLab to eleven read operations: projects, issues, repository files,
-  exact-commit pipelines and jobs, bounded traces, MR inspection and update-window
-  collection, and validation of a pinned MR head and selected successful pipeline.
-  Validation reports blockers and always reports `merge_performed: false`.
-- Added protected approval-signing key initialization, status, rotation, recovery,
-  revocation and retirement. Private mutation-ledger, execution-audit and approval
-  proof/spend foundations have deterministic failure and restart tests.
-- Updated website support descriptions and the saved-credential GitLab workflow,
-  and documented the source-release procedure in `AGENTS.md`.
-- Preserved `describe`, `invoke` and `serve`, the existing standalone Kubernetes
-  and PostgreSQL reads, and Rust 1.88 compatibility.
+### GitLab
 
-This source release targets Linux x86_64. Build the optimized CLI and adapter for
-local supervision; see the [GitLab guide](docs/local-gitlab-cli.md). Existing
-installed configuration and credentials are not automatically imported.
-The initial custody profile requires the exact qualified GNOME Keyring 50.0
-daemon on ext4 and an already-unlocked encrypted login collection; see
+- Persistent local lifecycle: setup, adapter lifecycle, protected connection
+  entry, repair, revalidation, terminal revocation and cached operation discovery.
+  SQLite holds metadata; a qualified Linux Secret Service collection holds
+  credentials. Saved credentials survive CLI, owner and keyring restarts.
+- Eleven read operations: projects, issues, repository files, exact-commit
+  pipelines and jobs, bounded traces, merge-request inspection and update-window
+  collection, and validation of a pinned MR head against a selected successful
+  pipeline.
+- An approved merge through the local CLI, with local approval policy, protected
+  proof issuance, single-use write requests, an explicit private prepare/commit
+  transport and authenticated bounded clock checks. A pinned head is checked at
+  dispatch and an uncertain outcome is never retried into a second effect.
+- Recovery for abandoned and keyed writes in the owner background, exact audit
+  acknowledgement recovery, and revoked-merge audit finalization verified across
+  owner crash and replay.
+- A failed terminal settlement keeps the known provider result rather than
+  replacing it, and a connection revoked after a known effect refuses disclosure
+  at admission instead of answering `not_attempted`.
+- Protected approval-signing key initialization, status, rotation, recovery,
+  revocation and retirement.
+
+### Kubernetes and PostgreSQL
+
+- Both reach the local CLI with saved credentials through the same persistent
+  lifecycle, verified against real servers — k3s `v1.31.5+k3s1` via k3d and
+  `postgres:17` — rather than fixtures.
+- A backend-less EndpointSlice reads as empty rather than malformed. Kubernetes
+  serialises such a slice with null members, and one Service with no ready
+  backends previously failed discovery for every Service beside it.
+- Helm release reads: revision history, deployed status, recorded values and
+  rendered manifest, with bounded pages, explicit completeness and provenance
+  naming the exact release Secret each observation came from. Values and manifests
+  are disclosed only as redacted projections, and the default is refusal.
+
+### Catalog
+
+- OpenAPI source ingest with preserved provenance, a deterministic operation
+  inventory with named gaps, bundle write and load through a local index, a
+  coverage report, and locally authored TOML actions expanding to the same
+  template.
+- Two writers into one bundle directory keep both index entries. The
+  read-modify-write is held under an exclusive lock; before it, concurrent writers
+  erased each other's rows while both were told they succeeded.
+
+### Contracts, models and tooling
+
+- Shared service, operations, authentication, datasource, discovery, session and
+  media semantics, with explicit compatibility and support boundaries. Native
+  contracts, designs and authored ESS models sit with their owning adapters so
+  each can be extracted independently.
+- Connection, profile, acquisition and custody ownership, execution audit,
+  bounded discovery state, historical mediated bindings and reusable immutable
+  artifact provenance are modelled alongside the execution and evidence models.
+- ESS 0.22.2 and AEP 0.55.0 are pinned by source identity with receipt-checked
+  local binaries. All 48 original contract-review findings are resolved, with the
+  independent reviews and source evidence retained.
+- The gate re-derives every archived upstream source digest — 84 files across six
+  manifests. Nothing had previously read one, so every pinned-evidence record in
+  the repository was evidence by assertion.
+
+### MCP contracts
+
+- Both MCP specification revisions this repository authors against are pinned —
+  `2026-07-28` primary and `2025-11-25` for interoperability — as 54 archived
+  files with source URL, uncompressed SHA-256 and byte length.
+- A `connectors_mcp` ESS root declares the MCP nouns and the three credential
+  kinds the design keeps distinct, with every relation no source answers carried
+  as an explicit marker rather than a chosen cardinality.
+- A coverage matrix dispositions every revision, transport and capability the pin
+  names as supported, explicitly refused or deferred, each with a reason and a
+  source line.
+
+### Platform and compatibility
+
+Linux x86_64, Rust 1.88. Existing installed configuration and credentials are not
+imported. The initial custody profile requires the qualified GNOME Keyring 50.0
+daemon on ext4 with an already-unlocked encrypted login collection; see
 [custody qualification](docs/local-secret-service.md).
 
-The implementation passed the full gate, six production CLI journeys with
-disposable HTTPS/keyring fixtures, native MR tests and local packaging checks;
-[implementation evidence](docs/evidence/gitlab-mr-validation-20260910/README.md)
-retains the exact inputs and limits. Release-version verification is recorded in
-the [release receipt](docs/evidence/release-v020-20260910/README.md).
+### Limitations
 
-Dedicated GitLab sandbox acceptance remains open. Approval issuance, a qualified
-production approval clock, governed GitLab writes, complete management pagination,
-Kubernetes/PostgreSQL persistent local lifecycle, MCP and the remaining providers
-are not completed by this release. Binary/registry distribution and website or
-cloud deployment are separate from this source release.
+- **No dedicated GitLab sandbox evidence.** All five GitLab stories remain open on
+  that credential. The write controls are verified by disposable CLI journeys
+  against a private HTTPS fixture, not against a GitLab server.
+- **Helm release reads are fixture-verified.** No real cluster has answered those
+  four operations.
+- **MCP is contracts only.** No connection is made, no server starts, no credential
+  persists and no transport is selected.
+- Helm chart rendering, linting, registry access and rollback stay outside
+  Connectors pending a decision on running external provider binaries.
+- Source release only: no hosted release page, binary, container image or website
+  deployment.
 
-## 0.1.0 — 2026-09-09
+## 0.7.2 — 2026-09-07
 
-Initial specification baseline for the selected Kubernetes (including discovery),
-GitLab and SQL scope.
+- Add `connectors inspect upgrade` to report the installed CLI version, embedded catalog schema
+  and digest, supported credential-file formats, and hosted session-metadata version. The command
+  supports text, compact, JSON and YAML output, needs no configured state or running service, and
+  includes source-installation guidance without checking remote releases or changing files.
+- Keep the report independent of async runtime startup, including its internal socket creation,
+  while preserving normal command dispatch, embedded use and output-error handling.
 
-- Defined shared service, operations, authentication, datasource, discovery,
-  session and media semantics, with explicit compatibility and support boundaries.
-- Co-located native contracts, designs and authored ESS models with their owning
-  adapters so they can be extracted independently.
-- Resolved all 48 original contract-review findings and retained independent
-  reviews, source evidence and verification records.
-- Modeled connection/profile/acquisition/custody ownership, execution audit,
-  bounded discovery state, historical mediated bindings and reusable immutable
-  artifact provenance alongside the existing execution/evidence models.
-- Added the shared ESS ownership gate and independent validation of authored
-  adapter models; pinned ESS 0.20.0.
-- Kept deferred capabilities and runtime enforcement obligations explicit.
+Existing catalog-schema, credential-file and operation-protocol versions are preserved. The
+inspection command provides information; updating the binary remains a separate step.
 
-This milestone records contract and model stabilization. The repository's
-existing first-slice runtime predates this hardening work; the new semantic
-profiles and persistent models do not claim new runtime implementations.
-Schema compilation and manual scenarios are distinct from runtime conformance.
+## 0.7.1 — 2026-09-07
+
+- Add bounded Jira issue search, project inventory and paginated comment reads; Confluence
+  page searches with explicit continuation; and GitLab activity, issue, merge-request,
+  pipeline, deployment and commit reads. Preserve stable source identities and revisions,
+  validate bounds before credential access, retain comment visibility metadata and omit provider
+  identity objects.
+- Keep the incremental contracts aligned across personal catalog and native hosted adapters,
+  including required deployment ordering when update-date filters are used.
+- Preserve structured rate-limit advice when incremental reads request pagination headers.
+- Keep generated catalog operations callable when their provider has no optional Connection
+  remediation metadata, and make expired authentication recovery fail consistently.
+- Document complete consumer-contract checks before upgrading a source-built installation.
+
+## 0.7.0 — 2026-09-07
+
+- Catalog write discovery now considers every admitting Connection, so an earlier read-only
+  placement cannot hide a writable one. Search and describe report required approval; invoke
+  still checks the explicitly selected Connection.
+- Default operation, Connection and event commands to the local target regardless of saved hosted
+  login. Use `--target hosted` explicitly; incompatible local configuration flags are refused.
+- Run bounded operation search, describe, invoke and Connection metadata reads without a daemon
+  when its socket is absent. Stateful sessions, activation and event flows still require
+  `connectors serve local`; uncertain transport outcomes never trigger a fallback invocation.
+- Add `kubernetes.namespace.list` and `kubernetes.workload.list` for activated Connections,
+  returning admitted namespaces and Deployments with container images and desired/ready replicas.
+- Expose personal GitLab Connections and four source-grounded pipeline-schedule operations:
+  list, create, update and delete. Preserve the official request schemas, including inputs and
+  omitted versus null fields; mutations require the selected Connection's write admission.
+- Treat a consumer closing a successful output pipe as normal completion across output formats.
+  Protocol refusals and other output failures remain failures.
+- Add Operation v0alpha2 structured `rate_limited` refusals, optional trusted retry delay and
+  source-grounded advisory rate metadata. Retain v1 with explicit loss of the new fields;
+  neither advice nor version selection resends an invocation.
+- Advance the canonical catalog and matching readers to schema 4 for personal OAuth declarations,
+  retaining schema 3 request-semantics/rate behavior and frozen schema 2 and 3 artifacts.
+- Add explicitly configured GitLab public PKCE and device authorization, token-info verification,
+  refresh and durable recovery through one dedicated OAuth store. This initial personal custody
+  is unsealed and development-only; private instructions use a terminal or owner-only file.
+- Default operations to v0alpha3 with typed `authentication_required`
+  refusals. Trusted local setup binds remediation to the intended operation and Connection, then
+  stops ready for a separate explicit invocation. `operation --protocol-version v2` retains
+  explicit interoperability; no negotiation, automatic session creation or invocation replay.
+
+### Also included since the last published release (v0.6.0)
+
+- Add bounded, read-only GitLab fetch sessions over internal TLS for the admitted default branch
+  and exact commit, including Git protocol v2 support and the hosted client operation. Recheck
+  identity, grants and project membership; bound session lifetime, depth, requests and bytes.
+- Reuse a bounded set of provider HTTP connections while rechecking destination policy and DNS
+  for every request.
+- Keep concurrent hosted Connect Session expiry terminal after credential verification and custody
+  awaits, so an expired session cannot become completed.
+- Keep legacy GitLab connections inactive until a verified reconnect binds current authority;
+  preserve their metadata and refuse recovery when a credential transaction's grant is absent
+  or superseded.
+- Refresh all twelve Cargo workspace lockfiles together with the release identity so cold runners
+  can fetch and verify the complete locked graphs.
+
+## 0.6.5 — 2026-09-05
+
+- Keep legacy GitLab connections inactive until a verified reconnect binds current authority,
+  while allowing the host and unrelated integrations to start. Preserve legacy metadata and
+  refuse recovery of credential transactions whose grant is absent or superseded.
+
+## 0.6.4 — 2026-09-05
+
+### Added
+
+- Support Git protocol v2 on the internal fetch proxy, with targeted reference discovery and an
+  exact-commit shallow-fetch grammar. Preserve legacy negotiation and the existing control payload.
+- Verify the admitted branch and HEAD after filtering provider references; bound capabilities,
+  packet framing and streamed pack sections. Reference commands leave the final fetch available,
+  and interrupted transfers require a fresh source capability.
+
+### Performance
+
+- Reuse a bounded set of provider HTTP connections while rechecking destination policy and DNS on
+  every request. Clients are separated by authority, origin and current admitted addresses;
+  credentials and request deadlines remain request-specific.
+
+## 0.6.3 — 2026-09-05
+
+### Fixed
+
+- Re-check a hosted Connect Session's `Pending` state after credential verification and custody
+  awaits. Concurrent expiry is now terminal and cannot be overwritten with `Completed`; the ESS
+  lifecycle marker for the former race has been retired with a deterministic regression test.
+
+## 0.6.2 — 2026-09-05
+
+### Fixed
+
+- Refresh every satellite workspace lockfile after cutting the release identity, so cold release
+  runners can populate each locked dependency graph before executing the sharded gate.
+
+## 0.6.1 — 2026-09-05
+
+### Added
+
+- Add an internal TLS Smart Git byte plane that creates short-lived, read-only fetch sessions for
+  one currently admitted GitLab project, provider default branch, and exact commit. Identity,
+  Connection, Grant, project membership, branch and commit are revalidated at creation while the
+  provider credential remains inside Connectors.
+- Add the official hosted-client operation for creating a bounded Git fetch session. Stable
+  idempotent locators survive retries while authorization and expiry rotate independently.
+
+### Security
+
+- Bound Git sessions by lifetime, depth, request count, transferred bytes, concurrent actor/global
+  sessions, TLS handshakes and idle deadlines. Upload-pack is the only admitted Git service;
+  protocol v2 and legacy grants without durable grant provenance fail closed.
+
+## 0.6.0 — 2026-09-05
+
+Every first-level word of the shipped binary moves, and bare `connectors serve` stops starting the
+local server: the breaking change the preamble puts in a minor bump.
+
+### Added
+
+- Expose the hosted Slack organization bot's app and bot tokens through the tenant-bound
+  administrative credential surface. A deployment can activate that bot without claiming that
+  personal Slack OAuth is configured; the personal flow appears only when its paired client
+  registration is present.
+
+### Changed
+
+- **`connectors --help` lists eight words, not sixteen.** Ten first-level commands that were five
+  different activities in one block are grouped: `setup` (`init`, `connect`, `completions`),
+  `inspect` (`doctor`, `providers`, `auth` — which was `auth status`), `session` (`login`, `logout`)
+  and `serve` (`local` — which was bare `serve` — `hosted` and `mcp`). `connection`, `event`,
+  `operation` and `admin` stay where they were.
+- **Every old path but one works for one more release.** `connectors doctor`,
+  `connectors auth status`, `connectors serve-hosted --config …` and the rest are rewritten onto
+  their new path before the arguments are parsed, produce the same output, and write one line to
+  stderr naming where they went. Clap decides the rewrite: the global `-o`/`--output` may stand in
+  front of the words or between them in any of its four spellings, and
+  `connectors help <old word>` and `connectors auth help` answer as they did. The table that does
+  it, `MOVED` in `crates/connectors-cli/src/lib.rs`, is removed in the release after this one. The
+  one path not carried is the next entry.
+- **`connectors serve` no longer starts the local server; `connectors serve local` does.** This is
+  a break, not a deprecated path that still works: bare `connectors serve`,
+  `connectors serve --help`, `connectors serve -h`, and `connectors serve` with nothing but global
+  options in front of it or behind it — `connectors serve -o json`, `connectors -o json serve` —
+  are the `serve` group, a `Commands:` listing as for `setup`, `inspect` and `session`, and exit 2
+  without serving and without a note. A script that started the server with bare
+  `connectors serve` has to say `connectors serve local` from this release on. `serve` and
+  `serve -o json` are one invocation, so one of them starting a server while the other listed
+  commands would be two commands under one name, which is the defect this release removed. Only
+  `connectors serve --config …` and `connectors serve --state-root …` — the old leaf's own
+  options, which the group refuses and `serve local` declares — are still rewritten onto
+  `connectors serve local`, with the note.
+- The hosted image starts on `connectors serve hosted`. `README.md`, the guides, `Taskfile.yaml`
+  and the design pages name the new paths, and the fence that refuses shipped text naming an old
+  one now reads all of them rather than Rust sources alone.
+- The `connectors` command-line surface is declared in `ess/system/components.yaml`, and the clap
+  tree projected from it is committed under `ess/generated/clap/` and held against the parser on
+  every run (`docs/design/19-the-cli-surface.md`).
+
+### Removed
+
+- `CLI_TOTAL_LINE_LIMIT`, the cap on the thin frontend's line count in
+  `crates/catalog-build/tests/main/architecture_fence.rs`. It was raised at every one of the six
+  times it fired and never once moved a line out of the binary; `product_cli_is_a_thin_frontend`
+  still bounds what the frontend may link and what it may declare.
+
+### Fixed
+
+- Page the GitLab membership scan used by both project-binding discovery and redemption. A
+  repository listed after the first 100 memberships no longer becomes inaccessible when a caller
+  opens it, while malformed or unbounded provider pagination still fails closed.
+- Accept a scope-omitting Claude Code refresh response only by carrying forward the scopes from the
+  previously verified OAuth record. Initial responses without the required inference scope remain
+  refused.
+
+## 0.5.11 — 2026-09-04
+
+### Fixed
+
+- Keep delegated GitLab repository reads alive after the two-hour OAuth access token expires.
+  GitLab refresh responses may omit `scope`; Connectors now accepts that documented response shape
+  and continues to verify the refreshed token's exact scopes through `/oauth/token/info` before
+  committing the rotated access and refresh credentials.
+- Make the CLI credential-store test create the owner-only state root required by the runtime,
+  instead of depending on the hosted runner's `/tmp` permissions and blocking releases in CI.
+
+## 0.5.10 — 2026-09-04
+
+### Changed
+
+- `connectors doctor`, `providers` and `auth status` render as a scannable report rather than a
+  JSON dump. A list of records is one aligned row each, led by an ASCII severity marker that
+  survives a pipe. The leading columns are laid out to a 120-column budget, spent on content
+  rather than on column names, so that the last column *starts* within the first 120 terminal
+  columns and everything before it is aligned there. It does not make a row fit 120 columns: the
+  last column is never cut, so 66 of the 71 lines `connectors providers` prints are wider than
+  that and the longest is 237. `doctor` goes from 26 lines for six checks to 9; `providers` keeps
+  every catalogued id whole instead of wrapping at 927 lines.
+- `-o compact` no longer drops fields. A record carries every scalar the value holds beside it, at
+  every nesting depth, so `healthy` and the `summary` counts survive. An empty listing answers
+  with an empty stream rather than a line that parses as a record.
+- `-o json` and `-o yaml` are byte-for-byte unchanged. Both adversary passes probed this
+  specifically and found no difference.
+
+### Fixed
+
+- `scripts/gate.sh` runs the `crates/connectors-console` workspace. It was in the root workspace's
+  `exclude` list and in no lane, so nothing had ever executed its tests; the package now carries
+  three test binaries and 80 cases.
+
+## 0.5.9 — 2026-09-04
+
+### Added
+
+- Four read-only Slack operations: `slack-conversations-replies` (a thread's parent and its
+  replies, which nothing could reach before), `slack-conversations-list`, `slack-conversations-info`
+  and `slack-users-list`. The first three are projected to a model; the workspace directory is
+  catalogued and not projected.
+- `confluence.service_api_token`, the deployment-owned bearer twin of the personal Basic token.
+- `[catalog.usernames]` in the personal configuration: a value-free home for the non-secret user
+  half of a `basic` credential, keyed by the credential it joins. `connectors connect --set` writes
+  it, and `connectors auth status` reports whether it is present.
+
+  **The section is optional and a configuration without it reads unchanged — but it is a new key,
+  and the configuration is `deny_unknown_fields`, so a binary older than this release refuses a file
+  that carries one.** Install before writing, not after; observed as a red `connectors doctor` on
+  2026-09-04 when a 0.5.3 binary met a file a newer build had written.
+
+### Changed
+
+- **Both Atlassian connectors address the vendor's cloud gateway by cloud id** rather than the
+  tenant's own site host, and Confluence's four reads moved from the `api/v2` surface to `rest/api`.
+  This is a correctness fix, not a preference: measured on one tenant with a service-account API
+  token, a project search returned HTTP 200 and `total: 0` against the site host and HTTP 200 with
+  40 results against the gateway, while `api/v2` answered 401. A connector pointed at the old route
+  reported an empty world rather than a refusal anyone could act on. `site` is replaced by
+  `cloud_id` in both `[[catalog]]` entries.
+- `confluence-page-get` now returns the page body, because it sends the expansion that asks for it.
+- Both Atlassian connectors declare their service-account mechanism first, so a placement holding
+  both a personal and a service-account token authenticates as the service account.
+- The Slack user-token declaration no longer requests `im:*` or `mpim:*` scopes; no operation names
+  them, and `slack-conversations-list` withholds the parameter that would reach a DM.
+
+### Fixed
+
+- A personal-local `basic` credential could not be assembled at all. The user half resolves through
+  the configuration port, and both `CatalogBackend` constructors built a port that could only answer
+  endpoint variables — so a stored Atlassian token refused with `not_granted: no stored credential
+  satisfies this operation's declared mechanisms` while `auth status` reported it as stored.
+- Personal-local Kubernetes served exactly one activated cluster. `cluster_connection` answered the
+  first key of a map, so an operator with five authorized contexts saw one in
+  `operation describe kubernetes.deployment.status` and got `not_found` from every other — a message
+  about the operation for a fault in Connection selection.
+- A non-2xx vendor answer carried one sentence for every cause. It now names the HTTP status, and
+  401, 403, 404 and 429 each say what to check.
+## 0.5.8 — 2026-09-04
+
+### Changed
+
+- Migrate the seventy-three `docs/stories/S-*.md` records into the AEP planning store, so the
+  repository has one backlog instead of two that never named each other. Every source file keeps
+  its text and gains a backlink to the artifact that now carries it; nothing was deleted.
+- The thirty-five stories the sources call `done` are recorded as resting on an assertion rather
+  than an observed run, and `aep artifact validate` reports that count on every run.
+
+No crate source changed in this release. The version moves because it is the artifact identity
+written into every catalog document, `connectors.lock` and the wire User-Agent, and those move
+together or not at all.
+
+## 0.5.7 — 2026-09-04
+
+### Added
+
+- `connectors completions <shell>` prints a completion script for bash, zsh, fish, elvish or
+  PowerShell, generated from the same clap command tree that parses the arguments.
+
+### Fixed
+
+- The release gate passes again. `d3707aa` took `integration-gitlab`'s backend past its size
+  waiver, which failed every release run from v0.5.3 to v0.5.6 before a binary was built; the
+  repository-file path helpers it added now live in their own module.
+
+## 0.5.6 — 2026-09-03
+
+### Fixed
+
+- Canonicalize the Identity repository source URL so downstream Cargo graphs cannot instantiate
+  duplicate Identity client types from the same 0.5.6 commit.
+
+## 0.5.5 — 2026-09-03
+
+### Fixed
+
+- Refresh every satellite workspace lockfile after the 0.5.4 dependency and artifact-identity
+  changes so the sharded release gate remains reproducible under `--locked`.
+
+## 0.5.4 — 2026-09-03
+
+### Changed
+
+- Upgrade the hosted Identity client from 0.4.0 to 0.5.6 so Connector grants use the current
+  Identity contract throughout the deployed stack.
+
+## 0.5.3 — 2026-09-03
+
+### Fixed
+
+- Encode validated repository-relative GitLab file paths as one API path segment, so nested files
+  can be read at an exact commit without weakening generic Connector path safety.
+
+## 0.5.2 — 2026-09-03
+
+### Added
+
+- Carry receiver-verified agent, attempt, delegation, Grant, and Grant-revision provenance in the
+  admitted principal context so delegated calls cannot collapse into an owner-only identity.
+- Add approval-gated GitLab operations for creating an `agentide/…` session branch, atomically
+  committing reviewed file actions, and creating or updating the session merge request. These
+  publication operations require `api` scope and stay out of the model-exposed tool inventory.
+
+## 0.5.1 — 2026-09-03
+
+### Fixed
+
+- Refresh every satellite workspace lockfile after the 0.5.0 dependency changes, so the release
+  gate and the local-identity refusal check remain reproducible under `--locked` on a clean runner.
+
+## 0.5.0 — 2026-09-03
+
+### Added
+
+- Compose the generic catalog adapter into hosted deployments, with per-principal Connect Sessions,
+  prepared credential transactions, crash recovery, exact public egress apertures, and catalog-
+  derived setup profiles.
+- Let a signed-in person connect an Anthropic API key through the generic flow and verify it with
+  the catalog-declared Models request before the Connection becomes callable.
+
+### Changed
+
+- Preserve curated GitLab, Slack, and Grafana setup as the authoritative experience while generic
+  catalog setup adds providers and credential profiles those integrations do not own.
+
+### Security
+
+- Bind every generic hosted Connection and credential address to its authenticated tenant and
+  subject. Two principals never see or resolve one another's stored provider credential.
+
+## 0.4.5 — 2026-09-02
+
+### Added
+
+- Keep SIP in ordinary Connector binaries by default while allowing an embedding product whose
+  strict configuration disables SIP to omit the voice dependency graph. A SIP-enabled
+  configuration still fails closed when that capability was omitted.
+
+## 0.4.4 — 2026-09-02
+
+### Added
+
+- Add a typed, bounded hosted Catalog client with request correlation and closed-envelope
+  validation for product integrations.
+- Publish GitLab OAuth-user and personal-token setup profiles when the hosted GitLab backend is
+  available, so products can derive self-service controls from runtime capability.
+
+### Changed
+
+- Retire the dormant, unshipped VitePress explorer and its duplicate site projection. Hosted
+  Catalog protocol reads and product-owned interfaces are now the supported browsing path.
+
+## 0.4.3 — 2026-09-02
+
+### Added
+
+- Add `connectors admin` for Identity-protected hosted Integration readiness and credential writes,
+  with public authority discovery and typed status responses for GitLab, Slack, and Jira.
+
+### Security
+
+- Require the exact administrative audience, scope, and operator-group membership for credential
+  changes; accept secret input only through hidden prompts, standard input, or owner-only files,
+  and return and audit metadata without credential bytes.
+
+## 0.4.2 — 2026-09-02
+
+### Added
+
+- Add `connectors login`, `logout`, and `mcp`: the native CLI discovers a hosted Connectors
+  deployment's neutral Identity authority, completes browser Authorization Code + S256 PKCE login,
+  and bridges local stdio MCP to the hosted `/mcp` transport.
+- Automatically use the selected hosted deployment for Operation, Connection, and Event commands
+  when no explicit personal-local configuration or state root is supplied.
+
+### Changed
+
+- Cache five-minute Identity access tokens in memory by their exact Connector scope, renew them
+  inside a 30-second margin, and retry one hosted request with fresh authority after a 401.
+
+### Fixed
+
+- Admit the exact `connectors.approvals.issue` scope used by the hosted approval-issuance endpoint
+  through the closed Identity verifier vocabulary.
+
+### Security
+
+- Keep the opaque Identity session only in the operating-system keyring and write only non-secret
+  account/deployment selection beneath XDG state. The stdio MCP peer sees neither the session nor
+  access tokens, and Connectors requests receive only the least-privilege token for that call.
+
+## 0.4.1 — 2026-09-02
+
+### Added
+
+- Add governed outbound MCP as a generated Connector service. A reviewed profile freezes the full
+  remote tool snapshot and assigns local operation identity, prose, and effect; the ordinary
+  deployment overlay still owns exposure, risk, approval, grants, endpoint and credential
+  bindings. HTTP exchanges stay inside Connection-bound egress and fetch bearer material from the
+  Connector secret store per exchange.
+- Add a generator-facing service factory contract and deterministic runtime bundle builder. A
+  registered factory remains inert until an explicit deployment overlay assigns permanent provider
+  identity and complete operation policy/resource bindings; provider and operation collisions,
+  incomplete overlays, and catalog/dispatch drift refuse composition.
+- Activate generated service bundles as ordinary hosted backends with exact durable Grants,
+  explicit operation admission, and readiness reporting for every composed service.
+- Add bounded, single-use human approval evidence bound to the authenticated subject, exact
+  operation, Connection, description lease, canonical input, and a five-minute maximum lifetime.
+- Route hosted GitLab OAuth, PAT verification, project discovery, repository reads, and operation
+  dispatch through the exact-origin Connection-bound post-DNS transport.
+
+### Changed
+
+- Carry the optional realm only in receiver-verified principal context. It is absent from service
+  operation coordinates, and an absent realm remains distinct from the literal realm `default`.
+
+### Security
+
+- Refuse hosted GitLab unless `connection_bound_post_dns_v1` is declared, and include GitLab in the
+  exhaustive source fence that rejects raw HTTP clients, DNS resolution, and outbound sockets from
+  credential-bearing Integration adapters.
+
+## 0.4.0 — 2026-09-01
+
+### Added
+
+- Add a projected-Kubernetes-token remote adapter for the shared Secrets service, including
+  metadata-only enumeration and atomic put-only prepared generations.
+- Preserve the verified owner subject when subscription credentials are created or refreshed.
+- Add an idempotent, scope-bounded Vault-to-Secrets migration utility which keeps all secret bytes
+  in memory and never deletes or mutates the source.
+
+### Changed
+
+- Hosted credential-bearing integrations select exactly one complete `[secrets]` or `[vault]`
+  backend. Provider exchange, refresh, and upstream revocation remain in Connectors.
+
+## 0.3.3 — 2026-09-01
+
+### Fixed
+
+- Complete Claude subscription OAuth from the provider's exact manual-callback value: split its
+  `authorization_code#state` form, verify the returned state against the pending browser flow, and
+  exchange only the authorization-code component. Missing, mismatched, or multiply delimited state
+  is refused before any token-endpoint request.
+
+### Security
+
+- Keep the correction wholly inside Connectors. Identity remains provider- and relying-party-
+  agnostic, while Connectors continues to own provider state, PKCE material, and token custody.
+
+## 0.3.2 — 2026-09-01
+
+### Added
+
+- Add a bounded, single-use OAuth2 PKCE connection flow for Claude subscriptions. Connectors keeps
+  the verifier and provider tokens in custody; authenticated callers receive only the provider
+  authorization URL, an opaque flow id, presence, and attempt-bounded lease results.
+- Persist refresh-capable subscription records and refresh them before expiry during serialized
+  lease redemption, including refresh-token rotation. Existing manually supplied credentials
+  remain readable for compatibility.
+- Expose typed start and completion operations through the hosted API, Rust client, and embedded
+  OpenAPI document. Credential-bearing requests and responses are bounded and non-cacheable.
+
+### Security
+
+- Provider acquisition and token lifecycle remain wholly inside Connectors. Identity remains
+  provider- and service-agnostic, and neither authorization codes, PKCE verifiers, refresh tokens,
+  nor provider diagnostics are returned to callers or written to logs.
+
+## 0.3.1 — 2026-09-01
+
+### Fixed
+
+- Teach the complete-history secret scan to distinguish the exact generated catalog-lock
+  SHA-256 line shape from credentials, without allowlisting other content in the lock file.
+- Admit plain HTTP only for loopback and fully qualified Kubernetes service DNS, so in-cluster
+  callers do not route credential custody through an ingress; remote origins remain HTTPS-only.
+
+## 0.3.0 — 2026-09-01
+
+### Added
+
+- **Claude Code subscription custody.** The `claude-code` catalog provider is explicitly
+  `custody_only`: it owns one user-bound setup token but publishes no callable service or
+  operation. Hosted deployments opt in with `[claude_code] enabled = true`, which requires the
+  configured Vault store.
+- **Attempt-bounded credential leases.** A new custody component stores the provider credential at
+  a tenant/subject-derived address and issues cryptorandom capabilities bound to one exact Harness
+  attempt, an expiry no longer than one hour, and a finite use count. Restart revokes every live
+  lease; disconnect and credential replacement revoke every lease over the previous value.
+- **Typed hosted client and OpenAPI surface.** Presence, connect, disconnect, lease, and redemption
+  have bounded client methods and documented HTTP contracts. Credential-bearing responses are
+  required to carry `no-store` and `no-cache`; capability and credential diagnostics are redacted
+  and their allocations are cleared on drop.
+
+### Changed
+
+- **Breaking pre-deployment wire correction.** Identity authority fields now use the neutral
+  `tenant_id`, `principal_kind`, and `deployment_id` vocabulary and accept only the
+  `identity_access_v1_` opaque credential format introduced by Identity 0.3.0. The Connector
+  session authority likewise uses product-neutral claim names and the
+  `b10x-connectors-session+jwt` media type. Compatibility with the inherited former-product
+  vocabulary is intentionally not retained.
+- A custody-only catalog document now projects an empty summary base URL instead of panicking; it
+  still cannot compose a request because it has no service or operation.
+
+### Security
+
+- Creating a provider lease requires the new least-privilege
+  `connectors.credentials.lease` Identity scope. Connecting and disconnecting remain self-service
+  under `connectors.connections.self`; redemption accepts only the attempt capability and exact
+  attempt id, never an Identity session.
+
+## 0.2.1 — 2026-08-25
+
+No product change: `crates/`, `providers/`, `specs/` and `catalog/` are byte-identical to `0.2.0`
+apart from the `generator` string every artifact carries. This release is CI, tooling and the
+security baseline. The version moved anyway because the version *is* the artifact identity — there
+is no way to ship a `generator` that says `0.2.1` without cutting one.
+
+### Added
+
+- **`.github/workflows/release.yml`** — the first CI in this repository. Pushing a `v*` tag runs the
+  full repository gate, the history-wide secret scan and the `local-identity` release refusal, then
+  builds `connectors` for four targets (x86_64 and aarch64 Linux, x86_64 and aarch64 macOS) and
+  publishes a GitHub release with the archives, a `SHA256SUMS` file, and the notes read from this
+  file's section for that version.
+- **No Windows target, and the reason is recorded.** `connectors` does not compile for
+  `x86_64-pc-windows-msvc`: `connectors-config` opens files with `O_NOFOLLOW` and compares the
+  effective uid to the owner, `connector-secrets` binds custody to Unix file modes, and the personal
+  posture serves on a Unix socket. Supporting Windows means deciding what owner-bound credential
+  custody means in terms of ACLs, which is an architecture question rather than a build flag.
+- The tag and `[workspace.package] version` must agree, and each built binary must report the tagged
+  version from `--version`, or the run fails before an asset is uploaded. The version is the artifact
+  identity written into every catalog document's `generator`, so a disagreement would ship binaries
+  that misreport themselves.
+
+### Changed
+
+- `scripts/gate.sh` gains `--list-workspaces`, `--workspace <path>` and `--final`. No argument still
+  runs everything, unchanged. The flags exist so CI can shard the gate one workspace per runner: the
+  eleven workspaces do not share a `target/` directory and need about 39 GB between them, which no
+  hosted runner has. CI reads the workspace list from this script rather than keeping a second copy
+  that would drift.
+- `scripts/check-local-identity-refused.sh` now holds the release workflow to the same rule it
+  already held the Dockerfile to: no Cargo feature is selected for a build that ships. The image was
+  the only such build when that guard was written; a tag now attaches archives for four targets.
+- **History was rewritten** to remove a former brand from commit authorship, messages, paths and
+  blobs across all 254 commits, and again to remove a named individual's work address from the one
+  commit that carried it. Verified both times by the rewritten `HEAD` tree being byte-identical to
+  the original — every substitution had to be a no-op there, and was. Every clone predating
+  `2026-08-25` is incompatible and must be re-cloned.
+- `.gitleaksignore` regenerated twice as a consequence: a fingerprint names a commit, so a rewrite
+  invalidates every entry whose commit it touched. All 87 findings were reclassified from scratch
+  rather than carried over by count. `scripts/check-secrets.sh` had been failing since `4520cf47`
+  and now exits 0.
+- `scripts/vendor-babelforce-specs.sh` no longer writes out the address it exists to scrub. The
+  script already declined to name two AWS account ids for that reason; the rule now applies to a
+  person's name too.
+- AGENTS.md gains what this cycle taught: that the gate does not fit on one machine, that an offline
+  check still needs a populated registry, what a version cut actually rewrites, why the published
+  targets are Unix only, and how to rewrite history and rebaseline the secret scan without
+  measuring it circularly.
+
+## 0.2.0 — 2026-08-25
+
+### Added
+
+- **`crates/connector-oauth`** — one authorization-code OAuth implementation, replacing three
+  hand-rolled copies. PKCE with S256, single-use state with a TTL bound, authorize-URL
+  construction, token-response validation against a declared policy, and refresh timing with a
+  configurable skew. Transport-free and clock-free by design: its three callers dial three
+  different ways, and a crate that owned HTTP would have dragged a client into every consumer.
+  ([S-069](docs/stories/S-069-one-oauth-implementation-not-three.md))
+- **`custody_only`** — a provider may declare that it holds a credential and describes no request
+  surface at all, so a credential whose *use* belongs to another component can still have an owner,
+  an address and a lifecycle here. Every key that could describe an outbound request is refused by
+  name, and the refusal reads the declared TOML key rather than the assembled value.
+  ([S-070](docs/stories/S-070-a-provider-can-hold-a-credential-it-cannot-spend.md),
+  [design 16](docs/design/16-subscription-credential-custody.md))
+- The catalog document **publishes** `custody_only`. A consumer must be able to tell a provider
+  that happens to have no operations from one whose declaration forbids ever having any; only the
+  second is safe to hand a credential whose use belongs elsewhere. Additive, so the document
+  `schema_version` stays `2` — an older reader sees no service and no operation, and has nothing to
+  call.
+
+### Changed
+
+- `integration-gitlab`, `integration-jira` and `integration-slack` moved onto `connector-oauth`,
+  one commit each. Slack shares the state table and nothing else, on purpose: forcing its
+  `xoxp-`-prefix token judgement and per-scope charset parser through a shared policy would have
+  changed a request that works today.
+- **The pending-state table is bounded at 1024 in all three.** It was unbounded, and every connect
+  session inserts one. Expired entries are swept before the bound is consulted. A genuine flood
+  makes further connect sessions for that integration return `connection_unavailable` until
+  entries expire.
+- GitLab's refresh response is now length-bounded at 4096, as its exchange response already was.
+- Jira's authorize-URL parameter order changed. Key set, values and percent-encoding are
+  byte-identical; only the order moved, and order is not significant in a query string.
+- `authorize_url` clears an origin's query and fragment rather than appending to them.
+
+### Fixed
+
+- `provider-toml.schema.json` referenced `#/$defs/authRequirements`; the definition is
+  `authRequirement`. The document did not compile as a schema, so **every rule downstream of that
+  `$ref` validated nothing**, silently. `every_ref_resolves_to_a_declared_def` now catches it.
+- `PendingStates::contains`'s documentation claimed to be the answer to `owns_hosted_oauth_state`.
+  Using it there turns an expired callback from a refusal into a not-found, because the dispatcher
+  finds no claimant — a regression caught during the migration and reverted, which the comment
+  would have re-sold to the next reader.
+- In GitLab and Jira the fallible inserts now run before the infallible ones, so a refused connect
+  session leaves no hosted session that `session_owners` has no row for.
+
+### Documentation
+
+- [Design 16 — subscription credential custody](docs/design/16-subscription-credential-custody.md),
+  and stories S-069 through S-074.
+- Architecture ruling: platform ADR 0056, which partially supersedes ADR 0014 for custody. ADR
+  0014's rule that harness credentials remain in the harness was a rule about custody as well as
+  about use; the boundary moved, and the new decision says so rather than reinterpreting the old
+  one. Use is unchanged — a harness credential is spent by its harness adapter and by nothing else.
+
+## 0.1.0
+
+The first `beyond10x/connectors` artifact identity. The predecessor differential passed and its
+`0.26` line is retired; generator, lock rows and wire User-Agent start again here.
