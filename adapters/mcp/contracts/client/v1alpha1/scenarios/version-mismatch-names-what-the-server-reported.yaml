@@ -1,0 +1,33 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:version-mismatch
+outcome: mcp.outbound.version-refused
+wire_code: unsupported
+summary: A version refusal is surfaced with whatever the server reported about it, and
+  no other version is declared on the request's behalf.
+given:
+  - A binding configured for the primary revision (2026-07-28), whose error carries a
+    supported list; under the interoperability revision (2025-11-25) the same refusal
+    arrives as a bare 400 and carries none.
+  - A server that does not implement it.
+when:
+  - The client sends a request declaring the configured version.
+  - Under the primary revision (2026-07-28) the server answers `400 Bad Request` carrying
+    `UnsupportedProtocolVersionError` (-32022, mcp-2026-07-28-schema.ts:450) with its
+    `supported` list (mcp-2026-07-28-basic-versioning.mdx:48-52).
+  - Under the interoperability revision (2025-11-25) the same refusal arrives as a bare
+    `400 Bad Request`, which that revision requires of a server receiving a version it
+    cannot use and defines no body for
+    (mcp-2025-11-25-basic-transports.mdx:281-282).
+then:
+  - The observable outcome is `unsupported`, carrying the endpoint, the declared version
+    and the reported `supported` list verbatim where the revision defines one, and an
+    empty list where it does not.
+  - A reported string no pinned revision covers, such as `2025-06-18` or `2024-11-05`, is
+    shown as reported rather than dropped.
+  - The request that met the mismatch is not carried out.
+never:
+  - A version from the reported list is declared without an operator changing the binding.
+  - An HTTP status alone is renamed into proof that a version is unsupported; the
+    JSON-RPC body is what carries that fact.

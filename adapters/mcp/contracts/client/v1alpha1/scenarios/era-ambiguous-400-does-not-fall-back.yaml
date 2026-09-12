@@ -1,0 +1,24 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:version-mismatch
+outcome: mcp.outbound.era-ambiguous-answer-refused
+wire_code: upstream_protocol
+summary: A `400` whose body is not a recognised modern MCP error stops the interaction
+  instead of starting a different one.
+given:
+  - A binding configured for the primary revision.
+when:
+  - A modern request is answered `400 Bad Request` with an empty or unrecognised body,
+    the case the primary revision tells a dual-era client to inspect
+    (mcp-2026-07-28-basic-transports-streamable-http.mdx:650-668).
+then:
+  - The observable outcome is `upstream_protocol`, naming the HTTP status and stating that
+    no recognised modern MCP error was present.
+  - Era stays a property of the server rather than of the request
+    (mcp-2026-07-28-basic-versioning.mdx:148-152), and this outcome is where a probe of it
+    stops; whether what a probe settles outlives the process that ran it is stated
+    nowhere in this contract.
+never:
+  - The client begins speaking a revision the binding's configuration does not name.
+  - The deprecated HTTP+SSE transport is opened; the selection matrix refuses it outbound.
