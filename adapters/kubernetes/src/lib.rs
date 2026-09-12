@@ -175,12 +175,10 @@ impl Kubernetes {
             .iter()
             .map(|item| helm::revision(item, namespace, release))
             .collect::<Result<Vec<_>>>()?;
-        let continuation = value["metadata"]["continue"].as_str().unwrap_or_default();
-        let next_cursor = if continuation.is_empty() {
-            None
-        } else {
-            Some(self.cursors.issue(&context, continuation.into())?)
-        };
+        let next_cursor = self.continuation(
+            &context,
+            value["metadata"]["continue"].as_str().unwrap_or_default(),
+        )?;
         Ok(Page {
             items: revisions,
             complete: next_cursor.is_none(),
@@ -228,7 +226,29 @@ impl Kubernetes {
             ));
         }
         let body = helm::body(&secret)?;
+        // The provenance is built from the object's labels, so a body naming a
+        // different release, revision or namespace must not be served under
+        // that identity.
+        helm::check_identity(&body, &record)?;
         Ok((name, record.source_revision, body))
+    }
+    /// Issue a continuation inside the bound the published output schema
+    /// declares for `next_cursor`. The provider's own continue token has no
+    /// stated length, and the host terminates the local runtime child when a
+    /// result fails its own schema, so the bound is checked before the cursor
+    /// is returned rather than discovered by the validator.
+    fn continuation(&self, context: &Value, token: &str) -> Result<Option<String>> {
+        if token.is_empty() {
+            return Ok(None);
+        }
+        let cursor = self.cursors.issue(context, token.to_owned())?;
+        if cursor.len() > 16384 {
+            return Err(Error::new(
+                ErrorCode::UpstreamProtocol,
+                "provider continuation exceeds the declared cursor bound",
+            ));
+        }
+        Ok(Some(cursor))
     }
     fn namespace(&self, namespace: &str) -> Result<()> {
         if !self.config.namespaces.iter().any(|n| n == namespace) {
@@ -297,12 +317,10 @@ impl Kubernetes {
                 "Kubernetes exceeded requested page size",
             ));
         }
-        let continuation = value["metadata"]["continue"].as_str().unwrap_or_default();
-        let next_cursor = if continuation.is_empty() {
-            None
-        } else {
-            Some(self.cursors.issue(&context, continuation.into())?)
-        };
+        let next_cursor = self.continuation(
+            &context,
+            value["metadata"]["continue"].as_str().unwrap_or_default(),
+        )?;
         let revision = value["metadata"]["resourceVersion"]
             .as_str()
             .map(str::to_owned);
