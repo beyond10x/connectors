@@ -1,0 +1,141 @@
+domain: connectors_kubernetes.helm
+summary: Kubernetes-owned release-storage coordinates, revision observations and redacted content projections.
+
+# Normative owner: adapters/kubernetes/contracts/helm/v1alpha1/semantics.md.
+# Every value below is read from a release Secret written by a Helm storage
+# driver; the pinned source is the 2026-09-12 provider-source evidence beside
+# that contract. These are observations of provider-owned objects. This adapter
+# neither creates nor owns a release, so nothing here is declared as an entity
+# with a lifecycle: an observed revision has no state this system moves.
+types:
+  - name: connectors_kubernetes.helm.ReleaseCoordinates
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: release, type: String}
+    # release must match ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+    # and be at most 53 bytes (pinned validate_name.go:35,60 in the v4 line and
+    # :36,61 in the v3 line). String does not enforce that predicate; the binding
+    # does, before any provider request.
+    # UNMAPPED: whether a release name identifies one release cluster-wide. The
+    # pinned source keys storage objects within a namespace only, and the
+    # all-namespaces selection is a separate admitted scope under the auth
+    # contract. Do not read these coordinates as a global identity.
+  - name: connectors_kubernetes.helm.ReleaseStatus
+    kind: enum
+    variants: [unknown, deployed, uninstalled, superseded, failed, uninstalling, pending_install, pending_upgrade, pending_rollback]
+    # The provider vocabulary is the same nine values with hyphens in the last
+    # three (pinned status.go:25-41 in both lines). The hyphenated provider
+    # strings are the wire form; these identifiers are their model spelling and
+    # the binding maps them one to one. A tenth observed string is never folded
+    # into unknown: it refuses as a protocol violation.
+  - name: connectors_kubernetes.helm.ReleaseRevision
+    kind: struct
+    fields:
+      - {name: source_secret, type: String}
+      - {name: source_revision, type: "Optional<String>"}   # <=512 bytes
+      - {name: namespace, type: String}
+      - {name: release, type: String}
+      - {name: revision, type: Integer}
+      - {name: status, type: connectors_kubernetes.helm.ReleaseStatus}
+      - {name: created_at_unix_s, type: "Optional<Integer>"}
+      - {name: modified_at_unix_s, type: "Optional<Integer>"}
+    # source_secret is the exact object name sh.helm.release.v1.<release>.v<revision>
+    # (pinned storage.go:327-328 / :251-252); it is the provenance the observation
+    # came from, not a caller-selectable locator. source_revision is the
+    # Kubernetes resourceVersion of that object and is absent when, and only
+    # when, the provider omits the key; it is bounded at 512 bytes, the bound
+    # the published output schema declares, and an object exceeding it refuses.
+    # A value present in a shape this binding has not established — a number, a
+    # null, anything but a string — is not an omission and refuses rather than
+    # being reported as absent. namespace is the namespace the object reports,
+    # falling back to the admitted selection under the same rule: only when the
+    # key is absent, never when it is present and unreadable, so no field of an
+    # observation is the caller's own input. revision is the decimal version label (secrets.go:266 / :236).
+    # created_at_unix_s and modified_at_unix_s are written by separate code paths
+    # (secrets.go:174 and :205 in the v4 line, :155 and :181 in the v3 line), so a
+    # revision carries one, both or neither; absent means not recorded, never zero.
+    #
+    # One release name selects many version-keyed revision records: the storage
+    # key embeds the version (storage.go:327-328), and history is a query by
+    # {name, owner} returning a list (storage.go:212-215 / :153-156). That
+    # cardinality is read from pinned source, not assumed. More than one revision
+    # may carry status deployed at the same time; Helm's own comment calls that a
+    # corrupted store and resolves it by sorting (storage.go:171-175 / :125-129).
+    # This model does not encode a single current revision, because the provider
+    # does not guarantee one.
+    #
+    # UNMAPPED: the relation between a revision and the cluster resources it
+    # manages. The stored body carries a rendered manifest but no resolved
+    # resource identities, and info.resources is populated by a status action
+    # rather than by the storage driver. UNMAPPED: whether an observed collection
+    # of revisions is the complete history — a driver prunes by max history and
+    # the provider's own list is a paged observation of a mutable collection.
+  - name: connectors_kubernetes.helm.RecordedValueKind
+    kind: enum
+    variants: [object, array, string, number, boolean, null_value]
+    # The six JSON shapes a recorded value can take. null_value is the JSON null
+    # literal; the model has no bare null identifier.
+  - name: connectors_kubernetes.helm.RecordedValueProjection
+    kind: struct
+    fields:
+      - {name: source_secret, type: String}
+      - {name: path, type: String}
+      - {name: kind, type: connectors_kubernetes.helm.RecordedValueKind}
+      - {name: value_digest, type: String}
+    # The safe projection of one entry in the release's recorded values
+    # (config, pinned release.go:41 / :31). path is the dotted location, kind is
+    # its JSON shape and value_digest is an unsalted SHA-256 over the canonical
+    # JSON of the value — the bytes connectors_core::canonical produces, not the
+    # value's own text. It covers a JSON value because it exists to be compared
+    # across revisions; ManifestDocumentProjection.content_digest covers raw
+    # bytes because it exists to be reproduced. No recorded scalar is carried.
+    # Helm values routinely contain credentials, so this projection exists
+    # precisely so the literal never crosses the boundary; there is no variant
+    # of this type that carries one. Unsalted also means the digest confirms a
+    # guessed literal offline: it bounds disclosure of an unenumerable value and
+    # does not protect a guessable one.
+    # UNMAPPED: how a path reads back. It is a dotted display projection, not
+    # a selector: a recorded key containing a dot or a bracket produces a path
+    # that cannot be parsed back to its location unambiguously.
+    # path is bounded at 1..=1024 bytes, which is the bound the operation's
+    # published output schema declares. A node whose path falls outside it is
+    # not projected and the page reports itself incomplete; emitting it would
+    # produce a result the host rejects, and the host terminates the adapter
+    # child on that rejection rather than refusing the call.
+    # UNMAPPED: whether an absent path means unset or defaulted. The stored
+    # config holds only the values supplied at install or upgrade; chart defaults
+    # live in the unread chart, so absence here is not evidence of a default.
+  - name: connectors_kubernetes.helm.ManifestDocumentProjection
+    kind: struct
+    fields:
+      - {name: source_secret, type: String}
+      - {name: index, type: Integer}
+      - {name: bytes, type: Integer}
+      - {name: content_digest, type: String}
+    # The safe projection of one document of the rendered manifest (pinned
+    # release.go:43 / :33). index is the document's position in this projection,
+    # counting from zero over the documents actually emitted — not its position
+    # in the stored text. The two coincide for every manifest Helm writes,
+    # because Helm's writer emits no empty document (action.go:358,476 / :183)
+    # and this projection drops a whitespace-only chunk, but a page that starts
+    # at a later document or omits one would separate them, so index is defined
+    # as the emitted position rather than assumed equal to the stored one.
+    # bytes is the document's UTF-8 length as stored and content_digest an
+    # unsalted SHA-256 over exactly those stored bytes, with nothing stripped:
+    # Helm terminates every document with a newline, including the last, so a
+    # reader that extracts a document reproduces content_digest with sha256sum.
+    # It is deliberately not the digest RecordedValueProjection.value_digest
+    # computes; see that type for why the two cover different bytes.
+    # A chart's templates are usually public, so the unknown part of a rendered
+    # document may be only the value injected into it, and bytes publishes that
+    # document's exact length. This projection is therefore no stronger than the
+    # recorded-value one and in a public chart can be weaker: like value_digest,
+    # content_digest confirms a guess offline.
+    # UNMAPPED: the apiVersion, kind, name and namespace of the document. The
+    # stored manifest is YAML and this binding has no YAML reader; extracting
+    # those from lines would be a guess, not a parse, so they are absent rather
+    # than approximated. UNMAPPED: whether the document separator this binding
+    # splits on partitions the manifest exactly as a YAML reader would — a
+    # separator inside a block scalar is indistinguishable without a parse, so
+    # the projection reports its own splitting, not a document model.
