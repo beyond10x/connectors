@@ -151,7 +151,7 @@ impl Kubernetes {
             ("labelSelector", helm::selector(release, deployed)),
             ("limit", limit.to_string()),
         ];
-        if let Some(cursor) = cursor {
+        if let Some(cursor) = self.admitted_cursor(cursor)? {
             query.push(("continue", self.cursors.read(&context, cursor)?));
         }
         let response = self
@@ -175,13 +175,10 @@ impl Kubernetes {
             .iter()
             .map(|item| helm::revision(item, namespace, release))
             .collect::<Result<Vec<_>>>()?;
-        let next_cursor = self.continuation(
-            &context,
-            value["metadata"]["continue"].as_str().unwrap_or_default(),
-        )?;
+        let (next_cursor, complete, revision) = self.envelope(&context, &value)?;
         Ok(Page {
             items: revisions,
-            complete: next_cursor.is_none(),
+            complete,
             next_cursor,
             provenance: provenance(
                 &self.descriptor.instance,
@@ -189,9 +186,7 @@ impl Kubernetes {
                     "{namespace}/helm-releases/{release}{}",
                     if deployed { "/deployed" } else { "" }
                 ),
-                value["metadata"]["resourceVersion"]
-                    .as_str()
-                    .map(str::to_owned),
+                revision,
             ),
         })
     }
@@ -232,23 +227,79 @@ impl Kubernetes {
         helm::check_identity(&body, &record)?;
         Ok((name, record.source_revision, body))
     }
-    /// Issue a continuation inside the bound the published output schema
-    /// declares for `next_cursor`. The provider's own continue token has no
-    /// stated length, and the host terminates the local runtime child when a
-    /// result fails its own schema, so the bound is checked before the cursor
-    /// is returned rather than discovered by the validator.
-    fn continuation(&self, context: &Value, token: &str) -> Result<Option<String>> {
-        if token.is_empty() {
-            return Ok(None);
-        }
-        let cursor = self.cursors.issue(context, token.to_owned())?;
-        if cursor.len() > 16384 {
+    /// Read the list response's own envelope: the continuation to issue and the
+    /// collection revision to attribute the page to.
+    ///
+    /// A continuation the provider sent in a shape this binding has not
+    /// established is not the absence of a continuation, and neither is one
+    /// whose issued cursor would exceed the bound the published output schema
+    /// declares for `next_cursor`. In both cases the provider said it had not
+    /// finished, so the page reports `complete: false` with a null cursor:
+    /// truthfully partial, and honest that it cannot hand back a way to
+    /// continue. Defaulting either to the empty token would report
+    /// `complete: true` over a selection the provider said it had not
+    /// finished — the same unsound completeness claim the Helm contract
+    /// refuses for a foreign labelled object, one layer up.
+    ///
+    /// The collection's own resourceVersion is different: a page has no
+    /// vocabulary for "the revision is unreadable", and reporting it as absent
+    /// would attribute the page to no observed revision. That refuses.
+    fn envelope(
+        &self,
+        context: &Value,
+        value: &Value,
+    ) -> Result<(Option<String>, bool, Option<String>)> {
+        let metadata = &value["metadata"];
+        if !metadata.is_object() {
             return Err(Error::new(
                 ErrorCode::UpstreamProtocol,
-                "provider continuation exceeds the declared cursor bound",
+                "Kubernetes list response has no metadata",
             ));
         }
-        Ok(Some(cursor))
+        let revision = helm::optional_string(metadata, "resourceVersion")
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "Kubernetes collection revision is not a string",
+                )
+            })?
+            .map(str::to_owned);
+        // `Partial` is "the provider continued and this binding cannot carry
+        // the continuation", which is a page that is not complete rather than
+        // a page that is refused.
+        enum Carried {
+            None,
+            Partial,
+            Cursor(String),
+        }
+        let carried = match helm::optional_string(metadata, "continue") {
+            None => Carried::Partial,
+            Some(None) => Carried::None,
+            Some(Some("")) => Carried::None,
+            Some(Some(token)) => {
+                let cursor = self.cursors.issue(context, token.to_owned())?;
+                if cursor.len() > 16384 {
+                    Carried::Partial
+                } else {
+                    Carried::Cursor(cursor)
+                }
+            }
+        };
+        Ok(match carried {
+            Carried::None => (None, true, revision),
+            Carried::Partial => (None, false, revision),
+            Carried::Cursor(cursor) => (Some(cursor), false, revision),
+        })
+    }
+    /// `cursor` is declared `maxLength 16384` on every paging input. An
+    /// over-long value is refused today only as a side effect of cursor
+    /// verification failing; the enumeration of declared bounds asks for the
+    /// bound itself to be checked by the layer that publishes it.
+    fn admitted_cursor<'a>(&self, cursor: Option<&'a str>) -> Result<Option<&'a str>> {
+        if cursor.is_some_and(|cursor| cursor.len() > 16384) {
+            return Err(Error::invalid("cursor exceeds its declared bound"));
+        }
+        Ok(cursor)
     }
     fn namespace(&self, namespace: &str) -> Result<()> {
         if !self.config.namespaces.iter().any(|n| n == namespace) {
@@ -278,7 +329,7 @@ impl Kubernetes {
             context["partition"] = json!(partition);
         }
         let mut query = vec![("limit", limit.to_string())];
-        if let Some(cursor) = cursor {
+        if let Some(cursor) = self.admitted_cursor(cursor)? {
             query.push(("continue", self.cursors.read(&context, cursor)?));
         }
         let segments = match kind {
@@ -317,16 +368,10 @@ impl Kubernetes {
                 "Kubernetes exceeded requested page size",
             ));
         }
-        let next_cursor = self.continuation(
-            &context,
-            value["metadata"]["continue"].as_str().unwrap_or_default(),
-        )?;
-        let revision = value["metadata"]["resourceVersion"]
-            .as_str()
-            .map(str::to_owned);
+        let (next_cursor, complete, revision) = self.envelope(&context, &value)?;
         Ok(Page {
             items,
-            complete: next_cursor.is_none(),
+            complete,
             next_cursor,
             provenance: provenance(
                 &self.descriptor.instance,
@@ -551,7 +596,12 @@ impl Adapter for Kubernetes {
             }
             "helm_releases.values" | "helm_releases.manifest" => {
                 let args: ReleaseContent = decode(input)?;
-                if !(1..=500).contains(&args.limit) || args.revision == 0 {
+                // `revision` is declared `minimum 1, maximum 2147483647` —
+                // Helm's own `Version int` domain. The host validates input
+                // against that schema before dispatch, but a bound only an
+                // outer layer enforces is not enforced by this binding.
+                if !(1..=500).contains(&args.limit) || !(1..=2_147_483_647).contains(&args.revision)
+                {
                     return Err(Error::invalid("invalid release revision or page limit"));
                 }
                 let (name, source_revision, body) = self
