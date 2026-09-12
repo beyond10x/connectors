@@ -1,0 +1,30 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:streaming
+outcome: mcp.outbound.stream-opened
+wire_code: n/a
+summary: An SSE answer is scoped to the request that opened it, and a subscription
+  stream carries only what its filter named. Under the interoperability revision
+  (2025-11-25) a server request may arrive on that stream, which
+  `legacy-ping-on-the-stream-is-answered.yaml` decides.
+given:
+  - A binding configured for the primary revision (2026-07-28), where no server request
+    may arrive on the stream.
+  - A request whose answer the server chooses to stream.
+when:
+  - The server opens `text/event-stream` and sends notifications before the final response
+    (mcp-2026-07-28-basic-transports-streamable-http.mdx:107-125).
+  - Separately, a `subscriptions/listen` request opens a long-lived stream
+    (mcp-2026-07-28-basic-patterns-subscriptions.mdx:12-16).
+then:
+  - Every message on the stream relates to the request that opened it, and the final
+    response terminates the stream.
+  - The subscription's acknowledgment arrives before any notification of that subscription
+    (mcp-2026-07-28-basic-patterns-subscriptions.mdx:52-56).
+  - Each notification is demultiplexed by the subscription id it carries.
+never:
+  - A JSON-RPC request arriving on the stream is answered; this revision defines no channel
+    for one, so it is refused as `upstream_protocol`.
+  - A closed stream is resumed from a cursor; `Last-Event-ID` resumption is not supported
+    (mcp-2026-07-28-basic-transports-streamable-http.mdx:157).

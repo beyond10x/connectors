@@ -1,0 +1,28 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:capability-mismatch
+outcome: mcp.outbound.advertised-capability-recorded-not-projected
+wire_code: n/a
+summary: A capability key this repository does not consume is recorded as advertised and
+  projected into nothing; it is neither an error nor support.
+given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); an advertised key is recorded and projected into nothing on
+    both.
+  - A server advertising a key the selection matrix refuses, such as `logging`, and a key
+    no archived byte names at all, which both revisions' schemas permit
+    (mcp-2026-07-28-schema.ts:789, mcp-2025-11-25-schema.ts:380).
+when:
+  - The server reports its advertised capability keys — under the primary revision
+    (2026-07-28) in the description result section 1 names
+    (mcp-2026-07-28-server-discover.mdx:94-95), under the interoperability revision
+    (2025-11-25) in the `InitializeResult` of the handshake, which is the only place that
+    revision reports them (mcp-2025-11-25-basic-lifecycle.mdx:42-53).
+then:
+  - Both keys appear exactly as sent, marked advertised and not consumed.
+  - No Connectors capability exists because of either key.
+never:
+  - An unknown key is an error.
+  - An advertised key becomes an admission decision, an authority or a reason to send a
+    request that depends on it.

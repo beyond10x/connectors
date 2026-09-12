@@ -1,0 +1,27 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:session-loss
+outcome: mcp.outbound.session-lost
+wire_code: session_lost
+summary: A repudiated session is reported lost, and the request that was in flight is
+  reported unobserved; neither fact is turned into the other.
+given:
+  - A binding configured for the interoperability revision, in a session whose session id
+    the server assigned (mcp-2025-11-25-basic-transports.mdx:194-222).
+  - One request in flight.
+when:
+  - The server terminates the session and answers `404 Not Found` to a request carrying
+    that session id.
+then:
+  - The observable outcome is `session_lost`, naming the endpoint and the repudiated
+    session.
+  - The in-flight request is reported separately as `outcome_unknown`.
+  - A new session is established when a caller makes a new request that needs one, which
+    is a new interaction with its own record.
+never:
+  - The lost session's requests are carried out again on the new session; the
+    interoperability revision asks for a new `InitializeRequest`, not for the lost request
+    to be sent a second time.
+  - The outcome is `unavailable`, which names a transport that could not be reached rather
+    than a session that was repudiated.

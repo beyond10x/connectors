@@ -1,0 +1,27 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:initialize-negotiation
+outcome: mcp.outbound.legacy-initialize-negotiated
+wire_code: n/a
+summary: Against a binding configured for the interoperability revision, `initialize`
+  settles one version, the server's capabilities and an empty client capability set.
+given:
+  - A binding configured for the interoperability revision (2025-11-25), which the
+    selection matrix dispositions supported outbound.
+  - A server that answers the `initialize` handshake.
+when:
+  - The client sends `initialize` carrying the configured version, its client capabilities
+    and its implementation information (mcp-2025-11-25-basic-lifecycle.mdx:42-53).
+  - The server answers with the same version and its own capabilities.
+then:
+  - The client sends the `initialized` notification before ordinary requests
+    (mcp-2025-11-25-basic-lifecycle.mdx:149-157).
+  - The session's phase moves from initialization to operation, the protocol's own
+    vocabulary in `connectors_mcp.protocol.LegacySessionPhase`.
+  - A server-assigned `MCP-Session-Id` is recorded and echoed on every subsequent request
+    (mcp-2025-11-25-basic-transports.mdx:194-222).
+never:
+  - A client capability is declared that the selection matrix refuses; `roots`, `sampling`
+    and `elicitation` are all refused, so the declared set is empty.
+  - A capability that was not negotiated is used (mcp-2025-11-25-basic-lifecycle.mdx:186-212).
