@@ -194,11 +194,14 @@ revision, then invoke with the saved connection as above. The request shapes are
 | `hosts.discover` | `{"limit":50}` |
 | `helm_releases.history` | `{"namespace":"default","release":"api","limit":50}` |
 | `helm_releases.status` | `{"namespace":"default","release":"api","limit":50}` |
-| `helm_releases.values` | `{"namespace":"default","release":"api","revision":3,"limit":200}` |
-| `helm_releases.manifest` | `{"namespace":"default","release":"api","revision":3,"limit":200}` |
+| `helm_releases.values` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
+| `helm_releases.manifest` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
 
-`limit` is between 1 and 100. List results contain `items`, `next_cursor` and
-`complete`. Pass a returned cursor alongside unchanged selectors, limit and
+For every operation above except the two release projections,
+`limit` is between 1 and 100. For `helm_releases.values` and
+`helm_releases.manifest` it is between 1 and 500, because those two page over
+one stored object rather than over a provider collection. List results contain
+`items`, `next_cursor` and `complete`. Pass a returned cursor alongside unchanged selectors, limit and
 connection; a cursor issued under one connection is not readable under another.
 Pages are observations of a mutable collection.
 
@@ -230,11 +233,20 @@ concurrently written store can hold more than one.
 a **redacted projection, never the stored content**. A release's recorded values
 routinely contain credentials, and its rendered manifest contains the body of
 every Secret the release applied. `values` returns one entry per recorded path
-with its JSON shape and a SHA-256 of its value; `manifest` returns one entry per
-rendered document with its position, byte length and a SHA-256 of its text. No
-recorded scalar and no manifest byte is returned, and there is no setting that
-returns one. Use the digests to tell whether something changed between
-revisions; to read the value itself, use your own cluster credentials directly.
+with its JSON shape and a SHA-256 over the canonical JSON of its value;
+`manifest` returns one entry per rendered document with its position, byte
+length and a SHA-256 over exactly the document text those bytes count, which
+`sha256sum` on the document reproduces. No recorded scalar and no manifest byte
+is returned, and there is no setting that returns one. Use the digests to tell
+whether something changed between revisions; to read the value itself, use your
+own cluster credentials directly.
+
+Both digests are unsalted, which is what makes them comparable — and means
+**a digest confirms a guess**. Anyone holding a `value_digest` can test a
+candidate literal offline with one `sha256sum` and learn whether it is right.
+The projection therefore bounds disclosure of a value nobody can enumerate; it
+does not protect a short, guessable or already-suspected one. Treat the output
+as you would treat the list of keys in a values file, not as a secret.
 
 Both projections read a single object, so they never issue a cursor: a
 projection larger than `limit` comes back with `complete: false` and
