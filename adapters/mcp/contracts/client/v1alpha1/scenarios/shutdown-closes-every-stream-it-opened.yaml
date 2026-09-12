@@ -1,0 +1,26 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:shutdown
+outcome: mcp.outbound.shutdown-completed
+wire_code: n/a
+summary: Shutdown closes what this client opened and invents no results for what it did
+  not observe.
+given:
+  - A client with open streams, and possibly a session-bearing binding.
+when:
+  - The client shuts down; the interoperability revision defines no shutdown message and
+    signals it through the transport (mcp-2025-11-25-basic-lifecycle.mdx:224-246).
+then:
+  - Every stream this client opened is closed.
+  - Each in-flight request is reported under its own outcome, `outcome_unknown` where an
+    answer was never seen.
+  - A session-bearing binding sends one HTTP DELETE carrying the session id, and an
+    answer of 405 Method Not Allowed is recorded as permitted
+    (mcp-2025-11-25-basic-transports.mdx:194-222,
+    mcp-2026-07-28-basic-transports-streamable-http.mdx:670-678).
+  - The binding's configuration is unchanged and reusable.
+never:
+  - A request is reported successful because the process is ending.
+  - A request whose effect was not observed is reported failed.
+  - The credential lifecycle is decided here; story:mcp-outbound-auth-lifecycle owns it.
