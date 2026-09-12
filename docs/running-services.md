@@ -38,7 +38,7 @@ The first profile supports one federation hop. It never retries a provider reque
 | Adapter | Operations | External binding |
 |---|---|---|
 | GitLab | `project.get`, `issues.list`, `file.get` | GitLab API v4; configured project allowlist; token or public reads |
-| Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover` | Kubernetes API; namespace/kind restrictions; bearer token and CA |
+| Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, optionally `helm_releases.history`/`.status`/`.values`/`.manifest` | Kubernetes API; namespace/kind restrictions; bearer token and CA; Helm release reads need their own `helm_release_reads` selection |
 | SQL | `schema.list`, `query.read` | PostgreSQL; explicit role/database; read-only transactions and deadlines |
 
 SQL uses the `postgresql-native-text` profile: column names and native type names

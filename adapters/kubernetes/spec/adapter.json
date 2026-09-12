@@ -5,7 +5,9 @@
   "sources": [
     "https://kubernetes.io/docs/reference/using-api/api-concepts/",
     "https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/",
-    "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/node-v1/"
+    "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/node-v1/",
+    "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/storage/driver/secrets.go",
+    "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/storage/driver/secrets.go"
   ],
   "configuration_schema": {
     "oneOf": [
@@ -63,6 +65,14 @@
           },
           "discover_hosts": {
             "type": "boolean"
+          },
+          "helm_release_reads": {
+            "description": "Helm release reads. off advertises none. metadata advertises revision history and deployed status, read from release-Secret metadata only. redacted_content additionally advertises the recorded values and rendered manifest as safe projections that never carry a stored literal. There is no setting that discloses provider bytes.",
+            "enum": [
+              "off",
+              "metadata",
+              "redacted_content"
+            ]
           }
         },
         "required": [
@@ -72,7 +82,8 @@
           "ca_digest",
           "namespaces",
           "resource_kinds",
-          "discover_hosts"
+          "discover_hosts",
+          "helm_release_reads"
         ],
         "additionalProperties": false
       },
@@ -114,6 +125,14 @@
               },
               "discover_hosts": {
                 "type": "boolean"
+              },
+              "helm_release_reads": {
+                "description": "Helm release reads. off advertises none. metadata advertises revision history and deployed status, read from release-Secret metadata only. redacted_content additionally advertises the recorded values and rendered manifest as safe projections that never carry a stored literal. There is no setting that discloses provider bytes.",
+                "enum": [
+                  "off",
+                  "metadata",
+                  "redacted_content"
+                ]
               }
             },
             "required": [
@@ -479,6 +498,637 @@
                 "type": "null"
               }
             ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "helm_releases.history",
+      "description": "Read a bounded page of a Helm release's revision records from its own release Secrets.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-helm-release-history",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "release": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 53,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "namespace",
+          "release",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_secret": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                },
+                "source_revision": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 512
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "release": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 53,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "status": {
+                  "enum": [
+                    "unknown",
+                    "deployed",
+                    "uninstalled",
+                    "superseded",
+                    "failed",
+                    "uninstalling",
+                    "pending-install",
+                    "pending-upgrade",
+                    "pending-rollback"
+                  ]
+                },
+                "created_at_unix_s": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "modified_at_unix_s": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "source_secret",
+                "source_revision",
+                "namespace",
+                "release",
+                "revision",
+                "status",
+                "created_at_unix_s",
+                "modified_at_unix_s"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "helm_releases.status",
+      "description": "Read the revision records a Helm release currently marks deployed, without choosing one when the store holds several.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-helm-release-status",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "release": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 53,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "namespace",
+          "release",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_secret": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                },
+                "source_revision": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 512
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63
+                },
+                "release": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 53,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "status": {
+                  "enum": [
+                    "unknown",
+                    "deployed",
+                    "uninstalled",
+                    "superseded",
+                    "failed",
+                    "uninstalling",
+                    "pending-install",
+                    "pending-upgrade",
+                    "pending-rollback"
+                  ]
+                },
+                "created_at_unix_s": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "modified_at_unix_s": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "source_secret",
+                "source_revision",
+                "namespace",
+                "release",
+                "revision",
+                "status",
+                "created_at_unix_s",
+                "modified_at_unix_s"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "helm_releases.values",
+      "description": "Read a safe projection of the values recorded for one Helm release revision: paths, JSON shapes and digests, never a recorded literal.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-helm-release-values",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "release": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 53,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "namespace",
+          "release",
+          "revision",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_secret": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "kind": {
+                  "enum": [
+                    "object",
+                    "array",
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "value_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "source_secret",
+                "path",
+                "kind",
+                "value_digest"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "type": "null"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "helm_releases.manifest",
+      "description": "Read a safe projection of one Helm release revision's rendered manifest: per-document position, byte length and digest, never manifest text.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-helm-release-manifest",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "release": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 53,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": [
+          "namespace",
+          "release",
+          "revision",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_secret": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253
+                },
+                "index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "content_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "source_secret",
+                "index",
+                "bytes",
+                "content_digest"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "type": "null"
           },
           "complete": {
             "type": "boolean"
