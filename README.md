@@ -67,7 +67,7 @@ The current services provide:
 | Adapter | Implemented operations | Binding |
 |---|---|---|
 | GitLab | `project.get`, `issues.list`, `file.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.validate` | GitLab API v4, with a configured project allowlist; exact-commit CI, bounded traces, MR update windows and pinned-head validation observations |
-| Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover` | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI |
+| Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, and optionally the `helm_releases.*` release reads | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
 
 They can run as separate Rust services, with a generic CLI and one-hop federation.
