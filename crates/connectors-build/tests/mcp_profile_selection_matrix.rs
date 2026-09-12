@@ -978,3 +978,413 @@ fn the_matrix_states_that_a_supported_row_is_a_selection_not_implemented_support
         );
     }
 }
+
+// ── Derivation 4: the optional extensions the pinned revisions identify ──────────────
+
+/// One optional extension the pinned bytes name by identifier.
+#[derive(Debug, Clone)]
+struct NamedExtension {
+    /// The display name the specification links, e.g. `MCP Apps`.
+    name: String,
+    /// The advertised key, e.g. `io.modelcontextprotocol/ui`.
+    identifier: String,
+    /// `<archived file>:<line>` of the sentence that identifies it.
+    at: String,
+}
+
+/// The file's lines joined by single spaces, keeping the 1-based source line of every
+/// joined position. A sentence in an `.mdx` source is wrapped, so the phrase that
+/// identifies an extension appears on no single line of the archived bytes.
+fn flattened(text: &str) -> (String, Vec<(usize, usize)>) {
+    let mut flat = String::with_capacity(text.len());
+    let mut starts = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        starts.push((flat.len(), index + 1));
+        flat.push_str(line.trim());
+        flat.push(' ');
+    }
+    (flat, starts)
+}
+
+fn line_of(starts: &[(usize, usize)], offset: usize) -> usize {
+    let mut line = starts.first().map(|(_, line)| *line).unwrap_or(1);
+    for (start, at) in starts {
+        if *start <= offset {
+            line = *at;
+        } else {
+            break;
+        }
+    }
+    line
+}
+
+/// Every optional extension the pinned revisions name **by identifier**, derived
+/// structurally from the sentence form the specification introduces one with:
+/// ``[<Name> extension](<link>) identified as `<identifier>` ``.
+///
+/// Like the other three derivations this is a property of where the token sits, not a
+/// list of strings. An extension the next pin introduces by the same sentence form is
+/// found without editing this file.
+fn derived_extensions() -> Vec<NamedExtension> {
+    let sentence =
+        regex::Regex::new(r"\[([^\]]+) extension\]\([^)]*\) identified as `([^`]+)`").unwrap();
+    let mut found = Vec::new();
+    let mut seen = BTreeSet::new();
+    for entry in manifest_entries() {
+        let file = manifest_field(&entry, "file");
+        let (flat, starts) = flattened(&archived(&file));
+        for capture in sentence.captures_iter(&flat) {
+            let whole = capture.get(0).expect("capture 0 always exists");
+            let identifier = capture[2].to_string();
+            if !seen.insert(identifier.clone()) {
+                continue;
+            }
+            found.push(NamedExtension {
+                name: capture[1].to_string(),
+                identifier,
+                at: format!("{file}:{}", line_of(&starts, whole.start())),
+            });
+        }
+    }
+    found
+}
+
+/// Every extension identifier the pinned revisions name is named by the matrix.
+///
+/// The two `extensions` rows are `deferred` on a *stated enumeration* of the extensions
+/// the pin identifies, and for one round that enumeration said "the only one" while the
+/// archives named two — with the client row citing the other one's lines as its own
+/// source. That is derivation 1's defect one category over: a set stated in prose, with
+/// nothing comparing it to the bytes.
+///
+/// This is not a demand that every extension take a row. `extensions` is a map of
+/// identifiers, and the matrix's rule that a map's keys are not separately advertisable
+/// capabilities is what keeps them out of the key space. It is a demand that a deferral
+/// resting on an enumeration name every member of it, so the next pin's new extension
+/// gets a mention or a derivation rule and there is no third outcome.
+#[test]
+fn every_extension_the_pinned_revisions_identify_is_named_by_the_matrix() {
+    let identified = derived_extensions();
+    assert!(
+        identified.len() >= 2,
+        "derivation 4 yielded {identified:?} from the archives; the sentence form it \
+         reads has changed and this case proves nothing"
+    );
+
+    let document = matrix();
+    let unnamed: Vec<&NamedExtension> = identified
+        .iter()
+        .filter(|extension| !document.contains(&extension.identifier))
+        .collect();
+
+    assert!(
+        unnamed.is_empty(),
+        "the pinned revisions identify {} optional extensions by identifier and the \
+         matrix names {} of them:\n  identified by the archives:\n    {}\n  named by no \
+         line of selection.md:\n    {}",
+        identified.len(),
+        identified.len() - unnamed.len(),
+        identified
+            .iter()
+            .map(|found| format!("{} `{}` at {}", found.name, found.identifier, found.at))
+            .collect::<Vec<_>>()
+            .join("\n    "),
+        unnamed
+            .iter()
+            .map(|found| format!("{} `{}` at {}", found.name, found.identifier, found.at))
+            .collect::<Vec<_>>()
+            .join("\n    "),
+    );
+}
+
+// ── A marker attached to the other side's kind ──────────────────────────────────────
+
+/// Every node of the authored model that carries a comment block, as
+/// `(normalised block, node name)`.
+///
+/// YAML comment blocks in the model precede the node they annotate, and a block ends at
+/// the first line that is not a comment. So the node a marker is attached to is the
+/// `- name:` that follows its block, and that is a structural fact about the file rather
+/// than a guess about which words belong to which enum.
+fn annotated_nodes() -> Vec<(String, String)> {
+    let mut annotated = Vec::new();
+    for (_, text) in model_files_raw() {
+        let mut block: Vec<String> = Vec::new();
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if let Some(comment) = trimmed.strip_prefix('#') {
+                // Stripped per line, before the join: `normalise` sees one line and would
+                // leave every interior `#` standing in the middle of the block's words.
+                block.push(comment.trim().to_string());
+            } else if let Some(name) = trimmed.strip_prefix("- name: ") {
+                if !block.is_empty() {
+                    annotated.push((normalise(&block.join(" ")), name.trim().to_string()));
+                }
+                block.clear();
+            } else {
+                block.clear();
+            }
+        }
+    }
+    annotated
+}
+
+/// Every authored model file under `adapters/mcp/spec/ess/`, as `(path, raw text)`.
+fn model_files_raw() -> Vec<(String, String)> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../adapters/mcp/spec/ess");
+    let mut files = Vec::new();
+    let mut stack = vec![root.clone()];
+    while let Some(directory) = stack.pop() {
+        let entries = std::fs::read_dir(&directory)
+            .unwrap_or_else(|e| panic!("read dir {}: {e}", directory.display()));
+        for entry in entries {
+            let path = entry.expect("directory entry").path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|kind| kind == "yaml") {
+                let text = std::fs::read_to_string(&path)
+                    .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+                files.push((path.display().to_string(), text));
+            }
+        }
+    }
+    assert!(
+        files.len() >= 3,
+        "only {} authored model file(s) were read under {}; the attachment check would \
+         pass vacuously",
+        files.len(),
+        root.display()
+    );
+    files
+}
+
+/// The side — `server` or `client` — whose capability kind a marker is attached to.
+fn marker_side(marker: &str) -> Option<&'static str> {
+    for (block, node) in annotated_nodes() {
+        if !block.contains(marker) {
+            continue;
+        }
+        let lowered = node.to_lowercase();
+        if lowered.ends_with("servercapabilitykind") {
+            return Some("server");
+        }
+        if lowered.ends_with("clientcapabilitykind") {
+            return Some("client");
+        }
+    }
+    None
+}
+
+/// Every `<side>/<feature>` the matrix's inherited-marker table states, with the kind it
+/// says the marker is attached to.
+fn stated_inherited_markers() -> BTreeSet<(String, String)> {
+    let entry =
+        regex::Regex::new(r"^\| `([a-z]+/[a-z]+)` \| `([A-Za-z]+CapabilityKind)` \|").unwrap();
+    matrix()
+        .lines()
+        .filter_map(|line| entry.captures(line.trim()))
+        .map(|capture| (capture[1].to_string(), capture[2].to_string()))
+        .collect()
+}
+
+/// A deferred capability row whose marker is attached to the *other* side's kind is
+/// listed, by name, in the matrix's own table of inherited markers.
+///
+/// The `names-the-feature` rule strips the side and matches the stem, deliberately: a row
+/// and a marker are written in different vocabularies and demanding the side match would
+/// be a rule about wording. The cost is that `capability:server/tasks` passes on a marker
+/// attached to `ClientCapabilityKind` — so whoever answers that marker settles the client
+/// row and leaves the server one exactly where it was, while both read as cleared.
+///
+/// Stating the set is what closes that, and it closes the class rather than the instance:
+/// a future deferral that inherits a cross-side marker is absent from the table and fails
+/// here. The table is prose a reader can check, and the check is that it is exhaustive.
+#[test]
+fn every_deferred_row_inheriting_the_other_sides_marker_is_stated_as_inheriting_it() {
+    let quoted = regex::Regex::new(r"`(UNMAPPED: [^`]+)`").unwrap();
+    let mut derived: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut examined = 0usize;
+
+    for row in rows() {
+        if row.disposition != "deferred" {
+            continue;
+        }
+        let Some(feature) = row.key.strip_prefix("capability:") else {
+            continue;
+        };
+        let Some((side, _)) = feature.split_once('/') else {
+            continue;
+        };
+        for capture in quoted.captures_iter(&row.reason) {
+            let marker = normalise(&capture[1]);
+            if marker == "unmapped:" {
+                continue;
+            }
+            examined += 1;
+            let Some(attached) = marker_side(&marker) else {
+                continue;
+            };
+            if attached != side {
+                let kind = format!(
+                    "{}CapabilityKind",
+                    if attached == "server" {
+                        "Server"
+                    } else {
+                        "Client"
+                    }
+                );
+                derived.insert((feature.to_string(), kind));
+            }
+        }
+    }
+
+    assert!(
+        examined > 0,
+        "no deferred capability row quoted a marker; this case proves nothing"
+    );
+
+    let stated = stated_inherited_markers();
+    let unstated: Vec<&(String, String)> = derived.difference(&stated).collect();
+    let stale: Vec<&(String, String)> = stated.difference(&derived).collect();
+
+    assert!(
+        unstated.is_empty() && stale.is_empty(),
+        "the matrix's table of deferrals inheriting the other side's marker does not \
+         match the model:\n  inherits a cross-side marker and is not in the table:\n    \
+         {}\n  in the table and does not inherit one:\n    {}",
+        if unstated.is_empty() {
+            "(none)".to_string()
+        } else {
+            unstated
+                .iter()
+                .map(|(feature, kind)| format!("`{feature}` — marker attached to `{kind}`"))
+                .collect::<Vec<_>>()
+                .join("\n    ")
+        },
+        if stale.is_empty() {
+            "(none)".to_string()
+        } else {
+            stale
+                .iter()
+                .map(|(feature, kind)| format!("`{feature}` — table says `{kind}`"))
+                .collect::<Vec<_>>()
+                .join("\n    ")
+        },
+    );
+}
+
+// ── One wire input, two rows ────────────────────────────────────────────────────────
+
+/// When a revision requires the `MCP-Protocol-Version` header, read from that revision's
+/// own archived documents: the scope words of the sentence that imposes it, and where.
+///
+/// The two pinned revisions impose it in two shapes — "on all subsequent requests" and
+/// "Every POST request … MUST include" — and the difference is the whole point: a
+/// revision whose rule is scoped to *subsequent* requests opens a session with a request
+/// that carries no header at all.
+fn header_scope(revision: &str) -> Option<(String, String)> {
+    let subsequent = regex::Regex::new(
+        r"\*\*MUST\*\* include the `MCP-Protocol-Version:[^`]*` HTTP header on ([a-z ]+) requests",
+    )
+    .unwrap();
+    let every = regex::Regex::new(
+        r"(?i)(every [a-z ]*request)[^.]*\*\*MUST\*\* include an `MCP-Protocol-Version` header",
+    )
+    .unwrap();
+    for entry in manifest_entries() {
+        let file = manifest_field(&entry, "file");
+        if !file.starts_with(&format!("mcp-{revision}-")) {
+            continue;
+        }
+        let (flat, starts) = flattened(&archived(&file));
+        for rule in [&subsequent, &every] {
+            if let Some(capture) = rule.captures(&flat) {
+                let whole = capture.get(0).expect("capture 0 always exists");
+                return Some((
+                    capture[1].trim().to_lowercase(),
+                    format!("{file}:{}", line_of(&starts, whole.start())),
+                ));
+            }
+        }
+    }
+    None
+}
+
+/// An inbound refusal keyed on the absent `MCP-Protocol-Version` header names every
+/// revision this matrix supports inbound whose session opener carries no such header.
+///
+/// The matrix's covering property is stated over *keys*: one disposition per feature per
+/// direction. Over the bytes that arrive on a socket it says nothing, and for one round
+/// the inbound `2025-03-26` row refused every header-less request — which is exactly the
+/// legacy `initialize` the supported inbound `2025-11-25` row four lines above promises
+/// to answer, over a transport this matrix also selects.
+///
+/// The rule is derived per supported row rather than fixed to the one pair that was
+/// wrong: whatever the matrix supports inbound, that revision's own document says when it
+/// requires the header, and a revision whose rule is scoped to *subsequent* requests must
+/// be excepted by name in any refusal that keys on the header's absence.
+#[test]
+fn an_inbound_header_refusal_excepts_every_supported_revision_whose_opener_carries_none() {
+    let inbound = |row: &Row| row.direction == "inbound" || row.direction == "both";
+    let all = rows();
+
+    let mut opener_carries_none: Vec<(String, String, String)> = Vec::new();
+    let mut classified = 0usize;
+    for row in all.iter().filter(|row| inbound(row)) {
+        if row.disposition != "supported" {
+            continue;
+        }
+        let Some(revision) = row.key.strip_prefix("revision:") else {
+            continue;
+        };
+        let Some((scope, at)) = header_scope(revision) else {
+            continue;
+        };
+        classified += 1;
+        if scope.contains("subsequent") {
+            opener_carries_none.push((revision.to_string(), scope, at));
+        }
+    }
+
+    let refusals: Vec<&Row> = all
+        .iter()
+        .filter(|row| inbound(row) && row.disposition == "explicitly refused")
+        .filter(|row| {
+            row.reason.contains("MCP-Protocol-Version header")
+                && ["missing", "omits", "without", "no version header"]
+                    .iter()
+                    .any(|absent| row.reason.contains(absent))
+        })
+        .collect();
+
+    assert!(
+        classified > 0 && !refusals.is_empty(),
+        "{classified} supported inbound revision(s) carry a header rule and \
+         {} inbound refusal(s) key on the header's absence; this case proves nothing",
+        refusals.len()
+    );
+
+    let mut broken = Vec::new();
+    for (revision, scope, at) in &opener_carries_none {
+        for row in &refusals {
+            if row.reason.contains(revision.as_str()) {
+                continue;
+            }
+            broken.push(format!(
+                "selection.md:{} `{}` ({}) refuses a request that omits the header and \
+                 never names `{revision}`, which this matrix supports inbound and whose \
+                 own rule ({at}) requires the header on {scope:?} requests — so its \
+                 session opener carries none and this row refuses it",
+                row.line, row.key, row.direction
+            ));
+        }
+    }
+
+    assert!(
+        broken.is_empty(),
+        "{} inbound refusal(s) of a header-less request reach a revision the same matrix \
+         supports:\n  {}",
+        broken.len(),
+        broken.join("\n  ")
+    );
+}
