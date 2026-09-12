@@ -66,8 +66,12 @@ round and the way that was found was an adversary reading the definition against
 | a row naming an open blocker is `deferred` | `no_row_resting_on_an_open_decision_blocker_claims_support_or_refusal` |
 | a `deferred` row's blocker names the deferred feature | `mcp_profile_selection_matrix_adversary.rs`, against the blocker's own record |
 | a `deferred` row's `UNMAPPED:` marker exists verbatim and names the feature | `every_deferred_row_names_a_record_and_every_quoted_marker_exists_in_the_model` |
+| a `deferred` row inheriting the *other* side's marker is stated as inheriting it | `every_deferred_row_inheriting_the_other_sides_marker_is_stated_as_inheriting_it` |
+| every extension identifier the pin names is named by this document | `every_extension_the_pinned_revisions_identify_is_named_by_the_matrix` |
+| an inbound refusal keyed on the absent version header excepts every revision supported inbound whose session opener carries none | `an_inbound_header_refusal_excepts_every_supported_revision_whose_opener_carries_none` |
 | every feature is dispositioned once per direction, with a resolvable source line | the two enumeration cases |
 | **an `explicitly refused` row states the refusal a caller observes** | **nothing.** A reason cell that said only "not supported" would pass every case in this repository. Eighteen rows are refusals and each states an observable outcome — a status code, an error code, an absent advertisement, a fallback declined — but that is held by review, and this row exists so nobody reads the green suite as evidence of it. Making it mechanical would reward keyword-stuffing a cell rather than stating an outcome, so it is left to review deliberately. |
+| **no two rows disposition the same bytes on the wire differently** | **one case, not the property.** The covering property above is stated over *keys*, and two rows can describe one arriving request without ever sharing a key — which is what happened: an inbound refusal of every header-less request and a supported inbound legacy `initialize`, four lines apart. The case now in the suite covers exactly that collision, derived over every revision supported inbound. The general property needs a model of wire inputs, which this repository does not have, so the rest of it is review's. |
 
 **Direction** is `outbound`, `inbound` or `both`, because `epic:mcp-contracts` says the
 two directions "are separate directions with separate trust boundaries":
@@ -89,7 +93,7 @@ once" means here, and it is what the check counts.
 The enumeration comes from the archived bytes, not from what anyone remembers about MCP,
 because the property worth having is that a capability absent from the matrix is a defect
 in the matrix. `crates/connectors-build/tests/mcp_profile_selection_matrix.rs` implements
-exactly these three rules and fails if the matrix and the archives disagree.
+exactly these four rules and fails if the matrix and the archives disagree.
 
 1. **Revisions** — **every version-shaped token in the 54 archived files**, matched as
    `YYYY-MM-DD` or `DRAFT-…`, minus the three kinds of token that are stated not to be a
@@ -135,6 +139,23 @@ exactly these three rules and fails if the matrix and the archives disagree.
    and so belong to both counts. The check holds each to the section of the side whose
    schema declares it, not to the document as a whole: a setting named only in the other
    side's paragraph is named beside a row that does not carry it.
+4. **Extension identifiers** — every extension the pinned revisions introduce with the
+   sentence form ``[<Name> extension](<link>) identified as `<identifier>` ``, which is
+   how `mcp-2026-07-28-basic-versioning.mdx` "## Extension Negotiation" introduces one.
+   There are **two**: `io.modelcontextprotocol/ui` (`:89-90`) and
+   `io.modelcontextprotocol/tasks` (`:105`).
+
+   These do **not** take rows, and that is rule 3 deciding it rather than an omission:
+   `extensions` is a map of identifiers to per-extension settings objects, and rule 3
+   already holds that a map's contents are settings of an advertised capability rather
+   than separately advertisable capabilities. What rule 4 requires is weaker, and is the
+   thing that was missing — **every identified extension is named somewhere in this
+   document.** Both `extensions` rows are deferred on a stated enumeration of them, and
+   for one round that enumeration read "the only one either pinned revision names" while
+   the archives named two, fifteen lines apart, with the client row citing the *other*
+   one's lines as its own source. A set stated in prose with nothing comparing it to the
+   bytes is derivation 1's defect in a second category, and this rule is the same repair:
+   the next pin's new extension gets a mention or a rule, and there is no third outcome.
 
 Neither capability set is closed. `mcp-2026-07-28-schema.ts:789` and
 `mcp-2026-07-28-schema.ts:712` say so in as many words, of the server and the client
@@ -153,7 +174,7 @@ under [Limits](#limits); it is not silently accepted.
 | `revision:2024-11-05` | outbound | `mcp-2026-07-28-deprecated.mdx:31` `mcp-2025-11-25-basic-transports.mdx:284-311` | explicitly refused | No bytes of this revision are archived here, and without them every statement about it is a hypothesis. Connectors never offers it in an initialize and never follows a fallback that would land on it; it surfaces an unsupported-revision error naming the endpoint it declined. |
 | `revision:2024-11-05` | inbound | `mcp-2025-11-25-basic-lifecycle.mdx:61` `mcp-2026-07-28-schema.ts:450` | explicitly refused | A modern request declaring it is answered with UNSUPPORTED_PROTOCOL_VERSION -32022 whose supported list names only the two pinned strings; a legacy initialize declaring it is answered with a pinned version instead, which a client that cannot use disconnects on. |
 | `revision:2025-03-26` | outbound | `mcp-2026-07-28-basic-transports-streamable-http.mdx:9-11` `mcp-2026-07-28-deprecated.mdx:31` | explicitly refused | A real revision, not an artefact: it introduced Streamable HTTP and it is the registry's Deprecated-in value for HTTP+SSE. No bytes of it are archived here, so Connectors never offers it, and every outbound request carries an explicit version header rather than omitting one and letting a server assume this revision on its behalf. |
-| `revision:2025-03-26` | inbound | `mcp-2025-11-25-basic-transports.mdx:276-279` `mcp-2026-07-28-basic-transports-streamable-http.mdx:277-281` | explicitly refused | Both pinned revisions tell a server to treat a request with no version header as this revision — one says SHOULD assume, the other says MAY treat. The inbound binding declines both and takes the alternative the primary revision states for a server that does not support such clients: a request missing the MCP-Protocol-Version header is rejected with 400 Bad Request and HeaderMismatch -32020, never silently assumed into an unpinned revision. |
+| `revision:2025-03-26` | inbound | `mcp-2025-11-25-basic-transports.mdx:276-279` `mcp-2026-07-28-basic-transports-streamable-http.mdx:277-281` `mcp-2025-11-25-basic-transports.mdx:267-269` | explicitly refused | Both pinned revisions tell a server to treat a request with no version header as this revision — one says SHOULD assume, the other says MAY treat. The inbound binding declines both and takes the alternative the primary revision states for a server that does not support such clients: a **modern** request missing the MCP-Protocol-Version header is rejected with 400 Bad Request and HeaderMismatch -32020, never silently assumed into an unpinned revision. **This refusal reaches modern requests only.** A legacy `initialize` is not one: it declares its version in the request body, and `2025-11-25` requires the header only on requests *subsequent* to initialization (`mcp-2025-11-25-basic-transports.mdx:267-269`), so its first POST carries none by that revision's own rule. Such a request is answered by the `revision:2025-11-25` inbound row above, not refused here. |
 | `revision:2025-06-18` | both | `mcp-2025-11-25-basic-transports.mdx:271` `mcp-2026-07-28-basic-transports-streamable-http.mdx:278` | explicitly refused | It reaches this matrix only as a header example inside a pinned document and as a named earlier revision; no bytes of it are archived. It is never sent, and a request declaring it is refused exactly as any other unpinned revision is. |
 | `revision:DRAFT-2025-v3` | both | `mcp-2025-11-25-schema.ts:14` `mcp-2026-07-28-basic-versioning.mdx:62` | explicitly refused | It is the interoperability revision's own LATEST_PROTOCOL_VERSION left at a draft value, not a negotiable wire version; the negotiable string for that revision is 2025-11-25, stated by the primary revision. A contract reading this constant states the wrong version. It is never sent and never accepted. |
 
@@ -234,8 +255,8 @@ inbound, whether the Connectors binding advertises it.
 | `capability:server/logging` | both | `mcp-2026-07-28-schema.ts:808` `mcp-2026-07-28-deprecated.mdx:28` | explicitly refused | Deprecated in the primary revision with a stated migration path away from it, and Connectors already owns its own observability. Inbound the capability is absent from the advertised set and a setLevel request is refused as an unknown method; outbound Connectors never subscribes to a server's log stream. |
 | `capability:server/completions` | both | `mcp-2026-07-28-schema.ts:815` `mcp-2026-07-28-server-utilities-completion.mdx:33-43` | explicitly refused | Argument autocompletion is named by no deliverable of `epic:mcp-contracts` and no Connectors contract produces or consumes it. Inbound it is absent from the advertised set and a complete request is refused as an unknown method; outbound Connectors never asks a server for completions. |
 | `capability:server/experimental` | both | `mcp-2026-07-28-schema.ts:797` `mcp-2026-07-28-schema.ts:789` | explicitly refused | The field is a map of non-standard keys that no archived byte defines, so there is nothing to author against. Inbound the map is never advertised; outbound an advertised experimental key is not projected into any Connectors capability and a call that would depend on one is refused rather than attempted. |
-| `capability:server/extensions` | both | `mcp-2026-07-28-schema.ts:882` `mcp-2026-07-28-basic-versioning.mdx:80-119` | deferred | The negotiation mechanism is specified, but no extension identifier is selected, and the only one either pinned revision names for this model is the tasks extension, whose shape is unread: `adapters/mcp/spec/ess/domains/protocol.yaml` carries `UNMAPPED: whether tasks is modelled as a client capability of this root or as an extension identifier`. Refusing the mechanism while its only named instance is undecided would be a decision made backwards. |
-| `capability:server/tasks` | both | `mcp-2025-11-25-schema.ts:431-454` `mcp-2026-07-28-basic-versioning.mdx:105-116` | deferred | The two pinned revisions disagree about what tasks is: a named capability field in the interoperability schema, an extension identifier in the primary revision. `adapters/mcp/spec/ess/domains/protocol.yaml` carries this as `UNMAPPED: whether tasks is modelled as a client capability of this root or as an extension identifier`, and no reading of one revision settles the other. |
+| `capability:server/extensions` | both | `mcp-2026-07-28-schema.ts:882` `mcp-2026-07-28-basic-versioning.mdx:80-119` | deferred | The negotiation mechanism is specified and **no extension identifier is selected — neither of the two the pin identifies**. Those two are derived, not recalled: the MCP Apps extension `io.modelcontextprotocol/ui` (`mcp-2026-07-28-basic-versioning.mdx:89-90`) and the Tasks extension `io.modelcontextprotocol/tasks` (`mcp-2026-07-28-basic-versioning.mdx:105`), by [derivation 4](#how-this-list-was-derived). An advertised identifier is an unknown key and is handled as [Limits](#limits) states, not accepted. What defers this row is that one of the two has an unread *shape*: `adapters/mcp/spec/ess/domains/protocol.yaml` carries `UNMAPPED: whether tasks is modelled as a client capability of this root or as an extension identifier` — a marker attached to the client kind and [inherited here](#deferrals-that-inherit-the-other-sides-marker). Refusing the mechanism while a named instance is undecided would be a decision made backwards. |
+| `capability:server/tasks` | both | `mcp-2025-11-25-schema.ts:431-454` `mcp-2026-07-28-basic-versioning.mdx:105-116` | deferred | The two pinned revisions disagree about what tasks is: a named capability field in the interoperability schema, an extension identifier in the primary revision. `adapters/mcp/spec/ess/domains/protocol.yaml` carries this as `UNMAPPED: whether tasks is modelled as a client capability of this root or as an extension identifier`, and no reading of one revision settles the other. That marker is attached to `ClientCapabilityKind` and poses only the client-side question, so this row **inherits** it; `mcp-2025-11-25-schema.ts:431-454` declares a server `tasks` whose children differ from the client one. What answering the marker would and would not settle here is stated under [Deferrals that inherit the other side's marker](#deferrals-that-inherit-the-other-sides-marker). |
 
 Sub-capability settings of the rows above, named here rather than given rows of their
 own, because each is a setting of a capability that is already dispositioned:
@@ -262,7 +283,7 @@ asks a caller for more information mid-request, not about a reverse request chan
 | `capability:client/elicitation` | outbound | `mcp-2026-07-28-schema.ts:769-772` `mcp-2026-07-28-client-elicitation.mdx:49-81` | explicitly refused | Connectors declares no elicitation capability, so a server that needs mid-request input from a user fails with -32021 and the failure reaches the caller as a protocol error. Nothing is auto-answered and no default is supplied on the user's behalf. |
 | `capability:client/elicitation` | inbound | `mcp-2026-07-28-basic-patterns-mrtr.mdx:10-13` `mcp-2026-07-28-client-elicitation.mdx:83-103` | explicitly refused | The inbound binding never answers a caller with a request for more information. An invocation that lacks what it needs is refused with its own error, so a caller never has to implement the multi-round-trip pattern to reach a Connectors capability. |
 | `capability:client/experimental` | both | `mcp-2026-07-28-schema.ts:720` `mcp-2026-07-28-schema.ts:712` | explicitly refused | The client-side twin of the server field: a map of non-standard keys no archived byte defines. Outbound the map is never declared; inbound a caller's experimental key changes nothing about what is advertised or admitted, and no behaviour is unlocked by sending one. |
-| `capability:client/extensions` | both | `mcp-2026-07-28-schema.ts:785` `mcp-2026-07-28-basic-versioning.mdx:89-103` | deferred | Same position as the server side: the mechanism is specified, no extension identifier is selected, and the only named instance is the tasks extension, which `adapters/mcp/spec/ess/domains/protocol.yaml` leaves as `UNMAPPED: whether tasks is modelled as a client capability of this root or as an extension identifier`. When one party supports an extension and the other does not, the specification allows reverting to core behaviour or rejecting; which of those Connectors does is part of what is deferred. |
+| `capability:client/extensions` | both | `mcp-2026-07-28-schema.ts:785` `mcp-2026-07-28-basic-versioning.mdx:89-103` | deferred | Same position as the server side: the mechanism is specified and neither identified extension is selected — `io.modelcontextprotocol/ui`, whose own example (`mcp-2026-07-28-basic-versioning.mdx:89-103`, the lines this row cites) is a **client** advertising it, and `io.modelcontextprotocol/tasks` (`mcp-2026-07-28-basic-versioning.mdx:105`), which `adapters/mcp/spec/ess/domains/protocol.yaml` leaves as `UNMAPPED: whether tasks is modelled as a client capability of this root or as an extension identifier`. Connectors advertises no `extensions` map and selects neither. When one party supports an extension and the other does not, the specification allows reverting to core behaviour or rejecting; which of those Connectors does is part of what is deferred. |
 | `capability:client/tasks` | both | `mcp-2025-11-25-schema.ts:344-376` `mcp-2025-11-25-basic-lifecycle.mdx:198` | deferred | The interoperability revision lists a client tasks capability that the primary revision's schema does not carry as a named field, showing it as an extension identifier instead. `adapters/mcp/spec/ess/domains/protocol.yaml` carries the same `UNMAPPED: whether tasks is modelled as a client capability of this root or as an extension identifier` for both sides, and it is a modelling question rather than a selection anyone has declined to make. |
 
 Sub-capability settings of the rows above: `roots.listChanged`, `sampling.context` and
@@ -277,6 +298,36 @@ server-supplied domain, and refusing the capability refuses that outright.
 inherit its deferral. The first three of those are declared by the client capability
 interface **and** by the server one, with different children on each side, so they are
 named in both sections rather than in whichever happened to be written first.
+
+## Deferrals that inherit the other side's marker
+
+Capability rows deferred against an `UNMAPPED:` marker are held to the marker reaching the
+feature, and that check deliberately **strips the side**: a row and a marker are written in
+different vocabularies, and requiring the side to match would be a rule about wording
+rather than about the deferral. The cost is exact, and it is recorded here rather than left
+to be rediscovered. The tasks marker is attached to `ClientCapabilityKind` in
+`adapters/mcp/spec/ess/domains/protocol.yaml` and poses only the client-side question. Two
+**server** rows rest on it:
+
+| Deferred row | Marker attached to | What answering it does not settle |
+|---|---|---|
+| `server/extensions` | `ClientCapabilityKind` | The marker asks what shape `tasks` takes, not whether this server advertises an `extensions` map or which identifier it would select. Answering it settles the shape question and leaves the selection — what this row actually defers — untouched. |
+| `server/tasks` | `ClientCapabilityKind` | `mcp-2025-11-25-schema.ts:431-454` declares a **server** `tasks` capability whose children differ from the client one, which the [Server capabilities](#server-capabilities) paragraph says in its own words. These are two questions. Answering the client-side one leaves the server capability where it was, with no marker of its own: `ServerCapabilityKind` omits `tasks` and says nothing about why. |
+
+**This table is exhaustive, and the check is that it is exhaustive.**
+`every_deferred_row_inheriting_the_other_sides_marker_is_stated_as_inheriting_it` derives
+the set — for each deferred capability row, which capability kind the authored model
+attaches its quoted marker to — and requires exact equality with the rows above. A future
+deferral that inherits a cross-side marker and is absent here fails; an entry that stops
+inheriting one fails too. That is why this is a table and not a sentence, and it is the
+same shape as the exclusions table under [derivation 1](#how-this-list-was-derived).
+
+**The durable fix is not in this document.** A second `UNMAPPED:` marker on
+`ServerCapabilityKind`, posing the server-side question in its own words, would empty this
+table. That marker's text belongs to `story:mcp-domain-model` and not to this matrix, so
+what this document can do is record the inheritance and state what a server-side marker
+would have to say. Until one exists, answering the client-side marker clears the client row
+and neither of these two.
 
 ## What this document does not cover
 
