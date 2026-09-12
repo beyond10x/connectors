@@ -15,7 +15,7 @@ scope:
   path: adapters/mcp/spec/ess/domains/state.yaml
 - confidence: inferred
   path: adapters/mcp/spec/ess/system.yaml
-revision: 4
+revision: 6
 ---
 ## Acceptance
 
@@ -34,7 +34,7 @@ carried as an explicit `UNMAPPED:` comment rather than a chosen cardinality.
   lifecycles
 
 No shared `ess/` file is touched, and `ess/system.yaml` is not edited. That is not
-a preference; `adapters/README.md:66-70` states the rule: "Each authored
+a preference; `adapters/README.md:67-71` states the rule: "Each authored
 native model lives in `spec/ess` with namespace `connectors_<owner>.<domain>`.
 Shared ESS includes none of these roots and imports none of their types. Each
 compiles independently. Native-to-shared projection is an explicit adapter binding
@@ -45,6 +45,14 @@ so creating `adapters/mcp/` makes `mcp` a term shared ESS may not carry.
 `crates/connectors-build/ess-boundary.json` currently lists `sip` as its only
 `shared_protocol_names` entry, which is what an exception would have to look like.
 
+*(This citation read `:66-70` at revisions 1 to 4, and it was right when it was
+written. `story:mcp-specification-pin` — a sibling in this same decomposition —
+added the MCP row to that table, which moved every following line down by one.
+This is citation drift caused by a unit of the same epic rather than an error of
+authorship, and it is the second such drift this epic has produced: the pin story
+cited the initiative at `:35` for a sentence at `:33`. A `path:line` into a file
+another story in the same wave will edit is a citation with a half-life.)*
+
 ## Domain relations
 
 This story is where the relation census lands, so it carries the whole of it.
@@ -52,14 +60,25 @@ This story is where the relation census lands, so it carries the whole of it.
 **Relations it can cite, and therefore states:**
 
 - `McpAdvertisedCapability → connectors.declarations.OperationDeclaration`,
-  many advertised capabilities to the operations already declared, the
-  `AdapterSpecification` owning both — inferable from
-  `ess/domains/declarations.yaml:119-123`
-  (`connectors.declarations.AdapterSpecification.operations`, `kind: owns`,
-  `cardinality: many`, `via: adapter_id`). The epic requires the reuse rather than
-  a second owner: "Reuse established owners instead of making MCP the universal
-  internal contract." An advertised MCP capability is therefore a projection of an
-  owned declaration and never a second record of it.
+  **one** advertised capability to the one operation it projects. The
+  `AdapterSpecification` owns the declaration, and an advertised MCP capability is
+  a projection of an owned declaration and never a second record of it — which is
+  what the epic asks for: "Reuse established owners instead of making MCP the
+  universal internal contract."
+
+  *(Corrected at revision 6. This entry cited
+  `ess/domains/declarations.yaml:119-123` for a cardinality of `many`. The
+  adversary pass over this story checked that block: it declares
+  `AdapterSpecification.operations` — `AdapterSpecification owns many
+  OperationDeclaration` — which is a different pair, so it answers this edge
+  neither way and `many` was chosen rather than read. The cardinality that is
+  readable is the one this repository's own invariant gives: a `cardinality: many`
+  relation carries a `List<…>` via field and a `cardinality: one` carries a scalar,
+  without exception across `ess/domains/artifact_provenance.yaml:85-89`,
+  `ess/domains/auth_bindings.yaml:102-107` and
+  `ess/domains/credentials.yaml:40-45`. The carrier is scalar, so the edge is
+  `one`.)*
+
 - `McpSession → connectors.auth_bindings.Connection` is **deliberately absent**,
   and that absence is itself cited: `ess/domains/sessions.yaml:89-91` says
   "UNMAPPED: a future selected session binding must join its one Connection and
@@ -85,8 +104,7 @@ they are decisions rather than modelling gaps:
 `decision-blocker:mcp-caller-connection-assignment` holds `McpCaller →
 connectors.auth_bindings.Connection`, and
 `decision-blocker:mcp-outbound-stdio-process-ownership` holds `McpServerBinding →
-supervised OS process`. This model must not answer either by writing a
-cardinality; where their nouns appear it carries the marker and names the blocker.
+supervised OS process`.
 
 ## The three credential kinds
 
