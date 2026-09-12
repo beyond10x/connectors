@@ -1,0 +1,22 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:explicit-selection
+outcome: mcp.outbound.server-selected
+wire_code: n/a
+summary: The connected server is the one an operator configured, and the configuration is
+  readable without having spoken to it.
+given:
+  - An operator configuration naming one endpoint, `transport:streamable-http` and the
+    revision the binding may declare.
+when:
+  - The CLI is asked which outbound MCP server is selected, before any request is sent.
+then:
+  - The selected endpoint, transport binding and revision are the configured ones.
+  - Every request of this binding declares that revision in its `MCP-Protocol-Version`
+    header and in its body `_meta` (mcp-2026-07-28-basic-transports-streamable-http.mdx:250-261).
+  - The answer is identical before and after any number of discovery observations.
+never:
+  - A field of the selection is read off the wire.
+  - The document implies which durable record holds the selection; four `McpServerBinding`
+    edges remain UNMAPPED in story:mcp-domain-model.
