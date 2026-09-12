@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:mcp-outbound-connection-lifecycle
 kind: story
-status: draft
+status: active
 title: Specify the outbound MCP connection lifecycle over the selected HTTP transport
 relations:
 - decomposes: epic:mcp-contracts
@@ -13,7 +13,7 @@ scope:
   path: adapters/mcp/contracts/client/v1alpha1/scenarios
 - confidence: inferred
   path: adapters/mcp/contracts/client/v1alpha1/semantics.md
-revision: 2
+revision: 4
 ---
 ## Acceptance
 
