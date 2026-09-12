@@ -18,6 +18,39 @@ summary: MCP-owned protocol values read from the pinned specification revisions.
 # UNMAPPED: which revisions, transports and capabilities this repository selects. That
 # is story:mcp-profile-selection-matrix, which reads this file; no selection is made
 # here and no enum below may be read as one.
+#
+# ── The open-set sweep, run over declarations ─────────────────────────────────────
+#
+# Typing a carrier to an enum asserts that the enum's variants exhaust the values the
+# carrier can hold. Where the pinned specification says a set is open, that assertion is
+# false, and it is false in a way that cannot be discovered later: the value the server
+# legally sent has nowhere to go. `ProtocolRevision` was the first instance found — a
+# carrier was retyped to `String` because a server may name a version neither pinned
+# revision covers — and an instance is not a class, so every enum below was checked
+# against its own source, and every carrier in `domains/state.yaml` that is typed to one
+# was enumerated. Ten carriers, six declarations, and the verdict for each:
+#
+#   open upstream, therefore NO carrier is typed to it —
+#     · ProtocolRevision     mcp-2026-07-28-basic-versioning.mdx:36-37 defines "Legacy"
+#                            as `2025-11-25` AND EARLIER, so more strings exist.
+#     · ServerCapabilityKind mcp-2026-07-28-schema.ts:789, verbatim below.
+#     · ClientCapabilityKind mcp-2026-07-28-schema.ts:712, the same sentence for the
+#                            client side. No carrier existed; none may be added.
+#     · ProtocolErrorCode    three codes this revision adds, not the protocol's errors.
+#
+#   bounded by its own source, therefore safe to carry —
+#     · ProtocolEra          three terms, and the taxonomy is exhaustive by
+#                            construction: versioning.mdx:34-39.
+#     · TransportBinding     the specification's own `custom` category is the escape, so
+#                            a transport outside the named ones still has a variant:
+#                            basic-transports-index.mdx:60-72.
+#     · LegacySessionPhase   a numbered list of exactly three: lifecycle.mdx:12-14.
+#     · CacheScope           "either `\"public\"` or `\"private\"`": caching.mdx:44.
+#     · CredentialAcquisitionMode  `custom-negotiated` is the escape the specification
+#                            itself provides: basic-index.mdx:228-229.
+#
+# An enum with no carrier is not dead weight. It states what the pinned revisions name,
+# which is this file's whole job; what it may not do is type a field.
 types:
   # The two negotiable wire version strings, taken from the PRIMARY revision.
   # mcp-2026-07-28-basic-versioning.mdx:62 is the `UnsupportedProtocolVersionError`
@@ -93,6 +126,13 @@ types:
   # `2026-07-28`. The interoperability revision's own table
   # (mcp-2025-11-25-basic-lifecycle.mdx:195-199) additionally lists a client `tasks`
   # capability, which the primary revision's schema does not carry as a named field.
+  #
+  # UNMAPPED: this enum is not the closed set of client capabilities either.
+  # mcp-2026-07-28-schema.ts:712 carries the same sentence as the server side, of the
+  # client side: "Known capabilities are defined here, in this schema, but this is not a
+  # closed set: any client can define its own, additional capabilities." No carrier in
+  # domains/state.yaml is typed to it, and by the sweep at the head of this file none
+  # may be.
   #
   # UNMAPPED: whether `tasks` is modelled as a client capability of this root or as an
   # extension identifier. mcp-2026-07-28-basic-versioning.mdx:105-112 shows Tasks as the
