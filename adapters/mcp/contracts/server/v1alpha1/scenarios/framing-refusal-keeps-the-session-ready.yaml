@@ -61,25 +61,19 @@ timeline:
   outcome: ready
   events:
   - event: connectors.sessions.SessionReady
-# The malformed line arrives and is refused with JSON-RPC -32700; nothing is executed.
-# The supervisor permits the connection to keep reading rather than denying it: a caller
-# may interleave unrelated requests on this transport (mcp-2026-07-28-basic-index.mdx:204-209).
+# The refusal is written back on the same single channel, and the supervisor's decision is
+# permit_data: the connection keeps carrying traffic rather than being denied, because a
+# caller may interleave unrelated requests on this transport
+# (mcp-2026-07-28-basic-index.mdx:204-209).
+#
+# One admitted act, and that is arithmetic rather than brevity. ESS instants are whole
+# seconds and must strictly increase (ESS-AUTHOR-001, ESS-AUTHOR-023), a lease may not
+# outlive 2,000 ms from its issuance, and an act admitted *on* the effective expiry is
+# refused by the contract — so exactly one whole second lies strictly inside a lease
+# window, and a trace records the decision the outcome is about. The inbound line's own
+# admission, one instant earlier under the same lease, is that same decision for the other
+# direction; nothing here turns on it.
 - at: '2026-09-12T12:00:03Z'
-  command: connectors.sessions.PermitData
-  input:
-    session_id:
-      $instance: session
-    decision: allow
-    direction: input
-  outcome: permitted
-  events:
-  - event: connectors.sessions.DataPermitted
-  no_events:
-  - connectors.sessions.ClosingBegun
-  - connectors.sessions.ContinuityLost
-  - connectors.sessions.DataAuthorityTerminated
-# The refusal is written back on the same single channel.
-- at: '2026-09-12T12:00:04Z'
   command: connectors.sessions.PermitData
   input:
     session_id:
