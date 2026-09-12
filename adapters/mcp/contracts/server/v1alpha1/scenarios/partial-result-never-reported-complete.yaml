@@ -1,0 +1,121 @@
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.2.
+# Behaviour: streaming
+# Outcome: partial-result-never-reported-complete
+# Transition: connectors.sessions.Session.begin_close (Ready → Closing)
+#
+# Compiled supervisor decisions, not an executed trace, and not an MCP message: the
+# pinned toolchain "compiles obligations but does NOT execute a sequential trace"
+# (ess/domains/sessions.yaml, closing note). Whole-second acts express causal order.
+#
+# One instance_ref, one connection_ref, one authority_ref, in every trace of this story:
+# the single principal contracts/cli/v1alpha1/semantics.md §1 admits. A second value of
+# any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
+type: ess-scenario/1
+domain: connectors.sessions
+scenario: partial-result-never-reported-complete
+summary: 'A partially delivered outbound result ends with a recorded terminal and the graceful empty response; no further result content follows and nothing partial is reported complete.'
+arrange:
+- instance: session
+  entity: connectors.sessions.Session
+timeline:
+- at: '2026-09-12T12:00:00Z'
+  command: connectors.sessions.OfferSession
+  input:
+    binding:
+      instance_ref: connectors-local
+      connection_ref: local-owner
+      admitted_revision: config-revision-a
+      authority_ref: local-owner-uid
+    profile: inbound_offer
+    placement: local
+    streams:
+    - stdio
+  outcome: offered
+  events:
+  - event: connectors.sessions.SessionOffered
+  capture:
+    instance: session
+    event: connectors.sessions.SessionOffered
+    field: session_id
+- at: '2026-09-12T12:00:01Z'
+  command: connectors.sessions.AcceptOffer
+  input:
+    session_id:
+      $instance: session
+  outcome: accepted
+  events:
+  - event: connectors.sessions.OfferAccepted
+- at: '2026-09-12T12:00:02Z'
+  command: connectors.sessions.EstablishReady
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    lease:
+      issued_at: '2026-09-12T12:00:02Z'
+      effective_expiry: '2026-09-12T12:00:04Z'
+      sequence: 1
+  outcome: ready
+  events:
+  - event: connectors.sessions.SessionReady
+# Notifications of a long-lived subscriptions/listen result are delivered on the one
+# shared channel (mcp-2026-07-28-basic-transports-stdio.mdx:41-42). The result is partial.
+- at: '2026-09-12T12:00:03Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: output
+  outcome: permitted
+  events:
+  - event: connectors.sessions.DataPermitted
+# The binding ends the partially delivered result on its own initiative and records the
+# first terminal once. The graceful empty subscriptions/listen response goes out before
+# teardown (mcp-2026-07-28-basic-patterns-subscriptions.mdx:128-135); no complete result does.
+- at: '2026-09-12T12:00:04Z'
+  command: connectors.sessions.BeginClose
+  input:
+    session_id:
+      $instance: session
+    terminal:
+      reason: local_close
+      by: host
+      accepted_at: '2026-09-12T12:00:04Z'
+    cutoff_due_at: '2026-09-12T12:00:06Z'
+    teardown_due_at: '2026-09-12T12:00:07Z'
+  outcome: closing
+  events:
+  - event: connectors.sessions.ClosingBegun
+# After the terminal is recorded no further result content is emitted for that request.
+- at: '2026-09-12T12:00:05Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: output
+  outcome: wrong-state
+  error:
+    name: connectors.sessions.StateConflict
+    fields:
+      state: Closing
+  no_events:
+  - connectors.sessions.DataPermitted
+  - connectors.sessions.SessionReady
+- at: '2026-09-12T12:00:07Z'
+  command: connectors.sessions.FinishTeardown
+  input:
+    session_id:
+      $instance: session
+    decision: released
+    peer_shutdown: unconfirmed
+  outcome: closed
+  events:
+  - event: connectors.sessions.LocalResourcesReleased
+assert:
+- view: connectors.sessions.SessionStates
+  contains:
+    session_id:
+      $instance: session
+    state: Closed
