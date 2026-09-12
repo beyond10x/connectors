@@ -12,7 +12,7 @@ relations:
 scope:
 - confidence: inferred
   path: adapters/mcp/contracts/protocol/v1alpha1/selection.md
-revision: 2
+revision: 3
 ---
 ## Acceptance
 
@@ -44,7 +44,7 @@ feature `deferred`, which is the honest third value the epic itself supplies:
 `epic:mcp-contracts` asks for four separable things here and this document is the
 single owner of all four:
 
-1. **The selected revisions and transports.** `initiative:complete-local-connectors:35`
+1. **The selected revisions and transports.** `initiative:complete-local-connectors`, milestone 5 (cited by its number, not its line: this citation read `:35` and the sentence is at `:33` — the identical drift `story:mcp-specification-pin` corrected in itself and nobody propagated to the siblings drafted in the same wave)
    already records the intent — "over stdio and Streamable HTTP, with
    version-specific 2026-07-28 and explicit 2025-11-25 interoperability" — and the
    epic requires that "local stdio and deployed HTTP profiles" be evaluated
