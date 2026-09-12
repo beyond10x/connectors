@@ -24,6 +24,18 @@ summary: MCP-owned nouns, the three distinct credential kinds, and the relations
 # A later editor who replaces a marker with a cardinality must bring a source line, not
 # a plausible reading.
 #
+# Two conventions make the markers checkable rather than merely present, and
+# `crates/connectors-build/tests/mcp_domain_model_census.rs` enforces both:
+#
+#   · Every mention of an edge carries its own verdict — `UNMAPPED:`, `FILED` with the
+#     blocker id, or `ABSENT` with the citation — within two lines of the edge itself. A
+#     marker in a heading above a list of five edges is not a marker for any of them.
+#   · An edge is realised by a FIELD as surely as by a `relations:` block. A field on the
+#     source entity named for the target, or typed as the target, is the same claim in a
+#     weaker syntax — `binding_ref: String` on `McpOutboundSession` says one-to-one just
+#     as loudly as `cardinality: one` does. Neither form may appear for an edge whose
+#     verdict is `UNMAPPED`, `FILED` or `ABSENT`.
+#
 # ── Why no lifecycle below has more than one state ─────────────────────────────────
 #
 # ESS 0.22.2 refuses a transition that no command outcome causes
@@ -82,9 +94,10 @@ types:
   # security-considerations.mdx:120,124 and authorization-index.mdx:285-286 (a server
   # MUST validate that a token was issued specifically for it).
   #
-  # UNMAPPED: the whole of `McpInboundSession → McpCaller` and
-  # `McpCaller → connectors.auth_bindings.Connection` — see the census at the foot of
-  # this file. This type is the credential, not the caller, and declares no caller.
+  # UNMAPPED: `McpInboundSession → McpCaller`, and filed under
+  # `decision-blocker:mcp-caller-connection-assignment`:
+  # `McpCaller → connectors.auth_bindings.Connection`. See the census at the foot of this
+  # file. This type is the credential, not the caller, and declares no caller.
   - name: connectors_mcp.state.McpInboundCallerCredential
     kind: struct
     fields:
@@ -193,22 +206,25 @@ entities:
   # acceptance 1, that the CLI "exits/restarts and reuses its persisted credential
   # binding" — so a record survives a restart and this is an entity, not a value.
   #
-  # UNMAPPED, five separate things, none of them guessed:
+  # Five separate things, none of them guessed. Each bullet carries its own marker, on
+  # the line that names the edge, so a reader who lands on one edge sees its verdict
+  # without reading the block — and so the census case can bind the two together:
   #
-  #   · `McpServerBinding → connectors.declarations.ServiceConfiguration` — whether a
-  #     selected outbound server is a configured instance at all. It cannot be an ESS
-  #     relation from this root in any case (adapters/README.md:67-71); the question is
-  #     whether the projection exists, and nothing answers it.
-  #   · `McpServerBinding → connectors.auth_bindings.Connection` — whether it is one
-  #     `Connection` row, several, or none.
-  #   · `McpServerBinding → McpCapabilitySnapshot` — recorded on that type above.
-  #   · `McpServerBinding → credential custody` — whether the outbound server credential
-  #     is a `connectors.credentials.CredentialGeneration` under a `Connection`
+  #   · UNMAPPED: `McpServerBinding → connectors.declarations.ServiceConfiguration` —
+  #     whether a selected outbound server is a configured instance at all. It cannot be
+  #     an ESS relation from this root in any case (adapters/README.md:67-71); the
+  #     question is whether the projection exists, and nothing answers it.
+  #   · UNMAPPED: `McpServerBinding → connectors.auth_bindings.Connection` — whether it
+  #     is one `Connection` row, several, or none.
+  #   · UNMAPPED: `McpServerBinding → McpCapabilitySnapshot` — recorded on that type
+  #     above.
+  #   · UNMAPPED: `McpServerBinding → credential custody` — whether the outbound server
+  #     credential is a `connectors.credentials.CredentialGeneration` under a `Connection`
   #     (ess/domains/credentials.yaml:41-45, `kind: references`, `cardinality: one`,
   #     `via: connection_ref`) or a custody record with no connection owner. The shared
   #     model's shape is cited so a reader can see exactly which of the two is open — it
   #     is not adopted here.
-  #   · `McpServerBinding → supervised OS process` is
+  #   · FILED: `McpServerBinding → supervised OS process` is held by
   #     `decision-blocker:mcp-outbound-stdio-process-ownership`, open. The protocol says
   #     who launches — mcp-2026-07-28-basic-transports-stdio.mdx:7, "the client launches
   #     the MCP server as a subprocess", and mcp-2025-11-25-basic-transports.mdx:26 the
@@ -236,11 +252,27 @@ entities:
       # lifetime of the server process or origin and MAY persist it across restarts of
       # the same server configuration, re-probing if the cached assumption later fails.
       - {name: determined_era, type: "Optional<connectors_mcp.protocol.ProtocolEra>"}
-      # The revision this repository would speak to this server. Optional for the same
-      # reason; versioning.mdx:69-71 has the client select one from a server's supported
-      # list, and mcp-2026-07-28-basic-versioning.mdx:12-13 states there is no negotiation
-      # handshake in the primary revision — every request carries its own version.
-      - {name: selected_revision, type: "Optional<connectors_mcp.protocol.ProtocolRevision>"}
+      # The revision this repository would speak to this server. Optional because
+      # mcp-2026-07-28-basic-versioning.mdx:12-13 states there is no negotiation handshake
+      # in the primary revision — every request carries its own version — so nothing is
+      # selected before one is sent.
+      #
+      # String, NOT connectors_mcp.protocol.ProtocolRevision, for three reasons that all
+      # point the same way. The selection is drawn from exactly the list a server reports:
+      # mcp-2026-07-28-basic-versioning.mdx:69-71, "The client **SHOULD** select a
+      # mutually supported version from the `supported` list". That list is
+      # `McpCapabilitySnapshot.supported_versions: List<String>`, and it is List<String>
+      # because a server may name versions neither pinned revision covers — so a closed
+      # selection type makes a reportable version unselectable, `2025-06-18` and
+      # `2024-11-05` among them, and `http-sse-2024-11-05` is a declared TransportBinding
+      # variant whose revision is one of those. domains/protocol.yaml:36-39 declares the
+      # revision set open in as many words. And domains/protocol.yaml:18-20 says that file
+      # makes no selection: typing this field to a closed two-variant enum would BE that
+      # selection, made here instead.
+      #
+      # The enum still states what the pinned revisions are; it is a protocol value, not
+      # the type of a runtime choice.
+      - {name: selected_revision, type: "Optional<String>"}
     lifecycle:
       initial: Selected
       states: [Selected]
@@ -251,16 +283,35 @@ entities:
   # This is the one cross-root edge the census can CITE, so it is stated — in prose,
   # because adapters/README.md:67-71 and `ESS-ENTITY-001` both forbid declaring it here:
   #
-  #   McpAdvertisedCapability → connectors.declarations.OperationDeclaration, MANY
-  #   advertised capabilities to the operations already declared, with the
-  #   `AdapterSpecification` owning both. ess/domains/declarations.yaml:119-123 declares
-  #   `connectors.declarations.AdapterSpecification.operations` as `kind: owns`,
-  #   `cardinality: many`, `via: adapter_id`.
+  #   McpAdvertisedCapability → connectors.declarations.OperationDeclaration, ONE — one
+  #   advertised capability projects exactly one already-declared operation.
   #
-  # The cardinality is read off that block, not chosen. epic:mcp-contracts requires the
-  # reuse rather than a second owner — "Reuse established owners instead of making MCP
-  # the universal internal contract" — so an advertised MCP capability is a PROJECTION of
-  # an owned declaration and never a second record of it. `operation_ref` below is that
+  # ONE is read off the carrier, under a binding this repository keeps without exception:
+  # a `references` relation whose `cardinality` is `one` carries a SCALAR `via` field, and
+  # one whose `cardinality` is `many` carries a `List<…>`. Four sibling blocks, checked:
+  #
+  #   · one  — ess/domains/credentials.yaml:40-45, `cardinality: one`,
+  #     `via: connection_ref`, itself `{name: connection_ref, type: String}` at :32; and
+  #     ess/domains/auth_bindings.yaml:102-106, five `cardinality: one` relations, each
+  #     `via` a scalar `String` field.
+  #   · many — ess/domains/artifact_provenance.yaml:85-89, `cardinality: many`,
+  #     `via: source_refs`, itself `{name: source_refs, type: "List<String>"}` at :78; and
+  #     ess/domains/auth_bindings.yaml:107, `cardinality: many`,
+  #     `via: superseded_custody_version_refs`, itself `List<String>` at :99.
+  #
+  # `operation_ref` below is a scalar `String`, so this edge is ONE. Where a cardinality
+  # and its carrier disagree, one of them is wrong; here the carrier is the thing a reader
+  # builds against, so the cardinality follows it.
+  #
+  # NOT cited for this edge: ess/domains/declarations.yaml:119-123. An earlier revision of
+  # this file read MANY off that block. It declares `AdapterSpecification owns many
+  # OperationDeclaration` — a DIFFERENT pair — and says nothing about how many operations
+  # one advertised capability projects, so it answers this edge neither way. What it does
+  # establish, and the only thing cited from it here, is that `AdapterSpecification` is
+  # the existing owner of `OperationDeclaration`: epic:mcp-contracts requires the reuse
+  # rather than a second owner — "Reuse established owners instead of making MCP the
+  # universal internal contract" — so an advertised MCP capability is a PROJECTION of an
+  # owned declaration and never a second record of it. `operation_ref` is that
   # projection's flat carrier, the shape
   # adapters/docker/spec/ess/domains/mutations.yaml:12-13 already uses.
   #
@@ -368,40 +419,47 @@ entities:
 # closes it. Ten entries; every one appears above and every one appears here.
 #
 # STATED, with its source line:
-#   1. McpAdvertisedCapability → connectors.declarations.OperationDeclaration — many,
-#      owner `AdapterSpecification`, from ess/domains/declarations.yaml:119-123. Prose,
-#      not an ESS relation: adapters/README.md:67-71 forbids the cross-root import and
-#      `ESS-ENTITY-001` refuses it mechanically.
+#   1. McpAdvertisedCapability → connectors.declarations.OperationDeclaration — one,
+#      read off the scalar carrier `McpAdvertisedCapability.operation_ref: String` under
+#      the scalar-via-is-one binding cited at that declaration
+#      (ess/domains/credentials.yaml:40-45 and ess/domains/auth_bindings.yaml:102-106 for
+#      one; ess/domains/artifact_provenance.yaml:85-89 and
+#      ess/domains/auth_bindings.yaml:107 for many). Prose, not an ESS relation:
+#      adapters/README.md:67-71 forbids the cross-root import and `ESS-ENTITY-001`
+#      refuses it mechanically.
 #
-# DELIBERATELY ABSENT, with the absence itself cited:
-#   2. McpSession → connectors.auth_bindings.Connection. ess/domains/sessions.yaml:89-91:
+# Deliberately absent, with the absence itself cited:
+#   2. ABSENT: McpSession → connectors.auth_bindings.Connection, per ess/domains/sessions.yaml:89-91:
 #      "UNMAPPED: a future selected session binding must join its one Connection and
 #      establishment authority, whose persistence model remains unselected. Sessions are
 #      outside the current three-adapter model milestone; no stub edge is implied." The
 #      shared model declined to declare this edge; this model does not invent it for
 #      McpOutboundSession or McpInboundSession, and no stub edge is implied here either.
 #
-# UNMAPPED — unreadable from any `ess/1` document and any pinned specification byte:
-#   3. McpServerBinding → connectors.declarations.ServiceConfiguration — whether a
-#      selected outbound server is a configured instance at all.
-#   4. McpServerBinding → connectors.auth_bindings.Connection — whether it is one
-#      `Connection` row, several, or none.
-#   5. McpServerBinding → McpCapabilitySnapshot — whether a discovered
-#      tool/resource/prompt set is durable state or a per-session value, and therefore
-#      whether a cardinality exists to declare.
-#   6. McpOutboundSession → McpServerBinding — whether a session may outlive a binding,
-#      and what a binding's removal does to a live session.
-#   7. McpServerBinding → credential custody — whether the outbound server credential is
-#      a `connectors.credentials.CredentialGeneration` under a `Connection`
+# Unreadable from any `ess/1` document and any pinned specification byte. The marker is
+# on the line that names the edge, not in a heading above it:
+#   3. UNMAPPED: McpServerBinding → connectors.declarations.ServiceConfiguration
+#      — whether a selected outbound server is a configured instance at all.
+#   4. UNMAPPED: McpServerBinding → connectors.auth_bindings.Connection
+#      — whether it is one `Connection` row, several, or none.
+#   5. UNMAPPED: McpServerBinding → McpCapabilitySnapshot
+#      — whether a discovered tool/resource/prompt set is durable state or a per-session
+#      value, and therefore whether a cardinality exists to declare.
+#   6. UNMAPPED: McpOutboundSession → McpServerBinding
+#      — whether a session may outlive a binding, and what a binding's removal does to a
+#      live session.
+#   7. UNMAPPED: McpServerBinding → credential custody
+#      — whether the outbound server credential is a
+#      `connectors.credentials.CredentialGeneration` under a `Connection`
 #      (ess/domains/credentials.yaml:41-45) or a custody record with no connection owner.
-#   8. McpInboundSession → McpCaller — whether a caller is an entity in this repository
-#      at all.
+#   8. UNMAPPED: McpInboundSession → McpCaller
+#      — whether a caller is an entity in this repository at all.
 #
-# FILED AS DECISIONS, not modelling gaps — a cardinality written here would answer them:
-#   9. McpCaller → connectors.auth_bindings.Connection —
-#      decision-blocker:mcp-caller-connection-assignment (open).
-#  10. McpServerBinding → supervised OS process —
-#      decision-blocker:mcp-outbound-stdio-process-ownership (open).
+# Filed as decisions, not modelling gaps — a cardinality written here would answer them:
+#   9. FILED: McpCaller → connectors.auth_bindings.Connection
+#      — decision-blocker:mcp-caller-connection-assignment (open).
+#  10. FILED: McpServerBinding → supervised OS process
+#      — decision-blocker:mcp-outbound-stdio-process-ownership (open).
 #
 # Nothing above is a cardinality this model chose. Ten stories read this file; a guessed
 # one-to-many and a guessed one-to-one produce different schemas, different lifecycles
