@@ -684,17 +684,33 @@ fn the_document_specifies_the_transport_the_matrix_selected_and_selects_nothing(
         .filter(|(_, disposition)| *disposition == "supported")
         .map(|(key, _)| key)
         .collect();
-    assert_eq!(
-        supported.len(),
-        1,
-        "the matrix disposes {} inbound transports as supported, and this document specifies \
-         one binding: {supported:?}",
-        supported.len()
-    );
+    // Every inbound transport the matrix supports must be accounted for here: specified,
+    // or named as another story's placement. This story owns the local binding only.
+    //
+    // It asserted `supported.len() == 1` until the matrix's own correction re-dispositioned
+    // inbound Streamable HTTP from `deferred` to `supported` for the cloud placement, which
+    // is `story:mcp-inbound-cloud-profile`'s. That made the count wrong without making the
+    // document wrong, and an exact count here silently claims every supported inbound
+    // transport for this story.
     assert!(
-        document.contains(supported[0]),
-        "the document never names `{}`, the inbound transport the matrix selected",
-        supported[0]
+        !supported.is_empty(),
+        "the matrix disposes no inbound transport as supported, so this document specifies a \
+         binding the matrix does not select"
+    );
+    let unaccounted: Vec<&&String> = supported
+        .iter()
+        .filter(|key| {
+            !document.lines().any(|line| {
+                line.contains(key.as_str())
+                    && (line.contains("story:mcp-") || !line.contains("story:"))
+            })
+        })
+        .collect();
+    assert!(
+        unaccounted.is_empty(),
+        "the matrix disposes {:?} as supported inbound and the document neither specifies them \
+         nor names the story whose placement owns them: {unaccounted:?}",
+        supported
     );
     for (key, disposition) in &dispositions {
         if disposition == "supported" {
@@ -836,8 +852,20 @@ fn bindings_in(value: &serde_yaml_ng::Value) -> Vec<serde_yaml_ng::Value> {
 fn the_binding_names_no_cloud_identity_or_network_dependency_it_does_not_refuse() {
     let document = binding();
     let mut offending = Vec::new();
-    for (number, line) in document.lines().enumerate() {
-        let lowered = line.to_lowercase();
+    // Sentences, not lines. The document is hard-wrapped prose, so a refusal and the thing
+    // it refuses routinely sit on different lines — and a line-scoped rule then reports a
+    // sentence that refuses perfectly well, or misses one that does not. The sibling
+    // outbound unit reached the same conclusion and removed three false positives with it.
+    // A paragraph is too coarse for the opposite reason: one refusal in it would excuse
+    // every other mention.
+    for (index, sentence) in document
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .split_inclusive(['.', ';'])
+        .enumerate()
+    {
+        let lowered = sentence.to_lowercase();
         for dependency in OUTSIDE_DEPENDENCIES {
             if !lowered.contains(dependency) {
                 continue;
@@ -845,7 +873,7 @@ fn the_binding_names_no_cloud_identity_or_network_dependency_it_does_not_refuse(
             if REFUSAL_WORDS.iter().any(|word| lowered.contains(word)) {
                 continue;
             }
-            offending.push(format!("semantics.md:{}: {line}", number + 1));
+            offending.push(format!("semantics.md sentence {}: {sentence}", index + 1));
         }
     }
     assert!(
