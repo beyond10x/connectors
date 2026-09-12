@@ -16,8 +16,9 @@ then:
   - The observable outcome is `upstream_protocol`, naming the HTTP status and stating that
     no recognised modern MCP error was present.
   - Era stays a property of the server rather than of the request
-    (mcp-2026-07-28-basic-versioning.mdx:148-152); a probe that settles it records the
-    determined era and nothing more.
+    (mcp-2026-07-28-basic-versioning.mdx:148-152), and this outcome is where a probe of it
+    stops; whether what a probe settles outlives the process that ran it is stated
+    nowhere in this contract.
 never:
   - The client begins speaking a revision the binding's configuration does not name.
   - The deprecated HTTP+SSE transport is opened; the selection matrix refuses it outbound.

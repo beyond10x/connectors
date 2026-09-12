@@ -4,12 +4,12 @@ document: adapters/mcp/contracts/client/v1alpha1/semantics.md
 state: state:cancellation
 outcome: mcp.outbound.cancelled-by-closing-the-stream
 wire_code: n/a
-summary: Cancelling is closing that request's stream, and what the server did with the
-  work is not thereby known.
+summary: Under the primary revision (2026-07-28) cancelling is closing that request's
+  stream, and what the server did with the work is not thereby known. Under the
+  interoperability revision (2025-11-25) closing signals nothing and
+  `legacy-cancellation-is-sent-not-implied.yaml` decides it.
 given:
-  - A binding configured for the primary revision (2026-07-28); under the
-    interoperability revision (2025-11-25) this act signals nothing and
-    `legacy-cancellation-is-sent-not-implied.yaml` is the case instead.
+  - A binding configured for the primary revision (2026-07-28).
   - An in-flight request with an open SSE response stream.
 when:
   - The caller cancels, or the request's timeout expires
