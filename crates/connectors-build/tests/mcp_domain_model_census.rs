@@ -31,8 +31,8 @@ enum Verdict {
     Absent,
     /// Unreadable from every legitimate source; carried as an `UNMAPPED:` marker.
     Unmapped,
-    /// An open `decision-blocker:`; a cardinality here would answer it.
-    Filed,
+    /// Held by the named open `decision-blocker:`; a cardinality here would answer it.
+    Filed(&'static str),
 }
 
 /// The whole relation census `story:mcp-domain-model` carries, in the story's order.
@@ -69,9 +69,13 @@ const CENSUS: &[(&str, &str, Verdict)] = &[
     (
         "McpCaller",
         "connectors.auth_bindings.Connection",
-        Verdict::Filed,
+        Verdict::Filed("decision-blocker:mcp-caller-connection-assignment"),
     ),
-    ("McpServerBinding", "supervised OS process", Verdict::Filed),
+    (
+        "McpServerBinding",
+        "supervised OS process",
+        Verdict::Filed("decision-blocker:mcp-outbound-stdio-process-ownership"),
+    ),
 ];
 
 /// The three kinds `epic:mcp-contracts` requires kept apart: "Caller credentials for
@@ -85,7 +89,17 @@ const CREDENTIAL_KINDS: &[&str] = &[
 
 /// Version strings the pinned revisions carry that are NOT the negotiable wire version.
 /// `specification-sources.md` "## The version-string trap this pin makes checkable"
-/// names all three; a model that read the obvious constant would carry one of them.
+/// documents **three**; this list carries **two** of them, and the omission is
+/// deliberate.
+///
+/// The third is `2024-11-05`, from that revision's own lifecycle examples
+/// (`mcp-2025-11-25-basic-lifecycle.mdx:61` and `:107`). It cannot be banned from a
+/// declaration here, because `connectors_mcp.protocol.TransportBinding` legitimately
+/// carries the variant `http-sse-2024-11-05` — the deprecated-not-removed HTTP+SSE
+/// binding named at `mcp-2026-07-28-basic-transports-streamable-http.mdx:695`. A rule
+/// that banned the substring would make a correct model unfixable, so `2024-11-05` is
+/// guarded by the exact-variant assertion on `ProtocolRevision` below instead, which is
+/// the only place the trap could actually do harm.
 const TRAP_STRINGS: &[(&str, &str)] = &[
     (
         "DRAFT-2025-v3",
@@ -110,16 +124,63 @@ fn document(relative: &str) -> serde_yaml_ng::Value {
     serde_yaml_ng::from_str(&read(relative)).unwrap_or_else(|e| panic!("parse {relative}: {e}"))
 }
 
-/// Every ESS relation the state domain actually declares, as `(entity, target)` with
-/// the `connectors_mcp.state.` prefix stripped so it compares against the census.
-fn declared_relations() -> Vec<(String, String)> {
-    let short = |name: &str| name.trim_start_matches("connectors_mcp.state.").to_owned();
+/// A declaration name without its namespace: `connectors_mcp.state.McpCaller` → `McpCaller`.
+fn short(name: &str) -> &str {
+    name.rsplit('.').next().unwrap_or(name)
+}
+
+/// `McpServerBinding` → `["mcp", "server", "binding"]`; `credential custody` →
+/// `["credential", "custody"]`. Census targets are a mix of declared type names and the
+/// prose names of things this repository does not model, so both forms are reduced the
+/// same way.
+fn words(name: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for ch in short(name).chars() {
+        if (ch.is_ascii_uppercase() || !ch.is_ascii_alphanumeric()) && !current.is_empty() {
+            out.push(std::mem::take(&mut current));
+        }
+        if ch.is_ascii_alphanumeric() {
+            current.push(ch.to_ascii_lowercase());
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
+}
+
+/// Every field name that would read as a carrier for `target`: any contiguous run of its
+/// words, with and without the `_ref`/`_refs`/`_id`/`_ids` suffixes this repository uses
+/// for flat reference carriers. `McpServerBinding` yields `binding`, `binding_ref`,
+/// `server_binding`, `mcp_server_binding`, … so the `binding_ref: String` the model
+/// itself names as the risk is in the set.
+fn carrier_names(target: &str) -> Vec<String> {
+    let parts = words(target);
+    let mut out = Vec::new();
+    for start in 0..parts.len() {
+        for end in start + 1..=parts.len() {
+            let stem = parts[start..end].join("_");
+            for suffix in ["", "_ref", "_refs", "_id", "_ids"] {
+                out.push(format!("{stem}{suffix}"));
+            }
+        }
+    }
+    out
+}
+
+/// Declared `relations:` entries of `domains/state.yaml`, as
+/// `(entity, target, "<name>, cardinality: <c>")`, all names shortened.
+fn declared_relations() -> Vec<(String, String, String)> {
     let mut found = Vec::new();
-    let state = document("domains/state.yaml");
-    let Some(entities) = state.get("entities").and_then(|e| e.as_sequence()) else {
+    let Some(entities) = document("domains/state.yaml")
+        .get("entities")
+        .and_then(|e| e.as_sequence())
+        .cloned()
+    else {
         return found;
     };
-    for entity in entities {
+    for entity in &entities {
         let name = entity
             .get("name")
             .and_then(|n| n.as_str())
@@ -132,10 +193,58 @@ fn declared_relations() -> Vec<(String, String)> {
                 .get("target")
                 .and_then(|t| t.as_str())
                 .expect("a relation without a target");
-            found.push((short(name), short(target)));
+            found.push((
+                short(name).to_owned(),
+                short(target).to_owned(),
+                format!(
+                    "{}, cardinality: {}",
+                    relation.get("name").and_then(|n| n.as_str()).unwrap_or("?"),
+                    relation
+                        .get("cardinality")
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("?")
+                ),
+            ));
         }
     }
     found
+}
+
+/// The `(field name, field type)` pairs `<entity>` declares in `domains/state.yaml`.
+///
+/// `identity` is deliberately not read: it is the entity's own key, not a carrier to
+/// another entity.
+fn entity_fields(entity_short: &str) -> Vec<(String, String)> {
+    let Some(entities) = document("domains/state.yaml")
+        .get("entities")
+        .and_then(|e| e.as_sequence())
+        .cloned()
+    else {
+        return Vec::new();
+    };
+    for entity in &entities {
+        let name = entity.get("name").and_then(|n| n.as_str()).unwrap_or("");
+        if short(name) != entity_short {
+            continue;
+        }
+        let Some(fields) = entity.get("fields").and_then(|f| f.as_sequence()) else {
+            return Vec::new();
+        };
+        return fields
+            .iter()
+            .map(|field| {
+                let text = |key| {
+                    field
+                        .get(key)
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_owned()
+                };
+                (text("name"), text("type"))
+            })
+            .collect();
+    }
+    Vec::new()
 }
 
 /// Every type and entity name the root declares, across both domains.
@@ -160,64 +269,140 @@ fn declared_names() -> Vec<String> {
     names
 }
 
-/// No census edge may be realised as a declared ESS relation unless the story states
-/// it, and every census edge must be named in the model's own text.
+/// How far from an edge its own verdict may sit, in lines. Two, so that a marker may
+/// lead a wrapped sentence, and no further: a marker in a heading above a list of five
+/// edges is not a marker for any of them.
+const MARKER_WINDOW: usize = 2;
+
+/// The text that carries a verdict, which a reader must find beside the edge itself.
+/// A `Filed` row is bound to *its own* blocker, not to either of them.
+fn marker(verdict: Verdict) -> Option<&'static str> {
+    match verdict {
+        Verdict::Unmapped => Some("UNMAPPED"),
+        Verdict::Filed(blocker) => Some(blocker),
+        Verdict::Absent => Some("ess/domains/sessions.yaml:89-91"),
+        Verdict::Stated => None,
+    }
+}
+
+/// Whether a census target names a type this root could embed, rather than the prose
+/// name of something this repository does not model (`credential custody`).
+fn is_type_name(target: &str) -> bool {
+    let short = short(target);
+    !short.contains(' ') && short.starts_with(|c: char| c.is_ascii_uppercase())
+}
+
+/// Every census edge is marked *where it is named*, and no unreadable edge is realised
+/// — in either of the two forms a realisation takes.
 ///
 /// This is the case the named checks cannot make: `ess specify validate` accepts a
 /// guessed `cardinality: one` on an UNMAPPED row exactly as readily as a correct one.
+///
+/// Two holes the pass-1 adversary measured in the first version of this case are closed
+/// here, and both were holes of the same kind — a guard that reads the whole file
+/// instead of the thing under test:
+///
+/// 1. it walked only `entities[].relations[]`, so a flat `binding_ref: String` on
+///    `McpOutboundSession` — the realisation `domains/state.yaml` itself names as the
+///    risk — was invisible and validated at exit 0. Both forms are read now: a declared
+///    relation, and a field named for or typed as the target.
+/// 2. the `UNMAPPED:` assertion was file-global, so it held while any one marker
+///    survived anywhere. Each edge now needs its own verdict within `MARKER_WINDOW`
+///    lines of every line that names it.
 #[test]
-fn every_census_edge_is_marked_and_no_unreadable_one_is_declared_as_a_relation() {
+fn every_census_edge_is_marked_and_no_unreadable_one_is_realised() {
     let text = read("domains/state.yaml");
+    let lines: Vec<&str> = text.lines().collect();
     let declared = declared_relations();
 
     for (source, target, verdict) in CENSUS {
         let edge = format!("{source} → {target}");
+        let sites: Vec<usize> = lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| line.contains(&edge))
+            .map(|(index, _)| index)
+            .collect();
         assert!(
-            text.contains(&edge),
+            !sites.is_empty(),
             "census edge `{edge}` is named nowhere in domains/state.yaml; every row of \
              story:mcp-domain-model's census must appear in the model that closes it"
         );
 
-        let realised = declared
-            .iter()
-            .any(|(entity, to)| entity == source && to == target);
-        match verdict {
-            Verdict::Unmapped | Verdict::Filed | Verdict::Absent => assert!(
-                !realised,
-                "`{edge}` is declared as an ESS relation with a cardinality, but no \
-                 source answers it — it is carried as a marker, not chosen. \
-                 `ess specify validate` exits 0 on this; that is why this case exists"
-            ),
-            Verdict::Stated => {}
+        // — the verdict must be legible at every site, not merely present in the file —
+        if let Some(wanted) = marker(*verdict) {
+            let unmarked: Vec<String> = sites
+                .iter()
+                .filter(|site| {
+                    let low = site.saturating_sub(MARKER_WINDOW);
+                    let high = (**site + MARKER_WINDOW).min(lines.len() - 1);
+                    !lines[low..=high].iter().any(|line| line.contains(wanted))
+                })
+                .map(|site| format!("domains/state.yaml:{}", site + 1))
+                .collect();
+            assert!(
+                unmarked.is_empty(),
+                "`{edge}` is named at {} without `{wanted}` within {MARKER_WINDOW} \
+                 lines. A marker in a heading above a list is not a marker for the edges \
+                 in it; a reader who lands on one edge must see its verdict",
+                unmarked.join(", ")
+            );
         }
 
-        if matches!(verdict, Verdict::Unmapped) {
+        if matches!(verdict, Verdict::Stated) {
+            continue;
+        }
+
+        // — realisation form 1: a declared ESS relation —
+        if let Some((_, _, label)) = declared
+            .iter()
+            .find(|(entity, to, _)| entity == source && to == short(target))
+        {
+            panic!(
+                "`{edge}` is realised by the declared relation `{label}`, but no source \
+                 answers it — it is carried as a marker, not chosen. \
+                 `ess specify validate` exits 0 on this; that is why this case exists"
+            );
+        }
+
+        // — realisation form 2: a field named for, or typed as, the target —
+        let names = carrier_names(target);
+        for (field, declared_type) in entity_fields(source) {
             assert!(
-                text.contains("UNMAPPED:"),
-                "no `UNMAPPED:` marker survives in domains/state.yaml, yet `{edge}` is \
-                 unreadable from every legitimate source"
+                !names.contains(&field),
+                "`{edge}` is realised by the field \
+                 `{source}.{field}: {declared_type}`. A flat carrier is the same claim \
+                 in a weaker syntax — a scalar `{field}` says one-to-one as loudly as \
+                 `cardinality: one` does — and it produces no `relations:` entry and \
+                 validates at exit 0. This edge has no answered cardinality to carry"
+            );
+            assert!(
+                !is_type_name(target) || !declared_type.contains(short(target)),
+                "`{edge}` is realised by the field \
+                 `{source}.{field}: {declared_type}`, whose type names the target. \
+                 Embedding the target is the same claim as declaring the relation"
             );
         }
     }
 
-    // The two filed questions are decisions, not modelling gaps: the model must name
-    // the blocker that holds each, so a reader knows where the answer will come from.
-    for blocker in [
-        "decision-blocker:mcp-caller-connection-assignment",
-        "decision-blocker:mcp-outbound-stdio-process-ownership",
+    // The one stated edge carries the binding its cardinality was read from. Not
+    // `ess/domains/declarations.yaml:119-123`: that block declares `AdapterSpecification
+    // owns many OperationDeclaration`, a different pair, and does not answer this edge.
+    // The cardinality is read off the carrier, under the scalar-via-is-one binding these
+    // four sibling blocks keep.
+    for citation in [
+        "ess/domains/credentials.yaml:40-45",
+        "ess/domains/auth_bindings.yaml:102-106",
+        "ess/domains/artifact_provenance.yaml:85-89",
+        "ess/domains/auth_bindings.yaml:107",
     ] {
         assert!(
-            text.contains(blocker),
-            "`{blocker}` holds a census edge and is named nowhere in the model"
+            text.contains(citation),
+            "the one stated census edge is stated without `{citation}`, one of the four \
+             `ess/1` blocks that bind a scalar `via` carrier to `cardinality: one` and a \
+             `List<…>` carrier to `cardinality: many`"
         );
     }
-
-    // The one stated edge carries the source its cardinality was read from, not chosen.
-    assert!(
-        text.contains("ess/domains/declarations.yaml:119-123"),
-        "the only citable census edge is stated without the `ess/1` block its \
-         `cardinality: many` is read from"
-    );
 }
 
 /// Three credential kinds, three declared types, never one polymorphic value.
