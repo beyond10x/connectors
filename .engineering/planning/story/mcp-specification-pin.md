@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:mcp-specification-pin
 kind: story
-status: active
+status: implemented
 title: Pin the authoritative MCP specification revisions with exact source digests
 relations:
 - decomposes: epic:mcp-contracts
@@ -15,7 +15,7 @@ scope:
   path: adapters/mcp/contracts/protocol/v1alpha1/evidence
 - confidence: inferred
   path: adapters/mcp/design.md
-revision: 5
+revision: 6
 ---
 ## Acceptance
 
