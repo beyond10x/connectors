@@ -7,6 +7,8 @@ wire_code: unsupported
 summary: A server that answers `initialize` with a revision the binding does not name ends
   the connection instead of setting the revision.
 given:
+  - A binding configured for the interoperability revision (2025-11-25), the only one
+    with a handshake to answer.
   - A binding configured for exactly one revision.
 when:
   - The server answers `initialize` with a different protocol version of its own choosing,

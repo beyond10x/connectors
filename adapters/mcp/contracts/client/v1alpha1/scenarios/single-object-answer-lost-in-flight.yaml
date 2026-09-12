@@ -1,0 +1,26 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:transport-unreachable
+outcome: mcp.outbound.answer-never-arrived
+wire_code: outcome_unknown
+summary: A request that was sent and answered with one JSON object, lost before the object
+  arrived, is uncertainty — not an unreachable endpoint and not a lost session.
+given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); on both, a server may answer with one `application/json`
+    object and this client supports that shape.
+  - One request that this client framed and sent, and whose answer it is waiting for.
+when:
+  - The connection dies before any answer to that request is seen.
+then:
+  - The observable outcome is `outcome_unknown`, naming the request and the connection
+    that died (mcp-2026-07-28-basic-transports-streamable-http.mdx:70-91,
+    mcp-2025-11-25-basic-transports.mdx:103-106).
+  - Nothing is reported about a provider effect, because the answer that would have
+    carried it was never seen.
+  - The act reported is nobody's, because nothing was observed.
+never:
+  - The outcome is `unavailable`; the endpoint was reachable enough to take the request.
+  - The outcome is `session_lost`; nothing repudiated a session.
+  - The request is sent a second time to find out what happened to it.

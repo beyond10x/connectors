@@ -7,6 +7,8 @@ wire_code: outcome_unknown
 summary: A stream that closes before its final response leaves the request's outcome
   unobserved, and it is reported as unobserved.
 given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); this client continues a broken stream on neither.
   - A request being answered on an open SSE stream, possibly after progress notifications.
 when:
   - The stream closes with no JSON-RPC response for that request, which the specification

@@ -7,8 +7,8 @@ wire_code: n/a
 summary: Against a binding configured for the interoperability revision, `initialize`
   settles one version, the server's capabilities and an empty client capability set.
 given:
-  - A binding whose configured revision is the interoperability one, which the selection
-    matrix dispositions supported outbound.
+  - A binding configured for the interoperability revision (2025-11-25), which the
+    selection matrix dispositions supported outbound.
   - A server that answers the `initialize` handshake.
 when:
   - The client sends `initialize` carrying the configured version, its client capabilities

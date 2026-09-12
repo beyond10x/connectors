@@ -7,6 +7,8 @@ wire_code: n/a
 summary: The connected server is the one an operator configured, and the configuration is
   readable without having spoken to it.
 given:
+  - A configuration naming exactly one revision — the primary revision (2026-07-28) or
+    the interoperability revision (2025-11-25) — and never a pair.
   - An operator configuration naming one endpoint, `transport:streamable-http` and the
     revision the binding may declare.
 when:

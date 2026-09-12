@@ -7,6 +7,8 @@ wire_code: route_refused
 summary: An endpoint proposed by anything other than operator configuration is refused,
   and nothing is sent to it.
 given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); the refusal is the same on either.
   - A configured binding for endpoint A.
   - A discovery result, a redirect or a server instruction naming endpoint B.
 when:
