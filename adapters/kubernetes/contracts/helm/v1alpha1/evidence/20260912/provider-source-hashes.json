@@ -1,0 +1,114 @@
+[
+  {
+    "file": "helm-v4.3.0-storage.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/storage/storage.go",
+    "sha256": "7fe14767c833b5d7e0e7475dc590827f2a49b82cd261fb6f24735d5b8356875b",
+    "bytes": 11187,
+    "archive": "vendor/helm-v4.3.0-storage.go.gz"
+  },
+  {
+    "file": "helm-v4.3.0-driver-secrets.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/storage/driver/secrets.go",
+    "sha256": "733f179d158a058d7e58a6779e120b2902ffad5f7bd3c45584a633ed33148002",
+    "bytes": 8417,
+    "archive": "vendor/helm-v4.3.0-driver-secrets.go.gz"
+  },
+  {
+    "file": "helm-v4.3.0-driver-util.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/storage/driver/util.go",
+    "sha256": "0575dfadeb29b1ced9335a7e758ecdd8ace8d75aa2fdff74798ca1ee022e25ff",
+    "bytes": 2870,
+    "archive": "vendor/helm-v4.3.0-driver-util.go.gz"
+  },
+  {
+    "file": "helm-v4.3.0-release.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/release/v1/release.go",
+    "sha256": "bd2bec0929c0293a9950d939434aa07cb47a9fb1080a3012849cc2c137045a37",
+    "bytes": 2338,
+    "archive": "vendor/helm-v4.3.0-release.go.gz"
+  },
+  {
+    "file": "helm-v4.3.0-info.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/release/v1/info.go",
+    "sha256": "bb98877ebf038378c0bc82ccc88b55f32850fbcb4220b7afa9d7a8412601642a",
+    "bytes": 4147,
+    "archive": "vendor/helm-v4.3.0-info.go.gz"
+  },
+  {
+    "file": "helm-v4.3.0-status.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/release/common/status.go",
+    "sha256": "081dce7b2f4b9d399cfecffe7f711aa55fcc4f2d532f7d62f4b4d4e5286337d6",
+    "bytes": 2094,
+    "archive": "vendor/helm-v4.3.0-status.go.gz"
+  },
+  {
+    "file": "helm-v4.3.0-validate-name.go",
+    "release": "v4.3.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/bec5b06ed841fe5269972d864d5177944fd5970f/pkg/chart/v2/util/validate_name.go",
+    "sha256": "bcfa06665474e8b072325e5374838923681e6c03526bc30ba9bddc84a6b6d025",
+    "bytes": 4226,
+    "archive": "vendor/helm-v4.3.0-validate-name.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-storage.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/storage/storage.go",
+    "sha256": "1d65ac16b34a1eda3c7194bb1108c85ee6d9d091aafa135d4393b1e882de2530",
+    "bytes": 8620,
+    "archive": "vendor/helm-v3.22.0-storage.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-driver-secrets.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/storage/driver/secrets.go",
+    "sha256": "3b6398fb39b09618d65c8a1e9be7dbfab6ab0ddee62456bf77fb9c568aa10e4d",
+    "bytes": 7969,
+    "archive": "vendor/helm-v3.22.0-driver-secrets.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-driver-util.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/storage/driver/util.go",
+    "sha256": "5fbcfd08dcecd3894c14e82cac673dd375a7988c00cc2f4d600b90dce8227ae5",
+    "bytes": 2891,
+    "archive": "vendor/helm-v3.22.0-driver-util.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-release.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/release/release.go",
+    "sha256": "1750f1168853189b2c81826f92d629fa07ff146cbb54d0a8b7f76051002924a3",
+    "bytes": 1923,
+    "archive": "vendor/helm-v3.22.0-release.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-info.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/release/info.go",
+    "sha256": "df8c11b1f50bcf9f7189e25b4d509638145888f5892e2fc28c34dcf7822596f6",
+    "bytes": 1442,
+    "archive": "vendor/helm-v3.22.0-info.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-status.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/release/status.go",
+    "sha256": "d74755fa40edb5ac5f351c810d6a3a9d32009517ace95f0ce748dc533980a0cf",
+    "bytes": 2095,
+    "archive": "vendor/helm-v3.22.0-status.go.gz"
+  },
+  {
+    "file": "helm-v3.22.0-validate-name.go",
+    "release": "v3.22.0",
+    "url": "https://raw.githubusercontent.com/helm/helm/144ca65f8501953fa8b41cd1d37c7223051c85b7/pkg/chartutil/validate_name.go",
+    "sha256": "d08a4dcdbbadcc56a7ae6e87c69ac07cdba5b34dfa170cacc6f60088c5ddcbe0",
+    "bytes": 4248,
+    "archive": "vendor/helm-v3.22.0-validate-name.go.gz"
+  }
+]
