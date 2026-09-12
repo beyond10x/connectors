@@ -7,6 +7,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     std::fs::create_dir_all(&base)?;
     let temp = tempfile::Builder::new().prefix("gate-").tempdir_in(base)?;
     super::ess_boundary::run(root, ess, temp.path())?;
+    super::source_hashes::run(root)?;
     super::cli::run(root, ess, true)?;
     let command = |program: &str| {
         let mut cmd = Command::new(program);
