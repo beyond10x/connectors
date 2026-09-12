@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:mcp-domain-model
 kind: story
-status: draft
+status: active
 title: Model the MCP nouns in an adapter-owned ESS root, with unreadable relations left UNMAPPED
 relations:
 - decomposes: epic:mcp-contracts
@@ -15,7 +15,7 @@ scope:
   path: adapters/mcp/spec/ess/domains/state.yaml
 - confidence: inferred
   path: adapters/mcp/spec/ess/system.yaml
-revision: 2
+revision: 4
 ---
 ## Acceptance
 
