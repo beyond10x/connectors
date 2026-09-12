@@ -10,6 +10,10 @@ relations:
 - depends_on: story:mcp-outbound-connection-lifecycle
 - depends_on: story:mcp-inbound-local-binding
 - depends_on: story:mcp-profile-selection-matrix
+- depends_on: story:mcp-inbound-capability-projection
+- depends_on: story:mcp-outbound-invocation-results
+- depends_on: story:mcp-inbound-mutation-replay
+- depends_on: story:mcp-outbound-auth-lifecycle
 scope:
 - confidence: inferred
   path: adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md
