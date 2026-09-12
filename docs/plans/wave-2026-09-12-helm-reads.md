@@ -157,3 +157,92 @@ did not exist for the minutes between.
 | full gate with Rust 1.88 | pending |
 | store evidence and body update | pending |
 | commits | pending |
+
+## Unit 1 — implementor returned
+
+Verdict green. Package lane executed 11 → 20 exit 0; CLI journey lane 3 → 4 exit 0.
+Committed by the coordinator as `5e4b0c4`, 31 files, +2699 −26.
+
+The implementor did not commit, and was right not to: the operator's standing rule
+forbids committing without the operator's own instruction and says a brief asking for
+one does not grant it. The brief asked. The rule wins, the coordinator holds the wave's
+approval, and the coordinator committed.
+
+### Checks, each with its own exit status
+
+ESS validate, ESS compile, shared ESS, adapter boundary gate, descriptor drift, clippy
+with `-D warnings`, fmt across 15 members, library independence with
+`--no-default-features`, `+1.88.0 check`, `build --workspace` — all 0.
+
+### Discrimination was measured twice, because the first injection proved the wrong thing
+
+The CLI journey case passed as written, so the implementor injected the defect the
+acceptance forbids: emit the recorded literal in `value_digest`. That was caught by the
+declared `^[a-f0-9]{64}$` pattern at the wire (`"service_code":"upstream_protocol"`) —
+a real refusal, but not the assertion under test. The second injection put the literal
+in `path`, which no schema constrains, and the journey's own assertion fired at
+`cli_journey.rs:543`. Injection reverted and rebuilt before every recorded run;
+`grep -c "DELIBERATE DEFECT"` returns 0.
+
+### What the pin established, and what it un-established
+
+Fourteen upstream Helm sources pinned with URL, uncompressed SHA-256 and byte length,
+both lines — v4.3.0 at `bec5b06` and v3.22.0 at `144ca65` — because a cluster's Secrets
+may come from either.
+
+The story instructed that the release-to-revision cardinality be recorded `UNMAPPED:`,
+on the reasoning that it could not be drafted honestly before a source was pinned. With
+the source pinned it became readable, and the implementor cited it rather than obeying
+the instruction: one release name to many version-keyed records (`storage.go:327-328`,
+`:212-215`), and more than one may be `deployed` at once (`:171-175`), which is why the
+status read returns them all. **This is the story's own condition being met, not an
+instruction ignored** — the story said "it cannot be drafted honestly before the
+upstream source above is pinned", and then it was.
+
+Six relations stayed `UNMAPPED:`: cluster-wide release identity, revision to managed
+resources, whether an observed history is complete, how a value path reads back, unset
+against defaulted, and manifest document identity.
+
+## Two environment facts this wave measured, that outlive it
+
+| fact | effect | workaround |
+|---|---|---|
+| `~/.cargo/config.toml` sets `rustc-wrapper = /usr/bin/sccache`; under a `TMPDIR` inside a managed worktree sccache aborts `path must be shorter than SUN_LEN` before rustc runs | every cargo command in every managed worktree | export `RUSTC_WRAPPER=""`; builds are uncached, not wrong |
+| a dbus fixture builds a Unix socket path from `TMPDIR`, capped at 108 bytes; the managed-worktree path is 93 | any CLI-journey lane is red **on untouched base code** under `<worktree>/.local/tmp` | give that lane a short `TMPDIR` under the wave's scratch root |
+
+`SCCACHE_SERVER_UDS` does not fix the first — sccache derives a second path from
+`TMPDIR` too. Both were relayed to every agent still in flight.
+
+## Coordinator decision — the stale-surface patch, corrected before applying
+
+The implementor found four documents claiming a three-operation Kubernetes surface that
+this unit makes stale, none of them its file, and left a 57-line patch unapplied:
+`README.md`, `docs/running-services.md`, `website/docs/adapters/kubernetes.mdx` and
+`website/publication.json`.
+
+Three of the four hunks are taken as written. The fourth is corrected: the patch gives
+the new website page `"status": "implemented"`, and that string is not in this
+repository's vocabulary. `website/publication.json` uses eleven status values across 46
+entries; the closest existing and truthful one is
+`"Read-only observation; dedicated sandbox acceptance open"`, already used once. This
+unit's evidence is a fixture cluster, not a real one, and `AGENTS.md` § Verify requires
+the website to keep specification, example and runtime support claims distinct. A
+website page claiming `implemented` for a binding no real cluster has answered is the
+runtime claim that rule forbids.
+
+**Held, not applied.** The adversary is working in that worktree against commit
+`5e4b0c4`; moving `HEAD` under it would change the baseline it was given. The patch
+applies after the adversary returns.
+
+## Stages
+
+| stage | state |
+|---|---|
+| decomposer on `epic:mcp-contracts` | done — 12 stories, 2 blockers |
+| critic panel, 2 rounds | done — 4 findings, all fixed |
+| implementor pass 1 | green, `5e4b0c4` |
+| adversary pass 1 | dispatched |
+| stale-surface patch | held until the adversary returns |
+| full gate with Rust 1.88 | pending |
+| store evidence and body update | pending |
+| commits | 1 unit commit made |
