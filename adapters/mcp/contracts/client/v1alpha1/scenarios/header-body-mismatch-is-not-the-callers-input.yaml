@@ -1,0 +1,22 @@
+type: mcp-outbound-lifecycle/1
+story: story:mcp-outbound-connection-lifecycle
+document: adapters/mcp/contracts/client/v1alpha1/semantics.md
+state: state:framing
+outcome: mcp.outbound.framing-refused
+wire_code: upstream_protocol
+summary: A framing refusal is reported as a protocol disagreement with the peer, not as
+  the caller's bad input.
+given:
+  - A request framed by this client.
+when:
+  - The peer answers `HeaderMismatch` (-32020, mcp-2026-07-28-schema.ts:434,
+    mcp-2026-07-28-basic-transports-streamable-http.mdx:580-607), or answers with a body
+    that is not readable as JSON-RPC, or with a media type the transport does not define.
+then:
+  - The observable outcome is `upstream_protocol`, carrying the endpoint, the HTTP status
+    and the JSON-RPC code the peer returned.
+  - The caller's request is not carried out.
+never:
+  - The outcome is `invalid_input`; the caller supplied no header, so the caller's input
+    is not what disagreed.
+  - A decoding failure is reported as evidence about a provider effect.
