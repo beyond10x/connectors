@@ -7,6 +7,8 @@ wire_code: n/a
 summary: Shutdown closes what this client opened and invents no results for what it did
   not observe.
 given:
+  - A binding configured for the primary revision (2026-07-28) or the interoperability
+    revision (2025-11-25); only the second can have a session to delete.
   - A client with open streams, and possibly a session-bearing binding.
 when:
   - The client shuts down; the interoperability revision defines no shutdown message and
