@@ -196,6 +196,15 @@ fn refusal(output: Output, code: &str) -> Value {
 }
 
 fn configure(cli: &Cli, cluster: &Cluster, custody: &Custody) {
+    configure_operations(
+        cli,
+        cluster,
+        custody,
+        &["resources.list", "endpoints.discover"],
+    );
+}
+
+fn configure_operations(cli: &Cli, cluster: &Cluster, custody: &Custody, operations: &[&str]) {
     success(cli.run(&["setup", "init"]));
     success(cli.run(&["setup", "check"]));
     let adapter = cluster.selection();
@@ -203,11 +212,12 @@ fn configure(cli: &Cli, cluster: &Cluster, custody: &Custody) {
     // paths and selectors. No credential is a configuration input.
     let q = |value: &str| serde_json::to_string(value).unwrap();
     let configuration = format!(
-        "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.cluster]\ninstance_id={}\nadapter_id='kubernetes'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.cluster.permissions]\nprofiles=['kubernetes.token']\noperations=['resources.list','endpoints.discover']\n[adapters.cluster.executable]\npath={}\nsha256={}\nargs={}\n",
+        "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.cluster]\ninstance_id={}\nadapter_id='kubernetes'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.cluster.permissions]\nprofiles=['kubernetes.token']\noperations={}\n[adapters.cluster.executable]\npath={}\nsha256={}\nargs={}\n",
         filesystem::uid(),
         q(custody.socket.to_str().unwrap()),
         q(&adapter.instance_id),
         q(&adapter.configuration_revision),
+        serde_json::to_string(operations).unwrap(),
         q(adapter.executable.path.to_str().unwrap()),
         q(&adapter.executable.sha256),
         serde_json::to_string(&adapter.executable.args).unwrap()
@@ -461,6 +471,172 @@ fn kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_cre
         serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["items"][0]["address"],
         "10.0.0.7"
     );
+}
+
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn kubernetes_cli_reads_helm_release_history_and_redacted_values() {
+    // Content disclosure is configured, so all four release operations are
+    // advertised. `helm_releases.manifest` is deliberately left out of the
+    // permitted operations, which is a separate decision from advertisement.
+    let cluster = Cluster::with(false, "redacted_content");
+    let custody = Custody::new(cluster.root.path());
+    let cli = Cli::new(cluster.root.path());
+    configure_operations(
+        &cli,
+        &cluster,
+        &custody,
+        &[
+            "helm_releases.history",
+            "helm_releases.status",
+            "helm_releases.values",
+        ],
+    );
+    let credential = cluster.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let connected = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "cluster",
+        "--profile",
+        "kubernetes.token",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]
+        .clone();
+    let reference = connected["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(connected["summary"]["state"], "ready");
+    // One identity probe and no business read.
+    assert_eq!(cluster.count(), 1);
+
+    let read = |operation: &str, input: &str| -> Value {
+        let describe = success(cli.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "cluster",
+            "--operation",
+            operation,
+        ]));
+        let output = cli.run(&[
+            "operations",
+            "invoke",
+            "--adapter",
+            "cluster",
+            "--connection",
+            &reference,
+            "--operation",
+            operation,
+            "--schema",
+            describe["schema"].as_str().unwrap(),
+            "--revision",
+            describe["revision"].as_str().unwrap(),
+            "--input-json",
+            input,
+        ]);
+        // The production CLI's own bytes must not carry a recorded literal.
+        let printed = String::from_utf8_lossy(&output.stdout).into_owned();
+        assert!(!printed.contains(RECORDED_VALUE_SECRET), "{operation}");
+        assert!(!printed.contains(RENDERED_MANIFEST_SECRET), "{operation}");
+        serde_json::from_str(success(output)["result"].as_str().unwrap()).unwrap()
+    };
+
+    let history = read(
+        "helm_releases.history",
+        r#"{"namespace":"fixture","release":"api","limit":50}"#,
+    );
+    let revisions: Vec<u64> = history["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["revision"].as_u64().unwrap())
+        .collect();
+    assert_eq!(revisions, [1, 2, 3]);
+    assert_eq!(history["complete"], true);
+    assert_eq!(
+        history["items"][2]["source_secret"],
+        "sh.helm.release.v1.api.v3"
+    );
+
+    let status = read(
+        "helm_releases.status",
+        r#"{"namespace":"fixture","release":"api","limit":50}"#,
+    );
+    assert_eq!(status["items"].as_array().map(Vec::len), Some(1));
+    assert_eq!(status["items"][0]["status"], "deployed");
+
+    let values = read(
+        "helm_releases.values",
+        r#"{"namespace":"fixture","release":"api","revision":3,"limit":200}"#,
+    );
+    assert_eq!(values["complete"], true);
+    assert_eq!(
+        values["provenance"]["resource"],
+        "fixture/sh.helm.release.v1.api.v3/values"
+    );
+    assert!(
+        values["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["path"] == "postgresql.auth.password" && item["kind"] == "string")
+    );
+
+    // An advertised release operation the configuration did not permit is
+    // refused at description, before any provider request.
+    let before = cluster.count();
+    refusal(
+        cli.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "cluster",
+            "--operation",
+            "helm_releases.manifest",
+        ]),
+        "forbidden",
+    );
+    assert_eq!(cluster.count(), before);
+
+    // A release outside the configured namespace scope never reaches the
+    // cluster, and is distinct from the empty history `backendless` returns.
+    let describe = success(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "cluster",
+        "--operation",
+        "helm_releases.history",
+    ]));
+    let outside = [
+        "operations",
+        "invoke",
+        "--adapter",
+        "cluster",
+        "--connection",
+        &reference,
+        "--operation",
+        "helm_releases.history",
+        "--schema",
+        describe["schema"].as_str().unwrap(),
+        "--revision",
+        describe["revision"].as_str().unwrap(),
+        "--input-json",
+        r#"{"namespace":"kube-system","release":"api","limit":50}"#,
+    ];
+    let before = cluster.count();
+    refusal(cli.run(&outside), "forbidden");
+    assert_eq!(cluster.count(), before);
+    let empty = read(
+        "helm_releases.history",
+        r#"{"namespace":"backendless","release":"api","limit":50}"#,
+    );
+    assert_eq!(empty["items"].as_array().map(Vec::len), Some(0));
+    assert_eq!(empty["complete"], true);
 }
 
 /// Opt-in real cluster: `CONNECTORS_K8S_SANDBOX=<api-base>` with
