@@ -277,8 +277,15 @@ impl Metadata {
             access | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(unavailable)?;
+        // How long a writer waits for another to release the database before reporting
+        // it unavailable. Two seconds was enough for one CLI and its owner; it is not
+        // enough when the machine is loaded, and an exhausted busy timeout surfaces as
+        // `MetadataUnavailable` — indistinguishable from a store that is genuinely gone.
+        // Every caller above this carries its own deadline and cancels on it, so waiting
+        // longer here cannot hang a request; it only stops a contended write from
+        // reporting the wrong failure. See story:host-suite-load-sensitivity.
         connection
-            .busy_timeout(Duration::from_secs(2))
+            .busy_timeout(Duration::from_secs(30))
             .map_err(unavailable)?;
         connection
             .pragma_update(None, "trusted_schema", false)

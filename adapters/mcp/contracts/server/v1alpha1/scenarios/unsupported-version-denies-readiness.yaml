@@ -1,0 +1,106 @@
+# Owner: story:mcp-inbound-local-binding — the inbound local MCP binding, ../semantics.md §3.6.
+# Behaviour: version and capability mismatch (legacy initialize)
+# Outcome: unsupported-version-denies-readiness
+# Transition: connectors.sessions.Session.deny_ready (Establishing → Closing)
+#
+# Compiled supervisor decisions, not an executed trace, and not an MCP message: the
+# pinned toolchain "compiles obligations but does NOT execute a sequential trace"
+# (ess/domains/sessions.yaml, closing note). Whole-second acts express causal order.
+#
+# One instance_ref, one connection_ref, one authority_ref, in every trace of this story:
+# the single principal contracts/cli/v1alpha1/semantics.md §1 admits. A second value of
+# any of them is decision-blocker:mcp-caller-connection-assignment, not this trace.
+type: ess-scenario/1
+domain: connectors.sessions
+scenario: unsupported-version-denies-readiness
+summary: 'A legacy initialize this binding cannot answer with a version the caller accepts never reaches readiness: the gate is unverified, establishment is denied and the connection tears down.'
+arrange:
+- instance: session
+  entity: connectors.sessions.Session
+timeline:
+- at: '2026-09-12T12:00:00Z'
+  command: connectors.sessions.OfferSession
+  input:
+    binding:
+      instance_ref: connectors-local
+      connection_ref: local-owner
+      admitted_revision: config-revision-a
+      authority_ref: local-owner-uid
+    profile: inbound_offer
+    placement: local
+    streams:
+    - stdio
+  outcome: offered
+  events:
+  - event: connectors.sessions.SessionOffered
+  capture:
+    instance: session
+    event: connectors.sessions.SessionOffered
+    field: session_id
+- at: '2026-09-12T12:00:01Z'
+  command: connectors.sessions.AcceptOffer
+  input:
+    session_id:
+      $instance: session
+  outcome: accepted
+  events:
+  - event: connectors.sessions.OfferAccepted
+# The legacy initialize selects legacy semantics scoped to this process
+# (mcp-2026-07-28-basic-versioning.mdx:174-180). The binding answers with a version it
+# supports; the caller supports none of them and disconnects
+# (mcp-2025-11-25-basic-lifecycle.mdx:172-177). Establishment never completes: the gate
+# decision is unverified, which the shared model fixes to the terminal reason error.
+- at: '2026-09-12T12:00:02Z'
+  command: connectors.sessions.EstablishReady
+  input:
+    session_id:
+      $instance: session
+    decision: unverified
+    # Lifetime 2,000 ms: the ceiling contracts/sessions/v1alpha1/semantics.md §4.1 sets on
+    # the effective deadline of a data lease, which ess/domains/sessions.yaml repeats as
+    # "lease lifetime <= 2000 ms including uncertainty".
+    lease:
+      issued_at: '2026-09-12T12:00:02Z'
+      effective_expiry: '2026-09-12T12:00:04Z'
+      sequence: 1
+  outcome: authority-terminated
+  events:
+  - event: connectors.sessions.DataAuthorityTerminated
+    payload:
+      decision: unverified
+  no_events:
+  - connectors.sessions.SessionReady
+  - connectors.sessions.DataPermitted
+  - connectors.sessions.DataLeaseRenewed
+# A request arriving after the refusal opens no data path.
+- at: '2026-09-12T12:00:03Z'
+  command: connectors.sessions.PermitData
+  input:
+    session_id:
+      $instance: session
+    decision: allow
+    direction: input
+  outcome: wrong-state
+  error:
+    name: connectors.sessions.StateConflict
+    fields:
+      state: Closing
+  no_events:
+  - connectors.sessions.DataPermitted
+  - connectors.sessions.SessionReady
+- at: '2026-09-12T12:00:07Z'
+  command: connectors.sessions.FinishTeardown
+  input:
+    session_id:
+      $instance: session
+    decision: released
+    peer_shutdown: unconfirmed
+  outcome: closed
+  events:
+  - event: connectors.sessions.LocalResourcesReleased
+assert:
+- view: connectors.sessions.SessionStates
+  contains:
+    session_id:
+      $instance: session
+    state: Closed
