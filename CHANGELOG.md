@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+## 0.9.0 — 2026-09-13
+
+Every GitLab claim in 0.8.0 was verified against a fixture. This release verifies
+them against a dedicated live GitLab, and four of the five GitLab stories close on
+that evidence. No source file changed: the code that passed the fixtures is the code
+that passed the provider.
+
+### Verified against a live GitLab
+
+- A dedicated GitLab 19.3.2 sandbox, operated by a non-administrator with a
+  `read_api` token and project role Developer. The administrator token set the
+  sandbox up and ran none of the operations under test.
+- All eleven read operations answered with provenance. A pipeline was watched from
+  `pending` through `running` to `failed` on one exact commit SHA, its jobs paged,
+  and the failed job's trace read with explicit bounded completeness at two byte
+  limits.
+- A pinned merge-request validation reported `checks_passed: true`, and the same
+  pinned request reported `head_changed` after the merge request's head actually
+  moved.
+- A merge request was merged through the approval chain: authenticated clock,
+  signing issuer, published policy, prepared subject and issued proof.
+- Two crash shapes were exercised against the provider. With the owner killed on
+  the merge PUT, the merge applied and the response was lost; replaying the same
+  business key returned the original attempt and the merge endpoint still shows one
+  PUT. With the owner killed before the PUT, nothing merged and the replay demanded
+  a fresh proof.
+
+Full record with identities, commands and outcomes:
+[docs/evidence/gitlab-sandbox-20260913](docs/evidence/gitlab-sandbox-20260913/README.md).
+
+### Documentation
+
+- `docs/local-gitlab-cli.md` now says how to stand up the sandbox, including the
+  certificate chain the adapter requires.
+- `docs/local-gitlab-merge.md` records that GitLab answers a merge **401**, not
+  403, when it has identified the user and that user may not merge into a protected
+  branch.
+- `AGENTS.md` makes a hosted release page a step of cutting a release, authored by
+  the organization bot like every commit and tag.
+
+### Limitations
+
+- **A single self-signed certificate does not work.** The adapter's rustls client
+  rejects an end-entity certificate carrying `basicConstraints CA:TRUE`, which curl
+  accepts. A CA and a leaf signed by it are required. This is unchanged behaviour,
+  newly documented.
+- **Merge-request read acceptance is incomplete.** Deleting an open merge request's
+  source branch closes it in GitLab 19.3.2, and the mergeability check settles
+  faster than a CLI process starts, so neither the nullable deleted-source shape nor
+  an unknown merge status could be produced. `story:gitlab-mr-reads` stays open.
+- **No crash between GitLab's acknowledgement and the ledger write.** The lost
+  response was lost between the owner and the CLI; the ledger already held the
+  outcome.
+- **Helm release reads are still fixture-verified.** No real cluster has answered
+  those four operations.
+- **MCP is still contracts only.** No connection, no server, no persisted credential.
+- One instance, one project, one runner, one executor. No concurrency and no
+  credential expiry under load.
+- Source release only: no binary, container image or website deployment.
+
 ## 0.8.0 — 2026-09-12
 
 **This release replaces the implementation.** Every source file is new: the
