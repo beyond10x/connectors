@@ -2,13 +2,13 @@
 format: aep.planning-md/1
 id: configuration-blocker:gitlab-v020-publication-target
 kind: configuration-blocker
-status: open
+status: cleared
 title: The GitLab v0.2.0 source publication destination is missing
 relations:
 - blocks: release-plan:gitlab-v020
 - blocks: release-plan:connectors-v030
 - blocks: release-plan:connectors-v080
-revision: 1
+revision: 2
 ---
 ## Missing input
 
