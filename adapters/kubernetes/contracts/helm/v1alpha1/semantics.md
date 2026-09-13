@@ -232,7 +232,7 @@ for the projections, and stating them is not a claim that they are checked.
 ## Evidence and obligations
 
 The recorded usage this serves is in
-`docs/evidence/recent-adapter-usage-20260909/actions.csv`: `history` 19 sites,
+the retained action inventory (`recent-adapter-usage-20260909`, `actions.csv`): `history` 19 sites,
 `get values` 3, `status` 1 and `get manifest` 1, which is 24 of that family's 25
 release-state sites. The twenty-fifth is `helm list` (1 site), a listing of every
 release in a scope rather than of one release's revisions; it is not implemented

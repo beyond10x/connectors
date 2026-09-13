@@ -20,7 +20,9 @@ pub mod auth;
 mod ci;
 mod merge;
 mod merge_requests;
+mod update;
 pub use merge::PreparedMerge;
+pub use update::PreparedUpdate;
 
 #[path = "../generated/writes.rs"]
 #[rustfmt::skip]

@@ -148,7 +148,7 @@ pub(super) fn import(spec: &Spec, path: &Path) -> Result<(Value, Value)> {
     for w in &spec.writes {
         let m = &w.mapping;
         let item = &source["paths"][&m.path];
-        let operation = &item["put"];
+        let operation = &item[&m.method];
         if operation["operationId"] != m.upstream_operation || item.get("$ref").is_some() {
             return Err(refuse("missing or changed upstream write operation"));
         }
@@ -315,12 +315,17 @@ pub(super) fn import(spec: &Spec, path: &Path) -> Result<(Value, Value)> {
                 BodyParameter::Integer { value } => constant(property, json!(value))?,
             }
         }
-        let mut selected = json!({"put":operation});
+        // Two writes may select different methods on one path; each keeps its own
+        // operation and they share the path-level parameters.
+        let selected = &mut paths[&m.path];
+        if selected.is_null() {
+            *selected = json!({});
+        }
+        selected[&m.method] = operation.clone();
         if let Some(p) = item.get("parameters") {
             selected["parameters"] = p.clone();
         }
-        paths[&m.path] = selected;
-        coverage.push(json!({"operation":w.operation.id,"source_operation":m.upstream_operation,"method":"put","path":m.path,"mapped_body_properties":m.body.keys().collect::<Vec<_>>(),"excluded_optional_parameters":excluded,"excluded_optional_body_properties":properties.keys().filter(|n|!m.body.contains_key(*n)).collect::<Vec<_>>(),"generated":["typed_input","typed_output","immutable_request","consuming_dispatch","private_descriptor"],"authority":"consumer-supplied one-use capability; no approval or credential grant","requires_implementation":["native read-only preflight","native effect and response interpretation"]}));
+        coverage.push(json!({"operation":w.operation.id,"source_operation":m.upstream_operation,"method":m.method,"path":m.path,"mapped_body_properties":m.body.keys().collect::<Vec<_>>(),"excluded_optional_parameters":excluded,"excluded_optional_body_properties":properties.keys().filter(|n|!m.body.contains_key(*n)).collect::<Vec<_>>(),"generated":["typed_input","typed_output","immutable_request","consuming_dispatch","private_descriptor"],"authority":"consumer-supplied one-use capability; no approval or credential grant","requires_implementation":["native read-only preflight","native effect and response interpretation"]}));
     }
     let mut selected =
         json!({"openapi":source["openapi"],"info":source["info"],"paths":paths,"components":{}});

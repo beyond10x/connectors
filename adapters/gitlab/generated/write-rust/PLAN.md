@@ -1,14 +1,14 @@
 <!--
   generated from gitlab_writes v1
-  model digest 60e62b0197192fde0bab0673274f72e3236cac4e4c6b290f72b847ab42c0254f
-  contract digest bf080db26d82ecf93e6e97307361cd6a49bbf2ef3cb125dd19f3a4605b5a35c2
+  model digest d71a3b2285e5b421c6f596c260c21fda824356846d5876221beafc5cf7d18f9a
+  contract digest 0d52075ceb7e8f55a5f1b8672be27768f0e663364671db383cfdd5fe5f27c313
   do not edit: regenerate with `ess synthesize`
 -->
 # Synthesis plan — gitlab_writes v1
 
 Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synthesize`.
 
-5 capabilities: **5 generated**, **0 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
+9 capabilities: **9 generated**, **0 obligations**, **0 refused**. An obligation is yours to implement against its contract; a refusal is a fact about this synthesis scope, not about the specification.
 
 ## Generated
 
@@ -18,6 +18,10 @@ Scope: `component-skeletons`, planned by `ess-synth`. Regenerate with `ess synth
 | domain type | `gitlab_writes.requests.MergeRequestMergeOutputItem` |
 | domain type | `gitlab_writes.requests.MergeRequestMergeOutputProvenance` |
 | domain type | `gitlab_writes.requests.MergeRequestMergeRequest` |
+| domain type | `gitlab_writes.requests.MergeRequestUpdateOutput` |
+| domain type | `gitlab_writes.requests.MergeRequestUpdateOutputItem` |
+| domain type | `gitlab_writes.requests.MergeRequestUpdateOutputProvenance` |
+| domain type | `gitlab_writes.requests.MergeRequestUpdateRequest` |
 | component port | `gitlab-writes-adapter` |
 
 ## Obligations — yours to implement

@@ -91,7 +91,7 @@ impl Spec {
                 || !methods.insert(method_name(&op.id))
                 || !types.insert(type_name(&op.id))
                 || m.operation != op.id
-                || m.method != "put"
+                || !matches!(m.method.as_str(), "post" | "put")
                 || m.upstream_operation.is_empty()
             {
                 return Err(refuse("invalid or colliding write operation mapping"));

@@ -17,8 +17,11 @@ calendar validity and window order before transport.
 The [native validation profile](../adapters/gitlab/contracts/merge-requests/v1alpha1/validation.md)
 uses the same generated MR GET with native pinned-head and selected-pipeline
 checks. Its result is an observation and never grants a write.
-The separate private projection adds `merge_request.merge`, its typed request/body
-mapping and a consuming write binding. The handwritten native implementation owns
+The separate private projection adds `merge_request.merge` and
+`merge_request.update`, their typed request/body mappings and a consuming write
+binding; a write mapping may select `put` or `post`. Further ordinary endpoints are
+not generated here — they run from the pinned source through the
+[catalog provider](local-catalog-provider.md). The handwritten native implementation owns
 fresh preflight and effect classification. [Local merge dispatch](local-gitlab-merge.md)
 requires the host's approval, audit and attempt coordinator; generation supplies no
 authority. The public descriptor and generated read runtime retain their bytes.

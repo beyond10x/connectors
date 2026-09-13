@@ -2,11 +2,11 @@ use axum::{
     Router,
     extract::OriginalUri,
     http::{HeaderMap, StatusCode},
-    routing::put,
+    routing::{post, put},
 };
 use connectors_core::{ErrorCode, Result};
 use connectors_host::http::{HttpConfig, ScopedHttp};
-use connectors_sdk::{Credential, Secret};
+use connectors_sdk::{Credential, Secret, WriteMethod};
 use serde_json::{Value, json};
 use std::{
     sync::{
@@ -221,4 +221,53 @@ async fn invalid_target_segments_refuse_before_credential_resolution() {
         assert_eq!(error.code, ErrorCode::InvalidInput);
     }
     assert_eq!(credentials.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn post_sends_one_json_document_with_the_selected_method() {
+    let source = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = source.local_addr().unwrap();
+    let puts = Arc::new(AtomicUsize::new(0));
+    let put_hits = puts.clone();
+    let server = tokio::spawn(async move {
+        axum::serve(
+            source,
+            Router::new().route(
+                "/api/v4/projects/1/merge_requests",
+                post(
+                    |headers: HeaderMap, axum::Json(body): axum::Json<Value>| async move {
+                        assert_eq!(headers["private-token"], "write-fixture-token");
+                        assert_eq!(headers["content-type"], "application/json");
+                        assert_eq!(
+                            body,
+                            json!({"source_branch":"fix","target_branch":"main","title":"t"})
+                        );
+                        (StatusCode::CREATED, "created")
+                    },
+                )
+                .put(move || {
+                    put_hits.fetch_add(1, Ordering::SeqCst);
+                    async { StatusCode::OK }
+                }),
+            ),
+        )
+        .await
+        .unwrap();
+    });
+    let credentials = Arc::new(AtomicUsize::new(0));
+    let response = http(address, credentials.clone())
+        .into_write()
+        .send_json(
+            WriteMethod::Post,
+            &["projects", "1", "merge_requests"],
+            &[],
+            &json!({"source_branch":"fix","target_branch":"main","title":"t"}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status, 201);
+    assert_eq!(response.body, b"created");
+    assert_eq!(puts.load(Ordering::SeqCst), 0);
+    assert_eq!(credentials.load(Ordering::SeqCst), 1);
+    server.abort();
 }

@@ -322,7 +322,10 @@
                 "pattern": "^/"
               },
               "method": {
-                "const": "put"
+                "enum": [
+                  "post",
+                  "put"
+                ]
               },
               "path_parameters": {
                 "$ref": "#/properties/mappings/items/properties/path_parameters"

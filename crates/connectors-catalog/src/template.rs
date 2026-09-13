@@ -376,6 +376,15 @@ impl Binding {
     }
 }
 
+/// A binding left for the transport to encode: raw path segments and raw query
+/// pairs. Header parameters are refused here rather than carried, because the
+/// authenticated transport this is for accepts none.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Resolved {
+    pub segments: Vec<String>,
+    pub query: Vec<(String, String)>,
+}
+
 /// One operation, checked once, ready to bind values against repeatedly.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Template {
@@ -508,6 +517,63 @@ impl Template {
             headers,
             media_type: self.media_type(media_type)?,
         })
+    }
+
+    /// The same binding, left unencoded: the raw path segments after the
+    /// placeholders are filled and the raw query pairs, for a transport that
+    /// encodes each segment and pair itself. Every refusal `bind` makes, this
+    /// makes too; the two differ only in who encodes.
+    pub fn resolve_raw(
+        &self,
+        values: &BTreeMap<String, String>,
+    ) -> std::result::Result<Resolved, Refusal> {
+        let assigned = self.assign(values)?;
+        let mut segments: Vec<String> = Vec::new();
+        let mut current = String::new();
+        for segment in &self.segments {
+            match segment {
+                Segment::Literal(text) => {
+                    let mut parts = text.split('/');
+                    if let Some(first) = parts.next() {
+                        current.push_str(first);
+                    }
+                    for part in parts {
+                        segments.push(std::mem::take(&mut current));
+                        current.push_str(part);
+                    }
+                }
+                Segment::Value(name) => {
+                    // Validated exactly as `bind` validates it; the encoded form
+                    // is discarded because the transport encodes.
+                    self.resolve(name, &assigned)?;
+                    let (index, _) = self
+                        .parameters
+                        .iter()
+                        .enumerate()
+                        .find(|(_, p)| p.location == Location::Path && &p.name == name)
+                        .ok_or_else(|| Refusal::PlaceholderUndeclared(name.clone()))?;
+                    current.push_str(assigned[index].map(String::as_str).unwrap_or_default());
+                }
+            }
+        }
+        segments.push(current);
+        segments.retain(|s| !s.is_empty());
+        let mut query = Vec::new();
+        for (index, parameter) in self.parameters.iter().enumerate() {
+            let carried = match assigned[index] {
+                Some(value) => value,
+                None if parameter.required => {
+                    return Err(Refusal::ValueAbsent(key_for(&self.parameters, parameter)));
+                }
+                None => continue,
+            };
+            match parameter.location {
+                Location::Query => query.push((parameter.name.clone(), carried.clone())),
+                Location::Header => return Err(Refusal::HeaderUnsafe(parameter.name.clone())),
+                Location::Path | Location::Cookie => {}
+            }
+        }
+        Ok(Resolved { segments, query })
     }
 
     /// Which value each declared parameter is bound to, by position. Qualified

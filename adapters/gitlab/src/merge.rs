@@ -56,6 +56,20 @@ impl GitLab {
     }
 }
 impl writes::WriteBindings for MergeBindings {
+    fn prepare_merge_request_update(
+        &self,
+        _: &gitlab_writes_types::requests::MergeRequestUpdateRequest,
+    ) -> Result<writes::MergeRequestUpdateRequestContext> {
+        Err(Error::internal())
+    }
+    fn finish_merge_request_update(
+        &self,
+        _: gitlab_writes_types::requests::MergeRequestUpdateRequest,
+        _: writes::MergeRequestUpdateRequestContext,
+        _: Result<HttpResponse>,
+    ) -> WriteOutcome<gitlab_writes_types::requests::MergeRequestUpdateOutput> {
+        WriteOutcome::Unknown(Error::internal())
+    }
     fn prepare_merge_request_merge(
         &self,
         input: &MergeRequestMergeRequest,

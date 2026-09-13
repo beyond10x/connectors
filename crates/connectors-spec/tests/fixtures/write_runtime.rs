@@ -32,7 +32,7 @@ mod reads;
 #[path = "../generated/writes.rs"]
 pub mod writes;
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
-use connectors_sdk::{AuthenticatedHttp, AuthenticatedWrite, HttpResponse, WriteOutcome};
+use connectors_sdk::{AuthenticatedHttp, AuthenticatedWrite, HttpResponse, WriteMethod, WriteOutcome};
 use fixture_writes_types::requests::{ItemUpdateOutput, ItemUpdateOutputDetail, ItemUpdateRequest};
 use serde_json::{json, Value};
 use std::sync::{
@@ -110,13 +110,15 @@ struct WritePort {
 }
 #[async_trait::async_trait]
 impl AuthenticatedWrite for WritePort {
-    async fn put_json(
+    async fn send_json(
         self: Box<Self>,
+        method: WriteMethod,
         segments: &[&str],
         query: &[(&str, String)],
         body: &Value,
     ) -> Result<HttpResponse> {
         self.sends.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(method, WriteMethod::Put);
         assert_eq!(segments, ["items", "space/item?literal"]);
         assert_eq!(query.len(), 1);
         assert_eq!(query[0].0, "version");
