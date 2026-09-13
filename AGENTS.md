@@ -86,8 +86,8 @@ bounded teaching implementations; they do not authorize production runtime work.
 For the current provider delivery, cut a release at each verified, usable batch
 handoff before moving to the next provider. The order is GitLab, Kubernetes,
 PostgreSQL, MCP, then the remaining providers. The operator's instruction authorizes
-the source commit, tag and push sequence below; it supersedes the earlier
-local-only Connectors publication boundary for these releases.
+the source commit, tag, push and release-page sequence below; it supersedes the
+earlier local-only Connectors publication boundary for these releases.
 
 "Cutting a release" means completing all of these steps:
 
@@ -119,11 +119,22 @@ local-only Connectors publication boundary for these releases.
    the intended release commit. Finish with clean `main`, retained release
    evidence and cleanup of task-owned managed worktrees through `worktree`.
    Report the version, commit, destination and verification result.
+7. Publish the hosted release page for that exact tag through
+   `b10x-gates gh -- release create v<version> --verify-tag --notes-file <file>`,
+   so the page is authored by `b10x-bot[bot]` like every commit and tag before it.
+   A page created with a personal `gh` login is the same defect as a commit
+   authored by a person, and is corrected the same way: delete it and recreate it
+   under the bot, never leave it. Take the notes from the annotated tag with
+   `git tag -l --format='%(contents)'`; `--notes-from-tag` is refused alongside
+   `--repo`. Write no new commit, move no tag and edit no existing release. When
+   the tag is not on the remote's default branch, say so in the report and pass
+   `--latest=false` unless the release is the newest on that default branch.
+   Verify the created page's author and that it resolves to the tag's peeled commit.
 
-A local commit or local tag alone is not a cut release. Source release does not
-implicitly include a hosted release page, binary/package or container-registry
-publication, website/cloud deployment, or Atlas registration; those need their
-own requested scope. If a release step is blocked, record the exact blocker and
+A local commit or local tag alone is not a cut release, and neither is a pushed
+tag with no release page. Source release does not implicitly include a
+binary/package or container-registry publication, website/cloud deployment, or
+Atlas registration; those need their own requested scope. If a release step is blocked, record the exact blocker and
 report the release as incomplete.
 
 ## Workspace and integrations
