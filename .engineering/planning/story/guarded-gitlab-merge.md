@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:guarded-gitlab-merge
 kind: story
-status: active
+status: implemented
 title: Perform an approved GitLab merge without duplicate effects after restart
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -57,7 +57,7 @@ scope:
   path: spec-kinds/adapter
 - confidence: inferred
   path: website
-revision: 26
+revision: 28
 ---
 ## Outcome
 
@@ -255,3 +255,25 @@ What this story still needs: a second merge request, the clock configuration
 `issue --approve-subject --proof-output`, an approved merge whose response is lost,
 and a replay of the same business key after CLI and owner restart that returns the
 original uncertain attempt without a second native merge.
+
+## Sandbox evidence boundary — corrected 2026-09-13
+
+The note above was written before the guarded merge was attempted, and it is now
+wrong. `docs/evidence/gitlab-sandbox-20260913/README.md` records three merge
+attempts against the live sandbox:
+
+- MR 5 merged with the response delivered, `classification: applied`
+- MR 6 merged with the response lost to a killed owner; the same business key,
+  replayed after the owner had gone, returned the original attempt with
+  `replayed: true` and the merge endpoint still shows exactly one PUT
+- MR 7 crashed before the PUT; the same key returned `approval_required` and
+  `not_attempted`, and the endpoint shows zero PUTs
+
+The safety property this story exists for — a replayed business key never issues a
+second native merge — holds on a live provider in both crash shapes.
+
+One deviation from the acceptance as written: the MR 6 replay reported the attempt
+as `applied` rather than leaving it uncertain, because the ledger already held the
+outcome when the owner died. The response was lost between the owner and the CLI,
+not between GitLab and the owner. A crash inside that narrower window was attempted
+and could not be timed.
