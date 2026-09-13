@@ -24,7 +24,7 @@ scope:
   path: spec-kinds/adapter/v2
 - confidence: inferred
   path: website
-revision: 10
+revision: 11
 ---
 ## Outcome
 
@@ -73,3 +73,17 @@ The two generated MR reads now run through the saved-connection CLI and narrow a
 An initial gate failure exposed a test assumption about concurrent setup's existing two-second metadata-lock bound. Runtime code is unchanged. The revised test still refuses early unavailability and requires every loser to converge after the winner completes; a deterministic held-lock refusal/recovery case and the full gate pass. The original failure and unconfirmed internal-stage attribution remain explicit in evidence.
 
 The local image build is not container business-runtime or dedicated GitLab sandbox evidence. The credential blocker remains open, this story remains active, and C14/C21 and the full GitLab phase are not complete. Next comes separately modeled native validation/guarded writes and the shared mutation foundation, before Kubernetes and PostgreSQL. No external publication or deployment occurred.
+
+## Sandbox evidence boundary — 2026-09-13
+
+`docs/evidence/gitlab-sandbox-20260913/README.md` covers `merge_request.get`,
+`merge_requests.list`, an inclusive update window, a followed continuation cursor and
+its refusal across a changed selection partition (`stale_cursor` at stage `dispatch`),
+all against a dedicated live GitLab as a non-administrator with `read_api` only.
+
+Two of this story's named cases are not covered and one may not be reachable as
+written. Deleting the source branch of an open merge request **closes it** in GitLab
+19.3.2: MR 2 was read as `state: closed`, `detailed_merge_status: not_open`,
+`merge_commit_sha: null`, not as an open MR with a deleted source. Unknown merge status
+was never produced. Either the acceptance needs rewording against what GitLab actually
+does, or it needs a construction nobody has found yet.
