@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: release-plan:connectors-v090
 kind: release-plan
-status: active
+status: implemented
 title: Release v0.9.0 from the live-provider GitLab acceptance
 relations:
 - informed_by: initiative:complete-local-connectors
-revision: 3
+revision: 4
 ---
 <!-- Starting point for a `release-plan` artifact. There is no `artifacts/kinds/release-plan.yaml` yet,
      so these sections are a suggestion rather than a declared expectation. -->
