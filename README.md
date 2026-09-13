@@ -39,9 +39,15 @@ stores credentials. See the [GitLab CLI guide](docs/local-gitlab-cli.md), the
 Disposable GitLab HTTPS and keyring fixtures prove saved-credential reuse after
 CLI, owner and keyring restarts. Explicit revalidation renews the 60-second
 validation evidence without credential re-entry. A dedicated live GitLab has now
-answered all eleven reads, the pinned validation and an approved merge; see
-[the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md). Merge-request
-read acceptance is the one GitLab item still open.
+answered all eleven reads, the pinned validation, an approved merge and a raced
+update; see [the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md).
+
+Ordinary HTTP endpoints no longer need adapter code. The
+[catalog provider](docs/local-catalog-provider.md) loads a bundle compiled from a
+pinned OpenAPI document — the GitLab bundle carries all 1,847 operations of the
+pinned source — and exposes a configured selection of them through the same local
+CLI, approval and audit path. Merge-request create and update have run against
+the live GitLab through it, with the accepted race boundary declared as a guard.
 
 Kubernetes now has the same local lifecycle binding: a saved bearer token, an
 identity validated by one SelfSubjectReview probe, and its three reads through the
