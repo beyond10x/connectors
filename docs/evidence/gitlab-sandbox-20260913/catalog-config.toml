@@ -1,0 +1,29 @@
+secret_service_socket = <redacted>
+format = "connectors-local/2"
+owner_uid = 1000
+
+[adapters]
+
+[approval_clock]
+format = "roughtime-clock/1"
+address = "192.36.143.134:2002"
+public_key = "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI="
+max_rate_error_ppm = 10000
+
+[adapters.forge]
+instance_id = "gitlab-sandbox"
+adapter_id = "catalog"
+configuration_revision = "a938c824cb1c2e3a3012c860571751643166141b91e6cf911460753e6a42bd73"
+protocol = "v1alpha1"
+private_protocol = "connectors-private/2"
+startup = "on-demand"
+restart = "never"
+
+[adapters.forge.permissions]
+profiles = ["gitlab.pat"]
+operations = ["merge_request.get", "branch.get", "merge_request.create", "merge_request.update"]
+
+[adapters.forge.executable]
+pat = <redacted>
+sha256 = "e48a84a5671d0162b5295c8fc90c210349d892f9efffd8e97048d67e31f99b2e"
+args = ["--local-config", "/home/timo/.cache/connectors-gitlab-20260912/gitlab-catalog.json"]

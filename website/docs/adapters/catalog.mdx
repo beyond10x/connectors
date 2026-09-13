@@ -9,6 +9,16 @@ Optional discovery and distribution of adapter bundles.
 
 The catalog design describes listing and locating precompiled adapter bundles with provenance and coverage. Directly configured adapter services do not require a catalog.
 
-Catalog information grants no installation or execution authority. The shared catalog contract is specified; no catalog adapter runtime is implemented here.
+Catalog information grants no installation or execution authority.
+
+The `provider` realization is implemented in the development checkout: one
+executable, `connectors-catalog-provider`, loads a digest-verified bundle built
+from a pinned OpenAPI document and exposes a declared selection of its operations
+through the local CLI, with no Rust per endpoint. Reads are one bound GET; writes
+are one bound POST, PUT, PATCH or DELETE under the host's approval, audit and
+attempt controls, with an optional declarative preflight/postflight guard. The
+GitLab bundle carries all 1,847 operations of the pinned source. A live GitLab has
+answered merge-request reads, create and update through it. The index service
+realization is not implemented.
 
 [Read the shared catalog contract](/contracts/catalog).

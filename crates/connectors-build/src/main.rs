@@ -72,6 +72,21 @@ enum Action {
     EssBoundary,
     /// Re-derive every recorded upstream source digest from its archived bytes.
     SourceHashes,
+    /// Build one provider bundle from its pinned OpenAPI source into a bundle
+    /// directory, and index it there. Deterministic; never touches the network.
+    Catalog {
+        #[arg(long)]
+        provider: String,
+        #[arg(long)]
+        source: PathBuf,
+        #[arg(long)]
+        directory: PathBuf,
+        #[arg(long)]
+        auth_profile: String,
+        /// Replace a bundle the index already carries for this provider.
+        #[arg(long)]
+        replace: bool,
+    },
     /// Run the local repository acceptance gates, without live provider credentials.
     Gate {
         /// Also check every target on the declared minimum Rust version.
@@ -122,6 +137,25 @@ fn main() -> Result<()> {
     }
     if let Action::SourceHashes = args.command {
         source_hashes::run(&root)?;
+        return Ok(());
+    }
+    if let Action::Catalog {
+        provider,
+        source,
+        directory,
+        auth_profile,
+        replace,
+    } = &args.command
+    {
+        let run = connectors_catalog::pipeline::run(&connectors_catalog::pipeline::Request {
+            provider,
+            source: &inside(&root, source)?,
+            directory: &inside(&root, directory)?,
+            auth_profile,
+            replace: *replace,
+        })
+        .map_err(|failure| failure.to_string())?;
+        println!("{}", serde_json::to_string_pretty(&run.coverage)?);
         return Ok(());
     }
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;

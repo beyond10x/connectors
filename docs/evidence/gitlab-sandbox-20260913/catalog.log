@@ -1,0 +1,66 @@
+setup init exit=0
+executable sha256 e48a84a5671d0162b5295c8fc90c210349d892f9efffd8e97048d67e31f99b2e configuration_revision a938c824cb1c2e3a3012c860571751643166141b91e6cf911460753e6a42bd73
+setup check exit=0
+connection conn_b1133a1560e745f6b63f021ccfda61d3_99e3edc9b26048f4b7b2062a783fec8e identity {'kind': 'gitlab.user', 'subject': '2'}
+key-init exit=0
+policy-set exit=0
+get-9 (merge_request.get): ok classification None cause None
+branch-applied (branch.get): ok classification None cause None
+get-outside (merge_request.get): ERR failure service_failure stage dispatch classification None cause None
+POSTs before: 0
+pinned head (applied) b268f4f4482cc79ecdb4803baf5db270824e31f6
+create-applied (merge_request.create): ok classification applied cause None
+opened merge request iid 10 POSTs now 0
+stale pin c64b58120d9ce0de849e215f32dad9f6095b5003
+create-stale (merge_request.create): ERR failure forbidden stage dispatch classification not_attempted cause None
+POSTs now 0
+create-conflict (merge_request.create): ERR failure forbidden stage dispatch classification refused cause None
+POSTs now 0
+update-applied (merge_request.update): ok classification applied cause None
+PUTs to 10: 0
+update-stale (merge_request.update): ERR failure forbidden stage dispatch classification not_attempted cause None
+PUTs to 10: 0
+pinned head (raced) 84e7a49c6ca9c4fc120b49e07ecce73f3db8aa98
+Traceback (most recent call last):
+  File "<stdin>", line 9, in <module>
+  File "/usr/lib/python3.14/urllib/request.py", line 187, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/urllib/request.py", line 493, in open
+    response = meth(req, response)
+  File "/usr/lib/python3.14/urllib/request.py", line 602, in http_response
+    response = self.parent.error(
+        'http', request, response, code, msg, hdrs)
+  File "/usr/lib/python3.14/urllib/request.py", line 531, in error
+    return self._call_chain(*args)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/lib/python3.14/urllib/request.py", line 464, in _call_chain
+    result = func(*args)
+  File "/usr/lib/python3.14/urllib/request.py", line 611, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+Traceback (most recent call last):
+  File "<stdin>", line 9, in <module>
+  File "/usr/lib/python3.14/urllib/request.py", line 187, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/urllib/request.py", line 493, in open
+    response = meth(req, response)
+  File "/usr/lib/python3.14/urllib/request.py", line 602, in http_response
+    response = self.parent.error(
+        'http', request, response, code, msg, hdrs)
+  File "/usr/lib/python3.14/urllib/request.py", line 531, in error
+    return self._call_chain(*args)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/lib/python3.14/urllib/request.py", line 464, in _call_chain
+    result = func(*args)
+  File "/usr/lib/python3.14/urllib/request.py", line 611, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+moved head to dcadb91c2073f0c9a1aae50bbca4f5135affd957
+create-raced (merge_request.create): ERR failure outcome_unknown stage dispatch classification unknown cause None
+branch head after race dcadb91c2073f0c9a1aae50bbca4f5135affd957
+POSTs total: 0 (before 0)
+MR 11 opened feature/create-raced dcadb91c2073f0c9a1aae50bbca4f5135affd957 'Opened while the head was moving'
+MR 10 opened feature/create-applied b268f4f4482cc79ecdb4803baf5db270824e31f6 'Retitled through the catalog provider'
+DONE

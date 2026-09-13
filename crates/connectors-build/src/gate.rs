@@ -87,7 +87,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "-D",
         "warnings",
     ]))?;
-    for adapter in ["gitlab", "kubernetes", "sql"] {
+    for adapter in ["gitlab", "kubernetes", "sql", "catalog-provider"] {
         let package = format!("connectors-{adapter}");
         execute(command("cargo").args([
             "build",

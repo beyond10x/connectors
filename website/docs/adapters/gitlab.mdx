@@ -44,8 +44,13 @@ as `--approval-file` and an optional `--idempotency-key` to `operations invoke`.
 Fresh preflight precedes one source-SHA-guarded PUT. Results carry mutation and
 audit observations; an unknown outcome never triggers another PUT, and an exact
 retained key can observe the original attempt after restart. This development
-feature is outside v0.2.0; its wider failure and sandbox acceptance remain open.
-Create/update workflows remain unfinished.
+feature is outside v0.2.0; its wider failure matrix remains open.
+`merge_request.update` runs the same way natively, but GitLab offers no SHA
+precondition for it: a pinned head that already differs is refused in preflight,
+and a head that moves during dispatch leaves the outcome uncertain rather than
+refused. `merge_request.create`, and update again, run through the
+[catalog provider](/adapters/catalog) from the pinned OpenAPI source with the same
+boundary declared as a guard; no further GitLab endpoint is bound by hand.
 
 ## Use saved credentials
 
