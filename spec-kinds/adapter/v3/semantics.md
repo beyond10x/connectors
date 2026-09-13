@@ -13,7 +13,7 @@ field to opt into unguarded public dispatch. Duplicate IDs across read/write set
 are refused. Generated `descriptor.json` remains the read projection;
 `private-descriptor.json` contains both sets with a separately derived revision.
 
-The initial write mapping is intentionally bounded: method `put`, exact pinned
+The write mapping is intentionally bounded: method `put` or `post`, exact pinned
 upstream operation/path, path/query parameters using the existing typed parameter
 binding, and a JSON-object body map. Each body member has a tagged source:
 `input` names one required scalar input property; `string`, `boolean` and

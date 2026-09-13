@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use connectors_core::{Error, ErrorCode, Result};
 use connectors_sdk::{
     AuthProbe, AuthenticatedHttp, AuthenticatedWrite, Credential, HttpResponse, HttpResponsePrefix,
+    WriteMethod,
 };
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
@@ -155,9 +156,9 @@ impl ScopedHttp {
 }
 
 impl ScopedHttp {
-    /// Trusted composition selects a single consuming PUT capability. This
-    /// conversion grants no approval or ledger authority. Business adapters
-    /// receiving only `AuthenticatedHttp` cannot perform it.
+    /// Trusted composition selects a single consuming write capability, one PUT
+    /// or one POST. This conversion grants no approval or ledger authority.
+    /// Business adapters receiving only `AuthenticatedHttp` cannot perform it.
     ///
     /// ```compile_fail
     /// use connectors_host::http::ScopedHttp;
@@ -263,20 +264,28 @@ impl ScopedHttp {
 struct ScopedWrite(ScopedHttp);
 #[async_trait]
 impl AuthenticatedWrite for ScopedWrite {
-    async fn put_json(
+    async fn send_json(
         self: Box<Self>,
+        method: WriteMethod,
         segments: &[&str],
         query: &[(&str, String)],
         body: &serde_json::Value,
     ) -> Result<HttpResponse> {
-        let response = self
-            .0
-            .request(reqwest::Method::PUT, segments, query)
-            .await?
-            .json(body)
-            .send()
-            .await
-            .map_err(provider_error)?;
+        let method = match method {
+            WriteMethod::Post => reqwest::Method::POST,
+            WriteMethod::Put => reqwest::Method::PUT,
+            WriteMethod::Patch => reqwest::Method::PATCH,
+            WriteMethod::Delete => reqwest::Method::DELETE,
+        };
+        let request = self.0.request(method, segments, query).await?;
+        // A null body sends no document at all, which is what a bodiless DELETE
+        // declares; any other value is sent as one JSON document.
+        let request = if body.is_null() {
+            request
+        } else {
+            request.json(body)
+        };
+        let response = request.send().await.map_err(provider_error)?;
         let status = response.status().as_u16();
         let mut headers = std::collections::BTreeMap::new();
         let mut bytes = 0_usize;
@@ -303,7 +312,7 @@ impl AuthenticatedWrite for ScopedWrite {
     }
 }
 
-// Deliberately private and separate from both the GET and the consuming PUT
+// Deliberately private and separate from both the GET and the consuming write
 // capability. The path is fixed at construction, so no caller can retarget it.
 struct ScopedProbe {
     http: ScopedHttp,
