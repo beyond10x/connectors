@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: release-plan:connectors-v0100
 kind: release-plan
-status: active
+status: implemented
 title: 'Release v0.10.0: GitLab writes from the pinned source through the catalog provider'
 relations:
 - informed_by: initiative:complete-local-connectors
-revision: 2
+revision: 3
 ---
 ## Scope
 
