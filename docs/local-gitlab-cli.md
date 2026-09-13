@@ -18,6 +18,58 @@ target/release/connectors --output json setup check
 An absolute `--config` and `--state-dir` can select a separate private placement.
 Existing installations and credentials are not automatically imported.
 
+## Run a disposable GitLab sandbox
+
+A local GitLab in Docker is enough to exercise every operation below. Choose a
+directory outside the repository for its certificates, credentials and keyring.
+
+**The certificate must be a chain.** A single self-signed certificate with
+`basicConstraints CA:TRUE`, served as the end-entity certificate, is accepted by
+`curl` and rejected by the adapter's rustls client, which opens no connection at
+all. Issue a CA and a leaf signed by it:
+
+```sh
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 825 \
+  -keyout ca.key -out ca.crt -subj "/CN=Connectors Sandbox CA" \
+  -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign"
+openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj "/CN=localhost"
+printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:localhost,IP:127.0.0.1\n' > leaf.ext
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+  -out server.crt -days 825 -sha256 -extfile leaf.ext
+cat server.crt ca.crt > fullchain.crt
+```
+
+`ca_file` in the native configuration names `ca.crt`; GitLab serves `fullchain.crt`.
+
+```sh
+docker run -d --name gitlab-sandbox --hostname localhost --shm-size 256m \
+  -p 8929:8929 -p 2224:22 \
+  -e GITLAB_OMNIBUS_CONFIG="external_url 'https://localhost:8929'; nginx['ssl_certificate'] = '/etc/gitlab/ssl/fullchain.crt'; nginx['ssl_certificate_key'] = '/etc/gitlab/ssl/server.key'; letsencrypt['enable'] = false; gitlab_rails['gitlab_shell_ssh_port'] = 2224; prometheus_monitoring['enable'] = false;" \
+  -v gitlab-sandbox-config:/etc/gitlab -v gitlab-sandbox-data:/var/opt/gitlab \
+  -v "$PWD/ssl":/etc/gitlab/ssl:ro gitlab/gitlab-ce:latest
+```
+
+The container reports `healthy` before nginx and puma are running. Poll
+`/api/v4/version` instead; it answers 401 once the API is up.
+
+Read the initial root password from `/etc/gitlab/initial_root_password` inside the
+container, or mint a token with `gitlab-rails runner`. Use the administrator only to
+set the sandbox up. Create a separate non-administrator user, add it to the project,
+and give the operations under test that user's `read_api` token — an administrator's
+token proves nothing about permission refusals.
+
+CI evidence needs a registered runner. GitLab 19 removed registration tokens; create
+a project runner through `POST /user/runners` with `runner_type=project_type`, then
+register with `gitlab-runner register --token`. A runner container on the host
+network reaches `https://localhost:8929`; put `ca.crt` in `/etc/gitlab-runner/certs/`.
+
+The Secret Service binding refuses a desktop keyring whose default collection alias
+is not `login`. Run a task-owned `dbus-daemon --session` and
+`gnome-keyring-daemon --foreground --components=secrets --unlock`, and name that
+socket in the configuration's `secret_service_socket`. See
+[the qualified binding](local-secret-service.md).
+
 ## Configure the native target
 
 Create an owner-only native JSON file, in an admitted directory without symlinks.
@@ -208,7 +260,10 @@ expired or missing credential requires repair; revalidation cannot revive it.
 Concurrent repair/revoke or another successful revalidation refuses stale results.
 An unknown acknowledgement is observed through connection status without replay.
 Disposable HTTPS/keyring fixtures cover restart reuse and revalidation after real
-evidence expiry. Dedicated GitLab sandbox acceptance remains open.
+evidence expiry. Dedicated sandbox acceptance for the reads, the persistent journey
+and pinned MR validation is recorded in
+[docs/evidence/gitlab-sandbox-20260913](evidence/gitlab-sandbox-20260913/README.md).
+Guarded merge acceptance remains open.
 
 Kubernetes and PostgreSQL retain their existing explicit service operations but
 do not yet have this local connection/owner binding. GitLab MR and changed-record
