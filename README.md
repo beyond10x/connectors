@@ -38,8 +38,10 @@ stores credentials. See the [GitLab CLI guide](docs/local-gitlab-cli.md), the
 
 Disposable GitLab HTTPS and keyring fixtures prove saved-credential reuse after
 CLI, owner and keyring restarts. Explicit revalidation renews the 60-second
-validation evidence without credential re-entry. Dedicated GitLab sandbox
-acceptance remains open.
+validation evidence without credential re-entry. A dedicated live GitLab has now
+answered all eleven reads, the pinned validation and an approved merge; see
+[the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md). Merge-request
+read acceptance is the one GitLab item still open.
 
 Kubernetes now has the same local lifecycle binding: a saved bearer token, an
 identity validated by one SelfSubjectReview probe, and its three reads through the
@@ -89,8 +91,9 @@ On current `main`, [local approval commands](docs/local-approvals.md) manage pol
 prepare exact subjects and issue protected proofs for explicitly selected private-protocol-two
 write adapters. The development checkout also joins a local-only
 [guarded GitLab merge](docs/local-gitlab-merge.md) through private protocol two,
-including approval, audit and same-key result observation. Its wider failure and
-sandbox acceptance remain open. MCP binding and complete multi-provider
+including approval, audit and same-key result observation. A live GitLab merge
+request has been merged through it, and a replayed business key after an owner crash
+issued no second merge. The wider write failure matrix remains open. MCP binding and complete multi-provider
 acceptance remain implementation work. The executable
 also provides `describe`, `invoke` and `serve`.
 
