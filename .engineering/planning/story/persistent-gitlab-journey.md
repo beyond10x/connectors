@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:persistent-gitlab-journey
 kind: story
-status: active
+status: implemented
 title: Persist and reuse an admitted GitLab connection across CLI and owner restarts
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -37,7 +37,7 @@ scope:
   path: docs
 - confidence: cited
   path: ess/domains
-revision: 18
+revision: 19
 ---
 ## Acceptance
 

@@ -57,7 +57,7 @@ scope:
   path: spec-kinds/adapter
 - confidence: inferred
   path: website
-revision: 25
+revision: 26
 ---
 ## Outcome
 
@@ -240,3 +240,18 @@ Two failures are retained with their corrections: the first gate exposed deadlin
 The next concrete runtime case is task-owned metadata unavailability after a held native response proves a write effect: check the live result, final disclosure admission, restart observation, retained key and exact provider effect count. This is a composed outage, not an isolated per-port acknowledgement injection. Any conflict between known-result preservation and final result-access admission must be resolved against the owning contracts; do not weaken current policy checks to pass a fixture. docs/gitlab-write-failure-matrix.md records the remaining joined acknowledgement/concurrency cases and the separate unresolved original-audit persistence/correlation binding.
 
 The story, initiative and goal remain active. Dedicated GitLab sandbox input, C14 create/update head-guard semantics, other selected workflows and isolated distributable reproducibility remain open. Complete GitLab still precedes Kubernetes including Helm, PostgreSQL, MCP and remaining providers. Root is the single writer on primary main; no new decomposition, critic panel, sub-agent or task-owned linked tree is needed for this increment. The two separately active managed trees are preserved. Atlas bot authority is verified against clean local and remote main; this internal checkpoint creates no release, push, deployment or Atlas registration. The driver blocker and existing sandbox input request remain unchanged.
+
+## Sandbox evidence boundary — 2026-09-13
+
+The dedicated sandbox evidence recorded on 2026-09-13 does **not** cover this story's
+acceptance. `docs/evidence/gitlab-sandbox-20260913/README.md` states plainly that
+`merge_request.merge`, its approval chain and the lost-response replay were not
+exercised. The `test_result` recorded against this artifact on that date attests only
+that the dedicated GitLab sandbox now exists and that the read and validation paths
+work against it. It is not a merge result, and no later move may be decided on it.
+
+What this story still needs: a second merge request, the clock configuration
+`story:local-bounded-clock` describes, `approvals policy-set` / `prepare` /
+`issue --approve-subject --proof-output`, an approved merge whose response is lost,
+and a replay of the same business key after CLI and owner restart that returns the
+original uncertain attempt without a second native merge.

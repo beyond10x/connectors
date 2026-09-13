@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:gitlab-ci-runtime
 kind: story
-status: active
+status: implemented
 title: Read exact-commit GitLab pipelines, jobs and bounded traces through the local CLI
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -37,7 +37,7 @@ scope:
   path: spec-kinds/adapter/v2
 - confidence: cited
   path: website
-revision: 10
+revision: 11
 ---
 ## Acceptance
 
