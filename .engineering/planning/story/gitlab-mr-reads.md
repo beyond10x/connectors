@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:gitlab-mr-reads
 kind: story
-status: active
+status: implemented
 title: Read GitLab merge requests and bounded update windows
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -24,7 +24,7 @@ scope:
   path: spec-kinds/adapter/v2
 - confidence: inferred
   path: website
-revision: 11
+revision: 13
 ---
 ## Outcome
 
@@ -87,3 +87,21 @@ written. Deleting the source branch of an open merge request **closes it** in Gi
 `merge_commit_sha: null`, not as an open MR with a deleted source. Unknown merge status
 was never produced. Either the acceptance needs rewording against what GitLab actually
 does, or it needs a construction nobody has found yet.
+
+## Both named cases produced — 2026-09-13
+
+The boundary note above is superseded. Both cases its acceptance names were produced
+against the live sandbox and read through the CLI:
+
+- **Nullable source.** A fork of `root/connectors-sandbox` opened a merge request to
+  the parent; the fork project was then destroyed. The merge request reads back with
+  `source_project_id: null`, `state: closed`, `detailed_merge_status: not_open`.
+- **Unusual merge status.** A merge request whose change conflicts with `main` reads
+  back with `detailed_merge_status: conflict`.
+
+The earlier attempt deleted the source *branch*, which GitLab answers by closing the
+merge request while keeping `source_project_id`. It is the source **project** that has
+to go. The conclusion that the acceptance might be unsatisfiable was wrong.
+
+One field the schema allows to be null was not produced: `sha` stays set, because
+GitLab retains a merge request's recorded head SHA after its source project is gone.

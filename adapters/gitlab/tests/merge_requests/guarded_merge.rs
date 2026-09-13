@@ -1,5 +1,5 @@
 use super::*;
-use connectors_sdk::{AuthenticatedWrite, WriteOutcome};
+use connectors_sdk::{AuthenticatedWrite, WriteMethod, WriteOutcome};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn input() -> Value {
@@ -17,13 +17,15 @@ struct Put {
 }
 #[async_trait::async_trait]
 impl AuthenticatedWrite for Put {
-    async fn put_json(
+    async fn send_json(
         self: Box<Self>,
+        method: WriteMethod,
         path: &[&str],
         query: &[(&str, String)],
         body: &Value,
     ) -> Result<HttpResponse> {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(method, WriteMethod::Put);
         assert_eq!(
             path,
             ["projects", "org/project", "merge_requests", "1", "merge"]

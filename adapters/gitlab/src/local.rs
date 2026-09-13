@@ -152,12 +152,14 @@ impl Local {
         let mut bootstrap_v2 = bootstrap.clone();
         bootstrap_v2.descriptor =
             serde_json::to_string(&adapter.private_descriptor()).map_err(|_| Failure::Protocol)?;
-        bootstrap_v2.requirements.push(Requirement {
-            operation: "merge_request.merge".into(),
-            profile: auth::PROFILE_ID.into(),
-            scopes: BTreeSet::from(["api".into()]),
-            effect: Effect::Write,
-        });
+        for write in ["merge_request.merge", "merge_request.update"] {
+            bootstrap_v2.requirements.push(Requirement {
+                operation: write.into(),
+                profile: auth::PROFILE_ID.into(),
+                scopes: BTreeSet::from(["api".into()]),
+                effect: Effect::Write,
+            });
+        }
         bootstrap_v2.validate_for(runtime::PrivateProtocol::V2)?;
         Ok(Self {
             bootstrap,
@@ -199,20 +201,34 @@ impl runtime::Adapter for Local {
         document: Secret,
         input: Value,
     ) -> Result<Box<dyn runtime::PreparedWrite>> {
-        if operation != "merge_request.merge" {
-            return Err(Failure::Unsupported);
-        }
         let http = Arc::new(self.authenticated(document)?);
-        let prepared = self
-            .adapter
-            .prepare_merge(http.clone(), partition, input)
-            .await
-            .map_err(Failure::from_provider)?;
-        let http = Arc::try_unwrap(http).map_err(|_| Failure::Protocol)?;
-        Ok(Box::new(Merge {
-            prepared,
-            http: http.into_write(),
-        }))
+        match operation {
+            "merge_request.merge" => {
+                let prepared = self
+                    .adapter
+                    .prepare_merge(http.clone(), partition, input)
+                    .await
+                    .map_err(Failure::from_provider)?;
+                let http = Arc::try_unwrap(http).map_err(|_| Failure::Protocol)?;
+                Ok(Box::new(Merge {
+                    prepared,
+                    http: http.into_write(),
+                }))
+            }
+            "merge_request.update" => {
+                let prepared = self
+                    .adapter
+                    .prepare_update(http.clone(), partition, input)
+                    .await
+                    .map_err(Failure::from_provider)?;
+                let http = Arc::try_unwrap(http).map_err(|_| Failure::Protocol)?;
+                Ok(Box::new(Update {
+                    prepared,
+                    http: http.into_write(),
+                }))
+            }
+            _ => Err(Failure::Unsupported),
+        }
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline> {
         if profile != auth::PROFILE_ID {
@@ -255,6 +271,16 @@ struct Merge {
 }
 #[async_trait::async_trait]
 impl runtime::PreparedWrite for Merge {
+    async fn execute(self: Box<Self>) -> connectors_sdk::WriteOutcome<Value> {
+        self.prepared.execute(self.http).await
+    }
+}
+struct Update {
+    prepared: connectors_gitlab::PreparedUpdate,
+    http: Box<dyn connectors_sdk::AuthenticatedWrite>,
+}
+#[async_trait::async_trait]
+impl runtime::PreparedWrite for Update {
     async fn execute(self: Box<Self>) -> connectors_sdk::WriteOutcome<Value> {
         self.prepared.execute(self.http).await
     }

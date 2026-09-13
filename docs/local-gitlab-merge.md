@@ -1,5 +1,24 @@
 # Guarded GitLab merge in the development checkout
 
+This guide covers two native writes. `merge_request.merge` is guarded: GitLab checks
+the source SHA atomically. `merge_request.update` is **not** guarded — GitLab's update
+endpoint carries no SHA precondition — and runs under an accepted race boundary
+described in [the raced update contract](../adapters/gitlab/contracts/raced-update.md).
+Permit it in the adapter's operations and in the approval policy exactly like merge;
+its input is `project`, `iid`, `title` and the pinned `sha`.
+
+`merge_request.create` has no native binding. It runs through the
+[catalog provider](local-catalog-provider.md) straight from the pinned GitLab OpenAPI
+source, with the same race boundary declared as a guard in configuration; that guide
+also runs update the same way. No further GitLab endpoint is bound by hand.
+
+A pinned head that already differs is refused before any write. A head that moves
+during dispatch returns an uncertain outcome, never a refusal. The postflight
+comparison is best effort: a merge request's recorded head is eventually consistent
+with its source branch, and a live GitLab has answered the update PUT with the pinned
+head while the branch had already moved.
+
+
 The local CLI can call `merge_request.merge` through the approval, audit and
 mutation coordinator. This development work extends the v0.2.0 source release;
 it is not a completed GitLab provider batch. Dedicated sandbox acceptance is

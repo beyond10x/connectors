@@ -1,0 +1,33 @@
+{
+  "format": "connectors-catalog-local/1",
+  "instance": "gitlab-sandbox",
+  "provider": "gitlab",
+  "bundle_directory": "<repo>/adapters/catalog/generated/bundles",
+  "api_base": "https://localhost:8929/api/v4",
+  "ca_file": "<sandbox>/ssl/ca.crt",
+  "auth": {
+    "profile": "gitlab.pat",
+    "header": "PRIVATE-TOKEN",
+    "bearer": false,
+    "label": "GitLab personal access token",
+    "identity": {"path": "user", "kind": "gitlab.user", "subject_pointer": "/id"},
+    "scopes": {"path": "personal_access_tokens/self", "pointer": "/scopes"},
+    "minimum_scopes": ["api"]
+  },
+  "operations": [
+    {"id": "merge_request.get", "operation_id": "getApiV4ProjectsIdMergeRequestsMergeRequestIid", "effect": "read"},
+    {"id": "branch.get", "operation_id": "getApiV4ProjectsIdRepositoryBranchesBranch", "effect": "read"},
+    {"id": "merge_request.create", "operation_id": "postApiV4ProjectsIdMergeRequests", "effect": "write",
+     "description": "Open a merge request whose source head was read in preflight",
+     "guard": {"preflight": {"operation_id": "getApiV4ProjectsIdRepositoryBranchesBranch",
+                             "values": {"id": "id", "branch": "body.source_branch"},
+                             "pointer": "/commit/id", "expect": "sha"},
+               "postflight": {"pointer": "/sha", "expect": "sha"}}},
+    {"id": "merge_request.update", "operation_id": "putApiV4ProjectsIdMergeRequestsMergeRequestIid", "effect": "write",
+     "description": "Update a merge request whose head was read in preflight",
+     "guard": {"preflight": {"operation_id": "getApiV4ProjectsIdMergeRequestsMergeRequestIid",
+                             "values": {"id": "id", "merge_request_iid": "merge_request_iid"},
+                             "pointer": "/sha", "expect": "sha"},
+               "postflight": {"pointer": "/sha", "expect": "sha"}}}
+  ]
+}

@@ -3,8 +3,10 @@
 This selects the first native write in the current GitLab phase. The development
 binding exposes it only through explicitly selected private protocol two;
 sandbox acceptance remains open. Existing MR reads and validation remain
-observations. Create/update
-retain the open C14 atomic-head decision; this document does not weaken it.
+observations. Update is bound separately under an accepted race boundary; see
+[raced merge-request update](raced-update.md). Create is not bound natively at
+all: it runs through the catalog provider from the pinned OpenAPI source, as the
+declarative-runtime decision requires for further ordinary HTTP endpoints.
 
 `merge_request.merge` is an approval-required, local-only Write. Its input reuses
 the authored ValidationInput: allowlisted project, positive project-local IID,

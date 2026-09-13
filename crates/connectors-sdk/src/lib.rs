@@ -85,18 +85,42 @@ pub trait AuthenticatedHttp: Send + Sync {
     }
 }
 
+/// The HTTP method of one admitted native write. A generated write mapping
+/// selects exactly one; the capability carries no other verb.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WriteMethod {
+    Post,
+    Put,
+    Patch,
+    Delete,
+}
+
 /// A single admitted native write. Composition supplies exact credentials and
 /// destination restrictions after the host gate. GET capabilities cannot be
 /// converted into this port, and calling it consumes the capability even when
 /// the response is lost. Implementations must not retry or follow redirects.
 #[async_trait]
 pub trait AuthenticatedWrite: Send {
+    /// Send one JSON document with the selected method. The capability is
+    /// consumed whether or not a response arrives.
+    async fn send_json(
+        self: Box<Self>,
+        method: WriteMethod,
+        segments: &[&str],
+        query: &[(&str, String)],
+        body: &Value,
+    ) -> Result<HttpResponse>;
+
+    /// One PUT, through `send_json`.
     async fn put_json(
         self: Box<Self>,
         segments: &[&str],
         query: &[(&str, String)],
         body: &Value,
-    ) -> Result<HttpResponse>;
+    ) -> Result<HttpResponse> {
+        self.send_json(WriteMethod::Put, segments, query, body)
+            .await
+    }
 }
 
 /// A check-specific probe bound to one provider endpoint fixed by the trusted
