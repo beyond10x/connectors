@@ -187,20 +187,78 @@ protected entry. Evidence lifetime is 60 seconds.
 After the refused repair, `connections describe` still reported `state: ready` with
 identity subject `2`. The failed repair preserved the valid existing credential.
 
+## Guarded merge
+
+`story:guarded-gitlab-merge`. Run through a second private configuration:
+`format = "connectors-local/2"`, `private_protocol = "connectors-private/2"`,
+`merge_request.merge` added to the adapter's permitted operations, a
+`[approval_clock]` table naming roughtime.se `192.36.143.134:2002`, and a separate
+`api`-scope token for the same delegated user. Approval issuer initialized with
+`approvals key-init`; policy `{"operations":["merge_request.merge"]}` published at
+revision 1; each attempt prepared with `approvals prepare` and issued to an
+owner-only proof file with `approvals issue --approve-subject --proof-output`.
+
+`approvals clock-check` returned a bounded observation 2.07 s wide.
+
+### What GitLab refused first
+
+The first merge PUT was answered **401**, while the preflight GET on the same
+connection returned 200. GitLab's own log shows the request authenticated:
+`username: sandbox-dev, user_id: 2`. GitLab answers 401, not 403, when an identified
+user may not merge into a protected branch, and `main` allowed merges by Maintainers
+only while `sandbox-dev` is a Developer.
+
+This is a sandbox configuration fact, not an adapter defect, and it is only visible
+because the operations ran as a delegated user. An administrator token would have
+merged and proved nothing. `main` was then reprotected with
+`merge_access_level=30`.
+
+### Three attempts
+
+| MR | what happened | classification | PUTs to the merge endpoint | merged |
+|---|---|---|---|---|
+| 5 | response delivered | `applied` | 2 — the 401 above, then the merge | `29be68d0ffeb67ac01854e9a537cf53bf3a3ea19` |
+| 6 | owner killed on the PUT | `unknown`, cause `unavailable` at stage `response` | 1 | `88bfb9b61b90a2560a0888d535145254f45fb3cc` |
+| 7 | owner killed before the PUT | `unknown`, cause `unavailable` at stage `response` | 0 | not merged |
+
+### The replays
+
+**MR 6 — the response was lost and the merge had happened.** Invoking the same
+idempotency key after the owner had died, with no owner running, returned
+`ok: true`, `classification: applied`, `replayed: true`, carrying the original
+attempt and `original_request_id`. The merge endpoint still shows **exactly one
+PUT**. No second native merge was issued.
+
+One honest nuance: the replay reported the attempt as `applied`, not as still
+uncertain. Terminal replay is documented as passive, so the ledger already held the
+outcome — the response was lost between the owner and the CLI, not between GitLab
+and the owner. The attempt that the caller saw as uncertain is the attempt the
+replay returned, and it returned it without merging again.
+
+**MR 7 — the outcome was never recorded and no merge happened.** The same key
+returned `approval_required`, `classification: not_attempted`, `replayed: false`.
+The abandoned preparation was fenced rather than resumed, and a fresh proof is
+required. The merge endpoint shows **zero PUTs**; MR 7 is still open.
+
 ## Repository gate
 
-`cargo run --locked -p connectors-build -- gate --msrv` on the commit these changes
-sit on: `gate: all checks passed`, process exit 0. `plan artifact validate` read 343
-artifacts in `.engineering/planning` and reported `valid`.
+`cargo run --locked -p connectors-build -- gate --msrv`, run twice: once before the
+guarded merge work and once after. The second run's full log was retained:
+**35 steps, every one exit 0, 85 test targets**, `gate: all checks passed`, process
+exit 0. `plan artifact validate` read 343 artifacts in `.engineering/planning` and
+reported `valid`.
 
-The run's own output was truncated to its last 40 lines when it was captured, so the
-per-step count is not recorded here. Only the final verdict is.
+The first run's output was truncated to its last 40 lines when captured, so only its
+verdict is known. The counts above are the second run's.
 
 ## What this evidence does not cover
 
-- **`merge_request.merge` is unproven.** The guarded write path, its approval chain
-  (`approvals policy-set`, `prepare`, `issue`) and the lost-response replay acceptance of
-  `story:guarded-gitlab-merge` were not exercised. That story stays `active`.
+- **No merge whose response was lost before the outcome reached the ledger.** The
+  MR 6 crash lost the response between the owner and the CLI; the ledger already held
+  `applied`. A crash between GitLab's acknowledgement and the ledger write would leave
+  a genuinely unreconciled attempt, and the kill could not be timed into that window.
+- No key rotation, revocation or retirement during a live write; no policy revocation
+  mid-preflight; no approval replay after the proof expired.
 - **No open MR with a deleted source branch.** Deleting the source branch of MR 2
   closed it, so what was read is `state: closed`, `detailed_merge_status: not_open`,
   `merge_commit_sha: null`. GitLab does not leave such an MR open, so this shape of the
