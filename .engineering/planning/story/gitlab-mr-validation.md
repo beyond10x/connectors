@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: story:gitlab-mr-validation
 kind: story
-status: active
+status: implemented
 title: Validate a pinned GitLab MR head and selected pipeline through the CLI
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -21,7 +21,7 @@ scope:
   path: docs
 - confidence: inferred
   path: website
-revision: 6
+revision: 7
 ---
 ## Outcome
 
