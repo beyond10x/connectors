@@ -2,6 +2,64 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-09-13
+
+GitLab merge-request create and update now run from the pinned OpenAPI document
+through a generic provider, with no adapter code per endpoint. This is the first
+release of the catalog track's runtime half; the native GitLab adapter gains a
+raced update and nothing else.
+
+### Catalog provider
+
+- `connectors-build catalog` compiles a pinned OpenAPI 3.0 or 3.1 document, JSON
+  or YAML, into a digest-verified provider bundle and indexes it. The committed
+  GitLab bundle carries all 1,847 operations of `openapi_v3.yaml` with none
+  unsupported, and a test refuses a committed bundle a fresh run would not
+  reproduce.
+- `connectors-catalog-provider` is a new adapter executable behind the same
+  private protocol as `connectors-gitlab`. Its configuration selects operations by
+  `operationId`, declares each one's effect, names one token-header auth profile
+  with declarative identity and scope probes, and may attach a guard: a preflight
+  read that refuses before any request when a pinned value already differs, and a
+  postflight comparison that leaves the outcome uncertain — never refused — when
+  it differs afterwards. Reads are one bound GET; writes are one bound POST, PUT,
+  PATCH or DELETE under the host's approval, audit and attempt controls.
+- Against the live GitLab sandbox, through the provider: merge-request reads, a
+  create that opened MR 10 at its pinned head, a stale pin refused with no request,
+  a duplicate create refused by GitLab's 409, an update that retitled MR 10, and a
+  create whose branch moved mid-flight, which opened MR 11 at the moved head and
+  was classified `unknown`. One request per attempt that reached dispatch.
+- `AuthenticatedWrite` gains `send_json` with a `WriteMethod`; `put_json` remains
+  as a provided method. The v3 write generator accepts `post` as well as `put`.
+
+### Native GitLab
+
+- `merge_request.update` is a native write under the accepted C14 race boundary:
+  preflight read, unguarded PUT, best-effort postflight comparison. The sandbox
+  showed the comparison can miss a move: GitLab answered the PUT with the pinned
+  head while the branch had already moved. `decision-blocker:gitlab-mr-create-update-head-guard`
+  is cleared with that finding recorded.
+- `story:gitlab-mr-reads` closes: a fork's merge request whose source project was
+  destroyed reads with `source_project_id: null`, and a conflicting change reads
+  `detailed_merge_status: conflict`.
+- `merge_request.create` was deliberately **not** added to the native adapter.
+
+Full record with identities, commands and outcomes:
+[docs/evidence/gitlab-sandbox-20260913](docs/evidence/gitlab-sandbox-20260913/README.md).
+
+### Limitations
+
+- **The catalog bundle carries no request or response schemas.** A write body is
+  passed through as supplied and validated only by the provider.
+- **One provider has run through the engine.** The handoff specification requires
+  a second ordinary HTTP provider and TOML-authored actions through the same
+  engine before it is satisfied.
+- **The postflight comparison is not detection.** A merge request's recorded head
+  is eventually consistent with its branch; a match means no move was observed.
+- Helm release reads stay fixture-verified; MCP stays contracts only; one
+  instance, one project, one runner. Source release only: no binary, container
+  image or website deployment.
+
 ## 0.9.0 — 2026-09-13
 
 Every GitLab claim in 0.8.0 was verified against a fixture. This release verifies
