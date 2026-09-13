@@ -187,6 +187,15 @@ protected entry. Evidence lifetime is 60 seconds.
 After the refused repair, `connections describe` still reported `state: ready` with
 identity subject `2`. The failed repair preserved the valid existing credential.
 
+## Repository gate
+
+`cargo run --locked -p connectors-build -- gate --msrv` on the commit these changes
+sit on: `gate: all checks passed`, process exit 0. `plan artifact validate` read 343
+artifacts in `.engineering/planning` and reported `valid`.
+
+The run's own output was truncated to its last 40 lines when it was captured, so the
+per-step count is not recorded here. Only the final verdict is.
+
 ## What this evidence does not cover
 
 - **`merge_request.merge` is unproven.** The guarded write path, its approval chain
@@ -196,7 +205,13 @@ identity subject `2`. The failed repair preserved the valid existing credential.
   closed it, so what was read is `state: closed`, `detailed_merge_status: not_open`,
   `merge_commit_sha: null`. GitLab does not leave such an MR open, so this shape of the
   `story:gitlab-mr-reads` acceptance may not be reachable as written. MR 3 gives a
-  second closed MR. Unknown merge status is still unproven.
+  second closed MR.
+- **Unknown merge status was not produced.** MR 4 was created and read through the CLI
+  as fast as the commands allow, to catch `checking` or `preparing` before the
+  mergeability check finished. The first read already returned `mergeable`. On a local
+  instance with one small project the check settles faster than a CLI invocation
+  starts, so this case needs either a contrived slow instance or a different
+  construction.
 - The runner's own CA copy must be updated whenever the sandbox certificate changes.
   It was not, after the chain was reissued, and four pipelines sat `pending` with the
   runner reporting `online` — the failure is silent from the API's side.
