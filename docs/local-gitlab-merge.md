@@ -2,8 +2,15 @@
 
 The local CLI can call `merge_request.merge` through the approval, audit and
 mutation coordinator. This development work extends the v0.2.0 source release;
-it is not a completed GitLab provider batch. Dedicated sandbox acceptance,
-recovery across storage acknowledgements and the wider write failure matrix remain open.
+it is not a completed GitLab provider batch. Dedicated sandbox acceptance is
+recorded in [docs/evidence/gitlab-sandbox-20260913](evidence/gitlab-sandbox-20260913/README.md);
+recovery across every storage acknowledgement and the wider write failure matrix
+remain open.
+
+The merging identity needs more than `api` scope. GitLab answers a merge request
+**401**, not 403, when it has identified the user and that user may not merge into a
+protected branch, so a permission problem reads as an authentication problem. Check
+the branch's `merge_access_levels` before concluding the credential is wrong.
 
 Start with the [saved GitLab connection guide](local-gitlab-cli.md). Deliberately
 select `format = "connectors-local/2"` in the host configuration and
