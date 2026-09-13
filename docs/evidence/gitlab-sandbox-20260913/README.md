@@ -240,6 +240,105 @@ returned `approval_required`, `classification: not_attempted`, `replayed: false`
 The abandoned preparation was fenced rather than resumed, and a fresh proof is
 required. The merge endpoint shows **zero PUTs**; MR 7 is still open.
 
+## Raced merge-request update
+
+`merge_request.update` was added after the operator accepted the C14 race boundary.
+GitLab's update endpoint carries no source-SHA precondition, so the write is a
+preflight read, an unguarded PUT and a postflight comparison.
+
+Three runs against merge request 9, pinned to head `b6f6c959`:
+
+| pinned sha | what happened | result | PUTs |
+|---|---|---|---|
+| current head | ordinary update | `applied`, title changed | 1 |
+| `000000…` | head already differs | `forbidden` at stage `admission`, `not_attempted` | 0 |
+| current head, branch moved mid-flight | see below | `applied` | 1 |
+
+The refused run left the title untouched and issued no PUT at all: a head difference
+seen in preflight is the one place it is definite.
+
+### The postflight comparison is not detection
+
+The third run is the important one. A commit moving `feature/conflicting` from
+`b6f6c959` to `d7abb779` was pushed the moment the preflight GET appeared in GitLab's
+access log, before the update PUT was sent.
+
+- The PUT response reported `sha: b6f6c959`, the pinned head.
+- The postflight comparison therefore passed, and the write was classified `applied`.
+- A read taken immediately afterwards reported `sha: d7abb779`.
+
+A merge request's recorded head is eventually consistent with its source branch. The
+postflight read can confirm a head that did not move and can catch a move it happens
+to see; it cannot prove that none occurred. The decision record said a postflight read
+that finds the head changed reports the write as possibly applied — true, and
+incomplete. It may not find it.
+
+This does not reopen the decision, because a precondition the provider does not offer
+cannot be built here. It narrows what may be claimed, and
+`adapters/gitlab/contracts/raced-update.md` now says so.
+
+### Create is not bound natively
+
+`merge_request.create` was not added to the native adapter. The declarative-runtime
+decision says GitLab is not expanded endpoint by endpoint, so create — and update
+again — ran through the catalog provider instead, below.
+
+## Through the catalog provider
+
+`connectors-catalog-provider` bound to the GitLab bundle built from the pinned
+`openapi_v3.yaml` (source SHA-256 `f9e830bd…`, 1,847 operations, 0 unsupported),
+under a fresh private configuration. Executable SHA-256
+`e48a84a5671d0162b5295c8fc90c210349d892f9efffd8e97048d67e31f99b2e`, configuration
+revision `a938c824…`; the native configuration is [gitlab-catalog.json](gitlab-catalog.json),
+the host configuration [catalog-config.toml](catalog-config.toml), the script
+[catalog.sh](catalog.sh) and its log [catalog.log](catalog.log). Same delegated
+user (`sandbox-dev`, id 2) with the `api` token; identity and scopes were read by
+the declared probes, not by adapter code.
+
+| attempt | operation | pin | result | requests | record |
+|---|---|---|---|---|---|
+| read MR 9 | `merge_request.get` | — | `ok`, status 200, head `d7abb779` | 1 GET | [catalog-get-9.json](catalog-get-9.json) |
+| read branch | `branch.get` | — | `ok`, status 200 | 1 GET | [catalog-branch-applied.json](catalog-branch-applied.json) |
+| read MR 999999 | `merge_request.get` | — | `service_failure`, `service_code: not_found` | 1 GET | [catalog-get-outside.json](catalog-get-outside.json) |
+| create | `merge_request.create` | `b268f4f4`, the branch head | `applied`, **MR 10** opened at that head | 1 POST → 201 | [catalog-create-applied.json](catalog-create-applied.json) |
+| create, stale pin | `merge_request.create` | `c64b5812`, main's head | `forbidden`, `not_attempted` | 0 | [catalog-create-stale.json](catalog-create-stale.json) |
+| create again | `merge_request.create` | `b268f4f4` | `forbidden`, `refused` | 1 POST → 409 | [catalog-create-conflict.json](catalog-create-conflict.json) |
+| update | `merge_request.update` | `b268f4f4` | `applied`, MR 10 retitled | 1 PUT → 200 | [catalog-update-applied.json](catalog-update-applied.json) |
+| update, stale pin | `merge_request.update` | `c64b5812` | `forbidden`, `not_attempted` | 0 | [catalog-update-stale.json](catalog-update-stale.json) |
+| create, branch moved mid-flight | `merge_request.create` | `84e7a49c` | `outcome_unknown`, `unknown`; **MR 11** exists at `dcadb91c` | 1 POST → 201 | [catalog-create-raced.json](catalog-create-raced.json) |
+
+The request counts are from GitLab's access log: two POSTs answered 201, one
+answered 409, one PUT to merge request 10 answered 200, and no request at all for
+the two attempts the guard refused.
+
+The raced create is the same race the native update saw, with the opposite
+visibility: the branch moved between the preflight GET and the POST, GitLab
+opened the merge request at the moved head, its 201 body carried that head, and
+the postflight comparison saw the difference. The effect is real and the outcome
+is reported uncertain, as the accepted boundary says; the merge request's IID is
+in the retained response, not in the classification.
+
+Every operation above came from the pinned source through the bundle. The
+provider crate contains no GitLab code: the selection, the guard and the auth
+probes are the configuration file.
+
+## Nullable and unusual merge-request reads
+
+The two cases `story:gitlab-mr-reads` names, both read through the CLI:
+
+| case | how it was produced | observed |
+|---|---|---|
+| nullable source | a fork opened a merge request to the parent, then the fork project was destroyed | `source_project_id: null`, `state: closed`, `detailed_merge_status: not_open` |
+| unusual merge status | a merge request whose change conflicts with `main` | `detailed_merge_status: conflict` |
+
+An earlier attempt deleted the source *branch* and concluded the nullable case was
+unreachable. That was wrong: GitLab closes a merge request whose branch goes away but
+keeps `source_project_id`. It is the source **project** that has to go.
+
+`sha` stayed non-null on the fork merge request. GitLab retains the recorded head SHA
+after the source project is destroyed, so the schema's nullable `sha` was not
+exercised.
+
 ## Repository gate
 
 `cargo run --locked -p connectors-build -- gate --msrv`, run twice: once before the
@@ -251,6 +350,15 @@ reported `valid`.
 The first run's output was truncated to its last 40 lines when captured, so only its
 verdict is known. The counts above are the second run's.
 
+A third run, on the tree that adds the catalog provider, the native update and the
+version 0.10.0 bump: `gate: all checks passed`, process exit 0, **90 test targets,
+none failed**, every gate command exit 0, including the workspace build, test and
+Clippy runs, the four adapter library boundary builds (`connectors-gitlab`,
+`connectors-kubernetes`, `connectors-sql`, `connectors-catalog-provider`) and the
+Rust 1.88 check of all targets. `plan artifact validate` read 345 artifacts and
+reported `valid`. Website typecheck and build pass after two Kubernetes contract
+pages stopped naming private evidence paths, which the public-output audit refuses.
+
 ## What this evidence does not cover
 
 - **No merge whose response was lost before the outcome reached the ledger.** The
@@ -259,17 +367,16 @@ verdict is known. The counts above are the second run's.
   a genuinely unreconciled attempt, and the kill could not be timed into that window.
 - No key rotation, revocation or retirement during a live write; no policy revocation
   mid-preflight; no approval replay after the proof expired.
-- **No open MR with a deleted source branch.** Deleting the source branch of MR 2
-  closed it, so what was read is `state: closed`, `detailed_merge_status: not_open`,
-  `merge_commit_sha: null`. GitLab does not leave such an MR open, so this shape of the
-  `story:gitlab-mr-reads` acceptance may not be reachable as written. MR 3 gives a
-  second closed MR.
-- **Unknown merge status was not produced.** MR 4 was created and read through the CLI
-  as fast as the commands allow, to catch `checking` or `preparing` before the
-  mergeability check finished. The first read already returned `mergeable`. On a local
-  instance with one small project the check settles faster than a CLI invocation
-  starts, so this case needs either a contrived slow instance or a different
-  construction.
+- **Nullable `sha` was not produced.** GitLab keeps a merge request's recorded head
+  SHA after its source project is destroyed, so only `source_project_id` went null.
+- **`merge_request.create` has no native binding.** It ran through the catalog
+  provider, as did update; the native adapter was not extended.
+- **Only GitLab has run through the catalog provider.** The bundle carries no
+  request/response schemas, no header parameters and one token-header auth
+  profile; a second provider through the same engine is still required.
+- **A transient `checking` or `preparing` merge status was not read through the CLI.**
+  It was observed through the API on merge request 8, but on a one-project local
+  instance the mergeability check settles faster than a CLI process starts.
 - The runner's own CA copy must be updated whenever the sandbox certificate changes.
   It was not, after the chain was reissued, and four pipelines sat `pending` with the
   runner reporting `online` — the failure is silent from the API's side.

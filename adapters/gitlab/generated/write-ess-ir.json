@@ -11,7 +11,11 @@
         "gitlab_writes.requests.MergeRequestMergeOutput",
         "gitlab_writes.requests.MergeRequestMergeOutputItem",
         "gitlab_writes.requests.MergeRequestMergeOutputProvenance",
-        "gitlab_writes.requests.MergeRequestMergeRequest"
+        "gitlab_writes.requests.MergeRequestMergeRequest",
+        "gitlab_writes.requests.MergeRequestUpdateOutput",
+        "gitlab_writes.requests.MergeRequestUpdateOutputItem",
+        "gitlab_writes.requests.MergeRequestUpdateOutputProvenance",
+        "gitlab_writes.requests.MergeRequestUpdateRequest"
       ],
       "entities": [],
       "commands": [],
@@ -277,6 +281,272 @@
           },
           {
             "name": "sha",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab_writes.requests.MergeRequestUpdateOutput": {
+      "name": "gitlab_writes.requests.MergeRequestUpdateOutput",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "item",
+            "type_ref": {
+              "kind": "declared",
+              "name": "gitlab_writes.requests.MergeRequestUpdateOutputItem"
+            },
+            "naming": {}
+          },
+          {
+            "name": "provenance",
+            "type_ref": {
+              "kind": "declared",
+              "name": "gitlab_writes.requests.MergeRequestUpdateOutputProvenance"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab_writes.requests.MergeRequestUpdateOutputItem": {
+      "name": "gitlab_writes.requests.MergeRequestUpdateOutputItem",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "description",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "detailed_merge_status",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "draft",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "boolean"
+            },
+            "naming": {}
+          },
+          {
+            "name": "id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "iid",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "merge_commit_sha",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "project_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "sha",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "source_branch",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "source_project_id",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "integer"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "squash_commit_sha",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          },
+          {
+            "name": "state",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "target_branch",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "target_project_id",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "title",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "updated_at",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab_writes.requests.MergeRequestUpdateOutputProvenance": {
+      "name": "gitlab_writes.requests.MergeRequestUpdateOutputProvenance",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "instance",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "observed_at_unix_ms",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "resource",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "source_revision",
+            "type_ref": {
+              "kind": "optional",
+              "of": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            },
+            "naming": {}
+          }
+        ],
+        "invariants": []
+      },
+      "naming": {}
+    },
+    "gitlab_writes.requests.MergeRequestUpdateRequest": {
+      "name": "gitlab_writes.requests.MergeRequestUpdateRequest",
+      "body": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "iid",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "integer"
+            },
+            "naming": {}
+          },
+          {
+            "name": "project",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "sha",
+            "type_ref": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "naming": {}
+          },
+          {
+            "name": "title",
             "type_ref": {
               "kind": "primitive",
               "name": "string"

@@ -108,13 +108,25 @@ fn text(value: &serde_json::Value, path: &[&str]) -> Option<String> {
     current.as_str().map(str::to_owned)
 }
 
-/// Ingest exactly these bytes, under this file name.
-pub fn ingest(file_name: &str, bytes: &[u8]) -> std::result::Result<SourceRecord, Refusal> {
+/// Parse a source document. JSON is read under the strict reader every other
+/// document in this repository goes through; bytes that are not JSON are read
+/// as YAML, the other encoding OpenAPI documents are published in. The digest a
+/// record carries is always over the bytes, never over this parsed form.
+pub fn parse_document(bytes: &[u8]) -> std::result::Result<serde_json::Value, Refusal> {
     if bytes.len() > SOURCE_LIMIT {
         return Err(Refusal::TooLarge);
     }
-    let document: serde_json::Value =
-        connectors_core::read_json(bytes).map_err(|_| Refusal::Malformed)?;
+    if let Ok(document) = connectors_core::read_json(bytes) {
+        return Ok(document);
+    }
+    let yaml: serde_yaml_ng::Value =
+        serde_yaml_ng::from_slice(bytes).map_err(|_| Refusal::Malformed)?;
+    serde_json::to_value(yaml).map_err(|_| Refusal::Malformed)
+}
+
+/// Ingest exactly these bytes, under this file name.
+pub fn ingest(file_name: &str, bytes: &[u8]) -> std::result::Result<SourceRecord, Refusal> {
+    let document = parse_document(bytes)?;
     if !document.is_object() {
         return Err(Refusal::NotADocument);
     }

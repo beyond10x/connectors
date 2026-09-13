@@ -113,12 +113,21 @@ earlier local-only Connectors publication boundary for these releases.
    `b10x-gates bot`, and create an annotated `v<version>` tag at that
    exact release commit. Verify author, committer and tagger identities. Existing
    release tags are immutable.
-6. Push `main` and that exact tag to the authorized source remote through
-   `b10x-gates bot`, or `publish` with its retained receipt, under the coordinated
-   hooks. Verify the remote branch and peeled tag resolve to
-   the intended release commit. Finish with clean `main`, retained release
-   evidence and cleanup of task-owned managed worktrees through `worktree`.
-   Report the version, commit, destination and verification result.
+6. Publish to the source remote through `b10x-gates bot`, or `publish` with its
+   retained receipt, under the coordinated hooks. **This checkout has no GitHub
+   remote.** The destination is the `next` branch of `beyond10x/connectors`, which
+   carries a 1:1 replay of this history with rewritten parents: every commit there
+   has the same tree, message, author and dates as its counterpart here, and only
+   the SHA differs. Publish by replaying the new commits onto the remote head with
+   `git commit-tree`, preserving `GIT_AUTHOR_*` and `GIT_COMMITTER_*` from each
+   source commit and asserting tree equality at every step, then pushing that head.
+   Recreate the annotated tag at the mapped commit; the local tag and the published
+   tag name different SHAs by design. `git fetch` auto-follows tags, so check that a
+   fetched tag has not landed on an unmapped commit before pushing it. Verify the
+   remote branch head's tree equals local `main`'s and that the peeled tag is an
+   ancestor of it. Finish with clean `main`, retained release evidence and cleanup of
+   task-owned managed worktrees through `worktree`. Report the version, commit,
+   destination and verification result.
 7. Publish the hosted release page for that exact tag through
    `b10x-gates gh -- release create v<version> --verify-tag --notes-file <file>`,
    so the page is authored by `b10x-bot[bot]` like every commit and tag before it.
@@ -126,10 +135,12 @@ earlier local-only Connectors publication boundary for these releases.
    authored by a person, and is corrected the same way: delete it and recreate it
    under the bot, never leave it. Take the notes from the annotated tag with
    `git tag -l --format='%(contents)'`; `--notes-from-tag` is refused alongside
-   `--repo`. Write no new commit, move no tag and edit no existing release. When
-   the tag is not on the remote's default branch, say so in the report and pass
-   `--latest=false` unless the release is the newest on that default branch.
-   Verify the created page's author and that it resolves to the tag's peeled commit.
+   `--repo`. Write no new commit, move no tag and edit no existing release. `next` is
+   the repository's default branch, so a release cut from it is Latest and needs no
+   flag; pass `--latest=false` only when the release is deliberately not the newest.
+   A page that is not Latest is invisible on the repository's front page, which is
+   how v0.8.0 and v0.9.0 went unnoticed after they shipped. Verify the created
+   page's author, its Latest state and that it resolves to the tag's peeled commit.
 
 A local commit or local tag alone is not a cut release, and neither is a pushed
 tag with no release page. Source release does not implicitly include a
