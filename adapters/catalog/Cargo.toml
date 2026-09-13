@@ -1,0 +1,32 @@
+[package]
+name = "connectors-catalog-provider"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = ["service"]
+service = ["dep:connectors-host", "dep:clap"]
+
+[[bin]]
+name = "connectors-catalog-provider"
+path = "src/main.rs"
+required-features = ["service"]
+
+[dependencies]
+connectors-core.workspace = true
+connectors-sdk.workspace = true
+connectors-catalog = { path = "../../crates/connectors-catalog" }
+connectors-host = { workspace = true, optional = true }
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+zeroize.workspace = true
+clap = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio.workspace = true
+tempfile.workspace = true
+sha2.workspace = true
+hex.workspace = true

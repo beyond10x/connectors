@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "provider": "gitlab",
+      "file_name": "gitlab.bundle.json",
+      "bundle_sha256": "20c8d99532de7dc287dba318ce42c97adbc8b612451ff1e2c3063935d8e15773",
+      "source_sha256": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530",
+      "operations": 1847,
+      "unsupported": 0
+    }
+  ]
+}

@@ -178,12 +178,12 @@ pub fn run(request: &Request<'_>) -> std::result::Result<Run, Box<Failure>> {
     //
     // This arm cannot fire. `ingest` above put these exact bytes — the ones in
     // `bytes`, not a re-read of the file — through this same
-    // `connectors_core::read_json` and returned `Ok`, and `read_json` is a pure
+    // `parse_document` and returned `Ok`, and `parse_document` is a pure
     // function of the bytes. It is written as a refusal rather than an unwrap
     // because an unwrap would make an impossibility a panic, and it is attributed
     // to its step like every other, so no refusal can reach a caller without one.
-    let document = connectors_core::read_json(&bytes)
-        .map_err(|error| refused(Step::Extract, error, Some(source.clone()), None))?;
+    let document = crate::parse_document(&bytes)
+        .map_err(|refusal| refused(Step::Extract, refusal.into(), Some(source.clone()), None))?;
     let bundle = Bundle {
         provider: request.provider.to_owned(),
         source: source.clone(),

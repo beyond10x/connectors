@@ -1,6 +1,6 @@
 // generated from gitlab_writes v1
-// model digest 60e62b0197192fde0bab0673274f72e3236cac4e4c6b290f72b847ab42c0254f
-// contract digest bf080db26d82ecf93e6e97307361cd6a49bbf2ef3cb125dd19f3a4605b5a35c2
+// model digest d71a3b2285e5b421c6f596c260c21fda824356846d5876221beafc5cf7d18f9a
+// contract digest 0d52075ceb7e8f55a5f1b8672be27768f0e663364671db383cfdd5fe5f27c313
 // do not edit: regenerate with `ess synthesize`
 
 //! The typed refusal of an unmet obligation, and the conversion seams owed between contexts.
