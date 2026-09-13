@@ -2,7 +2,7 @@
 format: aep.planning-md/1
 id: credential-blocker:gitlab-runtime-sandbox
 kind: credential-blocker
-status: open
+status: cleared
 title: Dedicated GitLab sandbox target and protected credential source are missing
 relations:
 - blocks: story:persistent-gitlab-journey
@@ -11,7 +11,7 @@ relations:
 - blocks: story:gitlab-mr-validation
 - blocks: story:guarded-gitlab-merge
 withholds: test_result
-revision: 1
+revision: 2
 ---
 ## Missing prerequisite
 
