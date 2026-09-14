@@ -77,3 +77,9 @@ with the native adapter deleted, before the version bump: every command exit 0,
 `kubernetes` and `sql` only, the library-boundary loop `kubernetes`, `sql` and
 `catalog-provider`. Log: [gate.log](gate.log). `cargo tree -p connectors-gitlab`
 answers `package ID specification connectors-gitlab did not match any packages`.
+
+The same gate on the release tree, after the version bump to 0.11.0 and the
+planning-store moves: every command exit 0, 78 test targets, 0 failed,
+`gate: all checks passed`; website typecheck and build exit 0. Log:
+[gate-release.log](gate-release.log). This file and the planning record of the
+run are the only edits after it.

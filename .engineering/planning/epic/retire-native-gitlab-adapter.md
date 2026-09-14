@@ -2,13 +2,13 @@
 format: aep.planning-md/1
 id: epic:retire-native-gitlab-adapter
 kind: epic
-status: active
+status: implemented
 title: Serve GitLab from the catalog only and retire the native adapter
 relations:
 - derived_from: architecture-decision-record:declarative-http-provider-runtime
 - decomposes: initiative:complete-local-connectors
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 ---
 ## Outcome
 

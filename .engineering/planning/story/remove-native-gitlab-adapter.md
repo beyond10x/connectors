@@ -2,13 +2,13 @@
 format: aep.planning-md/1
 id: story:remove-native-gitlab-adapter
 kind: story
-status: active
+status: implemented
 title: Delete the native GitLab adapter and re-point everything to the catalog provider
 relations:
 - decomposes: epic:retire-native-gitlab-adapter
 - derived_from: specification:catalog-http-runtime-handoff
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 ---
 ## Outcome
 
