@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 — 2026-09-14
+
+GitLab has one runtime. The catalog provider serves every operation the native
+GitLab adapter carried, from the pinned OpenAPI document and a selection set
+reviewed and shipped in the repository, and the native adapter is deleted. This
+is the convergence `architecture-decision-record:declarative-http-provider-runtime`
+asked for: no handwritten Rust per endpoint for an ordinary HTTP provider.
 
 ### Catalog provider
 
