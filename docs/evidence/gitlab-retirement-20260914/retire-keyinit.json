@@ -1,0 +1,1 @@
+{"ok":true,"result":{"adapter":"forge","issuer":{"audience":"connectors.approval/ff2493a6-9c85-43a0-9a71-1af805447708","issuer":"connectors.local-issuer/ff2493a6-9c85-43a0-9a71-1af805447708","keys":[{"key_id":"a5f7637d-e322-4a5a-a800-655b6e6cce53","public_key":"5Y1Yoq468LDMVguHN8ipqUnc0DHdvGtNU7vKSfxueaA","state":"active"}],"revision":"51145f4e-3dfa-4bcc-b63c-61162c79f2d1"}}}

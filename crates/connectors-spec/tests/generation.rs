@@ -1,44 +1,28 @@
 use connectors_spec::generate;
 use connectors_spec::v2::{Spec, hash, import, tree};
 use serde_json::{Value, json};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-fn ess() -> std::path::PathBuf {
+fn ess() -> PathBuf {
     connectors_spec::toolchain::resolve(None).unwrap()
 }
 
-fn root() -> &'static Path {
-    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
+/// The GET-only GitLab document the native adapter was generated from, frozen
+/// as a fixture when that adapter was retired; its upstream pin still names the
+/// pinned source under `adapters/gitlab/upstream/`.
+fn fixture() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gitlab-v2.json")
 }
 fn source() -> Value {
-    let mut value: Value = serde_json::from_slice(
-        &std::fs::read(root().join("adapters/gitlab/spec/adapter.json")).unwrap(),
-    )
-    .unwrap();
-    // Retain explicit v2 parser/import coverage after the production adapter
-    // selects v3. Bundle tests below exercise the actual selected format.
-    value["kind"] = json!("connectors.adapter/v2");
-    value.as_object_mut().unwrap().remove("writes");
-    value
+    serde_json::from_slice(&std::fs::read(fixture()).unwrap()).unwrap()
 }
 fn parse(value: &Value) -> connectors_core::Result<Spec> {
     Spec::parse(&serde_json::to_vec(value).unwrap())
 }
 
 #[test]
-fn checked_in_bundle_matches_its_pinned_sources_and_toolchain() {
-    generate(
-        &root().join("adapters/gitlab/spec/adapter.json"),
-        &root().join("adapters/gitlab/generated"),
-        &ess(),
-        true,
-    )
-    .unwrap();
-}
-
-#[test]
 fn public_import_refuses_specs_changed_after_validation() {
-    let path = root().join("adapters/gitlab/spec/adapter.json");
+    let path = fixture();
     let mut spec = parse(&source()).unwrap();
     spec.mappings[0].response_prefix_limit = Some(0);
     assert!(
@@ -176,7 +160,7 @@ fn pinned_source_and_required_source_semantics_are_enforced() {
 #[test]
 fn regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift() {
     let temp = tempfile::tempdir().unwrap();
-    let spec = root().join("adapters/gitlab/spec/adapter.json");
+    let spec = fixture();
     let out = temp.path().join("generated");
     generate(&spec, &out, &ess(), false).unwrap();
     let original = tree(&out).unwrap();
@@ -221,7 +205,7 @@ fn regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift() 
 #[test]
 fn regeneration_refuses_unowned_files_and_output_symlinks() {
     let temp = tempfile::tempdir().unwrap();
-    let spec = root().join("adapters/gitlab/spec/adapter.json");
+    let spec = fixture();
     let out = temp.path().join("generated");
     std::fs::create_dir(&out).unwrap();
     std::fs::write(out.join("runtime.rs"), b"handwritten").unwrap();

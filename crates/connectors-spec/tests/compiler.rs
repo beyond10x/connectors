@@ -5,10 +5,6 @@ use serde_json::{Value, json};
 fn all_adapter_descriptors_are_reproducible_and_schema_valid() {
     for (source, generated) in [
         (
-            include_bytes!("../../../adapters/gitlab/spec/adapter.json").as_slice(),
-            include_bytes!("../../../adapters/gitlab/generated/descriptor.json").as_slice(),
-        ),
-        (
             include_bytes!("../../../adapters/kubernetes/spec/adapter.json").as_slice(),
             include_bytes!("../../../adapters/kubernetes/generated/descriptor.json").as_slice(),
         ),
@@ -30,7 +26,7 @@ fn all_adapter_descriptors_are_reproducible_and_schema_valid() {
 
 #[test]
 fn ambiguous_unmapped_and_duplicate_declarations_are_refused() {
-    let source = include_bytes!("../../../adapters/gitlab/spec/adapter.json");
+    let source = include_bytes!("../../../adapters/kubernetes/spec/adapter.json");
     let original: Value = serde_json::from_slice(source).unwrap();
     let mut duplicate = original.clone();
     let operation = duplicate["operations"][0].clone();

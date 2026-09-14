@@ -11,7 +11,7 @@ This is the `provider` realization of
 `architecture-decision-record:declarative-http-provider-runtime`. The host keeps
 what it already owns: connection admission, approval policy and proofs, audit,
 the attempt ledger, dispatch and recovery. The provider is one more adapter
-executable behind the same private protocol as `connectors-gitlab`.
+executable behind the same private protocol as the Kubernetes adapter.
 
 ## Build the bundle
 
@@ -35,8 +35,8 @@ here reaches the network.
 The repository reviews and ships one selection set per provider under
 `adapters/catalog/providers/<provider>/operations.json`. The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
-every operation the native GitLab adapter exposes, so one configuration serves
-the provider from the pinned source alone:
+every operation the retired native GitLab adapter exposed, so one configuration
+serves the provider from the pinned source alone:
 
 | id | source operation | effect |
 |---|---|---|
@@ -49,8 +49,8 @@ the provider from the pinned source alone:
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
 
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
-and checks that every native read and write id is present. The native adapter's
-`merge_request.validate` has no entry: it is `merge_request.get` plus
+and checks that every id the native adapter carried is present. The native
+`merge_request.validate` has no entry: it was `merge_request.get` plus
 `pipeline.get` and a comparison, which the merge guard now makes itself.
 
 ## Configure the provider
@@ -116,15 +116,65 @@ the one PUT: `/sha` equal to the pinned `body.sha`, `/state` literally `opened`,
 `/detailed_merge_status` literally `mergeable`, `/head_pipeline/id` equal to the
 input `pipeline_id` and `/head_pipeline/status` literally `success`. After it:
 `/state` literally `merged` and `/sha` still the pinned head. Those are the
-checks the native `merge_request.validate` made in Rust, as five lines of data.
+checks the retired native `merge_request.validate` made in Rust, as five lines of data.
 
-Add the adapter to the host configuration exactly as for
-[the native GitLab binding](local-gitlab-cli.md), with `adapter_id = "catalog"`,
-the bootstrap's `configuration_revision` from
-`connectors-catalog-provider --local-config <file> --print-local-bootstrap`, the
-executable's SHA-256 and the selected operation ids in its permissions. Select
-`private_protocol = "connectors-private/2"` for writes and publish an approval
-policy naming them.
+## Bind the provider to the local CLI
+
+The local CLI requires Linux x86_64 and the
+[qualified Secret Service binding](local-secret-service.md). Use the optimized
+build for the local owner: startup copies and verifies the executable within a
+bounded deadline, and a large debug binary can exceed that budget on a busy host.
+
+```sh
+target/release/connectors --output json setup init
+target/release/connectors --output json setup check
+target/release/connectors-catalog-provider --local-config /absolute/path/gitlab-catalog.json --print-local-bootstrap
+sha256sum target/release/connectors-catalog-provider
+```
+
+Add an adapter entry to the configuration created by setup, with the bootstrap's
+exact `configuration_revision`, the executable's SHA-256 and absolute paths. The
+operation ids are the selection ids; omitted permission sets deny access.
+
+```toml
+[adapters.forge]
+instance_id = "gitlab-sandbox"
+adapter_id = "catalog"
+configuration_revision = "REPLACE_FROM_BOOTSTRAP"
+protocol = "v1alpha1"
+private_protocol = "connectors-private/2"
+startup = "on-demand"
+restart = "never"
+
+[adapters.forge.permissions]
+profiles = ["gitlab.pat"]
+operations = ["project.get", "issues.list", "file.get", "branch.get", "merge_requests.list", "merge_request.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.create", "merge_request.update", "merge_request.merge"]
+
+[adapters.forge.executable]
+path = "/absolute/path/connectors-catalog-provider"
+sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
+args = ["--local-config", "/absolute/path/gitlab-catalog.json"]
+```
+
+Credentials never belong in TOML, native configuration, executable arguments or
+environment variables. Connect with the hidden token prompt on your controlling
+terminal, or `--credential-file` / `--credential-stdin` carrying the protected
+`{"token":"..."}` document from an owner-only source:
+
+```sh
+target/release/connectors --output json connections connect --adapter forge --profile gitlab.pat --credential-prompt
+target/release/connectors --output json operations describe --adapter forge --operation project.get
+```
+
+Connect runs the declared identity and scope reads and refuses a token below
+`minimum_scopes`. Validation evidence lasts `evidence_lifetime_ms` (60 seconds by
+default); after expiry the connection reports `pending` and reads refuse until
+`connections revalidate --adapter forge --connection CONNECTION --expected-revision REVISION`
+renews it with no credential re-entry. `connections repair` replaces an invalid
+credential and refuses a changed identity; `connections revoke` is terminal local
+revocation and does not revoke the token at GitLab. Lists, descriptions and status
+start nothing. Writes need `private_protocol = "connectors-private/2"` and an
+approval policy naming them; see [the guarded merge guide](local-gitlab-merge.md).
 
 ## Invoke
 

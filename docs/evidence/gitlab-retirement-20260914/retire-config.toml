@@ -1,0 +1,29 @@
+secret_service_socket = <redacted>
+format = "connectors-local/2"
+owner_uid = 1000
+
+[adapters]
+
+[approval_clock]
+format = "roughtime-clock/1"
+address = "192.36.143.134:2002"
+public_key = "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI="
+max_rate_error_ppm = 10000
+
+[adapters.forge]
+instance_id = "gitlab-sandbox"
+adapter_id = "catalog"
+configuration_revision = "46f7e22844c2dfc3462aab35722c7b6a2be4dc0eda2f18819a0417a6d1547bfa"
+protocol = "v1alpha1"
+private_protocol = "connectors-private/2"
+startup = "on-demand"
+restart = "never"
+
+[adapters.forge.permissions]
+profiles = ["gitlab.pat"]
+operations = ["project.get", "issues.list", "file.get", "branch.get", "merge_requests.list", "merge_request.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.create", "merge_request.update", "merge_request.merge"]
+
+[adapters.forge.executable]
+path = "~/beyond10x/connectors_v2/target/release/connectors-catalog-provider"
+sha256 = "b85b1c10bb75c1c489b560c74a01a860f5b359984fa6e7a717f7d33be9e6d2bd"
+args = ["--local-config", "~/.cache/connectors-gitlab-20260912/gitlab-catalog-2.json"]

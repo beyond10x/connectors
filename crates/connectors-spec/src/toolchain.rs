@@ -780,16 +780,4 @@ mod tests {
             matching.canonicalize().unwrap()
         );
     }
-    #[test]
-    fn committed_manifest_uses_the_repository_pin() {
-        let manifest: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../adapters/gitlab/generated/manifest.json"
-        ))
-        .unwrap();
-        assert_eq!(manifest["ess"], version().unwrap());
-        assert_eq!(
-            manifest["ess_source"],
-            serde_json::to_value(source().unwrap()).unwrap()
-        );
-    }
 }

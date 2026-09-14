@@ -551,6 +551,7 @@ version = "0.10.0"
 dependencies = [
  "clap",
  "connectors-catalog",
+ "connectors-catalog-provider",
  "connectors-spec",
  "jsonschema",
  "pulldown-cmark",
@@ -586,11 +587,13 @@ dependencies = [
  "connectors-host",
  "connectors-sdk",
  "hex",
+ "rcgen",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
  "tokio",
+ "tokio-rustls",
  "zeroize",
 ]
 
@@ -650,36 +653,6 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror",
-]
-
-[[package]]
-name = "connectors-gitlab"
-version = "0.10.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64 0.22.1",
- "clap",
- "connectors-client",
- "connectors-contracts",
- "connectors-core",
- "connectors-host",
- "connectors-sdk",
- "gitlab-types",
- "gitlab_writes-types",
- "hex",
- "libc",
- "rcgen",
- "ring",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "time",
- "tokio",
- "tokio-rustls",
- "zeroize",
 ]
 
 [[package]]
@@ -1259,14 +1232,6 @@ dependencies = [
  "rand_core",
  "wasm-bindgen",
 ]
-
-[[package]]
-name = "gitlab-types"
-version = "1.0.0"
-
-[[package]]
-name = "gitlab_writes-types"
-version = "1.0.0"
 
 [[package]]
 name = "hashbrown"

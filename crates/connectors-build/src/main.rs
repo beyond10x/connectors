@@ -29,7 +29,7 @@ struct Args {
     ess: Option<PathBuf>,
     #[arg(long)]
     aep: Option<PathBuf>,
-    #[arg(long, default_value = "adapters/gitlab/realizations/local.json")]
+    #[arg(long, default_value = "adapters/catalog/realizations/local.json")]
     declaration: PathBuf,
     #[command(subcommand)]
     command: Action,
@@ -98,7 +98,7 @@ enum Action {
         #[arg(long)]
         output: PathBuf,
         /// Local Docker tag, never pushed by this executor.
-        #[arg(long, default_value = "connectors-v2-gitlab:local")]
+        #[arg(long, default_value = "connectors-v2-catalog:local")]
         image: String,
         #[arg(long, default_value_t = 2)]
         jobs: usize,

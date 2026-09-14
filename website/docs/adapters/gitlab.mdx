@@ -3,153 +3,102 @@ title: GitLab
 slug: /adapters/gitlab
 ---
 
-import ReferenceCards from '@site/src/components/ReferenceCards';
-
 # GitLab
 
-Eleven bounded reads and persistent local credentials in source release v0.2.0.
+Served from GitLab's own pinned OpenAPI document through the
+[catalog provider](/adapters/catalog), with no adapter code per endpoint. The
+native GitLab adapter that source release v0.2.0 packaged was retired in v0.11.0
+once every operation it carried ran through the catalog with the same or
+stricter guarantees.
 
 [Follow a request from your laptop to GitLab](/introduction/examples) to see federation, the separate authentication boundaries and the issue response.
 
-## Current capabilities
+## What runs
 
-Use `project.get` to inspect an allowed project, `issues.list` for a bounded issue page, and `file.get` for repository content.
+The repository ships a reviewed selection set for GitLab. Each entry exposes one
+operation of the pinned source under a local id with a declared effect:
 
-For CI, `pipelines.list` selects one exact full commit SHA; `pipeline.get` observes
-the selected pipeline's native status. `pipeline.jobs` pages its current job
-attempts, `job.get` verifies a job's pipeline and SHA, and `job.trace` returns a
-bounded UTF-8 prefix with explicit completeness. A successful pipeline for another
-SHA cannot satisfy the selection. Read the [CI contract](/adapters/gitlab/contracts/ci)
-for input shapes and limits. Dedicated GitLab sandbox acceptance remains open.
+| id | effect | what it binds |
+|---|---|---|
+| `project.get`, `issues.list`, `file.get`, `branch.get` | read | one GET each on the project, its issues, a repository file, a branch |
+| `merge_requests.list`, `merge_request.get` | read | the project's merge requests, one merge request by IID |
+| `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | read | pipelines, one pipeline, its jobs, one job |
+| `job.trace` | read | a job's log, answered as text |
+| `merge_request.create` | write | one POST, guarded on the pinned source head |
+| `merge_request.update` | write | one PUT, guarded on the pinned source head |
+| `merge_request.merge` | write | one PUT, guarded on five checks |
 
-`merge_request.get` reads an MR by project-local IID. `merge_requests.list` traverses
-a fixed inclusive update window with bounded pages and explicit completeness.
-Unknown statuses and missing heads remain observations; they do not validate a
-merge. Read the [MR contract](/adapters/gitlab/contracts/merge-requests) for window,
-cursor and projection rules. Mutable pages are not a snapshot or lossless feed;
-the consumer owns its checkpoint.
+Input is one property per declared path or query parameter, named as GitLab
+names it, plus a `body` object where the operation takes one. Output is the
+provider's status, its body unchanged, and provenance naming the instance, the
+resource path and the pinned source's SHA-256. A paged read returns one page as
+GitLab answers it.
 
-`merge_request.validate` checks an exact requested MR source SHA and selected
-successful head pipeline, together with opened, non-draft and mergeable status.
-The result contains `checks_passed`, ordered `blockers` and
-`merge_performed: false`. A negative validation is a successful read: inspect
-`checks_passed` even when the CLI exits successfully. A passing observation
-does not reserve the head or authorize a later write. See the
-[validation contract](/adapters/gitlab/contracts/merge-validation).
-The development checkout also implements `merge_request.merge` through explicitly
-selected `connectors-local/2` and `connectors-private/2`, with a saved PAT granting
-`api`, current local approval policy, signing keys and an authenticated clock.
-Prepare and issue a proof for the exact input, then pass its owner-private path
-as `--approval-file` and an optional `--idempotency-key` to `operations invoke`.
-Fresh preflight precedes one source-SHA-guarded PUT. Results carry mutation and
-audit observations; an unknown outcome never triggers another PUT, and an exact
-retained key can observe the original attempt after restart. This development
-feature is outside v0.2.0; its wider failure matrix remains open.
-`merge_request.update` runs the same way natively, but GitLab offers no SHA
-precondition for it: a pinned head that already differs is refused in preflight,
-and a head that moves during dispatch leaves the outcome uncertain rather than
-refused. `merge_request.create`, and update again, run through the
-[catalog provider](/adapters/catalog) from the pinned OpenAPI source with the same
-boundary declared as a guard; no further GitLab endpoint is bound by hand.
+## Writes and the guard
+
+A write is a required-approval mutation under private protocol two, with the
+host's approval, audit and attempt controls. The guard is data in the selection:
+before the one request it reads the merge request and refuses unless every check
+holds; after it, it compares the response and leaves the outcome uncertain,
+never refused, when a check fails, because GitLab may already have applied the
+write. No corrective request is ever issued.
+
+The merge guard requires the request to be open and mergeable, at the pinned
+`body.sha`, with the pinned `pipeline_id` as its head pipeline in status
+`success`; afterwards it requires state `merged` at the pinned head. GitLab also
+checks `sha` atomically on the merge. Update has no such precondition at GitLab,
+so a head that moves between the preflight read and the PUT leaves the outcome
+uncertain.
+
+## Against a live GitLab
+
+Through the shipped selection set, a dedicated sandbox answered all eleven reads,
+the job trace as text; refused a merge with a stale pinned head and a merge
+naming the wrong pipeline before any request; merged one request with exactly
+one PUT; and refused an update of the merged request on the state check. Earlier
+the same day, a create opened a request at its pinned head, a duplicate was
+refused by GitLab's 409, and a create whose branch moved between the preflight
+read and the POST was classified uncertain.
 
 ## Use saved credentials
 
-The local CLI requires Linux x86_64 and the qualified GNOME Keyring Secret Service
-binding described in the source guide `docs/local-secret-service.md`: the pinned
-Arch Linux GNOME Keyring 50.0 daemon on ext4, with an already-unlocked encrypted
-login collection. Other daemon builds and filesystems require qualification.
-SQLite stores connection metadata; credentials stay in the keyring.
-Existing installed configuration and credentials are not automatically imported.
-Build the optimized CLI and adapter so supervised startup fits its bounded budget:
+The local CLI requires Linux x86_64 and the qualified GNOME Keyring Secret
+Service binding. SQLite stores connection metadata; credentials stay in the
+keyring. Build the optimized CLI and provider, write an owner-only provider
+configuration naming the bundle, the API base, the token header and the identity
+and scope reads, and reference the shipped selection set:
 
 ```sh
-CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-gitlab
+CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-catalog-provider
 target/release/connectors --output json setup init
-target/release/connectors --output json setup check
+target/release/connectors-catalog-provider --local-config /absolute/path/gitlab-catalog.json --print-local-bootstrap
+sha256sum target/release/connectors-catalog-provider
 ```
 
-Create a private native configuration file with your endpoint and permitted projects:
-
-```json
-{
-  "format": "connectors-gitlab-local/1",
-  "instance": "gitlab-local",
-  "api_base": "https://gitlab.example/api/v4",
-  "allowed_projects": ["group/project"]
-}
-```
-
-Keep it owner-only in a directory without symlinks. Read the native bootstrap and
-hash the executable:
-
-```sh
-target/release/connectors-gitlab --local-config /absolute/path/gitlab.json --print-local-bootstrap
-sha256sum target/release/connectors-gitlab
-```
-
-Add this entry to the TOML configuration created by setup, substituting the exact
-bootstrap revision, executable hash and absolute paths:
-
-```toml
-[adapters.forge]
-instance_id = "gitlab-local"
-adapter_id = "gitlab"
-configuration_revision = "REPLACE_FROM_BOOTSTRAP"
-protocol = "v1alpha1"
-startup = "on-demand"
-restart = "never"
-
-[adapters.forge.permissions]
-profiles = ["gitlab.pat"]
-operations = ["project.get", "issues.list", "file.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.get", "merge_requests.list", "merge_request.validate"]
-
-[adapters.forge.executable]
-path = "/absolute/path/connectors-gitlab"
-sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
-args = ["--local-config", "/absolute/path/gitlab.json"]
-```
-
-Connect using the hidden PAT prompt, then describe the operation:
+Add the adapter to the TOML configuration created by setup with `adapter_id =
+"catalog"`, the bootstrap's `configuration_revision`, the executable's SHA-256
+and the selection ids it may serve, then connect with the hidden token prompt:
 
 ```sh
 target/release/connectors --output json connections connect --adapter forge --profile gitlab.pat --credential-prompt
 target/release/connectors --output json operations describe --adapter forge --operation project.get
+target/release/connectors --output json operations invoke --adapter forge --connection CONNECTION --operation project.get --schema SCHEMA --revision REVISION --input-json '{"id":"group/project"}'
 ```
 
-Use the returned connection reference and the operation's current schema and
-descriptor revision:
+Connect runs the declared identity and scope reads and refuses a token below the
+required scopes. Validation evidence lasts 60 seconds; `connections revalidate`
+renews it without re-entry, `connections repair` replaces an invalid credential
+and refuses a changed identity, and `connections revoke` is terminal local
+revocation that does not revoke the token at GitLab. The source checkout's
+`docs/local-catalog-provider.md` and `docs/local-gitlab-merge.md` carry the full
+configuration and the approval steps for a write.
 
-```sh
-target/release/connectors --output json operations invoke --adapter forge --connection CONNECTION --operation project.get --schema SCHEMA --revision REVISION --input-json '{"project":"group/project"}'
-```
+## Limits
 
-Later invocations reuse the saved credential, including after owner restart.
-Validation evidence lasts at most 60 seconds. When it expires, explicitly
-revalidate the saved credential using the current connection revision:
-
-```sh
-target/release/connectors --output json connections revalidate --adapter forge --connection CONNECTION --expected-revision CONNECTION_REVISION
-```
-
-Revalidation requires no credential re-entry. Invalid or missing credentials need
-`connections repair`; `connections revoke` is terminal local revocation and does
-not revoke the PAT at GitLab. Listing, status and cached descriptions start nothing.
-Protected file and stdin entry, exact stop selectors, CI/MR input shapes and
-keyring qualification are detailed in `docs/local-gitlab-cli.md` in this source release.
-
-## Access and limits
-
-Configure the GitLab endpoint and an explicit project allowlist. Public reads can use no provider credential; private reads use a separately bound token. Caller authentication to the adapter service is a different boundary.
-
-File content follows its declared representation and byte limits. Read the native contract for pagination, provenance and refusal behavior.
-
-## Run a standalone service
-
-The existing explicit service interface remains available. Build the workspace,
-choose this adapter's example configuration and bind private credentials separately
-from operation input. The [getting-started guide](/introduction/getting-started)
-explains that workflow.
-
-## Native contract reference
-
-<ReferenceCards owner="gitlab" />
+- The bundle carries parameters, media types and response statuses, not request
+  or response schemas: a `body` is passed through and validated only by GitLab.
+- Operations that need a header or cookie parameter, a multipart or form body,
+  or that answer binary content are not served; a selection naming one is
+  refused at load or fails at request time with a safe error.
+- One token-header authentication profile. OAuth is not offered.
+- A guard compares scalars for equality; it cannot express ranges or absence.

@@ -487,12 +487,28 @@ fn check_walkthrough_fixtures(root: &Path) -> Result<()> {
     let fixture: Value = serde_json::from_slice(&fs::read(
         root.join("website/examples/walkthrough-fixtures.json"),
     )?)?;
-    let descriptor: Value = serde_json::from_slice(&fs::read(
-        root.join("adapters/gitlab/generated/descriptor.json"),
-    )?)?;
+    let descriptor = shipped_gitlab_descriptor(root)?;
     validate_walkthrough_fixtures(&descriptor, &fixture)?;
-    println!("website: walkthrough input/result match the GitLab descriptor");
+    println!("website: walkthrough input/result match the shipped GitLab selection");
     Ok(())
+}
+
+/// The operations the catalog provider declares for the shipped GitLab
+/// selection set against the committed bundle, in descriptor shape.
+fn shipped_gitlab_descriptor(root: &Path) -> Result<Value> {
+    use connectors_catalog_provider::{Effect, Engine, Selection};
+    let shipped: Value = serde_json::from_slice(&fs::read(
+        root.join("adapters/catalog/providers/gitlab/operations.json"),
+    )?)?;
+    let selections: Vec<Selection> = serde_json::from_value(shipped["operations"].clone())?;
+    let bundle = connectors_catalog::bundle::load(
+        &root.join("adapters/catalog/generated/bundles"),
+        "gitlab",
+    )
+    .map_err(|error| format!("gitlab bundle: {error:?}"))?;
+    let engine = Engine::new(&bundle, "/api/v4", &selections)
+        .map_err(|error| format!("shipped GitLab selection: {error:?}"))?;
+    Ok(json!({"operations": engine.declarations(&[Effect::Read, Effect::Write])}))
 }
 
 fn validate_walkthrough_fixtures(descriptor: &Value, fixture: &Value) -> Result<()> {
@@ -501,11 +517,13 @@ fn validate_walkthrough_fixtures(descriptor: &Value, fixture: &Value) -> Result<
         .ok_or("missing descriptor operations")?
         .iter()
         .find(|op| op["id"] == fixture["operation"])
-        .ok_or("walkthrough operation is not in the GitLab descriptor")?;
+        .ok_or("walkthrough operation is not in the shipped GitLab selection")?;
     for (name, schema) in [("input", "input_schema"), ("result", "output_schema")] {
         let validator = jsonschema::validator_for(&operation[schema])?;
         if !validator.is_valid(&fixture[name]) {
-            return Err(format!("walkthrough {name} does not match the GitLab descriptor").into());
+            return Err(
+                format!("walkthrough {name} does not match the shipped GitLab selection").into(),
+            );
         }
     }
     Ok(())
@@ -562,21 +580,19 @@ mod tests {
         assert_eq!(headings[1]["id"], "rules");
     }
     #[test]
-    fn walkthrough_fixtures_follow_the_real_descriptor() {
-        let descriptor: Value = serde_json::from_str(include_str!(
-            "../../../adapters/gitlab/generated/descriptor.json"
-        ))
-        .unwrap();
+    fn walkthrough_fixtures_follow_the_shipped_selection() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let descriptor = shipped_gitlab_descriptor(&root).unwrap();
         let fixture: Value = serde_json::from_str(include_str!(
             "../../../website/examples/walkthrough-fixtures.json"
         ))
         .unwrap();
         validate_walkthrough_fixtures(&descriptor, &fixture).unwrap();
         let mut invalid = fixture.clone();
-        invalid["input"]["state"] = json!("opened");
+        invalid["input"]["invented"] = json!("value");
         assert!(
             validate_walkthrough_fixtures(&descriptor, &invalid).is_err(),
-            "the operation does not support an open-issues filter"
+            "the selection declares no such parameter"
         );
         invalid = fixture.clone();
         invalid["result"]["provenance"]

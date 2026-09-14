@@ -64,7 +64,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         return Err("incomplete Cargo formatting selection".into());
     }
     execute(format.args(["--", "--check"]))?;
-    for adapter in ["gitlab", "kubernetes", "sql"] {
+    for adapter in ["kubernetes", "sql"] {
         let source = root.join(format!("adapters/{adapter}/spec/adapter.json"));
         let descriptor = connectors_spec::compile(&std::fs::read(source)?)?;
         if connectors_spec::descriptor_bytes(&descriptor)?
@@ -87,7 +87,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "-D",
         "warnings",
     ]))?;
-    for adapter in ["gitlab", "kubernetes", "sql", "catalog-provider"] {
+    for adapter in ["kubernetes", "sql", "catalog-provider"] {
         let package = format!("connectors-{adapter}");
         execute(command("cargo").args([
             "build",
@@ -114,7 +114,6 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         for name in [
             "connectors-host",
             "connectors-client",
-            "connectors-gitlab",
             "connectors-kubernetes",
             "connectors-sql",
         ] {
@@ -143,9 +142,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     if tree.lines().any(|line| {
         matches!(
             line.split_whitespace().next(),
-            Some(
-                "connectors-gitlab" | "connectors-kubernetes" | "connectors-sql" | "tokio-postgres"
-            )
+            Some("connectors-kubernetes" | "connectors-sql" | "tokio-postgres")
         )
     }) {
         return Err("generic CLI depends on a provider".into());
