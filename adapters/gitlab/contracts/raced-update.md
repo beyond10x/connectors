@@ -7,9 +7,10 @@ selected private protocol two, alongside [guarded merge](guarded-merge.md).
 `merge_request.create` is **not** bound here. It runs through the
 [catalog provider](../../../docs/local-catalog-provider.md) from the pinned OpenAPI
 source, under the same race boundary expressed as a declarative guard rather than a
-handler; the same provider also runs update that way. This native binding is the
-endpoint-by-endpoint form that
-`architecture-decision-record:declarative-http-provider-runtime` says not to extend.
+handler; the same provider also runs update and merge that way from the shipped
+selection set. This native binding is the endpoint-by-endpoint form that
+`architecture-decision-record:declarative-http-provider-runtime` says not to extend,
+and `epic:retire-native-gitlab-adapter` records its removal.
 
 ## Why this is not guarded merge
 

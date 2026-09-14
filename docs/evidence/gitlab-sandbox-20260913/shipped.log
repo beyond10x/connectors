@@ -1,0 +1,33 @@
+setup init exit=0
+executable sha256 46387422284ff83e347d50055df08270336ccf7d5051e90dd3a667c894fedc56 configuration_revision 46f7e22844c2dfc3462aab35722c7b6a2be4dc0eda2f18819a0417a6d1547bfa
+setup check exit=0
+connection conn_75c7a1da72334693bf88f52f87b00bfd_b10570bc3a1e479bb9fa23d9d717ea4b identity {'kind': 'gitlab.user', 'subject': '2'}
+key-init exit=0
+policy-set exit=0
+merge_request.merge input required: 
+project (project.get): ok status 200 body object classification None cause None
+issues (issues.list): ok status 200 body list[1] classification None cause None
+file (file.get): ok status 200 body object classification None cause None
+branch (branch.get): ok status 200 body object classification None cause None
+mrs (merge_requests.list): ok status 200 body list[3] classification None cause None
+mr-10 (merge_request.get): ok status 200 body object classification None cause None
+MR 10 head b268f4f4482cc79ecdb4803baf5db270824e31f6 pipeline 19 success mergeable
+pipelines (pipelines.list): ok status 200 body list[2] classification None cause None
+pipeline-19 (pipeline.get): ok status 200 body object classification None cause None
+pipeline-19-jobs (pipeline.jobs): ok status 200 body list[1] classification None cause None
+job of pipeline 19: 23
+job (job.get): ok status 200 body object classification None cause None
+job-trace (job.trace): ok status 200 body text:'2026-09-13T15:48:08.971190Z 00O \x1b[0KRunn' classification None cause None
+MR 10 head b268f4f4482cc79ecdb4803baf5db270824e31f6; main head c64b58120d9ce0de849e215f32dad9f6095b5003
+merge PUTs to 10 before: 0
+merge-stale (merge_request.merge): ERR failure forbidden stage dispatch classification not_attempted cause None
+merge PUTs to 10 now: 0
+merge-other-pipeline (merge_request.merge): ERR failure forbidden stage dispatch classification not_attempted cause None
+merge PUTs to 10 now: 0
+merge-applied (merge_request.merge): ok status 200 body object classification applied cause None
+merge PUTs to 10 now: 0 (before 0)
+MR 10 after: merged merge_commit 45fbac1b0127059aac91c45ee6cf25b1903230fb
+update-merged (merge_request.update): ERR failure forbidden stage dispatch classification not_attempted cause None
+PUTs to 10: 0 (before 0)
+MR 10 merged b268f4f4482cc79ecdb4803baf5db270824e31f6 merge_commit 45fbac1b0127059aac91c45ee6cf25b1903230fb 'Retitled through the catalog provider'
+DONE

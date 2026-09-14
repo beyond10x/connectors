@@ -9,8 +9,10 @@ its input is `project`, `iid`, `title` and the pinned `sha`.
 
 `merge_request.create` has no native binding. It runs through the
 [catalog provider](local-catalog-provider.md) straight from the pinned GitLab OpenAPI
-source, with the same race boundary declared as a guard in configuration; that guide
-also runs update the same way. No further GitLab endpoint is bound by hand.
+source, with the same race boundary declared as a guard in configuration. The
+shipped selection set in that guide also runs update and merge the same way, so
+every operation on this page has a catalog form. No further GitLab endpoint is
+bound by hand.
 
 A pinned head that already differs is refused before any write. A head that moves
 during dispatch returns an uncertain outcome, never a refusal. The postflight

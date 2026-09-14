@@ -29,25 +29,49 @@ pub enum Effect {
     Write,
 }
 
-/// A read performed before a write, whose answer must match a pinned input
-/// value. `values` maps the probe operation's parameter keys to input
-/// references; `pointer` is a JSON pointer into the probe's body; `expect` is
-/// the input reference the pointed value must equal.
+/// What an observed value is compared with: the input value a reference names
+/// (a top-level key, or `body.<key>`), or a literal written in the selection.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Expectation {
+    Input(String),
+    Literal(String),
+}
+
+/// One comparison: the scalar at `pointer` in an observed body must equal what
+/// `expect` resolves to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Check {
+    pub pointer: String,
+    pub expect: Expectation,
+}
+
+/// A read performed before a write, whose answer must satisfy every check.
+/// `values` maps the probe operation's parameter keys to input references.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Preflight {
     pub operation_id: String,
     pub values: BTreeMap<String, String>,
-    pub pointer: String,
-    pub expect: String,
+    pub checks: Vec<Check>,
 }
 
-/// A comparison against the write's own response body after dispatch.
+/// Comparisons against the write's own response body after dispatch.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Postflight {
-    pub pointer: String,
-    pub expect: String,
+    pub checks: Vec<Check>,
+}
+
+/// How a 2xx body is read. The bundle's declared media types decide by default;
+/// `text` is the reviewed exception for a source that declares JSON where the
+/// provider answers with plain text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponseKind {
+    Json,
+    Text,
 }
 
 /// The declarative head guard: a preflight read that refuses before any write
@@ -73,6 +97,8 @@ pub struct Selection {
     pub description: Option<String>,
     #[serde(default)]
     pub guard: Option<Guard>,
+    #[serde(default)]
+    pub response: Option<ResponseKind>,
 }
 
 /// An input reference: a top-level key, or `body.<key>` one level into the body.
@@ -106,6 +132,7 @@ struct Exposed {
     operation: Operation,
     template: Template,
     declaration: connectors_core::Operation,
+    text: bool,
 }
 
 struct Probe {
@@ -127,7 +154,7 @@ pub struct Prepared {
     segments: Vec<String>,
     query: Vec<(String, String)>,
     body: Value,
-    postflight: Option<(String, String)>,
+    postflight: Vec<(String, String)>,
     resource: String,
     instance: String,
     source_revision: String,
@@ -207,16 +234,39 @@ impl Engine {
                         selection.id
                     )));
                 }
+                let checks = guard
+                    .preflight
+                    .checks
+                    .iter()
+                    .chain(&guard.postflight.checks)
+                    .collect::<Vec<_>>();
+                if guard.preflight.checks.is_empty()
+                    || checks.len() > 16
+                    || checks.iter().any(|c| !c.pointer.starts_with('/'))
+                {
+                    return Err(refuse(format!(
+                        "guard of `{}` needs one to sixteen checks with JSON pointers",
+                        selection.id
+                    )));
+                }
                 let template =
                     Template::from_operation(&probe).map_err(|refusal| refuse(refusal.reason()))?;
                 probes.insert(guard.preflight.operation_id.clone(), Probe { template });
             }
+            if selection.response == Some(ResponseKind::Text) && selection.effect != Effect::Read {
+                return Err(refuse(format!(
+                    "selection `{}` declares a text response for a write",
+                    selection.id
+                )));
+            }
             let declaration = declare(selection, &operation);
+            let text = expects_text(selection, &operation);
             exposed.push(Exposed {
                 selection: selection.clone(),
                 operation,
                 template,
                 declaration,
+                text,
             });
         }
         Ok(Self {
@@ -295,7 +345,7 @@ impl Engine {
         let query: Vec<(&str, String)> =
             query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
         let response = http.get(&borrowed, &query).await?;
-        let body = read_body(&response)?;
+        let body = read_body(&response, exposed.text)?;
         Ok(json!({
             "status": response.status,
             "body": body,
@@ -328,11 +378,28 @@ impl Engine {
         } else {
             input.get("body").cloned().unwrap_or(Value::Null)
         };
-        let mut postflight = None;
+        let mut postflight = Vec::new();
         if let Some(guard) = &exposed.selection.guard {
-            let expected = reference(&input, &guard.preflight.expect)
-                .and_then(scalar)
-                .ok_or_else(|| refuse("guard expects an input value that is absent"))?;
+            // Every expectation resolves before any request: an absent input is
+            // a refusal with nothing sent, not a surprise after the preflight.
+            let expected = |checks: &[Check]| -> Result<Vec<(String, String)>> {
+                checks
+                    .iter()
+                    .map(|check| {
+                        let value = match &check.expect {
+                            Expectation::Input(path) => {
+                                reference(&input, path).and_then(scalar).ok_or_else(|| {
+                                    refuse(format!("guard expects input `{path}`, which is absent"))
+                                })?
+                            }
+                            Expectation::Literal(text) => text.clone(),
+                        };
+                        Ok((check.pointer.clone(), value))
+                    })
+                    .collect()
+            };
+            let preflight = expected(&guard.preflight.checks)?;
+            postflight = expected(&guard.postflight.checks)?;
             let probe = self
                 .probes
                 .get(&guard.preflight.operation_id)
@@ -357,28 +424,23 @@ impl Engine {
                     "guard target was not found before dispatch",
                 ));
             }
-            let observed = read_body(&response)?;
-            let current = observed
-                .pointer(&guard.preflight.pointer)
-                .and_then(scalar)
-                .ok_or_else(|| {
+            let observed = read_body(&response, false)?;
+            for (pointer, expected) in &preflight {
+                let current = observed.pointer(pointer).and_then(scalar).ok_or_else(|| {
                     Error::new(
                         ErrorCode::UpstreamProtocol,
-                        "guard preflight answered without the pinned value",
+                        format!("guard preflight answered without a value at `{pointer}`"),
                     )
                 })?;
-            // The only point at which a difference is definite. After dispatch
-            // the same difference is uncertainty, not a refusal.
-            if current != expected {
-                return Err(Error::new(
-                    ErrorCode::Forbidden,
-                    "pinned value differs from the provider before dispatch",
-                ));
+                // The only point at which a difference is definite. After
+                // dispatch the same difference is uncertainty, not a refusal.
+                if current != *expected {
+                    return Err(Error::new(
+                        ErrorCode::Forbidden,
+                        format!("value at `{pointer}` differs from the pinned one before dispatch"),
+                    ));
+                }
             }
-            let expected = reference(&input, &guard.postflight.expect)
-                .and_then(scalar)
-                .ok_or_else(|| refuse("guard expects an input value that is absent"))?;
-            postflight = Some((guard.postflight.pointer.clone(), expected));
         }
         Ok(Prepared {
             method,
@@ -425,7 +487,7 @@ impl Prepared {
                 "unconfirmed write outcome",
             ));
         }
-        let body = match read_body(&response) {
+        let body = match read_body(&response, false) {
             Ok(body) => body,
             Err(_) => {
                 return WriteOutcome::Unknown(Error::new(
@@ -438,15 +500,15 @@ impl Prepared {
         // a pinned value that differs in the acknowledgement leaves the effect
         // possible. It is never reported as refused, and no corrective request
         // is issued. The comparison is best effort, not detection.
-        if let Some((pointer, expected)) = &self.postflight
-            && body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str())
-        {
-            return WriteOutcome::Unknown(Error::new(
-                ErrorCode::UpstreamProtocol,
-                format!(
-                    "write acknowledged with a value at `{pointer}` other than the pinned one; the effect is possible"
-                ),
-            ));
+        for (pointer, expected) in &self.postflight {
+            if body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+                return WriteOutcome::Unknown(Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    format!(
+                        "write acknowledged with a value at `{pointer}` other than the pinned one; the effect is possible"
+                    ),
+                ));
+            }
         }
         WriteOutcome::Applied(Ok(json!({
             "status": response.status,
@@ -471,7 +533,25 @@ fn path_within(path: &str, base: &[String]) -> bool {
     segments.len() > base.len() && segments.iter().zip(base).all(|(s, b)| *s == b)
 }
 
-fn read_body(response: &HttpResponse) -> Result<Value> {
+/// Whether a read's 2xx body is text. The selection's reviewed exception wins;
+/// otherwise the bundle decides: text when every declared 2xx media type is a
+/// `text/` type, JSON when it declares JSON or nothing at all.
+fn expects_text(selection: &Selection, operation: &Operation) -> bool {
+    match selection.response {
+        Some(kind) => kind == ResponseKind::Text,
+        None => {
+            let declared: Vec<&String> = operation
+                .responses
+                .iter()
+                .filter(|r| r.status.starts_with('2'))
+                .flat_map(|r| r.media_types.iter())
+                .collect();
+            !declared.is_empty() && declared.iter().all(|m| m.starts_with("text/"))
+        }
+    }
+}
+
+fn read_body(response: &HttpResponse, text: bool) -> Result<Value> {
     if !(200..300).contains(&response.status) {
         let code = match response.status {
             400 | 409 | 412 | 422 => ErrorCode::InvalidInput,
@@ -487,12 +567,18 @@ fn read_body(response: &HttpResponse) -> Result<Value> {
     if response.body.is_empty() {
         return Ok(Value::Null);
     }
-    connectors_core::read_json(&response.body).map_err(|_| {
+    let unreadable = || {
         Error::new(
             ErrorCode::UpstreamProtocol,
             "provider returned a body this engine cannot read",
         )
-    })
+    };
+    if text {
+        return String::from_utf8(response.body.clone())
+            .map(Value::String)
+            .map_err(|_| unreadable());
+    }
+    connectors_core::read_json(&response.body).map_err(|_| unreadable())
 }
 
 fn provenance(instance: &str, resource: &str, source_revision: &str) -> Value {
@@ -528,8 +614,17 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
     }
     if let Some(guard) = &selection.guard {
         let mut references: Vec<&String> = guard.preflight.values.values().collect();
-        references.push(&guard.preflight.expect);
-        references.push(&guard.postflight.expect);
+        references.extend(
+            guard
+                .preflight
+                .checks
+                .iter()
+                .chain(&guard.postflight.checks)
+                .filter_map(|check| match &check.expect {
+                    Expectation::Input(path) => Some(path),
+                    Expectation::Literal(_) => None,
+                }),
+        );
         for reference in references {
             if reference
                 .split_once('.')
