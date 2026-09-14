@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: release-plan:connectors-v0110
 kind: release-plan
-status: active
+status: implemented
 title: 'Release v0.11.0: GitLab served by the catalog provider only; native adapter retired'
 relations:
 - informed_by: initiative:complete-local-connectors
 - delivers: epic:retire-native-gitlab-adapter
-revision: 2
+revision: 3
 ---
 ## Scope
 
