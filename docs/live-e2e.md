@@ -1,11 +1,12 @@
-# Reproduce the three-provider acceptance run
+# Reproduce the two-provider acceptance run
 
 Run from the repository root on Linux with Rust, Docker, `kubectl`, `jq`, and
 OpenSSL installed. These commands create a disposable Kubernetes server and
-PostgreSQL database. They use public GitLab reads over verified HTTPS. They never
-select the user's default Kubernetes context. Kubernetes uses a private bearer
-credential and its cluster CA; SQL uses a restricted reader role. GitLab private
-token placement is covered separately by the HTTP fixture tests.
+PostgreSQL database. They never select the user's default Kubernetes context.
+Kubernetes uses a private bearer credential and its cluster CA; SQL uses a
+restricted reader role. GitLab has no standalone service: it runs through the
+catalog provider under the local CLI, and its acceptance is recorded separately
+under `docs/evidence/gitlab-sandbox-20260913/`.
 
 The example uses fixed local container names and service ports 17100–17103. Choose
 unused names/ports if they already exist; do not remove another run's resources.
@@ -92,11 +93,6 @@ or an explicit private copy/rotation process must handle that deployment.
 Generate non-secret configuration referencing the private files:
 
 ```sh
-jq -n '{service:{instance:"gitlab-live",listen:"127.0.0.1:17101",
-    service_credential:{kind:"file",path:".local/e2e/service.secret"}},
-  http:{base_url:"https://gitlab.com/api/v4/",credential:null,
-    credential_header:"private-token",bearer:false},
-  adapter:{allowed_projects:["gitlab-org/gitlab"]}}' > .local/e2e/gitlab.json
 jq -n --arg base "https://$CONNECTORS_KUBE_ADDRESS/" \
   '{service:{instance:"kubernetes-live",listen:"127.0.0.1:17102",
     service_credential:{kind:"file",path:".local/e2e/service.secret"}},
@@ -108,10 +104,6 @@ jq -n --arg base "https://$CONNECTORS_KUBE_ADDRESS/" \
 ```
 
 Start each service in its own terminal from the repository root:
-
-```sh
-target/debug/connectors-gitlab --config .local/e2e/gitlab.json
-```
 
 ```sh
 target/debug/connectors-kubernetes --config .local/e2e/kubernetes.json
@@ -158,8 +150,7 @@ The adapter requires verified database TLS unless that option is explicitly set.
 ```sh
 jq -n '{service:{instance:"engineering-live",listen:"127.0.0.1:17100",
     service_credential:{kind:"file",path:".local/e2e/service.secret"}},
-  downstreams:([{name:"gitlab",port:17101},{name:"kubernetes",port:17102},
-    {name:"sql",port:17103}] | map({name:.name,
+  downstreams:([{name:"kubernetes",port:17102},{name:"sql",port:17103}] | map({name:.name,
     endpoint:("http://127.0.0.1:"+(.port|tostring)+"/"),
     credential:{kind:"file",path:".local/e2e/service.secret"},allow_plaintext:true}))}' \
   > .local/e2e/federation.json
@@ -179,15 +170,15 @@ target/debug/connectors-conformance --token-file .local/e2e/service.secret \
 cat .local/e2e/live-acceptance.json
 ```
 
-Exit 0 and `status: passed` mean nine scenario groups passed: service authentication
+Exit 0 and `status: passed` mean six scenario groups passed: service authentication
 for each provider, then all supported operations and selected failure cases directly
 and through federation. The SQL deadline checks intentionally take roughly ten
-seconds each. Public GitLab availability and rate limits are external dependencies;
-an unsuccessful run is not passing evidence. The runner performs no automatic retry.
+seconds each. An unsuccessful run is not passing evidence. The runner performs no
+automatic retry.
 
 ## Shutdown
 
-Send Ctrl-C or SIGTERM to each of the four service processes and wait for exit.
+Send Ctrl-C or SIGTERM to each of the three service processes and wait for exit.
 After verifying that the containers belong to this run, remove these exact fixtures:
 
 ```sh

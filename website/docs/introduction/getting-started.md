@@ -6,11 +6,12 @@ sidebar_position: 3
 
 # Run your first adapter
 
-The v0.2.0 services run from a source checkout with Rust 1.88.0 or later and an
+The services run from a source checkout with Rust 1.88.0 or later and an
 explicitly configured provider endpoint. On Linux x86_64, start with the
-[saved-credential GitLab CLI](/adapters/gitlab#use-saved-credentials).
-The steps below cover the compatible standalone service interface, also used by
-Kubernetes and PostgreSQL. Binary/package distribution is not configured.
+[saved-credential GitLab CLI](/adapters/gitlab#use-saved-credentials), which
+runs GitLab through the catalog provider. The steps below cover the standalone
+service interface used by Kubernetes and PostgreSQL. Binary/package distribution
+is not configured.
 
 ## Build
 
@@ -24,7 +25,7 @@ Ordinary builds read checked-in generated Rust and do not require ESS. Cargo may
 
 ## Configure access
 
-Choose `examples/gitlab.yaml`, `examples/kubernetes.yaml` or `examples/sql.yaml` as your starting configuration. Set a unique instance and listener, the provider endpoint and permitted resources, and private credential references.
+Choose `examples/kubernetes.yaml` or `examples/sql.yaml` as your starting configuration. Set a unique instance and listener, the provider endpoint and permitted resources, and private credential references.
 
 Credentials belong in private regular files owned by the service user with mode `0600`, or supported environment references. Caller credentials for the adapter service are separate from credentials used against its provider. Do not put either credential value into operation input.
 
@@ -32,17 +33,17 @@ Config changes require a service restart. Replacing a credential file is observe
 
 ## Start and describe
 
-For GitLab, after preparing a configuration file named `gitlab.yaml`:
+For Kubernetes, after preparing a configuration file named `kubernetes.yaml`:
 
 ```sh
-target/debug/connectors-gitlab --config gitlab.yaml
+target/debug/connectors-kubernetes --config kubernetes.yaml
 ```
 
 From another terminal, with the matching service credential in `service.secret`:
 
 ```sh
 target/debug/connectors describe \
-  --endpoint http://127.0.0.1:7101/ \
+  --endpoint http://127.0.0.1:7102/ \
   --allow-plaintext --token-file service.secret
 ```
 
@@ -50,16 +51,16 @@ The endpoint and credential must match your configuration. Plaintext is explicit
 
 ## Invoke a selected operation
 
-Prepare the project input using the repository’s `examples/requests/gitlab-project.json`, matching an allowed project:
+Prepare the discovery input using the repository’s `examples/requests/kubernetes-endpoints.json`, naming a permitted namespace:
 
 ```sh
 target/debug/connectors invoke \
-  --endpoint http://127.0.0.1:7101/ \
+  --endpoint http://127.0.0.1:7102/ \
   --allow-plaintext --token-file service.secret \
-  --operation project.get --input examples/requests/gitlab-project.json
+  --operation endpoints.discover --input examples/requests/kubernetes-endpoints.json
 ```
 
-The client discovers the current descriptor before invoking. Through the example federation host the operation is `gitlab__project.get`; the prefix distinguishes its source.
+The client discovers the current descriptor before invoking. Through the example federation host the operation is `kubernetes__endpoints.discover`; the prefix distinguishes its source.
 
 Read the [service contract](/contracts/service) for exact limits and result semantics. Choose an [adapter](/adapters) for provider-specific boundaries. Local reproduction and full-gate instructions remain in the source checkout’s development guides.
 
@@ -92,7 +93,6 @@ apart. The command starts no owner or adapter and reads no credential or metadat
 An unavailable source, wrong key or uncertain time bound refuses safely.
 The output is historical observation, not reusable approval evidence. On current `main`, the CLI also
 provides `approvals policy-status`, `policy-set`, `prepare` and `issue` for explicitly
-selected private-protocol-two write adapters. Production GitLab still advertises
-reads; its write dispatch remains pending. Ordinary reads need no approval
-clock. See the [clock contract](/contracts/clock) for the trust assumptions,
+selected private-protocol-two write adapters, which is how the GitLab merge-request
+writes run. Ordinary reads need no approval clock. See the [clock contract](/contracts/clock) for the trust assumptions,
 process lifetime, suspend detection and conservative UTC-midnight refusal window.

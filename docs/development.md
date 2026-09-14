@@ -70,34 +70,21 @@ TMPDIR="$PWD/.local/tmp" CARGO_BUILD_JOBS=2 cargo run --locked -p connectors-bui
 ```
 
 Normal builds consume checked-in generated files and need neither ESS nor networked
-vendor-source refresh. GitLab uses the full v3 generation pipeline with separate
-read-only and private write projections:
+vendor-source refresh. Kubernetes and SQL use v1 descriptor generation: omit
+`--generate` and select their `generated/descriptor.json` output. GitLab is served
+by the catalog provider from a bundle compiled with `connectors-build catalog`;
+see [the catalog provider guide](local-catalog-provider.md).
 
-```sh
-cargo run --locked -p connectors-spec -- \
-  --generate \
-  --specification adapters/gitlab/spec/adapter.json \
-  --output adapters/gitlab/generated
-```
-
-Repeat with `--check` to verify the complete bundle. Generation and its tests need
-the exact pinned ESS source build and the recorded rustfmt version. The shared
-resolver checks `--ess`, then `CONNECTORS_ESS`, then the commit-keyed local cache,
-then `ess` on PATH. It verifies the pinned source receipt and executable digest
-before using a candidate. Explicit selections cannot fall back to another tool.
-Resolution never installs a tool or changes PATH. See the
-[toolchain setup](gitlab-generation.md#generate-and-check).
-Kubernetes and SQL retain v1 descriptor
-generation: omit `--generate` and select their `generated/descriptor.json` output.
-
-The [v3 write generator](../spec-kinds/adapter/v3/semantics.md) is implemented for
-the guarded GitLab merge slice, with a separate private descriptor and consuming
-write capability. The development GitLab adapter selects this format.
-`cargo test --locked --offline -p connectors-spec --test write_generation` checks
-closed-reader refusals, pinned imports, deterministic generation and an executable
-consumer fixture. That fixture uses a separate temporary Cargo target, two jobs
-and the repository's dependency pins. It does not grant a provider write or prove
-the pending approval/private-protocol CLI integration.
+The v2 generator (`connectors-spec --generate`, ESS-backed Rust for a GET-only
+adapter document) keeps its tests against the frozen fixture
+`crates/connectors-spec/tests/fixtures/gitlab-v2.json`, whose upstream pin names
+`adapters/gitlab/upstream/openapi_v3.yaml`; no committed adapter selects it
+today. Generation and its tests need the exact pinned ESS source build and the
+recorded rustfmt version. The shared resolver checks `--ess`, then
+`CONNECTORS_ESS`, then the commit-keyed local cache, then `ess` on PATH. It
+verifies the pinned source receipt and executable digest before using a
+candidate. Explicit selections cannot fall back to another tool. Resolution never
+installs a tool or changes PATH.
 
 Each adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:
@@ -106,7 +93,7 @@ wiring. To embed only its contract implementation, disable default features:
 cargo build --locked -p connectors-kubernetes --lib --no-default-features
 ```
 
-The same command works for `connectors-gitlab` and `connectors-sql`. These libraries
+The same command works for `connectors-sql` and `connectors-catalog-provider`. These libraries
 depend on shared contracts/SDK and their protocol dependencies, with no host,
 client, or sibling adapter dependency. The generic client and federation host have
 no adapter dependencies. A new provider supplies an `Adapter` implementation and

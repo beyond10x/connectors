@@ -7,7 +7,7 @@ and bounded Rust/WASM examples.
 ## Start the preview
 
 Use Node 22 or later, Rust 1.88 or later, and the repository's exact ESS pin. Follow
-[toolchain setup](../docs/gitlab-generation.md#generate-and-check) if the pin is not
+[toolchain setup](../docs/development.md) if the pin is not
 already available. The examples also need Rust's browser target:
 
 ```sh
