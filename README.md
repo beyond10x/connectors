@@ -12,7 +12,7 @@ what callers can expect from access, results and failures.
 ```mermaid
 flowchart LR
     app[Application or agent] --> client[Generic client]
-    client --> gitlab[GitLab adapter]
+    client --> catalog[Catalog provider · GitLab]
     client --> host[Optional federation host]
     host --> kube[Kubernetes adapter]
     host --> sql[SQL adapter]
@@ -25,31 +25,28 @@ separate steps.
 
 ## Where the project stands
 
-Source release **v0.2.0** packages the persistent GitLab CLI and eleven native read
-operations. The [changelog](CHANGELOG.md) records its scope and remaining work.
+Source release **v0.11.0** serves GitLab from its pinned OpenAPI source through
+the catalog provider and retires the native GitLab adapter. The
+[changelog](CHANGELOG.md) records its scope and remaining work.
 
 The local CLI implements setup, configured adapter management, protected
 connect/repair, saved-credential revalidation, connection inspection/revoke, cached operation discovery and
 supervised GitLab and Kubernetes reads. A local owner manages exact
 child processes; SQLite records metadata and a qualified Secret Service keyring
-stores credentials. See the [GitLab CLI guide](docs/local-gitlab-cli.md), the
-[Kubernetes CLI guide](docs/local-kubernetes-cli.md) and the
+stores credentials. See the [catalog provider guide](docs/local-catalog-provider.md),
+the [Kubernetes CLI guide](docs/local-kubernetes-cli.md) and the
 [runtime binding](docs/local-runtime-foundation.md).
 
-Disposable GitLab HTTPS and keyring fixtures prove saved-credential reuse after
-CLI, owner and keyring restarts. Explicit revalidation renews the 60-second
-validation evidence without credential re-entry. A dedicated live GitLab has now
-answered all eleven reads, the pinned validation, an approved merge and a raced
-update; see [the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md).
-
-Ordinary HTTP endpoints no longer need adapter code. The
+Ordinary HTTP endpoints need no adapter code. The
 [catalog provider](docs/local-catalog-provider.md) loads a bundle compiled from a
 pinned OpenAPI document — the GitLab bundle carries all 1,847 operations of the
 pinned source — and exposes a configured selection of them through the same local
 CLI, approval and audit path. A reviewed selection set shipped with the repository
-exposes every operation the native GitLab adapter exposes; all of its reads,
-merge-request create, update and a guarded merge have run against the live GitLab
-through it, the preconditions declared as data.
+exposes every operation the native GitLab adapter carried before it was retired;
+all of its reads, merge-request create, update and a guarded merge have run
+against a live GitLab through it, the preconditions declared as data. Explicit
+revalidation renews the 60-second validation evidence without credential
+re-entry; see [the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md).
 
 Kubernetes now has the same local lifecycle binding: a saved bearer token, an
 identity validated by one SelfSubjectReview probe, and its three reads through the
@@ -76,7 +73,7 @@ The current services provide:
 
 | Adapter | Implemented operations | Binding |
 |---|---|---|
-| GitLab | `project.get`, `issues.list`, `file.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.validate` | GitLab API v4, with a configured project allowlist; exact-commit CI, bounded traces, MR update windows and pinned-head validation observations |
+| GitLab (catalog provider) | `project.get`, `issues.list`, `file.get`, `branch.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.create`, `merge_request.update`, `merge_request.merge` | GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks; the host's permitted operation ids are the scope |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, and optionally the `helm_releases.*` release reads | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
 
@@ -129,9 +126,7 @@ with disposable Kubernetes and PostgreSQL services, use the
 [live acceptance recipe](docs/live-e2e.md).
 
 The [development guide](docs/development.md) covers the full gate, pinned
-generation tools and embedding adapter libraries. GitLab's
-[generation and packaging guide](docs/gitlab-generation.md) explains how its
-specification becomes a local service artifact.
+generation tools and embedding adapter libraries.
 
 ## Explore the design
 

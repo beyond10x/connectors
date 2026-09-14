@@ -4,18 +4,20 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.2.0
+# Source release v0.11.0
 
-Version **0.2.0** delivers the persistent Linux GitLab CLI and eleven native read
-operations. The earlier **v0.1.0 milestone** remains a reviewed specification
-baseline for Kubernetes including discovery, GitLab and SQL.
+Version **0.11.0** serves GitLab from its pinned OpenAPI document through the
+catalog provider and retires the native GitLab adapter. The earlier **v0.1.0
+milestone** remains a reviewed specification baseline for Kubernetes including
+discovery, GitLab and SQL.
 
 ## Available runtime
 
-The [GitLab adapter](/adapters/gitlab) reads projects, issues, files, exact-commit
-pipelines/jobs, bounded traces and merge requests. Pinned-head validation checks
-the selected MR SHA and successful head pipeline and reports blockers; it never
-performs or authorizes a merge.
+[GitLab](/adapters/gitlab) runs through the [catalog provider](/adapters/catalog):
+projects, issues, files, branches, pipelines, jobs, traces and merge requests as
+reads, and merge-request create, update and a guarded merge as approved writes,
+every one bound from the pinned source with no adapter code per endpoint. A
+live GitLab has answered all of them.
 
 Local setup, adapter supervision and connection management use SQLite metadata
 and qualified Secret Service custody. Saved PATs can be reused after restarts,
@@ -28,9 +30,10 @@ The generic client and one-hop federation host retain their existing interfaces.
 
 ## Verification and remaining work
 
-The GitLab increment has six production CLI journeys using disposable HTTPS and
-keyring fixtures, native MR tests, local packaging checks, and the repository
-gate including Rust 1.88. Dedicated GitLab sandbox acceptance is still open.
+The catalog provider has engine fixtures for binding, guards and text
+responses, host-child fixtures over disposable HTTPS, a drift check on the
+committed bundle, and the repository gate including Rust 1.88. Its GitLab
+sandbox acceptance is recorded in the source checkout's evidence directory.
 
 The development checkout extends this release with local approval policy,
 protected proof issuance and a guarded GitLab merge through private protocol two.

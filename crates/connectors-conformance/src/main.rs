@@ -8,31 +8,20 @@ use serde_json::{Value, json};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(about = "Verify the configured three-adapter live acceptance environment")]
+#[command(about = "Verify the configured Kubernetes and PostgreSQL live acceptance environment")]
 struct Args {
     #[arg(long)]
     token_file: PathBuf,
-    #[arg(long, default_value = "http://127.0.0.1:17101/")]
-    gitlab: String,
     #[arg(long, default_value = "http://127.0.0.1:17102/")]
     kubernetes: String,
     #[arg(long, default_value = "http://127.0.0.1:17103/")]
     sql: String,
     #[arg(long, default_value = "http://127.0.0.1:17100/")]
     gateway: String,
-    #[arg(long, default_value = "gitlab-org/gitlab")]
-    project: String,
-    #[arg(long, default_value = "README.md")]
-    file: String,
-    #[arg(long, default_value = "HEAD")]
-    reference: String,
     #[arg(long, default_value = "engineering")]
     namespace: String,
     #[arg(long)]
     allow_plaintext: bool,
-    /// Run the GitLab direct/federated slice without Kubernetes or SQL fixtures.
-    #[arg(long)]
-    gitlab_only: bool,
 }
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -59,14 +48,7 @@ async fn main() -> Result<()> {
     let gateway = Client::new(&args.gateway, token.clone(), args.allow_plaintext)?;
     let gateway_desc = gateway.describe().await?;
     let mut checks = Vec::new();
-    for (name, url) in [
-        ("gitlab", &args.gitlab),
-        ("kubernetes", &args.kubernetes),
-        ("sql", &args.sql),
-    ] {
-        if args.gitlab_only && name != "gitlab" {
-            continue;
-        }
+    for (name, url) in [("kubernetes", &args.kubernetes), ("sql", &args.sql)] {
         let direct = Client::new(url, token.clone(), args.allow_plaintext)?;
         let descriptor = direct.describe().await?;
         require(
@@ -88,17 +70,6 @@ async fn main() -> Result<()> {
             (&gateway, &gateway_desc, format!("{name}__"), "federated"),
         ] {
             match name {
-                "gitlab" => {
-                    gitlab(
-                        client,
-                        desc,
-                        &prefix,
-                        &args.project,
-                        &args.file,
-                        &args.reference,
-                    )
-                    .await?
-                }
                 "kubernetes" => kubernetes(client, desc, &prefix, &args.namespace).await?,
                 "sql" => sql(client, desc, &prefix).await?,
                 _ => unreachable!(),
@@ -111,7 +82,7 @@ async fn main() -> Result<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(
-            &json!({"status":"passed","wire":"v1alpha1","checks":checks,"evidence":if args.gitlab_only { "live configured upstream; public GitLab reads" } else { "live configured upstreams; public GitLab reads, scoped Kubernetes service account, PostgreSQL reader role" }})
+            &json!({"status":"passed","wire":"v1alpha1","checks":checks,"evidence":"live configured upstreams; scoped Kubernetes service account, PostgreSQL reader role"})
         )?
     );
     Ok(())
@@ -127,75 +98,6 @@ async fn call(
     Ok(client
         .invoke(descriptor, &format!("{prefix}{operation}"), input)
         .await?)
-}
-
-async fn gitlab(
-    client: &Client,
-    descriptor: &Descriptor,
-    prefix: &str,
-    project: &str,
-    file: &str,
-    reference: &str,
-) -> Result<()> {
-    let result = call(
-        client,
-        descriptor,
-        prefix,
-        "project.get",
-        json!({"project":project}),
-    )
-    .await?;
-    require(
-        result["item"]["id"].is_number(),
-        "GitLab did not return a project identity",
-    )?;
-    let first = call(
-        client,
-        descriptor,
-        prefix,
-        "issues.list",
-        json!({"project":project,"limit":1}),
-    )
-    .await?;
-    require(
-        first["items"].is_array(),
-        "GitLab did not return issue records",
-    )?;
-    if let Some(cursor) = first["next_cursor"].as_str() {
-        let next = call(
-            client,
-            descriptor,
-            prefix,
-            "issues.list",
-            json!({"project":project,"limit":1,"cursor":cursor}),
-        )
-        .await?;
-        require(next["items"].is_array(), "GitLab continuation is invalid")?;
-    }
-    let result = call(
-        client,
-        descriptor,
-        prefix,
-        "file.get",
-        json!({"project":project,"path":file,"ref":reference}),
-    )
-    .await?;
-    require(
-        result["item"]["encoding"] == "base64" && result["item"]["content"].is_string(),
-        "GitLab file representation mismatch",
-    )?;
-    let refused = client
-        .invoke(
-            descriptor,
-            &format!("{prefix}project.get"),
-            json!({"project":"outside-configured-scope"}),
-        )
-        .await
-        .unwrap_err();
-    require(
-        refused.code == ErrorCode::Forbidden,
-        "GitLab project scope was not enforced",
-    )
 }
 
 async fn kubernetes(

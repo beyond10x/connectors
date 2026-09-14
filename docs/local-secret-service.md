@@ -4,7 +4,7 @@ The host's `local::keyring::custody` module implements immutable scoped writes a
 exact-version reads against one qualified Linux Secret Service implementation.
 It is infrastructure for the persistent GitLab journey. The
 [SQLite coordinator](local-connection-registry.md) now binds connection publication
-and guarded retirement. [Protected CLI entry and supervised GitLab reads](local-gitlab-cli.md)
+and guarded retirement. [Protected CLI entry and supervised GitLab reads](local-catalog-provider.md)
 now use this binding. `setup check` qualifies the current daemon/storage against this exact
 binding; that prerequisite alone does not establish a usable saved connection.
 

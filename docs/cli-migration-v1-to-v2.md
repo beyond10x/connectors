@@ -99,7 +99,7 @@ the feature waits for; verb names are not decided unless stated. "Not carried" c
 | `inspect providers` | not available | `catalog.list`/`catalog.describe` when a catalog service is configured (`catalog/v1alpha1`, proposed) | a mandatory catalog |
 | `inspect auth` | not available (a descriptor never lists credentials) | `connections.list` with safe status (`auth.connection/v1alpha1`, proposed) | reading a credential value: never, unchanged from v1 |
 | `session login --no-browser --timeout-seconds` / `session logout` | not available; `--token-file` holds a static service token | Identity access token source for the `identity-audience` admission profile (`service/v1alpha2`, proposed); keyring storage undecided | a login that changes the default target of later commands |
-| `serve local --config --state-root` | `serve --config federation.yaml` runs the federation host; each adapter runs as its own binary: `connectors-gitlab --config gitlab.yaml`, `connectors-kubernetes …`, `connectors-sql …` | host launches adapter executables from a local composition ("local adapter lifecycle", `docs/design.md` § 17.1–17.3); verb undecided | one daemon linking every provider |
+| `serve local --config --state-root` | `serve --config federation.yaml` runs the federation host; each adapter runs as its own binary: `connectors-kubernetes --config kubernetes.yaml`, `connectors-sql …`; GitLab runs through `connectors-catalog-provider` under the local CLI | host launches adapter executables from a local composition ("local adapter lifecycle", `docs/design.md` § 17.1–17.3); verb undecided | one daemon linking every provider |
 | `serve hosted` | same binaries; admission is configuration (`static-bearer` today, `identity-audience` proposed) | — | a separate hosted mode |
 | `serve mcp` | not available | inbound `/mcp` as a host transport binding onto governed operations (ADR 0028); how it is started is undecided | MCP as the internal contract between client and adapters |
 | `connection candidates --target --query --limit` | not available | `resource_discovery/v1alpha1` + `auth.connection` `managed` profile (both proposed) | — |
@@ -141,7 +141,7 @@ mkdir -p .local/tmp
 TMPDIR="$PWD/.local/tmp" cargo build --workspace --locked
 
 # run one adapter from an example config (credential files must be 0600, owner-only)
-target/debug/connectors-gitlab --config gitlab.yaml
+target/debug/connectors-kubernetes --config kubernetes.yaml
 
 # discover its contract, then invoke
 target/debug/connectors describe \

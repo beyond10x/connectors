@@ -1,5 +1,9 @@
 # Three adapters: verification record
 
+> The GitLab entries on this page record the native GitLab adapter, retired in
+> 0.11.0 in favour of the catalog provider. The commands and paths they cite
+> existed at the recorded commits and are kept as history.
+
 Latest local review remediation: [independent review response, 2026-09-08](independent-review-response-2026-09-08.md).
 That run passed 50 tests and the full Rust 1.88/ESS 0.20.0 gate, plus 100 toolchain
 stress runs and live PostgreSQL deadline/cancellation checks over plaintext and TLS.
@@ -185,8 +189,8 @@ Connectors checkout were not integrated or changed by this implementation.
 
 The follow-up story is `story:gitlab-spec-service`. Local commit
 `75f1c7275d7b227d5a2e4a3e95bfc5c9b2de262a` preserves the previous workspace before
-this implementation. [Generation and packaging](gitlab-generation.md) explains
-reproduction; [the evidence directory](evidence/gitlab-spec-service-2026-09-08/)
+this implementation. The generation and packaging guide, retired with the native
+adapter in 0.11.0, explained reproduction; [the evidence directory](evidence/gitlab-spec-service-2026-09-08/)
 contains the exact build, source, test, runtime and shutdown observations.
 
 Observed verification:
@@ -294,8 +298,9 @@ Upgraded the repository pin to official ESS 0.20.0 after the preceding resolver
 acceptance. [Release metadata](evidence/ess-toolchain-2026-09-08/release.json)
 records the exact tag commit, platform archive checksum and executable hashes.
 The verified release is at `.local/toolchains/ess/0.20.0/bin/ess`; both global
-installations remain unchanged. [Generation documentation](gitlab-generation.md#ess-upgrade-reviewed-on-2026-09-08)
-reviews the two changed bundle files and the preserved vendor-import refusal.
+installations remain unchanged. The generation guide (retired with the native
+adapter in 0.11.0) reviewed the two changed bundle files and the preserved
+vendor-import refusal.
 
 All of these commands exited 0 with `TMPDIR="$PWD/.local/tmp"`,
 `CARGO_BUILD_JOBS=2` and `CONNECTORS_ESS` unset:
@@ -328,7 +333,7 @@ rechecks all 81 code/Cargo source inputs against the package snapshot. Later
 documentation, evidence and planning updates describe the run; they are not claimed
 to have existed in that snapshot.
 
-Following the [container recipe](gitlab-generation.md#run-and-prove-the-container),
+Following the container recipe of the since-retired generation guide,
 the task created container `connectors-v2-ess-020-20260908`, exposed only
 `127.0.0.1:27201`, and ran a generic gateway on `127.0.0.1:27200`. Configuration
 and a fresh owner-only caller credential were mounted separately and read-only.

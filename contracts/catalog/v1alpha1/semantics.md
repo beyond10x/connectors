@@ -21,9 +21,9 @@ The pipeline this contract describes has three parts, matching the old repositor
 
 | Old surface | Source | Disposition |
 |---|---|---|
-| `providers/<id>.toml`: `[spec]` pin (path, source_url, upstream_version, fetched_at, sha256) plus `[[patch.operations]]` curation (select, rename, direction, risk, idempotency, effects, placement, capabilities) | `../connectors/providers/alertmanager.toml:13-18,26-37` | preserve as the v2 adapter document's `upstream` and `mappings` (`adapters/gitlab/spec/adapter.json`) plus a per-operation curation block the v2 kind lacks today |
+| `providers/<id>.toml`: `[spec]` pin (path, source_url, upstream_version, fetched_at, sha256) plus `[[patch.operations]]` curation (select, rename, direction, risk, idempotency, effects, placement, capabilities) | `../connectors/providers/alertmanager.toml:13-18,26-37` | preserve as the v2 adapter document's `upstream` and `mappings` (frozen at `crates/connectors-spec/tests/fixtures/gitlab-v2.json`) plus a per-operation curation block the v2 kind lacks today; the implemented provider realization takes the selection set `adapters/catalog/providers/<id>/operations.json` instead |
 | Hand-authored providers with no vendor document: 48 of 65 providers, 279 of 1,017 operations; body fields declared with `wire` paths | `../connectors/providers/airtable.toml:1-11,352-388`; counts over `../connectors/catalog/*.catalog.json` | preserve: the adapter kind must accept mappings without `upstream` (today `upstream` is required, `spec-kinds/adapter/v2/schema.json` `required`) |
-| `catalog build`: TOML + spec → canonical `catalog/<id>.catalog.json` (18 top-level fields, `catalog/connector-document.schema.json`) → `catalog.pack` + `connectors.lock`; hermetic, deterministic, all-or-nothing, explicit, engine-free | `../connectors/crates/catalog-build/src/lib.rs:11-17,34-40` | preserve the five invariants; replace document plus pack with the per-adapter `generated/` bundle (`adapters/gitlab/generated/`) plus one index |
+| `catalog build`: TOML + spec → canonical `catalog/<id>.catalog.json` (18 top-level fields, `catalog/connector-document.schema.json`) → `catalog.pack` + `connectors.lock`; hermetic, deterministic, all-or-nothing, explicit, engine-free | `../connectors/crates/catalog-build/src/lib.rs:11-17,34-40` | preserve the five invariants; replace document plus pack with the per-provider bundle (`adapters/catalog/generated/bundles/<id>.bundle.json`) plus one index |
 | `catalog-reader`: embedded offset-indexed pack, vendored SHA-256, refusal by name of a newer container or schema version or digest mismatch | `../connectors/crates/catalog-reader/src/lib.rs:12-40` | preserve refusal by name; drop the custom pack and the embed-into-every-consumer model (`docs/design.md:79,1095`) |
 | `catalog` typed view: `Risk` low/medium/high, `Idempotency` idempotent/non_idempotent/conditional; no field a secret value could live in | `../connectors/crates/catalog/src/lib.rs:60-66,87-93`; `crates/catalog/README.md:30` | map to the mutation profile's `risk` and `idempotency.kind` (`natural`/`none`/`keyed`); preserve value freedom |
 | `integration-catalog`: one adapter for every declared provider; `connector-resolve`: template + input + credential → request plan; acquisition, datasources and events explicitly excluded | `../connectors/crates/integration-catalog/src/lib.rs:1,28-36`; `crates/connector-resolve/src/lib.rs:1` | preserve as the `generic-http` profile realized by the catalog adapter; keep the exclusions |
@@ -65,7 +65,7 @@ The pipeline this contract describes has three parts, matching the old repositor
 }
 ```
 
-`catalog.provider.describe` `{ "adapter": "alertmanager" }` → the bundle's descriptor (shape of `adapters/gitlab/generated/descriptor.json`: `adapter`, `configuration_schema`, operations) plus a coverage summary per operation (`generated`, `requires_implementation`, `refused`, from `adapters/gitlab/generated/coverage.json`, format `connectors.import-coverage/v1`) and the curation block per operation.
+`catalog.provider.describe` `{ "adapter": "alertmanager" }` → the bundle's descriptor (shape of `adapters/kubernetes/generated/descriptor.json`: `adapter`, `configuration_schema`, operations) plus a coverage summary per operation (`generated`, `requires_implementation`, `refused`, format `connectors.import-coverage/v1`) and the curation block per operation.
 
 `catalog.operations.list` `{ "adapter": null, "contract": "operations/v1alpha1", "profile": "mutation", "effects": ["external_write"], "limit": 100, "cursor": null }` → items:
 
@@ -75,7 +75,7 @@ The pipeline this contract describes has three parts, matching the old repositor
   "requires_auth": [{ "profile": "zendesk.api_token", "scopes": [] }], "realization": "generic" }
 ```
 
-`catalog.bundle.describe` `{ "adapter": "zendesk", "digest": "sha256:…" }` → manifest fields (`format`, `specification_sha256`, `upstream_sha256`, `ess`, `rustfmt`, `files` with per-file digests, as in `adapters/gitlab/generated/manifest.json`) plus `locations: [ { "kind": "path" | "oci" | "https", "reference": "…" } ]`. Bytes are not served over this contract; a host fetches by location and verifies the digest.
+`catalog.bundle.describe` `{ "adapter": "zendesk", "digest": "sha256:…" }` → manifest fields (`format`, `specification_sha256`, `upstream_sha256`, `ess`, `rustfmt`, `files` with per-file digests, as the v2 generator's `manifest.json` carries) plus `locations: [ { "kind": "path" | "oci" | "https", "reference": "…" } ]`. Bytes are not served over this contract; a host fetches by location and verifies the digest.
 
 `catalog.sources.status` `{ "adapter": "zendesk" }` → per source: pinned revision, sha256, `fetched_at`, refresh policy (`manual`, `authored-review`), and `drift: "unknown" | "none" | "upstream_changed"`. `drift` is `unknown` unless a deliberate, separately invoked refresh check recorded a result; a read never contacts a vendor.
 
@@ -85,7 +85,7 @@ The pipeline this contract describes has three parts, matching the old repositor
 | `sources[].origin` | `vendor`, `repository-authored`, `vendor-derived`, `mixed` (old vocabulary) |
 | `sources[].kind` | `openapi`, `swagger2`, `authored`, `asyncapi` (recorded, not ingested) |
 | `bundle.digest` | SHA-256 over the manifest, which carries every file digest |
-| `toolchain` | exact versions from the manifest; a pin change requires regeneration (`docs/gitlab-generation.md`) |
+| `toolchain` | exact versions from the manifest; a pin change requires regeneration (`docs/development.md`) |
 
 Errors: base codes; `NotFound` for an unknown adapter or digest; `Unsupported` for a bundle or index format version newer than the reader understands (refusal by name, old `catalog-reader` rule); `Unavailable` naming the file when a digest does not match; `StaleCursor` for an index generation that was replaced.
 

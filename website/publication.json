@@ -12,7 +12,7 @@
       "title": "Local CLI",
       "source": "contracts/cli/v1alpha1/semantics.md",
       "owner": "shared",
-      "status": "Local GitLab management and reads; full contract acceptance pending"
+      "status": "Local management, reads and approved writes; full contract acceptance pending"
     },
     {
       "route": "/contracts/service",
@@ -181,34 +181,6 @@
       "source": "contracts/catalog/v1alpha1/semantics.md",
       "owner": "shared",
       "status": "Specified; runtime pending"
-    },
-    {
-      "route": "/adapters/gitlab/contracts/reads",
-      "title": "GitLab bounded reads",
-      "source": "adapters/gitlab/contracts/reads/v1alpha1/semantics.md",
-      "owner": "gitlab",
-      "status": "First-slice reads implemented; extensions specified"
-    },
-    {
-      "route": "/adapters/gitlab/contracts/ci",
-      "title": "GitLab CI reads",
-      "source": "adapters/gitlab/contracts/ci/v1alpha1/semantics.md",
-      "owner": "gitlab",
-      "status": "Local implementation; dedicated sandbox acceptance open"
-    },
-    {
-      "route": "/adapters/gitlab/contracts/merge-requests",
-      "title": "GitLab merge-request reads",
-      "source": "adapters/gitlab/contracts/merge-requests/v1alpha1/semantics.md",
-      "owner": "gitlab",
-      "status": "Local implementation; dedicated sandbox acceptance open"
-    },
-    {
-      "route": "/adapters/gitlab/contracts/merge-validation",
-      "title": "GitLab pinned-head validation",
-      "source": "adapters/gitlab/contracts/merge-requests/v1alpha1/validation.md",
-      "owner": "gitlab",
-      "status": "Read-only observation; dedicated sandbox acceptance open"
     },
     {
       "route": "/adapters/sql/contracts/reads",

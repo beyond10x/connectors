@@ -1,14 +1,13 @@
 {
   "operation": "issues.list",
-  "input": {"project": "acme/website", "limit": 20},
+  "input": {"id": "acme/website", "per_page": 20},
   "result": {
-    "items": [
+    "status": 200,
+    "body": [
       {"id": 101, "iid": 42, "title": "Make the sign-in form easier to use", "state": "opened"},
       {"id": 102, "iid": 43, "title": "Add keyboard navigation to search", "state": "opened"},
       {"id": 103, "iid": 44, "title": "Document the staging environment", "state": "closed"}
     ],
-    "next_cursor": null,
-    "complete": true,
-    "provenance": {"instance": "gitlab-remote", "resource": "acme/website", "observed_at_unix_ms": 0, "source_revision": null}
+    "provenance": {"instance": "gitlab-remote", "resource": "/api/v4/projects/{id}/issues", "observed_at_unix_ms": 0, "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"}
   }
 }

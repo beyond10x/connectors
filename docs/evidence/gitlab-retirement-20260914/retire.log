@@ -1,0 +1,30 @@
+setup init exit=0
+executable sha256 b85b1c10bb75c1c489b560c74a01a860f5b359984fa6e7a717f7d33be9e6d2bd configuration_revision 46f7e22844c2dfc3462aab35722c7b6a2be4dc0eda2f18819a0417a6d1547bfa
+setup check exit=0
+connection conn_1a6a606f8d3e4661a8bfcd7e926a1aec_8cf565a46a194c34827c5a338570dba2 identity {'kind': 'gitlab.user', 'subject': '2'}
+key-init exit=0
+policy-set exit=0
+merge_request.merge input required: 
+project (project.get): ok status 200 body object classification None cause None
+issues (issues.list): ok status 200 body list[1] classification None cause None
+file (file.get): ok status 200 body object classification None cause None
+branch (branch.get): ok status 200 body object classification None cause None
+mrs (merge_requests.list): ok status 200 body list[3] classification None cause None
+mr-10 (merge_request.get): ok status 200 body object classification None cause None
+MR 10 head b268f4f4482cc79ecdb4803baf5db270824e31f6 pipeline 19 success not_open
+pipelines (pipelines.list): ok status 200 body list[2] classification None cause None
+pipeline-19 (pipeline.get): ok status 200 body object classification None cause None
+pipeline-19-jobs (pipeline.jobs): ok status 200 body list[1] classification None cause None
+job of pipeline 19: 23
+job (job.get): ok status 200 body object classification None cause None
+job-trace (job.trace): ok status 200 body text:'2026-09-13T15:48:08.971190Z 00O \x1b[0KRunn' classification None cause None
+MR 10 recorded head b268f4f4482cc79ecdb4803baf5db270824e31f6; main head 45fbac1b0127059aac91c45ee6cf25b1903230fb
+PUTs to 10 before: merge 0 update 0
+merge-merged (merge_request.merge): ERR failure forbidden stage dispatch classification not_attempted cause None
+merge PUTs to 10 now: 0 (before 0)
+merge-missing (merge_request.merge): ERR failure forbidden stage dispatch classification not_attempted cause None
+merge PUTs to 999: 0
+update-merged (merge_request.update): ERR failure forbidden stage dispatch classification not_attempted cause None
+PUTs to 10 now: merge 0 update 0 (before merge 0 update 0)
+MR 10 merged b268f4f4482cc79ecdb4803baf5db270824e31f6 merge_commit 45fbac1b0127059aac91c45ee6cf25b1903230fb 'Retitled through the catalog provider'
+DONE

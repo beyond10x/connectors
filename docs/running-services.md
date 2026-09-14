@@ -13,7 +13,6 @@ downstream credentials. Environment references reflect the process environment;
 changing a parent shell's environment cannot update an already running service.
 
 ```sh
-target/debug/connectors-gitlab --config gitlab.yaml
 target/debug/connectors-kubernetes --config kubernetes.yaml
 target/debug/connectors-sql --config sql.yaml
 target/debug/connectors serve --config federation.yaml
@@ -23,13 +22,15 @@ The shared CLI discovers the current contract before invoking it:
 
 ```sh
 target/debug/connectors describe \
-  --endpoint http://127.0.0.1:7101/ --allow-plaintext --token-file service.secret
+  --endpoint http://127.0.0.1:7102/ --allow-plaintext --token-file service.secret
 target/debug/connectors invoke \
-  --endpoint http://127.0.0.1:7101/ --allow-plaintext --token-file service.secret \
-  --operation project.get --input examples/requests/gitlab-project.json
+  --endpoint http://127.0.0.1:7102/ --allow-plaintext --token-file service.secret \
+  --operation endpoints.discover --input examples/requests/kubernetes-endpoints.json
 ```
 
-Through the example federation host, the same operation is `gitlab__project.get`.
+Through the example federation host, the same operation is `kubernetes__endpoints.discover`.
+GitLab has no standalone service: the [catalog provider](local-catalog-provider.md)
+serves it under the local CLI.
 Source prefixes distinguish instances; the gateway does not interpret provider data.
 The first profile supports one federation hop. It never retries a provider request.
 
@@ -37,7 +38,6 @@ The first profile supports one federation hop. It never retries a provider reque
 
 | Adapter | Operations | External binding |
 |---|---|---|
-| GitLab | `project.get`, `issues.list`, `file.get` | GitLab API v4; configured project allowlist; token or public reads |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, optionally `helm_releases.history`/`.status`/`.values`/`.manifest` | Kubernetes API; namespace/kind restrictions; bearer token and CA; Helm release reads need their own `helm_release_reads` selection |
 | SQL | `schema.list`, `query.read` | PostgreSQL; explicit role/database; read-only transactions and deadlines |
 

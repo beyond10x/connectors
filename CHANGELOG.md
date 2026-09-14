@@ -22,11 +22,47 @@
   and three guard refusals with none ran through the shipped set; see
   `docs/evidence/gitlab-sandbox-20260913/README.md`.
 
+### Removed
+
+- The native GitLab adapter: the `connectors-gitlab` crate under
+  `adapters/gitlab/` with its v3 specification, generated tree, tests, native
+  contracts and packaging realization. GitLab has one runtime, the catalog
+  provider with the shipped selection set. `adapters/gitlab/upstream/` stays as
+  the pinned source the bundle is compiled from.
+- The v3 write generator in `crates/connectors-spec` (`src/v3.rs`,
+  `tests/write_generation.rs`) and the `connectors.adapter/v3` spec kind; GitLab
+  was its only consumer. The v2 generator keeps its tests against the frozen
+  fixture `crates/connectors-spec/tests/fixtures/gitlab-v2.json`.
+- The standalone GitLab service and its conformance slice: the catalog provider
+  runs under the local CLI only, so `connectors-conformance`, `examples/` and the
+  live acceptance recipe cover Kubernetes and PostgreSQL. GitLab acceptance is
+  the sandbox record under `docs/evidence/gitlab-sandbox-20260913/`.
+- `docs/local-gitlab-cli.md`, `docs/gitlab-generation.md` and
+  `docs/gitlab-write-failure-matrix.md`; the four `/adapters/gitlab/contracts/*`
+  website pages. The CLI binding steps now live in
+  `docs/local-catalog-provider.md`.
+
+### Changed
+
+- The repository gate checks the `kubernetes` and `sql` descriptors and the
+  `kubernetes`, `sql` and `catalog-provider` library boundaries;
+  `connectors-build package` defaults to `adapters/catalog/realizations/local.json`.
+- The website walkthrough validates its fixture against the catalog provider's
+  declared `issues.list` and shows the provider's status, body and provenance.
+- `adapters/catalog/tests/local_runtime.rs` carries the host-child checks the
+  native adapter's suite held: spawn against the printed bootstrap, identity and
+  scope probes, reads through the shipped set, exact-incarnation stop, and
+  refusal of a changed artifact, bootstrap or trust root. The production CLI
+  journeys (approval spend, settlement, owner crash, background recovery,
+  revocation) that ran with the native adapter as the child are not yet re-run
+  with the catalog provider; `story:catalog-cli-journeys` owns that.
+
 ### Planning
 
 - `epic:retire-native-gitlab-adapter` records the convergence: GitLab served by
   the catalog provider only, the native adapter removed once every operation it
   carries runs through the catalog with equal or stricter guarantees.
+  `story:remove-native-gitlab-adapter` is the deletion.
 
 ## 0.10.0 — 2026-09-13
 
