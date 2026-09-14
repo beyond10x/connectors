@@ -20,7 +20,9 @@ use std::{
 };
 use zeroize::Zeroizing;
 
-pub const FORMAT: &str = "connectors-catalog-local/1";
+pub const FORMAT: &str = "connectors-catalog-local/2";
+/// A selection set shipped with the repository, referenced by `operations_file`.
+pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
 const DOCUMENT_LIMIT: usize = 64 * 1024;
 
 /// A read the profile performs to learn who the credential is, and optionally
@@ -69,6 +71,21 @@ struct Configuration {
     api_base: String,
     ca_file: Option<PathBuf>,
     auth: AuthConfig,
+    /// Selections written into this file.
+    #[serde(default)]
+    operations: Vec<Selection>,
+    /// An absolute path to a reviewed selection set for `provider`, appended to
+    /// `operations`. The repository ships one per provider it has reviewed.
+    #[serde(default)]
+    operations_file: Option<PathBuf>,
+}
+
+/// The document `operations_file` names.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperationsFile {
+    format: String,
+    provider: String,
     operations: Vec<Selection>,
 }
 
@@ -136,8 +153,29 @@ impl Local {
                 .is_some_and(|s| segments(&s.path).is_empty())
             || (config.auth.scopes.is_none() && !config.auth.minimum_scopes.is_empty())
             || !config.bundle_directory.is_absolute()
+            || config
+                .operations_file
+                .as_ref()
+                .is_some_and(|path| !path.is_absolute())
         {
             return Err(Failure::InvalidConfiguration);
+        }
+        let mut operations = config.operations.clone();
+        if let Some(path) = &config.operations_file {
+            // A shipped selection set is ordinary repository content, readable by
+            // anyone; only the configuration that names it must be private.
+            let bytes = std::fs::File::open(path)
+                .map_err(|_| Failure::InvalidConfiguration)
+                .and_then(|file| {
+                    filesystem::read_bounded(file, 1024 * 1024)
+                        .map_err(|_| Failure::InvalidConfiguration)
+                })?;
+            let shipped: OperationsFile =
+                connectors_core::read_json(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
+            if shipped.format != OPERATIONS_FORMAT || shipped.provider != config.provider {
+                return Err(Failure::InvalidConfiguration);
+            }
+            operations.extend(shipped.operations);
         }
         let bundle = bundle::load(&config.bundle_directory, &config.provider)
             .map_err(Failure::from_service)?;
@@ -154,7 +192,7 @@ impl Local {
             .transpose()
             .map_err(|_| Failure::InvalidConfiguration)?;
         let engine =
-            Engine::new(&bundle, &base_path, &config.operations).map_err(Failure::from_service)?;
+            Engine::new(&bundle, &base_path, &operations).map_err(Failure::from_service)?;
         let effective = json!({
             "format": config.format,
             "instance": config.instance,
@@ -166,7 +204,7 @@ impl Local {
             "api_base": base,
             "ca_digest": ca.as_ref().map(|b| connectors_core::digest(&json!(b))),
             "auth": serde_json::to_value(&config.auth).map_err(|_| Failure::Protocol)?,
-            "operations": serde_json::to_value(&config.operations).map_err(|_| Failure::Protocol)?,
+            "operations": serde_json::to_value(&operations).map_err(|_| Failure::Protocol)?,
         });
         let configuration_revision = connectors_core::digest(&effective);
         let http = Arc::new(
