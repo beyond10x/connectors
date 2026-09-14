@@ -1,1 +1,0 @@
-{"components":[{"component":"gitlab-writes-adapter","owns":{"domains":["gitlab_writes.requests"]},"reached_by":"in_process"}]}

@@ -16,7 +16,7 @@ export default function Home() {
           </div>
           <aside className="home-request" aria-label="A request through Connectors">
             <div className="home-request-title"><span>ONE ISSUE READ</span><span className="home-live-dot">GitLab</span></div>
-            <ol><li><span className="request-number">01</span><div><strong>Your application</strong><span>Ask for issues in acme/website</span></div></li><li><span className="request-number">02</span><div><strong>A federating host</strong><span>Route to the configured remote adapter</span></div></li><li><span className="request-number">03</span><div><strong>The GitLab adapter</strong><span>Check the request, then call GitLab</span></div></li></ol>
+            <ol><li><span className="request-number">01</span><div><strong>Your application</strong><span>Ask for issues in acme/website</span></div></li><li><span className="request-number">02</span><div><strong>A federating host</strong><span>Route to the configured remote adapter</span></div></li><li><span className="request-number">03</span><div><strong>The catalog provider</strong><span>Bind the request from the pinned source, then call GitLab</span></div></li></ol>
             <div className="home-response"><span aria-hidden="true">↳</span><div><strong>Issues, with context</strong><span>Items · pagination · source provenance</span></div></div>
             <p>Call an adapter directly, or use a host when you need federation. Provider credentials stay at the adapter boundary.</p>
           </aside>
@@ -32,7 +32,7 @@ export default function Home() {
       </section>
       <section className="home-section home-working">
         <SectionHeader eyebrow="AVAILABLE TODAY" title="Start with a small, working service." description="The first runtime slice supports bounded reads and discovery. Each adapter documents its precise limits." action={<Link to="/introduction/status">Full support status →</Link>} />
-        <div className="home-adapters">{[['GitLab', 'Projects, issues and files', 'gitlab'], ['Kubernetes', 'Resources and endpoints', 'kubernetes'], ['SQL / PostgreSQL', 'Schemas and read-only queries', 'sql']].map(([title, description, id]) => <Link key={id} to={'/adapters/' + id}><strong>{title}</strong><span>{description}</span><span aria-hidden="true">↗</span></Link>)}</div>
+        <div className="home-adapters">{[['GitLab', 'Any operation of the pinned source', 'gitlab'], ['Kubernetes', 'Resources and endpoints', 'kubernetes'], ['SQL / PostgreSQL', 'Schemas and read-only queries', 'sql']].map(([title, description, id]) => <Link key={id} to={'/adapters/' + id}><strong>{title}</strong><span>{description}</span><span aria-hidden="true">↗</span></Link>)}</div>
       </section>
     </main>
   </Layout>;

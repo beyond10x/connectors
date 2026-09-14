@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 connectors-catalog = { path = "../connectors-catalog" }
+connectors-catalog-provider = { path = "../../adapters/catalog", default-features = false }
 clap.workspace = true
 serde_json.workspace = true
 serde.workspace = true

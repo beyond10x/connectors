@@ -1,0 +1,21 @@
+{
+  "format": "connectors.local-service/1",
+  "adapter": "catalog",
+  "package": "connectors-catalog-provider",
+  "binary": "connectors-catalog-provider",
+  "specification": "adapters/catalog/providers/gitlab/operations.json",
+  "generated": "adapters/catalog/generated/bundles",
+  "platform": {
+    "os": "linux",
+    "architecture": "amd64"
+  },
+  "entrypoint": [
+    "/usr/local/bin/connectors-catalog-provider"
+  ],
+  "command": [
+    "--local-config",
+    "/config/catalog.json"
+  ],
+  "user": "65532:65532",
+  "repository": "connectors-v2-catalog"
+}

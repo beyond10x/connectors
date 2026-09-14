@@ -143,7 +143,7 @@ fn journey(mode: &str, situation: &str) -> Vec<Step> {
     if situation == "adapter_unreachable" {
         return refuse(steps, "gateway", "unavailable", "The adapter cannot be reached", "The configured adapter is unavailable. The gateway returns a failure; it does not fall back to another source or claim the project has no issues.");
     }
-    steps.push(Step::new("leaf_admission", if governed { "The receiving host checks authority independently" } else { "The adapter checks the request locally" }, if governed { "The receiver verifies signature, audience, request binding, expiry and one-use delivery admission against its configured trust. It then checks current policy for this caller, operation and connection. A signed assertion alone does not grant access." } else { "The service validates its own credential, description revision and typed input. The GitLab adapter independently checks that acme/website is in its configured project allowlist." }, "adapter", "adapter", "Authenticate; validate; check access").credential(if governed { "delegation" } else { "downstream_service" }).rule(if governed { "/contracts/delegation" } else { "/adapters/gitlab/contracts/reads" }));
+    steps.push(Step::new("leaf_admission", if governed { "The receiving host checks authority independently" } else { "The adapter checks the request locally" }, if governed { "The receiver verifies signature, audience, request binding, expiry and one-use delivery admission against its configured trust. It then checks current policy for this caller, operation and connection. A signed assertion alone does not grant access." } else { "The service validates its own credential, description revision and typed input. The catalog provider binds only the parameters the pinned GitLab source declares for this operation; the destination and the provider credential come from its configuration, never from the input." }, "adapter", "adapter", "Authenticate; validate; check access").credential(if governed { "delegation" } else { "downstream_service" }).rule(if governed { "/contracts/delegation" } else { "/adapters/catalog" }));
     if situation == "connection_denied" {
         return refuse(steps, "adapter", "not_granted", "This caller cannot use the connection", "The receiving host's current policy denies this operation on the selected connection. Valid login and prior GitLab consent do not override that policy. No provider call is sent.");
     }
@@ -153,15 +153,15 @@ fn journey(mode: &str, situation: &str) -> Vec<Step> {
             return refuse(steps, "adapter", "connection_not_ready", "Required credential custody is unavailable", "The host cannot establish readiness of the required custody dependency. It does not pretend the credential is invalid or try anonymous access. No GitLab issue request is sent.");
         }
     }
-    let mut dispatch = Step::new("provider_request", "The adapter calls the GitLab API", "The adapter constructs the project issue request. Its scoped HTTP capability attaches the GitLab credential only at the configured provider destination. This is the first GitLab business request in the journey.", "adapter", "provider", "GET project issues · page 1 · up to 20").credential("provider").payload(json!({"method":"GET","path":"/api/v4/projects/acme%2Fwebsite/issues","query":{"per_page":20,"page":1,"order_by":"created_at","sort":"asc"}})).rule("/adapters/gitlab/contracts/reads");
+    let mut dispatch = Step::new("provider_request", "The adapter calls the GitLab API", "The adapter constructs the project issue request. Its scoped HTTP capability attaches the GitLab credential only at the configured provider destination. This is the first GitLab business request in the journey.", "adapter", "provider", "GET project issues · up to 20").credential("provider").payload(json!({"method":"GET","path":"/api/v4/projects/acme%2Fwebsite/issues","query":{"per_page":20}})).rule("/adapters/catalog");
     dispatch.provider_call = true;
     steps.push(dispatch);
     if situation == "provider_rejected" {
-        steps.push(Step::new("provider_denied", "GitLab rejects its credential", "GitLab returns HTTP 401. Authentication to Connectors succeeded earlier; this is a different credential boundary. The adapter maps the provider response to a safe error, without copying the raw provider body.", "provider", "adapter", "HTTP 401 from GitLab").credential("provider").rule("/adapters/gitlab/contracts/reads"));
+        steps.push(Step::new("provider_denied", "GitLab rejects its credential", "GitLab returns HTTP 401. Authentication to Connectors succeeded earlier; this is a different credential boundary. The adapter maps the provider response to a safe error, without copying the raw provider body.", "provider", "adapter", "HTTP 401 from GitLab").credential("provider").rule("/adapters/catalog"));
         return refuse(steps, "adapter", "unauthorized", "No issue page was obtained", "The provider request failed authentication. This configured read profile does not automatically refresh, retry or switch credentials.");
     }
-    steps.push(Step::new("provider_result", "GitLab returns an issue page", "GitLab checks the provider credential and project access before returning its data. In this fictional project there are three issues; the fixture includes both open and closed issues because the operation has no state filter.", "provider", "adapter", "3 issues + pagination information").payload(fixture["result"]["items"].clone()).rule("/adapters/gitlab/contracts/reads"));
-    steps.push(Step::new("adapt_result", "The adapter returns a bounded, attributed result", "The adapter validates the page, preserves the issue data and adds pagination and source provenance. Complete means this fixture has no further page, not that an unavailable source was silently omitted.", "adapter", "gateway", "Issue page + source + continuation").payload(fixture["result"].clone()).rule("/adapters/gitlab/contracts/reads"));
+    steps.push(Step::new("provider_result", "GitLab returns an issue page", "GitLab checks the provider credential and project access before returning its data. In this fictional project there are three issues; the fixture includes both open and closed issues because the operation has no state filter.", "provider", "adapter", "3 issues").payload(fixture["result"]["body"].clone()).rule("/adapters/catalog"));
+    steps.push(Step::new("adapt_result", "The provider returns the answer with provenance", "The provider returns GitLab's status and body unchanged and adds provenance: the instance, the resource path and the pinned source revision it was bound from. One page per request; a further page is a further request.", "adapter", "gateway", "Status + body + provenance").payload(fixture["result"].clone()).rule("/adapters/catalog"));
     steps.push(Step::new("result", "The issues arrive back at your application", "The gateway preserves the adapter's result and source information. Your application can display the issues without handling a GitLab credential or implementing GitLab transport.", "gateway", "client", "Display the project issues").payload(fixture["result"].clone()));
     steps
 }
@@ -288,12 +288,12 @@ mod tests {
         panic!("walkthrough did not terminate");
     }
     #[test]
-    fn successful_journeys_return_the_same_bounded_issue_page() {
+    fn successful_journeys_return_the_same_issue_page() {
         for mode in ["configured", "governed"] {
             let end = finish(&mut Walkthrough::new(mode, "success"));
-            assert_eq!(end["result"]["items"].as_array().unwrap().len(), 3);
+            assert_eq!(end["result"]["body"].as_array().unwrap().len(), 3);
             assert_eq!(end["provider_calls"], 1);
-            assert_eq!(end["result"]["complete"], true);
+            assert_eq!(end["result"]["status"], 200);
             assert_eq!(end["result"]["provenance"]["instance"], "gitlab-remote");
         }
     }

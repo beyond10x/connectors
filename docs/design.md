@@ -1284,7 +1284,7 @@ packages the binary and required runtime files through an ESS build graph, and
 validates a physical realization against the exact local image and ESS digest.
 Configuration and credentials are mounted separately. All selected reads passed
 from the container directly and through federation, alongside a fresh Kubernetes/
-SQL regression run. [The operating guide](gitlab-generation.md) and
+SQL regression run. [The operating guide](development.md) and
 [verification evidence](verification.md#gitlab-specification-to-service-completion-2026-09-08)
 record commands, tool compatibility adaptations, source licensing and limitations.
 Everything remains local; Atlas integration and publication remain deferred.
