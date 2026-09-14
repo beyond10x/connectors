@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 34
+revision: 35
 ---
 ## Outcome and authority
 
@@ -270,3 +270,28 @@ The operator restated the declarative-runtime decision after `merge_request.upda
 The committed GitLab bundle carries all 1,847 operations of the pinned source with none unsupported; `adapters/catalog/tests/bundle_drift.rs` refuses drift from a fresh run. Against the live sandbox through the provider, under a fresh private configuration and the same delegated `api` token: merge-request reads, a create that opened MR 10 at its pinned head (one POST, 201), a stale-pin create refused with no request, a duplicate create refused by GitLab's 409, an update that retitled MR 10 (one PUT, 200), a stale-pin update refused with no request, and a create whose branch moved between the preflight GET and the POST, which opened MR 11 at the moved head and was classified `unknown`. docs/evidence/gitlab-sandbox-20260913/README.md, section *Through the catalog provider*, retains the records, configuration and log; docs/local-catalog-provider.md is the guide.
 
 This satisfies, for GitLab, the handoff specification's first and second acceptance lines — complete inventory with a disposition per operation, and supported operations invoking through one runtime with no per-operation Rust — and does not satisfy its others: no second provider, no TOML-authored action executed, no request/response schemas in the bundle, header parameters not carried, one token-header auth profile. `specification:catalog-http-runtime-handoff` stays draft on those gaps. The native `merge_request.update` binding remains in the GitLab adapter with its own sandbox evidence; it is the endpoint-by-endpoint form the ADR says not to extend, and no further native endpoint will be added. The GitLab batch — eleven reads, validation, guarded merge, raced update, and create/update through the catalog provider — is the handoff for release v0.10.0 under release-plan:connectors-v0100. Kubernetes with Helm, PostgreSQL, MCP and the remaining providers keep their order.
+
+## Native GitLab adapter retired — 2026-09-14
+
+`epic:retire-native-gitlab-adapter` is implemented. The shipped selection set
+`adapters/catalog/providers/gitlab/operations.json` exposes every operation the
+native adapter carried, the multi-check guard carries the merge precondition as
+data, and the native crate, its v3 specification, generated tree, tests,
+contracts and the v3 write generator are deleted; `adapters/gitlab/upstream/`
+remains as the pinned source. GitLab has one runtime. Evidence:
+docs/evidence/gitlab-sandbox-20260913/ (the shipped set against the live
+sandbox: eleven reads, a guarded merge with one PUT, three guard refusals with
+none) and docs/evidence/gitlab-retirement-20260914/ (the post-removal provider:
+eleven reads, three write attempts refused before dispatch, zero PUTs; gate with
+MSRV all checks passed, 78 targets). This is the GitLab batch handoff for
+release v0.11.0 under release-plan:connectors-v0110.
+
+Not carried over: the production CLI mutation journeys that ran with the native
+adapter as the child (settlement, owner crash, background recovery, revocation)
+are recorded evidence from 2026-09-11 on unchanged host code and are not yet
+re-run with the catalog provider (`story:catalog-cli-journeys`). GitLab has no
+standalone HTTP service, so the live conformance runner covers Kubernetes and
+PostgreSQL. The handoff specification's second provider, TOML-authored action,
+schemas and further auth profiles stay open. Kubernetes with Helm, PostgreSQL,
+MCP and the remaining providers keep their order.
+
