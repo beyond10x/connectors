@@ -6,7 +6,6 @@ use std::collections::BTreeSet;
 
 pub mod toolchain;
 pub mod v2;
-pub mod v3;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -26,9 +25,6 @@ pub fn compile(bytes: &[u8]) -> Result<Descriptor> {
     let value: Value = connectors_core::read_json(bytes)?;
     if value["kind"] == "connectors.adapter/v2" {
         return v2::Spec::parse(bytes)?.descriptor();
-    }
-    if value["kind"] == "connectors.adapter/v3" {
-        return v3::Spec::parse(bytes)?.descriptor();
     }
     let schema: Value =
         serde_json::from_str(include_str!("../../../spec-kinds/adapter/v1/schema.json"))
@@ -107,7 +103,6 @@ pub fn generate(
     let value: Value = connectors_core::read_json(&bytes)?;
     match value["kind"].as_str() {
         Some("connectors.adapter/v2") => v2::generate(specification, out, ess, check),
-        Some("connectors.adapter/v3") => v3::generate(specification, out, ess, check),
         _ => Err(Error::invalid("unsupported generated bundle specification")),
     }
 }

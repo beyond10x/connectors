@@ -61,7 +61,7 @@ unless the current design deliberately preserves them.
 ## Verify the affected surface
 
 Use [the development guide](docs/development.md) for build and gate commands and
-[generation setup](docs/gitlab-generation.md#generate-and-check) for tool resolution.
+[generation setup](docs/development.md) for tool resolution.
 The single ESS pin is [toolchain.json](crates/connectors-spec/toolchain.json).
 Explicit ESS selections must match it; never silently use an ambient older binary.
 

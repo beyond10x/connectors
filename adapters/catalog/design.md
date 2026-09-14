@@ -1,6 +1,6 @@
 # Adapter design: catalog, pre-compiled third-party specifications, and the generic HTTP engine
 
-- **Status:** the `provider` realization is implemented as `connectors-catalog-provider` (`src/`), over bundles built by `connectors-build catalog` from `crates/connectors-catalog`; the `catalog` index-service realization is not. Evidence: `docs/evidence/gitlab-sandbox-20260913/README.md`, section *Through the catalog provider*; the shipped GitLab selection set `providers/gitlab/operations.json` exposes every operation the native adapter exposes. One adapter crate `adapters/catalog/` (`docs/design.md:212`) building one executable with two realizations: `catalog` (index service) and `provider` (generic engine bound to one bundle). One build-time pipeline in `crates/connectors-spec` and `crates/connectors-build`.
+- **Status:** the `provider` realization is implemented as `connectors-catalog-provider` (`src/`), over bundles built by `connectors-build catalog` from `crates/connectors-catalog`; the `catalog` index-service realization is not. Evidence: `docs/evidence/gitlab-sandbox-20260913/README.md`, section *Through the catalog provider*; the shipped GitLab selection set `providers/gitlab/operations.json` exposes every operation the native adapter exposed; that adapter is retired and GitLab has this one runtime. One adapter crate `adapters/catalog/` (`docs/design.md:212`) building one executable with two realizations: `catalog` (index service) and `provider` (generic engine bound to one bundle). One build-time pipeline in `crates/connectors-spec` and `crates/connectors-build`.
 - **Old baseline:** `../connectors` at `81459ac4`: `providers/*.toml` (65), `specs/` (83 files; 32 pinned spec entries over 17 providers in `connectors.lock`), `catalog/*.catalog.json` (65), `connectors.lock`, `SOURCES.toml` (28 sources), crates `connector-spec` (16,479 lines), `catalog-build` (9,594), `catalog`, `catalog-reader`, `catalog-cli`, `connector-resolve` (4,462), `integration-catalog` (3,935).
 - **Contract:** [contracts/catalog/v1alpha1/semantics.md](../../contracts/catalog/v1alpha1/semantics.md). Index: [contracts/README.md](../../contracts/README.md).
 
@@ -115,7 +115,7 @@ The catalog service itself has no provider credential; the host's caller authori
 
 `index` realization: no process; the client or host reads `index.json` and each bundle's `manifest.json` directly, verifying digests.
 
-The bundle's own `configuration_schema` (generated, as `adapters/gitlab/generated/descriptor.json` carries today) is composed with the outline above; provider-specific fields such as `slots` come from the old `[[config]]` declarations.
+The bundle's own `configuration_schema` (generated, as `adapters/kubernetes/generated/descriptor.json` carries today) is composed with the outline above; provider-specific fields such as `slots` come from the old `[[config]]` declarations.
 
 ## 7. Discovery and routes
 
@@ -135,7 +135,7 @@ The catalog is a service-discovery source (`docs/design.md:319-323`): it names s
 | Swagger 2.0 exact projection as a recorded transform | 2 old inputs |
 | default `prepare`/`finish` realization for `generic-http` | today required handwritten (`spec-kinds/adapter/v2/semantics.md:20-21`) |
 
-Pipeline per provider: `adapters/<id>/spec/adapter.json` → `connectors-spec --generate` → `adapters/<id>/generated/` (descriptor, coverage, manifest, ESS lowering, upstream pin) → `connectors-build catalog build` → `catalog/index.json`. Toolchain pin: ESS 0.20.0 (`crates/connectors-spec/toolchain.json`). Normal Cargo builds read committed outputs and never invoke ESS or the network (`docs/gitlab-generation.md`).
+Pipeline per provider, as implemented: pinned source under `adapters/<id>/upstream/` → `connectors-build catalog` → `adapters/catalog/generated/bundles/<id>.bundle.json` plus `index.json` → the reviewed selection set `providers/<id>/operations.json`. The earlier design named `connectors-spec --generate` and a per-adapter `generated/` tree; that path was retired with the native GitLab adapter. Normal Cargo builds read committed outputs and never invoke ESS or the network (`docs/development.md`).
 
 First slice, chosen to cover each ingest shape once: `alertmanager` (1 GET, vendor OpenAPI 3), `zendesk` (35 operations, vendor spec, POST bodies), `airtable` (4 operations, hand-authored, JSON body envelope), `argocd` (Swagger 2.0). Everything else is inventory until curated (`docs/design.md:1100`).
 
