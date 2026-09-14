@@ -6,7 +6,10 @@ sandbox acceptance remains open. Existing MR reads and validation remain
 observations. Update is bound separately under an accepted race boundary; see
 [raced merge-request update](raced-update.md). Create is not bound natively at
 all: it runs through the catalog provider from the pinned OpenAPI source, as the
-declarative-runtime decision requires for further ordinary HTTP endpoints.
+declarative-runtime decision requires for further ordinary HTTP endpoints. The
+same provider now runs merge itself from the shipped selection set, with these
+preconditions as guard checks; `epic:retire-native-gitlab-adapter` records that
+this native binding is to be removed once that path carries everything here.
 
 `merge_request.merge` is an approval-required, local-only Write. Its input reuses
 the authored ValidationInput: allowlisted project, positive project-local IID,

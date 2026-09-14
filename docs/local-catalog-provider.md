@@ -2,9 +2,9 @@
 
 The catalog provider runs ordinary HTTP operations straight from a pinned OpenAPI
 document. There is no Rust per endpoint: the pinned source is compiled into a
-digest-verified bundle, a configuration file selects which operations to expose
-and what each one is allowed to do, and one engine binds, sends and classifies.
-Adding a supported endpoint changes the selection; it changes no code.
+digest-verified bundle, a selection set says which operations to expose and what
+each one is allowed to do, and one engine binds, sends and classifies. Adding a
+supported endpoint changes the selection; it changes no code.
 
 This is the `provider` realization of
 [the catalog design](../adapters/catalog/design.md) and applies
@@ -30,6 +30,29 @@ source with none unsupported; `adapters/catalog/tests/bundle_drift.rs` refuses a
 committed bundle that a fresh run would not reproduce byte for byte. Nothing
 here reaches the network.
 
+## The shipped selection set
+
+The repository reviews and ships one selection set per provider under
+`adapters/catalog/providers/<provider>/operations.json`. The GitLab set,
+[operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
+every operation the native GitLab adapter exposes, so one configuration serves
+the provider from the pinned source alone:
+
+| id | source operation | effect |
+|---|---|---|
+| `project.get`, `issues.list`, `file.get`, `branch.get` | the matching `getApiV4Projects…` | read |
+| `merge_requests.list`, `merge_request.get` | `getApiV4ProjectsIdMergeRequests`, `…MergeRequestIid` | read |
+| `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | the matching `getApiV4Projects…` | read |
+| `job.trace` | `getApiV4ProjectsIdJobsJobIdTrace`, `"response": "text"` | read |
+| `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
+| `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
+| `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
+
+`adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
+and checks that every native read and write id is present. The native adapter's
+`merge_request.validate` has no entry: it is `merge_request.get` plus
+`pipeline.get` and a comparison, which the merge guard now makes itself.
+
 ## Configure the provider
 
 Build the executable and write an owner-only native configuration:
@@ -41,7 +64,7 @@ sha256sum target/release/connectors-catalog-provider
 
 ```json
 {
-  "format": "connectors-catalog-local/1",
+  "format": "connectors-catalog-local/2",
   "instance": "gitlab-sandbox",
   "provider": "gitlab",
   "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
@@ -56,41 +79,44 @@ sha256sum target/release/connectors-catalog-provider
     "scopes": {"path": "personal_access_tokens/self", "pointer": "/scopes"},
     "minimum_scopes": ["api"]
   },
-  "operations": [
-    {"id": "merge_request.get", "operation_id": "getApiV4ProjectsIdMergeRequestsMergeRequestIid", "effect": "read"},
-    {"id": "branch.get", "operation_id": "getApiV4ProjectsIdRepositoryBranchesBranch", "effect": "read"},
-    {"id": "merge_request.create", "operation_id": "postApiV4ProjectsIdMergeRequests", "effect": "write",
-     "guard": {"preflight": {"operation_id": "getApiV4ProjectsIdRepositoryBranchesBranch",
-                             "values": {"id": "id", "branch": "body.source_branch"},
-                             "pointer": "/commit/id", "expect": "sha"},
-               "postflight": {"pointer": "/sha", "expect": "sha"}}},
-    {"id": "merge_request.update", "operation_id": "putApiV4ProjectsIdMergeRequestsMergeRequestIid", "effect": "write",
-     "guard": {"preflight": {"operation_id": "getApiV4ProjectsIdMergeRequestsMergeRequestIid",
-                             "values": {"id": "id", "merge_request_iid": "merge_request_iid"},
-                             "pointer": "/sha", "expect": "sha"},
-               "postflight": {"pointer": "/sha", "expect": "sha"}}}
-  ]
+  "operations_file": "/absolute/path/adapters/catalog/providers/gitlab/operations.json"
 }
 ```
 
 The complete configuration used against the sandbox is
-[gitlab-catalog.json](evidence/gitlab-sandbox-20260913/gitlab-catalog.json).
+[gitlab-catalog-2.json](evidence/gitlab-sandbox-20260913/gitlab-catalog-2.json).
 
 - `auth` is the whole authentication profile: the header the token travels in,
   the read that names the credential's subject, an optional read that lists its
   granted scopes, and the scopes the profile requires. The token itself enters
   through the usual protected entry and custody; the file never holds it.
-- Each `operations` entry exposes one `operationId` from the bundle under a local
-  id. `effect` is declared, not inferred from the method: `read` is allowed only
-  for GET, `write` only for POST, PUT, PATCH and DELETE, and a write is a
+- `operations_file` names a shipped selection set; its `provider` must match. An
+  inline `operations` list is accepted as well and comes first. The selection
+  ids, in either place, are what the host permits and the approval policy names.
+- Each selection exposes one `operationId` from the bundle under a local id.
+  `effect` is declared, not inferred from the method: `read` is allowed only for
+  GET, `write` only for POST, PUT, PATCH and DELETE, and a write is a
   required-approval mutation under private protocol two like any other.
+- `response` is a reviewed exception for a read whose source declares JSON where
+  the provider answers plain text, as GitLab does for a job trace. Without it the
+  bundle decides: a 2xx declared only as `text/…` is read as text, anything else
+  as JSON. A write never carries it.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
-  request when the value at `pointer` is not the input value `expect` names. The
-  postflight compares the write's own response the same way; a difference there
-  leaves the outcome uncertain and never refused, because the provider may already
-  have applied the write. No corrective request is ever issued. This is the C14
-  boundary the operator accepted for create and update, written as data.
+  request unless every check holds. A check compares the scalar at a JSON
+  `pointer` in the observed body with `{"input": "<key>"}` (a top-level input or
+  `body.<key>`) or `{"literal": "<value>"}`. The postflight applies its checks to
+  the write's own response; a difference there leaves the outcome uncertain and
+  never refused, because the provider may already have applied the write. No
+  corrective request is ever issued. This is the C14 boundary the operator
+  accepted for create and update, written as data.
+
+The merge guard in the shipped set reads the merge request and requires, before
+the one PUT: `/sha` equal to the pinned `body.sha`, `/state` literally `opened`,
+`/detailed_merge_status` literally `mergeable`, `/head_pipeline/id` equal to the
+input `pipeline_id` and `/head_pipeline/status` literally `success`. After it:
+`/state` literally `merged` and `/sha` still the pinned head. Those are the
+checks the native `merge_request.validate` made in Rust, as five lines of data.
 
 Add the adapter to the host configuration exactly as for
 [the native GitLab binding](local-gitlab-cli.md), with `adapter_id = "catalog"`,
@@ -104,8 +130,9 @@ policy naming them.
 
 Input is one property per declared path or query parameter, named as the source
 names it, a `body` object where the operation takes one, and any extra value a
-guard reads. Output is the provider's status, its JSON body unchanged, and
-provenance whose `source_revision` is the pinned source's SHA-256.
+guard reads. Output is the provider's status, its body unchanged (JSON, or a
+string for a text read), and provenance whose `source_revision` is the pinned
+source's SHA-256.
 
 ```sh
 connectors operations invoke --adapter forge --connection "$connection" \
@@ -114,8 +141,8 @@ connectors operations invoke --adapter forge --connection "$connection" \
 ```
 
 ```json
-{"id":"group/project","sha":"<source branch head>",
- "body":{"source_branch":"feature/x","target_branch":"main","title":"Open me"}}
+{"id":"group/project","merge_request_iid":10,"pipeline_id":19,
+ "body":{"sha":"<source branch head>"}}
 ```
 
 Prepare, issue and invoke a write with that file exactly as
@@ -127,15 +154,20 @@ a 2xx whose postflight holds, and `unknown` for everything else.
 
 ## What the sandbox showed
 
-Against the live GitLab, through this provider: a read of merge request 9 and of a
-branch; a create that opened merge request 10 at its pinned head; the same create
-with a stale pin refused with no request sent; a second create for the same branch
-refused by GitLab's 409; an update that retitled 10 with its pinned head; the same
-update at a stale pin refused before dispatch; and a create whose branch was moved
-the moment the preflight GET appeared, which opened merge request 11 at the moved
-head and was classified `unknown`. The provider made exactly one request per
-attempt that reached dispatch and none for the two the guard refused. The full
-record is in [the sandbox evidence](evidence/gitlab-sandbox-20260913/README.md).
+Against the live GitLab, through this provider and the shipped selection set:
+all eleven reads answered, the job trace as text; a merge with a stale pinned
+`sha` and a merge naming the wrong pipeline were both refused before dispatch
+with no request to the merge endpoint; the merge at the pinned head with the
+successful pipeline merged request 10 with exactly one PUT; and an update of the
+now-merged request was refused by the literal `/state` check with no request
+sent. Before that, with the selection typed into the configuration: a create that
+opened merge request 10 at its pinned head, the same create with a stale pin
+refused with no request sent, a second create for the same branch refused by
+GitLab's 409, an update that retitled 10, the same update at a stale pin refused
+before dispatch, and a create whose branch was moved the moment the preflight GET
+appeared, which opened merge request 11 at the moved head and was classified
+`unknown`. The full record is in
+[the sandbox evidence](evidence/gitlab-sandbox-20260913/README.md).
 
 ## Limits
 
@@ -148,5 +180,7 @@ record is in [the sandbox evidence](evidence/gitlab-sandbox-20260913/README.md).
   basic and signing profiles are not offered by this provider yet.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
+- A guard compares scalars for equality. It cannot express "any of", ordering or
+  a value the preflight must not have.
 - Only GitLab has run live. A second provider through the same engine is still
   required by `specification:catalog-http-runtime-handoff`.
