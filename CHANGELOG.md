@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Catalog provider
+
+- The repository ships a reviewed selection set per provider under
+  `adapters/catalog/providers/<provider>/operations.json`, referenced from a native
+  configuration by `operations_file` (format `connectors-catalog-local/2`). The
+  GitLab set exposes every operation the native adapter exposes: eleven reads,
+  `merge_request.create`, `merge_request.update` and `merge_request.merge`;
+  `adapters/catalog/tests/shipped.rs` refuses a set that resolves against the
+  committed bundle without one of them.
+- A guard carries a list of checks in its preflight and its postflight; each
+  compares a JSON pointer in the observed body with an input reference or a
+  literal. The merge precondition (open, mergeable, pinned head, pinned pipeline
+  successful) is five checks in the selection rather than a Rust handler.
+- A selection may declare `"response": "text"` for a read whose source declares
+  JSON where the provider answers plain text, as GitLab does for a job trace;
+  without it the bundle's declared 2xx media types decide.
+- Against the live sandbox, all eleven GitLab reads, a guarded merge with one PUT
+  and three guard refusals with none ran through the shipped set; see
+  `docs/evidence/gitlab-sandbox-20260913/README.md`.
+
+### Planning
+
+- `epic:retire-native-gitlab-adapter` records the convergence: GitLab served by
+  the catalog provider only, the native adapter removed once every operation it
+  carries runs through the catalog with equal or stricter guarantees.
+
 ## 0.10.0 — 2026-09-13
 
 GitLab merge-request create and update now run from the pinned OpenAPI document

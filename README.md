@@ -46,8 +46,10 @@ Ordinary HTTP endpoints no longer need adapter code. The
 [catalog provider](docs/local-catalog-provider.md) loads a bundle compiled from a
 pinned OpenAPI document — the GitLab bundle carries all 1,847 operations of the
 pinned source — and exposes a configured selection of them through the same local
-CLI, approval and audit path. Merge-request create and update have run against
-the live GitLab through it, with the accepted race boundary declared as a guard.
+CLI, approval and audit path. A reviewed selection set shipped with the repository
+exposes every operation the native GitLab adapter exposes; all of its reads,
+merge-request create, update and a guarded merge have run against the live GitLab
+through it, the preconditions declared as data.
 
 Kubernetes now has the same local lifecycle binding: a saved bearer token, an
 identity validated by one SelfSubjectReview probe, and its three reads through the
