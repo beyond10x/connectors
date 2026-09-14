@@ -322,6 +322,60 @@ Every operation above came from the pinned source through the bundle. The
 provider crate contains no GitLab code: the selection, the guard and the auth
 probes are the configuration file.
 
+### The whole native surface from the shipped selection set
+
+Same day, a third private configuration (`cfg8`, [shipped-config.toml](shipped-config.toml))
+bound the provider to the selection set the repository ships,
+`adapters/catalog/providers/gitlab/operations.json`, through `operations_file` in
+[gitlab-catalog-2.json](gitlab-catalog-2.json) (format `connectors-catalog-local/2`,
+configuration revision `46f7e228…`, executable SHA-256 `46387422…`). All fourteen
+selections were permitted; the approval policy named create, update and merge. The
+connection was the same delegated `sandbox-dev` (identity subject `2`, `api` scope).
+Script: [shipped.sh](shipped.sh); log: [shipped.log](shipped.log).
+
+Every read the native adapter exposes answered `200` through the bundle:
+
+| selection | input | answer | record |
+|---|---|---|---|
+| `project.get` | the project | object | [shipped-project.json](shipped-project.json) |
+| `issues.list` | `per_page` 2 | 1 issue | [shipped-issues.json](shipped-issues.json) |
+| `file.get` | `.gitlab-ci.yml` at `main` | object | [shipped-file.json](shipped-file.json) |
+| `branch.get` | `feature/create-applied` | object | [shipped-branch.json](shipped-branch.json) |
+| `merge_requests.list` | `opened`, `per_page` 3 | 3 requests | [shipped-mrs.json](shipped-mrs.json) |
+| `merge_request.get` | iid 10 | head `b268f4f4…`, pipeline 19 `success`, `mergeable` | [shipped-mr-10.json](shipped-mr-10.json) |
+| `pipelines.list` | `per_page` 2 | 2 pipelines | [shipped-pipelines.json](shipped-pipelines.json) |
+| `pipeline.get` | 19 | object | [shipped-pipeline-19.json](shipped-pipeline-19.json) |
+| `pipeline.jobs` | 19 | 1 job, id 23 | [shipped-pipeline-19-jobs.json](shipped-pipeline-19-jobs.json) |
+| `job.get` | 23 | object | [shipped-job.json](shipped-job.json) |
+| `job.trace` | 23 | the runner log as a string, under the selection's `"response": "text"` | [shipped-job-trace.json](shipped-job-trace.json) |
+
+Then `merge_request.merge` under the five-check guard, against merge request 10
+(source `feature/create-applied`, head `b268f4f4482cc79ecdb4803baf5db270824e31f6`,
+head pipeline 19 `success`), counting PUTs to `…/merge_requests/10/merge` in the
+sandbox's nginx access log:
+
+| attempt | pinned `body.sha` | `pipeline_id` | classification | PUTs to the merge endpoint | record |
+|---|---|---|---|---|---|
+| stale head | `main`'s head `c64b5812…` | 19 | `not_attempted`, `forbidden` at stage `dispatch` | 0 | [shipped-merge-stale.json](shipped-merge-stale.json) |
+| other pipeline | `b268f4f4…` | 18 (canceled, older head) | `not_attempted`, `forbidden` at stage `dispatch` | 0 | [shipped-merge-other-pipeline.json](shipped-merge-other-pipeline.json) |
+| pinned head, pinned pipeline | `b268f4f4…` | 19 | `applied`; response `200`, `state: merged`, `sha` still `b268f4f4…` | 1 (`18:13:38`, `200`) | [shipped-merge-applied.json](shipped-merge-applied.json) |
+
+Merge request 10 is merged with merge commit
+`45fbac1b0127059aac91c45ee6cf25b1903230fb`. Afterwards `merge_request.update` on
+the same request, at its still-correct head, was refused before dispatch by the
+literal `/state` = `opened` check: `not_attempted`, and the access log shows no
+further PUT to `…/merge_requests/10`
+([shipped-update-merged.json](shipped-update-merged.json)).
+
+The provider held every one of the native adapter's merge preconditions — open,
+mergeable, pinned head, pinned pipeline, pipeline successful — as data in the
+selection, with the same `not_attempted` / `applied` classifications the native
+`merge_request.validate` plus `merge_request.merge` produced on 2026-09-13 above.
+What the native path reported in its own vocabulary (`checks_passed`, named
+blockers) the catalog path reports as a refusal at stage `dispatch` with no request
+sent; the blocker's name is in the provider's refusal, not in the CLI's output.
+
+
 ## Nullable and unusual merge-request reads
 
 The two cases `story:gitlab-mr-reads` names, both read through the CLI:
@@ -358,6 +412,12 @@ Clippy runs, the four adapter library boundary builds (`connectors-gitlab`,
 Rust 1.88 check of all targets. `plan artifact validate` read 345 artifacts and
 reported `valid`. Website typecheck and build pass after two Kubernetes contract
 pages stopped naming private evidence paths, which the public-output audit refuses.
+
+A fourth run, on the tree that ships the GitLab selection set, the multi-check guard
+and the text-response exception: `gate: all checks passed`, process exit 0, **91 test
+targets, none failed** (the new `shipped` target among them), every gate command
+exit 0. `plan artifact validate` reported `valid` over the two new planning
+artifacts. Website typecheck and build exit 0.
 
 ## What this evidence does not cover
 

@@ -1,0 +1,27 @@
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "gitlab-sandbox",
+  "provider": "gitlab",
+  "bundle_directory": "<repo>/adapters/catalog/generated/bundles",
+  "api_base": "https://localhost:8929/api/v4",
+  "ca_file": "<sandbox>/ssl/ca.crt",
+  "auth": {
+    "profile": "gitlab.pat",
+    "header": "PRIVATE-TOKEN",
+    "bearer": false,
+    "label": "GitLab personal access token",
+    "identity": {
+      "path": "user",
+      "kind": "gitlab.user",
+      "subject_pointer": "/id"
+    },
+    "scopes": {
+      "path": "personal_access_tokens/self",
+      "pointer": "/scopes"
+    },
+    "minimum_scopes": [
+      "api"
+    ]
+  },
+  "operations_file": "<repo>/adapters/catalog/providers/gitlab/operations.json"
+}
