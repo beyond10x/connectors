@@ -17,8 +17,10 @@ from a pinned OpenAPI document and exposes a declared selection of its operation
 through the local CLI, with no Rust per endpoint. Reads are one bound GET; writes
 are one bound POST, PUT, PATCH or DELETE under the host's approval, audit and
 attempt controls, with an optional declarative preflight/postflight guard. The
-GitLab bundle carries all 1,847 operations of the pinned source. A live GitLab has
-answered merge-request reads, create and update through it. The index service
-realization is not implemented.
+GitLab bundle carries all 1,847 operations of the pinned source, and the repository
+ships a reviewed selection set that exposes every operation the native GitLab
+adapter exposes. A live GitLab has answered all of its reads, merge-request create,
+update and a guarded merge through it. The index service realization is not
+implemented.
 
 [Read the shared catalog contract](/contracts/catalog).
