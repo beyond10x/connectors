@@ -1,8 +1,0 @@
-# generated from gitlab v1
-# model digest b437c9021e38b1a4dca0876effaedcbf8c5f6ce1fcb3f7212e936fd6f9356d07
-# contract digest 004c3aa38f241afa38c5b5988b23bf2cc5194cd63287264f15043685f8a77bf7
-# do not edit: regenerate with `ess synthesize`
-
-[workspace]
-resolver = "2"
-members = ["crates/gitlab-adapter", "crates/gitlab-system", "crates/gitlab-types"]

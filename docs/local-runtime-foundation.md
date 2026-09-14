@@ -6,7 +6,7 @@ operation discovery, saved-credential revalidation and supervised GitLab reads.
 This is incremental work under
 `initiative:complete-local-connectors` and `story:persistent-gitlab-journey`.
 Dedicated sandbox acceptance and the broader runtime plan
-remain open. See the [GitLab CLI guide](local-gitlab-cli.md) for the runnable surface.
+remain open. See the [catalog provider guide](local-catalog-provider.md) for the runnable surface.
 
 ## Try the implemented commands
 
@@ -162,11 +162,11 @@ They use the existing service binding described in [running services](running-se
 
 The host now supplies a [private adapter binding](../contracts/cli/v1alpha1/private-adapter.md)
 with a sealed, digest-verified executable snapshot, inherited Unix channel, exact
-child ownership and bounded bootstrap/request handling. GitLab's
-[local executable mode](../adapters/gitlab/contracts/auth/v1alpha1/semantics.md#local-executable-configuration)
-uses it for native validation and the three existing reads against an immutable
-credential/target capability. Disposable TLS/process fixtures cover mismatch
-refusal, cursor partitioning, stale stop, deadline loss and fresh child startup.
+child ownership and bounded bootstrap/request handling. The catalog provider's
+`--local-config` mode uses it for the declared identity and scope probes and the
+shipped reads against an immutable credential/target capability. Disposable
+TLS/process fixtures (`adapters/catalog/tests/local_runtime.rs`) cover mismatch
+refusal, stale stop, deadline loss and fresh child startup.
 The [local owner](../contracts/cli/v1alpha1/owner.md) now binds that transport to
 the production CLI. It coalesces startup under a retained lifetime lock, owns
 children on persistent worker threads, and exposes bounded same-UID sockets.

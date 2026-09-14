@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 # Specification-only adapters have no Cargo package until implemented.
-members = ["crates/*", "adapters/catalog", "adapters/gitlab", "adapters/kubernetes", "adapters/sql", "apps/connectors"]
-exclude = ["adapters/gitlab/generated/rust", "adapters/gitlab/generated/write-rust", "apps/connectors-cli-contract"]
+members = ["crates/*", "adapters/catalog", "adapters/kubernetes", "adapters/sql", "apps/connectors"]
+exclude = ["apps/connectors-cli-contract"]
 
 [workspace.package]
 version = "0.10.0"

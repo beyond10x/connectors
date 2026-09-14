@@ -79,7 +79,7 @@ require restart and get a new descriptor revision. No live-update API is adverti
 ## Selected operations
 
 The shared service defines transport, lookup and envelopes. Native implemented
-profiles belong to [GitLab](../../../adapters/gitlab/contracts/reads/v1alpha1/semantics.md),
+profiles belong to
 [Kubernetes](../../../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md)
 and [SQL](../../../adapters/sql/contracts/reads/v1alpha1/semantics.md).
 These index links document current local implementations, not a closed provider

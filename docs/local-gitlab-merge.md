@@ -1,67 +1,54 @@
-# Guarded GitLab merge in the development checkout
+# Guarded GitLab merge through the local CLI
 
-This guide covers two native writes. `merge_request.merge` is guarded: GitLab checks
-the source SHA atomically. `merge_request.update` is **not** guarded — GitLab's update
-endpoint carries no SHA precondition — and runs under an accepted race boundary
-described in [the raced update contract](../adapters/gitlab/contracts/raced-update.md).
-Permit it in the adapter's operations and in the approval policy exactly like merge;
-its input is `project`, `iid`, `title` and the pinned `sha`.
+`merge_request.merge` and `merge_request.update` run through the
+[catalog provider](local-catalog-provider.md) from the pinned GitLab OpenAPI
+source, selected by the shipped selection set. Merge is guarded: the provider
+reads the merge request first and refuses before any request unless it is open,
+mergeable, at the pinned `body.sha`, with the pinned `pipeline_id` as its head
+pipeline in status `success`; GitLab then checks `sha` atomically on the PUT.
+Update carries no SHA precondition at GitLab, so it runs under the accepted race
+boundary: a pinned head that already differs is refused in preflight, and a head
+that moves during dispatch leaves the outcome uncertain, never refused. The
+postflight comparison is best effort: a merge request's recorded head is
+eventually consistent with its source branch, and a live GitLab has answered the
+update PUT with the pinned head while the branch had already moved.
 
-`merge_request.create` has no native binding. It runs through the
-[catalog provider](local-catalog-provider.md) straight from the pinned GitLab OpenAPI
-source, with the same race boundary declared as a guard in configuration. The
-shipped selection set in that guide also runs update and merge the same way, so
-every operation on this page has a catalog form. No further GitLab endpoint is
-bound by hand.
-
-A pinned head that already differs is refused before any write. A head that moves
-during dispatch returns an uncertain outcome, never a refusal. The postflight
-comparison is best effort: a merge request's recorded head is eventually consistent
-with its source branch, and a live GitLab has answered the update PUT with the pinned
-head while the branch had already moved.
-
-
-The local CLI can call `merge_request.merge` through the approval, audit and
-mutation coordinator. This development work extends the v0.2.0 source release;
-it is not a completed GitLab provider batch. Dedicated sandbox acceptance is
-recorded in [docs/evidence/gitlab-sandbox-20260913](evidence/gitlab-sandbox-20260913/README.md);
-recovery across every storage acknowledgement and the wider write failure matrix
-remain open.
+The local CLI calls both through the approval, audit and mutation coordinator.
+Dedicated sandbox acceptance is recorded in
+[docs/evidence/gitlab-sandbox-20260913](evidence/gitlab-sandbox-20260913/README.md);
+recovery across every storage acknowledgement remains open.
 
 The merging identity needs more than `api` scope. GitLab answers a merge request
 **401**, not 403, when it has identified the user and that user may not merge into a
 protected branch, so a permission problem reads as an authentication problem. Check
 the branch's `merge_access_levels` before concluding the credential is wrong.
 
-Start with the [saved GitLab connection guide](local-gitlab-cli.md). Deliberately
-select `format = "connectors-local/2"` in the host configuration and
-`private_protocol = "connectors-private/2"` on each configured adapter. Select the
-exact new executable hash, permit `merge_request.merge` in the adapter's
-operation permissions and retain `gitlab.pat` in its profile permissions. The
-saved PAT must grant GitLab `api` scope. Use a fresh explicit local selection and
-an admitted connect to collect its descriptor before discovering the new metadata.
-The native configuration format stays `connectors-gitlab-local/1`.
-
-Version one and the public service still expose eleven reads. There is no
-automatic configuration rewrite, credential migration or fallback write path.
-Keep the previous executable available until the new selection is usable.
+Start with the [catalog provider guide](local-catalog-provider.md). Select
+`format = "connectors-local/2"` in the host configuration and
+`private_protocol = "connectors-private/2"` on the adapter. Select the exact
+executable hash, permit `merge_request.merge` and `merge_request.update` in the
+adapter's operation permissions and retain `gitlab.pat` in its profile
+permissions. The saved PAT must grant GitLab `api` scope. Use a fresh explicit
+local selection and an admitted connect to collect its descriptor before
+discovering the new metadata. There is no automatic configuration rewrite,
+credential migration or fallback write path.
 
 Configure a [bounded authenticated clock](local-clock.md), initialize
 [approval-signing keys](local-approval-keys.md) and use the
 [approval commands](local-approvals.md) to publish a policy file containing:
 
 ```json
-{"operations":["merge_request.merge"]}
+{"operations":["merge_request.merge","merge_request.update"]}
 ```
 
 Discover the exact `schema` and descriptor `revision` using
 `connectors operations describe --adapter forge --operation merge_request.merge`.
-Put the intended business input in `merge.json`, using a project from the native
-allowlist, a project-local MR IID, its exact lowercase source SHA and the expected
-successful head pipeline ID:
+Put the intended business input in `merge.json`: the project path or numeric id,
+the project-local MR IID, the expected successful head pipeline id, and the PUT
+body with the exact lowercase source SHA:
 
 ```json
-{"project":"group/project","iid":17,"sha":"0123456789abcdef0123456789abcdef01234567","pipeline_id":123}
+{"id":"group/project","merge_request_iid":17,"pipeline_id":123,"body":{"sha":"0123456789abcdef0123456789abcdef01234567"}}
 ```
 
 Use `approvals prepare` with this input and those exact selectors. Inspect its
@@ -85,11 +72,12 @@ without another proof; a new attempt always requires a valid proof. Reads refuse
 both write-only options. The original 20-second write budget includes argument
 processing, document/proof acquisition, startup, preflight and commit.
 
-Fresh preflight checks the same MR/head/pipeline conditions as
-`merge_request.validate`. Commit sends one PUT with `sha`, `auto_merge:false`
-and `should_remove_source_branch:false`. It omits squash and follows the project's
-configuration. GitLab checks the source SHA atomically; expected pipeline ID and
-status are preflight observations, not an atomic merge condition.
+Fresh preflight is the guard's five checks against one GET of the merge request.
+Commit sends one PUT with the `body` as supplied; add `auto_merge` or
+`should_remove_source_branch` there only when wanted, and GitLab applies the
+project's squash configuration otherwise. GitLab checks the source SHA
+atomically; the pipeline id and status are preflight observations, not an atomic
+merge condition.
 
 Success retains the usual JSON-text `result` and adds `request_id`, `mutation`
 and `source_audit`. Failure carries those observations inside `error.data` when
@@ -112,21 +100,10 @@ abandoned records without another invocation of the original write. Live worker
 exchanges finish before their queued recovery batch runs; suppression remains set.
 Background recovery does not expose an old result or grant a new effect.
 
-Disposable production CLI fixtures cover applied/refused/lost-response behavior,
-same-key observation through a newly started owner with custody stopped, and an
-owner killed after the provider receives the PUT. The crash leaves the original
-attempt uncertain; exact-key recovery quarantines it without another send. The
-exact native child exits with its owner, and approval spend survives the restart. Revocation during
-preflight refuses the write and completes its admitted audit before returning.
-The preparation-recovery fixture separately exits a durable-port producer before
-any dispatch gate and verifies clock failure/recovery through the production CLI.
-It does not exercise native preflight or approval spending before that exit.
-An additional CLI fixture holds a live write during a background pass, crashes
-its owner, starts a new owner through a separate admitted read, then stops the
-adapter and custody. Background recovery quarantines the original write with
-exactly one PUT and settles a separate unkeyed preparation when trusted time
-returns, without a request using the original key. Another CLI fixture starts a
-new owner through a different instance, then proves recovery of the revoked,
-removed original target and refusal of later result disclosure. These cases do
-not establish real GitLab sandbox behavior, original-audit reconciliation or
-crashes across every storage acknowledgement.
+The production CLI journeys that covered applied, refused and lost-response
+settlement, same-key observation through a newly started owner, an owner killed
+after the provider received the PUT, background recovery and post-effect
+revocation ran with the native adapter as the child; their records stay under
+`docs/evidence/gitlab-*-20260911/`, and the host mechanics they exercised are
+unchanged. They have not been re-run with the catalog provider as the child;
+`story:catalog-cli-journeys` owns that.
