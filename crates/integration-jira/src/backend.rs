@@ -286,7 +286,7 @@ impl ConnectorBackend for JiraBackend {
             OperationRequest::Describe(request) => is_jira_operation(&request.operation_ref),
             OperationRequest::Invoke(request) => {
                 is_jira_operation(&request.operation_ref)
-                    && ((request.endpoint_ref == ORG_CONNECTION_REF
+                    && ((request.connection_ref == ORG_CONNECTION_REF
                         && matches!(
                             request.operation_ref.as_str(),
                             "jira-issue-search" | "jira-project-list" | "jira-issue-comments-read"
@@ -294,7 +294,7 @@ impl ConnectorBackend for JiraBackend {
                         || lock(&self.inner.metadata)
                             .endpoints
                             .iter()
-                            .any(|connection| connection.endpoint_ref == request.endpoint_ref))
+                            .any(|connection| connection.endpoint_ref == request.connection_ref))
             }
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)

@@ -286,8 +286,8 @@ mod tests {
         assert_eq!(
             rendered,
             concat!(
-                "events=message\tconnection_ref=connection:slack:T1\n",
-                "events=reaction\tconnection_ref=connection:slack:T1",
+                "events=message\tendpoint_ref=connection:slack:T1\n",
+                "events=reaction\tendpoint_ref=connection:slack:T1",
             )
         );
     }

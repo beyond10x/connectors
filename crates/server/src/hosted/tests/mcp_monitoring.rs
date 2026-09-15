@@ -154,12 +154,12 @@ impl MonitoringBackend {
     fn endpoints(
         endpoints: &[(&str, &str)],
         provider: &str,
-    ) -> Vec<protocol::operation::EndpointSummary> {
+    ) -> Vec<protocol::operation::ConnectionSummary> {
         endpoints
             .iter()
             .map(
-                |(endpoint_ref, label)| protocol::operation::EndpointSummary {
-                    endpoint_ref: (*endpoint_ref).to_owned(),
+                |(endpoint_ref, label)| protocol::operation::ConnectionSummary {
+                    connection_ref: (*endpoint_ref).to_owned(),
                     label: (*label).to_owned(),
                     provider: provider.to_owned(),
                     audiences: Vec::new(),
@@ -198,7 +198,7 @@ impl ConnectorBackend for MonitoringBackend {
                                 title: (*title).to_owned(),
                                 effect: EffectClass::ReadOnly,
                                 approval: ApprovalPosture::NotRequired,
-                                endpoints: Self::endpoints(
+                                connections: Self::endpoints(
                                     endpoints,
                                     provider_of(operation_ref),
                                 ),
@@ -231,7 +231,7 @@ impl ConnectorBackend for MonitoringBackend {
                     output_schema: json!({"type": "object"}),
                     effect: EffectClass::ReadOnly,
                     approval: ApprovalPosture::NotRequired,
-                    endpoints: Self::endpoints(endpoints, provider_of(operation_ref)),
+                    connections: Self::endpoints(endpoints, provider_of(operation_ref)),
                     description_ref: MONITORING_LEASE.to_owned(),
                 }))
             }
@@ -242,9 +242,9 @@ impl ConnectorBackend for MonitoringBackend {
                 assert!(
                     endpoints
                         .iter()
-                        .any(|(endpoint_ref, _)| *endpoint_ref == request.endpoint_ref),
+                        .any(|(connection_ref, _)| *connection_ref == request.connection_ref),
                     "the dispatched connection must be one the describe advertised: {}",
-                    request.endpoint_ref
+                    request.connection_ref
                 );
                 if request.description_ref != MONITORING_LEASE {
                     return Err(OperationError::new(
@@ -263,7 +263,7 @@ impl ConnectorBackend for MonitoringBackend {
                 }
                 self.dispatched.lock().expect("dispatch lock").push((
                     request.operation_ref.clone(),
-                    request.endpoint_ref.clone(),
+                    request.connection_ref.clone(),
                     request.input.clone(),
                 ));
                 Ok(OperationResult::Invoke(InvocationResult {

@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use catalog::{HostEffect, OperationDirection, Risk};
 use connector_secrets::SecretStore;
 use protocol::operation::{
-    EndpointSummary, InvocationResult, OperationDescription, OperationError, OperationErrorCode,
+    ConnectionSummary, InvocationResult, OperationDescription, OperationError, OperationErrorCode,
     OperationSummary,
 };
 use service::{EgressHttpRequest, EgressTransport};
@@ -32,7 +32,7 @@ pub fn read_admitted(operation: &catalog::Operation) -> bool {
 pub fn describe(
     provider: &str,
     operation_ref: &str,
-    endpoints: Vec<EndpointSummary>,
+    endpoints: Vec<ConnectionSummary>,
     description_ref: String,
 ) -> Result<OperationDescription, OperationError> {
     let operation = admitted_operation(provider, operation_ref)?;
@@ -50,21 +50,21 @@ pub fn describe(
             .unwrap_or(serde_json::Value::Null),
         effect: effect_class(operation),
         approval: approval_posture(operation),
-        endpoints,
+        connections: endpoints,
         description_ref,
     })
 }
 
 pub fn summary(
     operation: &catalog::Operation,
-    endpoints: Vec<EndpointSummary>,
+    endpoints: Vec<ConnectionSummary>,
 ) -> OperationSummary {
     OperationSummary {
         operation_ref: operation.id.to_owned(),
         title: operation.id.to_owned(),
         effect: effect_class(operation),
         approval: approval_posture(operation),
-        endpoints,
+        connections: endpoints,
     }
 }
 

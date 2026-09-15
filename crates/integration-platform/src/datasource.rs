@@ -191,7 +191,7 @@ impl PlatformBackend {
                 context,
                 InvokeRequest {
                     operation_ref: operation_ref.to_owned(),
-                    endpoint_ref: self.config.connection.endpoint_ref.clone(),
+                    connection_ref: self.config.connection.endpoint_ref.clone(),
                     description_ref: self.description_ref(context, canonical),
                     input,
                     approval_evidence_ref: None,

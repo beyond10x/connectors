@@ -59,7 +59,7 @@ components:
         - connectors.runtime.SessionTerminating
         - connectors.runtime.SessionTerminated
     # UNMAPPED: this surface is the write half only. The read verbs of the three protocols —
-    # `CandidateSearch`, `Search`, `Describe`, `ObservationSearch`, `SetupSessionStatus`
+    # `CandidateSearch`, `Search`, `Describe`, `ObservationSearch`, `ConnectSessionStatus`
     # (crates/protocol/src/endpoint.rs:35-48), `SessionStatus`, `SessionReconcile`
     # (crates/protocol/src/operation/legacy.rs:49-56), `Receive`, `Replay`
     # (crates/protocol/src/event.rs:40-42) — change no entity, and ESS models a read as a `views:`
@@ -186,11 +186,11 @@ components:
     #   unspecified-path: daemon start — lifecycle
     #   unspecified-path: daemon status — read
     #   unspecified-path: daemon stop — lifecycle
+    #   unspecified-path: inventory list — read
+    #   unspecified-path: inventory show — read
+    #   unspecified-path: inventory refresh — flow
+    #   unspecified-path: inventory bind — flow
     #   unspecified-path: endpoint list — read
-    #   unspecified-path: endpoint show — read
-    #   unspecified-path: endpoint refresh — flow
-    #   unspecified-path: endpoint bind — flow
-    #   unspecified-path: connection list — read
     #   unspecified-path: event search — read
     #   unspecified-path: event receive — read
     #   unspecified-path: event replay — read
@@ -213,9 +213,9 @@ components:
           summary: Run a Connector for this machine, for a hosted deployment, or over stdio.
         - name: daemon
           summary: Start, inspect, or stop the background local Connector.
-        - name: endpoint
+        - name: inventory
           summary: Discover service interfaces and manage their provider bindings.
-        - name: connection
+        - name: endpoint
           summary: Manage durable Endpoints through the credential-free control socket.
         - name: event
           summary: Search or receive durable normalized data events.

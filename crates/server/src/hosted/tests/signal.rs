@@ -30,7 +30,7 @@ impl SessionBackend {
         SessionStatus {
             execution_ref: LIVE_SESSION.to_owned(),
             operation_ref: SESSION_OPERATION.to_owned(),
-            endpoint_ref: SESSION_CONNECTION.to_owned(),
+            connection_ref: SESSION_CONNECTION.to_owned(),
             state: SessionState::Established,
             termination: None,
             connector_audit_ref: "audit:test".to_owned(),
@@ -70,8 +70,8 @@ impl ConnectorBackend for SessionBackend {
                     output_schema: serde_json::json!({"type": "object"}),
                     effect: EffectClass::Mutating,
                     approval: ApprovalPosture::Required,
-                    endpoints: vec![protocol::operation::EndpointSummary {
-                        endpoint_ref: SESSION_CONNECTION.to_owned(),
+                    connections: vec![protocol::operation::ConnectionSummary {
+                        connection_ref: SESSION_CONNECTION.to_owned(),
                         label: "test".to_owned(),
                         provider: "test".to_owned(),
                         audiences: Vec::new(),

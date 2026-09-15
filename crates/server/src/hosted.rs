@@ -364,7 +364,7 @@ async fn operation_decided_at(
                 &owner,
                 &request.request_id,
                 &invoke.operation_ref,
-                &invoke.endpoint_ref,
+                &invoke.connection_ref,
             )
             .await
         } else {
@@ -823,8 +823,8 @@ mod tests {
                         output_schema: serde_json::json!({"type": "object"}),
                         effect: EffectClass::Mutating,
                         approval: ApprovalPosture::Required,
-                        endpoints: vec![protocol::operation::EndpointSummary {
-                            endpoint_ref: "connection:todo".to_owned(),
+                        connections: vec![protocol::operation::ConnectionSummary {
+                            connection_ref: "connection:todo".to_owned(),
                             label: "Todo".to_owned(),
                             provider: "provider:todo".to_owned(),
                             audiences: Vec::new(),
@@ -889,7 +889,7 @@ mod tests {
         let mut request = envelope("tenant-dev");
         request.request = OperationRequest::Invoke(InvokeRequest {
             operation_ref: operation_ref.to_owned(),
-            endpoint_ref: "connection:test".to_owned(),
+            connection_ref: "connection:test".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: approval.map(str::to_owned),
@@ -970,7 +970,7 @@ mod tests {
             let mut envelope = envelope("tenant-dev");
             envelope.request = OperationRequest::Invoke(InvokeRequest {
                 operation_ref: APPROVAL_OPERATION.to_owned(),
-                endpoint_ref: "connection:todo".to_owned(),
+                connection_ref: "connection:todo".to_owned(),
                 description_ref: "description:todo-create-list".to_owned(),
                 input: input.clone(),
                 approval_evidence_ref: Some(proof.approval_evidence_ref.clone()),
@@ -1055,21 +1055,21 @@ mod tests {
     fn tenant_members_receive_only_read_only_module_invocation() {
         let read = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "work/task.list".to_owned(),
-            endpoint_ref: "connection:b10x".to_owned(),
+            connection_ref: "connection:b10x".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
         });
         let write = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "work/task.create".to_owned(),
-            endpoint_ref: "connection:b10x".to_owned(),
+            connection_ref: "connection:b10x".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
         });
         let external = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "slack.chat.post-message".to_owned(),
-            endpoint_ref: "connection:slack".to_owned(),
+            connection_ref: "connection:slack".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
@@ -1436,7 +1436,7 @@ mod tests {
             .with_kubernetes_groups(["dev".to_owned(), "sre".to_owned()], ["sre".to_owned()]);
         let request = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "kubernetes.pod.logs".to_owned(),
-            endpoint_ref: "connection:kubernetes:in-cluster".to_owned(),
+            connection_ref: "connection:kubernetes:in-cluster".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,
@@ -1465,7 +1465,7 @@ mod tests {
             .with_monitoring_groups(["dev".to_owned(), "sre".to_owned()]);
         let request = OperationRequest::Invoke(InvokeRequest {
             operation_ref: "prometheus-query-range".to_owned(),
-            endpoint_ref: "connection:prometheus:dev".to_owned(),
+            connection_ref: "connection:prometheus:dev".to_owned(),
             description_ref: "description:test".to_owned(),
             input: serde_json::json!({}),
             approval_evidence_ref: None,

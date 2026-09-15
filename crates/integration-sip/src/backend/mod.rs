@@ -17,7 +17,7 @@ use domain::{
     voice::TerminationReason, AdmittedOperation, Capability, EndpointAuthority, DriverId,
 };
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary, DescribeRequest, EffectClass, InvocationResult,
+    ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
     OperationResult, OperationSummary, RequestedSessionTermination, SessionRequest,
     SessionSignalRequest, SessionState, SessionStatus, SessionTerminateRequest, SessionTermination,
@@ -302,13 +302,13 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             title: "Dial a SIP voice session".to_owned(),
             effect: effect(operation.effects()),
             approval: ApprovalPosture::Required,
-            endpoints: vec![self.connection()],
+            connections: vec![self.connection()],
         }
     }
 
-    fn connection(&self) -> EndpointSummary {
-        EndpointSummary {
-            endpoint_ref: self.config.connection.endpoint_ref.clone(),
+    fn connection(&self) -> ConnectionSummary {
+        ConnectionSummary {
+            connection_ref: self.config.connection.endpoint_ref.clone(),
             label: self.config.connection.label.clone(),
             provider: SIP_DIAL_PROVIDER.to_owned(),
             audiences: catalog::provider(catalog::ProviderKey::id(SIP_DIAL_PROVIDER))
@@ -357,7 +357,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
             output_schema: self.output_schema.clone(),
             effect: effect(operation.effects()),
             approval: ApprovalPosture::Required,
-            endpoints: vec![self.connection()],
+            connections: vec![self.connection()],
             description_ref: self.description_ref(context),
         }))
     }
@@ -368,7 +368,7 @@ impl<L: SessionLauncher> SipOperationBackend<L> {
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
         require_operation(&request.operation_ref)?;
-        if request.endpoint_ref != self.config.connection.endpoint_ref {
+        if request.connection_ref != self.config.connection.endpoint_ref {
             return Err(not_granted());
         }
         if request.description_ref != self.description_ref(context) {
@@ -585,7 +585,7 @@ impl<L: SessionLauncher> ConnectorBackend for SipOperationBackend<L> {
             OperationRequest::Describe(request) => request.operation_ref == SIP_DIAL_TOOL_REF,
             OperationRequest::Invoke(request) => {
                 request.operation_ref == SIP_DIAL_TOOL_REF
-                    && request.endpoint_ref == self.config.connection.endpoint_ref
+                    && request.connection_ref == self.config.connection.endpoint_ref
             }
             OperationRequest::SessionStatus(request)
             | OperationRequest::SessionReconcile(request) => {

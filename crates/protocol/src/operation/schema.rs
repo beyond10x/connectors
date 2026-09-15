@@ -45,7 +45,7 @@ pub fn operation_v2_schema() -> Value {
         ("DescribeRequest", &["operation_ref"][..]),
         (
             "InvokeRequest",
-            &["operation_ref", "endpoint_ref", "description_ref"][..],
+            &["operation_ref", "connection_ref", "description_ref"][..],
         ),
         ("SessionRequest", &["execution_ref"][..]),
         ("SessionTerminateRequest", &["execution_ref"][..]),
@@ -64,11 +64,11 @@ pub fn operation_v2_schema() -> Value {
             &[
                 "execution_ref",
                 "operation_ref",
-                "endpoint_ref",
+                "connection_ref",
                 "connector_audit_ref",
             ][..],
         ),
-        ("EndpointSummary", &["endpoint_ref"][..]),
+        ("ConnectionSummary", &["connection_ref"][..]),
     ] {
         for field in fields {
             defs[name]["properties"][*field] = reference(512);
@@ -76,15 +76,15 @@ pub fn operation_v2_schema() -> Value {
     }
     defs["InvokeRequest"]["properties"]["approval_evidence_ref"] = nullable(reference(512));
     defs["InvocationResult"]["properties"]["execution_ref"] = nullable(reference(512));
-    defs["EndpointSummary"]["properties"]["provider"] = reference(128);
-    defs["EndpointSummary"]["properties"]["label"] = text(1, 1024);
-    defs["EndpointSummary"]["properties"]["audiences"] = json!({
+    defs["ConnectionSummary"]["properties"]["provider"] = reference(128);
+    defs["ConnectionSummary"]["properties"]["label"] = text(1, 1024);
+    defs["ConnectionSummary"]["properties"]["audiences"] = json!({
         "type":"array", "maxItems":wire::MAX_CONNECTION_AUDIENCES, "uniqueItems":true,
         "items":reference(64)
     });
     for name in ["OperationSummary", "OperationDescription"] {
         defs[name]["properties"]["title"] = text(1, 1024);
-        defs[name]["properties"]["endpoints"]["maxItems"] = json!(64);
+        defs[name]["properties"]["connections"]["maxItems"] = json!(64);
         defs[name]["allOf"] = json!([{
             "if":{"properties":{"effect":{"enum":["mutating","destructive"]}}},
             "then":{"properties":{"approval":{"const":"required"}}}

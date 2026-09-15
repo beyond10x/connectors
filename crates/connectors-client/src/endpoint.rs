@@ -166,10 +166,10 @@ fn operation_response(
             ) => {
                 result.operation_ref == request.operation_ref
                     && request.endpoint_ref.as_ref().is_none_or(|reference| {
-                        result.endpoints.len() == 1
-                            && result.endpoints[0].endpoint_ref == *reference
+                        result.connections.len() == 1
+                            && result.connections[0].connection_ref == *reference
                     })
-                    && (request.endpoint_ref.is_none() || result.endpoints.len() == 1)
+                    && (request.endpoint_ref.is_none() || result.connections.len() == 1)
             }
             (operation::OperationResult::Invoke(result), v5::OperationRequest::Invoke(request)) => {
                 result.operation_ref == request.operation_ref

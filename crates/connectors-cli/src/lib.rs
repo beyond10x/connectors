@@ -84,7 +84,7 @@ enum Command {
         command: daemon::DaemonCommand,
     },
     /// Discover service interfaces and manage their provider bindings.
-    EndpointInventoryEntry {
+    Inventory {
         /// Deployment to reach. A saved login never changes the local default.
         #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
         target: Target,
@@ -92,7 +92,7 @@ enum Command {
         command: endpoint::EndpointInventoryCommand,
     },
     /// Manage durable Endpoints through the credential-free control socket.
-    Connection {
+    Endpoint {
         /// Deployment to reach. A saved login never changes the local default.
         #[arg(long, value_enum, default_value_t = Target::Local, global = true)]
         target: Target,
@@ -241,12 +241,12 @@ struct PersonalOAuthArgs {
     /// Private OAuth instructions in a new owner-only file; otherwise use the controlling terminal.
     #[arg(long)]
     instruction_file: Option<PathBuf>,
-    /// Repair the configured Connection for this admitted operation; never invoke it automatically.
-    #[arg(long, requires_all = ["connection", "remediation-input"], conflicts_with_all = ["provider", "label", "context", "credential", "auth_profile", "settings", "allow", "operator_network", "credential_file", "instance"])]
+    /// Repair the configured Endpoint for this admitted operation; never invoke it automatically.
+    #[arg(long, requires_all = ["endpoint", "remediation-input"], conflicts_with_all = ["provider", "label", "context", "credential", "auth_profile", "settings", "allow", "operator_network", "credential_file", "instance"])]
     operation: Option<String>,
-    /// Exact configured Connection to repair, paired with --operation.
+    /// Exact configured Endpoint to repair, paired with --operation.
     #[arg(long, requires = "operation")]
-    connection: Option<String>,
+    endpoint: Option<String>,
     /// Intended input, checked again against the fresh operation schema after acknowledgement.
     #[arg(long, group = "remediation-input", requires = "operation")]
     input_json: Option<String>,
@@ -370,9 +370,7 @@ enum OperationCommand {
         config: Option<PathBuf>,
         #[arg(long)]
         operation: String,
-        #[arg(long, conflicts_with = "endpoint_ref")]
-        connection: Option<String>,
-        #[arg(long, conflicts_with = "connection")]
+        #[arg(long)]
         endpoint_ref: Option<String>,
         #[arg(long)]
         state_root: Option<PathBuf>,
@@ -396,18 +394,8 @@ enum OperationCommand {
         config: Option<PathBuf>,
         #[arg(long)]
         operation: String,
-        #[arg(
-            long,
-            required_unless_present = "endpoint_ref",
-            conflicts_with = "endpoint_ref"
-        )]
-        connection: Option<String>,
-        #[arg(
-            long,
-            required_unless_present = "connection",
-            conflicts_with = "connection"
-        )]
-        endpoint_ref: Option<String>,
+        #[arg(long)]
+        endpoint_ref: String,
         #[arg(long)]
         description_ref: String,
         /// Strict JSON object of catalog-declared caller input. See also --input-file and --input.
@@ -795,8 +783,8 @@ where
     // the command that failed is no longer available to ask.
     let format = cli.output;
     let target = match &cli.command {
-        Command::Connection { target, .. }
-        | Command::EndpointInventoryEntry { target, .. }
+        Command::Endpoint { target, .. }
+        | Command::Inventory { target, .. }
         | Command::Event { target, .. }
         | Command::Operation { target, .. } => Some(target.as_str()),
         _ => None,
@@ -940,7 +928,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 }
                 let personal = PersonalConfig::read(&config_path)?;
                 if let (Some(operation_ref), Some(endpoint_ref)) =
-                    (oauth.operation, oauth.connection)
+                    (oauth.operation, oauth.endpoint)
                 {
                     remediation::require_daemon(&state_root)?;
                     let input =
@@ -1063,9 +1051,9 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 Ok(())
             }
         },
-        Command::Connection { target, command } => connection(format, target, command).await,
+        Command::Endpoint { target, command } => connection(format, target, command).await,
         Command::Daemon { command } => daemon::run(format, command).await,
-        Command::EndpointInventoryEntry { target, command } => endpoint::run(format, target, command).await,
+        Command::Inventory { target, command } => endpoint::run(format, target, command).await,
         Command::Event { target, command } => event(format, target, command).await,
         Command::Operation {
             target,
@@ -1306,7 +1294,6 @@ async fn operation(
         OperationCommand::Describe {
             config,
             operation,
-            connection,
             endpoint_ref,
             state_root,
         } => (
@@ -1314,7 +1301,6 @@ async fn operation(
             state_root,
             OperationRequest::Describe(OperationDescribeRequest {
                 operation_ref: operation,
-                endpoint_ref: connection,
                 endpoint_ref,
             }),
         ),
@@ -1334,7 +1320,6 @@ async fn operation(
         OperationCommand::Invoke {
             config,
             operation,
-            connection,
             endpoint_ref,
             description_ref,
             input_json,
@@ -1349,7 +1334,6 @@ async fn operation(
                 state_root,
                 OperationRequest::Invoke(OperationInvokeRequest {
                     operation_ref: operation,
-                    endpoint_ref: connection,
                     endpoint_ref,
                     description_ref,
                     input,
@@ -1410,10 +1394,8 @@ fn legacy_operation(
     request: OperationRequest,
 ) -> Result<protocol::operation::OperationRequest, MainError> {
     let has_target = match &request {
-        OperationRequest::Describe(value) => {
-            value.endpoint_ref.is_some() || value.endpoint_ref.is_some()
-        }
-        OperationRequest::Invoke(value) => value.endpoint_ref.is_some(),
+        OperationRequest::Describe(value) => value.endpoint_ref.is_some(),
+        OperationRequest::Invoke(_) => true,
         _ => false,
     };
     if has_target {

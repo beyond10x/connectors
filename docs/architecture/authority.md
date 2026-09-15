@@ -1,40 +1,40 @@
 ---
-title: Connections and authority
+title: Endpoints and authority
 description: How provider configuration, account authorization, Grants, approvals, and credential custody fit together.
-sidebar_label: Connections and authority
+sidebar_label: Endpoints and authority
 sidebar_position: 2
 b10x:
   documentType: architecture
   audiences: [developer, operator, evaluator]
 ---
 
-# Connections and authority
+# Endpoints and authority
 
-Connecting an account and permitting an action are separate decisions. A Connection identifies
+Connecting an account and permitting an action are separate decisions. A Endpoint identifies
 the authorized external account or target. A Grant determines which operations or events may use
-that Connection. Provider credentials stay in Connectors' credential store.
+that Endpoint. Provider credentials stay in Connectors' credential store.
 
-## From a provider to a usable Connection
+## From a provider to a usable Endpoint
 
 ```mermaid
 flowchart TB
     accTitle: Establish access before requesting an action
-    accDescr: A deployment enables an Integration. A Connect Session establishes a Connection and credential custody; action admission remains a separate decision.
+    accDescr: A deployment enables an Integration. A Setup Session establishes a Endpoint and credential custody; action admission remains a separate decision.
     provider[Provider: reviewed capabilities] --> integration[Integration: deployment configuration]
-    integration --> session[Connect Session: acquire authorization]
+    integration --> session[Setup Session: acquire authorization]
     human[Authorized person or provider consent] --> session
     session --> store[Credential store]
-    session --> connection[Connection: durable account or target]
-    connection --> admission[Receiver policy and required Grants]
+    session --> endpoint[Endpoint: durable account or target]
+    endpoint --> admission[Receiver policy and required Grants]
     admission --> call[Admitted invocation or event access]
 ```
 
 The deployment enables an Integration and supplies its non-secret policy. Where acquisition is
-required, the person completes a Connect Session through protected input or provider consent.
-Credentials enter Connector custody; the caller observes the resulting Connection and its status.
+required, the person completes a Setup Session through protected input or provider consent.
+Credentials enter Connector custody; the caller observes the resulting Endpoint and its status.
 Requests must still pass the authority checks that apply to their operation.
 
-Not every Connection uses this acquisition flow. Local Kubernetes can use existing owner-controlled
+Not every Endpoint uses this acquisition flow. Local Kubernetes can use existing owner-controlled
 cluster configuration; hosted OAuth and direct operator entry have different prerequisites.
 The [provider guides](../../README.md#connect-a-provider) explain those differences.
 
@@ -43,16 +43,16 @@ The [provider guides](../../README.md#connect-a-provider) explain those differen
 | Session | Owner and purpose | Result |
 |---|---|---|
 | Identity login session | Identity; lets a hosted client obtain short-lived access authority | Client login continuity, stored in the OS keyring |
-| Connect Session | Connectors; a bounded attempt to establish or repair provider authorization | Connection status and reference, with credentials retained by Connectors |
+| Setup Session | Connectors; a bounded attempt to establish or repair provider authorization | Endpoint status and reference, with credentials retained by Connectors |
 
-The [Connect Session lifecycle](../../crates/service/src/connect_session.rs) starts at `pending`
+The [Setup Session lifecycle](../../crates/service/src/connect_session.rs) starts at `pending`
 and terminates at `completed`, `expired`, or `failed`. Terminal results cannot be completed again.
 A terminal response does not confer general authority on its caller.
 
 ## The example: establish C1
 
-The person adds a companion bot through its protected Connect Session. Connectors validates the
-configured workspace and retains the app and bot credentials for the resulting Connection, C1.
+The person adds a companion bot through its protected Setup Session. Connectors validates the
+configured workspace and retains the app and bot credentials for the resulting Endpoint, C1.
 The person's Identity login is separate: it supplies authority to access the hosted deployment.
 Neither the application nor a model needs the provider credentials.
 
@@ -62,8 +62,8 @@ Hosted requests present short-lived Identity authority for the exact Connector a
 scope. Connectors validates it and derives the tenant and principal from that authority. Request
 fields do not choose an independent tenant. Receiver-side policy further narrows admission.
 
-The [Grant evaluator](../../crates/domain/src/evaluator.rs) checks the selected Connection and the
-operation facts supplied by admission. A [Grant](../../crates/domain/src/grant.rs) binds one Connection and
+The [Grant evaluator](../../crates/domain/src/evaluator.rs) checks the selected Endpoint and the
+operation facts supplied by admission. A [Grant](../../crates/domain/src/grant.rs) binds one Endpoint and
 can express a risk ceiling, admitted effects and idempotency classes, explicit operation allow/deny
 sets, and a closed inbound event set. An explicit denial takes precedence.
 
@@ -77,7 +77,7 @@ effect, and idempotency bounds; an exact operation allow rule is the expected ad
 The richer Grant type alone does not prove that every transport supplies all of its facts.
 
 For operations requiring approval, the [approval gate](../../crates/domain/src/approval.rs)
-verifies issuer, subject, operation, Connection, canonical input digest, and expiry. It redeems an
+verifies issuer, subject, operation, Endpoint, canonical input digest, and expiry. It redeems an
 approval once and records the attempt before dispatch. Recovery distinguishes an aborted attempt
 from an indeterminate one whose effect may already have happened.
 
@@ -88,7 +88,7 @@ channel, thread, and message. It first describes the operation and receives D1.
 
 The [hosted approval endpoint](../../crates/server/src/hosted/approval.rs) requires verified human
 authority with `connectors.approvals.issue`. It rechecks D1 and C1, then records A1 against the
-subject, operation, Connection, canonical input digest, and expiry. A changed message or thread
+subject, operation, Endpoint, canonical input digest, and expiry. A changed message or thread
 is different input and cannot reuse that approval.
 
 **Receiving E1 is not approval to reply.** The hosted path loads and redeems an issued approval
@@ -98,7 +98,7 @@ hosted reply or a universal ten-minute event grant.
 | A caller has… | What still has to hold |
 |---|---|
 | A valid hosted login | A current access token with the correct audience and scope |
-| A callable Connection | Receiver admission and, for a hosted write, an admitting Grant |
+| A callable Endpoint | Receiver admission and, for a hosted write, an admitting Grant |
 | A Grant | Current description/authority checks and any required approval |
 | An approval reference | Exact request binding, validity, and successful one-time redemption |
 

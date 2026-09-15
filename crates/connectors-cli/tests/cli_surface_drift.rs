@@ -165,13 +165,13 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
     ("daemon start", Unspecified::Lifecycle, "starts the local daemon process"),
     ("daemon status", Unspecified::Read, "reads local daemon lifecycle status"),
     ("daemon stop", Unspecified::Lifecycle, "stops the local daemon process"),
-    ("endpoint list", Unspecified::Read, "reads discovered service interfaces"),
-    ("endpoint show", Unspecified::Read, "reads one endpoint and its readiness"),
-    ("endpoint refresh", Unspecified::Flow, "reconciles configured discovery sources"),
-    ("endpoint bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
+    ("inventory list", Unspecified::Read, "reads discovered service interfaces"),
+    ("inventory show", Unspecified::Read, "reads one endpoint and its readiness"),
+    ("inventory refresh", Unspecified::Flow, "reconciles configured discovery sources"),
+    ("inventory bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
     // Under `connection`.
     (
-        "connection list",
+        "endpoint list",
         Unspecified::Read,
         "a read of non-secret Connection summaries",
     ),
@@ -565,7 +565,7 @@ fn the_restated_contract_is_green_against_the_unchanged_tree() {
 /// specification declares nothing named `harvest`, and no group of the specification places it.
 #[test]
 fn a_command_added_under_a_declared_group_is_refused() {
-    let drifted = connectors_cli::command().mut_subcommand("connection", |group| {
+    let drifted = connectors_cli::command().mut_subcommand("endpoint", |group| {
         group.subcommand(clap::Command::new("harvest").about("added by nobody's decision"))
     });
     let refusals = contract_refusals(&drifted, &committed_tree());
@@ -647,7 +647,7 @@ fn a_committed_tree_that_swaps_completions_for_an_undeclared_word_is_refused() {
 /// inverse mutation: the same contract must catch every group losing its declared target.
 #[test]
 fn a_target_flag_removed_from_a_group_is_refused_by_the_countdown() {
-    for name in ["connection", "event", "operation"] {
+    for name in ["endpoint", "event", "operation"] {
         let drifted = connectors_cli::command().mut_subcommand(name, |group| {
             group.mut_arg("target", |argument| argument.long("formerly-target"))
         });

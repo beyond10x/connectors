@@ -113,14 +113,14 @@ impl ConnectorBackend for KubernetesLocalBackend {
             OperationRequest::Invoke(request) => {
                 lock(&self.state)
                     .children
-                    .contains_key(&request.endpoint_ref)
+                    .contains_key(&request.connection_ref)
                     || (matches!(
                         request.operation_ref.as_str(),
                         STATUS_OPERATION
                             | RESTART_OPERATION
                             | NAMESPACE_OPERATION
                             | WORKLOAD_OPERATION
-                    ) && self.is_cluster_connection(&request.endpoint_ref))
+                    ) && self.is_cluster_connection(&request.connection_ref))
             }
             OperationRequest::Search(_) => false,
             _ => false,
@@ -219,7 +219,7 @@ impl ConnectorBackend for KubernetesLocalBackend {
             OperationRequest::Invoke(request)
                 if lock(&self.state)
                     .children
-                    .contains_key(&request.endpoint_ref) =>
+                    .contains_key(&request.connection_ref) =>
             {
                 self.invoke_service(context, request).await
             }

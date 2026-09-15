@@ -157,7 +157,7 @@ pub(super) fn status(execution_ref: &str, record: &SessionRecord) -> SessionStat
     SessionStatus {
         execution_ref: execution_ref.to_owned(),
         operation_ref: record.operation_ref.clone(),
-        endpoint_ref: record.endpoint_ref.clone(),
+        connection_ref: record.endpoint_ref.clone(),
         state,
         termination,
         connector_audit_ref: record.audit_ref.clone(),

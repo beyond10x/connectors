@@ -57,9 +57,9 @@ of the sixteen carry no `naming.wire`, because in this specification a `naming.w
 protocol `method` tag and nothing else (`ess/system/system.yaml`, enforced by
 `every_declared_wire_name_is_a_method_the_protocol_accepts`,
 `crates/catalog-build/tests/main/ess_claim_fence.rs:360`). A `cli:` block over the whole accepted
-surface was generated to see what it produced, and it produced `SuperviseChannel`,
+surface was generated to see what it produced, and it produced `SuperviseEventReceiver`,
 `ReconnectChannel`, `ConnectChannel`, `StopChannel`, `AuthorizeConnection`, `VerifyConnection`,
-`ReauthorizeConnection`, `RevokeConnection`, `FinishConnectSession`, `RefreshObservation` and
+`ReauthorizeConnection`, `RevokeConnection`, `FinishSetupSession`, `RefreshObservation` and
 `SettleSession` as words at a shell. Every one of those is an act the platform performs on its own —
 a supervisor step, a settlement, a lifecycle move — and giving each a typeable verb would mean
 inventing eleven `naming.wire` values, which the claim fence refuses because they name methods no
@@ -293,7 +293,7 @@ The current exception list has **33 entries, 0 of them one word and 33 of them t
 **9 of the 33** kinds are derived from the tree, and **2 more** are `Grouping`.
 **The remaining 22** — `inspect upgrade`, `inspect doctor`, `inspect providers`, `inspect auth`,
 `admin integrations status`, `setup completions`, `daemon start`, `daemon status`, `daemon stop`,
-`endpoint list`, `endpoint show`, `endpoint refresh`, `endpoint bind`, `event subscribe`,
+`inventory list`, `inventory show`, `inventory refresh`, `inventory bind`, `event subscribe`,
 `event unsubscribe`, and the seven `Lifecycle`
 steps — reach no protocol request in the current source walker. Their classifications remain
 reviewed claims; the new leaf handlers live in separate CLI modules that the walker does not yet
@@ -307,7 +307,7 @@ and credential inspection use the confidential local setup protocol; provider cr
 acquisition calls stay in the daemon. Static help and installed-provider inspection remain offline.
 
 The current model was checked with the same command-name extraction, and it produced `ActivateCandidate`,
-`MaterializeObservation`, `SuperviseChannel`, `connect_session_create`,
+`MaterializeObservation`, `SuperviseEventReceiver`, `connect_session_create`,
 `invoke` and `session_terminate` as words at a shell. Legacy internal normalization commands no
 longer claim a public discovery wire method. Event subscribe/unsubscribe use the explicit v2
 subscription lifecycle; their leaf handlers are included among the residual module claims above.

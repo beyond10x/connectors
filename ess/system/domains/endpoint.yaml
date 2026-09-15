@@ -278,7 +278,7 @@ types:
 entities:
   # States: crates/protocol/src/endpoint.rs:112-117 (`EndpointState`).
   # Transitions: docs/design/01-domain-model.md:198-201, the only drawn lifecycle in the tree.
-  # Fields: `EndpointSummary`, crates/protocol/src/endpoint.rs:186-200.
+  # Fields: `EndpointSummary`, crates/protocol/src/endpoint.rs:192-207.
   # UNMAPPED: `route` (crates/protocol/src/endpoint.rs:167-174) is `direct` or
   # `via_endpoint(parent Endpoint, resource binding, adapter)`, so a mediated Endpoint
   # references a parent Endpoint. The cardinality of that relation is not stated anywhere:
@@ -351,7 +351,7 @@ entities:
   # `start_supervisor` (line 704), `Reconnecting` at each loop head (line 730), `Connected` once
   # the socket is open (line 801), `Stopped` when the loop breaks (line 746).
   # The protocol declares `ChannelSummary` twice, and the two projections differ. Both are read:
-  # Fields: `ChannelSummary`, crates/protocol/src/endpoint.rs:177-182.
+  # Fields: `ChannelSummary`, crates/protocol/src/endpoint.rs:183-188.
   # Fields: `ChannelSummary`, crates/protocol/src/event.rs:77-83.
   # The endpoint.rs projection omits `endpoint_ref` because it is nested inside
   # `EndpointDescription` (crates/protocol/src/endpoint.rs:204-208), where the Endpoint is
@@ -410,7 +410,7 @@ entities:
   # by the service lifecycle's `finish` and `fail_pending` over its own map. These citations
   # were refreshed against integrated source9c6ce892 after the private custody lifecycle moved
   # the earlier service line anchors; no transition or lifecycle identity changed.
-  # Fields: `ConnectSessionStatus`, crates/protocol/src/endpoint.rs:272-284.
+  # Fields: `ConnectSessionStatus`, crates/protocol/src/endpoint.rs:281-293.
   - name: connectors.endpoint.SetupSession
 
     identity:
@@ -454,7 +454,7 @@ entities:
   # `EndpointRequest::CandidateActivate` (crates/protocol/src/endpoint.rs:38-39) asks for.
   # The protocol enforces the pairing at crates/protocol/src/endpoint.rs:495-496: `Detected`
   # exactly when `endpoint_ref` is absent, `Activated` exactly when it is present.
-  # Fields: `EndpointCandidateSummary`, crates/protocol/src/endpoint.rs:229-237.
+  # Fields: `EndpointCandidateSummary`, crates/protocol/src/endpoint.rs:236-244.
   - name: connectors.endpoint.EndpointCandidate
 
     identity:
@@ -496,7 +496,7 @@ entities:
   # naming a move out of `Observed`, and a lifecycle declares one `initial`. Settled by a code
   # site that performs the change the way crates/integration-kubernetes/src/local.rs:662 performs
   # `Materialized` — that is, by the observation state becoming stored rather than derived.
-  # Fields: `DiscoveryObservationSummary`, crates/protocol/src/endpoint.rs:242-255.
+  # Fields: `DiscoveryObservationSummary`, crates/protocol/src/endpoint.rs:249-264.
   - name: connectors.endpoint.DiscoveryObservation
 
     identity:

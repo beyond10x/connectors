@@ -89,7 +89,7 @@ impl OperationRequest {
             }),
             Self::Invoke(value) => wire::OperationRequest::Invoke(wire::InvokeRequest {
                 operation_ref: value.operation_ref,
-                endpoint_ref: resolved_endpoint.ok_or_else(v3::protocol_refusal)?.into(),
+                connection_ref: resolved_endpoint.ok_or_else(v3::protocol_refusal)?.into(),
                 description_ref: value.description_ref,
                 input: value.input,
                 approval_evidence_ref: value.approval_evidence_ref,
@@ -118,7 +118,7 @@ impl From<wire::OperationRequest> for OperationRequest {
                 operation_ref: value.operation_ref, endpoint_ref: None,
             }),
             wire::OperationRequest::Invoke(value) => Self::Invoke(InvokeRequest {
-                operation_ref: value.operation_ref, endpoint_ref: value.endpoint_ref,
+                operation_ref: value.operation_ref, endpoint_ref: value.connection_ref,
                 description_ref: value.description_ref, input: value.input,
                 approval_evidence_ref: value.approval_evidence_ref,
             }),
@@ -179,7 +179,7 @@ mod tests {
         let request: OperationRequest = serde_json::from_value(input()).unwrap();
         assert!(request.clone().into_internal(None).is_err());
         let wire::OperationRequest::Invoke(resolved) = request.into_internal(Some("endpoint:slack:bot-one")).unwrap() else { panic!() };
-        assert_eq!(resolved.endpoint_ref, "endpoint:slack:bot-one");
+        assert_eq!(resolved.connection_ref, "endpoint:slack:bot-one");
         for field in ["connection_ref", "instance_id"] {
             let mut value = input();
             value["params"][field] = json!("legacy-target");

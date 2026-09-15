@@ -219,7 +219,7 @@ async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
     use service::{CredentialReadiness, RemediationError, RemediationTarget};
     let target = RemediationTarget {
         operation_ref: &invoke.operation_ref,
-        endpoint_ref: &invoke.endpoint_ref,
+        endpoint_ref: &invoke.connection_ref,
     };
     if !backend.owns_remediation(service::RemediationRoute::Target(target)) {
         return Ok(None);
@@ -236,7 +236,7 @@ async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
         .map_err(operation_error)?;
     let described = if target_specific {
         backend
-            .describe_target(context, &invoke.operation_ref, &invoke.endpoint_ref)
+            .describe_target(context, &invoke.operation_ref, &invoke.connection_ref)
             .await
             .map(protocol::operation::OperationResult::Describe)
     } else {
@@ -261,8 +261,8 @@ async fn local_auth_preflight_at<B: ConnectorBackend + ?Sized>(
     if description.operation_ref != invoke.operation_ref
         || description.description_ref != invoke.description_ref
         || description.input_schema != record["contract"]["input_schema"]
-        || !description.endpoints.iter().any(|connection| {
-            connection.endpoint_ref == invoke.endpoint_ref
+        || !description.connections.iter().any(|connection| {
+            connection.connection_ref == invoke.connection_ref
                 && connection.provider == metadata.operation.provider()
                 && connection.purpose.as_deref() == Some(metadata.auth_profile.as_str())
         })
@@ -943,7 +943,7 @@ mod tests {
                     title: "Dial SIP".to_owned(),
                     effect: EffectClass::Mutating,
                     approval: ApprovalPosture::Required,
-                    endpoints: Vec::new(),
+                    connections: Vec::new(),
                 }],
             })
         }
@@ -1106,8 +1106,8 @@ mod tests {
                     output_schema: serde_json::json!({}),
                     effect: protocol::operation::EffectClass::ReadOnly,
                     approval: protocol::operation::ApprovalPosture::NotRequired,
-                    endpoints: vec![protocol::operation::EndpointSummary {
-                        endpoint_ref: "connection:local-fixture".into(),
+                    connections: vec![protocol::operation::ConnectionSummary {
+                        connection_ref: "connection:local-fixture".into(),
                         label: "fixture".into(),
                         provider: "slack".into(),
                         audiences: vec![],
@@ -1137,7 +1137,7 @@ mod tests {
             request: protocol::operation::OperationRequest::Invoke(
                 protocol::operation::InvokeRequest {
                     operation_ref: "slack-conversations-history".into(),
-                    endpoint_ref: "connection:local-fixture".into(),
+                    connection_ref: "connection:local-fixture".into(),
                     description_ref: "description:local-fixture".into(),
                     input: serde_json::json!({"channel":"C123"}),
                     approval_evidence_ref: None,
