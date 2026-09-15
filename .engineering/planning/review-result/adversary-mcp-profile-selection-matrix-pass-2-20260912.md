@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adversary-mcp-profile-selection-matrix-pass-2-20260912
 kind: review-result
-status: active
+status: archived
 title: Adversary pass 2 — MCP profile selection matrix, wave 3
 relations:
 - reviews: story:mcp-profile-selection-matrix
-revision: 1
+revision: 2
 ---
 ```
 unit: mcp-w3 story:mcp-profile-selection-matrix, worktree cv2-mcp-w1-20260912 at cc7b121

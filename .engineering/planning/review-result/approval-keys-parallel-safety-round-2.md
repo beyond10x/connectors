@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:approval-keys-parallel-safety-round-2
 kind: review-result
-status: active
+status: archived
 title: Approval keys parallel-safety review round 2
 relations:
 - reviews: story:local-approval-keys
-revision: 1
+revision: 2
 ---
 approve
 

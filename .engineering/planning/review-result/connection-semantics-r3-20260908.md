@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:connection-semantics-r3-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent final connection semantics approval
 relations:
 - reviews: story:contracts-connection-readiness
 - reviews: story:contracts-management-boundary
-revision: 1
+revision: 2
 ---
 # Connection semantics — independent reviewer A, final recheck
 

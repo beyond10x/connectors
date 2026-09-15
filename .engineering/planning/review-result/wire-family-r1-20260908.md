@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:wire-family-r1-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent family compatibility review, first pass
 relations:
 - reviews: story:contracts-wire-compatibility
-revision: 1
+revision: 2
 ---
 # Independent compatibility review A — proposed contract families
 

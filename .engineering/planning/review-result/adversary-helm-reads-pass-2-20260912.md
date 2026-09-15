@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adversary-helm-reads-pass-2-20260912
 kind: review-result
-status: active
+status: archived
 title: Adversary pass 2 — Helm release reads, unit 1
 relations:
 - reviews: story:kubernetes-helm-release-reads
-revision: 1
+revision: 2
 ---
 ```
 unit: 1 — story:kubernetes-helm-release-reads, worktree cv2-helm-reads-20260912 at e5938a6 (5e4b0c4 + correction round 1); origins diffed against 5e4b0c4~1

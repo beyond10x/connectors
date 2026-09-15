@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:sessions-model-r2-20260908
 kind: review-result
-status: active
+status: archived
 title: Session model final independent recheck
 relations:
 - reviews: story:contracts-session-revocation
-revision: 1
+revision: 2
 ---
 # Independent session specification review B — recheck
 

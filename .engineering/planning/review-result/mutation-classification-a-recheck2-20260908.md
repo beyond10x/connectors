@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:mutation-classification-a-recheck2-20260908
 kind: review-result
-status: active
+status: archived
 title: Mutation classification reviewer A final recheck
 relations:
 - reviews: story:contracts-mutation-classification
-revision: 1
+revision: 2
 ---
 # Independent classification recheck A — final terminal-error refinement
 

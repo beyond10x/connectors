@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:wire-binding-r1-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent service binding review, first pass
 relations:
 - reviews: story:contracts-wire-compatibility
-revision: 1
+revision: 2
 ---
 # Independent service wire compatibility review B
 

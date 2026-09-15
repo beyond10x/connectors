@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adversary-settlement-pass-1-20260912
 kind: review-result
-status: active
+status: archived
 title: Adversary pass 1 — terminal settlement CLI journey, unit 1
 relations:
 - reviews: story:guarded-gitlab-merge
-revision: 1
+revision: 2
 ---
 ```
 unit: 1 — the uncommitted two-file change in the primary checkout, branch main, working tree over bfd01ae (nothing committed)

@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adversary-mcp-inbound-local-binding-pass-1-20260912
 kind: review-result
-status: active
+status: archived
 title: Adversary pass 1 — MCP inbound local binding, wave 4a
 relations:
 - reviews: story:mcp-inbound-local-binding
-revision: 1
+revision: 2
 ---
 ```
 unit: mcp-w4a — story:mcp-inbound-local-binding, worktree cv2-mcp-w4a-20260912 at 1d22f58 (base 4ad2ee5)

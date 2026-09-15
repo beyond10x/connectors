@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:discovery-b-recheck1-20260908
 kind: review-result
-status: active
+status: archived
 title: Discovery coverage and composition reviewer B recheck-1
 relations:
 - reviews: story:contracts-discovery-coverage
 - reviews: story:contracts-host-composition
-revision: 1
+revision: 2
 ---
 # Independent reviewer B — discovery/composition recheck 1
 
