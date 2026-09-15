@@ -431,6 +431,10 @@ impl LocalClient {
             || !description.connections.iter().any(|binding| {
                 binding.connection_ref == pending.connection_ref
                     && binding.provider == pending.integration_ref
+                    && binding
+                        .purpose
+                        .as_deref()
+                        .is_none_or(|purpose| purpose == pending.auth_profile)
             })
         {
             return Err(ClientError::RemediationRefused);

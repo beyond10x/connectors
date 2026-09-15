@@ -872,9 +872,7 @@ async fn run(cli: Cli) -> Result<(), MainError> {
                 if let (Some(operation_ref), Some(connection_ref)) =
                     (oauth.operation, oauth.connection)
                 {
-                    if local_socket_absent(&state_root)? {
-                        return Err(remediation::RemediationError::DaemonRequired.into());
-                    }
+                    remediation::require_daemon(&state_root)?;
                     let input =
                         remediation::read_input(oauth.input_json, oauth.input_file, oauth.input)?;
                     let outcome = remediation::run(
