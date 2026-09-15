@@ -79,7 +79,7 @@ five repositories on 2026-09-15; the draft rows it replaces are named under it.
 
 | Consumer | Manifest (at that repository's `origin/main`) | Depends on | Pin |
 |---|---|---|---|
-| zwirn | `zwirn/Cargo.toml:25` | `connectors-cli` | rev `1e0eb9f` (ssh remote) |
+| zwirn | `zwirn/Cargo.toml:25` | `connectors-cli` | rev `1e0eb9f` (ssh remote) — orphaned; `8368fa0b` on `origin/main` is the same commit (below) |
 | devcenter | `devcenter/Cargo.toml:37-38` | `connectors-client`, `protocol` | rev `e80b7ae1`, `version = "=0.7.0"` |
 | devcenter | `devcenter/crates/devcenter-connectors/Cargo.toml:22-23`, with a `[patch."https://github.com/beyond10x/connectors.git"]` block at `:38-40` redirecting `protocol` and `service` | `connectors-runtime`, `service` | rev `097b1c58` (ssh remote) |
 | service-sdk | `service-sdk/crates/service-catalog/Cargo.toml:20-21` | `protocol`, `service` | rev `9f2a361b` |
@@ -95,11 +95,30 @@ not listed at all; agent-platform is `tag = "v0.5.6"` at `Cargo.toml:48`, not `v
 workspace is `rev = "dbdd285c"`, `version = "=0.6.4"`, not `b4f6d655`. Only zwirn and
 `devcenter/Cargo.toml` are unchanged.
 
-zwirn is the one row whose pin cannot be fetched from this repository. `1e0eb9f` (2026-08-24) is
-reachable from no ref here and survives only as an unreachable object on GitHub, which
-[`AGENTS.md`](../../AGENTS.md) § Boundaries (`AGENTS.md:362-364`) names as the expected state until
-GitHub garbage-collects — so the cutover has to repin `zwirn/Cargo.toml:25` to a commit on
-`origin/main`, and has to do it before the pre-public garbage collection that paragraph asks for.
+zwirn is the one row whose pin is not on `origin/main` — every other rev in the table is an
+ancestor of it and sits in at least two tags. `1e0eb9f` (2026-08-24) is reachable from no ref here:
+no branch, no tag, and none of the 1086 commits `git log --all` walks. It is not lost work. It is
+the pre-rewrite identity of a commit the former-brand history rewrite replaced, and its counterpart
+is **`8368fa0b`** on `origin/main`, first released in `v0.2.0` — same subject, same author timestamp
+to the second, and a 253-file diff whose 1611 removed and 1611 added lines are, without exception,
+that rewrite's own substitution. The repin target is therefore known and needs no decision about
+which commit carries zwirn's code.
+
+The deadline, not a breakage, is what this row is about. `1e0eb9f` is still fetchable today:
+`git fetch --depth=1 origin 1e0eb9fa86a610eef2bf103a3b13273b8e92f9e5` into an empty repository
+exits 0, because GitHub serves unreachable objects by SHA. It stops being fetchable at the
+pre-public garbage collection that [`AGENTS.md`](../../AGENTS.md) § Boundaries
+(`AGENTS.md:362-364`) asks for, and that is the deadline: the cutover (§6 phase 5) repins
+`zwirn/Cargo.toml:25` onto `8368fa0b`, or onto a tag containing it, before that GC runs. Making
+`1e0eb9f` reachable from a ref here instead is not an option — it would republish the 253
+pre-rewrite files the rewrite removed, which is exactly what that paragraph wants collected.
+
+Landing the repin is zwirn's decision, not this repository's, and it cannot be verified there today:
+`zwirn/AGENTS.md` records that zwirn's 26 `platform` crates at rev `19187fac` resolve to nothing,
+that any cargo verb in that workspace therefore fails at resolution before it compiles
+(`cargo test -p b10x-zwirn --locked` exits 101), and that a pin change is a decided build-shaped
+change rather than a side effect of reading the file. This repository can schedule the repin and
+name its target; it cannot prove it green.
 
 `connectors-client`, `protocol`, `service`, `connectors-runtime` and `connectors-cli` keep their
 names and contract shape in the rewrite; the cutover (§6 phase 5) is a coordinated repin of these
@@ -147,7 +166,7 @@ One workspace, ~10 crates, one specification authority:
 | 2 | Adequacy gate: mechanically enumerate every HTTP route, CLI verb, protocol message, and event kind in the current code; each item is either cited by a spec or named on the strip list — no third state. AEP critic pass over the spec set | Zero unclassified surface items |
 | 3 | Clean-room implementation in the new repo, waves of ≤5 parallel stories (AGENTS.md dispatching rule), each story owning one crate/module against its fixtures | Per-story: fixtures green |
 | 4 | Parity: catalog build byte-parity old-vs-new on all 19 providers; grant-decision and RequestPlan fixture parity; the Slack mention→reply walkthrough end-to-end on personal-local | All parity checks green |
-| 5 | Cutover: repin the 4 consumers (§3), release, archive this repo as predecessor | Consumers' gates green |
+| 5 | Cutover: repin the 9 manifests in 5 repositories (§3), release, archive this repo as predecessor | Consumers' gates green |
 
 Phase 1 is where the leverage is: it is read-only, parallelizable, and cheap to review — and a
 wrong strip decision surfaces there as a missing spec, not as a half-built runtime.
