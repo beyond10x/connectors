@@ -2,7 +2,8 @@
 
 **Status: accepted 2026-09-15. Drafted 2026-09-08; accepted by the operator through the org-state
 review decision sheet of 2026-09-15, items 1 and 15. The body below is the draft as written, except that two
-upstream-repository references are redacted under atlas ADR 0001; only §7 has been answered.** The lineage the acceptance rests on is recorded in the atlas ADR 0051
+upstream-repository references are redacted under atlas ADR 0001 and §3's consumer table is
+corrected in place by the dated note it carries (2026-09-15); only §7 has been answered.** The lineage the acceptance rests on is recorded in the atlas ADR 0051
 (2026-09-15).
 
 The operator's judgment: this repository is heavily over-engineered. The proposal: extract one
@@ -68,15 +69,42 @@ Data that survives verbatim, no rewrite: `specs/` (19 vendors + provenance), `pr
 
 ## 3. The consumers the rewrite must not break
 
-| Consumer | Depends on | Pin | Source |
-|---|---|---|---|
-| zwirn | `connectors-cli` | rev 1e0eb9f | `zwirn/Cargo.toml:25` |
-| devcenter | `connectors-client`, `protocol` | rev e80b7ae1, =0.7.0 | `devcenter/Cargo.toml:37-38` |
-| agent-platform | `connectors-client` | tag v0.3.1 | `agent-platform/Cargo.toml:44` |
-| workspace | `connectors-client` | rev b4f6d655 | `workspace/Cargo.toml:21` |
+**Corrected 2026-09-15** (org-state review run 2, lane 08 F2/F3/F8; ledger ORG-0082, ORG-0083,
+ORG-0088). As drafted on 2026-09-08 this section listed four manifests in four repositories and
+called the cutover "a coordinated repin of these four manifests". At `origin/main` of each consumer
+there are **nine manifests in five repositories**, and three of the four pins the draft did list had
+moved. The table below is re-derived from
+`git -C <repo> grep -nE 'beyond10x/connectors(\.git)?"' origin/main -- '*Cargo.toml'`, run over the
+five repositories on 2026-09-15; the draft rows it replaces are named under it.
 
-`connectors-client`, `protocol`, and `connectors-cli` keep their names and contract shape in the
-rewrite; the cutover (§6 phase 5) is a coordinated repin of these four manifests.
+| Consumer | Manifest (at that repository's `origin/main`) | Depends on | Pin |
+|---|---|---|---|
+| zwirn | `zwirn/Cargo.toml:25` | `connectors-cli` | rev `1e0eb9f` (ssh remote) |
+| devcenter | `devcenter/Cargo.toml:37-38` | `connectors-client`, `protocol` | rev `e80b7ae1`, `version = "=0.7.0"` |
+| devcenter | `devcenter/crates/devcenter-connectors/Cargo.toml:22-23`, with a `[patch."https://github.com/beyond10x/connectors.git"]` block at `:38-40` redirecting `protocol` and `service` | `connectors-runtime`, `service` | rev `097b1c58` (ssh remote) |
+| service-sdk | `service-sdk/crates/service-catalog/Cargo.toml:20-21` | `protocol`, `service` | rev `9f2a361b` |
+| service-sdk | `service-sdk/crates/service-conformance/Cargo.toml:23-24` | `protocol`, `service` | rev `9f2a361b` |
+| service-sdk | `service-sdk/crates/service-connectors/Cargo.toml:25-26` | `protocol`, `service` | rev `9f2a361b` |
+| service-sdk | `service-sdk/crates/service-host/Cargo.toml:33-34` | `protocol`, `service` | rev `9f2a361b` |
+| agent-platform | `agent-platform/Cargo.toml:48` | `connectors-client` | tag `v0.5.6` |
+| workspace | `workspace/Cargo.toml:21` | `connectors-client` | rev `dbdd285c`, `version = "=0.6.4"` |
+
+Against the 2026-09-08 draft: service-sdk (four manifests at rev `9f2a361b`) and devcenter's second
+manifest (`crates/devcenter-connectors/Cargo.toml`, rev `097b1c58`, plus its `[patch]` block) were
+not listed at all; agent-platform is `tag = "v0.5.6"` at `Cargo.toml:48`, not `v0.3.1` at `:44`; and
+workspace is `rev = "dbdd285c"`, `version = "=0.6.4"`, not `b4f6d655`. Only zwirn and
+`devcenter/Cargo.toml` are unchanged.
+
+zwirn is the one row whose pin cannot be fetched from this repository. `1e0eb9f` (2026-08-24) is
+reachable from no ref here and survives only as an unreachable object on GitHub, which
+[`AGENTS.md`](../../AGENTS.md) § Boundaries (`AGENTS.md:362-364`) names as the expected state until
+GitHub garbage-collects — so the cutover has to repin `zwirn/Cargo.toml:25` to a commit on
+`origin/main`, and has to do it before the pre-public garbage collection that paragraph asks for.
+
+`connectors-client`, `protocol`, `service`, `connectors-runtime` and `connectors-cli` keep their
+names and contract shape in the rewrite; the cutover (§6 phase 5) is a coordinated repin of these
+nine manifests, and the `[patch]` block in `devcenter/crates/devcenter-connectors/Cargo.toml` moves
+with them.
 
 ## 4. The strip list (proposed defaults; each is a named exclusion in the spec, re-addable later)
 
