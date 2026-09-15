@@ -39,7 +39,7 @@ use protocol::event::{
     EventResult,
 };
 use protocol::operation::{
-    EndpointSummary, InvocationResult, InvokeRequest, OperationError, OperationErrorCode,
+    ConnectionSummary, InvocationResult, InvokeRequest, OperationError, OperationErrorCode,
     OperationRequest, OperationResult,
 };
 use serde_json::Value;
@@ -175,9 +175,9 @@ impl PlatformBackend {
             || self.config.tenant_member_module_enabled(module)
     }
 
-    fn connection(&self) -> EndpointSummary {
-        EndpointSummary {
-            endpoint_ref: self.config.connection.endpoint_ref.clone(),
+    fn connection(&self) -> ConnectionSummary {
+        ConnectionSummary {
+            connection_ref: self.config.connection.endpoint_ref.clone(),
             label: self.config.connection.label.clone(),
             provider: PROVIDER.to_owned(),
             audiences: catalog::provider(catalog::ProviderKey::id(PROVIDER))
@@ -255,7 +255,7 @@ impl PlatformBackend {
                 false,
             ));
         }
-        if request.endpoint_ref != self.config.connection.endpoint_ref {
+        if request.connection_ref != self.config.connection.endpoint_ref {
             return Err(not_granted());
         }
         if request.description_ref != self.description_ref(context, canonical) {
@@ -276,7 +276,7 @@ impl PlatformBackend {
         let audit = AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            endpoint_ref: &request.endpoint_ref,
+            endpoint_ref: &request.connection_ref,
             tenant_id: context.tenant_id(),
             subject: context.subject(),
             actor_subject: context.actor_subject(),
@@ -343,7 +343,7 @@ impl PlatformBackend {
             .finish(AuditEvent {
                 audit_ref: &audit_ref,
                 operation_ref: &request.operation_ref,
-                endpoint_ref: &request.endpoint_ref,
+                endpoint_ref: &request.connection_ref,
                 tenant_id: context.tenant_id(),
                 subject: context.subject(),
                 actor_subject: context.actor_subject(),
@@ -990,7 +990,7 @@ impl ConnectorBackend for PlatformBackend {
         match request {
             OperationRequest::Describe(request) => self.operation(&request.operation_ref).is_some(),
             OperationRequest::Invoke(request) => {
-                request.endpoint_ref == self.config.connection.endpoint_ref
+                request.connection_ref == self.config.connection.endpoint_ref
                     && self.operation(&request.operation_ref).is_some()
             }
             OperationRequest::Search(_)

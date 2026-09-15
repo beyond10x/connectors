@@ -29,7 +29,7 @@ use protocol::datasource::{
     RecordView as DatasourceRecordView,
 };
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary as OperationEndpointSummary, EffectClass,
+    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
@@ -332,7 +332,7 @@ impl ConnectorBackend for GitlabBackend {
                     && lock(&self.inner.metadata)
                         .endpoints
                         .iter()
-                        .any(|connection| connection.endpoint_ref == request.endpoint_ref)
+                        .any(|connection| connection.endpoint_ref == request.connection_ref)
             }
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)
@@ -1144,12 +1144,12 @@ impl GitlabInner {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-    ) -> Vec<OperationEndpointSummary> {
+    ) -> Vec<OperationConnectionSummary> {
         self.owned_connections(context)
             .into_iter()
             .filter(|connection| supports_operation(connection, operation_ref))
-            .map(|connection| OperationEndpointSummary {
-                endpoint_ref: connection.endpoint_ref,
+            .map(|connection| OperationConnectionSummary {
+                connection_ref: connection.endpoint_ref,
                 label: connection.label,
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["delegated-user".to_owned()],
@@ -1183,7 +1183,7 @@ impl GitlabInner {
                     title,
                     effect: operation_effect(operation_ref),
                     approval: operation_approval(operation_ref),
-                    endpoints,
+                    connections: endpoints,
                 })
             })
             .collect()
@@ -1197,7 +1197,7 @@ impl GitlabInner {
         digest.update(operation_ref.as_bytes());
         for connection in self.operation_connections(context, operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.endpoint_ref.as_bytes());
+            digest.update(connection.connection_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }
@@ -1227,7 +1227,7 @@ impl GitlabInner {
                 .unwrap_or_else(|| serde_json::json!({"type":"object"})),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
-            endpoints,
+            connections: endpoints,
             description_ref: self.operation_description_ref(context, operation_ref),
         }))
     }
@@ -1244,7 +1244,7 @@ impl GitlabInner {
             .owned_connections(context)
             .into_iter()
             .find(|connection| {
-                connection.endpoint_ref == request.endpoint_ref
+                connection.endpoint_ref == request.connection_ref
                     && supports_operation(connection, &request.operation_ref)
             })
             .ok_or_else(operation_not_granted)?;
@@ -1307,7 +1307,7 @@ impl GitlabInner {
         self.audit(
             &audit_ref,
             &request.operation_ref,
-            &request.endpoint_ref,
+            &request.connection_ref,
             context,
             "attempted",
         )
@@ -1315,7 +1315,7 @@ impl GitlabInner {
         let response = self
             .egress
             .execute(
-                &request.endpoint_ref,
+                &request.connection_ref,
                 EgressHttpRequest {
                     request: plan.request,
                     maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,
@@ -1351,7 +1351,7 @@ impl GitlabInner {
                 self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.endpoint_ref,
+                    &request.connection_ref,
                     context,
                     "completed",
                 )
@@ -1367,7 +1367,7 @@ impl GitlabInner {
                 let _ = self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.endpoint_ref,
+                    &request.connection_ref,
                     context,
                     "indeterminate",
                 );

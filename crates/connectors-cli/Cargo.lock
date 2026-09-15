@@ -874,13 +874,18 @@ dependencies = [
 name = "connector-resolve"
 version = "0.7.2"
 dependencies = [
+ "base64 0.22.1",
  "catalog",
  "catalog-reader",
  "connector-address",
  "connector-secrets",
+ "hex",
+ "hmac 0.12.1",
  "jsonschema 0.49.9",
  "serde",
  "serde_json",
+ "sha1 0.10.7",
+ "sha2 0.10.9",
  "thiserror 2.0.20",
  "zeroize",
 ]

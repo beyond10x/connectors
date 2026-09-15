@@ -1,0 +1,1597 @@
+{
+  "provenance": {
+    "system": "connectors",
+    "specification_version": "v2",
+    "source_digest": "b46e08fdaea05ec1169f3d75212c80578b59fd21a94fe1d523f21714bddb663c",
+    "contract_digest": "d01ebb2ef8f96762b184433c1df72babf3565039aef3600d49dc1cd99b931c9b"
+  },
+  "scope": {
+    "profile": "component-skeletons"
+  },
+  "capabilities": [
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.Audience",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.Authority",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.Catalog.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.CatalogRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.ConditionalRateLimit",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.FixedRateLimit",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OAuthClientAuthentication",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OAuthEndpoint",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OAuthRedirectShape",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OAuthRefreshPolicy",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OAuthRegistrationUse",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OAuthScopeEncoding",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OAuthTokenEvidence",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.Operation.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.OperationRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.PersonalOAuthAdmission",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.PersonalOAuthFlow",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.Provider.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.ProviderRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.PublishedRate",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.RateLimitBasis",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.RequestParameterSemantics",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.RequestSemantics",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.RiskToken",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.ServiceName",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.SetupProfileActor",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.catalog.SetupProfileSummary",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.Credential.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.CredentialRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.CredentialSubject",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.Integration.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.IntegrationRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.LocalCredentialSelection",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.OAuthBrowserPlacement",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.OAuthCredentialEvidence",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.OAuthRefreshAttempt",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.PersonalOAuthCustody",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.PersonalOAuthRegistration",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.ProviderRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.deployment.Scope",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.AuthProfile",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Binding",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.BindingRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.BoundRemediationStatus",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.CandidateRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.CredentialKind",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.CredentialReference",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.DiscoveryMetadata",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.DiscoveryObservation.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.DiscoveryRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Endpoint.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EndpointActor",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EndpointCandidate.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EndpointInitiator",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EndpointRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EndpointScope",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EventName",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EventReceiver.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EventReceiverRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.EvidenceDigest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.IntegrationRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Label",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.OAuthCompletionRefusal",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.OAuthInstructionKind",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.ObservationRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.PersonalOAuthSessionPolicy",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.ProviderRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Readiness",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.RemediationAcknowledgement",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.RemediationBinding",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.RemediationNextAction",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.RemediationResumeState",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.RouteAdapter",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Scheme",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.SetupSession.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.SetupSessionRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Title",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Tls",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.endpoint.Transport",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.Delivery.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.DeliveryRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.EndpointRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.Event.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.EventFamily",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.EventProvenance",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.EventReceiverRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.EventRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.IntegrationRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.Subscription.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.SubscriptionRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.Webhook.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.event.WebhookRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleCreateFields",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleCreateRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleDeleteRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleListRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleScope",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleSnapshot",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleUpdateFields",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.gitlab.ScheduleUpdateRequest",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.inventory.ContainerImage",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.inventory.DeploymentSummary",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.inventory.NamespaceInventory",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.inventory.WorkloadInventory",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.ApprovalPosture",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.Audit.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.AuditRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.AuthenticationAttemptState",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.AuthenticationNeed",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.AuthenticationNextAction",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.AuthenticationRequired",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.CallRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.ConditionalRateAdvice",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.CredentialReadiness",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.EffectClass",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.EndpointRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.ExecutionRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.Grant.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.GrantRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.Invocation.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.OperationRateAdvice",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.OperationRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.Proxy.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.ProxyRef",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.RateLimitObservation",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.Session.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.SessionTermination",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.runtime.SipDial.State",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "domain_type",
+      "source": "connectors.target.Target",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.catalog.Catalog",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.catalog.Operation",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.catalog.Provider",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.deployment.Credential",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.deployment.Integration",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.endpoint.DiscoveryObservation",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.endpoint.Endpoint",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.endpoint.EndpointCandidate",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.endpoint.EventReceiver",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.endpoint.SetupSession",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.event.Delivery",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.event.Event",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.event.Subscription",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.event.Webhook",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.runtime.Audit",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.runtime.Grant",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.runtime.Invocation",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.runtime.Proxy",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.runtime.Session",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "entity_lifecycle",
+      "source": "connectors.runtime.SipDial",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.ActivateCandidate",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.ActivateCandidate",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "no candidate is stored under this reference"
+        },
+        "contract": "given `connectors.endpoint.ActivateCandidate` input, decide and enact exactly one outcome — `activated` otherwise, takes `activate` of `connectors.endpoint.EndpointCandidate`, emits `connectors.endpoint.CandidateActivated`; `not-found` externally decided (no candidate is stored under this reference), error `connectors.endpoint.CandidateNotFound`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.AuthorizeEndpoint",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.AuthorizeEndpoint",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.endpoint.AuthorizeEndpoint` input, decide and enact exactly one outcome — `authorized` otherwise, takes `authorize` of `connectors.endpoint.Endpoint`, emits `connectors.endpoint.EndpointAuthorized`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.ConnectEventReceiver",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.ConnectEventReceiver",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.endpoint.ConnectEventReceiver` input, decide and enact exactly one outcome — `connected` otherwise, takes `attach` of `connectors.endpoint.EventReceiver`, emits `connectors.endpoint.EventReceiverConnected`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.CreateSetupSession",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.CreateSetupSession",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "the bounded pending set is already at `maximum_pending`"
+        },
+        "contract": "given `connectors.endpoint.CreateSetupSession` input, decide and enact exactly one outcome — `pending` otherwise, creates `connectors.endpoint.SetupSession`, emits `connectors.endpoint.SetupSessionCreated`; `at-capacity` externally decided (the bounded pending set is already at `maximum_pending`), error `connectors.endpoint.SetupSessionCapacity`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.FinishSetupSession",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.FinishSetupSession",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "the session outlived its `expires_at_unix_ms`"
+        },
+        "contract": "given `connectors.endpoint.FinishSetupSession` input, decide and enact exactly one outcome — `completed` otherwise, takes `complete` of `connectors.endpoint.SetupSession`, emits `connectors.endpoint.SetupSessionCompleted`; `expired` externally decided (the session outlived its `expires_at_unix_ms`), takes `expire` of `connectors.endpoint.SetupSession`, emits `connectors.endpoint.SetupSessionExpired`; `failed` externally decided (the acquisition attempt failed, or the process shut down with the session still pending), takes `fail` of `connectors.endpoint.SetupSession`, emits `connectors.endpoint.SetupSessionFailed`; `not-pending` from a state no declared move starts in, error `connectors.endpoint.SetupSessionNotPending`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.MaterializeObservation",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.MaterializeObservation",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "no observation is stored under this reference"
+        },
+        "contract": "given `connectors.endpoint.MaterializeObservation` input, decide and enact exactly one outcome — `materialized` otherwise, takes `materialize` of `connectors.endpoint.DiscoveryObservation`, emits `connectors.endpoint.ObservationMaterialized`; `not-found` externally decided (no observation is stored under this reference), error `connectors.endpoint.ObservationNotFound`; `no-longer-current` externally decided (the observation was deactivated by a later refresh pass), error `connectors.endpoint.ObservationNoLongerCurrent`; `not-granted` externally decided (the observed type has no target Provider contract, or that Provider has no independent Connector Grant), error `connectors.endpoint.MaterializationNotGranted`; `unavailable` externally decided (durable inventory storage refused the new child projection), error `connectors.endpoint.MaterializationUnavailable`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.ReauthorizeEndpoint",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.ReauthorizeEndpoint",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.endpoint.ReauthorizeEndpoint` input, decide and enact exactly one outcome — `reauthorized` otherwise, takes `reauthorize` of `connectors.endpoint.Endpoint`, emits `connectors.endpoint.EndpointReauthorized`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.ReconnectEventReceiver",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.ReconnectEventReceiver",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.endpoint.ReconnectEventReceiver` input, decide and enact exactly one outcome — `reconnecting` otherwise, takes `supervise` of `connectors.endpoint.EventReceiver`, emits `connectors.endpoint.EventReceiverReconnecting`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.RefreshObservation",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.RefreshObservation",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "the re-seen observation still carries the `endpoint_ref` a materialization set"
+        },
+        "contract": "given `connectors.endpoint.RefreshObservation` input, decide and enact exactly one outcome — `reobserved` otherwise, takes `reobserve` of `connectors.endpoint.DiscoveryObservation`, emits `connectors.endpoint.ObservationReobserved`; `rematerialized` externally decided (the re-seen observation still carries the `endpoint_ref` a materialization set), takes `rematerialize` of `connectors.endpoint.DiscoveryObservation`, emits `connectors.endpoint.ObservationReobserved`; `withdrawn` externally decided (the refresh pass no longer sees the resource this observation was read from), takes `withdraw` of `connectors.endpoint.DiscoveryObservation`, emits `connectors.endpoint.ObservationWithdrawn`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.RevokeEndpoint",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.RevokeEndpoint",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.endpoint.RevokeEndpoint` input, decide and enact exactly one outcome — `revoked` otherwise, takes `revoke` of `connectors.endpoint.Endpoint`, emits `connectors.endpoint.EndpointRevoked`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.StopEventReceiver",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.StopEventReceiver",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.endpoint.StopEventReceiver` input, decide and enact exactly one outcome — `stopped` otherwise, takes `stop` of `connectors.endpoint.EventReceiver`, emits `connectors.endpoint.EventReceiverStopped`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.SuperviseEventReceiver",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.SuperviseEventReceiver",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.endpoint.SuperviseEventReceiver` input, decide and enact exactly one outcome — `starting` otherwise, creates `connectors.endpoint.EventReceiver`, emits `connectors.endpoint.EventReceiverStarting`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.endpoint.VerifyEndpoint",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.endpoint.VerifyEndpoint",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "the provider reports the credential expired or was revoked upstream"
+        },
+        "contract": "given `connectors.endpoint.VerifyEndpoint` input, decide and enact exactly one outcome — `callable` otherwise, takes `verify` of `connectors.endpoint.Endpoint`, emits `connectors.endpoint.EndpointBecameCallable`; `degraded` externally decided (the provider reports the credential expired or was revoked upstream), takes `degrade` of `connectors.endpoint.Endpoint`, emits `connectors.endpoint.EndpointDegraded`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.runtime.InvokeOperation",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.runtime.InvokeOperation",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "the grant, the approval gate or the provider refuses the call"
+        },
+        "contract": "given `connectors.runtime.InvokeOperation` input, decide and enact exactly one outcome — `established` otherwise, takes `establish` of `connectors.runtime.Session`, emits `connectors.runtime.SessionEstablished`; `refused` externally decided (the grant, the approval gate or the provider refuses the call), error `connectors.runtime.OperationRefused`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.runtime.SettleSession",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.runtime.SettleSession",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "unspecified_algorithm"
+        },
+        "contract": "given `connectors.runtime.SettleSession` input, decide and enact exactly one outcome — `terminated` otherwise, takes `settle` of `connectors.runtime.Session`, emits `connectors.runtime.SessionTerminated`"
+      }
+    },
+    {
+      "kind": "command_contract",
+      "source": "connectors.runtime.TerminateSession",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "command_behavior",
+      "source": "connectors.runtime.TerminateSession",
+      "disposition": {
+        "disposition": "obligation",
+        "reason": {
+          "class": "external",
+          "cause": "no session is held under this execution reference"
+        },
+        "contract": "given `connectors.runtime.TerminateSession` input, decide and enact exactly one outcome — `terminating` otherwise, takes `terminate` of `connectors.runtime.Session`, emits `connectors.runtime.SessionTerminating`; `not-found` externally decided (no session is held under this execution reference), error `connectors.runtime.SessionNotFound`; `unavailable` externally decided (the audit journal could not record the termination request), error `connectors.runtime.RuntimeUnavailable`"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.CandidateActivated",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EndpointAuthorized",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EndpointBecameCallable",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EndpointDegraded",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EndpointReauthorized",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EndpointRevoked",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EventReceiverConnected",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EventReceiverReconnecting",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EventReceiverStarting",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.EventReceiverStopped",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.ObservationMaterialized",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.ObservationReobserved",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.ObservationWithdrawn",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.SetupSessionCompleted",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.SetupSessionCreated",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.SetupSessionExpired",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.endpoint.SetupSessionFailed",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.runtime.SessionEstablished",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.runtime.SessionTerminated",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "event_type",
+      "source": "connectors.runtime.SessionTerminating",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.endpoint.CandidateNotFound",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.endpoint.MaterializationNotGranted",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.endpoint.MaterializationUnavailable",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.endpoint.ObservationNoLongerCurrent",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.endpoint.ObservationNotFound",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.endpoint.SetupSessionCapacity",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.endpoint.SetupSessionNotPending",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.runtime.OperationRefused",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.runtime.RuntimeUnavailable",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.runtime.SessionNotFound",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "error_type",
+      "source": "connectors.runtime.SessionOutcomeUnknown",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "component_port",
+      "source": "catalog-build",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "component_port",
+      "source": "connectors-cli",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "component_port",
+      "source": "connectors-service",
+      "disposition": {
+        "disposition": "generated"
+      }
+    },
+    {
+      "kind": "component_transport",
+      "source": "connectors-service",
+      "disposition": {
+        "disposition": "generated"
+      }
+    }
+  ]
+}

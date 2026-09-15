@@ -34,7 +34,7 @@ pub(super) async fn dispatch_admitted(
     invoke: InvokeRequest,
 ) -> Result<OperationResult, OperationError> {
     if operation.operation() != invoke.operation_ref
-        || operation.connection() != invoke.endpoint_ref
+        || operation.connection() != invoke.connection_ref
     {
         return Err(OperationError::new(
             OperationErrorCode::NotGranted,
@@ -64,7 +64,7 @@ pub(super) async fn dispatch_admitted_signal(
         return Err(signal_proof_gap());
     };
     if operation.operation() != session.operation_ref
-        || operation.connection() != session.endpoint_ref
+        || operation.connection() != session.connection_ref
         || session.execution_ref != signal.execution_ref
     {
         return Err(signal_proof_gap());

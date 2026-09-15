@@ -73,6 +73,7 @@ pub struct SearchRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DescribeRequest {
+    #[serde(rename = "connection_ref")]
     pub endpoint_ref: String,
 }
 
@@ -168,7 +169,10 @@ pub enum RouteAdapter {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EndpointRoute {
     Direct,
+    /// Wire tag and field keep the published v0alpha1/v0alpha2 names; only the Rust names migrated.
+    #[serde(rename = "via_connection")]
     ViaEndpoint {
+        #[serde(rename = "parent_connection_ref")]
         parent_endpoint_ref: String,
         route_adapter: RouteAdapter,
     },
@@ -186,6 +190,7 @@ pub struct ChannelSummary {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EndpointSummary {
+    #[serde(rename = "connection_ref")]
     pub endpoint_ref: String,
     pub integration_ref: String,
     pub label: String,
@@ -234,7 +239,7 @@ pub struct EndpointCandidateSummary {
     pub title: String,
     pub state: EndpointCandidateState,
     pub evidence_sha256: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, rename = "connection_ref", skip_serializing_if = "Option::is_none")]
     pub endpoint_ref: Option<String>,
 }
 
@@ -254,7 +259,7 @@ pub struct DiscoveryObservationSummary {
     pub evidence_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_provider_ref: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, rename = "connection_ref", skip_serializing_if = "Option::is_none")]
     pub endpoint_ref: Option<String>,
 }
 
@@ -283,7 +288,7 @@ pub struct ConnectSessionStatus {
     /// Optional one-use browser setup page. Provider credentials post directly to Connectors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub browser_completion_url: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, rename = "connection_ref", skip_serializing_if = "Option::is_none")]
     pub endpoint_ref: Option<String>,
 }
 

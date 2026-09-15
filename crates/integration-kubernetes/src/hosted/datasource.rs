@@ -286,7 +286,7 @@ impl ConnectorBackend for KubernetesStatusBackend {
                 matches!(
                     request.operation_ref.as_str(),
                     STATUS_OPERATION | RESTART_OPERATION | LOGS_OPERATION
-                ) && request.endpoint_ref == CONNECTION
+                ) && request.connection_ref == CONNECTION
             }
             OperationRequest::Search(_)
             | OperationRequest::SessionStatus(_)

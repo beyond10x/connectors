@@ -77,7 +77,7 @@ fn accepted_commands() -> BTreeSet<String> {
         }
     }
     assert!(
-        accepted.contains("connectors.connection.ActivateCandidate"),
+        accepted.contains("connectors.endpoint.ActivateCandidate"),
         "the `accepts.commands` extraction found {} entries and not the one this file names; the \
          block moved, so read it again: {accepted:?}",
         accepted.len()

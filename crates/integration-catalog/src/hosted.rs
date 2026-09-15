@@ -666,7 +666,7 @@ impl ConnectorBackend for HostedCatalogBackend {
             OperationRequest::Invoke(request) => lock(&self.inner.metadata)
                 .endpoints
                 .iter()
-                .any(|connection| connection.endpoint_ref == request.endpoint_ref),
+                .any(|connection| connection.endpoint_ref == request.connection_ref),
             _ => false,
         }
     }

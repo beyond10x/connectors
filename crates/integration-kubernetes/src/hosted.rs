@@ -20,7 +20,7 @@ use protocol::datasource::{
     SearchRequest as DatasourceSearchRequest,
 };
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary, DescribeRequest, EffectClass, InvocationResult,
+    ApprovalPosture, ConnectionSummary, DescribeRequest, EffectClass, InvocationResult,
     InvokeRequest, OperationDescription, OperationError, OperationErrorCode, OperationRequest,
     OperationResult, OperationSummary,
 };
@@ -293,7 +293,7 @@ impl KubernetesStatusBackend {
             }),
             effect: EffectClass::ReadOnly,
             approval: ApprovalPosture::NotRequired,
-            endpoints: vec![connection()],
+            connections: vec![connection()],
             description_ref: description_ref(context, STATUS_OPERATION),
         });
         }
@@ -326,7 +326,7 @@ impl KubernetesStatusBackend {
                 }),
                 effect: EffectClass::Mutating,
                 approval: ApprovalPosture::Required,
-                endpoints: vec![connection()],
+                connections: vec![connection()],
                 description_ref: description_ref(context, RESTART_OPERATION),
             });
         }
@@ -346,7 +346,7 @@ impl KubernetesStatusBackend {
         context: &PrincipalContext,
         request: InvokeRequest,
     ) -> Result<OperationResult, OperationError> {
-        if request.endpoint_ref != CONNECTION {
+        if request.connection_ref != CONNECTION {
             return Err(not_granted(
                 "Kubernetes operation authority is stale or not granted",
             ));
@@ -1113,7 +1113,7 @@ fn status_summary() -> OperationSummary {
         title: "Read Kubernetes deployment status".to_owned(),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        endpoints: vec![connection()],
+        connections: vec![connection()],
     }
 }
 
@@ -1123,7 +1123,7 @@ fn logs_summary() -> OperationSummary {
         title: "Read Kubernetes pod logs".to_owned(),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        endpoints: vec![connection()],
+        connections: vec![connection()],
     }
 }
 
@@ -1133,13 +1133,13 @@ fn restart_summary() -> OperationSummary {
         title: "Restart a Kubernetes Deployment rollout".to_owned(),
         effect: EffectClass::Mutating,
         approval: ApprovalPosture::Required,
-        endpoints: vec![connection()],
+        connections: vec![connection()],
     }
 }
 
-fn connection() -> EndpointSummary {
-    EndpointSummary {
-        endpoint_ref: CONNECTION.to_owned(),
+fn connection() -> ConnectionSummary {
+    ConnectionSummary {
+        connection_ref: CONNECTION.to_owned(),
         label: "Development cluster".to_owned(),
         provider: "kubernetes".to_owned(),
         audiences: vec!["operations".to_owned()],

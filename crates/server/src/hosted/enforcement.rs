@@ -210,7 +210,7 @@ impl HostedAuthority {
         let evaluated = self.evaluate_operation(
             principal,
             &invoke.operation_ref,
-            &invoke.endpoint_ref,
+            &invoke.connection_ref,
             description,
             &input_digest,
         );
@@ -320,7 +320,7 @@ impl HostedAuthority {
             .evaluate_operation(
                 principal,
                 &session.operation_ref,
-                &session.endpoint_ref,
+                &session.connection_ref,
                 description,
                 &input_digest,
             )
@@ -354,9 +354,9 @@ impl HostedAuthority {
         // caller invokes over — never from the caller's claims. A Connection the description
         // does not carry admits nothing.
         let provider = description
-            .endpoints
+            .connections
             .iter()
-            .find(|connection| connection.endpoint_ref == endpoint_ref)
+            .find(|connection| connection.connection_ref == endpoint_ref)
             .map(|connection| connection.provider.clone())
             .ok_or(GrantRefusal::Refused)?;
         let connection =
@@ -421,7 +421,7 @@ impl HostedAuthority {
             kind,
             principal,
             &session.operation_ref,
-            &session.endpoint_ref,
+            &session.connection_ref,
             &session.execution_ref,
             input_digest,
         )
@@ -473,7 +473,7 @@ impl HostedAuthority {
         let invocation = ApprovalInvocation {
             subject: principal.subject.clone(),
             operation: invoke.operation_ref.clone(),
-            connection: invoke.endpoint_ref.clone(),
+            connection: invoke.connection_ref.clone(),
             input_digest: input_digest.to_owned(),
             now_seconds: now_seconds(),
         };

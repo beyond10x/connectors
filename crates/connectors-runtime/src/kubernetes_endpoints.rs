@@ -146,7 +146,7 @@ impl KubernetesEndpointBackend {
         &self,
         context: &PrincipalContext,
         provider: &str,
-    ) -> Result<Vec<operation::EndpointSummary>, OperationError> {
+    ) -> Result<Vec<operation::ConnectionSummary>, OperationError> {
         Ok(self
             .callable(context)?
             .iter()
@@ -160,7 +160,7 @@ impl KubernetesEndpointBackend {
         context: &PrincipalContext,
         request: operation::InvokeRequest,
     ) -> Result<InvocationResult, OperationError> {
-        let endpoint = self.by_connection(context, &request.endpoint_ref)?;
+        let endpoint = self.by_connection(context, &request.connection_ref)?;
         if request.description_ref != self.description_ref(context, &request.operation_ref) {
             return Err(operation_refused());
         }
@@ -271,7 +271,7 @@ impl KubernetesEndpointBackend {
                 connector_audit_ref: audit(
                     context,
                     &request.operation_ref,
-                    &request.endpoint_ref,
+                    &request.connection_ref,
                 ),
                 execution_ref: None,
             });
@@ -291,12 +291,12 @@ impl KubernetesEndpointBackend {
         let (config, secrets) = http_credentials(context, provider, &credentials).await?;
         let egress = self
             .egress
-            .transport(&request.endpoint_ref, &route)
+            .transport(&request.connection_ref, &route)
             .map_err(operation_error)?;
         admitted
             .execute(
                 context.tenant_id(),
-                &request.endpoint_ref,
+                &request.connection_ref,
                 route.logical_url.as_str(),
                 &config,
                 &secrets,
@@ -535,7 +535,7 @@ impl ConnectorBackend for KubernetesEndpointBackend {
             .is_some_and(|operation| {
                 self.source.list().is_ok_and(|endpoints| {
                     endpoints.iter().any(|endpoint| {
-                        endpoint_ref(endpoint) == request.endpoint_ref
+                        endpoint_ref(endpoint) == request.connection_ref
                             && endpoint.provider.as_deref() == Some(operation.provider)
                     })
                 })
@@ -601,10 +601,10 @@ impl ConnectorBackend for KubernetesEndpointBackend {
         }
     }
 
-    fn owns_endpoint(&self, request: &connection::EndpointRequest) -> bool {
+    fn owns_endpoint(&self, request: &endpoint::EndpointRequest) -> bool {
         match request {
-            connection::EndpointRequest::Search(_) => true,
-            connection::EndpointRequest::Describe(request) => {
+            endpoint::EndpointRequest::Search(_) => true,
+            endpoint::EndpointRequest::Describe(request) => {
                 self.source.list().is_ok_and(|endpoints| {
                     endpoints
                         .iter()
@@ -618,17 +618,17 @@ impl ConnectorBackend for KubernetesEndpointBackend {
     async fn handle_endpoint(
         &self,
         context: &PrincipalContext,
-        request: connection::EndpointRequest,
-    ) -> Result<connection::EndpointResult, connection::EndpointError> {
+        request: endpoint::EndpointRequest,
+    ) -> Result<endpoint::EndpointResult, endpoint::EndpointError> {
         let refused = || {
-            connection::EndpointError::new(
-                connection::EndpointErrorCode::NotGranted,
+            endpoint::EndpointError::new(
+                endpoint::EndpointErrorCode::NotGranted,
                 "endpoint Connection is not admitted",
                 false,
             )
         };
         match request {
-            connection::EndpointRequest::Search(request) => {
+            endpoint::EndpointRequest::Search(request) => {
                 let endpoints = self
                     .callable(context)
                     .map_err(|_| refused())?
@@ -642,14 +642,14 @@ impl ConnectorBackend for KubernetesEndpointBackend {
                     .take(usize::from(request.limit))
                     .map(endpoint_summary)
                     .collect();
-                Ok(connection::EndpointResult::Search { endpoints })
+                Ok(endpoint::EndpointResult::Search { endpoints })
             }
-            connection::EndpointRequest::Describe(request) => {
+            endpoint::EndpointRequest::Describe(request) => {
                 let endpoint = self
                     .by_connection(context, &request.endpoint_ref)
                     .map_err(|_| refused())?;
-                Ok(connection::EndpointResult::Describe(
-                    connection::EndpointDescription {
+                Ok(endpoint::EndpointResult::Describe(
+                    endpoint::EndpointDescription {
                         summary: endpoint_summary(&endpoint),
                         channels: Vec::new(),
                     },
@@ -667,9 +667,9 @@ fn endpoint_ref(endpoint: &EndpointInventoryEntry) -> String {
     )
 }
 
-fn operation_connection(endpoint: &EndpointInventoryEntry) -> operation::EndpointSummary {
-    operation::EndpointSummary {
-        endpoint_ref: endpoint_ref(endpoint),
+fn operation_connection(endpoint: &EndpointInventoryEntry) -> operation::ConnectionSummary {
+    operation::ConnectionSummary {
+        connection_ref: endpoint_ref(endpoint),
         label: endpoint.resource_name.clone(),
         provider: endpoint.provider.clone().unwrap_or_default(),
         audiences: Vec::new(),
@@ -677,14 +677,14 @@ fn operation_connection(endpoint: &EndpointInventoryEntry) -> operation::Endpoin
     }
 }
 
-fn endpoint_summary(endpoint: &EndpointInventoryEntry) -> connection::EndpointSummary {
-    connection::EndpointSummary {
+fn endpoint_summary(endpoint: &EndpointInventoryEntry) -> endpoint::EndpointSummary {
+    endpoint::EndpointSummary {
         endpoint_ref: endpoint_ref(endpoint),
         integration_ref: endpoint.provider.clone().unwrap_or_default(),
         label: endpoint.resource_name.clone(),
-        state: connection::EndpointState::Authorized,
-        initiation: vec![connection::EndpointInitiator::Platform],
-        route: connection::EndpointRoute::Direct,
+        state: endpoint::EndpointState::Authorized,
+        initiation: vec![endpoint::EndpointInitiator::Platform],
+        route: endpoint::EndpointRoute::Direct,
         scope: None,
         actor: None,
         auth_profile: None,

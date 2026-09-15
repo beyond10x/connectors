@@ -167,13 +167,13 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
     ("daemon start", Unspecified::Lifecycle, "starts the local daemon process"),
     ("daemon status", Unspecified::Read, "reads local daemon lifecycle status"),
     ("daemon stop", Unspecified::Lifecycle, "stops the local daemon process"),
-    ("endpoint list", Unspecified::Read, "reads discovered service interfaces"),
-    ("endpoint show", Unspecified::Read, "reads one endpoint and its readiness"),
-    ("endpoint refresh", Unspecified::Flow, "reconciles configured discovery sources"),
-    ("endpoint bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
+    ("inventory list", Unspecified::Read, "reads discovered service interfaces"),
+    ("inventory show", Unspecified::Read, "reads one endpoint and its readiness"),
+    ("inventory refresh", Unspecified::Flow, "reconciles configured discovery sources"),
+    ("inventory bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
     // Under `connection`.
     (
-        "connection list",
+        "endpoint list",
         Unspecified::Read,
         "a read of non-secret Connection summaries",
     ),
@@ -278,7 +278,7 @@ fn accepted_commands() -> BTreeSet<String> {
         }
     }
     assert!(
-        accepted.contains("connectors.connection.ActivateCandidate"),
+        accepted.contains("connectors.endpoint.ActivateCandidate"),
         "the `accepts.commands` extraction found {} entries and not the one this file names in a \
          reason; the block moved, so read it again: {accepted:?}",
         accepted.len()
@@ -351,7 +351,7 @@ fn words_the_specification_can_type() -> BTreeSet<String> {
     assert!(
         words.contains("invoke")
             && words.contains("connect_session_create")
-            && words.contains("SuperviseChannel"),
+            && words.contains("SuperviseEventReceiver"),
         "the typed-word extraction read {words:?} out of ess/system/domains and not the two `naming.wire` values and the one un-cased last segment this file names; the blocks moved, so read them again"
     );
     words
@@ -414,7 +414,7 @@ fn protocol_request_variants() -> BTreeMap<String, BTreeSet<String>> {
         );
     }
     assert!(
-        declared.len() >= 5 && declared["connection"].contains("CandidateSearch"),
+        declared.len() >= 5 && declared["endpoint"].contains("CandidateSearch"),
         "the request enums of crates/protocol/src were read as {declared:?}; the modules moved, \
          so read them again before believing any result from a check that uses this"
     );
@@ -1208,10 +1208,10 @@ fn the_copies_this_probe_carries_are_still_copies() {
 ///
 /// `docs/design/19-the-cli-surface.md` states the rule twice and measures it once: "a command's
 /// typed word is its `naming.wire`, or the qualified name's last segment, verbatim and un-cased",
-/// and a `cli:` block over the whole accepted surface "produced `SuperviseChannel`,
+/// and a `cli:` block over the whole accepted surface "produced `SuperviseEventReceiver`,
 /// `ReconnectChannel`, `ConnectChannel`, `StopChannel`, `AuthorizeEndpoint`, ... as words at a
 /// shell". `ess/system/components.yaml` names three of the same words — "Placing them would emit
-/// `SuperviseChannel`, `FinishConnectSession` and `SettleSession` as words at a shell — measured,
+/// `SuperviseEventReceiver`, `FinishSetupSession` and `SettleSession` as words at a shell — measured,
 /// not supposed".
 ///
 /// `words_the_specification_can_type` is the set that decides whether an `Unmodelled` exception is

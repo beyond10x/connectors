@@ -71,9 +71,9 @@ pub fn constrain_endpoint_description(
         ));
     };
     description
-        .endpoints
-        .retain(|value| value.endpoint_ref == connection);
-    if description.endpoints.len() != 1 {
+        .connections
+        .retain(|value| value.connection_ref == connection);
+    if description.connections.len() != 1 {
         return Err(OperationError::new(
             OperationErrorCode::NotGranted,
             "the operation is not admitted for this endpoint",

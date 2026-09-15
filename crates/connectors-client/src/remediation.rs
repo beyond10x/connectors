@@ -428,8 +428,8 @@ impl LocalClient {
             return Err(ClientError::RemediationRefused);
         };
         if description.operation_ref != pending.operation_ref
-            || !description.endpoints.iter().any(|binding| {
-                binding.endpoint_ref == pending.endpoint_ref
+            || !description.connections.iter().any(|binding| {
+                binding.connection_ref == pending.endpoint_ref
                     && binding.provider == pending.integration_ref
                     && binding
                         .purpose

@@ -120,9 +120,9 @@ impl McpBackend {
         }
     }
 
-    fn connection() -> protocol::operation::EndpointSummary {
-        protocol::operation::EndpointSummary {
-            endpoint_ref: K8S_CONNECTION.to_owned(),
+    fn connection() -> protocol::operation::ConnectionSummary {
+        protocol::operation::ConnectionSummary {
+            connection_ref: K8S_CONNECTION.to_owned(),
             label: "in-cluster".to_owned(),
             provider: "kubernetes".to_owned(),
             audiences: Vec::new(),
@@ -152,7 +152,7 @@ impl ConnectorBackend for McpBackend {
                         title: "Read one deployment's status".to_owned(),
                         effect,
                         approval,
-                        endpoints: vec![Self::connection()],
+                        connections: vec![Self::connection()],
                     }]
                 } else {
                     Vec::new()
@@ -171,7 +171,7 @@ impl ConnectorBackend for McpBackend {
                     output_schema: json!({"type": "object"}),
                     effect,
                     approval,
-                    endpoints: vec![Self::connection()],
+                    connections: vec![Self::connection()],
                     description_ref: OPERATION_LEASE.to_owned(),
                 }))
             }
@@ -188,7 +188,7 @@ impl ConnectorBackend for McpBackend {
                     );
                 }
                 assert_eq!(request.operation_ref, K8S_OPERATION);
-                assert_eq!(request.endpoint_ref, K8S_CONNECTION);
+                assert_eq!(request.connection_ref, K8S_CONNECTION);
                 if request.description_ref != OPERATION_LEASE {
                     return Err(OperationError::new(
                         OperationErrorCode::StaleAuthority,

@@ -70,7 +70,7 @@ impl Fixture {
                 "invoke",
                 "--operation",
                 "fixture.read",
-                "--connection",
+                "--endpoint-ref",
                 "fixture.connection",
                 "--description-ref",
                 "fixture.description",
@@ -475,7 +475,7 @@ fn stdin_read_errors_stay_unsuccessful_with_a_closed_output_reader() {
                 "invoke",
                 "--operation",
                 "fixture.read",
-                "--connection",
+                "--endpoint-ref",
                 "fixture.connection",
                 "--description-ref",
                 "fixture.description",
@@ -634,7 +634,7 @@ fn admin_authentication_failures_remain_unsuccessful_with_a_closed_reader() {
 fn search_output(group: &str, format: &str, refused: bool, sink: Option<OwnedFd>) -> Output {
     let fixture = Fixture::new();
     let (verb, field) = match group {
-        "connection" => ("list", "endpoints"),
+        "endpoint" => ("list", "endpoints"),
         "event" => ("search", "channels"),
         "operation" => ("search", "operations"),
         _ => unreachable!(),
@@ -704,7 +704,7 @@ fn search_output(group: &str, format: &str, refused: bool, sink: Option<OwnedFd>
 
 #[test]
 fn protocol_refusals_keep_their_failure_when_a_result_reader_closes() {
-    for group in ["connection", "event", "operation"] {
+    for group in ["endpoint", "event", "operation"] {
         for format in FORMATS {
             let control = search_output(group, format, true, None);
             assert!(!control.status.success(), "{group} {format}: {control:?}");
@@ -726,7 +726,7 @@ fn protocol_refusals_keep_their_failure_when_a_result_reader_closes() {
 
 #[test]
 fn each_protocol_search_distinguishes_closed_readers_from_other_write_failures() {
-    for group in ["connection", "event", "operation"] {
+    for group in ["endpoint", "event", "operation"] {
         for format in FORMATS {
             let control = search_output(group, format, false, None);
             assert_success(&control);

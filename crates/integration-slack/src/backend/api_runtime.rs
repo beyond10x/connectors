@@ -722,7 +722,7 @@ impl SlackInner {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-    ) -> Vec<OperationEndpointSummary> {
+    ) -> Vec<OperationConnectionSummary> {
         lock(&self.metadata)
             .endpoints
             .iter()
@@ -730,8 +730,8 @@ impl SlackInner {
             .filter(|connection| self.connection_owned_by(connection, context))
             .filter(|connection| connection.carries_operations)
             .filter(|connection| connection_supports_operation(connection, operation_ref))
-            .map(|connection| OperationEndpointSummary {
-                endpoint_ref: connection.endpoint_ref.clone(),
+            .map(|connection| OperationConnectionSummary {
+                connection_ref: connection.endpoint_ref.clone(),
                 label: connection.label.clone(),
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec![match connection.profile {
@@ -773,7 +773,7 @@ impl SlackInner {
                     title: title.to_owned(),
                     effect: operation_effect(operation_ref),
                     approval: operation_approval(operation_ref),
-                    endpoints: endpoints.clone(),
+                    connections: endpoints.clone(),
                 })
             })
             .collect()
@@ -796,7 +796,7 @@ impl SlackInner {
         digest.update(self.policy.grant_ref.as_bytes());
         for connection in self.operation_connections(context, operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.endpoint_ref.as_bytes());
+            digest.update(connection.connection_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }
@@ -825,7 +825,7 @@ impl SlackInner {
             output_schema: serde_json::json!({"type":"object"}),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
-            endpoints,
+            connections: endpoints,
             description_ref: self.description_ref(context, operation_ref),
         }))
     }
@@ -842,7 +842,7 @@ impl SlackInner {
             .endpoints
             .iter()
             .find(|connection| {
-                connection.endpoint_ref == request.endpoint_ref
+                connection.endpoint_ref == request.connection_ref
                     && self.connection_is_admitted(connection)
                     && self.connection_owned_by(connection, context)
                     && connection_supports_operation(connection, &request.operation_ref)
@@ -931,7 +931,7 @@ impl SlackInner {
         let audit = AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            endpoint_ref: &request.endpoint_ref,
+            endpoint_ref: &request.connection_ref,
             tenant_id: context.tenant_id(),
             actor_subject: context.actor_subject(),
             outcome: "attempted",
@@ -945,7 +945,7 @@ impl SlackInner {
             let response = self
                 .egress
                 .execute(
-                    &request.endpoint_ref,
+                    &request.connection_ref,
                     EgressHttpRequest {
                         request: outbound,
                         maximum_response_bytes: protocol::operation::MAX_RESULT_BYTES,

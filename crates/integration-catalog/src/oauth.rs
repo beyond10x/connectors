@@ -17,7 +17,7 @@ use connector_oauth::{TokenPolicy, TokenResponse, ValidatedToken};
 use connector_secrets::{CredentialRef, FileStore, Secret, SecretStore};
 use connector_state::StateStore;
 use connectors_config::{CatalogIntegrationConfig, PersonalOAuthFlow, PersonalOAuthRegistration};
-use protocol::{connection as connection_api, operation as operation_api};
+use protocol::{endpoint as connection_api, operation as operation_api};
 use serde::{Deserialize, Serialize};
 use service::{
     ConnectSessionLifecycle, ConnectSessionTerminal, ConnectorBackend, EgressHttpRequest,
@@ -967,11 +967,11 @@ impl OAuthInner {
                 if !lock(&binding.authority)?.operation(operation, &publication.evidence) {
                     continue;
                 }
-                for connection in &mut summary.endpoints {
+                for connection in &mut summary.connections {
                     connection.purpose = Some(binding.policy.registration.auth_profile.clone());
                 }
                 if let Some(existing) = merged.get_mut(&summary.operation_ref) {
-                    existing.endpoints.extend(summary.endpoints);
+                    existing.connections.extend(summary.connections);
                 } else {
                     merged.insert(summary.operation_ref.clone(), summary);
                 }
@@ -1010,13 +1010,13 @@ impl OAuthInner {
                         })
                     });
             if !admitted {
-                description.endpoints.clear();
+                description.connections.clear();
             }
-            for connection in &mut description.endpoints {
+            for connection in &mut description.connections {
                 connection.purpose = Some(binding.policy.registration.auth_profile.clone());
             }
             if let Some(existing) = &mut result {
-                existing.endpoints.extend(description.endpoints);
+                existing.connections.extend(description.connections);
             } else {
                 result = Some(description);
             }
@@ -1036,7 +1036,7 @@ impl OAuthInner {
     ) -> std::result::Result<&'static catalog::Operation, operation_api::OperationError> {
         let (operation, raw) = binding.delegate.inner.admit_invocation(
             &request.operation_ref,
-            &request.endpoint_ref,
+            &request.connection_ref,
             &request.description_ref,
             &request.input,
         )?;
@@ -1080,7 +1080,7 @@ impl OAuthInner {
         let binding = self
             .bindings
             .iter()
-            .find(|binding| binding.custody.identity.connection == request.endpoint_ref)
+            .find(|binding| binding.custody.identity.connection == request.connection_ref)
             .ok_or_else(|| operation_error(PersonalOAuthError::Refused))?;
         let guard = binding.gate.lock().await;
         let operation = self.admit_invocation(binding, &request)?;
@@ -1120,7 +1120,7 @@ impl OAuthInner {
             .inner
             .invoke(
                 &request.operation_ref,
-                &request.endpoint_ref,
+                &request.connection_ref,
                 &request.description_ref,
                 request.input,
             )
@@ -1254,7 +1254,7 @@ impl ConnectorBackend for PersonalOAuthBackend {
                 .any(|binding| binding.delegate.owns_operation_ref(&request.operation_ref)),
             operation_api::OperationRequest::Invoke(request) => {
                 self.inner.bindings.iter().any(|binding| {
-                    binding.custody.identity.connection == request.endpoint_ref
+                    binding.custody.identity.connection == request.connection_ref
                         && binding.delegate.owns_operation_ref(&request.operation_ref)
                 })
             }
@@ -1315,7 +1315,7 @@ impl ConnectorBackend for PersonalOAuthBackend {
 
     fn supports_ephemeral_invocation(&self, request: &operation_api::InvokeRequest) -> bool {
         self.inner.bindings.iter().any(|binding| {
-            binding.custody.identity.connection == request.endpoint_ref
+            binding.custody.identity.connection == request.connection_ref
                 && binding.delegate.supports_ephemeral_invocation(request)
         })
     }

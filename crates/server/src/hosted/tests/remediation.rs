@@ -67,8 +67,8 @@ impl RemediationBackend {
             } else {
                 ApprovalPosture::Required
             },
-            endpoints: vec![protocol::operation::EndpointSummary {
-                endpoint_ref: CONNECTION.into(),
+            connections: vec![protocol::operation::ConnectionSummary {
+                connection_ref: CONNECTION.into(),
                 label: "Fixture Connection".into(),
                 provider: operation.provider.into(),
                 audiences: Vec::new(),
@@ -366,7 +366,7 @@ async fn auth_v3_requires_a_real_grant_and_keeps_unknown_targets_opaque() {
     let unknown_operation = request("auth-unconfigured-operation", None);
     let mut unknown_connection = request(READ, None);
     if let OperationRequest::Invoke(invoke) = &mut unknown_connection.request {
-        invoke.endpoint_ref = "connection:unknown".into();
+        invoke.connection_ref = "connection:unknown".into();
     }
     let mut bodies = Vec::new();
     for frame in [unadmitted, unknown_operation, unknown_connection] {

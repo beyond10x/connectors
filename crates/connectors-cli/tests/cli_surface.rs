@@ -186,13 +186,13 @@ const UNSPECIFIED_PATHS: &[(&str, Unspecified, &str)] = &[
     ("daemon start", Unspecified::Lifecycle, "starts the local daemon process"),
     ("daemon status", Unspecified::Read, "reads local daemon lifecycle status"),
     ("daemon stop", Unspecified::Lifecycle, "stops the local daemon process"),
-    ("endpoint list", Unspecified::Read, "reads discovered service interfaces"),
-    ("endpoint show", Unspecified::Read, "reads one endpoint and its readiness"),
-    ("endpoint refresh", Unspecified::Flow, "reconciles configured discovery sources"),
-    ("endpoint bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
+    ("inventory list", Unspecified::Read, "reads discovered service interfaces"),
+    ("inventory show", Unspecified::Read, "reads one endpoint and its readiness"),
+    ("inventory refresh", Unspecified::Flow, "reconciles configured discovery sources"),
+    ("inventory bind", Unspecified::Flow, "records an explicit endpoint provider binding"),
     // Under `connection`.
     (
-        "connection list",
+        "endpoint list",
         Unspecified::Read,
         "a read of non-secret Connection summaries",
     ),
@@ -578,7 +578,7 @@ fn the_target_countdown_is_exactly_what_the_parser_still_owes() {
     // Not a count: the point of deriving the set is that nobody has to know it. This refuses an
     // extraction that has stopped finding request enums at all, which would empty the candidate
     // set and make the countdown pass by finding nothing.
-    for known in ["connection", "event", "operation"] {
+    for known in ["endpoint", "event", "operation"] {
         assert!(
             protocols.contains(known),
             "`deployment_protocol_modules` reads `pub enum …Request` out of crates/protocol/src \
@@ -1189,7 +1189,7 @@ fn accepted_commands() -> BTreeSet<String> {
         }
     }
     assert!(
-        accepted.contains("connectors.connection.ActivateCandidate"),
+        accepted.contains("connectors.endpoint.ActivateCandidate"),
         "the `accepts.commands` extraction found {} entries and not the one this file names in a \
          reason; the block moved, so read it again: {accepted:?}",
         accepted.len()
@@ -1280,7 +1280,7 @@ fn words_the_specification_can_type() -> BTreeSet<String> {
     assert!(
         words.contains("invoke")
             && words.contains("connect_session_create")
-            && words.contains("SuperviseChannel"),
+            && words.contains("SuperviseEventReceiver"),
         "the typed-word extraction read {words:?} out of ess/system/domains and not the two `naming.wire` values and the one un-cased last segment this file names; the blocks moved, so read them again"
     );
     words
@@ -1385,7 +1385,7 @@ fn protocol_request_variants() -> BTreeMap<String, BTreeSet<String>> {
         );
     }
     assert!(
-        declared.len() >= 5 && declared["connection"].contains("CandidateSearch"),
+        declared.len() >= 5 && declared["endpoint"].contains("CandidateSearch"),
         "the request enums of crates/protocol/src were read as {declared:?}; the modules moved, \
          so read them again before believing any result from a check that uses this"
     );
@@ -1984,7 +1984,7 @@ fn the_exception_list_is_the_set_the_specification_enumerates() {
 /// named the exception list as the first thing to do about it.
 #[test]
 fn a_command_absorbed_into_the_exception_list_alone_is_refused() {
-    let drifted = connectors_cli::command().mut_subcommand("connection", |group| {
+    let drifted = connectors_cli::command().mut_subcommand("endpoint", |group| {
         group.subcommand(clap::Command::new("prune").about("added by nobody's decision"))
     });
     let mut absorbed = UNSPECIFIED_PATHS.to_vec();
@@ -2054,8 +2054,8 @@ fn an_exception_whose_kind_the_tree_contradicts_is_refused() {
 
     let mut read_of_a_command = UNSPECIFIED_PATHS.to_vec();
     for entry in &mut read_of_a_command {
-        if entry.0 == "connection list" {
-            entry.2 = "a read that forwards `connectors.connection.ActivateCandidate`";
+        if entry.0 == "endpoint list" {
+            entry.2 = "a read that forwards `connectors.endpoint.ActivateCandidate`";
         }
     }
     refuses(&read_of_a_command, "which this specification declares");
@@ -2080,19 +2080,19 @@ fn an_exception_whose_kind_the_tree_contradicts_is_refused() {
         "this specification names a command whose typed word is `invoke`",
     );
 
-    // The one the tree answers on its own. `connection list` builds a `EndpointRequest::Search`,
+    // The one the tree answers on its own. `endpoint list` builds a `EndpointRequest::Search`,
     // which `ess/system/components.yaml` enumerates as a read verb that changes no entity, so it
     // is a `Read` whatever anybody writes beside it. Nothing here volunteers a string that
     // incriminates the entry: the kind moves and the reason stays a sentence about a read.
     let mut relabelled = UNSPECIFIED_PATHS.to_vec();
     for entry in &mut relabelled {
-        if entry.0 == "connection list" {
+        if entry.0 == "endpoint list" {
             entry.1 = Unspecified::Lifecycle;
         }
     }
     refuses(
         &relabelled,
-        "`connection list` is excused as `Lifecycle` and the tree says `Read`",
+        "`endpoint list` is excused as `Lifecycle` and the tree says `Read`",
     );
 }
 
@@ -2602,7 +2602,7 @@ impl TargetFixture {
 fn an_omitted_target_ignores_a_saved_login_for_every_dual_target_group() {
     let fixture = TargetFixture::new(true);
     for (group, verb) in [
-        ("connection", "list"),
+        ("endpoint", "list"),
         ("event", "search"),
         ("operation", "search"),
     ] {
@@ -2624,7 +2624,7 @@ fn an_omitted_target_ignores_a_saved_login_for_every_dual_target_group() {
 fn an_explicit_hosted_target_requires_a_login_by_name_for_every_group() {
     let fixture = TargetFixture::new(false);
     for (group, verb) in [
-        ("connection", "list"),
+        ("endpoint", "list"),
         ("event", "search"),
         ("operation", "search"),
     ] {
@@ -2642,7 +2642,7 @@ fn an_explicit_hosted_target_requires_a_login_by_name_for_every_group() {
 fn hosted_refuses_each_local_only_option_for_every_group() {
     let fixture = TargetFixture::new(false);
     for (group, verb) in [
-        ("connection", "list"),
+        ("endpoint", "list"),
         ("event", "search"),
         ("operation", "search"),
     ] {
@@ -2665,7 +2665,7 @@ fn local_success_and_protocol_refusals_report_the_selected_target() {
     use std::io::{BufRead as _, Write as _};
     use std::os::unix::net::UnixListener;
     for (group, verb, field) in [
-        ("connection", "list", "endpoints"),
+        ("endpoint", "list", "endpoints"),
         ("event", "search", "channels"),
         ("operation", "search", "operations"),
     ] {
@@ -2748,7 +2748,7 @@ fn targeted_errors_keep_the_target_in_yaml_and_text() {
 #[test]
 fn the_parser_accepts_target_before_and_after_each_dual_target_leaf() {
     for (group, verb) in [
-        ("connection", "list"),
+        ("endpoint", "list"),
         ("event", "search"),
         ("operation", "search"),
     ] {
@@ -2789,7 +2789,7 @@ fn target_conflict_precedes_invoke_payload_loading() {
             "invoke",
             "--operation",
             "fixture.operation",
-            "--connection",
+            "--endpoint-ref",
             "fixture.connection",
             "--description-ref",
             "fixture.description",
@@ -2825,7 +2825,7 @@ fn target_conflict_precedes_missing_or_malformed_inline_input() {
                 "hosted",
                 "--operation",
                 "fixture.operation",
-                "--connection",
+                "--endpoint-ref",
                 "fixture.connection",
                 "--description-ref",
                 "fixture.description",
@@ -2859,7 +2859,7 @@ fn target_conflict_does_not_wait_for_open_stdin() {
             "hosted",
             "--operation",
             "fixture.operation",
-            "--connection",
+            "--endpoint-ref",
             "fixture.connection",
             "--description-ref",
             "fixture.description",
@@ -2905,7 +2905,7 @@ fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
     use std::io::{BufRead as _, Write as _};
     use std::os::unix::net::UnixListener;
     let leaves: &[(&[&str], &str)] = &[
-        (&["connection", "list"], "search"),
+        (&["endpoint", "list"], "search"),
         (&["event", "search"], "search"),
         (
             &[
@@ -2941,7 +2941,7 @@ fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
                 "invoke",
                 "--operation",
                 "fixture.operation",
-                "--connection",
+                "--endpoint-ref",
                 "fixture.connection",
                 "--description-ref",
                 "fixture.description",
@@ -3027,7 +3027,7 @@ fn every_local_leaf_ignores_broken_login_metadata_and_preserves_its_request() {
 
 fn adversary_target_leaves() -> Vec<Vec<&'static str>> {
     vec![
-        vec!["connection", "list"],
+        vec!["endpoint", "list"],
         vec!["event", "search"],
         vec![
             "event",
@@ -3053,7 +3053,7 @@ fn adversary_target_leaves() -> Vec<Vec<&'static str>> {
             "invoke",
             "--operation",
             "fixture.operation",
-            "--connection",
+            "--endpoint-ref",
             "fixture.connection",
             "--description-ref",
             "fixture.description",
@@ -3219,7 +3219,7 @@ fn selected_target_preserves_provider_owned_target_fields_in_every_renderer() {
             "invoke",
             "--operation",
             "fixture.operation",
-            "--connection",
+            "--endpoint-ref",
             "fixture.connection",
             "--description-ref",
             "fixture.description",

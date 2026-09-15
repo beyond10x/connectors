@@ -400,7 +400,7 @@ async fn auth_stage2_identity_409_does_not_renew_or_resend() {
             .operation(operation::OperationRequest::Invoke(
                 operation::InvokeRequest {
                     operation_ref: "fixture.write".into(),
-                    endpoint_ref: "connection:fixture".into(),
+                    connection_ref: "connection:fixture".into(),
                     description_ref: "description:fixture".into(),
                     input: serde_json::json!({}),
                     approval_evidence_ref: None,

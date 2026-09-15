@@ -111,7 +111,7 @@ fn endpoint_invocation_requires_exactly_one_target_and_the_current_protocol() {
 fn binding_accepts_named_secret_keys_and_refuses_values_without_a_secret_reference() {
     let mut arguments = vec![
         "connectors",
-        "endpoint",
+        "inventory",
         "bind",
         "--endpoint-ref",
         "endpoint:fixture",

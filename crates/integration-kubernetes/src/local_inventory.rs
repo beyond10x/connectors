@@ -4,7 +4,7 @@
 //! template, not Pods, and do not change the existing compact workload datasource projection.
 
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary, EffectClass, InvokeRequest, OperationDescription,
+    ApprovalPosture, ConnectionSummary, EffectClass, InvokeRequest, OperationDescription,
     OperationError, OperationErrorCode, MAX_RESULT_BYTES,
 };
 use serde::{Deserialize, Serialize};
@@ -137,7 +137,7 @@ impl KubernetesLocalBackend {
                 );
             }
             return bounded_value(NamespaceInventory {
-                endpoint_ref: &request.endpoint_ref,
+                endpoint_ref: &request.connection_ref,
                 namespaces: namespaces.into_iter().collect(),
             });
         }
@@ -163,7 +163,7 @@ impl KubernetesLocalBackend {
         // domain-separated key also prevents replay through the separate datasource protocol.
         let cursor_scope = format!(
             "{WORKLOAD_OPERATION}\0{}\0{}",
-            request.endpoint_ref, input.namespace
+            request.connection_ref, input.namespace
         );
         let cursors = &self.workloads.inventory_cursors;
         let provider_cursor = cursors
@@ -196,7 +196,7 @@ impl KubernetesLocalBackend {
             .store(context, &cursor_scope, provider_cursor)
             .map_err(operation_from_datasource)?;
         bounded_value(WorkloadInventory {
-            endpoint_ref: &request.endpoint_ref,
+            endpoint_ref: &request.connection_ref,
             namespace: &input.namespace,
             deployments,
             next_cursor,
@@ -205,7 +205,7 @@ impl KubernetesLocalBackend {
 }
 
 pub(super) fn namespace_operation(
-    endpoints: Vec<EndpointSummary>,
+    endpoints: Vec<ConnectionSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -224,13 +224,13 @@ pub(super) fn namespace_operation(
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        endpoints,
+        connections: endpoints,
         description_ref,
     }
 }
 
 pub(super) fn workload_operation(
-    endpoints: Vec<EndpointSummary>,
+    endpoints: Vec<ConnectionSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -267,7 +267,7 @@ pub(super) fn workload_operation(
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        endpoints,
+        connections: endpoints,
         description_ref,
     }
 }

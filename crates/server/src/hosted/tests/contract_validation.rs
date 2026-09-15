@@ -19,7 +19,7 @@ impl ConnectorBackend for MalformedBackend {
                 title: "Create a conversation room".to_owned(),
                 effect: EffectClass::Mutating,
                 approval: ApprovalPosture::NotRequired,
-                endpoints: Vec::new(),
+                connections: Vec::new(),
             }],
         })
     }
@@ -319,7 +319,7 @@ async fn rate_adversary_hosted_grant_and_approval_refusals_keep_requested_versio
             let OperationRequest::Invoke(invoke) = &mut request.request else {
                 panic!()
             };
-            invoke.endpoint_ref = "connection:todo".into();
+            invoke.connection_ref = "connection:todo".into();
             invoke.description_ref = "description:todo-create-list".into();
             let response = app.oneshot(operation_http_request(&request)).await.unwrap();
             let expected = match case {
@@ -398,7 +398,7 @@ impl ConnectorBackend for FinalDescribeBackend {
                 output_schema: serde_json::json!({"type":"object","properties":{"vendor":{"const":"retained"}}}),
                 effect: EffectClass::ReadOnly,
                 approval: ApprovalPosture::NotRequired,
-                endpoints: vec![],
+                connections: vec![],
                 description_ref: "fixture-description".into(),
                 rate_advice: Some(protocol::operation::OperationRateAdvice {
                     fixed: None,
