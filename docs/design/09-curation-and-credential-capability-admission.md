@@ -139,7 +139,7 @@ tokens may carry `read_api` for reads or `api` for reads and writes. Every read 
 `read_api OR api` on each exact credential purpose; the write declares only `api`.
 
 A developer normally chooses **As myself** (OAuth, with PAT as the explicit alternative). A
-platform or babelforce automation normally chooses **As automation**, then supplies a service
+platform or organization automation normally chooses **As automation**, then supplies a service
 account, group, or project token according to the intended resource boundary. No client-credentials
 grant is invented: GitLab does not offer one for this use case.
 

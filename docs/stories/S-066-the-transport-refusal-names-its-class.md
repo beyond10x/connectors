@@ -56,7 +56,7 @@ step of the diagnosis is blind.
 
 ## Progress
 
-- 2026-08-24, direct probes against https://grafana.infra.babelforce.com with the tenant's
+- 2026-08-24, direct probes against https://grafana.infra.example.com with the tenant's
   Grafana service-account token (read from Vault custody; token never persisted):
   - `grafana_dashboards_list`: the app-platform API answers **200 in 0.45 s**; the full
     namespace listing is **4,615,274 bytes**, and Grafana serves it whole even at

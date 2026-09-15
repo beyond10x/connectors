@@ -1152,8 +1152,8 @@ mod tests {
         // The whole reason a name exists. A random instance id made `connection:slack:<uuid>` and
         // every datasource binding ref change on every restart, so anything that referenced one was
         // dead by the next start. The name a person chose is what pins them.
-        let first = instance_id_for_name("babelforce-bot");
-        assert_eq!(first, instance_id_for_name("babelforce-bot"));
+        let first = instance_id_for_name("acme-bot");
+        assert_eq!(first, instance_id_for_name("acme-bot"));
         assert_ne!(first, instance_id_for_name("timo-ai"));
         // It has to be a canonical uuid, because that is the only shape a credential address
         // admits (`connector-address`, `validate_instance`).

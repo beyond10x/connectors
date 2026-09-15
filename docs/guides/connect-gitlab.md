@@ -97,7 +97,7 @@ the operator who registered the application.
 
 ## As automation
 
-Use a non-human GitLab identity for platform or babelforce automation. Select the narrowest kind:
+Use a non-human GitLab identity for platform or organization automation. Select the narrowest kind:
 
 - **Project access token** for one project.
 - **Group access token** for one group and its projects.

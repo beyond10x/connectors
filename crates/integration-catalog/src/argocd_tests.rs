@@ -104,7 +104,7 @@ impl EgressTransport for FakeArgoCd {
 
 fn project(roles: Value) -> Value {
     serde_json::json!({
-        "metadata": {"name": "babelforce"},
+        "metadata": {"name": "acme"},
         "spec": {
             "description": "payments",
             "sourceRepos": ["*"],
@@ -118,7 +118,7 @@ fn request() -> AcquireRequest {
         origin: "https://argocd.infra.example".to_owned(),
         username: "admin".to_owned(),
         password: Zeroizing::new("hunter2-not-a-real-password".to_owned()),
-        project: "babelforce".to_owned(),
+        project: "acme".to_owned(),
         role: "b10x".to_owned(),
         allow_sync: true,
         expires_in_seconds: DEFAULT_EXPIRES_IN_SECONDS,
@@ -135,9 +135,9 @@ async fn the_four_calls_happen_in_order_and_the_token_comes_back() {
         argocd.paths(),
         vec![
             "POST /api/v1/session",
-            "GET /api/v1/projects/babelforce",
-            "PUT /api/v1/projects/babelforce",
-            "POST /api/v1/projects/babelforce/roles/b10x/token",
+            "GET /api/v1/projects/acme",
+            "PUT /api/v1/projects/acme",
+            "POST /api/v1/projects/acme/roles/b10x/token",
         ]
     );
     assert!(acquired.role_created);
@@ -182,7 +182,7 @@ async fn the_password_appears_once_and_the_session_token_never_persists() {
 async fn an_existing_role_is_reused_and_its_policies_are_left_alone() {
     let existing = serde_json::json!([{
         "name": "b10x",
-        "policies": ["p, proj:babelforce:b10x, applications, get, babelforce/one, allow"],
+        "policies": ["p, proj:acme:b10x, applications, get, acme/one, allow"],
     }]);
     let argocd = FakeArgoCd::new(project(existing));
     let (_, acquired) = acquire(&argocd, request()).await.expect("acquisition");
@@ -192,8 +192,8 @@ async fn an_existing_role_is_reused_and_its_policies_are_left_alone() {
         argocd.paths(),
         vec![
             "POST /api/v1/session",
-            "GET /api/v1/projects/babelforce",
-            "POST /api/v1/projects/babelforce/roles/b10x/token",
+            "GET /api/v1/projects/acme",
+            "POST /api/v1/projects/acme/roles/b10x/token",
         ],
         "no PUT when the role is already there"
     );
@@ -219,15 +219,15 @@ async fn the_project_is_written_back_whole() {
 
 #[test]
 fn read_only_acquisition_carries_no_sync_policy() {
-    let read_only = policies_for("babelforce", "b10x", false);
+    let read_only = policies_for("acme", "b10x", false);
     assert_eq!(
         read_only,
-        vec!["p, proj:babelforce:b10x, applications, get, babelforce/*, allow"]
+        vec!["p, proj:acme:b10x, applications, get, acme/*, allow"]
     );
 
-    let syncing = policies_for("babelforce", "b10x", true);
+    let syncing = policies_for("acme", "b10x", true);
     assert_eq!(syncing.len(), 2);
-    assert!(syncing[1].contains("applications, sync, babelforce/*"));
+    assert!(syncing[1].contains("applications, sync, acme/*"));
 }
 
 /// Argo CD refuses any project-role policy outside its project-scoped resource set and any object
@@ -235,11 +235,11 @@ fn read_only_acquisition_carries_no_sync_policy() {
 /// rejected at the far end where the message is much harder to read.
 #[test]
 fn every_generated_policy_is_one_argo_cd_will_accept() {
-    for policy in policies_for("babelforce", "b10x", true) {
+    for policy in policies_for("acme", "b10x", true) {
         let parts = policy.split(", ").collect::<Vec<_>>();
         assert_eq!(parts.len(), 6, "{policy}");
         assert_eq!(parts[0], "p");
-        assert_eq!(parts[1], "proj:babelforce:b10x");
+        assert_eq!(parts[1], "proj:acme:b10x");
         assert!(
             [
                 "applications",
@@ -252,7 +252,7 @@ fn every_generated_policy_is_one_argo_cd_will_accept() {
             .contains(&parts[2]),
             "{policy} names a resource no project role may carry"
         );
-        assert!(parts[4].starts_with("babelforce/"), "{policy}");
+        assert!(parts[4].starts_with("acme/"), "{policy}");
         assert_eq!(parts[5], "allow");
     }
 }
@@ -278,7 +278,7 @@ async fn a_login_without_projects_update_is_told_which_grant_it_lacks() {
     let AcquireError::NotPermitted(project) = error else {
         panic!("expected a permission refusal, got {error:?}");
     };
-    assert_eq!(project, "babelforce");
+    assert_eq!(project, "acme");
 }
 
 #[tokio::test]
@@ -286,7 +286,7 @@ async fn a_missing_project_is_not_reported_as_a_permission_problem() {
     let mut argocd = FakeArgoCd::new(project(serde_json::json!([])));
     argocd.project_status = 404;
     let error = acquire(&argocd, request()).await.expect_err("refusal");
-    assert!(matches!(error, AcquireError::NoSuchProject(name) if name == "babelforce"));
+    assert!(matches!(error, AcquireError::NoSuchProject(name) if name == "acme"));
 }
 
 /// Argo CD reads `expiresIn: 0` as "never expires". Passing it through would quietly mint the one
@@ -312,8 +312,8 @@ async fn a_zero_lifetime_is_refused_rather_than_meaning_forever() {
 async fn a_project_or_role_name_that_could_change_the_path_is_refused() {
     let argocd = FakeArgoCd::new(project(serde_json::json!([])));
     for (project, role) in [
-        ("babelforce/../admin", "b10x"),
-        ("babelforce", "b10x?x=1"),
+        ("acme/../admin", "b10x"),
+        ("acme", "b10x?x=1"),
         ("", "b10x"),
     ] {
         let mut bad = request();

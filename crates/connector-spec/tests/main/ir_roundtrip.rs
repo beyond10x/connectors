@@ -3,10 +3,13 @@
 //! These exercise the crate through its public API only — the IR is the contract both front-ends
 //! produce and `connector-flux` consumes, so anything these tests cannot reach is not part of it.
 //!
-//! The fixture is deliberately babelforce-shaped: three declared auth methods where two apiKey
-//! headers must travel **together** and are an **alternative** to OAuth2. That is the real spec
-//! (`~/babelforce/projects/babelforce-api/.../manager.openapi.json`, document-level
-//! `security: [{oauth2: [*]}, {accessId: [], accessToken: []}]`), not a hypothetical.
+//! The fixture is shaped after the vendored provider spec: three declared auth methods where two
+//! apiKey headers must travel **together** and are an **alternative** to OAuth2. The two headers
+//! are that provider's REST credentials, both `required`
+//! (`specs/babelforce/manager-2026-07-10.openapi.yaml:26012-26025`,
+//! `UserCustomer_customer_apis_babelforce`). The alternative-to-OAuth2 arrangement is the
+//! fixture's own: that document declares only `security: [{oauth2: ['*']}]` at `:26280-26282`,
+//! so the IR shape these tests pin is not quoted from it.
 
 use std::collections::BTreeMap;
 

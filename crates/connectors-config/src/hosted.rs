@@ -869,13 +869,13 @@ mod tests {
         // and `initiation = "b10x"` and must keep parsing into the platform field.
         let config: HostedServerConfig = toml::from_str(
             r#"
-tenant_id = "babelforce"
-module_tenant_ids = ["babelforce"]
+tenant_id = "acme"
+module_tenant_ids = ["acme"]
 [server]
 listen = "0.0.0.0:8080"
 base_path = "/api/connectors/v1"
 [identity]
-origin = "https://identity.code.dev.babelforce.com"
+origin = "https://identity.code.dev.example.com"
 [authority]
 operator_groups = ["operator"]
 [storage]
@@ -915,13 +915,13 @@ initiation = "b10x"
     fn hosted_deployment_accepts_planner_integration() {
         let config: HostedServerConfig = toml::from_str(
             r#"
-tenant_id = "babelforce"
-module_tenant_ids = ["babelforce"]
+tenant_id = "acme"
+module_tenant_ids = ["acme"]
 [server]
 listen = "0.0.0.0:8080"
 base_path = "/api/connectors/v1"
 [identity]
-origin = "https://identity.code.dev.babelforce.com"
+origin = "https://identity.code.dev.example.com"
 [authority]
 operator_groups = ["operator"]
 [storage]
@@ -944,10 +944,10 @@ ca_file = "/etc/b10x-vault-ca/ca.crt"
 enabled = false
 listen = "0.0.0.0:5060"
 [slack]
-public_origin = "https://code.dev.babelforce.com/api/connectors/v1"
+public_origin = "https://code.dev.example.com/api/connectors/v1"
 team_id = "T01234567"
 oauth_client_id = "123456789.987654321"
-oauth_redirect_uri = "https://code.dev.babelforce.com/api/connectors/v1/oauth/slack/callback"
+oauth_redirect_uri = "https://code.dev.example.com/api/connectors/v1/oauth/slack/callback"
 org_read_grant_ref = "grant:slack:org-read"
 user_grant_ref = "grant:slack:org-user"
 companion_grant_ref = "grant:slack:workspace-companion"
