@@ -1,5 +1,15 @@
 # Repository instructions for agents
 
+## Serves
+
+This repository advances these objectives from `atlas/ROADMAP.md`:
+
+- **O1 — governed reach.** Every third-party effect runs through a declared
+  connection, an admitted operation and an approval the record can name; a call
+  outside that is a refusal by name, not an untracked request.
+- **O5 — the generic agent platform.** The local CLI, the adapters and the catalog
+  provider are the integration surface a tenant configures, connects and invokes.
+
 ## Establish scope and authority
 
 Follow the current user request. The reviewed v0.1.0 specification milestone covers
@@ -174,8 +184,17 @@ this repository, candidate suppression files carry no authority, and hooks are n
 bypassed. A receipt is invalidated by source changes, rebases, policy changes and
 scanner upgrades.
 
-Atlas integration remains deferred: do not register this repository, alter Atlas
-roadmap/catalog records, or wire documentation delivery or consumer dependencies.
-The design serves existing Connectors objectives O1 (governed integration access)
-and O5 (generic platform integration capabilities); it does not replace the
-registered component. A local recovery remote is not public distribution.
+This repository is registered in Atlas, and the `## Serves` section above is the
+grounding Atlas `check-map` reads; keep it accurate and keep its ids in
+`atlas/ROADMAP.md`. The org-state review of 2026-09-15 decided the lineage — Atlas
+ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its predecessor*), 2026-09-15: the name `beyond10x/connectors` denotes this
+lineage, which owns that repository's `next` default branch, its `v0.8.0`-and-later
+tag namespace and its Latest release. The v1 component at
+`/home/timo/beyond10x/connectors`, whose releases end at `v0.7.2`, is the
+predecessor, not a parallel current component.
+
+What stays deferred is narrower than before: do not alter Atlas roadmap or catalog
+records from here, and do not wire documentation delivery or consumer dependencies.
+Consumers are still on the predecessor — `devcenter/Cargo.toml:37-38` pins
+`beyond10x/connectors` at rev `e80b7ae1` (`=0.7.0`) — and moving one is its own
+requested scope. A local recovery remote is not public distribution.

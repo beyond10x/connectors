@@ -49,12 +49,15 @@ revalidation renews the 60-second validation evidence without credential
 re-entry; see [the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md).
 
 This catalog is a second implementation, not a migration of the first: the
-registered `connectors` component ships the predecessor it re-implements at
-`crates/catalog`, both exist today, and — as [AGENTS.md](AGENTS.md) states — this
-repository does not replace the registered component. Consumers pin the registered
-component and not this one: six repositories in the organization depend on
-`beyond10x/connectors`, at seven distinct revisions, and none depends on this
-repository.
+predecessor it re-implements ships at `crates/catalog` in the v1 component, and both
+exist today. The org-state review of 2026-09-15 decided which is which — Atlas ADR
+*Connectors lineage*, 2026-09-15: the name `beyond10x/connectors` denotes this
+lineage, which owns that repository's `next` default branch, its `v0.8.0`-and-later
+tags and its Latest release; v1, whose releases end at `v0.7.2`, is the predecessor.
+Consumers are still on the predecessor and not on this code: six repositories in the
+organization depend on `beyond10x/connectors` at seven distinct revisions (devcenter
+at rev `e80b7ae1`, `=0.7.0`), and none builds from this tree. Moving a consumer is
+its own requested scope.
 
 Kubernetes now has the same local lifecycle binding: a saved bearer token, an
 identity validated by one SelfSubjectReview probe, and its three reads through the

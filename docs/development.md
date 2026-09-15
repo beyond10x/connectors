@@ -28,6 +28,16 @@ explicit empty findings blocks and source-bound transcriptions of immutable lega
 reviews. This is a local patch on current AEP source, not an upstream released fix.
 Remove the patch when selecting an upstream commit that contains the correction.
 
+The transcription practice the second clause was written for stopped on 2026-09-15:
+do not transcribe a `review-result` into a `verification-report`. Record findings in
+the review-result itself, in its findings block; author a `verification-report` only
+when a story or a gate actually consumes it. The 52 existing drafts under
+`.engineering/planning/verification-report/` stay as history and are neither deleted
+nor rewritten, so the patch keeps its transcription clause to hold them valid — that
+clause is what makes them pass, not authority to add another. No script and no task
+target performs the transcription, so nothing is disabled to stop it; it was an
+authoring practice and this paragraph retires it.
+
 Build from reviewed local Git repositories containing those exact commits:
 
 ```sh
