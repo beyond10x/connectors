@@ -82,13 +82,17 @@ inspection command provides information; updating the binary remains a separate 
 - Refresh all twelve Cargo workspace lockfiles together with the release identity so cold runners
   can fetch and verify the complete locked graphs.
 
-## 0.6.5 — 2026-09-05
+## 0.6.5 — never tagged; folded into 0.7.0 (2026-09-07)
+
+The 0.6.5, 0.6.4 and 0.6.3 sections were written but never released: `git tag -l 'v0.6.*'` lists
+v0.6.0, v0.6.1 and v0.6.2 only. Their changes first shipped in v0.7.0 and are restated in its
+§ *Also included since the last published release*.
 
 - Keep legacy GitLab connections inactive until a verified reconnect binds current authority,
   while allowing the host and unrelated integrations to start. Preserve legacy metadata and
   refuse recovery of credential transactions whose grant is absent or superseded.
 
-## 0.6.4 — 2026-09-05
+## 0.6.4 — never tagged; folded into 0.7.0 (2026-09-07)
 
 ### Added
 
@@ -104,7 +108,7 @@ inspection command provides information; updating the binary remains a separate 
   every request. Clients are separated by authority, origin and current admitted addresses;
   credentials and request deadlines remain request-specific.
 
-## 0.6.3 — 2026-09-05
+## 0.6.3 — never tagged; folded into 0.7.0 (2026-09-07)
 
 ### Fixed
 
