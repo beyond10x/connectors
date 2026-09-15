@@ -11,6 +11,12 @@ every `connectors.lock` row, and the wire User-Agent. Those three move together,
 
 ## Unreleased
 
+- This line is now the **predecessor**. v1's tags end at **v0.7.2**; the
+  `github.com/beyond10x/connectors` remote's default branch `next` and its tags from v0.8.0 onwards
+  belong to `connectors_v2`. Decided by the atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its predecessor*, 2026-09-15) and by
+  `docs/design/21-clean-room-rewrite.md`, accepted the same day. Pin a v1 tag or rev here, never
+  "latest". No code changed.
+
 ## 0.7.2 — 2026-09-07
 
 - Add `connectors inspect upgrade` to report the installed CLI version, embedded catalog schema
@@ -67,7 +73,7 @@ inspection command provides information; updating the binary remains a separate 
   stops ready for a separate explicit invocation. `operation --protocol-version v2` retains
   explicit interoperability; no negotiation, automatic session creation or invocation replay.
 
-### Also included since the last published release (v0.6.0)
+### Also included since the last published release (v0.6.2)
 
 - Add bounded, read-only GitLab fetch sessions over internal TLS for the admitted default branch
   and exact commit, including Git protocol v2 support and the hosted client operation. Recheck
