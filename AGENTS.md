@@ -24,7 +24,8 @@ A change here that moves none of these is a question for the operator, not a tas
 ## Status
 
 **Predecessor line, as of 2026-09-15.** This repository is Connectors v1, superseded by
-`connectors_v2` — decided by the atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its predecessor*, 2026-09-15) and by
+`connectors_v2` under atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its
+predecessor*, accepted 2026-09-15) and
 [docs/design/21-clean-room-rewrite.md](docs/design/21-clean-room-rewrite.md), accepted the same day
 through the org-state review decision sheet (items 1 and 15). The `github.com/beyond10x/connectors`
 remote now carries both lineages and the successor owns the name: its default branch is `next`, and
@@ -32,7 +33,9 @@ its tags from **v0.8.0** onwards (v0.11.0 at the time of writing) are v2's, not 
 tags end at v0.7.2**; v1's last published commit is the tip of `origin/main`, and the 9 unpublished
 v1 commits are parked on the local branch `v1-bounded-reads-20260906`. v1 is still consumed —
 devcenter pins `connectors-client` and `protocol` at rev `e80b7ae1`, `version = "=0.7.0"`
-(`devcenter/Cargo.toml:37-38`) — and design 21 §3 lists the four manifests a cutover has to repin.
+(`devcenter/Cargo.toml:37-38`) — and
+[`docs/design/21-clean-room-rewrite.md`](docs/design/21-clean-room-rewrite.md) §3 lists the nine
+manifests in five repositories a cutover has to repin (corrected 2026-09-15; the draft said four).
 This is a freeze, not an abandonment: the repository becomes the read-only predecessor reference,
 exactly the status the two predecessor repositories named at the end of § Boundaries hold here today.
 
@@ -51,6 +54,14 @@ implemented alongside its design authority. Read that authority in order:
 Design documents are a numbered series (`docs/design/NN-title.md`). New design work gets the next
 number; earlier documents are amended with dated notes, not silently rewritten. Nouns come from
 the domain model and are not renamed casually (vision principle 10).
+
+Four numbers already collide and are recorded exceptions, not renumbered (the line is frozen, and
+renumbering would break every citation made against it): **09**
+(`09-curation-and-credential-capability-admission.md`, `09-platform-modules.md`), **13**
+(`13-grant-evaluation-and-approval-redemption.md`, `13-shared-secrets-custody.md`), **19**
+(`19-read-only-git-fetch-sessions.md`, `19-the-cli-surface.md`) and **21**
+(`21-clean-room-rewrite.md`, `21-personal-oauth-callback-custody.md`). Because of them, cite a
+design document by file name — never by number alone (recorded 2026-09-15, ledger ORG-0086).
 
 ## Dispatching work
 
