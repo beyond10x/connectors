@@ -4,7 +4,7 @@ id: epic:local-product
 kind: epic
 status: archived
 title: Local product
-revision: 5
+revision: 6
 ---
 ## Provenance
 
@@ -39,8 +39,8 @@ configuration), S-036 (OS keyring as the local store) and S-041 (state as a port
 
 S-042 ("one composed local placement, called by both the CLI and Zwirn") is the exception and does not
 follow the successor: zwirn is a consumer of *this* line (design 21 §3) and its pin is a bare rev,
-`1e0eb9f`, that no tag contains. Repinning the four consumers is design 21 §6 phase 5 work, not this
-epic's.
+`1e0eb9f`, that no tag contains. Repinning the nine manifests in five repositories §3 lists is
+design 21 §6 phase 5 work, not this epic's.
 
 Its 4 `docs/stories/S-*` records keep their own statuses (3 `in-progress`, 1 `backlog`). This repository's `AGENTS.md`
 states no convention for stories under an archived epic, so none was moved. Archiving keeps the record.
