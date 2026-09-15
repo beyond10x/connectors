@@ -15,12 +15,15 @@ accounts, invoke permitted actions, and receive provider events. It keeps provid
 inside the service and checks each request against the caller's authority and selected Connection.
 
 **Current status: predecessor line, frozen 2026-09-15.** This repository is Connectors **v1**,
-superseded by `connectors_v2` — decided by the atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its predecessor*, 2026-09-15) and by
-[design 21, clean-room rewrite](docs/design/21-clean-room-rewrite.md), accepted the same day. The
+superseded by `connectors_v2` under atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage;
+v1 is its predecessor*, accepted 2026-09-15) and [design 21, clean-room
+rewrite](docs/design/21-clean-room-rewrite.md), accepted the same day. The
 `github.com/beyond10x/connectors` remote carries both lineages and the successor owns the name: its
 default branch is `next`, and its tags from **v0.8.0** onwards (v0.11.0 at the time of writing) are
-v2's. **v1's tags end at v0.7.2** — pin a v1 tag or rev, never "latest". v1 is still consumed:
-devcenter pins `connectors-client` and `protocol` at rev `e80b7ae1`, `version = "=0.7.0"`. The 9
+v2's. **v1's tags end at v0.7.2** — pin a v1 tag or rev, never "latest". v1 is still consumed by
+nine manifests in five repositories — zwirn, devcenter, service-sdk, agent-platform and workspace;
+devcenter pins `connectors-client` and `protocol` at rev `e80b7ae1`, `version = "=0.7.0"`, and
+[design 21](docs/design/21-clean-room-rewrite.md) §3 lists all nine (corrected 2026-09-15). The 9
 unpublished v1 commits are parked on the local branch `v1-bounded-reads-20260906`. What is described
 below is what v1 shipped through v0.7.2: personal-local and bounded hosted deployments are
 implemented, available operations depend on the deployment, provider adapter, Connection and Grant,
