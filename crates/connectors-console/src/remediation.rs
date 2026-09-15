@@ -144,7 +144,9 @@ pub async fn run(
     Ok(json!({"ready":true,"attempt":"not_attempted","next_action":"explicit_invoke"}))
 }
 
-fn require_daemon(root: &Path) -> Result<(), RemediationError> {
+/// Refuse unsafe or absent daemon sockets before acquiring caller input or private instructions.
+/// The presenter repeats this check; it does not reserve the path against later replacement.
+pub fn require_daemon(root: &Path) -> Result<(), RemediationError> {
     let owner = rustix::process::geteuid().as_raw();
     let metadata = std::fs::symlink_metadata(root).map_err(|_| RemediationError::DaemonRequired)?;
     if !metadata.is_dir() || metadata.uid() != owner || metadata.mode() & 0o077 != 0 {
