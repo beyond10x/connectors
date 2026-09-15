@@ -8,6 +8,15 @@ or federation. Its planning owners are `story:local-cli-binding-semantics` and
 MCP and Atlas enrollment remain deferred. Hosted admission and custody retain
 their own contracts when that deployment binding is selected.
 
+**Atlas-enrollment update, 2026-09-15:** "MCP and Atlas enrollment remain deferred"
+above, and "does not register anything in Atlas. Atlas integration remains deferred by
+the operator" below, are superseded for grounding only. The org-state review of
+2026-09-15 enrolled this repository in Atlas — Atlas ADR 0051,
+2026-09-15 — and `AGENTS.md` § Serves now names objectives O1 and O5, which is what
+`atlas/scripts/check-map.sh` reads. The P5 Atlas catalog and roadmap records of § 5
+remain unauthorized and are still not created from here. The dated body below is
+history and is not rewritten.
+
 Baseline: local commit `57be07c` plus the uncommitted working tree of 2026-09-08. Source of the
 findings: [preserved concept and stack integration review](../.engineering/planning/review-result/concept-stack-integration-20260908.md) (gaps G1–G10; originally `.local/review/2026-09-08-concept-and-stack-integration-review.md`).
 Organization authority read from `../atlas` (README/ROADMAP dated 2026-09-04; ADRs 0001–0031).
