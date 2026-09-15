@@ -1,6 +1,6 @@
 //! EndpointInventoryEntry discovery arguments and shared local/hosted client dispatch.
 
-use protocol::endpoint_inventory::{self, EndpointInventoryRequest};
+use protocol::endpoint_inventory::{self as endpoint, EndpointInventoryRequest};
 
 use super::*;
 

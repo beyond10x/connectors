@@ -12,10 +12,10 @@ b10x:
 
 Connectors gives applications and agents a common way to discover external operations, connect
 accounts, invoke permitted actions, and receive provider events. It keeps provider credentials
-inside the service and checks each request against the caller's authority and selected Connection.
+inside the service and checks each request against the caller's authority and selected Endpoint.
 
 **Current status: pre-v1.** Personal-local and bounded hosted deployments are implemented. Available
-operations depend on the deployment, provider adapter, Connection, and Grant. Full SaaS and
+operations depend on the deployment, provider adapter, Endpoint, and Grant. Full SaaS and
 satellite federation remain outside the current support claim.
 
 Read [what's new in v0.7.1](https://github.com/beyond10x/connectors/blob/main/WHATS-NEW.md)
@@ -34,7 +34,7 @@ flowchart TB
 ```
 
 The catalog describes what can be called. A deployment enables an Integration; authorization
-creates a Connection. Receiver policy and Grants bound what a caller can do through it. Hosted
+creates a Endpoint. Receiver policy and Grants bound what a caller can do through it. Hosted
 writes require a Grant and any demanded approval. Connectors binds credentials at the execution
 boundary and records the result.
 Hosted identity comes from [Identity](https://beyond10x.github.io/docs/identity/).
@@ -46,7 +46,7 @@ one hosted Slack mention through receipt, an authorized consumer, and an approve
 The same example connects all six chapters.
 
 1. [System overview](docs/architecture/README.md) — locate the boundaries and the subsystem owners.
-2. [Connections and authority](docs/architecture/authority.md) — separate account access, Grants,
+2. [Endpoints and authority](docs/architecture/authority.md) — separate account access, Grants,
    and approval for one action.
 3. [Commands and interfaces](docs/architecture/interfaces.md) — trace a request from description
    to dispatch, including refusals.
@@ -73,11 +73,11 @@ credential references where needed, then describe and invoke a compatible operat
 See the [Kubernetes guide](docs/guides/connect-kubernetes.md) for namespace selection, bindings,
 SQL and HTTP examples, and hosted use.
 
-The provider guides explain the supported connection paths and their credential requirements.
+The provider guides explain the supported endpoint setup paths and their credential requirements.
 
 | Provider | Guide |
 |---|---|
-| Slack | [Socket Mode, hosted organization access, and personal connections](docs/guides/connect-slack.md) |
+| Slack | [Socket Mode, hosted organization access, and personal endpoints](docs/guides/connect-slack.md) |
 | GitLab | [Personal and automation access](docs/guides/connect-gitlab.md) |
 | Jira | [Cloud gateway access and hosted delegated OAuth](docs/guides/connect-jira.md) |
 | Confluence | [Cloud gateway reads](docs/guides/connect-confluence.md) |

@@ -151,7 +151,7 @@ pub async fn run(
         return Ok(json!({
             "provider": "slack",
             "connected": true,
-            "connection": description.summary.label,
+            "endpoint": description.summary.label,
             "endpoint_ref": description.summary.endpoint_ref,
             "events": channel.events,
         }));
@@ -363,7 +363,7 @@ pub async fn dispatch_with_personal_oauth(
     destination.clear()?;
     Ok(json!({ "provider": provider, "connected": true,
         "endpoint_ref": connection.summary.endpoint_ref,
-        "connection": display_label }))
+        "endpoint": display_label }))
 }
 
 /// Only the selected profile and private output path cross the CLI/console boundary.

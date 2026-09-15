@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::endpoint_inventorys::{
+use crate::endpoints::{
     EndpointBackendFactory, EndpointPlacement, EndpointPrincipalPolicy, KubernetesEndpointSource,
 };
 
@@ -44,7 +44,7 @@ use protocol::datasource::{
     DatasourceError, DatasourceErrorCode, DatasourceRequest, DatasourceResult,
 };
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary as OperationEndpointSummary, DescribeRequest, EffectClass,
+    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, DescribeRequest, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
@@ -488,7 +488,7 @@ impl KubernetesLocalBackend {
         state.clients.contains_key(endpoint_ref) && state.endpoints.contains_key(endpoint_ref)
     }
 
-    fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationEndpointSummary> {
+    fn connections_for_operation(&self, operation_ref: &str) -> Vec<OperationConnectionSummary> {
         // Workload and inventory operations belong to the cluster, not to a Service behind it. Publishing
         // them only for child Services is why an activated cluster admitted nothing a person could
         // call: the Connection was attached, readable as a datasource, and had no operation at all.
@@ -499,8 +499,8 @@ impl KubernetesLocalBackend {
             return self
                 .cluster_connections()
                 .into_iter()
-                .map(|(endpoint_ref, label)| OperationEndpointSummary {
-                    endpoint_ref,
+                .map(|(endpoint_ref, label)| OperationConnectionSummary {
+                    connection_ref: endpoint_ref,
                     label,
                     provider: KUBERNETES.to_owned(),
                     audiences: vec!["operations".to_owned()],
@@ -517,8 +517,8 @@ impl KubernetesLocalBackend {
             .children
             .values()
             .filter(|child| child.provider == provider && child_is_current(&state, child))
-            .map(|child| OperationEndpointSummary {
-                endpoint_ref: child.endpoint_ref.clone(),
+            .map(|child| OperationConnectionSummary {
+                connection_ref: child.endpoint_ref.clone(),
                 label: child.label.clone(),
                 provider: child.provider.clone(),
                 audiences: monitoring_model::audiences_for_operation(operation_ref),
@@ -571,7 +571,7 @@ impl KubernetesLocalBackend {
             title: title.to_owned(),
             effect,
             approval,
-            endpoints,
+            connections: endpoints,
         })
     }
 
@@ -608,7 +608,7 @@ impl KubernetesLocalBackend {
             )?,
             effect: EffectClass::ReadOnly,
             approval: ApprovalPosture::NotRequired,
-            endpoints,
+            connections: endpoints,
             description_ref,
         })
     }
@@ -620,7 +620,7 @@ impl KubernetesLocalBackend {
         hash.update(operation_ref.as_bytes());
         for connection in self.connections_for_operation(operation_ref) {
             hash.update(b"\0");
-            hash.update(connection.endpoint_ref.as_bytes());
+            hash.update(connection.connection_ref.as_bytes());
         }
         format!("description-sha256-{:x}", hash.finalize())
     }
@@ -737,7 +737,7 @@ impl KubernetesLocalBackend {
         // **The Connection the caller named**, not whichever one this backend would have picked.
         // A caller holding two clusters has to be able to say which; refusing an attached one here
         // is what made four of five activated clusters uncallable.
-        let endpoint_ref = request.endpoint_ref.clone();
+        let endpoint_ref = request.connection_ref.clone();
         if !self.is_cluster_connection(&endpoint_ref) {
             return Err(operation_not_found());
         }
@@ -821,7 +821,7 @@ impl KubernetesLocalBackend {
         monitoring_model::validate_input(&request.operation_ref, &request.input)?;
         let child = lock(&self.state)
             .children
-            .get(&request.endpoint_ref)
+            .get(&request.connection_ref)
             .cloned()
             .ok_or_else(operation_not_granted)?;
         if child.provider != monitoring_model::provider_for_operation(&request.operation_ref)

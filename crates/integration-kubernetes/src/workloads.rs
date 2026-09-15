@@ -32,7 +32,7 @@ use protocol::datasource::{
     DatasourceResult, DatasourceSummary, ReadRequest, ReadVerb, RecordView,
 };
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary, EffectClass, OperationDescription, OperationError,
+    ApprovalPosture, ConnectionSummary, EffectClass, OperationDescription, OperationError,
     OperationErrorCode, MAX_RESULT_BYTES,
 };
 use serde::{Deserialize, Serialize};
@@ -1090,7 +1090,7 @@ pub(crate) async fn read_workloads(
 /// so the contract a caller is handed must not depend on which placement answered. Only the
 /// Endpoints and the description lease belong to the placement.
 pub(crate) fn status_operation(
-    endpoints: Vec<EndpointSummary>,
+    endpoints: Vec<ConnectionSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -1121,13 +1121,13 @@ pub(crate) fn status_operation(
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        endpoints,
+        connections: endpoints,
         description_ref,
     }
 }
 
 pub(crate) fn logs_operation(
-    endpoints: Vec<EndpointSummary>,
+    endpoints: Vec<ConnectionSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -1161,7 +1161,7 @@ pub(crate) fn logs_operation(
         }),
         effect: EffectClass::ReadOnly,
         approval: ApprovalPosture::NotRequired,
-        endpoints,
+        connections: endpoints,
         description_ref,
     }
 }
@@ -1205,7 +1205,7 @@ pub(crate) fn fit_pod_logs(mut logs: PodLogs) -> Result<serde_json::Value, Opera
 }
 
 pub(crate) fn restart_operation(
-    endpoints: Vec<EndpointSummary>,
+    endpoints: Vec<ConnectionSummary>,
     description_ref: String,
 ) -> OperationDescription {
     OperationDescription {
@@ -1236,7 +1236,7 @@ pub(crate) fn restart_operation(
         }),
         effect: EffectClass::Mutating,
         approval: ApprovalPosture::Required,
-        endpoints,
+        connections: endpoints,
         description_ref,
     }
 }

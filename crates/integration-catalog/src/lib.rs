@@ -49,7 +49,7 @@ use connectors_config::{CatalogIntegrationConfig, InitiationConfig};
 use domain::InitiationPolicy;
 use protocol::endpoint as connection_api;
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary, EffectClass, InvocationResult, OperationDescription,
+    ApprovalPosture, ConnectionSummary, EffectClass, InvocationResult, OperationDescription,
     OperationError, OperationErrorCode, OperationRequest, OperationResult, OperationSummary,
 };
 use service::{
@@ -62,7 +62,7 @@ mod confluence_reads;
 mod incremental_reads;
 pub use config::DeclaredConfig;
 mod custody;
-pub mod endpoint_inventory;
+pub mod endpoint;
 mod oauth;
 pub use oauth::{
     personal_oauth_admitted_connection_ref, personal_oauth_admitted_origins, PersonalOAuthBackend,
@@ -320,9 +320,9 @@ impl Inner {
             .find(|binding| binding.endpoint_ref == endpoint_ref)
     }
 
-    fn summary(&self, binding: &Binding) -> EndpointSummary {
-        EndpointSummary {
-            endpoint_ref: binding.endpoint_ref.clone(),
+    fn summary(&self, binding: &Binding) -> ConnectionSummary {
+        ConnectionSummary {
+            connection_ref: binding.endpoint_ref.clone(),
             label: binding.label.clone(),
             provider: binding.provider.id.to_owned(),
             audiences: binding
@@ -382,7 +382,7 @@ impl Inner {
     fn search(&self, query: &str, limit: u16) -> Vec<OperationSummary> {
         // Insertion-ordered so the result is stable across runs: a caller diffing two searches
         // should see real changes, not map iteration order.
-        let mut grouped: Vec<(&'static catalog::Operation, Vec<EndpointSummary>)> = Vec::new();
+        let mut grouped: Vec<(&'static catalog::Operation, Vec<ConnectionSummary>)> = Vec::new();
         for binding in &self.bindings {
             for operation in binding.provider.operations {
                 if !binding.admits(operation) {
@@ -411,7 +411,7 @@ impl Inner {
                 title: operation.id.to_owned(),
                 effect: effect_class(operation),
                 approval: approval_posture(operation),
-                endpoints,
+                connections: endpoints,
             })
             .collect()
     }
@@ -466,7 +466,7 @@ impl Inner {
             effect: effect_class(operation),
             approval: approval_posture(operation),
             // Every Connection that could serve it, so a caller reading one description can pick.
-            endpoints: self
+            connections: self
                 .bindings
                 .iter()
                 .filter(|candidate| {
@@ -736,7 +736,7 @@ impl ConnectorBackend for CatalogBackend {
             }
             OperationRequest::Invoke(invoke) => {
                 self.owns_operation_ref(&invoke.operation_ref)
-                    && self.inner.binding_by_ref(&invoke.endpoint_ref).is_some()
+                    && self.inner.binding_by_ref(&invoke.connection_ref).is_some()
             }
             _ => false,
         }
@@ -758,7 +758,7 @@ impl ConnectorBackend for CatalogBackend {
                 self.inner
                     .invoke(
                         &invoke.operation_ref,
-                        &invoke.endpoint_ref,
+                        &invoke.connection_ref,
                         &invoke.description_ref,
                         invoke.input,
                     )

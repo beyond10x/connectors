@@ -132,7 +132,7 @@ pub(super) async fn operation_preflight_at(
 ) -> Option<Response> {
     let target = RemediationTarget {
         operation_ref: &invoke.operation_ref,
-        endpoint_ref: &invoke.endpoint_ref,
+        endpoint_ref: &invoke.connection_ref,
     };
     let resolved = state.backend.remediation_metadata(owner, target);
     // Old/default backends preserve ordinary admission and do not claim remediation support.
@@ -167,7 +167,7 @@ pub(super) async fn operation_preflight_at(
     let described = if target_specific {
         state
             .backend
-            .describe_target(owner, &invoke.operation_ref, &invoke.endpoint_ref)
+            .describe_target(owner, &invoke.operation_ref, &invoke.connection_ref)
             .await
             .map(OperationResult::Describe)
     } else {
@@ -196,8 +196,8 @@ pub(super) async fn operation_preflight_at(
     if description.operation_ref != invoke.operation_ref
         || description.description_ref != invoke.description_ref
         || description.input_schema != record["contract"]["input_schema"]
-        || !description.endpoints.iter().any(|connection| {
-            connection.endpoint_ref == invoke.endpoint_ref
+        || !description.connections.iter().any(|connection| {
+            connection.connection_ref == invoke.connection_ref
                 && connection.provider == metadata.operation.provider()
                 && connection.purpose.as_deref() == Some(metadata.auth_profile.as_str())
         })

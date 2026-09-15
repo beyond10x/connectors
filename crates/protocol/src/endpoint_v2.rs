@@ -54,6 +54,7 @@ pub enum EndpointRequest {
 #[serde(deny_unknown_fields)]
 pub struct RemediationStartRequest {
     pub operation_ref: String,
+    #[serde(rename = "connection_ref")]
     pub endpoint_ref: String,
     pub input: Value,
 }
@@ -69,6 +70,7 @@ pub struct RemediationStatusRequest {
 pub struct RemediationAcknowledgeRequest {
     pub connect_session_ref: String,
     pub operation_ref: String,
+    #[serde(rename = "connection_ref")]
     pub endpoint_ref: String,
 }
 
@@ -94,6 +96,7 @@ pub enum RemediationNextAction {
 pub struct BoundRemediationStatus {
     pub connect_session_ref: String,
     pub operation_ref: String,
+    #[serde(rename = "connection_ref")]
     pub endpoint_ref: String,
     pub integration_ref: String,
     pub auth_profile: String,
@@ -109,6 +112,7 @@ pub struct BoundRemediationStatus {
 pub struct RemediationAcknowledgement {
     pub connect_session_ref: String,
     pub operation_ref: String,
+    #[serde(rename = "connection_ref")]
     pub endpoint_ref: String,
     pub next_action: RemediationNextAction,
 }

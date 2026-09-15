@@ -97,7 +97,7 @@ impl ConnectorBackend for EndpointBackend {
                 false,
             )),
             OperationRequest::Invoke(request) => {
-                assert_eq!(request.endpoint_ref, "connection:resolved");
+                assert_eq!(request.connection_ref, "connection:resolved");
                 self.invocations.fetch_add(1, Ordering::SeqCst);
                 Ok(OperationResult::Invoke(InvocationResult {
                     operation_ref: request.operation_ref,
@@ -125,8 +125,8 @@ impl ConnectorBackend for EndpointBackend {
             output_schema: serde_json::json!({"type":"object"}),
             effect: EffectClass::ReadOnly,
             approval: ApprovalPosture::NotRequired,
-            endpoints: vec![protocol::operation::EndpointSummary {
-                endpoint_ref: "connection:resolved".into(),
+            connections: vec![protocol::operation::ConnectionSummary {
+                connection_ref: "connection:resolved".into(),
                 label: "Fixture".into(),
                 provider: "fixture".into(),
                 audiences: Vec::new(),
@@ -319,7 +319,7 @@ async fn endpoint_describe_and_invoke_enter_existing_connection_dispatch() {
     let Some(OperationResult::Describe(description)) = response.response else {
         panic!("expected target description")
     };
-    assert_eq!(description.endpoints.len(), 1);
+    assert_eq!(description.connections.len(), 1);
     let response = app(backend.clone(), true)
         .oneshot(http(
             "/operations",

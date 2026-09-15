@@ -41,7 +41,7 @@ impl BackendRegistry {
         unique_operation_claim(self.operation_claims(&OperationRequest::Invoke(
             protocol::operation::InvokeRequest {
                 operation_ref: operation_ref.into(),
-                endpoint_ref: endpoint_ref.into(),
+                connection_ref: endpoint_ref.into(),
                 description_ref: "ownership-only".into(),
                 input: serde_json::Value::Null,
                 approval_evidence_ref: None,
@@ -533,14 +533,14 @@ impl ConnectorBackend for BackendRegistry {
                 for description in descriptions {
                     ensure_compatible_description(&merged, &description)?;
                     local_refs.push(registry_contributor_ref(&description));
-                    merged.endpoints.extend(description.endpoints);
+                    merged.connections.extend(description.connections);
                 }
                 merged
-                    .endpoints
-                    .sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
+                    .connections
+                    .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
                 merged
-                    .endpoints
-                    .dedup_by(|left, right| left.endpoint_ref == right.endpoint_ref);
+                    .connections
+                    .dedup_by(|left, right| left.connection_ref == right.connection_ref);
                 merged.description_ref =
                     registry_description_ref(context, &merged.operation_ref, &mut local_refs)?;
                 Ok(OperationResult::Describe(merged))
@@ -553,10 +553,10 @@ impl ConnectorBackend for BackendRegistry {
                     .starts_with(TARGET_DESCRIPTION_PREFIX)
                 {
                     let description = backend
-                        .describe_target(context, &invoke.operation_ref, &invoke.endpoint_ref)
+                        .describe_target(context, &invoke.operation_ref, &invoke.connection_ref)
                         .await?;
                     let expected =
-                        target_description_ref(context, &invoke.endpoint_ref, &description)?;
+                        target_description_ref(context, &invoke.connection_ref, &description)?;
                     if invoke.description_ref != expected {
                         return Err(OperationError::new(
                             OperationErrorCode::StaleAuthority,
@@ -967,13 +967,13 @@ fn merge_summary(
     if existing.title != incoming.title {
         existing.title.clone_from(&existing.operation_ref);
     }
-    existing.endpoints.append(&mut incoming.endpoints);
+    existing.connections.append(&mut incoming.connections);
     existing
-        .endpoints
-        .sort_by(|left, right| left.endpoint_ref.cmp(&right.endpoint_ref));
+        .connections
+        .sort_by(|left, right| left.connection_ref.cmp(&right.connection_ref));
     existing
-        .endpoints
-        .dedup_by(|left, right| left.endpoint_ref == right.endpoint_ref);
+        .connections
+        .dedup_by(|left, right| left.connection_ref == right.connection_ref);
     Ok(())
 }
 
@@ -1010,8 +1010,8 @@ fn target_description_ref(
     endpoint_ref: &str,
     description: &OperationDescription,
 ) -> Result<String, OperationError> {
-    if description.endpoints.len() != 1
-        || description.endpoints[0].endpoint_ref != endpoint_ref
+    if description.connections.len() != 1
+        || description.connections[0].connection_ref != endpoint_ref
     {
         return Err(operation_protocol(
             "target description is not bound to exactly one Connection",

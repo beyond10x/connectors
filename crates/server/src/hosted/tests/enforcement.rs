@@ -30,8 +30,8 @@ fn described(operation_ref: String) -> OperationDescription {
         output_schema: serde_json::json!({"type": "object"}),
         effect,
         approval,
-        endpoints: vec![protocol::operation::EndpointSummary {
-            endpoint_ref: "connection:test".to_owned(),
+        connections: vec![protocol::operation::ConnectionSummary {
+            connection_ref: "connection:test".to_owned(),
             label: "test".to_owned(),
             provider: "test".to_owned(),
             audiences: Vec::new(),

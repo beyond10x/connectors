@@ -14,7 +14,7 @@ fn normal_help_exposes_the_guided_flow_and_hides_acquisition_plumbing() {
         assert!(!help.contains("connect-complete"));
     }
 
-    let connection = command.find_subcommand_mut("connection").unwrap();
+    let connection = command.find_subcommand_mut("endpoint").unwrap();
     let connection_help = connection.render_long_help().to_string();
     assert!(connection_help.contains("list"));
     assert!(!connection_help.contains("create"));

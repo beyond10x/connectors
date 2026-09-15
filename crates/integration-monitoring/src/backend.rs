@@ -28,7 +28,7 @@ use protocol::endpoint::{
     DiscoveryObservationSummary, RouteAdapter,
 };
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary, DescribeRequest, InvocationResult, InvokeRequest,
+    ApprovalPosture, ConnectionSummary, DescribeRequest, InvocationResult, InvokeRequest,
     OperationDescription, OperationError, OperationErrorCode, OperationRequest, OperationResult,
     OperationSummary,
 };
@@ -483,7 +483,7 @@ impl ConnectorBackend for MonitoringBackend {
             OperationRequest::Describe(request) => supported_operation(&request.operation_ref),
             OperationRequest::Invoke(request) => {
                 supported_operation(&request.operation_ref)
-                    && self.inner.owns_connection_ref(&request.endpoint_ref)
+                    && self.inner.owns_connection_ref(&request.connection_ref)
             }
             OperationRequest::Search(_) => false,
             _ => false,
@@ -714,7 +714,7 @@ impl MonitoringInner {
                     title: title.to_owned(),
                     effect: effect(operation.effects()),
                     approval: ApprovalPosture::NotRequired,
-                    endpoints,
+                    connections: endpoints,
                 })
             })
             .collect()
@@ -743,7 +743,7 @@ impl MonitoringInner {
             )?,
             effect: effect(operation.effects()),
             approval: ApprovalPosture::NotRequired,
-            endpoints,
+            connections: endpoints,
             description_ref: self.description_ref(context, &request.operation_ref),
         }))
     }
@@ -774,7 +774,7 @@ impl MonitoringInner {
         self.append_audit(AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            endpoint_ref: &request.endpoint_ref,
+            endpoint_ref: &request.connection_ref,
             parent_endpoint_ref: None,
             route_adapter: None,
             tenant_id: context.tenant_id(),
@@ -787,7 +787,7 @@ impl MonitoringInner {
             let parent = lock(&self.state)
                 .parent
                 .clone()
-                .filter(|parent| parent.endpoint_ref == request.endpoint_ref)
+                .filter(|parent| parent.endpoint_ref == request.connection_ref)
                 .ok_or_else(operation_not_granted)?;
             let token = self
                 .load_credential(&request.operation_ref, ROUTE_DIRECT)
@@ -810,7 +810,7 @@ impl MonitoringInner {
         } else {
             let child = lock(&self.state)
                 .children
-                .get(&request.endpoint_ref)
+                .get(&request.connection_ref)
                 .filter(|child| child.provider == provider)
                 .cloned()
                 .ok_or_else(operation_not_granted)?;
@@ -832,7 +832,7 @@ impl MonitoringInner {
         self.append_audit(AuditEvent {
             audit_ref: &audit_ref,
             operation_ref: &request.operation_ref,
-            endpoint_ref: &request.endpoint_ref,
+            endpoint_ref: &request.connection_ref,
             parent_endpoint_ref: parent_ref.as_deref(),
             route_adapter: adapter,
             tenant_id: context.tenant_id(),
@@ -1071,7 +1071,7 @@ impl MonitoringInner {
             .map_err(|failure| refuse_dispatch(&operation.id, ROUTE_MEDIATED, failure.into()))
     }
 
-    fn connections_for_operation(&self, operation_ref: &str) -> Vec<EndpointSummary> {
+    fn connections_for_operation(&self, operation_ref: &str) -> Vec<ConnectionSummary> {
         let provider = provider_for_operation(operation_ref);
         let state = lock(&self.state);
         if provider == GRAFANA {
@@ -1079,8 +1079,8 @@ impl MonitoringInner {
                 .parent
                 .as_ref()
                 .map(|parent| {
-                    vec![EndpointSummary {
-                        endpoint_ref: parent.endpoint_ref.clone(),
+                    vec![ConnectionSummary {
+                        connection_ref: parent.endpoint_ref.clone(),
                         label: parent.label.clone(),
                         provider: provider.to_owned(),
                         audiences: audiences_for_operation(operation_ref),
@@ -1093,8 +1093,8 @@ impl MonitoringInner {
             .children
             .values()
             .filter(|child| child.provider == provider && child_is_current(&state, child))
-            .map(|child| EndpointSummary {
-                endpoint_ref: child.endpoint_ref.clone(),
+            .map(|child| ConnectionSummary {
+                connection_ref: child.endpoint_ref.clone(),
                 label: child.label.clone(),
                 provider: provider.to_owned(),
                 audiences: audiences_for_operation(operation_ref),
@@ -1112,7 +1112,7 @@ impl MonitoringInner {
         digest.update(operation_ref.as_bytes());
         for connection in self.connections_for_operation(operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.endpoint_ref.as_bytes());
+            digest.update(connection.connection_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }

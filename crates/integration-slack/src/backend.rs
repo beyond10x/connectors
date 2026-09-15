@@ -43,7 +43,7 @@ use protocol::event::{
     EventRequest, EventResult,
 };
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary as OperationEndpointSummary, EffectClass,
+    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationRequest, OperationResult, OperationSummary,
 };
@@ -468,7 +468,7 @@ impl ConnectorBackend for SlackBackend {
                         .endpoints
                         .iter()
                         .any(|connection| {
-                            connection.endpoint_ref == request.endpoint_ref
+                            connection.endpoint_ref == request.connection_ref
                                 && self.inner.connection_is_admitted(connection)
                         })
             }

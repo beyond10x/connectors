@@ -545,7 +545,7 @@ pub(super) async fn tool_describe(
             // a table.
             input_schema["properties"]["target"]["enum"] = Value::Array(
                 description
-                    .endpoints
+                    .connections
                     .iter()
                     .map(|connection| Value::String(connection.label.clone()))
                     .collect(),
@@ -553,7 +553,7 @@ pub(super) async fn tool_describe(
             // And the honest `required`: with several endpoints configured the resolver
             // refuses a target-less call, so the schema says so; a sole connection needs no
             // choice and the argument stays omittable (S-064).
-            if description.endpoints.len() > 1 {
+            if description.connections.len() > 1 {
                 let required = &mut input_schema["required"];
                 if required.is_null() {
                     *required = Value::Array(Vec::new());
@@ -724,15 +724,15 @@ fn resolve_connection(
     };
     let labels = || {
         description
-            .endpoints
+            .connections
             .iter()
             .map(|connection| connection.label.as_str())
             .collect::<Vec<_>>()
             .join(", ")
     };
     match target {
-        None => match description.endpoints.as_slice() {
-            [connection] => Ok(connection.endpoint_ref.clone()),
+        None => match description.connections.as_slice() {
+            [connection] => Ok(connection.connection_ref.clone()),
             _ => Err(invalid_args(format!(
                 "several targets are configured; pass target as one of: {}",
                 labels()
@@ -740,11 +740,11 @@ fn resolve_connection(
         },
         Some(target) => {
             let mut matched = description
-                .endpoints
+                .connections
                 .iter()
                 .filter(|connection| connection.label == target);
             match (matched.next(), matched.next()) {
-                (Some(connection), None) => Ok(connection.endpoint_ref.clone()),
+                (Some(connection), None) => Ok(connection.connection_ref.clone()),
                 (None, _) => Err(invalid_args(format!(
                     "the target is not among the configured endpoints: {}",
                     labels()
@@ -797,7 +797,7 @@ async fn invoke_operation(
             request_id,
             OperationRequest::Invoke(InvokeRequest {
                 operation_ref: operation_ref.to_owned(),
-                endpoint_ref: endpoint_ref.clone(),
+                connection_ref: endpoint_ref.clone(),
                 description_ref: description.description_ref.clone(),
                 input: input.clone(),
                 approval_evidence_ref: evidence.map(str::to_owned),

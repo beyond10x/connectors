@@ -407,7 +407,7 @@ async fn hosted_subscription_client_refuses_a_cacheable_credential_boundary() {
 fn auth_stage2_invoke() -> operation::OperationRequest {
     operation::OperationRequest::Invoke(operation::InvokeRequest {
         operation_ref: "fixture.write".into(),
-        endpoint_ref: "connection:fixture".into(),
+        connection_ref: "connection:fixture".into(),
         description_ref: "description:fixture".into(),
         input: serde_json::json!({"synthetic": true}),
         approval_evidence_ref: None,
@@ -601,14 +601,14 @@ async fn auth_stage2_local_versions_are_strict_without_resend() {
 
 fn auth_stage2_bound_status(deadline: u64, ready: bool) -> serde_json::Value {
     serde_json::json!({
-        "connect_session_ref":"session:fixture", "operation_ref":"fixture.write", "endpoint_ref":"connection:fixture",
+        "connect_session_ref":"session:fixture", "operation_ref":"fixture.write", "connection_ref":"connection:fixture",
         "integration_ref":"fixture", "auth_profile":"fixture.user", "need":"reauthorize_existing",
         "session_state":if ready { "completed" } else { "pending" }, "expires_at_unix_ms":deadline,
         "resume_state":if ready { "ready" } else { "pending" },
         "session":{"connect_session_ref":"session:fixture", "integration_ref":"fixture",
           "state":if ready { "completed" } else { "pending" }, "expires_at_unix_ms":deadline,
           "browser_completion_url":if ready { serde_json::Value::Null } else { serde_json::json!(format!("http://127.0.0.1:18324/#token={}", "a".repeat(43))) },
-          "endpoint_ref":if ready { serde_json::json!("connection:fixture") } else { serde_json::Value::Null }}
+          "connection_ref":if ready { serde_json::json!("connection:fixture") } else { serde_json::Value::Null }}
     })
 }
 
@@ -688,14 +688,14 @@ async fn auth_stage2_bound_completion_rechecks_target_schema_and_never_invokes()
                     "remediation_start" => {
                         assert_eq!(
                             request["request"]["params"],
-                            serde_json::json!({"operation_ref":"fixture.write","endpoint_ref":"connection:fixture","input":{"synthetic":true}})
+                            serde_json::json!({"operation_ref":"fixture.write","connection_ref":"connection:fixture","input":{"synthetic":true}})
                         );
                         let mut status = auth_stage2_bound_status(
                             if case == "expired-start" { 1 } else { deadline },
                             false,
                         );
                         if case == "wrong-start-target" {
-                            status["endpoint_ref"] = serde_json::json!("connection:other");
+                            status["connection_ref"] = serde_json::json!("connection:other");
                         }
                         serde_json::json!({"result":method,"value":status})
                     }
@@ -712,8 +712,8 @@ async fn auth_stage2_bound_completion_rechecks_target_schema_and_never_invokes()
                                     serde_json::json!("session:other");
                             }
                             "wrong-status-target" => {
-                                status["endpoint_ref"] = serde_json::json!("connection:other");
-                                status["session"]["endpoint_ref"] =
+                                status["connection_ref"] = serde_json::json!("connection:other");
+                                status["session"]["connection_ref"] =
                                     serde_json::json!("connection:other");
                             }
                             "wrong-integration" => {
@@ -739,16 +739,16 @@ async fn auth_stage2_bound_completion_rechecks_target_schema_and_never_invokes()
                     "remediation_acknowledge" => {
                         assert_eq!(
                             request["request"]["params"],
-                            serde_json::json!({"operation_ref":"fixture.write","endpoint_ref":"connection:fixture","connect_session_ref":"session:fixture"})
+                            serde_json::json!({"operation_ref":"fixture.write","connection_ref":"connection:fixture","connect_session_ref":"session:fixture"})
                         );
-                        serde_json::json!({"result":method,"value":{"connect_session_ref":"session:fixture","operation_ref":"fixture.write","endpoint_ref":if case == "wrong-ack" { "connection:other" } else { "connection:fixture" },"next_action":"fresh_description_then_explicit_invoke"}})
+                        serde_json::json!({"result":method,"value":{"connect_session_ref":"session:fixture","operation_ref":"fixture.write","connection_ref":if case == "wrong-ack" { "connection:other" } else { "connection:fixture" },"next_action":"fresh_description_then_explicit_invoke"}})
                     }
                     "describe" if request["protocol"] == v2::CONTRACT => {
                         assert_eq!(
-                            request["request"]["params"]["endpoint_ref"],
+                            request["request"]["params"]["connection_ref"],
                             "connection:fixture"
                         );
-                        serde_json::json!({"result":"describe","value":{"endpoint_ref":if case == "wrong-description" { "connection:other" } else { "connection:fixture" },"integration_ref":"fixture","label":"SYNTHETIC_PRIVATE_INSTRUCTION","state":if case == "degraded" { "degraded" } else { "callable" },"initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]}})
+                        serde_json::json!({"result":"describe","value":{"connection_ref":if case == "wrong-description" { "connection:other" } else { "connection:fixture" },"integration_ref":"fixture","label":"SYNTHETIC_PRIVATE_INSTRUCTION","state":if case == "degraded" { "degraded" } else { "callable" },"initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]}})
                     }
                     "describe" => {
                         assert_eq!(request["protocol"], operation::v3::CONTRACT);
@@ -769,7 +769,7 @@ async fn auth_stage2_bound_completion_rechecks_target_schema_and_never_invokes()
                                 serde_json::json!({"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["synthetic"],"properties":{"synthetic":{"const":true}},"additionalProperties":false})
                             }
                         };
-                        serde_json::json!({"result":"describe","value":{"operation_ref":if case == "wrong-operation" { "other.write" } else { "fixture.write" },"title":"SYNTHETIC_PRIVATE_INSTRUCTION","description":"fixture","input_schema":schema,"output_schema":{},"effect":"read_only","approval":"not_required","endpoints":[{"endpoint_ref":if case == "missing-binding" { "connection:other" } else { "connection:fixture" },"label":"SYNTHETIC_PRIVATE_INSTRUCTION","provider":"fixture","audiences":[]}],"description_ref":"description:fresh"}})
+                        serde_json::json!({"result":"describe","value":{"operation_ref":if case == "wrong-operation" { "other.write" } else { "fixture.write" },"title":"SYNTHETIC_PRIVATE_INSTRUCTION","description":"fixture","input_schema":schema,"output_schema":{},"effect":"read_only","approval":"not_required","connections":[{"connection_ref":if case == "missing-binding" { "connection:other" } else { "connection:fixture" },"label":"SYNTHETIC_PRIVATE_INSTRUCTION","provider":"fixture","audiences":[]}],"description_ref":"description:fresh"}})
                     }
                     _ => panic!("unexpected private workflow method"),
                 };
@@ -901,13 +901,13 @@ async fn auth_adversary_fresh_operation_binding_rejects_conflicting_purpose() {
                     0 => auth_stage2_bound_status(deadline, false),
                     1 => auth_stage2_bound_status(deadline, true),
                     2 => {
-                        serde_json::json!({"connect_session_ref":"session:fixture","operation_ref":"fixture.write","endpoint_ref":"connection:fixture","next_action":"fresh_description_then_explicit_invoke"})
+                        serde_json::json!({"connect_session_ref":"session:fixture","operation_ref":"fixture.write","connection_ref":"connection:fixture","next_action":"fresh_description_then_explicit_invoke"})
                     }
                     3 => {
-                        serde_json::json!({"endpoint_ref":"connection:fixture","integration_ref":"fixture","label":"fixture","state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]})
+                        serde_json::json!({"connection_ref":"connection:fixture","integration_ref":"fixture","label":"fixture","state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]})
                     }
                     4 => {
-                        let mut binding = serde_json::json!({"endpoint_ref":"connection:fixture","label":"fixture","provider":"fixture","audiences":[]});
+                        let mut binding = serde_json::json!({"connection_ref":"connection:fixture","label":"fixture","provider":"fixture","audiences":[]});
                         if case != "legacy-absent" {
                             binding["purpose"] = serde_json::json!(if case == "matching" {
                                 "fixture.user"
@@ -917,9 +917,9 @@ async fn auth_adversary_fresh_operation_binding_rejects_conflicting_purpose() {
                         }
                         let mut endpoints = vec![binding];
                         if case == "split-pair" {
-                            endpoints.push(serde_json::json!({"endpoint_ref":"connection:other","label":"other","provider":"fixture","purpose":"fixture.user","audiences":[]}));
+                            endpoints.push(serde_json::json!({"connection_ref":"connection:other","label":"other","provider":"fixture","purpose":"fixture.user","audiences":[]}));
                         }
-                        serde_json::json!({"operation_ref":"fixture.write","title":"fixture","description":"fixture","input_schema":{"type":"object","additionalProperties":false},"output_schema":{},"effect":"read_only","approval":"not_required","endpoints":endpoints,"description_ref":"description:fresh"})
+                        serde_json::json!({"operation_ref":"fixture.write","title":"fixture","description":"fixture","input_schema":{"type":"object","additionalProperties":false},"output_schema":{},"effect":"read_only","approval":"not_required","connections":endpoints,"description_ref":"description:fresh"})
                     }
                     _ => unreachable!(),
                 };
@@ -1016,14 +1016,14 @@ async fn auth_adversary2_completion_fixture(case: &'static str) -> (bool, Vec<St
                 0 => auth_stage2_bound_status(deadline, false),
                 1 => auth_stage2_bound_status(deadline, true),
                 2 => {
-                    serde_json::json!({"connect_session_ref":"session:fixture","operation_ref":"fixture.write","endpoint_ref":"connection:fixture","next_action":"fresh_description_then_explicit_invoke"})
+                    serde_json::json!({"connect_session_ref":"session:fixture","operation_ref":"fixture.write","connection_ref":"connection:fixture","next_action":"fresh_description_then_explicit_invoke"})
                 }
                 3 => {
-                    serde_json::json!({"endpoint_ref":"connection:fixture","integration_ref":"fixture","label":"SYNTHETIC_PRIVATE_INSTRUCTION","state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]})
+                    serde_json::json!({"connection_ref":"connection:fixture","integration_ref":"fixture","label":"SYNTHETIC_PRIVATE_INSTRUCTION","state":"callable","initiation":["b10x"],"route":{"kind":"direct"},"auth_profile":"fixture.user","channels":[]})
                 }
                 4 => {
                     let schema = serde_json::json!({"$schema":"https://json-schema.org/draft/2020-12/schema", "$id":"https://private.invalid/SYNTHETIC_PRIVATE_INSTRUCTION", "$defs":{"input":{"type":"object","required":["synthetic"],"properties":{"synthetic":{"type":"boolean"}},"additionalProperties":false}}, "$ref":"#/$defs/input", "if":{"properties":{"synthetic":{"const":true}}}, "then":if case == "changed-composition" { serde_json::json!(false) } else { serde_json::json!({}) }});
-                    serde_json::json!({"operation_ref":"fixture.write","title":"SYNTHETIC_PRIVATE_INSTRUCTION","description":"fixture","input_schema":schema,"output_schema":{},"effect":"read_only","approval":"not_required","endpoints":[{"endpoint_ref":"connection:fixture","label":"fixture","provider":"fixture","purpose":"fixture.user","audiences":[]}],"description_ref":"description:fresh"})
+                    serde_json::json!({"operation_ref":"fixture.write","title":"SYNTHETIC_PRIVATE_INSTRUCTION","description":"fixture","input_schema":schema,"output_schema":{},"effect":"read_only","approval":"not_required","connections":[{"connection_ref":"connection:fixture","label":"fixture","provider":"fixture","purpose":"fixture.user","audiences":[]}],"description_ref":"description:fresh"})
                 }
                 _ => unreachable!(),
             };

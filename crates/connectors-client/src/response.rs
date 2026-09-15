@@ -24,7 +24,7 @@ pub(crate) fn validate_versioned_operation_response(
             return Err(ClientError::InvalidResponse);
         };
         if auth.operation_ref != invoke.operation_ref
-            || auth.endpoint_ref != invoke.endpoint_ref
+            || auth.endpoint_ref != invoke.connection_ref
         {
             return Err(ClientError::InvalidResponse);
         }
@@ -118,7 +118,7 @@ mod tests {
     fn invoke() -> operation::OperationRequest {
         operation::OperationRequest::Invoke(operation::InvokeRequest {
             operation_ref: "fixture.write".to_owned(),
-            endpoint_ref: "connection:fixture".to_owned(),
+            connection_ref: "connection:fixture".to_owned(),
             description_ref: "description:fixture".to_owned(),
             input: json!({}),
             approval_evidence_ref: None,

@@ -73,7 +73,7 @@ pub struct DescribeRequest {
 #[serde(deny_unknown_fields)]
 pub struct InvokeRequest {
     pub operation_ref: String,
-    pub endpoint_ref: String,
+    pub connection_ref: String,
     /// Opaque description lease returned by `describe`; stale catalog/authority leases refuse.
     pub description_ref: String,
     pub input: Value,
@@ -143,8 +143,8 @@ pub enum ApprovalPosture {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct EndpointSummary {
-    pub endpoint_ref: String,
+pub struct ConnectionSummary {
+    pub connection_ref: String,
     pub label: String,
     /// Target Provider whose API semantics this Connection exposes. This does not select a route.
     pub provider: String,
@@ -162,7 +162,7 @@ pub struct OperationSummary {
     pub title: String,
     pub effect: EffectClass,
     pub approval: ApprovalPosture,
-    pub endpoints: Vec<EndpointSummary>,
+    pub connections: Vec<ConnectionSummary>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -175,7 +175,7 @@ pub struct OperationDescription {
     pub output_schema: Value,
     pub effect: EffectClass,
     pub approval: ApprovalPosture,
-    pub endpoints: Vec<EndpointSummary>,
+    pub connections: Vec<ConnectionSummary>,
     pub description_ref: String,
 }
 
@@ -216,7 +216,7 @@ pub enum SessionTermination {
 pub struct SessionStatus {
     pub execution_ref: String,
     pub operation_ref: String,
-    pub endpoint_ref: String,
+    pub connection_ref: String,
     pub state: SessionState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub termination: Option<SessionTermination>,
@@ -317,7 +317,7 @@ impl RequestEnvelope {
             }
             OperationRequest::Invoke(request) => {
                 require_ref(&request.operation_ref)?;
-                require_ref(&request.endpoint_ref)?;
+                require_ref(&request.connection_ref)?;
                 require_ref(&request.description_ref)?;
                 if request
                     .approval_evidence_ref
@@ -417,7 +417,7 @@ fn validate_result(result: &OperationResult) -> Result<(), OperationError> {
                 title: description.title.clone(),
                 effect: description.effect,
                 approval: description.approval,
-                endpoints: description.endpoints.clone(),
+                connections: description.connections.clone(),
             })?;
             if description.description.len() > 16_384
                 || !valid_ref(&description.description_ref, MAX_REFERENCE_BYTES)
@@ -452,9 +452,9 @@ fn validate_summary(summary: &OperationSummary) -> Result<(), OperationError> {
             summary.effect,
             EffectClass::Mutating | EffectClass::Destructive
         ) && summary.approval != ApprovalPosture::Required)
-        || summary.endpoints.len() > 64
-        || summary.endpoints.iter().any(|connection| {
-            !valid_ref(&connection.endpoint_ref, MAX_REFERENCE_BYTES)
+        || summary.connections.len() > 64
+        || summary.connections.iter().any(|connection| {
+            !valid_ref(&connection.connection_ref, MAX_REFERENCE_BYTES)
                 || connection.label.is_empty()
                 || connection.label.len() > 1024
                 || !valid_ref(&connection.provider, 128)
@@ -476,7 +476,7 @@ fn validate_summary(summary: &OperationSummary) -> Result<(), OperationError> {
 fn validate_status(status: &SessionStatus) -> Result<(), OperationError> {
     if !valid_ref(&status.execution_ref, MAX_REFERENCE_BYTES)
         || !valid_ref(&status.operation_ref, MAX_REFERENCE_BYTES)
-        || !valid_ref(&status.endpoint_ref, MAX_REFERENCE_BYTES)
+        || !valid_ref(&status.connection_ref, MAX_REFERENCE_BYTES)
         || !valid_ref(&status.connector_audit_ref, MAX_REFERENCE_BYTES)
     {
         return Err(protocol_refusal());
@@ -564,7 +564,7 @@ mod tests {
             context: context(),
             request: OperationRequest::Invoke(InvokeRequest {
                 operation_ref: "sip.dial".to_owned(),
-                endpoint_ref: "connection-asterisk-dev".to_owned(),
+                connection_ref: "connection-asterisk-dev".to_owned(),
                 description_ref: "description-1".to_owned(),
                 input: serde_json::json!({"target": "asterisk-dev"}),
                 approval_evidence_ref: Some("approval-1".to_owned()),
@@ -607,7 +607,7 @@ mod tests {
             OperationResult::SessionStatus(SessionStatus {
                 execution_ref: "execution-1".to_owned(),
                 operation_ref: "sip.dial".to_owned(),
-                endpoint_ref: "connection-1".to_owned(),
+                connection_ref: "connection-1".to_owned(),
                 state: SessionState::Terminated,
                 termination: None,
                 connector_audit_ref: "audit-1".to_owned(),
@@ -646,8 +646,8 @@ mod tests {
                     title: "Query Prometheus range data".to_owned(),
                     effect: EffectClass::ReadOnly,
                     approval: ApprovalPosture::NotRequired,
-                    endpoints: vec![EndpointSummary {
-                        endpoint_ref: "connection:prometheus:infra".to_owned(),
+                    connections: vec![ConnectionSummary {
+                        connection_ref: "connection:prometheus:infra".to_owned(),
                         label: "Infrastructure metrics".to_owned(),
                         provider: "prometheus".to_owned(),
                         audiences: vec!["sre".to_owned(), "developer".to_owned()],
@@ -660,7 +660,7 @@ mod tests {
         let OperationResult::Search { operations } = response.response.as_mut().unwrap() else {
             unreachable!();
         };
-        operations[0].endpoints[0]
+        operations[0].connections[0]
             .audiences
             .push("sre".to_owned());
         assert_eq!(
@@ -680,7 +680,7 @@ mod tests {
                         title: "Create a conversation room".to_owned(),
                         effect,
                         approval: ApprovalPosture::NotRequired,
-                        endpoints: Vec::new(),
+                        connections: Vec::new(),
                     }],
                 },
             );

@@ -275,7 +275,7 @@ async fn explicit_private_file_is_reserved_before_create_and_erased_before_publi
     assert!(!public.contains("oauth/authorize"));
     assert!(!public.contains("instruction"));
     assert_eq!(outcome["endpoint_ref"], expected_reference);
-    assert_eq!(outcome["connection"], config().catalog[0].label());
+    assert_eq!(outcome["endpoint"], config().catalog[0].label());
 }
 
 #[test]
@@ -554,7 +554,7 @@ async fn successful_private_daemon_label_cannot_reach_the_public_summary() {
     assert!(!public.contains("oauth/authorize"));
     assert!(!public.contains("instruction"));
     assert_eq!(outcome["endpoint_ref"], expected_reference);
-    assert_eq!(outcome["connection"], config().catalog[0].label());
+    assert_eq!(outcome["endpoint"], config().catalog[0].label());
 }
 
 fn configured_reference() -> String {
@@ -750,7 +750,7 @@ fn oauth_pass1_real_controlling_pty_handoff_keeps_redirected_outputs_private() {
             .unwrap();
             daemon.await.unwrap();
             instructions.await.unwrap();
-            assert_eq!(value["connection"], "Trusted display");
+            assert_eq!(value["endpoint"], "Trusted display");
             assert_eq!(value["endpoint_ref"], configured_reference());
             value
         });

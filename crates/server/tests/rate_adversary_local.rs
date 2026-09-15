@@ -141,7 +141,7 @@ impl ConnectorBackend for FinalDescribeBackend {
                 output_schema: serde_json::json!({"type":"object","properties":{"vendor":{"const":"retained"}}}),
                 effect: EffectClass::ReadOnly,
                 approval: ApprovalPosture::NotRequired,
-                endpoints: vec![],
+                connections: vec![],
                 description_ref: "fixture-description".into(),
                 rate_advice: Some(protocol::operation::OperationRateAdvice {
                     fixed: None,

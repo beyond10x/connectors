@@ -1,0 +1,139 @@
+{
+  "provenance": {
+    "system": "connectors",
+    "specification_version": "v2",
+    "source_digest": "b46e08fdaea05ec1169f3d75212c80578b59fd21a94fe1d523f21714bddb663c",
+    "contract_digest": "d01ebb2ef8f96762b184433c1df72babf3565039aef3600d49dc1cd99b931c9b"
+  },
+  "target": "clap",
+  "weakenings": [
+    {
+      "guarantee": "a command's input arrives as its declared type",
+      "instead": "a handler receives `clap::ArgMatches`. The Rust target already emits every input as a type, and a fourth rendering of the type layer would be a fourth thing to keep in step — so this target emits the grammar and leaves the types where they are.",
+      "affects": [
+        "command_contract"
+      ]
+    },
+    {
+      "guarantee": "a shell completes every value a flag accepts",
+      "instead": "an enum-typed field completes its whole closed set; every other field completes as free text. A shell cannot enumerate a `String`, and offering a guess would complete values the system refuses.",
+      "affects": [
+        "command_contract"
+      ]
+    }
+  ],
+  "refusals": [
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.ActivateCandidate"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.AuthorizeEndpoint"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.ConnectEventReceiver"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.CreateSetupSession"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.FinishSetupSession"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.MaterializeObservation"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.ReauthorizeEndpoint"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.ReconnectEventReceiver"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.RefreshObservation"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.RevokeEndpoint"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.StopEventReceiver"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.SuperviseEventReceiver"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.endpoint.VerifyEndpoint"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.runtime.InvokeOperation"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.runtime.SettleSession"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    },
+    {
+      "capability": {
+        "kind": "command_contract",
+        "source": "connectors.runtime.TerminateSession"
+      },
+      "detail": "no component declaring `reached_by: command_line` accepts this command, so no tree places it and there is no word to type"
+    }
+  ]
+}

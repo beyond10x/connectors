@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use protocol::operation::{
-    ApprovalPosture, EndpointSummary as OperationEndpointSummary, EffectClass,
+    ApprovalPosture, ConnectionSummary as OperationConnectionSummary, EffectClass,
     InvocationResult, InvokeRequest, OperationDescription, OperationError, OperationErrorCode,
     OperationResult, OperationSummary,
 };
@@ -22,13 +22,13 @@ impl JiraInner {
         &self,
         context: &PrincipalContext,
         operation_ref: &str,
-    ) -> Vec<OperationEndpointSummary> {
+    ) -> Vec<OperationConnectionSummary> {
         let mut endpoints: Vec<_> = self
             .owned_user_connections(context)
             .into_iter()
             .filter(|connection| supports_operation(connection, operation_ref))
-            .map(|connection| OperationEndpointSummary {
-                endpoint_ref: connection.endpoint_ref,
+            .map(|connection| OperationConnectionSummary {
+                connection_ref: connection.endpoint_ref,
                 label: connection.label,
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["delegated-user".to_owned()],
@@ -36,8 +36,8 @@ impl JiraInner {
             })
             .collect();
         if incremental::is_incremental(operation_ref) {
-            endpoints.push(OperationEndpointSummary {
-                endpoint_ref: ORG_CONNECTION_REF.to_owned(),
+            endpoints.push(OperationConnectionSummary {
+                connection_ref: ORG_CONNECTION_REF.to_owned(),
                 label: "Organization read-only".to_owned(),
                 provider: INTEGRATION_REF.to_owned(),
                 audiences: vec!["organization".to_owned()],
@@ -72,7 +72,7 @@ impl JiraInner {
                     title: operation_ref.replace('-', " "),
                     effect: operation_effect(operation_ref),
                     approval: operation_approval(operation_ref),
-                    endpoints,
+                    connections: endpoints,
                 })
             })
             .collect()
@@ -93,7 +93,7 @@ impl JiraInner {
         }
         for connection in self.operation_connections(context, operation_ref) {
             digest.update(b"\0");
-            digest.update(connection.endpoint_ref.as_bytes());
+            digest.update(connection.connection_ref.as_bytes());
         }
         format!("description-sha256-{:x}", digest.finalize())
     }
@@ -122,7 +122,7 @@ impl JiraInner {
             output_schema: operation_output_schema(operation_ref),
             effect: operation_effect(operation_ref),
             approval: operation_approval(operation_ref),
-            endpoints,
+            connections: endpoints,
             description_ref: self.operation_description_ref(context, operation_ref),
         }))
     }
@@ -135,13 +135,13 @@ impl JiraInner {
         if !is_jira_operation(&request.operation_ref) {
             return Err(operation_not_found());
         }
-        let organization_read = request.endpoint_ref == ORG_CONNECTION_REF
+        let organization_read = request.connection_ref == ORG_CONNECTION_REF
             && incremental::is_incremental(&request.operation_ref);
         let connection = self
             .owned_user_connections(context)
             .into_iter()
             .find(|connection| {
-                connection.endpoint_ref == request.endpoint_ref
+                connection.endpoint_ref == request.connection_ref
                     && supports_operation(connection, &request.operation_ref)
             });
         if connection.is_none() && !organization_read {
@@ -223,7 +223,7 @@ impl JiraInner {
         self.audit(
             &audit_ref,
             &request.operation_ref,
-            &request.endpoint_ref,
+            &request.connection_ref,
             context,
             "attempted",
         )
@@ -305,7 +305,7 @@ impl JiraInner {
                 self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.endpoint_ref,
+                    &request.connection_ref,
                     context,
                     "completed",
                 )
@@ -321,7 +321,7 @@ impl JiraInner {
                 let _ = self.audit(
                     &audit_ref,
                     &request.operation_ref,
-                    &request.endpoint_ref,
+                    &request.connection_ref,
                     context,
                     "refused_or_indeterminate",
                 );
