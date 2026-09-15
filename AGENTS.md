@@ -77,8 +77,11 @@ Explicit ESS selections must match it; never silently use an ambient older binar
 
 For semantic or implementation changes, run the applicable ESS validation,
 generation/drift and conformance checks, then the required repository gate. Use a
-task-owned `TMPDIR` under `.local/tmp` and bounded Cargo jobs. Keep unrelated
-worktrees' build outputs separate. Do not refresh vendor inputs during normal
+task-owned `TMPDIR` under `.local/tmp` and bounded Cargo jobs, and delete that
+directory when the task reports — nothing under `.local/` is an artifact, so anything
+in `.local/tmp` older than the running task is deletable without asking (measured
+2026-09-15: 2.9G in `.local/tmp`, 3.7G in `.local`, against 1.5G of tracked tree).
+Keep unrelated worktrees' build outputs separate. Do not refresh vendor inputs during normal
 builds or edit generated output around a refusal.
 
 For documentation-only changes, check links, factual support claims and AEP
@@ -184,10 +187,20 @@ this repository, candidate suppression files carry no authority, and hooks are n
 bypassed. A receipt is invalidated by source changes, rebases, policy changes and
 scanner upgrades.
 
-This repository is registered in Atlas, and the `## Serves` section above is the
-grounding Atlas `check-map` reads; keep it accurate and keep its ids in
-`atlas/ROADMAP.md`. The org-state review of 2026-09-15 decided the lineage — Atlas
-ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its predecessor*), 2026-09-15: the name `beyond10x/connectors` denotes this
+Atlas grounds this repository through the fence, not through a catalog row (measured
+2026-09-15). `atlas/scripts/fences.sh:25-30` builds the expected-repository roster from
+every sibling directory holding a `.git`, so this repository is enumerated, and
+`atlas/scripts/check-map.sh:378-389` reads the `## Serves` ids out of this file — keep
+that section accurate and keep its ids in `atlas/ROADMAP.md`. There is no
+`connectors_v2` row in the Atlas catalog store or in `atlas/docs/catalog.md`, and
+Atlas ADR 0051 says why there will not be a separate one: a catalog id **is**
+the exact GitHub repository name, `beyond10x/connectors_v2` does not exist (404 on
+2026-09-15), and under that ADR this lineage's published identity — and so its
+catalog row — is `beyond10x/connectors`, the row that already exists. The lineage
+record itself is deferred there for the same reason.
+
+The lineage is Atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its
+predecessor*, accepted 2026-09-15): the name `beyond10x/connectors` denotes this
 lineage, which owns that repository's `next` default branch, its `v0.8.0`-and-later
 tag namespace and its Latest release. The v1 component at
 `/home/timo/beyond10x/connectors`, whose releases end at `v0.7.2`, is the
