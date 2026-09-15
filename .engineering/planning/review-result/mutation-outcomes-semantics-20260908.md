@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:mutation-outcomes-semantics-20260908
 kind: review-result
-status: active
+status: archived
 title: Mutation outcomes independent semantics review
 relations:
 - reviews: story:contracts-mutation-outcomes
-revision: 1
+revision: 2
 ---
 approve
 

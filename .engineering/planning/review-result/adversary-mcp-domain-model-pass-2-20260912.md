@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adversary-mcp-domain-model-pass-2-20260912
 kind: review-result
-status: active
+status: archived
 title: Adversary pass 2 — MCP domain model, wave 2
 relations:
 - reviews: story:mcp-domain-model
-revision: 1
+revision: 2
 ---
 ```
 unit: mcp-w2 — story:mcp-domain-model at ff8ec40 (d5270ca + ff8ec40), worktree cv2-mcp-w1-20260912

@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adversary-catalog-coverage-pass-1
 kind: review-result
-status: active
+status: archived
 title: Adversary pass 1 on the bundle coverage report
 relations:
 - reviews: story:catalog-coverage-report
-revision: 1
+revision: 2
 ---
 # Adversary pass 1 — story:catalog-coverage-report
 

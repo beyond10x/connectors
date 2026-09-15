@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:wire-binding-r3-20260908
 kind: review-result
-status: active
+status: archived
 title: Final independent service binding approval
 relations:
 - reviews: story:contracts-wire-compatibility
-revision: 1
+revision: 2
 ---
 # Independent final E02 review B
 

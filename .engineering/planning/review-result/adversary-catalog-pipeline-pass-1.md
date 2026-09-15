@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adversary-catalog-pipeline-pass-1
 kind: review-result
-status: active
+status: archived
 title: Adversary pass 1 on the bundle pipeline
 relations:
 - reviews: story:catalog-bundle-pipeline
-revision: 1
+revision: 2
 ---
 # Adversary pass 1 — story:catalog-bundle-pipeline
 

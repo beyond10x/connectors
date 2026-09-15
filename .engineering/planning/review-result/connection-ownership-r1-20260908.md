@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:connection-ownership-r1-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent connection ownership review round 1
 relations:
 - reviews: story:contracts-connection-readiness
 - reviews: story:contracts-management-boundary
-revision: 1
+revision: 2
 ---
 # Independent connection semantics review B — initial requirements
 

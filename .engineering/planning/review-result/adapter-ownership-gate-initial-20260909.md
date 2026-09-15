@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adapter-ownership-gate-initial-20260909
 kind: review-result
-status: active
+status: archived
 title: Initial extraction layout gate review
 relations:
 - reviews: story:extractable-adapter-contract-ownership
-revision: 1
+revision: 2
 ---
 approve
 

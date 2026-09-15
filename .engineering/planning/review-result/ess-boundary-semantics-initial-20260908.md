@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:ess-boundary-semantics-initial-20260908
 kind: review-result
-status: active
+status: archived
 title: Shared ESS boundary independent semantics review, initial
 relations:
 - reviews: story:shared-ess-provider-boundary
-revision: 1
+revision: 2
 ---
 needs-revision
 

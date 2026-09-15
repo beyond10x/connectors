@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:sessions-semantics-r2-20260908
 kind: review-result
-status: active
+status: archived
 title: Session semantics final recheck and tenant-header review
 relations:
 - reviews: story:contracts-session-revocation
 - reviews: story:contracts-tenant-header
-revision: 1
+revision: 2
 ---
 # Independent review A: final specification recheck
 

@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:connection-ownership-r3-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent final connection ownership approval
 relations:
 - reviews: story:contracts-connection-readiness
 - reviews: story:contracts-management-boundary
-revision: 1
+revision: 2
 ---
 # Independent management/readiness recheck B — final confirmation
 

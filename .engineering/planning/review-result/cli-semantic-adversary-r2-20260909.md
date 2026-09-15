@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:cli-semantic-adversary-r2-20260909
 kind: review-result
-status: active
+status: archived
 title: CLI semantic adversary final pass 2026-09-09
 relations:
 - reviews: story:local-cli-binding-semantics
-revision: 1
+revision: 2
 ---
 unit: story:local-cli-binding-semantics — ATTACK2 final semantic pass of uncommitted work/cli-semantics-20260909 atop 88c036562f6ae011bd5cb0ce8e4d4671146b4922
 verdict: nothing found

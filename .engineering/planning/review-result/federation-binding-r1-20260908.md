@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:federation-binding-r1-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent F03 binding review round 1
 relations:
 - reviews: story:contracts-federated-approval
-revision: 1
+revision: 2
 ---
 # Independent F03 foundation review B
 

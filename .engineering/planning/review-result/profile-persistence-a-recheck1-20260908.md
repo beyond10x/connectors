@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:profile-persistence-a-recheck1-20260908
 kind: review-result
-status: active
+status: archived
 title: Discovery profiles and persistence reviewer A final approval
 relations:
 - reviews: story:contracts-discovery-profiles
 - reviews: story:contracts-persistence-ownership
-revision: 1
+revision: 2
 ---
 # Independent recheck A — discovery profiles and persistence ownership
 

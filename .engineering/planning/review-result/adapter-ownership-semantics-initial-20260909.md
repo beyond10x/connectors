@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adapter-ownership-semantics-initial-20260909
 kind: review-result
-status: active
+status: archived
 title: Initial native contract ownership and preservation review
 relations:
 - reviews: story:extractable-adapter-contract-ownership
-revision: 1
+revision: 2
 ---
 needs-revision
 
