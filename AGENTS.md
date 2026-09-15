@@ -264,10 +264,19 @@ establish compatibility. Record the remote commit, release and downloadable arti
 
 **The version is an artifact identity, not a label.** `[workspace.package] version` is what
 `catalog-build` writes into every catalog document's `generator` field, into every
-`connectors.lock` row, and into the wire User-Agent. Cutting a version therefore rewrites all 67
-catalog artifacts and the lockfile; that diff is the intended consequence, not churn. The bump
-itself touches 184 pins across 27 manifests — every internal dependency is path-pinned to the exact
+`connectors.lock` row, and into the wire User-Agent. Cutting a version therefore rewrites every
+generated catalog artifact and the lockfile; that diff is the intended consequence, not churn. The
+bump also touches every internal dependency pin, because each one is path-pinned to the exact
 version — so bump them together and re-run `catalog build`.
+
+Count them rather than trusting a number written here; the numbers in the comments are what these
+printed at 0.7.2:
+
+```text
+grep -rl '"generator": "connectors ' catalog | wc -l                     # 65 catalog artifacts
+grep -rlE 'version = "[0-9.]+", path = ' --include=Cargo.toml . | wc -l  # 29 manifests
+grep -rnE 'version = "[0-9.]+", path = ' --include=Cargo.toml . | wc -l  # 177 pins
+```
 
 Cutting a release is pushing a `v*` tag. `.github/workflows/release.yml` checks the tag against the
 committed version and the CHANGELOG against that version, runs the sharded gate, the history-wide
