@@ -170,3 +170,9 @@ Rust/WASM behavior, separately from the adapter runtime; specified user authoriz
 is labeled separately from configured federation available today.
 
 Agents making repository changes should start with [AGENTS.md](AGENTS.md).
+
+<!-- b10x-docs:start -->
+## Documentation
+
+[Connectors documentation](https://beyond10x.github.io/docs/connectors/) · [Start](https://beyond10x.github.io/) · [Ecosystem](https://beyond10x.github.io/ecosystem/) · [Impact](https://beyond10x.github.io/changes/) · [Releases](https://beyond10x.github.io/releases/)
+<!-- b10x-docs:end -->
