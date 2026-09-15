@@ -58,9 +58,6 @@ surfaces:
   - kind: docs
     label: Development
     url: https://beyond10x.github.io/docs/connectors/development/
-  - kind: guide
-    label: Migrating from v1
-    url: https://beyond10x.github.io/docs/connectors/cli-migration-v1-to-v2/
   - kind: source
     label: Source
     url: https://github.com/beyond10x/connectors
@@ -70,8 +67,7 @@ surfaces:
       - README.md
       - docs/design.md
       - docs/development.md
-      - docs/cli-migration-v1-to-v2.md
-      - docs/compositions/*.md
+      - docs/compositions/monitoring.md
     navigation:
       group: Services
       label: Connectors
