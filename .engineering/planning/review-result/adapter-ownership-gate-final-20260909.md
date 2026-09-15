@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:adapter-ownership-gate-final-20260909
 kind: review-result
-status: active
+status: archived
 title: Final extraction boundary gate review
 relations:
 - reviews: story:extractable-adapter-contract-ownership
-revision: 1
+revision: 2
 ---
 approve
 

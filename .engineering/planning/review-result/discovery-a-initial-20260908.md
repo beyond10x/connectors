@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:discovery-a-initial-20260908
 kind: review-result
-status: active
+status: archived
 title: Discovery coverage and composition reviewer A initial
 relations:
 - reviews: story:contracts-discovery-coverage
 - reviews: story:contracts-host-composition
-revision: 1
+revision: 2
 ---
 # Discovery coverage and host composition — reviewer A initial
 

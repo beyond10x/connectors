@@ -2,13 +2,13 @@
 format: aep.planning-md/1
 id: review-result:auth-access-a-r2-20260908
 kind: review-result
-status: active
+status: archived
 title: Auth access and permission budgets reviewer A r2
 relations:
 - reviews: story:contracts-anonymous-auth
 - reviews: story:contracts-permission-budgets
 - reviews: story:contracts-acquisition-profiles
-revision: 1
+revision: 2
 ---
 # Auth-profile and permission-budget cluster — reviewer A first recheck
 

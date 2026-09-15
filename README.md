@@ -48,6 +48,14 @@ against a live GitLab through it, the preconditions declared as data. Explicit
 revalidation renews the 60-second validation evidence without credential
 re-entry; see [the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md).
 
+This catalog is a second implementation, not a migration of the first: the
+registered `connectors` component ships the predecessor it re-implements at
+`crates/catalog`, both exist today, and — as [AGENTS.md](AGENTS.md) states — this
+repository does not replace the registered component. Consumers pin the registered
+component and not this one: six repositories in the organization depend on
+`beyond10x/connectors`, at seven distinct revisions, and none depends on this
+repository.
+
 Kubernetes now has the same local lifecycle binding: a saved bearer token, an
 identity validated by one SelfSubjectReview probe, and its three reads through the
 local owner. Disposable TLS cluster and keyring fixtures prove reuse after CLI,
@@ -62,6 +70,20 @@ transaction with fixed statement and lock timeouts. A loopback wire fixture
 proves the journey; dedicated sandbox acceptance remains open. See the
 [PostgreSQL CLI guide](docs/local-postgres-cli.md). MCP and the remaining
 providers follow. The explicit network commands below remain compatible.
+
+Three decisions are open and are what MCP and the recorded Helm workflows wait on.
+`aep plan artifact list --kind decision-blocker --store .engineering/planning`
+prints their current status:
+
+- `decision-blocker:helm-execution-family` — nobody has decided whether Connectors
+  runs external provider binaries; it withholds the test result of
+  `initiative:complete-local-connectors`, the only active initiative.
+- `decision-blocker:mcp-caller-connection-assignment` — nobody has decided which
+  provider connection an inbound MCP caller may use; it withholds review of
+  `epic:mcp-contracts`.
+- `decision-blocker:mcp-outbound-stdio-process-ownership` — nobody has decided
+  whether Connectors spawns an MCP server as a child process; it withholds review
+  of `epic:mcp-contracts`.
 
 This repository contains a working local data/discovery slice and a broader,
 reviewed specification baseline. The local **v0.1.0 milestone is a specification

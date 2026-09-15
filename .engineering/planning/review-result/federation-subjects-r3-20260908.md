@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:federation-subjects-r3-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent F03 final subjects review
 relations:
 - reviews: story:contracts-federated-approval
-revision: 1
+revision: 2
 ---
 # F03 independent final semantic recheck A — round 3
 

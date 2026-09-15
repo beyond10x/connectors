@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:restart-visibility-a-recheck2-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent restart and visibility review A recheck2
 relations:
 - reviews: story:contracts-restart-idempotency
 - reviews: story:contracts-mutation-visibility
-revision: 1
+revision: 2
 ---
 approve
 

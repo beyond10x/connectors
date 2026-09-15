@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:auth-refresh-adversary-p1-20260908
 kind: review-result
-status: active
+status: archived
 title: F04 refresh coordination adversarial pass 1
 relations:
 - reviews: story:contracts-refresh-coordination
-revision: 1
+revision: 2
 ---
 unit: story:contracts-refresh-coordination; unstaged worktree connectors-v2-auth-refresh-20260908 against 1e567571d9ac62070933c7099b93a4e030613e58
 verdict: green

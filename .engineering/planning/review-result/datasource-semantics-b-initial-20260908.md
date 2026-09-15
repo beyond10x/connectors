@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:datasource-semantics-b-initial-20260908
 kind: review-result
-status: active
+status: archived
 title: Independent datasource semantics review B initial
 relations:
 - reviews: story:contracts-log-continuation
 - reviews: story:contracts-document-admission
-revision: 1
+revision: 2
 ---
 needs-revision
 

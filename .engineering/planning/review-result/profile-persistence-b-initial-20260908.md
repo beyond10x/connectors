@@ -2,12 +2,12 @@
 format: aep.planning-md/1
 id: review-result:profile-persistence-b-initial-20260908
 kind: review-result
-status: active
+status: archived
 title: Discovery profiles and persistence reviewer B initial
 relations:
 - reviews: story:contracts-discovery-profiles
 - reviews: story:contracts-persistence-ownership
-revision: 1
+revision: 2
 ---
 # Independent reviewer B — discovery profiles / persistence ownership, initial
 

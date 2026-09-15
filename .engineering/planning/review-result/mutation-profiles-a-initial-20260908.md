@@ -2,13 +2,13 @@
 format: aep.planning-md/1
 id: review-result:mutation-profiles-a-initial-20260908
 kind: review-result
-status: active
+status: archived
 title: Mutation profiles reviewer A initial review
 relations:
 - reviews: story:contracts-mutation-classification
 - reviews: story:contracts-restart-idempotency
 - reviews: story:contracts-mutation-visibility
-revision: 1
+revision: 2
 ---
 # Independent initial review A — mutation classification, lifecycle idempotency and visibility
 

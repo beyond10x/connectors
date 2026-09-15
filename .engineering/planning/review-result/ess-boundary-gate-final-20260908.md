@@ -2,11 +2,11 @@
 format: aep.planning-md/1
 id: review-result:ess-boundary-gate-final-20260908
 kind: review-result
-status: active
+status: archived
 title: Shared ESS boundary independent gate review, final approval
 relations:
 - reviews: story:shared-ess-provider-boundary
-revision: 1
+revision: 2
 ---
 approve
 
