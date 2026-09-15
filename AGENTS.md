@@ -1,8 +1,11 @@
 # AGENTS.md
 
 Orientation for agents (and humans) working in this repository.
-**github.com/beyond10x/connectors is the canonical home of Connectors.** The Zwirn product consumes
-this repository as a pinned git dependency; the dependency never runs the other way.
+**This repository is the v1 line of Connectors, and v1 is the predecessor line.** The
+`github.com/beyond10x/connectors` name is the successor's: the remote's default branch is `next` and
+every tag from v0.8.0 belongs to `connectors_v2`. v1's tags end at v0.7.2 — see § Status before
+pinning anything or cutting anything. The Zwirn product consumes this repository as a pinned git
+dependency; the dependency never runs the other way.
 Org-wide rules — the naming convention, the language rule (anything that runs is Rust, not Python),
 the former-brand rule (atlas ADR 0001) and the rule that renaming anything another repo verifies is a
 coordinated migration with an ADR — live in `atlas/AGENTS.md` and are not restated here.
@@ -20,8 +23,25 @@ A change here that moves none of these is a question for the operator, not a tas
 
 ## Status
 
-Pre-v1 implementation phase: the catalog, platform service, hosted integrations, and product
-binaries are implemented alongside their design authority. Read current authority in order:
+**Predecessor line, as of 2026-09-15.** This repository is Connectors v1, superseded by
+`connectors_v2` — decided by the atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its predecessor*, 2026-09-15) and by
+[docs/design/21-clean-room-rewrite.md](docs/design/21-clean-room-rewrite.md), accepted the same day
+through the org-state review decision sheet (items 1 and 15). The `github.com/beyond10x/connectors`
+remote now carries both lineages and the successor owns the name: its default branch is `next`, and
+its tags from **v0.8.0** onwards (v0.11.0 at the time of writing) are v2's, not this line's. **v1's
+tags end at v0.7.2**; v1's last published commit is the tip of `origin/main`, and the 9 unpublished
+v1 commits are parked on the local branch `v1-bounded-reads-20260906`. v1 is still consumed —
+devcenter pins `connectors-client` and `protocol` at rev `e80b7ae1`, `version = "=0.7.0"`
+(`devcenter/Cargo.toml:37-38`) — and design 21 §3 lists the four manifests a cutover has to repin.
+This is a freeze, not an abandonment: the repository becomes the read-only predecessor reference,
+exactly the status the two predecessor repositories named at the end of § Boundaries hold here today.
+
+Ten epics were `active` when that decision landed. Six are now `archived` against design 21 and four
+still need the operator; each one records which and why under its own `## Disposition` heading
+(`aep plan artifact list --kind epic --status archived`, `… --status active`).
+
+The v1 implementation — catalog, platform service, hosted integrations, product binaries — remains
+implemented alongside its design authority. Read that authority in order:
 [docs/design/01-domain-model.md](docs/design/01-domain-model.md) →
 [docs/design/02-architecture.md](docs/design/02-architecture.md) →
 [docs/VISION.md](docs/VISION.md) (historical founding intent). The research corpus

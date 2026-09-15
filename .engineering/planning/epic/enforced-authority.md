@@ -2,9 +2,9 @@
 format: aep.planning-md/1
 id: epic:enforced-authority
 kind: epic
-status: active
+status: archived
 title: Enforced authority
-revision: 3
+revision: 5
 ---
 ## Provenance
 
@@ -28,3 +28,19 @@ exists for this epic itself; the grouping is a frontmatter value and nothing els
 `active`, derived from its stories (backlog: 1, done: 7). **inferred** — no source document states a status
 for this epic, so the rung follows the work underneath it: all done is `implemented`, any work
 started is `active`, nothing started is `draft`.
+
+## Disposition
+
+Archived 2026-09-15 on the acceptance of `docs/design/21-clean-room-rewrite.md` (org-state review
+decision sheet 2026-09-15, items 1 and 15; atlas ADR 0051, 2026-09-15).
+
+**Absorbed by the successor lineage.** Design 21 §2 keeps authority as K3 — "admitted principal, Grant
+evaluation (deny > allow > predicate), approval issuance / exact-input binding / one-time redemption" —
+to be re-expressed as decision tables and fixtures, not as this code. The successor carries the same
+surface: local approval commands that "manage policy, prepare exact subjects and issue protected proofs",
+plus approval-signing key initialization, rotation, recovery, revocation and retirement
+(`connectors_v2/README.md`, `connectors_v2/docs/local-approvals.md`,
+`connectors_v2/docs/local-approval-keys.md`).
+
+Its 8 `docs/stories/S-*` records keep their own statuses (7 `done`, 1 `backlog`). This repository's `AGENTS.md` states no
+convention for stories under an archived epic, so none was moved. Archiving keeps the record.

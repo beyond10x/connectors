@@ -4,7 +4,7 @@ id: epic:post-m1
 kind: epic
 status: active
 title: Post-M1
-revision: 4
+revision: 5
 ---
 ## Provenance
 
@@ -25,3 +25,18 @@ exists for this epic itself; the grouping is a frontmatter value and nothing els
 `active`, derived from its stories (backlog: 1, done: 3, in-progress: 1). **inferred** — no source document states a status
 for this epic, so the rung follows the work underneath it: all done is `implemented`, any work
 started is `active`, nothing started is `draft`.
+
+## Disposition
+
+**Left `active` on 2026-09-15 — needs the operator.** `docs/design/21-clean-room-rewrite.md` was accepted
+that day (decision sheet items 1 and 15) and six sibling epics archived under it; this one does not
+classify cleanly and was not moved.
+
+It is maintenance of *this* repository rather than a capability: S-020 (a CI gate that runs what the
+"monorepo" claims) and S-021 (coverage regains its second direction) are the two open stories. Design 21
+§4 keeps three checks "with teeth" and says of the rest "The rest is not re-derived", and §6 phase 5
+archives this repository as predecessor — but a predecessor still needs a gate until the four consumers
+of §3 are repinned, and nothing in design 21 says when that gate stops mattering.
+
+What settles it: whether this repository keeps a running CI gate until §6 phase 5 cutover, or freezes
+read-only now.
