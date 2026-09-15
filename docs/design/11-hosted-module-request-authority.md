@@ -28,7 +28,7 @@ exists.
 ## Tenant and user attribution
 
 Hosted configuration lists the exact tenants this Connector deployment may project to modules.
-The Babelforce developer profile lists one tenant because it is a single-organization deployment.
+A single-organization developer profile lists one tenant because it is a single-organization deployment.
 The runtime still selects the tenant from each verified `PrincipalContext` and refuses one outside
 that configured set. Subject and actor are carried separately so a person's resource ownership and
 an immediate delegated/service actor are not collapsed.

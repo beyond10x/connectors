@@ -1956,7 +1956,7 @@ fn test_egress() -> Arc<dyn EgressTransport> {
 
 /// The stable machine identity of one declared instance, derived from the name a person chose.
 ///
-/// `CredentialRef::for_instance` admits only a canonical uuid, so `"babelforce-bot"` cannot be an
+/// `CredentialRef::for_instance` admits only a canonical uuid, so `"acme-bot"` cannot be an
 /// instance id directly. Deriving one from the name means the Connection ref, every datasource
 /// binding ref and the credential address are the same on every start — where a random id makes a
 /// saved binding reference dead the moment the placement restarts. The name stays the thing anybody

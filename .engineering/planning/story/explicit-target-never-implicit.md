@@ -26,11 +26,12 @@ scope:
   path: crates/connectors-console/src/output.rs
 - confidence: cited
   path: docs/design/19-the-cli-surface.md
-revision: 21
+revision: 22
 ---
 # Story: a command names its target; nothing infers it from a stored login
 
 ## Defect
+
 `connectors operation …`, `connectors connection …` and `connectors event …` decide where they go
 by the absence of two flags: when neither `--config` nor `--state-root` is given and
 `~/.local/state/b10x/connectors/identity-sessions.json` holds a login, the request goes to that
@@ -41,7 +42,7 @@ same command line therefore reaches two different systems depending on a file th
 not name, and `connectors login` run once changes the target of every later `operation invoke`
 on the machine — including the payloads a script passes as input. Measured 2026-09-04 with
 `strace -e trace=connect`: `operation search --query slack` with no flags connected to
-`devcenter.dev.babelforce.com:443`; with `--config`/`--state-root` to the local socket; the daemon
+`devcenter.dev.example.com:443`; with `--config`/`--state-root` to the local socket; the daemon
 was never consulted on the first route. No other verb has this fallback: `mcp`, `admin`,
 `serve-hosted`, `login`, `logout` are hosted by name; `connect`, `auth`, `providers`, `doctor` are
 local by construction. The pattern exists in connectors only; `zwirn` and the platform agent use
