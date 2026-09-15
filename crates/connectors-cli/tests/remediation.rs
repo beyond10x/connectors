@@ -533,3 +533,62 @@ fn auth_stage2_v3_refusal_keeps_failure_and_privacy_with_open_or_closed_output()
         }
     }
 }
+
+#[test]
+fn auth_adversary_cli_unsafe_daemon_objects_refuse_before_open_stdin_or_private_destination() {
+    let mut observations = Vec::new();
+    for case in ["absent", "regular", "symlink"] {
+        let fixture = Fixture::new();
+        let socket = fixture.root.join("connectors.sock");
+        let original = fixture.root.join("retained");
+        fs::write(&original, "retain-fixture").unwrap();
+        match case {
+            "regular" => fs::write(&socket, "retain-fixture").unwrap(),
+            "symlink" => std::os::unix::fs::symlink(&original, &socket).unwrap(),
+            _ => {}
+        }
+        let destination = fixture.root.join("private-instructions");
+        let mut child = fixture
+            .command(
+                "json",
+                &[
+                    "setup",
+                    "connect",
+                    "--operation",
+                    "fixture.write",
+                    "--connection",
+                    "connection:fixture",
+                    "--input",
+                    "-",
+                ],
+            )
+            .arg("--instruction-file")
+            .arg(&destination)
+            .stdin(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let input = child.stdin.take().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while child.try_wait().unwrap().is_none() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let blocked = child.try_wait().unwrap().is_none();
+        if blocked {
+            child.kill().unwrap();
+        }
+        drop(input);
+        let output = child.wait_with_output().unwrap();
+        observations.push((case, blocked, output.status.code()));
+        assert!(
+            !destination.exists(),
+            "unsafe/absent daemon must not reserve human output"
+        );
+        assert_eq!(fs::read_to_string(&original).unwrap(), "retain-fixture");
+        assert!(!output.status.success());
+    }
+    eprintln!("real CLI with stdin kept open; timed-out fixture children were killed and joined: {observations:?}");
+    assert!(
+        observations.iter().all(|(_, blocked, _)| !blocked),
+        "an existing non-socket or symlink must be refused before blocking on caller stdin"
+    );
+}
