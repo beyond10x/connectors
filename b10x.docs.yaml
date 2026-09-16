@@ -12,13 +12,12 @@ surfaces:
 - accent: '#52d6c7'
   adoption:
     estimatedMinutes: 20
-    label: Connect Slack locally
+    label: Build and run a connector locally
     mode: source-build
-    outcome: Configure a local Connector deployment and establish a governed Slack connection.
+    outcome: Build the workspace and run a connector against a local composition.
     prerequisites:
     - Rust toolchain
-    - Slack application credentials
-    url: https://beyond10x.github.io/docs/connectors/guides/connect-slack/
+    url: https://beyond10x.github.io/docs/connectors/development/
   audiences:
   - evaluator
   - adopter
