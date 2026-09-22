@@ -30,8 +30,8 @@ Manual scope and reasoning:
 Independently executed checks (all from the assigned tree):
 
 1. git rev-parse HEAD — exit 0; exact source above. git status --short — exit 0, empty before review.
-2. /home/timo/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify validate --path ess — exit 0: connectors v1 — 16 file(s), valid.
-3. /home/timo/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out .local/model-closure-20260909/initial-ir.json — exit 0: 16 files, 263 declarations.
+2. ~/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify validate --path ess — exit 0: connectors v1 — 16 file(s), valid.
+3. ~/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out .local/model-closure-20260909/initial-ir.json — exit 0: 16 files, 263 declarations.
 4. jq '.entities[] | select(.name == "connectors.auth_bindings.Connection")' .local/model-closure-20260909/initial-ir.json — exit 0; Connection's actual compiled fields have no EvidenceSnapshot carrier.
 5. git diff --check 8a5cf563fc717fd4b23e4dd7d470d0c967f39461 b5abe434fbb34dfd889303f19933a9bff9e2e23a — exit 0. Read the full selected delta to verify the existing identities/lifecycles/old field types were preserved.
 

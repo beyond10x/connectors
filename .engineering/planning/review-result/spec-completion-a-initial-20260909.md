@@ -14,7 +14,7 @@ revision: 1
 Verdict: **needs-revision**. One finding: **SCA-01, P2**. No P0/P1 finding.
 
 Exact reviewed commit: `eb0815961e6ffee54c50f91f37eff2bbe11811c0`.
-Managed checkout: `/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-review-a-20260909`.
+Managed checkout: `~/.local/state/worktree/trees/b10x/connectors_v2/specs-review-a-20260909`.
 Reviewer/session: `specs-review-a-20260909`.
 
 This is the initial stable-core pass, not final approval of all specifications.

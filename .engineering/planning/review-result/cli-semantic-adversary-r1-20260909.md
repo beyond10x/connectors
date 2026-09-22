@@ -292,7 +292,7 @@ integration was invoked. No source, generated artifact, existing test, AEP store
 Git index or commit was mutated by this review.
 
 Retained paths inside the assigned worktree scratch, all relative to
-`/home/timo/.local/state/worktree/trees/b10x/connectors_v2/cli-semantics-20260909/`:
+`~/.local/state/worktree/trees/b10x/connectors_v2/cli-semantics-20260909/`:
 
 - `.local/tmp/cli-wave/adversary-r1-completing.json`
 - `.local/tmp/cli-wave/adversary-r1-expired.json`

@@ -25,14 +25,14 @@ Review coverage and reasoning:
 
 Checks actually executed in the assigned tree:
 
-1. `TMPDIR="$PWD/.local/model-closure-20260909" /home/timo/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify validate --path ess` — exit 0: `connectors v1 — 18 file(s), valid`.
-2. `TMPDIR="$PWD/.local/model-closure-20260909" /home/timo/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out .local/model-closure-20260909/ir.json` — exit 0: 18 files, 314 declarations. The resulting IR has twenty entities.
+1. `TMPDIR="$PWD/.local/model-closure-20260909" ~/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify validate --path ess` — exit 0: `connectors v1 — 18 file(s), valid`.
+2. `TMPDIR="$PWD/.local/model-closure-20260909" ~/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out .local/model-closure-20260909/ir.json` — exit 0: 18 files, 314 declarations. The resulting IR has twenty entities.
 3. `git diff --check 8a5cf563fc717fd4b23e4dd7d470d0c967f39461..HEAD` — exit 0.
 4. `git rev-parse HEAD` remained the exact reviewed commit; `git status --short` was empty before report creation. Tracked source and planning files were not changed.
 
 Logs and compiled IR are retained beside this report. I read the assigned AGENTS.md, design document, relevant source delta and owning contracts, with the worktree and ESS skill boundaries. This was a non-interactive delegated read-only review; no planning mutation or approval bypass was needed. No other reviewer's findings or reports were read. No provider access, Rust/full build, new helper program, runtime code, commit, tag or publication was performed. The coordinator separately reported a passing full gate; this report does not present that as a check I ran. Schema/lifecycle compilation does not execute storage atomicity, clock, cryptographic, cross-record predicate or public-codec obligations, and approval does not claim otherwise.
 
-Managed tree retained for coordinator handoff: `/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-model-review-b-20260909`; session lease `specs-model-review-b-20260909` was acquired and heartbeated. Own-lease release is checked separately in the final handoff.
+Managed tree retained for coordinator handoff: `~/.local/state/worktree/trees/b10x/connectors_v2/specs-model-review-b-20260909`; session lease `specs-model-review-b-20260909` was acquired and heartbeated. Own-lease release is checked separately in the final handoff.
 
 ```findings
 []

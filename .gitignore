@@ -9,3 +9,7 @@
 /website/.cache/
 /website/static/examples/
 /apps/connectors-cli-contract/.ess-output/
+.engineering/.aep-planning-writer*.lock
+.engineering/state/writer.lock
+.engineering/migrations/*/recovery/
+.engineering/migrations/*/stage/

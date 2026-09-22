@@ -55,7 +55,7 @@ The requested implementation was already integrated directly into local main as 
 ## main
 ```
 
-git worktree list --porcelain reports only the primary Connectors checkout at that commit. worktree repo list reports the unmanaged primary, and worktree inspect --repo /home/timo/beyond10x/connectors_v2 --json returns an empty inspections array. There is no Connectors task tree to finish, reconcile or remove. No recovery repository or remote is created, and no Connectors publication is performed.
+git worktree list --porcelain reports only the primary Connectors checkout at that commit. worktree repo list reports the unmanaged primary, and worktree inspect --repo ~/beyond10x/connectors_v2 --json returns an empty inspections array. There is no Connectors task tree to finish, reconcile or remove. No recovery repository or remote is created, and no Connectors publication is performed.
 
 The earlier task's build target, its symlink and /dev/shm/connectors-local-runtime-20260910 are confirmed absent. The review binary and small verification receipts are retained. All 17 implementation entries in docs/evidence/local-runtime-20260910/implementation-sha256.txt pass sha256sum --check, and the retained binary still has the digest recorded in docs/evidence/local-runtime-20260910/README.md. The successful gate, Rust 1.88, generation, conformance and documentation evidence in that report applies to these unchanged inputs; an AEP-only checkpoint does not rerun unrelated builds or provider tests.
 
