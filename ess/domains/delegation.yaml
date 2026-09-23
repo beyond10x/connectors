@@ -200,6 +200,33 @@ entities:
       states: [Spent]
       terminal: [Spent]
 
+commands:
+  - name: connectors.delegation.RecordApprovalRedemption
+    input:
+      - {name: receipt_id, type: connectors.delegation.ReceiptId}
+      - {name: instance_id, type: String}
+      - {name: issuer, type: String}
+      - {name: reference, type: String}
+      - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: spent_at, type: Timestamp}
+    outcomes:
+      - name: recorded
+        creates: connectors.delegation.ApprovalRedemption
+        instance: receipt_id
+        emits: [connectors.delegation.ApprovalRedemptionRecorded]
+        sets:
+          instance_id: input.instance_id
+          issuer: input.issuer
+          reference: input.reference
+          subject: input.subject
+          attempt_id: input.attempt_id
+          spent_at: input.spent_at
+
+events:
+  - name: connectors.delegation.ApprovalRedemptionRecorded
+    fields: [{name: receipt_id, type: connectors.delegation.ReceiptId}]
+
 # UNMAPPED: proof constants, integer/string bounds, mandatory-null emission,
 # canonical JSON/base64url, signature/key provenance, purpose/correlation and
 # co-presence predicates, approved authority/target reconstruction and disclosure.

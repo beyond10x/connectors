@@ -2,6 +2,7 @@ use super::*;
 use crate::local::mutations;
 use serde_json::json;
 use std::{
+    cell::Cell,
     os::unix::fs::PermissionsExt,
     sync::{Arc, Barrier, atomic::Ordering},
 };
@@ -11,13 +12,29 @@ pub(crate) fn fixture() -> (tempfile::TempDir, Store) {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     drop(Metadata::initialize(root.path()).unwrap());
-    let metadata = Metadata::update(root.path(), false).unwrap();
-    metadata.connection.execute_batch("INSERT INTO registry_instances VALUES ('alpha','adapter','config',0),('beta','adapter','config',0);
-      INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1','{}');
-      INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms) VALUES
-      ('connection','alpha','profile','{}','scope','revision','fence','live',1,1),
-      ('other','alpha','profile','{}','other-scope','revision','fence','live',1,1),
-      ('beta-connection','beta','profile','{}','beta-scope','revision','fence','live',1,1);").unwrap();
+    let mut metadata = Metadata::update(root.path(), false).unwrap();
+    metadata.connection.execute_batch("INSERT INTO registry_instances VALUES ('alpha','adapter','config',0),('beta','adapter','config',0);").unwrap();
+    let profile = crate::local::registry::fixture_binding("alpha").profile;
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1',?1)",
+            [serde_json::to_string(&profile).unwrap()],
+        )
+        .unwrap();
+    for (reference, instance, scope) in [
+        ("connection", "alpha", "scope"),
+        ("other", "alpha", "other-scope"),
+        ("beta-connection", "beta", "beta-scope"),
+    ] {
+        let binding = crate::local::registry::fixture_binding(instance);
+        metadata.connection.execute(
+            "INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms)
+             VALUES (?1,?2,'profile',?3,?4,'revision','fence','live',1,1)",
+            rusqlite::params![reference, instance, serde_json::to_string(&binding).unwrap(), scope],
+        ).unwrap();
+    }
+    metadata.persist().unwrap();
     drop(metadata);
     let store = Store::new(root.path(), 100_000).unwrap();
     (root, store)
@@ -487,6 +504,15 @@ impl mutations::Clock for TestClock {
         })
     }
 }
+struct LaterClock(i64);
+impl mutations::Clock for LaterClock {
+    fn now(&self) -> mutations::Result<mutations::ClockInterval> {
+        Ok(mutations::ClockInterval {
+            lower_unix_ms: self.0,
+            upper_unix_ms: self.0,
+        })
+    }
+}
 fn candidate() -> mutations::Candidate {
     mutations::Candidate {
         namespace: mutations::Namespace {
@@ -556,7 +582,7 @@ fn retained_cross_owner_references_are_checked_and_never_cascade_deleted() {
     // Same-instance attempt-only correlation is permitted; it still grants no use.
     a.connection_ref = None;
     store.anchor(&a).unwrap();
-    let metadata = Metadata::update(root.path(), false).unwrap();
+    let mut metadata = Metadata::update(root.path(), false).unwrap();
     metadata.connection.execute("UPDATE registry_connections SET state='revoked',revoked_at_ms=1 WHERE connection_ref='connection'",[]).unwrap();
     assert!(
         metadata
@@ -576,15 +602,21 @@ fn retained_cross_owner_references_are_checked_and_never_cascade_deleted() {
             )
             .is_err()
     );
-    // Model the owning index's completed retirement while retaining attempts.
-    metadata
-        .connection
-        .execute(
-            "UPDATE mutation_keys SET state='expired' WHERE reservation_id=?1",
-            [known.reservation_id.unwrap().to_string()],
-        )
-        .unwrap();
+    metadata.persist().unwrap();
     drop(metadata);
+    // The owning idempotency index retires its result at the original
+    // deadline; the cross-owner audit and attempt still remain retained.
+    let later = mutations::Store::new(
+        root.path(),
+        LaterClock(known.replay_expires_at_ms.unwrap()),
+        mutations::Limits::default(),
+    )
+    .unwrap();
+    assert!(
+        later
+            .expire(&candidate, attempt, known.reservation_id.unwrap())
+            .unwrap()
+    );
     assert_eq!(store.observe(&reference).unwrap(), original);
     assert_eq!(
         ledger.observe(attempt).unwrap().state,
@@ -643,7 +675,8 @@ fn passive_old_schema_inspection_never_installs_audit_and_migration_preserves_hi
 fn corrupted_or_unavailable_metadata_is_not_absence_or_recovered_acknowledgement() {
     let (root, store) = fixture();
     let reference = reference(store.anchor(&anchor()).unwrap());
-    let metadata = Metadata::update(root.path(), false).unwrap();
+    let original = store.observe(&reference).unwrap();
+    let mut metadata = Metadata::update(root.path(), false).unwrap();
     metadata
         .connection
         .execute(
@@ -651,7 +684,28 @@ fn corrupted_or_unavailable_metadata_is_not_absence_or_recovered_acknowledgement
             [&reference.audit_ref],
         )
         .unwrap();
+    // The audit reader rejects a cross-owner SQL row while it is present.
+    // ER captures the typed record, so this redundant-column edit produces
+    // no recorded command and cannot replace the durable anchor.
+    assert!(matches!(
+        load(&metadata.connection, &reference),
+        Err(Failure::MetadataUnavailable)
+    ));
+    metadata.persist().unwrap();
     drop(metadata);
+    assert_eq!(store.observe(&reference).unwrap(), original);
+    // Damage the recorded authority itself to test corrupt durable state.
+    let physical = rusqlite::Connection::open(root.path().join("metadata.sqlite3")).unwrap();
+    assert_eq!(
+        physical
+            .execute(
+                "UPDATE connectors_er_events SET data='{}' WHERE global_seq=(SELECT max(global_seq) FROM connectors_er_events WHERE event_name='er.recorded_entry')",
+                [],
+            )
+            .unwrap(),
+        1
+    );
+    drop(physical);
     assert_eq!(store.observe(&reference), Err(Failure::MetadataUnavailable));
     assert_eq!(
         store.append(&reference, &final_value()),
@@ -752,15 +806,15 @@ fn recovering_append_reuses_exact_fields_and_reads_a_lost_acknowledgement() {
         let reference = reference(store.anchor(&anchor()).unwrap());
         let observation = final_value();
         store.fault.store(fault, Ordering::SeqCst);
-        // A recovery budget generous enough that a busy scheduler cannot consume it.
-        // These tests assert what recovery does, not how fast it is; the one test that
-        // does assert expiry passes an already-elapsed instant. See
-        // story:host-suite-load-sensitivity.
+        // Keep the production 250 ms cap while testing exact recovery logic
+        // through real metadata calls independent of their execution time.
+        let start = Instant::now();
         let record = store
-            .append_recovering(
+            .append_recovering_with_now(
                 &reference,
                 &observation,
-                Instant::now() + Duration::from_secs(60),
+                start + Duration::from_secs(60),
+                || start,
             )
             .unwrap();
         assert_eq!(record.final_observation, Some(observation.clone()));
@@ -869,12 +923,27 @@ fn recovering_append_requires_a_readable_exact_original_anchor() {
             .final_observation
             .is_none()
     );
-    let metadata = Metadata::update(root.path(), false).unwrap();
+    let mut metadata = Metadata::update(root.path(), false).unwrap();
     metadata
         .connection
         .execute("UPDATE execution_audits SET record_json='{}'", [])
         .unwrap();
+    // The projection edit is refused; only damage to the recorded authority
+    // can make the retained original unreadable on recovery.
+    assert!(metadata.persist().is_err());
     drop(metadata);
+    assert!(store.observe(&reference).unwrap().is_some());
+    let physical = rusqlite::Connection::open(root.path().join("metadata.sqlite3")).unwrap();
+    assert_eq!(
+        physical
+            .execute(
+                "UPDATE connectors_er_events SET data='{}' WHERE global_seq=(SELECT max(global_seq) FROM connectors_er_events WHERE event_name='er.recorded_entry')",
+                [],
+            )
+            .unwrap(),
+        1
+    );
+    drop(physical);
     store.appends.lock().unwrap().clear();
     store.reads.store(0, Ordering::SeqCst);
     assert_eq!(
@@ -895,16 +964,56 @@ fn recovering_append_stops_after_one_failed_retry() {
     let reference = reference(store.anchor(&anchor()).unwrap());
     let observation = final_value();
     store.fault.store(10, Ordering::SeqCst);
+    let start = Instant::now();
     assert_eq!(
-        store.append_recovering(
+        store.append_recovering_with_now(
             &reference,
             &observation,
-            Instant::now() + Duration::from_secs(60)
+            start + Duration::from_secs(60),
+            || start,
         ),
         Err(Failure::MetadataUnavailable)
     );
     assert_eq!(*store.appends.lock().unwrap(), vec![observation; 2]);
     assert_eq!(store.reads.load(Ordering::SeqCst), 2);
+    assert!(
+        store
+            .observe(&reference)
+            .unwrap()
+            .unwrap()
+            .final_observation
+            .is_none()
+    );
+}
+
+#[test]
+fn recovery_budget_expiring_after_first_read_prevents_retry() {
+    let (_root, store) = fixture();
+    let reference = reference(store.anchor(&anchor()).unwrap());
+    let observation = final_value();
+    store.fault.store(1, Ordering::SeqCst);
+    let start = Instant::now();
+    let calls = Cell::new(0);
+    assert_eq!(
+        store.append_recovering_with_now(
+            &reference,
+            &observation,
+            start + Duration::from_secs(60),
+            || {
+                let call = calls.get();
+                calls.set(call + 1);
+                if call < 2 {
+                    start
+                } else {
+                    start + Duration::from_millis(251)
+                }
+            },
+        ),
+        Err(Failure::MetadataUnavailable)
+    );
+    assert_eq!(calls.get(), 3);
+    assert_eq!(*store.appends.lock().unwrap(), vec![observation]);
+    assert_eq!(store.reads.load(Ordering::SeqCst), 1);
     assert!(
         store
             .observe(&reference)

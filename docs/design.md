@@ -1421,3 +1421,10 @@ keyring, supervisor or provider handlers. Existing `describe`, `invoke` and
 in [the CLI source guide](../apps/connectors/spec/README.md). The exact reviewed
 ESS Git source is selected through the single toolchain pin; regenerate all
 affected outputs and retain current-source evidence before accepting this wave.
+
+## 34. Recorded local metadata authority, 2026-09-16
+
+The selected implementation and compatible level 1–8 transition are specified in
+[Local metadata over Entity Runtime and Eventlog SQLite](local-er-metadata.md).
+It replaces durable direct-SQL metadata writes in the production local CLI and
+owner while retaining Secret Service custody and the existing process lifecycle.

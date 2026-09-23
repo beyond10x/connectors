@@ -99,7 +99,7 @@ impl Registry {
         now: u64,
         custody_available: bool,
     ) -> Result<ObservedConnection> {
-        self.transaction(now, false, |tx, _, now| {
+        self.transaction_observation(now, |tx, _, now| {
             let row = Self::connection(tx, reference)?;
             visible(&row, instance, adapter)?;
             observe(tx, row, configuration_revision, now, custody_available)
@@ -182,7 +182,7 @@ impl Registry {
     }
 }
 
-fn visible(row: &ConnectionRow, instance: &str, adapter: &str) -> Result<()> {
+pub(super) fn visible(row: &ConnectionRow, instance: &str, adapter: &str) -> Result<()> {
     if !row.public || row.binding.instance_id != instance || row.binding.adapter_id != adapter {
         return Err(Failure::NotFound);
     }

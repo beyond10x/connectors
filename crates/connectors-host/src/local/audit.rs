@@ -78,6 +78,7 @@ impl Store {
             std::process::exit(73);
         }
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist().map_err(host_error)?;
         #[cfg(test)]
         if self.take_fault(2) {
             return Err(Failure::OutcomeUnknown);
@@ -194,18 +195,28 @@ impl Store {
         observation: &FinalObservation,
         until: Instant,
     ) -> Result<Record> {
+        self.append_recovering_with_now(reference, observation, until, Instant::now)
+    }
+
+    fn append_recovering_with_now(
+        &self,
+        reference: &Reference,
+        observation: &FinalObservation,
+        until: Instant,
+        mut now: impl FnMut() -> Instant,
+    ) -> Result<Record> {
         let first_error = match self.append(reference, observation) {
             Ok(record) => return Ok(record),
             Err(error) => error,
         };
-        let until = until.min(Instant::now() + Duration::from_millis(250));
-        if Instant::now() >= until {
+        let until = until.min(now() + Duration::from_millis(250));
+        if now() >= until {
             return Err(first_error);
         }
         if let Some(record) = self.matching_final(reference, observation)? {
             return Ok(record);
         }
-        if Instant::now() >= until {
+        if now() >= until {
             return Err(first_error);
         }
         // Definite absence of a final observation permits one exact append
@@ -213,7 +224,7 @@ impl Store {
         match self.append(reference, observation) {
             Ok(record) => Ok(record),
             Err(error) => {
-                if Instant::now() >= until {
+                if now() >= until {
                     return Err(error);
                 }
                 self.matching_final(reference, observation)?.ok_or(error)
