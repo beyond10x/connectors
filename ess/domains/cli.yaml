@@ -1,5 +1,5 @@
 domain: connectors.cli
-summary: Selected local CLI presentation values; protected inputs are ephemeral, and no production runtime or new persistent owner is declared.
+summary: Selected local CLI presentation values and the existing local configuration owner's durable runtime facts.
 
 # Owner: contracts/cli/v1alpha1/semantics.md. Process globals live in ess-cli/1
 # Context, not these payloads. Existing auth/declaration identities retain their
@@ -164,16 +164,6 @@ types:
       - {name: publication_fence, type: String}
       - {name: captured_at_ms, type: Timestamp}
       - {name: expires_at_ms, type: Timestamp}
-  - name: connectors.cli.LocalRuntimeRecord
-    kind: struct
-    fields:
-      - {name: instance_id, type: String}
-      - {name: suppressed, type: Boolean}
-      - {name: selection, type: "Optional<String>"}
-      - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
-      - {name: observed_at_ms, type: "Optional<Timestamp>"}
-    # Configuration owner's durable suppression and cached descriptor projection.
-    # A cached bootstrap never establishes live readiness or dispatch authority.
   # Private local transport values, owned by contracts/cli/v1alpha1/private-adapter.md.
   # They bind existing owners and are not public CLI results or persisted entities.
   - name: connectors.cli.PrivateEntryField
@@ -652,3 +642,130 @@ types:
 # bound local protected action receives that ephemeral document, and it must
 # never reach logs, persistent state, ordinary provider invocation or outputs.
 # ESS structural schema projection proves none of the Linux/process/custody rules.
+
+entities:
+  - name: connectors.cli.LocalRuntimeRecord
+    identity: {name: instance_id, type: String}
+    fields:
+      - {name: suppressed, type: Boolean}
+      - {name: selection, type: "Optional<String>"}
+      - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
+      - {name: observed_at, type: "Optional<Timestamp>"}
+    lifecycle:
+      initial: Retained
+      states: [Retained]
+      terminal: [Retained]
+      transitions:
+        - {name: set_suppression, from: [Retained], to: Retained}
+        - {name: remember_bootstrap, from: [Retained], to: Retained}
+    # Durable stop suppression and the bounded cached bootstrap owned by local
+    # configuration. A cached bootstrap never establishes live readiness.
+
+  - name: connectors.cli.ConnectionListCursor
+    identity: {name: cursor_id, type: Uuid}
+    fields:
+      - {name: instance_id, type: String}
+      - {name: adapter_id, type: String}
+      - {name: configuration_revision, type: String}
+      - {name: registry_epoch, type: Integer}
+      - {name: last_connection_ref, type: String}
+      - {name: page_limit, type: Integer}
+      - {name: expires_at, type: Timestamp}
+    relations:
+      - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
+    lifecycle:
+      initial: Active
+      states: [Active, Expired]
+      terminal: [Expired]
+      transitions:
+        - {name: expire, from: [Active], to: Expired}
+    # This is the opaque cross-process stale-page fence. It grants no provider,
+    # connection or dispatch authority and is retained after logical expiry.
+
+commands:
+  - name: connectors.cli.RecordLocalRuntime
+    input:
+      - {name: instance_id, type: String}
+      - {name: suppressed, type: Boolean}
+      - {name: selection, type: "Optional<String>"}
+      - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
+      - {name: observed_at, type: "Optional<Timestamp>"}
+    outcomes:
+      - name: recorded
+        creates: connectors.cli.LocalRuntimeRecord
+        instance: instance_id
+        emits: [connectors.cli.LocalRuntimeRecorded]
+        sets:
+          suppressed: input.suppressed
+          selection: input.selection
+          bootstrap: input.bootstrap
+          observed_at: input.observed_at
+  - name: connectors.cli.SetLocalRuntimeSuppression
+    input:
+      - {name: instance_id, type: String}
+      - {name: suppressed, type: Boolean}
+    outcomes:
+      - name: updated
+        moves: connectors.cli.LocalRuntimeRecord.set_suppression
+        instance: instance_id
+        emits: [connectors.cli.LocalRuntimeSuppressionSet]
+        sets: {suppressed: input.suppressed}
+  - name: connectors.cli.RememberLocalRuntimeBootstrap
+    input:
+      - {name: instance_id, type: String}
+      - {name: selection, type: String}
+      - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
+      - {name: observed_at, type: Timestamp}
+    outcomes:
+      - name: remembered
+        moves: connectors.cli.LocalRuntimeRecord.remember_bootstrap
+        instance: instance_id
+        emits: [connectors.cli.LocalRuntimeBootstrapRemembered]
+        sets:
+          selection: input.selection
+          bootstrap: input.bootstrap
+          observed_at: input.observed_at
+  - name: connectors.cli.RecordConnectionListCursor
+    input:
+      - {name: cursor_id, type: Uuid}
+      - {name: instance_id, type: String}
+      - {name: adapter_id, type: String}
+      - {name: configuration_revision, type: String}
+      - {name: registry_epoch, type: Integer}
+      - {name: last_connection_ref, type: String}
+      - {name: page_limit, type: Integer}
+      - {name: expires_at, type: Timestamp}
+    outcomes:
+      - name: recorded
+        creates: connectors.cli.ConnectionListCursor
+        instance: cursor_id
+        emits: [connectors.cli.ConnectionListCursorRecorded]
+        sets:
+          instance_id: input.instance_id
+          adapter_id: input.adapter_id
+          configuration_revision: input.configuration_revision
+          registry_epoch: input.registry_epoch
+          last_connection_ref: input.last_connection_ref
+          page_limit: input.page_limit
+          expires_at: input.expires_at
+  - name: connectors.cli.ExpireConnectionListCursor
+    input: [{name: cursor_id, type: Uuid}]
+    outcomes:
+      - name: expired
+        moves: connectors.cli.ConnectionListCursor.expire
+        instance: cursor_id
+        emits: [connectors.cli.ConnectionListCursorExpired]
+
+events:
+  - name: connectors.cli.LocalRuntimeRecorded
+    fields: [{name: instance_id, type: String}]
+  - name: connectors.cli.LocalRuntimeSuppressionSet
+    fields:
+      - {name: instance_id, type: String}
+      - {name: suppressed, type: Boolean}
+  - name: connectors.cli.LocalRuntimeBootstrapRemembered
+    fields: [{name: instance_id, type: String}]
+  - name: connectors.cli.ConnectionListCursorRecorded
+    fields: [{name: cursor_id, type: Uuid}]
+  - name: connectors.cli.ConnectionListCursorExpired
+    fields: [{name: cursor_id, type: Uuid}]

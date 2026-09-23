@@ -2,7 +2,7 @@
 name = "connectors-host"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+rust-version = "1.91"
 license.workspace = true
 
 [features]
@@ -14,6 +14,11 @@ schemars = "1.2"
 connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
+entity-core.workspace = true
+entity-eventlog.workspace = true
+entity-executor.workspace = true
+entity-store.workspace = true
+eventlog-core.workspace = true
 async-trait.workspace = true
 base64.workspace = true
 axum.workspace = true
@@ -35,6 +40,7 @@ sha2.workspace = true
 hex.workspace = true
 zbus = "=5.19.0"
 zeroize.workspace = true
+time.workspace = true
 
 [dev-dependencies]
 rcgen = "0.14"

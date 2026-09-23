@@ -17,6 +17,16 @@ connectors-contracts = { path = "crates/connectors-contracts" }
 connectors-sdk = { path = "crates/connectors-sdk" }
 connectors-client = { path = "crates/connectors-client" }
 connectors-host = { path = "crates/connectors-host" }
+entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.19.0" }
+entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.19.0", features = ["sqlite", "sync-bridge"] }
+entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.19.0" }
+entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.19.0" }
+eventlog-core = { git = "https://github.com/beyond10x/eventlog", rev = "ac6b1731654329d32f1e3c9cf164fefad6a5b46a" }
+ess-compiler = { git = "https://github.com/beyond10x/ess", rev = "308a6d10273e074621f2bd797be0853fe9b94580" }
+ess-domain = { git = "https://github.com/beyond10x/ess", rev = "308a6d10273e074621f2bd797be0853fe9b94580" }
+ess-entity-runtime = { git = "https://github.com/beyond10x/ess", rev = "308a6d10273e074621f2bd797be0853fe9b94580" }
+ess-service-contract = { git = "https://github.com/beyond10x/ess", rev = "308a6d10273e074621f2bd797be0853fe9b94580" }
+ess-synth = { git = "https://github.com/beyond10x/ess", rev = "308a6d10273e074621f2bd797be0853fe9b94580" }
 async-trait = "0.1"
 axum = "0.8.9"
 base64 = "0.22"
@@ -40,11 +50,18 @@ url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 zeroize = "1"
 tempfile = "3"
+time = { version = "0.3", features = ["formatting", "parsing"] }
 
 [profile.dev]
+opt-level = 1
 debug = 0
+debug-assertions = true
+overflow-checks = true
 incremental = false
 
 [profile.test]
+opt-level = 1
 debug = 0
+debug-assertions = true
+overflow-checks = true
 incremental = false

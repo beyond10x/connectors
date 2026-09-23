@@ -3,6 +3,7 @@ use std::{path::Path, process::Command};
 
 pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     connectors_spec::v2::check_ess(ess)?;
+    super::metadata_entities::run(root, true)?;
     let base = root.join(".local/tmp");
     std::fs::create_dir_all(&base)?;
     let temp = tempfile::Builder::new().prefix("gate-").tempdir_in(base)?;
@@ -149,21 +150,63 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     }
     println!("gate: generic CLI boundary holds; exit=0");
     if msrv {
-        // Keep compiler metadata separate without duplicating a full binary build.
+        // Keep compiler metadata separate. The Eventlog-backed host graph needs
+        // Rust 1.91; libraries which do not select that graph retain 1.88.
         let target = std::env::var_os("CARGO_TARGET_DIR")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| root.join("target"));
+        for package in [
+            "connectors-catalog",
+            "connectors-client",
+            "connectors-contracts",
+            "connectors-core",
+            "connectors-sdk",
+        ] {
+            execute(
+                command("cargo")
+                    .args([
+                        "+1.88.0",
+                        "check",
+                        "--package",
+                        package,
+                        "--all-targets",
+                        "--locked",
+                        "--offline",
+                    ])
+                    .env("CARGO_TARGET_DIR", target.join("msrv-1.88")),
+            )?;
+        }
+        for package in [
+            "connectors-catalog-provider",
+            "connectors-kubernetes",
+            "connectors-sql",
+        ] {
+            execute(
+                command("cargo")
+                    .args([
+                        "+1.88.0",
+                        "check",
+                        "--package",
+                        package,
+                        "--lib",
+                        "--no-default-features",
+                        "--locked",
+                        "--offline",
+                    ])
+                    .env("CARGO_TARGET_DIR", target.join("msrv-1.88")),
+            )?;
+        }
         execute(
             command("cargo")
                 .args([
-                    "+1.88.0",
+                    "+1.91.0",
                     "check",
                     "--workspace",
                     "--all-targets",
                     "--locked",
                     "--offline",
                 ])
-                .env("CARGO_TARGET_DIR", target.join("msrv")),
+                .env("CARGO_TARGET_DIR", target.join("msrv-1.91")),
         )?;
     }
     // The pinned ESS authoring reader is non-recursive. Collect each explicitly
