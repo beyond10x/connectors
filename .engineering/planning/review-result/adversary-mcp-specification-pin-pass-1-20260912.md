@@ -13,7 +13,7 @@ unit: mcp-w1 — story:mcp-specification-pin, worktree cv2-mcp-w1-20260912, comm
 verdict: red
 cases: executed 20→24, red 2
 origin: introduced 6, pre-existing 2, undecided 0
-wrote-outside-worktree: /home/timo/.cache/cv2-mcp-waves-20260912/adversary-w1/ (28 entries, 3.8M)
+wrote-outside-worktree: ~/.cache/cv2-mcp-waves-20260912/adversary-w1/ (28 entries, 3.8M)
 needs-coordinator: yes
 ```
 

@@ -22,7 +22,7 @@ Verdict: **approve** for the selected textual specification scope.
 
 Reviewed commit: `d1dc83f5d600816c699db07dd843f079ded0e72b`.
 Reviewer: independent agent B, session `specs-review-b-20260909`.
-Read-only source checkout: `/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-review-b-20260909`.
+Read-only source checkout: `~/.local/state/worktree/trees/b10x/connectors_v2/specs-review-b-20260909`.
 
 I found no concrete contradiction that blocks the integrated selected semantic proposals or their declared ESS coverage. This is an independent agent judgment about specifications. It is not human approval, runtime conformance certification, or a claim that all proposed adapters are ready to advertise their profiles.
 
@@ -81,7 +81,7 @@ Exact provider selectors, decoding, mutation intents, recognition rules and medi
 Working directory for all checks was the exact review checkout. Scratch and TMPDIR remained inside `.local/spec-completion-20260909`.
 
 - `git rev-parse HEAD` returned the reviewed commit. `git status --short` was empty, and `git diff --exit-code` returned 0 at the end of substantive review.
-- Pinned `/home/timo/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess --version` returned `ess 0.20.0`.
+- Pinned `~/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess --version` returned `ess 0.20.0`.
 - Executed `ess specify validate --path <root>` and `ess specify compile --path <root> --format json` independently for every root below. All fourteen commands exited 0; validation and compiler outputs are retained in this scratch directory.
 
 | ESS root | Validated files | Result |

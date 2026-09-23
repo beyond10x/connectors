@@ -42,7 +42,7 @@ Read: 29 scoped artifacts; round-one bodies were reused after `rg` confirmed unc
 Could not establish: runtime implementation validity and same-file concurrent edit safety are outside this coupling review; source-ID sole ownership was treated as authoritative. No tool blocked the review.
 Validation (`aep plan artifact validate`, verbatim):
 ```text
-42 file(s) in /home/timo/beyond10x/connectors_v2/.engineering/planning: 42 artifact(s)
+42 file(s) in ~/beyond10x/connectors_v2/.engineering/planning: 42 artifact(s)
 4 review(s) recorded no findings block:
   - review-result:contract-docs-external-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
   - review-result:contract-plan-parallel-safety-r1-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere

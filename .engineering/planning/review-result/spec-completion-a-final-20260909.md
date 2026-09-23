@@ -25,7 +25,7 @@ runtime conformance evidence.
 
 Reviewer/session: `specs-review-a-20260909`.
 Managed read-only checkout:
-`/home/timo/.local/state/worktree/trees/b10x/connectors_v2/specs-review-a-20260909`.
+`~/.local/state/worktree/trees/b10x/connectors_v2/specs-review-a-20260909`.
 The initial `stable-core-review.md` at
 `eb0815961e6ffee54c50f91f37eff2bbe11811c0` remains immutable. Its SHA-256 remains
 `a05798deba9a655ff63db874301d9968de2d0947dc4b8edbf9dbe99e6b4e5dfc`.
@@ -86,7 +86,7 @@ All checks ran in the exact managed checkout above. Tracked source and planning
 were read-only. Source inspection used `rg`, `git diff`, `sed`, `cat` and `nl`.
 
 Pinned executable:
-`/home/timo/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess` (0.20.0).
+`~/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess` (0.20.0).
 With `TMPDIR="$PWD/.local/tmp"`, executed separately for each row:
 
 ```text
