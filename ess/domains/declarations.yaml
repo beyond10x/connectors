@@ -166,6 +166,8 @@ entities:
         type: String
       - name: revision
         type: String
+      - name: registry_epoch
+        type: Integer
     relations:
       - name: adapter
         kind: references
@@ -176,6 +178,44 @@ entities:
       initial: Declared
       states: [Declared]
       terminal: [Declared]
+      transitions:
+        - {name: advance_registry_epoch, from: [Declared], to: Declared}
+
+commands:
+  - name: connectors.declarations.RecordServiceConfiguration
+    input:
+      - {name: instance_id, type: String}
+      - {name: adapter_id, type: String}
+      - {name: revision, type: String}
+      - {name: registry_epoch, type: Integer}
+    outcomes:
+      - name: recorded
+        creates: connectors.declarations.ServiceConfiguration
+        instance: instance_id
+        emits: [connectors.declarations.ServiceConfigurationRecorded]
+        sets:
+          adapter_id: input.adapter_id
+          revision: input.revision
+          registry_epoch: input.registry_epoch
+  - name: connectors.declarations.AdvanceRegistryEpoch
+    input:
+      - {name: instance_id, type: String}
+      - {name: registry_epoch, type: Integer}
+    outcomes:
+      - name: advanced
+        moves: connectors.declarations.ServiceConfiguration.advance_registry_epoch
+        instance: instance_id
+        emits: [connectors.declarations.RegistryEpochAdvanced]
+        sets:
+          registry_epoch: input.registry_epoch
+
+events:
+  - name: connectors.declarations.ServiceConfigurationRecorded
+    fields: [{name: instance_id, type: String}]
+  - name: connectors.declarations.RegistryEpochAdvanced
+    fields:
+      - {name: instance_id, type: String}
+      - {name: registry_epoch, type: Integer}
 
   # UNMAPPED: multi-tenant SaaS ownership/assignment cardinality remains outside
   # this local, explicitly configured service slice. No tenant is caller-selected.

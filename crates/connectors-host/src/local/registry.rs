@@ -27,6 +27,7 @@ const USE_MS: u64 = 120_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {
     MetadataUnavailable,
+    ConcurrentRevision,
     OutcomeUnknown,
     NotFound,
     Conflict,
@@ -79,6 +80,24 @@ pub struct Binding {
     pub configuration_revision: String,
     pub provider_authority: String,
     pub profile: StaticProfile,
+}
+
+#[cfg(test)]
+pub(super) fn fixture_binding(instance: &str) -> Binding {
+    Binding {
+        instance_id: instance.into(),
+        adapter_id: "adapter".into(),
+        configuration_revision: "config".into(),
+        provider_authority: "https://fixture.invalid/fixed-authority".into(),
+        profile: StaticProfile {
+            id: "pat".into(),
+            revision: "1".into(),
+            purpose: Purpose::DelegatedUser,
+            subject: Subject::User,
+            minimum_scopes: BTreeSet::new(),
+            evidence_lifetime_ms: 60_000,
+        },
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,7 +237,56 @@ impl Registry {
         migrate: bool,
         action: impl FnOnce(&Transaction<'_>, Uuid, u64) -> Result<T>,
     ) -> Result<T> {
-        let mut metadata = Metadata::update(&self.path, migrate).map_err(host_failure)?;
+        self.transaction_inner(now, migrate, false, false, action)
+    }
+
+    // Only these read-only observation closures may be replayed. A stale
+    // expected clock revision is known not to have committed, so each bounded
+    // retry prepares a fresh authority and re-evaluates the original checks.
+    fn transaction_observation<T>(
+        &self,
+        now: u64,
+        action: impl Fn(&Transaction<'_>, Uuid, u64) -> Result<T>,
+    ) -> Result<T> {
+        for _ in 0..8 {
+            match self.transaction_inner(now, false, false, true, &action) {
+                Err(Failure::ConcurrentRevision) => continue,
+                other => return other,
+            }
+        }
+        Err(Failure::MetadataUnavailable)
+    }
+
+    fn transaction_admission<T>(
+        &self,
+        now: u64,
+        migrate: bool,
+        action: impl FnOnce(&Transaction<'_>, Uuid, u64) -> Result<T>,
+    ) -> Result<T> {
+        self.transaction_inner(now, migrate, true, false, action)
+    }
+
+    fn transaction_inner<T>(
+        &self,
+        now: u64,
+        migrate: bool,
+        admitted_registry_use: bool,
+        prepared_observation: bool,
+        action: impl FnOnce(&Transaction<'_>, Uuid, u64) -> Result<T>,
+    ) -> Result<T> {
+        // Established observations validate and close the immutable
+        // physical source under the lock, then replay ER outside it.
+        let mut metadata = if prepared_observation {
+            Metadata::update_observation(&self.path)
+        } else {
+            Metadata::update(&self.path, migrate)
+        }
+        .map_err(host_failure)?;
+        if prepared_observation {
+            metadata.relock_observation().map_err(host_failure)?;
+        }
+        // All clock writers are now excluded. Sample time only after
+        // acquiring the lock, including on a prepared observation.
         let authority = metadata.authority().map_err(host_failure)?;
         let tx = metadata
             .connection
@@ -254,6 +322,14 @@ impl Registry {
         }
         tx.execute_batch("RELEASE action").map_err(db)?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        let persisted = if prepared_observation {
+            metadata.persist_prepared_observation()
+        } else if admitted_registry_use {
+            metadata.persist_admission()
+        } else {
+            metadata.persist()
+        };
+        persisted.map_err(host_failure)?;
         #[cfg(test)]
         if result.is_ok()
             && self
@@ -489,6 +565,12 @@ fn encode(value: &impl Serialize) -> Result<String> {
     }
     Ok(text)
 }
+
+pub(super) fn encode_evidence_value(value: serde_json::Value) -> Result<String> {
+    let evidence: EvidenceSnapshot =
+        serde_json::from_value(value).map_err(|_| Failure::MetadataUnavailable)?;
+    encode(&evidence)
+}
 fn decode<T: DeserializeOwned>(text: &str) -> Result<T> {
     if text.len() > 32768 {
         return Err(Failure::MetadataUnavailable);
@@ -499,9 +581,9 @@ fn db(_: rusqlite::Error) -> Failure {
     Failure::MetadataUnavailable
 }
 fn host_failure(error: super::Failure) -> Failure {
-    if error == super::Failure::OutcomeUnknown {
-        Failure::OutcomeUnknown
-    } else {
-        Failure::MetadataUnavailable
+    match error {
+        super::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
+        super::Failure::ConcurrentRevision => Failure::ConcurrentRevision,
+        _ => Failure::MetadataUnavailable,
     }
 }

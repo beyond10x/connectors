@@ -553,6 +553,11 @@ dependencies = [
  "connectors-catalog",
  "connectors-catalog-provider",
  "connectors-spec",
+ "ess-compiler",
+ "ess-domain",
+ "ess-entity-runtime",
+ "ess-service-contract",
+ "ess-synth",
  "jsonschema",
  "pulldown-cmark",
  "regex",
@@ -665,19 +670,25 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-sdk",
+ "entity-core",
+ "entity-eventlog",
+ "entity-executor",
+ "entity-store",
+ "eventlog-core",
  "hex",
  "libc",
  "rcgen",
  "reqwest",
  "ring",
  "rusqlite",
- "schemars",
+ "schemars 1.2.2",
  "serde",
  "serde_json",
  "serde_yaml_ng",
  "sha2 0.10.9",
  "subtle",
  "tempfile",
+ "time",
  "tokio",
  "tokio-rustls",
  "toml",
@@ -895,6 +906,9 @@ name = "deranged"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
+dependencies = [
+ "serde_core",
+]
 
 [[package]]
 name = "digest"
@@ -952,6 +966,65 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 
 [[package]]
+name = "entity-core"
+version = "0.19.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.19.0#13f88d982f8ac90651e4023bdf6286332d042b33"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "entity-eventlog"
+version = "0.19.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.19.0#13f88d982f8ac90651e4023bdf6286332d042b33"
+dependencies = [
+ "entity-core",
+ "entity-executor",
+ "entity-query",
+ "entity-store",
+ "eventlog-core",
+ "eventlog-sqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "time",
+ "tokio",
+]
+
+[[package]]
+name = "entity-executor"
+version = "0.19.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.19.0#13f88d982f8ac90651e4023bdf6286332d042b33"
+dependencies = [
+ "entity-core",
+ "entity-store",
+ "serde_json",
+]
+
+[[package]]
+name = "entity-query"
+version = "0.19.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.19.0#13f88d982f8ac90651e4023bdf6286332d042b33"
+dependencies = [
+ "entity-core",
+ "entity-store",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "entity-store"
+version = "0.19.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.19.0#13f88d982f8ac90651e4023bdf6286332d042b33"
+dependencies = [
+ "entity-core",
+ "fs2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "enumflags2"
 version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -989,6 +1062,95 @@ dependencies = [
 ]
 
 [[package]]
+name = "ess-compiler"
+version = "0.29.0"
+source = "git+https://github.com/beyond10x/ess?rev=308a6d10273e074621f2bd797be0853fe9b94580#308a6d10273e074621f2bd797be0853fe9b94580"
+dependencies = [
+ "ess-domain",
+ "ess-primitives",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+]
+
+[[package]]
+name = "ess-domain"
+version = "0.29.0"
+source = "git+https://github.com/beyond10x/ess?rev=308a6d10273e074621f2bd797be0853fe9b94580#308a6d10273e074621f2bd797be0853fe9b94580"
+dependencies = [
+ "ess-primitives",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror",
+]
+
+[[package]]
+name = "ess-entity-runtime"
+version = "0.29.0"
+source = "git+https://github.com/beyond10x/ess?rev=308a6d10273e074621f2bd797be0853fe9b94580#308a6d10273e074621f2bd797be0853fe9b94580"
+dependencies = [
+ "entity-core",
+ "ess-compiler",
+ "ess-domain",
+ "ess-primitives",
+ "ess-service-contract",
+ "ess-synth",
+ "serde_json",
+ "sha2 0.11.0",
+]
+
+[[package]]
+name = "ess-gen"
+version = "0.29.0"
+source = "git+https://github.com/beyond10x/ess?rev=308a6d10273e074621f2bd797be0853fe9b94580#308a6d10273e074621f2bd797be0853fe9b94580"
+dependencies = [
+ "ess-compiler",
+ "ess-domain",
+ "ess-primitives",
+ "pulldown-cmark",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.11.0",
+]
+
+[[package]]
+name = "ess-primitives"
+version = "0.29.0"
+source = "git+https://github.com/beyond10x/ess?rev=308a6d10273e074621f2bd797be0853fe9b94580#308a6d10273e074621f2bd797be0853fe9b94580"
+dependencies = [
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "ess-service-contract"
+version = "0.29.0"
+source = "git+https://github.com/beyond10x/ess?rev=308a6d10273e074621f2bd797be0853fe9b94580#308a6d10273e074621f2bd797be0853fe9b94580"
+dependencies = [
+ "ess-compiler",
+ "ess-domain",
+ "ess-synth",
+]
+
+[[package]]
+name = "ess-synth"
+version = "0.29.0"
+source = "git+https://github.com/beyond10x/ess?rev=308a6d10273e074621f2bd797be0853fe9b94580#308a6d10273e074621f2bd797be0853fe9b94580"
+dependencies = [
+ "ess-compiler",
+ "ess-domain",
+ "ess-gen",
+ "ess-primitives",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1006,6 +1168,32 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
  "pin-project-lite",
+]
+
+[[package]]
+name = "eventlog-core"
+version = "0.3.0"
+source = "git+https://github.com/beyond10x/eventlog?rev=ac6b1731654329d32f1e3c9cf164fefad6a5b46a#ac6b1731654329d32f1e3c9cf164fefad6a5b46a"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "eventlog-sqlite"
+version = "0.3.0"
+source = "git+https://github.com/beyond10x/eventlog?rev=ac6b1731654329d32f1e3c9cf164fefad6a5b46a#ac6b1731654329d32f1e3c9cf164fefad6a5b46a"
+dependencies = [
+ "eventlog-core",
+ "nix",
+ "rusqlite",
+ "serde_json",
+ "time",
+ "tokio",
 ]
 
 [[package]]
@@ -1099,6 +1287,16 @@ checksum = "e076045bb43dac435333ed5f04caf35c7463631d0dae2deb2638d94dd0a5b872"
 dependencies = [
  "lazy_static",
  "num",
+]
+
+[[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
@@ -1715,6 +1913,18 @@ dependencies = [
  "libc",
  "wasi 0.11.1+wasi-snapshot-preview1",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "nix"
+version = "0.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
+dependencies = [
+ "bitflags",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
 ]
 
 [[package]]
@@ -2426,15 +2636,39 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "schemars"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
+dependencies = [
+ "dyn-clone",
+ "schemars_derive 0.8.22",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "687274d293b6cdc6e73e0fee520bf2049650090d7164f87672d212a3c530cf4a"
 dependencies = [
  "dyn-clone",
  "ref-cast",
- "schemars_derive",
+ "schemars_derive 1.2.2",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals 0.29.1",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2445,7 +2679,7 @@ checksum = "d98c67716b46af2f0b8cf752abc930f6f9aecfbf671ecfb531db8a31dbe4e2ba"
 dependencies = [
  "proc-macro2",
  "quote",
- "serde_derive_internals",
+ "serde_derive_internals 0.30.0",
  "syn 3.0.5",
 ]
 
@@ -2483,6 +2717,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.5",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2550,6 +2795,19 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_yaml"
+version = "0.9.34+deprecated"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
 ]
 
 [[package]]
@@ -2746,7 +3004,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -3424,6 +3682,28 @@ dependencies = [
  "wasite",
  "web-sys",
 ]
+
+[[package]]
+name = "winapi"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c839a674fcd7a98952e593242ea400abe93992746761e38641405d28b00f419"
+dependencies = [
+ "winapi-i686-pc-windows-gnu",
+ "winapi-x86_64-pc-windows-gnu",
+]
+
+[[package]]
+name = "winapi-i686-pc-windows-gnu"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
+
+[[package]]
+name = "winapi-x86_64-pc-windows-gnu"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows-link"

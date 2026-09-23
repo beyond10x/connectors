@@ -249,6 +249,7 @@ impl Store {
         .map_err(db)?;
         bump(&tx, issuer)?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist()?;
         let record = self
             .load(&metadata)
             .map_err(|_| Failure::OutcomeUnknown)?
@@ -321,6 +322,7 @@ impl Store {
         .map_err(db)?;
         bump(&tx, record.issuer_id)?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist()?;
         Ok(self
             .load(&metadata)
             .map_err(|_| Failure::OutcomeUnknown)?
@@ -339,6 +341,7 @@ impl Store {
         tx.execute("UPDATE local_approval_keys SET state='retired' WHERE issuer_id=?1 AND state IN ('active','candidate')",[record.issuer_id.to_string()]).map_err(db)?;
         bump(&tx, record.issuer_id)?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist()?;
         Ok(self
             .load(&metadata)
             .map_err(|_| Failure::OutcomeUnknown)?
@@ -391,6 +394,7 @@ impl Store {
                     .map_err(db)?;
                     bump(&tx, record.issuer_id)?;
                     tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+                    metadata.persist()?;
                     self.load(&metadata)
                         .map_err(|_| Failure::OutcomeUnknown)?
                         .ok_or(Failure::OutcomeUnknown)?
@@ -421,6 +425,7 @@ impl Store {
         .map_err(db)?;
         bump(&tx, current.issuer_id)?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist()?;
         Ok(self
             .load(&metadata)
             .map_err(|_| Failure::OutcomeUnknown)?
