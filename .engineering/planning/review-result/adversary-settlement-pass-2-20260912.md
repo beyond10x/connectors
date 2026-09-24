@@ -88,11 +88,11 @@ The one failure is mine. **Both implementor figures confirmed**: default 5 passe
 
 ## 6. Paths written outside the worktree
 
-- `~/.cache/cv2-wave-20260912/adversary-2/ignored-lane-1.log`
-- `~/.cache/cv2-wave-20260912/adversary-2/ignored-lane-2.log`
-- `~/.cache/cv2-wave-20260912/adversary-2/settlement-repeat.log`
+- `home-path:sha256:049e898f733c6699931a4cc1c96e466d2814b22c2a5c3aa5f528054e0c35f89e`
+- `home-path:sha256:2e40433550e60a781a464da56391673cf62281f761821e1dd03bbf7258bd8425`
+- `home-path:sha256:84d498d02127ee7afad5ab830d45ae4581aa50c03d0e18931482f0d9dd573123`
 
-(Pass 1's `~/.cache/cv2-wave-20260912/adversary-1/ignored-lane.log` still exists and was reported then. `$PWD/.local/tmp` is inside the worktree and git-ignored.)
+(Pass 1's `home-path:sha256:8cd24db8ca86ddaa48f8de3eb7a87df206fb8e15a841967cedab62ab2723cc55` still exists and was reported then. `$PWD/.local/tmp` is inside the worktree and git-ignored.)
 
 ```findings
 - file: docs/gitlab-write-failure-matrix.md

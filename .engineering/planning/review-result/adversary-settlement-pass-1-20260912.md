@@ -98,7 +98,7 @@ The unit's own case alone: `…gitlab_cli_failed_settlement_keeps_the_known_effe
 
 ## 6. Paths written outside the worktree
 
-- `~/.cache/cv2-wave-20260912/adversary-1/ignored-lane.log` (1.6 K) — my assigned scratch root.
+- `home-path:sha256:8cd24db8ca86ddaa48f8de3eb7a87df206fb8e15a841967cedab62ab2723cc55` (1.6 K) — my assigned scratch root.
 
 Also created inside the worktree, per the brief: `.local/tmp` (the `TMPDIR` the brief mandates; git-ignored, empty).
 
