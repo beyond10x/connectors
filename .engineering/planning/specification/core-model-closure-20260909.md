@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: specification:core-model-closure-20260909
 kind: specification
 status: draft

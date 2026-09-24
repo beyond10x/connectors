@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: specification:repository-integration-20260910
 kind: specification
 status: draft

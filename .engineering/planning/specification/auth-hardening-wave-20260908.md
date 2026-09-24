@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: specification:auth-hardening-wave-20260908
 kind: specification
 status: draft
