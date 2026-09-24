@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: specification:catalog-http-runtime-handoff
 kind: specification
 status: draft

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: configuration-blocker:gitlab-v020-publication-target
 kind: configuration-blocker
 status: cleared

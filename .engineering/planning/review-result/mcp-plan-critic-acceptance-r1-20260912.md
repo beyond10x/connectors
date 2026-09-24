@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: review-result:mcp-plan-critic-acceptance-r1-20260912
 kind: review-result
 status: active
