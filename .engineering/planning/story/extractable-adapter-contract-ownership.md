@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: story:extractable-adapter-contract-ownership
 kind: story
 status: implemented

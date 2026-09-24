@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: verification-report:findings-connection-ownership-r3-20260908
 kind: verification-report
 status: draft

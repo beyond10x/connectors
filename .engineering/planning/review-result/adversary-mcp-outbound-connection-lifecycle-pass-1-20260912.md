@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: review-result:adversary-mcp-outbound-connection-lifecycle-pass-1-20260912
 kind: review-result
 status: archived

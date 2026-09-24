@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: review-result:datasource-semantics-b-initial-20260908
 kind: review-result
 status: archived

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: review-result:guarded-merge-acceptance-independent
 kind: review-result
 status: active
