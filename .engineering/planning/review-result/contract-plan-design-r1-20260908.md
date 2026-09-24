@@ -42,7 +42,7 @@ Read: 29 scoped artifacts with `aep plan artifact show`, discovered via `aep pla
 Could not establish: runtime implementation validity and same-file concurrent edit safety are outside this coupling review; source-ID sole ownership was treated as authoritative. No tool blocked the review.
 Validation (`aep plan artifact validate`, verbatim):
 ```text
-38 file(s) in ~/beyond10x/connectors_v2/.engineering/planning: 38 artifact(s)
+38 file(s) in home-path:sha256:d16e230406b04a4741897d47f4c3c88c245399f8ea1bb6fdd7f7824d8fac5a37 38 artifact(s)
 2 review(s) recorded no findings block:
   - review-result:contract-docs-external-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere
   - review-result:contract-semantics-20260908 states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere

@@ -63,7 +63,7 @@ revision: 1
 | spec-kinds/adapter/v2/semantics.md:13-15, :46-50; adapters/kubernetes/spec/adapter.json; ess/domains/declarations.yaml; docs/live-e2e.md | 5 | all match |
 | ../connectors/providers/jira.toml | 19 (line count, 12 op ids, 3-11, 18-60, 140-297, 206, 217-222, oauth block, `public_network`) | 18 match; :376 (#17) |
 | ../connectors/providers/confluence.toml | 10 (line count, 7 op ids, 280, auth comment) | all match |
-| ../connectors/providers/{b10x,grafana,loki,prometheus,alertmanager,asterisk,babelforce}.toml | 14 | 13 match; b10x 741-760 (#16) |
+| ../connectors/providers/{b10x,grafana,loki,prometheus,alertmanager,asterisk,platform-api}.toml | 14 | 13 match; b10x 741-760 (#16) |
 | provider auth counts (`scheme`, `entry`, `grants`, `subject`) | 9 numbers | all match (50/6/3, 11, 4/1/1/1, 11/10) |
 | ../connectors/crates/{domain/approval.rs, connectors-runtime/claims.rs, integration-kubernetes/{local,workloads,databases,hosted}.rs, integration-monitoring/{projection,backend}.rs, driver-sip/{lib.rs,README.md,Cargo.toml}, integration-jira/backend.rs, connector-oauth/lib.rs} | 22 | all match |
 | ../connectors/crates/{voice-runtime,voice-local-audio,rtvbp-voice-endpoint,driver-audio,driver-speech}/README.md | 7 | all match |

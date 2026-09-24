@@ -10,11 +10,11 @@ revision: 1
 ---
 ship with fixes — build, tests, README gate (incl. Rust 1.88.0), GitLab regeneration and cargo audit all pass at HEAD 8903166; no code defect found; 8 minor doc/planning inconsistencies and 4 nits need small edits.
 
-Reviewer: reviewer-a. Repository: ~/beyond10x/connectors_v2, branch main, HEAD 8903166. Toolchain observed: rustc 1.98.1, cargo 1.98.1, rustup 1.88.0 present, `ess` on PATH = 0.18.0 (pin 0.20.0 resolved by the repository resolver), aep protocol 0.54.0, cargo-audit 0.22.0.
+Reviewer: reviewer-a. Repository: home-path:sha256:5e4fbbb5e0692cb6d78557975c58d067c93190ffe8400827b1c94ddd26c264b2, branch main, HEAD 8903166. Toolchain observed: rustc 1.98.1, cargo 1.98.1, rustup 1.88.0 present, `ess` on PATH = 0.18.0 (pin 0.20.0 resolved by the repository resolver), aep protocol 0.54.0, cargo-audit 0.22.0.
 
 ## Commands run
 
-All with `TMPDIR=.local/independent-review/reviewer-a/tmp CARGO_TARGET_DIR=.local/independent-review/reviewer-a/target CARGO_BUILD_JOBS=6`. Logs under `~/beyond10x/connectors_v2/.local/independent-review/reviewer-a/logs/`.
+All with `TMPDIR=.local/independent-review/reviewer-a/tmp CARGO_TARGET_DIR=.local/independent-review/reviewer-a/target CARGO_BUILD_JOBS=6`. Logs under `home-path:sha256:32ca76ed52e41f8a2bfe4e20eac14a77ae9d3ddc473f18bcf9d49ca3bb6fc8da`.
 
 | command | exit | wall | log |
 |---|---|---|---|

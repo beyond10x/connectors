@@ -44,7 +44,7 @@ All four cases were written before any test command. Each ran alone before the b
 An initial attempt to run case 1 failed before compilation or test selection (exit 101):
 
 ```text
-error: process didn't exit successfully: `/usr/bin/sccache ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc -vV` (exit status: 2)
+error: process didn't exit successfully: `/usr/bin/sccache home-path:sha256:da7abda9718cfd0d0c1e74f56f34135d83b4a908741f60a13ad1ed963424c535 -vV` (exit status: 2)
 --- stderr
 sccache: error: path must be shorter than SUN_LEN
 
@@ -64,7 +64,7 @@ RUSTC_WRAPPER= TMPDIR="$PWD/.local/tmp/cli-wave" CARGO_TARGET_DIR="$PWD/target" 
 Verbatim output:
 
 ```text
-   Compiling connectors-spec v0.1.0 (~/.local/state/worktree/trees/b10x/connectors_v2/cli-toolchain-20260909/crates/connectors-spec)
+   Compiling connectors-spec v0.1.0 (home-path:sha256:4cfb618c80dc51082554e55aa8115a6d10dcf3372bd7693f1736b1122a4cc994)
     Finished `test` profile [unoptimized] target(s) in 1.68s
      Running tests/toolchain_adversary.rs (target/debug/deps/toolchain_adversary-e2f1c17116d36dcc)
 
@@ -155,7 +155,7 @@ RUSTC_WRAPPER= TMPDIR="$PWD/.local/tmp/cli-wave" CARGO_TARGET_DIR="$PWD/target" 
 Verbatim output:
 
 ```text
-   Compiling connectors-spec v0.1.0 (~/.local/state/worktree/trees/b10x/connectors_v2/cli-toolchain-20260909/crates/connectors-spec)
+   Compiling connectors-spec v0.1.0 (home-path:sha256:4cfb618c80dc51082554e55aa8115a6d10dcf3372bd7693f1736b1122a4cc994)
     Finished `test` profile [unoptimized] target(s) in 0.72s
      Running unittests src/lib.rs (target/debug/deps/connectors_spec-07ca01f7d42b2ff0)
 
@@ -205,7 +205,7 @@ Nothing found. No judgement findings or confirmed failing cases are returned for
 
 None. Cargo output was confined to this assigned checkout's `target/`; temporary fixtures and logs used its assigned `.local/tmp/cli-wave/`. Worktree lifecycle commands updated their own registry for this review's lease; no other checkout, planning store, external integration, or recovery/publication destination was written.
 
-Retained inside this checkout: the new test file, `adversary-toolchain-r1.md`, `adversary-toolchain-r1-entry.sha256`, the initial infrastructure-refusal log `adversary-toolchain-r1-case1.log`, the four successful single-case logs `adversary-toolchain-r1-case1-direct.log` and `adversary-toolchain-r1-case2.log` through `adversary-toolchain-r1-case4.log`, and `adversary-toolchain-r1-suite.log`, all evidence files under `.local/tmp/cli-wave/`. The exact tree path is ~/.local/state/worktree/trees/b10x/connectors_v2/cli-toolchain-20260909; id cli-toolchain-20260909, branch work/cli-toolchain-20260909. No commit or publication was made. Root owns test transfer/integration, verbatim review recording, final-source build/regeneration, preservation and managed cleanup. The Cargo slot has been released; this reviewer releases only lease cli-toolchain-review-finish-20260909 at handoff.
+Retained inside this checkout: the new test file, `adversary-toolchain-r1.md`, `adversary-toolchain-r1-entry.sha256`, the initial infrastructure-refusal log `adversary-toolchain-r1-case1.log`, the four successful single-case logs `adversary-toolchain-r1-case1-direct.log` and `adversary-toolchain-r1-case2.log` through `adversary-toolchain-r1-case4.log`, and `adversary-toolchain-r1-suite.log`, all evidence files under `.local/tmp/cli-wave/`. The exact tree path is home-path:sha256:7ff51ae2c79cea43b7ae72d4de7f5bcbdb2d44420e7b7f8649fae41d8db5fb0e; id cli-toolchain-20260909, branch work/cli-toolchain-20260909. No commit or publication was made. Root owns test transfer/integration, verbatim review recording, final-source build/regeneration, preservation and managed cleanup. The Cargo slot has been released; this reviewer releases only lease cli-toolchain-review-finish-20260909 at handoff.
 
 ## 7. Findings
 

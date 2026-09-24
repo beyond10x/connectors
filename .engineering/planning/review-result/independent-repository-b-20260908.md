@@ -14,7 +14,7 @@ Reviewer: reviewer-b. Repository HEAD `8903166`, branch `main`, tree clean befor
 
 ## Commands run
 
-All with `TMPDIR=<scratch>/tmp CARGO_TARGET_DIR=<scratch>/target CARGO_BUILD_JOBS=6`, scratch = `~/beyond10x/connectors_v2/.local/independent-review/reviewer-b`. Log paths are relative to `<scratch>/logs/`.
+All with `TMPDIR=<scratch>/tmp CARGO_TARGET_DIR=<scratch>/target CARGO_BUILD_JOBS=6`, scratch = `home-path:sha256:bf5caba119016153e56c0fb436ef3101dc0bd663d579e546c005925ab5f96029`. Log paths are relative to `<scratch>/logs/`.
 
 | # | command | exit code | wall | log |
 |---|---|---|---|---|

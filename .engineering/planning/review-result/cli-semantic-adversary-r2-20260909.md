@@ -333,7 +333,7 @@ exit: 0
 ```
 
 Retained new files, all under
-`~/.local/state/worktree/trees/b10x/connectors_v2/cli-semantics-20260909/.local/tmp/cli-wave/`:
+`home-path:sha256:f08d58e6f030de5b9b064284fe90112a0a356373e13cdaffd3d9ab2ce284a2ee`:
 
 - `adversary-r2-completing.log`
 - `adversary-r2-expired.log`
