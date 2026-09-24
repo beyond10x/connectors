@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: story:catalog-openapi-source-ingest
 kind: story
 status: implemented

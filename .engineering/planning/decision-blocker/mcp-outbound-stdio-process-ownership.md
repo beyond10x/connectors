@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: decision-blocker:mcp-outbound-stdio-process-ownership
 kind: decision-blocker
 status: open

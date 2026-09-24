@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: release-plan:connectors-v0110
 kind: release-plan
 status: implemented

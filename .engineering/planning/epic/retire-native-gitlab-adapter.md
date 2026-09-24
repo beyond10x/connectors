@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: epic:retire-native-gitlab-adapter
 kind: epic
 status: implemented
