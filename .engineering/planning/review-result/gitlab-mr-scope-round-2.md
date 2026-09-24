@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: review-result:gitlab-mr-scope-round-2
 kind: review-result
 status: active

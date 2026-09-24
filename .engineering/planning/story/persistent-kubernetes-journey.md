@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: story:persistent-kubernetes-journey
 kind: story
 status: implemented

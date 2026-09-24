@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: decision-blocker:catalog-template-second-pass
 kind: decision-blocker
 status: cleared

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: story:catalog-local-toml-action
 kind: story
 status: implemented
