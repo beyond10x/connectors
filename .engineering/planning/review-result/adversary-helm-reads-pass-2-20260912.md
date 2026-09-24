@@ -13,7 +13,7 @@ unit: 1 — story:kubernetes-helm-release-reads, worktree cv2-helm-reads-2026091
 verdict: red
 cases: executed 30→36, red 6
 origin: introduced 6, pre-existing 1, undecided 0
-wrote-outside-worktree: 4 paths under ~/.cache/cv2-wave-b-20260912/adversary-2/
+wrote-outside-worktree: 4 paths under home-path:sha256:08260ca9fbc3cd88ddb499040790c6d9f10e7ad83c065ede5ad2c5db208f0cd9
 needs-coordinator: yes
 ```
 

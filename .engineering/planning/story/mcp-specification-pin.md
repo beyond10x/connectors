@@ -77,7 +77,7 @@ upstream specification revisions, not `../mcp` releases: upstream
 `modelcontextprotocol/modelcontextprotocol` carries release tags `2026-07-28` at
 `5f5440bb26a62e2cf3440b92da5a667efa03b267` and `2025-11-25` at
 `38c84e9f93ad191d9eb26d92b945d17bd0efcaf3`, and
-`~/beyond10x/mcp/crates/b10x-mcp-types/src/lib.rs:15,17` declares those
+`home-path:sha256:1e6e99834234a5a28fe4de1c34449cf4ec315c79187b786cc5fc7001c24bdfce,17` declares those
 same two strings as `CURRENT_PROTOCOL_VERSION` and `LEGACY_PROTOCOL_VERSION` —
 a consumer's selection of them, not their source. Upstream is what is pinned.
 

@@ -24,7 +24,7 @@ revision: 6
 
 The GitLab generation path pins ESS 0.9.2 (`crates/connectors-spec/src/v2.rs:8`, `check_ess` at `:562-570`). Which `ess` binary runs is decided outside the repository: `crates/connectors-build/src/main.rs` defaults `--ess` to the bare name `ess`, and `crates/connectors-spec/tests/generation.rs:6` reads `CONNECTORS_ESS` and otherwise falls back to PATH.
 
-Observed on 2026-09-08 on the operator's machine: `~/.cargo/bin/ess` reports `ess 0.18.0`, `~/.local/bin/ess` reports `ess 0.9.2`. The remediation shell resolved 0.9.2 (`docs/evidence/review-2026-09-08/toolchain.txt`) and the gate passed; the review shell resolved 0.18.0 and 2 of 5 `generation` tests failed with `generation requires ess 0.9.2; found ess 0.18.0`, and `target/debug/connectors-build gate` refused before running any check. The README gate command (`README.md:27`) passes no `--ess`; the workaround lives only in `docs/gitlab-generation.md:12-18`.
+Observed on 2026-09-08 on the operator's machine: `home-path:sha256:e3d2693a679c4cb61db8d6f7ab744d1237dbd02ac7fb6ba8a560c1c08a3a44b8` reports `ess 0.18.0`, `home-path:sha256:721b301408bf61e390e7b5d225e98eec314dc53095df998940c6568168324f52` reports `ess 0.9.2`. The remediation shell resolved 0.9.2 (`docs/evidence/review-2026-09-08/toolchain.txt`) and the gate passed; the review shell resolved 0.18.0 and 2 of 5 `generation` tests failed with `generation requires ess 0.9.2; found ess 0.18.0`, and `target/debug/connectors-build gate` refused before running any check. The README gate command (`README.md:27`) passes no `--ess`; the workaround lives only in `docs/gitlab-generation.md:12-18`.
 
 The pass/fail of the gate therefore depends on the caller's PATH order, and no file in the repository records which executable is the correct one.
 
@@ -47,7 +47,7 @@ With both a 0.18.0 and a 0.9.2 `ess` on PATH and 0.18.0 first, `cargo run --lock
 
 ## Verification
 
-Run the README gate command twice, once with `~/.cargo/bin` first on PATH and once with `~/.local/bin` first; both must print `gate: all checks passed`. Run the generation tests with `CONNECTORS_ESS` unset in the 0.18.0-first shell. Temporarily hide the 0.9.2 binary and confirm the refusal text names the pin record. Existing 35 tests remain green; record the commands and output in `docs/verification.md`.
+Run the README gate command twice, once with `home-path:sha256:ed5339b904f923a8a6c455fc05e0d0a51db0dd500cf567d53da477a4cd08139e` first on PATH and once with `home-path:sha256:8d6708581526e2954aab593f4ba61464fb67c0e06c88062276127839a99834b9` first; both must print `gate: all checks passed`. Run the generation tests with `CONNECTORS_ESS` unset in the 0.18.0-first shell. Temporarily hide the 0.9.2 binary and confirm the refusal text names the pin record. Existing 35 tests remain green; record the commands and output in `docs/verification.md`.
 
 ## Progress
 

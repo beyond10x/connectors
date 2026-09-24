@@ -28,7 +28,7 @@ Manual semantic review:
 Independently executed checks:
 
 1. git rev-parse HEAD returned the exact final source; git status --short was empty on entry.
-2. ~/beyond10x/connectors_v2/.local/toolchains/ess/0.20.0/bin/ess specify validate --path ess — exit 0: connectors v1 — 18 file(s), valid.
+2. home-path:sha256:5383c09e41cdcda0ca675683331222a70a611e2891760a75dfc862dcca8d8e7c specify validate --path ess — exit 0: connectors v1 — 18 file(s), valid.
 3. The same pinned binary, specify compile --path ess --out .local/model-closure-20260909/final-ir.json — exit 0: 18 files, 314 declarations.
 4. Archived only baseline ess/ into labeled scratch with git archive 8a5cf563fc717fd4b23e4dd7d470d0c967f39461 ess, then compiled .local/model-closure-20260909/final-baseline/ess with the same pinned binary — exit 0: 14 files, 218 declarations.
 5. jq comparison of those actual compiled IRs — exit 0: baseline_entities=11, current_entities=20, old_entities_preserved=true, old_types_preserved=true. The comparison checks each original identity and lifecycle, every complete original field entry, and every original named type. Separate compiled-IR inspection confirmed the actual optional evidence/route fields and exactly two ownership edges: AdapterSpecification to OperationDeclaration and DiscoveryCollection to ResourceObservation.
