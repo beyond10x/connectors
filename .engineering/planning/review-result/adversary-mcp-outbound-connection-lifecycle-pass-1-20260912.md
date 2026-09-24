@@ -13,7 +13,7 @@ unit: mcp-w4b — story:mcp-outbound-connection-lifecycle, worktree cv2-mcp-w4b-
 verdict: red
 cases: executed 54→60, red 6
 origin: introduced 8, pre-existing 0, undecided 0
-wrote-outside-worktree: 4 paths under ~/.cache/cv2-mcp-waves-20260912/adversary-w4b/
+wrote-outside-worktree: 4 paths under home-path:sha256:87a67691c675c001a1df0bdd9e4a12a233eb7d66702c177f7b35f0f0cb910184
 needs-coordinator: yes
 ```
 

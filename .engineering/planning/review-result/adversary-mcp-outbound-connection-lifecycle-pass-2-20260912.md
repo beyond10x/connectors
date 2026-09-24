@@ -13,7 +13,7 @@ unit: mcp-w4b
 verdict: red
 cases: executed 63→68, red 5
 origin: introduced 7, pre-existing 0, undecided 0
-wrote-outside-worktree: 2 logs under ~/.cache/cv2-mcp-waves-20260912/adversary-w4b-pass2/
+wrote-outside-worktree: 2 logs under home-path:sha256:4ac658033841e9867b84fec0c86740b28053da64819dcb657040574d2dd4b7ee
 needs-coordinator: yes
 ```
 
