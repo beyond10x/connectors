@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: specification:review-findings-toolchain-upgrade-20260911
 kind: specification
 status: draft

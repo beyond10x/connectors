@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: story:shared-ess-provider-boundary
 kind: story
 status: implemented

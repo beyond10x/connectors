@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: story:contracts-connection-readiness
 kind: story
 status: implemented

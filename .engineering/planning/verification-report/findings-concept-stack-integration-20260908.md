@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/1
+format: aep.planning-md/2
 id: verification-report:findings-concept-stack-integration-20260908
 kind: verification-report
 status: draft
