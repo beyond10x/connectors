@@ -44,19 +44,19 @@ The case is green under the structural compiler. It does not run a clock or prov
 Initial isolated output:
 
 ```text
-$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated --out ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated.json
-refusal[ESS-AUTHOR-023]: `connectors.credential_evidence/authored/retained-lineage-expires-before-dispatch` in ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated/retained-lineage-expires-before-dispatch.yaml
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios home-path:sha256:b5f8636e64e8c508f8c44a918f7b0b36154ae4272e225bca0290b5782352dd03 --out home-path:sha256:d23da255f5a68d957ed6ef942da0c5ccad81db41df26981d34923064cd96ad04
+refusal[ESS-AUTHOR-023]: `connectors.credential_evidence/authored/retained-lineage-expires-before-dispatch` in home-path:sha256:a84533050c4c76937a9dc6bd9581da8f95bfedf0cb7f5bb69a8cee6dc074ec21
   `2026-09-08T09:00:29Z` does not come after `2026-09-08T09:00:29Z`
   help: give each act an instant later than the one before it; the file's order is the scenario's order and `at:` is what states it
-0 authored scenario(s) from 1 file(s), 1 refusal(s), written to ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated.json
+0 authored scenario(s) from 1 file(s), 1 refusal(s), written to home-path:sha256:d23da255f5a68d957ed6ef942da0c5ccad81db41df26981d34923064cd96ad04
 exit: 1
 ```
 
 Corrected isolated output:
 
 ```text
-$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated --out ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated-fixed.json
-1 authored scenario(s) from 1 file(s), 0 refusal(s), written to ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-isolated-fixed.json
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios home-path:sha256:b5f8636e64e8c508f8c44a918f7b0b36154ae4272e225bca0290b5782352dd03 --out home-path:sha256:21e8068b5c10f240ccd6673ddb6a47ea35cd71113a51e06ae86858a71ff50f00
+1 authored scenario(s) from 1 file(s), 0 refusal(s), written to home-path:sha256:21e8068b5c10f240ccd6673ddb6a47ea35cd71113a51e06ae86858a71ff50f00
 exit: 0
 ```
 
@@ -71,20 +71,20 @@ $ .local/toolchains/ess/0.20.0/bin/ess specify validate --path ess
 connectors v1 — 7 file(s), valid
 exit: 0
 
-$ .local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-ir.json
-connectors v1 — 7 file(s), 66 declaration(s), compiled to ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-ir.json
+$ .local/toolchains/ess/0.20.0/bin/ess specify compile --path ess --out home-path:sha256:4c94ba9e6fc3e0564213756670cb34fff2799b8ab2c78086ebb3e7414219868c
+connectors v1 — 7 file(s), 66 declaration(s), compiled to home-path:sha256:4c94ba9e6fc3e0564213756670cb34fff2799b8ab2c78086ebb3e7414219868c
 exit: 0
 
-$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/auth/evidence/v1alpha1/scenarios --out ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-authored.json
-6 authored scenario(s) from 6 file(s), 0 refusal(s), written to ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-authored.json
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/auth/evidence/v1alpha1/scenarios --out home-path:sha256:cb153ade1c506a37d18435744229785ad4b6296d9255d3541b8b3744db99e69e
+6 authored scenario(s) from 6 file(s), 0 refusal(s), written to home-path:sha256:cb153ade1c506a37d18435744229785ad4b6296d9255d3541b8b3744db99e69e
 exit: 0
 
-$ .local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --scenarios contracts/auth/evidence/v1alpha1/scenarios --out ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-synthesized.json
-73 scenario(s) (6 authored), 0 refusal(s), written to ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-synthesized.json
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform synthesize --path ess --target ir --scenarios contracts/auth/evidence/v1alpha1/scenarios --out home-path:sha256:e7e43a008d78381af55f8d319bc9f5267b08bcca879a19040323264b47488566
+73 scenario(s) (6 authored), 0 refusal(s), written to home-path:sha256:e7e43a008d78381af55f8d319bc9f5267b08bcca879a19040323264b47488566
 exit: 0
 
-$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/operations/v1alpha1/scenarios --out ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-operations.json
-15 authored scenario(s) from 15 file(s), 0 refusal(s), written to ~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908/.local/waves/auth-hardening-20260908/evidence/adversary-p1-operations.json
+$ .local/toolchains/ess/0.20.0/bin/ess verify conform author --path ess --scenarios contracts/operations/v1alpha1/scenarios --out home-path:sha256:209454f1c877ba78a77ecdcfcb37564417f350ca73969d693df7f146e1c68d43
+15 authored scenario(s) from 15 file(s), 0 refusal(s), written to home-path:sha256:209454f1c877ba78a77ecdcfcb37564417f350ca73969d693df7f146e1c68d43
 exit: 0
 
 $ git diff --check
@@ -114,7 +114,7 @@ No finding rows. The timestamp authoring correction above is not a finding again
 
 The coordinator must record this report, add the new exact scenario path to the story's typed scope, preserve the additional compiled counts in closing verification, and run the combined integration gate. The existing unit verification document was not edited by the adversary. No further attack is requested by this report.
 
-Managed tree: `connectors-v2-auth-evidence-20260908`, path `~/.local/state/worktree/trees/b10x/connectors_v2/connectors-v2-auth-evidence-20260908`, branch `impl/contracts-credential-evidence`, base `1e567571d9ac62070933c7099b93a4e030613e58`. Changes remain unstaged. Next owner is the coordinator. The adversary releases only session `codex-auth-evidence-adversary-p1-20260908`; coordinator lease and managed-tree lifecycle remain untouched. No directories or build output were removed.
+Managed tree: `connectors-v2-auth-evidence-20260908`, path `home-path:sha256:aa42896769542bc0e65426710a9e88a07eb04ed579a007d6d6e44b86528a1b30`, branch `impl/contracts-credential-evidence`, base `1e567571d9ac62070933c7099b93a4e030613e58`. Changes remain unstaged. Next owner is the coordinator. The adversary releases only session `codex-auth-evidence-adversary-p1-20260908`; coordinator lease and managed-tree lifecycle remain untouched. No directories or build output were removed.
 
 Retained report, isolated copies, logs, compiler JSON and source digests live under `.local/waves/auth-hardening-20260908/evidence/`, the assigned scratch directory. Exact report path: `.local/waves/auth-hardening-20260908/evidence/adversary-pass-1.md`. Outside-worktree artifact paths: none. Required worktree lease bookkeeping is not an external deliverable.
 

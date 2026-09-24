@@ -13,7 +13,7 @@ unit: mcp-w2 — story:mcp-domain-model at ff8ec40 (d5270ca + ff8ec40), worktree
 verdict: red
 cases: executed 36→39, red 3
 origin: introduced 9, pre-existing 0, undecided 0
-wrote-outside-worktree: 14 paths under ~/.cache/cv2-mcp-waves-20260912/adversary-w2-pass2/
+wrote-outside-worktree: 14 paths under home-path:sha256:44ffc3f7291f314856c242bff85fa3cfcc1c08eb65d9635dbefe153d033a76b2
 needs-coordinator: yes
 ```
 

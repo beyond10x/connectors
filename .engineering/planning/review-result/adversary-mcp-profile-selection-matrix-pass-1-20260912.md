@@ -13,7 +13,7 @@ unit: mcp-w3 story:mcp-profile-selection-matrix, worktree cv2-mcp-w1-20260912 at
 verdict: red
 cases: executed 46→49, red 3
 origin: introduced 4, pre-existing 0, undecided 0
-wrote-outside-worktree: 4 paths under ~/.cache/cv2-mcp-waves-20260912/adversary-w3/
+wrote-outside-worktree: 4 paths under home-path:sha256:82257e76d9ee9b8affe9a37410fc132e0695bbc0f2085c3ba7bba25f69e78fcd
 needs-coordinator: yes
 ```
 

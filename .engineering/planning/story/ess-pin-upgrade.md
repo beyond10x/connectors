@@ -26,7 +26,7 @@ revision: 8
 ---
 ## Context
 
-The repository pins ESS 0.9.2 for GitLab generation (`crates/connectors-spec/src/v2.rs:8`; `docs/gitlab-generation.md:12`). The newer installed ESS on the operator's machine is 0.18.0 (`~/.cargo/bin/ess`, observed 2026-09-08). `docs/design.md:64` and `:915` record 0.9.2 as the version observed during the design handoff. `crates/connectors-build/src/main.rs` carries at least one adaptation specific to 0.9.2 (the empty-`secrets` default on build IR input, commented at the `build-ir.projectable.json` step).
+The repository pins ESS 0.9.2 for GitLab generation (`crates/connectors-spec/src/v2.rs:8`; `docs/gitlab-generation.md:12`). The newer installed ESS on the operator's machine is 0.18.0 (`home-path:sha256:e3d2693a679c4cb61db8d6f7ab744d1237dbd02ac7fb6ba8a560c1c08a3a44b8`, observed 2026-09-08). `docs/design.md:64` and `:915` record 0.9.2 as the version observed during the design handoff. `crates/connectors-build/src/main.rs` carries at least one adaptation specific to 0.9.2 (the empty-`secrets` default on build IR input, commented at the `build-ir.projectable.json` step).
 
 Whether 0.18.0 accepts the same `import openapi`, `build compile`, `project buildkit`, `realization validate` and `realization compile` invocations, and produces a byte-identical or reviewable bundle, is not known. It has not been tried.
 

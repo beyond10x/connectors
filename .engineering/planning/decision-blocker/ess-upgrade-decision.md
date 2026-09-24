@@ -15,7 +15,7 @@ Should the GitLab generation pin move from ESS 0.9.2 to 0.18.0, or stay at 0.9.2
 ## What is known
 
 - Pin: `crates/connectors-spec/src/v2.rs:8` = `ess 0.9.2`.
-- Installed: `~/.cargo/bin/ess` = 0.18.0 and `~/.local/bin/ess` = 0.9.2 (observed 2026-09-08).
+- Installed: `home-path:sha256:e3d2693a679c4cb61db8d6f7ab744d1237dbd02ac7fb6ba8a560c1c08a3a44b8` = 0.18.0 and `home-path:sha256:721b301408bf61e390e7b5d225e98eec314dc53095df998940c6568168324f52` = 0.9.2 (observed 2026-09-08).
 - Compatibility of 0.18.0 with the generator's CLI invocations and bundle output: not tested. I don't know.
 - Cost of upgrading: regeneration, bundle review, live GitLab re-acceptance (`docs/gitlab-generation.md:18`).
 

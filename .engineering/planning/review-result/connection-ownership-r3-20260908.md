@@ -36,7 +36,7 @@ The original eight requirements are reflected consistently across management, co
 
 The detailed observations are in `recheck-2-evidence-audit.json`.
 
-- All 16 viability examples agree with the documented first-match priorities, including metadata outage without an invented state, revoked/disabled dominance, known credential failure, custody/parent precedence, unpublished/stale baseline and ready.
+- All 16 viability examples agree with the documented first-match priorities, including metadata outage without an invented state, revoked/disabled dominance, known credential failure, custody or parent precedence, unpublished/stale baseline and ready.
 - All 18 eligibility examples agree with current authority/enablement, exact configured or alternative binding, global viability and operation scope/permission/verification rules. In particular, read-without-optional-write remains eligible and denied current grant precedes disclosure of revoked state.
 - All seven management target values agree with the selected instance/connection/acquisition owners. They are semantic target values, not proof of wire parsing or permission.
 - The 16 textual traces correctly cover publication, optional grant narrowing, failed independent repair, protected actions, absent/null selector refusal, retained federation owner, withdrawn management permission, local revoke versus uncertain cleanup and no automatic business replay.

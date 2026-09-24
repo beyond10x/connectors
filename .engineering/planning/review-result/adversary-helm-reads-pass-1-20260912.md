@@ -13,7 +13,7 @@ unit: 1 — story:kubernetes-helm-release-reads, worktree cv2-helm-reads-2026091
 verdict: red
 cases: executed 20→25, red 5
 origin: introduced 8, pre-existing 0, undecided 0
-wrote-outside-worktree: ~/.cache/cv2-wave-b-20260912/adversary-1/{tmp,vendor}
+wrote-outside-worktree: home-path:sha256:0daa9d190b9953bdc3dc069cdee64bc40babca1ec55a31660a095fcab0905a48,vendor}
 needs-coordinator: no
 ```
 
@@ -86,7 +86,7 @@ Named fixes, not applied: (1) change the contract and CLI doc to "over the canon
 
 ## 6. Paths written outside the worktree
 
-`~/.cache/cv2-wave-b-20260912/adversary-1/tmp/` and `.../vendor/`, 108K total. Inside the worktree, `target/debug/connectors` was built because the CLI-journey lane requires `CONNECTORS_TEST_CLI`.
+`home-path:sha256:4eafe2c07757f6eb005a2f3de02d75feeda94c594db0ffc301eaca831fa7a062` and `.../vendor/`, 108K total. Inside the worktree, `target/debug/connectors` was built because the CLI-journey lane requires `CONNECTORS_TEST_CLI`.
 
 ```findings
 - file: adapters/kubernetes/contracts/helm/v1alpha1/semantics.md
