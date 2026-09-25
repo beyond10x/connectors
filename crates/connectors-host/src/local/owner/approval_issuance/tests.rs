@@ -42,7 +42,7 @@ impl Target {
     fn fake_issuer(&self) {
         // Metadata-only tests assert no secret qualification. Real issuance
         // below initializes the issuer through its qualified custody owner.
-        let metadata = Metadata::update_approval_keys(&self.paths.state).unwrap();
+        let mut metadata = Metadata::update_approval_keys(&self.paths.state).unwrap();
         metadata
             .connection
             .execute(
@@ -54,6 +54,7 @@ impl Target {
                 ],
             )
             .unwrap();
+        metadata.persist().unwrap();
     }
 }
 fn setup(root: &Path, socket: Option<&Path>, clock_address: &str) -> Target {
@@ -195,7 +196,7 @@ fn prepare_is_passive_and_digests_the_strict_input_and_current_policy() {
     t.fake_issuer();
     let policy = t.policy();
     let metadata = Metadata::inspect(&t.paths.state).unwrap();
-    let path = metadata.connection.path().unwrap().to_owned();
+    let path = t.paths.state.join("metadata.sqlite3");
     drop(metadata);
     let observer =
         rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)

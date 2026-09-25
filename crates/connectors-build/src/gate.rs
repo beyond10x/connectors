@@ -3,6 +3,7 @@ use std::{path::Path, process::Command};
 
 pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     connectors_spec::v2::check_ess(ess)?;
+    super::metadata_entities::run(root, true)?;
     let base = root.join(".local/tmp");
     std::fs::create_dir_all(&base)?;
     let temp = tempfile::Builder::new().prefix("gate-").tempdir_in(base)?;
@@ -77,6 +78,32 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     // Generation fixtures verify the full pinned bundle, reproducibility and refusals.
     execute(command("cargo").args(["build", "--workspace", "--locked", "--offline"]))?;
     execute(command("cargo").args(["test", "--workspace", "--locked", "--offline"]))?;
+    // Alone: its recovery window is a 250 ms product bound, and parallel neighbours on a 4-thread runner consume it.
+    let isolated = [
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "connectors-host",
+        "--lib",
+        "--",
+        "--ignored",
+        "--exact",
+        "local::owner::mutation::tests::final_audit_recovery_preserves_every_live_business_result",
+        "--test-threads=1",
+    ];
+    println!("gate: {isolated:?}");
+    let output = command("cargo")
+        .args(isolated)
+        .stderr(std::process::Stdio::inherit())
+        .output()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    print!("{stdout}");
+    println!("gate: exit={} {isolated:?}", output.status);
+    if !output.status.success() {
+        return Err("gate command \"cargo\" failed".into());
+    }
+    ran_exactly_one(&stdout)?;
     execute(command("cargo").args([
         "clippy",
         "--workspace",
@@ -149,21 +176,63 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     }
     println!("gate: generic CLI boundary holds; exit=0");
     if msrv {
-        // Keep compiler metadata separate without duplicating a full binary build.
+        // Keep compiler metadata separate. The Eventlog-backed host graph needs
+        // Rust 1.91; libraries which do not select that graph retain 1.88.
         let target = std::env::var_os("CARGO_TARGET_DIR")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| root.join("target"));
+        for package in [
+            "connectors-catalog",
+            "connectors-client",
+            "connectors-contracts",
+            "connectors-core",
+            "connectors-sdk",
+        ] {
+            execute(
+                command("cargo")
+                    .args([
+                        "+1.88.0",
+                        "check",
+                        "--package",
+                        package,
+                        "--all-targets",
+                        "--locked",
+                        "--offline",
+                    ])
+                    .env("CARGO_TARGET_DIR", target.join("msrv-1.88")),
+            )?;
+        }
+        for package in [
+            "connectors-catalog-provider",
+            "connectors-kubernetes",
+            "connectors-sql",
+        ] {
+            execute(
+                command("cargo")
+                    .args([
+                        "+1.88.0",
+                        "check",
+                        "--package",
+                        package,
+                        "--lib",
+                        "--no-default-features",
+                        "--locked",
+                        "--offline",
+                    ])
+                    .env("CARGO_TARGET_DIR", target.join("msrv-1.88")),
+            )?;
+        }
         execute(
             command("cargo")
                 .args([
-                    "+1.88.0",
+                    "+1.91.0",
                     "check",
                     "--workspace",
                     "--all-targets",
                     "--locked",
                     "--offline",
                 ])
-                .env("CARGO_TARGET_DIR", target.join("msrv")),
+                .env("CARGO_TARGET_DIR", target.join("msrv-1.91")),
         )?;
     }
     // The pinned ESS authoring reader is non-recursive. Collect each explicitly
@@ -239,4 +308,47 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     execute(planning.args(["plan", "artifact", "validate"]))?;
     println!("gate: all checks passed");
     Ok(())
+}
+
+/// A name filter that matches nothing still exits 0, so an isolated step is
+/// green only when its single binary reports exactly the one case passing.
+fn ran_exactly_one(output: &str) -> Result<()> {
+    let summaries = output
+        .lines()
+        .filter(|line| line.starts_with("test result: "))
+        .collect::<Vec<_>>();
+    match summaries.as_slice() {
+        [summary] if summary.starts_with("test result: ok. 1 passed; 0 failed;") => Ok(()),
+        _ => Err(
+            format!("isolated test step did not run exactly one passing case: {summaries:?}")
+                .into(),
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_isolated_run_counts_only_when_its_one_case_passed() {
+        assert!(
+            ran_exactly_one("running 1 test\ntest x ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 184 filtered out; finished in 24.61s\n")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn an_isolated_run_that_selected_nothing_or_more_is_refused() {
+        for output in [
+            // A renamed or moved case: the filter matches nothing and cargo still exits 0.
+            "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 185 filtered out; finished in 0.00s\n",
+            "running 2 tests\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 183 filtered out; finished in 1.00s\n",
+            "",
+            // Another binary of the same package also printed a summary.
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.1s\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.0s\n",
+        ] {
+            assert!(ran_exactly_one(output).is_err(), "accepted {output:?}");
+        }
+    }
 }

@@ -109,6 +109,55 @@ pub fn private_file_at(parent: &File, child: &OsStr) -> Result<File> {
     Ok(file)
 }
 
+/// Check a private regular file without opening its inode. Closing a raw
+/// descriptor for a live SQLite database or WAL sidecar would cancel another
+/// connection's process-owned POSIX locks, outside SQLite's deferred-close VFS.
+pub fn private_file_metadata_at(parent: &File, child: &OsStr) -> Result<()> {
+    match private_file_metadata_if_present_at(parent, child)? {
+        true => Ok(()),
+        false => Err(Failure::InvalidConfiguration),
+    }
+}
+
+/// The same check in one `fstatat`, reporting absence rather than refusing it.
+/// SQLite retires sidecars on its last close; a separate existence probe
+/// before this check would refuse one that was retired in between.
+pub fn private_file_metadata_if_present_at(parent: &File, child: &OsStr) -> Result<bool> {
+    let child = name(child)?;
+    let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: the parent descriptor and NUL-terminated child remain live, and
+    // fstatat initializes stat on success without following a final symlink.
+    let result = unsafe {
+        libc::fstatat(
+            parent.as_raw_fd(),
+            child.as_ptr(),
+            stat.as_mut_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    if result != 0 {
+        if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOENT) {
+            return Ok(false);
+        }
+        return Err(Failure::InvalidConfiguration);
+    }
+    // SAFETY: successful fstatat initialized the stat structure.
+    let stat = unsafe { stat.assume_init() };
+    // A name unlinked while it was being resolved reports its inode with no
+    // remaining links: that file is already retired, not a second name.
+    if stat.st_nlink == 0 {
+        return Ok(false);
+    }
+    if stat.st_mode & libc::S_IFMT != libc::S_IFREG
+        || stat.st_uid != uid()
+        || stat.st_mode & 0o077 != 0
+        || stat.st_nlink != 1
+    {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok(true)
+}
+
 pub fn check_private_file(file: &File) -> Result<()> {
     let stat = file.metadata().map_err(|_| Failure::InvalidConfiguration)?;
     if !stat.is_file() || stat.uid() != uid() || stat.mode() & 0o077 != 0 || stat.nlink() != 1 {

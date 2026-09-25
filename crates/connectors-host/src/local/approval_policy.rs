@@ -20,6 +20,31 @@ const LOCK: &str = "approval-policy.lock";
 const MAX_REVISION: i64 = 9_007_199_254_740_991;
 const MAX_OPERATIONS: usize = 256;
 
+#[cfg(test)]
+thread_local! {
+    static SQL_WRITE_FAULT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+fn refuse_next_sql_write() {
+    SQL_WRITE_FAULT.with(|fault| fault.set(true));
+}
+
+#[cfg(test)]
+fn install_sql_write_fault(
+    transaction: &rusqlite::Transaction<'_>,
+) -> std::result::Result<(), Failure> {
+    if SQL_WRITE_FAULT.with(|fault| fault.replace(false)) {
+        transaction
+            .execute_batch(
+                "CREATE TEMP TRIGGER test_refuse_policy BEFORE UPDATE ON local_approval_policies \
+                 BEGIN SELECT RAISE(ABORT,'fixture failure'); END;",
+            )
+            .map_err(db)?;
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {
     InvalidInput,
@@ -210,6 +235,8 @@ impl Store {
         let selected = serde_json::to_string(&view.selection).map_err(|_| Failure::InvalidInput)?;
         let operations =
             serde_json::to_string(&view.operations).map_err(|_| Failure::InvalidInput)?;
+        #[cfg(test)]
+        install_sql_write_fault(&tx)?;
         match old {
             None => {
                 tx.execute("INSERT INTO local_approval_policies VALUES (?1,?2,?3,?4,?5,?6,?7)",
@@ -225,6 +252,7 @@ impl Store {
         }
         lease.check()?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist()?;
         // FULL/WAL acknowledges the transaction. Unknown acknowledgement never
         // returns the proposed view; later inspection cannot recreate a lease.
         acknowledge().map_err(|_| Failure::OutcomeUnknown)?;

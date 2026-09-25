@@ -29,14 +29,42 @@ fn fixture() -> (tempfile::TempDir, Store<TestClock>, Candidate) {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     drop(Metadata::initialize(root.path()).unwrap());
-    let metadata = Metadata::update_mutations(root.path()).unwrap();
+    let mut metadata = Metadata::update_mutations(root.path()).unwrap();
     // Synthetic admitted-registry coordinates, not provider/custody evidence.
-    metadata.connection.execute_batch("INSERT INTO registry_instances VALUES ('instance','adapter','config',0),('second','adapter','config',0);
-      INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1','{}');
-      INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms) VALUES
-      ('connection','instance','profile','{}','scope','revision','fence','live',1,1),
-      ('other','instance','profile','{}','other-scope','other-revision','other-fence','live',1,1),
-      ('second-connection','second','profile','{}','second-scope','revision','fence','live',1,1);").unwrap();
+    metadata.connection.execute_batch("INSERT INTO registry_instances VALUES ('instance','adapter','config',0),('second','adapter','config',0);").unwrap();
+    let profile = crate::local::registry::fixture_binding("instance").profile;
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1',?1)",
+            [serde_json::to_string(&profile).unwrap()],
+        )
+        .unwrap();
+    for (reference, instance, scope, revision, fence) in [
+        ("connection", "instance", "scope", "revision", "fence"),
+        (
+            "other",
+            "instance",
+            "other-scope",
+            "other-revision",
+            "other-fence",
+        ),
+        (
+            "second-connection",
+            "second",
+            "second-scope",
+            "revision",
+            "fence",
+        ),
+    ] {
+        let binding = crate::local::registry::fixture_binding(instance);
+        metadata.connection.execute(
+            "INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms)
+             VALUES (?1,?2,'profile',?3,?4,?5,?6,'live',1,1)",
+            rusqlite::params![reference, instance, serde_json::to_string(&binding).unwrap(), scope, revision, fence],
+        ).unwrap();
+    }
+    metadata.persist().unwrap();
     drop(metadata);
     let clock = TestClock(Arc::new(Mutex::new(Ok(ClockInterval {
         lower_unix_ms: NOW,
@@ -192,7 +220,7 @@ fn instance_recovery_preserves_fault_uncertainty_and_ignores_revoked_business_gr
         Err(Failure::BindingChanged)
     );
     assert_eq!(store.observe(reference).unwrap().state, State::Prepared);
-    let metadata = Metadata::update(root.path(), false).unwrap();
+    let mut metadata = Metadata::update(root.path(), false).unwrap();
     metadata
         .connection
         .execute(
@@ -200,6 +228,7 @@ fn instance_recovery_preserves_fault_uncertainty_and_ignores_revoked_business_gr
             [],
         )
         .unwrap();
+    metadata.persist().unwrap();
     drop(metadata);
     store.fault.store(1, Ordering::SeqCst);
     assert_eq!(
@@ -603,17 +632,25 @@ fn capacity_and_corrupt_or_unavailable_reads_do_not_become_absence() {
         Err(Failure::Capacity)
     );
     assert_eq!(existing(&store, &candidate).state, State::Prepared);
-    let metadata = Metadata::update(root.path(), false).unwrap();
-    metadata
-        .connection
-        .execute("UPDATE mutation_keys SET fingerprint='corrupt'", [])
-        .unwrap();
-    drop(metadata);
+    assert_eq!(count(root.path(), "mutation_attempts"), 1);
+    // The level-9 SQL connection is only a disposable projection. Corrupt the
+    // recorded provider event itself to exercise unavailable durable authority.
+    let physical = rusqlite::Connection::open(root.path().join("metadata.sqlite3")).unwrap();
+    assert_eq!(
+        physical
+            .execute(
+                "UPDATE connectors_er_events SET data='{}' WHERE global_seq=(SELECT max(global_seq) FROM connectors_er_events WHERE event_name='er.recorded_entry')",
+                [],
+            )
+            .unwrap(),
+        1
+    );
+    drop(physical);
     assert_eq!(
         store.observe(owner.reference()),
         Err(Failure::MetadataUnavailable)
     );
-    assert_eq!(count(root.path(), "mutation_attempts"), 1);
+    assert_eq!(store.lookup(&candidate), Err(Failure::MetadataUnavailable));
     let missing = Store::new(
         &root.path().join("missing"),
         store.clock.clone(),
@@ -639,8 +676,9 @@ fn connection_fences_authority_and_process_identity_refuse_stale_handles() {
         let (root, store, candidate) = fixture();
         let owner = prepared(&store, &candidate);
         let reference = owner.reference();
-        let metadata = Metadata::update(root.path(), false).unwrap();
+        let mut metadata = Metadata::update(root.path(), false).unwrap();
         metadata.connection.execute_batch(change).unwrap();
+        metadata.persist().unwrap();
         drop(metadata);
         assert!(matches!(
             store.open_dispatch(owner),
@@ -688,24 +726,46 @@ fn unkeyed_attempts_still_require_the_gate_and_retain_outcome() {
 
 #[test]
 fn version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authority() {
-    let (root, store, candidate) = fixture();
-    let authority;
-    let old_digests;
-    {
-        let metadata = Metadata::update(root.path(), false).unwrap();
-        authority = metadata.authority().unwrap();
-        old_digests = metadata
-            .connection
-            .prepare(
-                "SELECT version,digest FROM schema_migrations WHERE version<=3 ORDER BY version",
-            )
-            .unwrap()
-            .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
-            .unwrap()
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .unwrap();
-        metadata.connection.execute_batch("DROP TABLE mutation_keys; DROP TABLE mutation_attempts; DROP TABLE mutation_clock; DELETE FROM schema_migrations WHERE version=4; PRAGMA user_version=3;").unwrap();
-    }
+    let root = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let authority = crate::local::metadata::legacy_fixture(root.path(), 3);
+    let connection = rusqlite::Connection::open(root.path().join("metadata.sqlite3")).unwrap();
+    connection
+        .execute_batch("INSERT INTO registry_instances VALUES ('instance','adapter','config',0);")
+        .unwrap();
+    let binding = crate::local::registry::fixture_binding("instance");
+    connection
+        .execute(
+            "INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1',?1)",
+            [serde_json::to_string(&binding.profile).unwrap()],
+        )
+        .unwrap();
+    connection.execute(
+        "INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms)
+         VALUES ('connection','instance','profile',?1,'scope','revision','fence','live',1,1)",
+        [serde_json::to_string(&binding).unwrap()],
+    ).unwrap();
+    drop(connection);
+    let store = Store::new(
+        root.path(),
+        TestClock(Arc::new(Mutex::new(Ok(ClockInterval {
+            lower_unix_ms: NOW,
+            upper_unix_ms: NOW + 2000,
+        })))),
+        Limits::default(),
+    )
+    .unwrap();
+    let candidate = candidate();
+    let metadata = Metadata::inspect(root.path()).unwrap();
+    let old_digests = metadata
+        .connection
+        .prepare("SELECT version,digest FROM schema_migrations ORDER BY version")
+        .unwrap()
+        .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+        .unwrap()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .unwrap();
+    drop(metadata);
     assert_eq!(store.lookup(&candidate), Err(Failure::MetadataUnavailable));
     // Ordinary setup/re-entry and admitted read metadata operations retain v3.
     drop(Metadata::initialize(root.path()).unwrap());
@@ -741,6 +801,12 @@ fn version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authorit
         4
     );
     assert_eq!(metadata.connection.query_row("SELECT semantic_revision FROM registry_connections WHERE connection_ref='connection'",[],|r|r.get::<_,String>(0)).unwrap(),"revision");
+    drop(metadata);
+    let restarted = Store::new(root.path(), store.clock.clone(), Limits::default()).unwrap();
+    assert_eq!(
+        restarted.observe(owner.reference()).unwrap().state,
+        State::Prepared
+    );
 }
 
 #[test]

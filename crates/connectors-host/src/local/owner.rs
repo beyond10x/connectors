@@ -72,7 +72,9 @@ impl From<super::Failure> for Error {
             super::Failure::InvalidConfiguration | super::Failure::ConfigurationExists => {
                 Code::InvalidConfiguration
             }
-            super::Failure::MetadataUnavailable => Code::MetadataUnavailable,
+            super::Failure::MetadataUnavailable | super::Failure::ConcurrentRevision => {
+                Code::MetadataUnavailable
+            }
             super::Failure::OutcomeUnknown => Code::OutcomeUnknown,
         }
         .into()
@@ -82,7 +84,7 @@ impl From<registry::Failure> for Error {
     fn from(e: registry::Failure) -> Self {
         use registry::Failure as F;
         match e {
-            F::MetadataUnavailable => Code::MetadataUnavailable,
+            F::MetadataUnavailable | F::ConcurrentRevision => Code::MetadataUnavailable,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
             F::Conflict => Code::LifecycleConflict,
@@ -236,7 +238,19 @@ pub fn admit_revalidation(
     connection: &str,
     revision: &str,
 ) -> Result<String> {
-    let profile = admit_capture(paths, alias, None, Some(connection), Some(revision))?;
+    let (config, adapter) = selected(paths, alias)?;
+    let profile = registry::Registry::new(&paths.state).revalidation_profile(
+        &adapter.instance_id,
+        &adapter.adapter_id,
+        connection,
+        revision,
+    )?;
+    if !adapter.permissions.profiles.contains(&profile) {
+        return Err(Code::Forbidden.into());
+    }
+    if !custody::available_at(config.secret_service_socket.as_deref()) {
+        return Err(Code::CustodyUnavailable.into());
+    }
     let binding = cached(paths, alias)?.binding(&profile)?;
     registry::Registry::with_system_clock(&paths.state).admit_revalidation(
         &binding,

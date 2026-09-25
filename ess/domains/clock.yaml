@@ -1,5 +1,5 @@
 domain: connectors.clock
-summary: Explicitly trusted local clock configuration and bounded observations; no persistent clock identity.
+summary: Explicitly trusted local clock configuration, bounded observations and owner anti-regression floors.
 # Normative owner: contracts/service/clock.md. Values convey no caller or approval authority.
 types:
   - name: connectors.clock.Configuration
@@ -19,3 +19,50 @@ types:
       - {name: upper_unix_ms, type: Integer}
     # UNMAPPED: raw signature/nonce validation, process continuity, elapsed-time
     # bounds, suspend rejection, TTL and outward rounding require runtime evidence.
+
+entities:
+  - name: connectors.clock.LocalClockFloor
+    identity: {name: owner, type: String}
+    fields:
+      - {name: lower_unix_ms, type: Integer}
+    lifecycle:
+      initial: Recorded
+      states: [Recorded]
+      terminal: [Recorded]
+      transitions:
+        - {name: advance, from: [Recorded], to: Recorded}
+    # The local registry and mutation owners use distinct identities. An
+    # advance is recorded even when a separately proposed business action is
+    # refused, so a restart cannot admit a regressed trusted observation.
+
+commands:
+  - name: connectors.clock.RecordLocalClockFloor
+    input:
+      - {name: owner, type: String}
+      - {name: lower_unix_ms, type: Integer}
+    outcomes:
+      - name: recorded
+        creates: connectors.clock.LocalClockFloor
+        instance: owner
+        emits: [connectors.clock.LocalClockFloorRecorded]
+        sets:
+          lower_unix_ms: input.lower_unix_ms
+  - name: connectors.clock.AdvanceLocalClockFloor
+    input:
+      - {name: owner, type: String}
+      - {name: lower_unix_ms, type: Integer}
+    outcomes:
+      - name: advanced
+        moves: connectors.clock.LocalClockFloor.advance
+        instance: owner
+        emits: [connectors.clock.LocalClockFloorAdvanced]
+        sets:
+          lower_unix_ms: input.lower_unix_ms
+
+events:
+  - name: connectors.clock.LocalClockFloorRecorded
+    fields: [{name: owner, type: String}]
+  - name: connectors.clock.LocalClockFloorAdvanced
+    fields:
+      - {name: owner, type: String}
+      - {name: lower_unix_ms, type: Integer}
