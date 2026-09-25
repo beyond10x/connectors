@@ -381,10 +381,7 @@ fn disposable_registry_publication_cli_and_retirement_restart() {
             .args(args)
             .output()
             .unwrap();
-        assert!(
-            output.status.success(),
-            "production CLI refused fixture metadata"
-        );
+        assert!(output.status.success());
         assert!(output.stderr.is_empty());
         let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(value["ok"], true);

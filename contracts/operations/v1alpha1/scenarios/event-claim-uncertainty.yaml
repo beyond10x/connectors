@@ -21,6 +21,19 @@ timeline:
       approval_mode: event_claim
       approval_ref: opaque-test-reference
       idempotency_key: null
+      request_fingerprint:
+        operation_ref: '["connectors.operation/v1","test-instance","test-adapter","issue.create"]'
+        connection_ref: test-connection
+        connection_revision: connection-r1
+        contract_ref: operations/v1alpha1
+        profile: mutation
+        descriptor_revision: descriptor-r1
+        configuration_revision: config-r1
+        canonicalization_version: adapter-v1-canonical-json
+        input_digest: test-digest
+        route: null
+      owner_nonce: 9e2eb32f-2387-51ed-8af5-f251066bfab9
+      publication_fence: e447c310-7a4b-5be4-ae3e-63104077bc80
     outcome: prepared
     events:
       - event: connectors.mutations.AttemptPrepared
@@ -39,6 +52,7 @@ timeline:
     command: connectors.mutations.RecordUncertainty
     input:
       attempt_id: {$instance: attempt}
+      terminal_result_json: '{"kind":"failure","error":{"code":"outcome_unknown"}}'
     outcome: indeterminate
     events:
       - event: connectors.mutations.AttemptIndeterminate

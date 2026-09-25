@@ -1,0 +1,74 @@
+components:
+  - component: local-metadata-authority
+    summary: Owns the local host decisions retained by the recorded metadata authority.
+    owns:
+      domains:
+        - connectors.declarations
+        - connectors.auth_bindings
+        - connectors.credentials
+        - connectors.mutations
+        - connectors.idempotency
+        - connectors.execution_audit
+        - connectors.delegation
+        - connectors.approval_issuers
+        - connectors.local_approval_policy
+        - connectors.credential_evidence
+        - connectors.clock
+        - connectors.cli
+    accepts:
+      commands:
+        - connectors.declarations.RecordServiceConfiguration
+        - connectors.declarations.AdvanceRegistryEpoch
+        - connectors.auth_bindings.RecordProfile
+        - connectors.auth_bindings.AllocateConnection
+        - connectors.auth_bindings.RevokeConnection
+        - connectors.auth_bindings.PublishBinding
+        - connectors.auth_bindings.BeginAcquisition
+        - connectors.auth_bindings.ConsumeAcquisition
+        - connectors.auth_bindings.RecordAcquisitionCandidate
+        - connectors.auth_bindings.CompleteAcquisition
+        - connectors.auth_bindings.FailAcquisition
+        - connectors.auth_bindings.ExpireAcquisition
+        - connectors.auth_bindings.RecordCustodyVersion
+        - connectors.auth_bindings.AcknowledgeCustodyWrite
+        - connectors.auth_bindings.InvalidateCustodyVersion
+        - connectors.auth_bindings.RetireCustodyVersion
+        - connectors.auth_bindings.AcknowledgeCustodyDeletion
+        - connectors.mutations.PrepareAttempt
+        - connectors.mutations.OpenDispatch
+        - connectors.mutations.AbortPrepared
+        - connectors.mutations.RecordCompletion
+        - connectors.mutations.RecordRefusal
+        - connectors.mutations.RecordUncertainty
+        - connectors.idempotency.ReserveKey
+        - connectors.idempotency.RetainResult
+        - connectors.idempotency.QuarantineKey
+        - connectors.idempotency.ExpireResult
+        - connectors.execution_audit.AcknowledgeAnchor
+        - connectors.execution_audit.AppendFinalObservation
+        - connectors.approval_issuers.PublishKey
+        - connectors.approval_issuers.BindIssuer
+        - connectors.approval_issuers.AdvanceIssuerRevision
+        - connectors.approval_issuers.StageKey
+        - connectors.approval_issuers.RevokeKey
+        - connectors.approval_issuers.RetireKey
+        - connectors.approval_issuers.ConfirmKeyDeletion
+        - connectors.clock.RecordLocalClockFloor
+        - connectors.clock.AdvanceLocalClockFloor
+        - connectors.credential_evidence.CaptureReadUse
+        - connectors.credential_evidence.DispatchReadUse
+        - connectors.credential_evidence.ReleaseReadUse
+        - connectors.credential_evidence.ExpireReadUse
+        - connectors.credential_evidence.InspectGeneration
+        - connectors.credential_evidence.AdmitGeneration
+        - connectors.credential_evidence.RejectAdmission
+        - connectors.credential_evidence.DispatchGeneration
+        - connectors.credentials.RecordCredentialGeneration
+        - connectors.delegation.RecordApprovalRedemption
+        - connectors.local_approval_policy.ConfigureLocalApprovalPolicy
+        - connectors.local_approval_policy.ReviseLocalApprovalPolicy
+        - connectors.cli.RecordLocalRuntime
+        - connectors.cli.SetLocalRuntimeSuppression
+        - connectors.cli.RememberLocalRuntimeBootstrap
+        - connectors.cli.RecordConnectionListCursor
+        - connectors.cli.ExpireConnectionListCursor

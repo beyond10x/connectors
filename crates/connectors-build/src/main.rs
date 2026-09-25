@@ -17,6 +17,7 @@ mod cli;
 mod docs;
 mod ess_boundary;
 mod gate;
+mod metadata_entities;
 mod source_hashes;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -72,6 +73,11 @@ enum Action {
     EssBoundary,
     /// Re-derive every recorded upstream source digest from its archived bytes.
     SourceHashes,
+    /// Generate or compare the local metadata Entity Runtime definitions.
+    MetadataEntities {
+        #[arg(long)]
+        check: bool,
+    },
     /// Build one provider bundle from its pinned OpenAPI source into a bundle
     /// directory, and index it there. Deterministic; never touches the network.
     Catalog {
@@ -138,6 +144,9 @@ fn main() -> Result<()> {
     if let Action::SourceHashes = args.command {
         source_hashes::run(&root)?;
         return Ok(());
+    }
+    if let Action::MetadataEntities { check } = args.command {
+        return metadata_entities::run(&root, check);
     }
     if let Action::Catalog {
         provider,
