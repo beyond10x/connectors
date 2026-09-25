@@ -137,6 +137,7 @@ fn check_model(
     let mut errors = BTreeSet::new();
     let mut declared_domains = BTreeSet::new();
     let mut manifest_domains = BTreeSet::new();
+    let mut owned_domains = BTreeSet::new();
     let mut has_system = false;
     for source in sources {
         let relative = source.strip_prefix(root)?;
@@ -169,14 +170,45 @@ fn check_model(
         ) {
             continue;
         }
-        if local != Path::new("system.yaml") && (local.parent() != Some(Path::new("domains"))) {
+        // A root components.yaml names which of this model's domains a
+        // component owns. It declares no domain, so it may only own ones the
+        // manifest already lists; the domain inventory stays exact.
+        let component_source = local == Path::new("components.yaml");
+        if local != Path::new("system.yaml")
+            && !component_source
+            && (local.parent() != Some(Path::new("domains")))
+        {
             errors.insert(format!(
-                "{name}: model YAML must be system.yaml or domains/<name>.yaml"
+                "{name}: model YAML must be system.yaml, components.yaml or domains/<name>.yaml"
             ));
         }
         let yaml: Value =
             serde_yaml_ng::from_str(&text).map_err(|e| format!("{name}: invalid YAML: {e}"))?;
-        if local == Path::new("system.yaml") {
+        if component_source {
+            match yaml["components"].as_sequence() {
+                Some(components) => {
+                    for component in components {
+                        for domain in component["owns"]["domains"]
+                            .as_sequence()
+                            .into_iter()
+                            .flatten()
+                        {
+                            match domain.as_str() {
+                                Some(domain) => {
+                                    owned_domains.insert(domain.to_owned());
+                                }
+                                None => {
+                                    errors.insert(format!("{name}: domain must be a string"));
+                                }
+                            }
+                        }
+                    }
+                }
+                None => {
+                    errors.insert(format!("{name}: missing component list"));
+                }
+            }
+        } else if local == Path::new("system.yaml") {
             has_system = true;
             if yaml["system"].as_str() != Some(system) {
                 errors.insert(format!("{name}: expected system {system}"));
@@ -223,6 +255,12 @@ fn check_model(
     if manifest_domains.is_empty() || manifest_domains != declared_domains {
         errors.insert(format!(
             "{}: manifest/source domains must match and be nonempty",
+            model.display()
+        ));
+    }
+    for domain in owned_domains.difference(&manifest_domains) {
+        errors.insert(format!(
+            "{}: a component owns {domain}, which the manifest does not list",
             model.display()
         ));
     }
@@ -571,6 +609,50 @@ mod tests {
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(path, text).unwrap();
             assert!(check(temp.path()).is_err());
+        }
+    }
+
+    #[test]
+    fn admits_a_root_component_source_that_owns_only_declared_domains() {
+        let temp = fixture();
+        fs::write(
+            temp.path().join("ess/components.yaml"),
+            "components:\n  - component: local-authority\n    owns:\n      domains: [connectors.reads]\n",
+        )
+        .unwrap();
+        assert_eq!(check(temp.path()).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn refuses_a_component_source_owning_undeclared_domains_or_outside_the_root() {
+        for (path, text) in [
+            (
+                "ess/components.yaml",
+                "components:\n  - component: local-authority\n    owns:\n      domains: [connectors.writes]\n",
+            ),
+            (
+                "ess/components.yaml",
+                "components:\n  - component: local-authority\n    owns:\n      domains: [alien.reads]\n",
+            ),
+            ("ess/components.yaml", "components: local-authority\n"),
+            (
+                "ess/domains/components.yaml",
+                "components:\n  - component: local-authority\n    owns:\n      domains: [connectors.reads]\n",
+            ),
+            (
+                "ess/components.yaml",
+                "components:\n  - component: local-authority\n    summary: GitLab custody\n    owns:\n      domains: [connectors.reads]\n",
+            ),
+        ] {
+            let temp = fixture();
+            fs::write(temp.path().join(path), text).unwrap();
+            let error = check(temp.path()).expect_err(&format!("accepted {path}: {text}"));
+            if path == "ess/components.yaml" {
+                assert!(
+                    !error.to_string().contains("expected a domain source"),
+                    "refused as a misplaced domain source, not for its content: {error}"
+                );
+            }
         }
     }
 

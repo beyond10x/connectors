@@ -75,6 +75,9 @@ entities:
       - {name: operation_id, type: String}
       - {name: connection_ref, type: String}
       - {name: input_digest, type: String}
+      # Exact admitted request coordinates retained for deterministic replay and
+      # projection rebuild. This is the existing typed idempotency fingerprint.
+      - {name: request_fingerprint, type: connectors.idempotency.RequestFingerprint}
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
       - {name: approval_ref, type: "Optional<String>"}
       # Immutable full subject captured by an approval-aware preparation. Old
@@ -82,10 +85,17 @@ entities:
       # a new approval-spend receipt by reconstructing missing authority facts.
       - {name: approval_subject, type: "Optional<connectors.delegation.CanonicalApprovalSubject>"}
       - {name: idempotency_key, type: "Optional<String>"}
+      # Private one-shot owner and current publication coordinates. They are
+      # fixed by preparation and retained so restart recovery cannot recreate a
+      # dispatch winner or use a connection after its publication fence moved.
+      - {name: owner_nonce, type: Uuid}
+      - {name: publication_fence, type: String}
       # Host fixes this with the first durable terminal outcome. Keyed retention
       # uses that instant even if reservation settlement is recovered later.
-      # UNMAPPED: clock provenance and assignment by terminal commands.
       - {name: settled_at, type: "Optional<Timestamp>"}
+      # Canonical bounded JSON text for the already typed provider result. This
+      # is retained replay evidence, never an arbitrary entity property bag.
+      - {name: terminal_result_json, type: "Optional<String>"}
     relations:
       - name: instance
         kind: references
@@ -134,15 +144,31 @@ commands:
       - {name: operation_id, type: String}
       - {name: connection_ref, type: String}
       - {name: input_digest, type: String}
+      - {name: request_fingerprint, type: connectors.idempotency.RequestFingerprint}
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
       - {name: approval_ref, type: "Optional<String>"}
       - {name: approval_subject, type: "Optional<connectors.delegation.CanonicalApprovalSubject>"}
       - {name: idempotency_key, type: "Optional<String>"}
+      - {name: owner_nonce, type: Uuid}
+      - {name: publication_fence, type: String}
     outcomes:
       - name: prepared
         creates: connectors.mutations.AttemptRecord
         instance: attempt_id
         emits: [connectors.mutations.AttemptPrepared]
+        sets:
+          instance_id: input.instance_id
+          request_id: input.request_id
+          operation_id: input.operation_id
+          connection_ref: input.connection_ref
+          input_digest: input.input_digest
+          request_fingerprint: input.request_fingerprint
+          approval_mode: input.approval_mode
+          approval_ref: input.approval_ref
+          approval_subject: input.approval_subject
+          idempotency_key: input.idempotency_key
+          owner_nonce: input.owner_nonce
+          publication_fence: input.publication_fence
 
   - name: connectors.mutations.OpenDispatch
     # Durably win the one-shot dispatch permission; not proof of a send.
@@ -161,11 +187,16 @@ commands:
     # Fence dispatch on cancellation, deadline or recovery while still Prepared.
     input:
       - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: settled_at, type: Timestamp}
+      - {name: terminal_result_json, type: String}
     outcomes:
       - name: aborted
         moves: connectors.mutations.AttemptRecord.abort
         instance: attempt_id
         emits: [connectors.mutations.AttemptAborted]
+        sets:
+          settled_at: input.settled_at
+          terminal_result_json: input.terminal_result_json
       - name: wrong-state
         wrong_state: true
         error: connectors.mutations.AttemptStateConflict
@@ -174,11 +205,16 @@ commands:
     # Persist a definitive provider success; transport completion alone is insufficient.
     input:
       - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: settled_at, type: Timestamp}
+      - {name: terminal_result_json, type: String}
     outcomes:
       - name: completed
         moves: connectors.mutations.AttemptRecord.complete
         instance: attempt_id
         emits: [connectors.mutations.AttemptCompleted]
+        sets:
+          settled_at: input.settled_at
+          terminal_result_json: input.terminal_result_json
       - name: wrong-state
         wrong_state: true
         error: connectors.mutations.AttemptStateConflict
@@ -187,11 +223,16 @@ commands:
     # Persist a definitive provider refusal with evidence that no business effect occurred.
     input:
       - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: settled_at, type: Timestamp}
+      - {name: terminal_result_json, type: String}
     outcomes:
       - name: refused
         moves: connectors.mutations.AttemptRecord.refuse
         instance: attempt_id
         emits: [connectors.mutations.AttemptRefused]
+        sets:
+          settled_at: input.settled_at
+          terminal_result_json: input.terminal_result_json
       - name: wrong-state
         wrong_state: true
         error: connectors.mutations.AttemptStateConflict
@@ -200,11 +241,14 @@ commands:
     # Persist uncertainty after dispatch permission, including recovery with no terminal evidence.
     input:
       - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: terminal_result_json, type: String}
     outcomes:
       - name: indeterminate
         moves: connectors.mutations.AttemptRecord.lose_outcome
         instance: attempt_id
         emits: [connectors.mutations.AttemptIndeterminate]
+        sets:
+          terminal_result_json: input.terminal_result_json
       - name: wrong-state
         wrong_state: true
         error: connectors.mutations.AttemptStateConflict

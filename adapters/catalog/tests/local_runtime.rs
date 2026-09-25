@@ -2,8 +2,9 @@
 //! a disposable authenticated HTTPS GitLab: spawn against the printed bootstrap,
 //! validate a credential through the declared identity and scope probes, read
 //! through the shipped selection set, stop by exact incarnation, and refuse a
-//! changed artifact, bootstrap or trust root before any provider work. These
-//! are the checks the retired native GitLab adapter carried for the same host.
+//! changed artifact, bootstrap or trust root before any provider work. The
+//! separate CLI journey exercises the same selection through the production
+//! owner and disposable Secret Service.
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
@@ -28,6 +29,9 @@ use tokio_rustls::{
     TlsAcceptor,
     rustls::{self, pki_types::PrivatePkcs8KeyDer},
 };
+
+#[path = "local_runtime/cli_journey.rs"]
+mod cli_journey;
 
 struct Provider {
     stop: Option<oneshot::Sender<()>>,

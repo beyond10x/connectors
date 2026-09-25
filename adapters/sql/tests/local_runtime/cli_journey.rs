@@ -369,6 +369,21 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
     cli.shutdown();
     custody.restart();
     fs::remove_file(&credential).unwrap();
+    // Refresh provider evidence after the restart. This uses the saved custody
+    // version: the input credential file is gone, and the original bounded
+    // evidence may have expired during the earlier real server checks.
+    let refreshed = success(cli.run(&[
+        "connections",
+        "revalidate",
+        "--adapter",
+        "warehouse",
+        "--connection",
+        &reference,
+        "--expected-revision",
+        &revision,
+    ]));
+    assert_eq!(refreshed["connection"]["summary"]["state"], "ready");
+    assert_eq!(refreshed["connection"]["summary"]["revision"], revision);
     let value = success(cli.run(&args));
     let rows: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
     assert_eq!(rows["rows"].as_array().map(|r| r.len()), Some(2));

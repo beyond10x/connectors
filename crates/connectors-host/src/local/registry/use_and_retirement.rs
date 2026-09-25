@@ -115,7 +115,7 @@ impl Registry {
         if !scopes_valid(scopes) {
             return Err(Failure::InvalidInput);
         }
-        self.transaction(now, false, |tx, _, now| {
+        self.transaction_observation(now, |tx, _, now| {
             admitted_read(tx, binding, reference, scopes, now).map(|_| ())
         })
     }
@@ -134,7 +134,7 @@ impl Registry {
         {
             return Err(Failure::InvalidInput);
         }
-        self.transaction(now, false, |tx, authority, now| {
+        self.transaction_admission(now, false, |tx, authority, now| {
             if expires_at <= now { return Err(Failure::Expired); }
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
             let row = admitted_read(tx, binding, reference, required_scopes, now)?;

@@ -41,9 +41,57 @@ entities:
       initial: Configured
       states: [Configured]
       terminal: [Configured]
+      transitions:
+        - {name: revise, from: [Configured], to: Configured}
     # Stable retained identity; mutable revisioned policy contents. Configured
     # does not assert admission: an empty operation set revokes every new use.
     # No record or reference cascades deletion of issuer/configuration/history.
+
+commands:
+  - name: connectors.local_approval_policy.ConfigureLocalApprovalPolicy
+    input:
+      - {name: policy_id, type: Uuid}
+      - {name: instance_id, type: String}
+      - {name: issuer_id, type: Uuid}
+      - {name: revision, type: Integer}
+      - {name: owner_uid, type: Integer}
+      - {name: selection, type: connectors.local_approval_policy.Selection}
+      - {name: operations, type: List<String>}
+    outcomes:
+      - name: configured
+        creates: connectors.local_approval_policy.LocalApprovalPolicy
+        instance: policy_id
+        emits: [connectors.local_approval_policy.LocalApprovalPolicyConfigured]
+        sets:
+          instance_id: input.instance_id
+          issuer_id: input.issuer_id
+          revision: input.revision
+          owner_uid: input.owner_uid
+          selection: input.selection
+          operations: input.operations
+  - name: connectors.local_approval_policy.ReviseLocalApprovalPolicy
+    input:
+      - {name: policy_id, type: Uuid}
+      - {name: revision, type: Integer}
+      - {name: selection, type: connectors.local_approval_policy.Selection}
+      - {name: operations, type: List<String>}
+    outcomes:
+      - name: revised
+        moves: connectors.local_approval_policy.LocalApprovalPolicy.revise
+        instance: policy_id
+        emits: [connectors.local_approval_policy.LocalApprovalPolicyRevised]
+        sets:
+          revision: input.revision
+          selection: input.selection
+          operations: input.operations
+
+events:
+  - name: connectors.local_approval_policy.LocalApprovalPolicyConfigured
+    fields: [{name: policy_id, type: Uuid}]
+  - name: connectors.local_approval_policy.LocalApprovalPolicyRevised
+    fields:
+      - {name: policy_id, type: Uuid}
+      - {name: revision, type: Integer}
 # UNMAPPED executable predicates: one policy per instance, issuer-instance equality,
 # monotonic non-reused bounded revision/CAS and durable acknowledgement, current
 # peer UID, shared/exclusive process leases, strict canonical snapshots, sorted

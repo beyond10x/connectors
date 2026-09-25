@@ -2,6 +2,7 @@ use super::*;
 use std::{sync::atomic::Ordering, time::Duration};
 
 #[test]
+#[ignore = "run alone by the connectors-build gate: its 250 ms recovery window is a product bound"]
 fn final_audit_recovery_preserves_every_live_business_result() {
     for (classification, applied_error) in [
         (Classification::Applied, false),

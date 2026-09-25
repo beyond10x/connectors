@@ -148,7 +148,7 @@ fn host_failure(error: Failure) -> HandlerReply {
             "check_configuration",
             false,
         ),
-        Failure::MetadataUnavailable => {
+        Failure::MetadataUnavailable | Failure::ConcurrentRevision => {
             failure("metadata_unavailable", "observation", "retry_status", false)
         }
         Failure::OutcomeUnknown => failure("outcome_unknown", "publication", "retry_status", false),
