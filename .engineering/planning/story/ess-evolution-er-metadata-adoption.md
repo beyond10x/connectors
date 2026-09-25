@@ -2,7 +2,7 @@
 format: aep.planning-md/2
 id: story:ess-evolution-er-metadata-adoption
 kind: story
-status: active
+status: implemented
 title: Migrate local metadata to ER over Eventlog SQLite and verify the complete CLI adoption
 owner: astra
 refs:
@@ -70,7 +70,7 @@ scope:
   path: docs/local-runtime-foundation.md
 - confidence: cited
   path: ess
-revision: 30
+revision: 31
 ---
 # M7 — complete Connectors ER metadata adoption
 
