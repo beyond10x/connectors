@@ -8,11 +8,11 @@ tags:
 - review-findings-supplement
 refs:
 - provider: review-body-sha256
-  reference: a8af4383ed53d85a2a308d7d81104e5929e44e1104ee847e89fbb73c885f3fd9
+  reference: 13fc5155a846b4261756031499328c150a2efd45346bf63b93a4c274aadd033c
 relations:
 - verifies: review-result:connection-ownership-r3-20260908
 - derived_from: specification:review-findings-toolchain-upgrade-20260911
-revision: 1
+revision: 2
 ---
 # Structured transcription of review-result:connection-ownership-r3-20260908
 

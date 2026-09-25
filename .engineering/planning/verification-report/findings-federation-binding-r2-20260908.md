@@ -8,11 +8,11 @@ tags:
 - review-findings-supplement
 refs:
 - provider: review-body-sha256
-  reference: a8e3fa5a946de6d8987c1a6b913e95fdd33728ab8f35089c0e777292d4a38eae
+  reference: 6df1a522177f7fb2baf0f467ff0600fb6586c39e75792feaaec8f52355d7cb11
 relations:
 - verifies: review-result:federation-binding-r2-20260908
 - derived_from: specification:review-findings-toolchain-upgrade-20260911
-revision: 1
+revision: 2
 ---
 # Structured transcription of review-result:federation-binding-r2-20260908
 
