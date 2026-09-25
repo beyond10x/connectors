@@ -8,11 +8,11 @@ tags:
 - review-findings-supplement
 refs:
 - provider: review-body-sha256
-  reference: 266a32f997fd0e2994bb8efe59ce2a4749acb74a9551a100eeb0936242bac40c
+  reference: 22009004911c76c934cd3cc6b67cbef6a60023bcea22b65a0a3dda31a4b7c1e8
 relations:
 - verifies: review-result:contract-docs-external-20260908
 - derived_from: specification:review-findings-toolchain-upgrade-20260911
-revision: 1
+revision: 2
 ---
 # Structured transcription of review-result:contract-docs-external-20260908
 
