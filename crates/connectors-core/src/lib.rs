@@ -153,7 +153,56 @@ impl<'de> Deserialize<'de> for Response {
     }
 }
 
+/// Keys serde_json's own `Value` reader reinterprets as a number or raw JSON
+/// under its `arbitrary_precision` and `raw_value` features.
+const NUMBER_TOKEN: &str = "$serde_json::private::Number";
+const PRIVATE_TOKENS: [&str; 2] = [NUMBER_TOKEN, "$serde_json::private::RawValue"];
+
+/// Read a JSON number's digits the way the default serde_json build does: an
+/// integer outside `i64`/`u64` or any fraction/exponent is the nearest `f64`.
+fn parsed_number<E: serde::de::Error>(digits: &str) -> std::result::Result<Value, E> {
+    digits
+        .parse::<f64>()
+        .ok()
+        .and_then(serde_json::Number::from_f64)
+        .map(Value::Number)
+        .ok_or_else(|| E::custom("number out of range"))
+}
+
+/// The value under a private token: `Some` only when handed over owned.
+struct TokenValue;
+impl<'de> serde::de::DeserializeSeed<'de> for TokenValue {
+    type Value = Option<String>;
+    fn deserialize<D: serde::Deserializer<'de>>(
+        self,
+        deserializer: D,
+    ) -> std::result::Result<Self::Value, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = Option<String>;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("serde_json number digits")
+            }
+            fn visit_string<E: serde::de::Error>(
+                self,
+                v: String,
+            ) -> std::result::Result<Self::Value, E> {
+                Ok(Some(v))
+            }
+            fn visit_str<E: serde::de::Error>(
+                self,
+                _: &str,
+            ) -> std::result::Result<Self::Value, E> {
+                Ok(None)
+            }
+        }
+        deserializer.deserialize_any(Visitor)
+    }
+}
+
 /// Reject ambiguous duplicate keys before projecting JSON into typed envelopes.
+/// Numbers read identically with and without serde_json `arbitrary_precision`,
+/// and a document key spelled like a serde_json private token is refused.
 pub fn read_json<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
     struct Strict(Value);
     impl<'de> Deserialize<'de> for Strict {
@@ -173,6 +222,12 @@ pub fn read_json<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
                     Ok(Strict(Value::Bool(v)))
                 }
                 fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<Strict, E> {
+                    // Only `-0` reaches here as a signed zero: the default
+                    // serde_json build reads it as the float -0.0, while
+                    // `arbitrary_precision` reads it as the integer 0.
+                    if v == 0 {
+                        return self.visit_f64(-0.0);
+                    }
                     Ok(Strict(v.into()))
                 }
                 fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<Strict, E> {
@@ -210,7 +265,25 @@ pub fn read_json<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
                     mut map: A,
                 ) -> std::result::Result<Strict, A::Error> {
                     let mut values = serde_json::Map::new();
-                    while let Some((k, Strict(v))) = map.next_entry::<String, Strict>()? {
+                    while let Some(k) = map.next_key::<String>()? {
+                        if PRIVATE_TOKENS.contains(&k.as_str()) {
+                            // With `arbitrary_precision`, serde_json hands a
+                            // non-integer number over as a one-entry map under
+                            // its number token, the digits as an owned string.
+                            // `from_slice` never hands a document string over
+                            // owned, so an owned value here is that number and
+                            // anything else is a document spelling the token.
+                            let digits = map.next_value_seed(TokenValue)?;
+                            if values.is_empty()
+                                && k == NUMBER_TOKEN
+                                && let Some(digits) = digits
+                                && map.next_key::<serde::de::IgnoredAny>()?.is_none()
+                            {
+                                return parsed_number(&digits).map(Strict);
+                            }
+                            return Err(serde::de::Error::custom("reserved serde_json key"));
+                        }
+                        let Strict(v) = map.next_value()?;
                         if values.insert(k, v).is_some() {
                             return Err(serde::de::Error::custom("duplicate JSON key"));
                         }
@@ -239,6 +312,13 @@ pub fn canonical(value: &Value) -> Vec<u8> {
                 Value::Object(sorted.into_iter().collect())
             }
             Value::Array(values) => Value::Array(values.iter().map(ordered).collect()),
+            // `arbitrary_precision` keeps a parsed number's source spelling
+            // (`1.50`, `1e2`); write every non-integer as the default build
+            // does, the nearest `f64` in its shortest form.
+            Value::Number(number) if !(number.is_u64() || number.is_i64()) => number
+                .as_f64()
+                .and_then(serde_json::Number::from_f64)
+                .map_or_else(|| value.clone(), Value::Number),
             other => other.clone(),
         }
     }

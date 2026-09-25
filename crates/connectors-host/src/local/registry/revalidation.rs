@@ -98,6 +98,30 @@ fn invalidate(tx: &Transaction<'_>, row: &ConnectionRow, reason: InvalidCredenti
 }
 
 impl Registry {
+    /// Resolve only the retained identity needed to select the configured
+    /// profile. This does not sample or persist time and grants no provider
+    /// work; admit_revalidation performs the authoritative current check.
+    pub fn revalidation_profile(
+        &self,
+        instance: &str,
+        adapter: &str,
+        reference: &str,
+        revision: &str,
+    ) -> Result<String> {
+        let mut metadata =
+            Metadata::inspect(&self.path).map_err(|_| Failure::MetadataUnavailable)?;
+        let tx = metadata.connection.transaction().map_err(db)?;
+        let row = Self::connection(&tx, reference)?;
+        observation::visible(&row, instance, adapter)?;
+        if row.revision != revision {
+            return Err(Failure::Conflict);
+        }
+        if row.state == "revoked" {
+            return Err(Failure::Revoked);
+        }
+        Ok(row.binding.profile.id)
+    }
+
     pub fn admit_revalidation(
         &self,
         binding: &Binding,
@@ -123,7 +147,7 @@ impl Registry {
         if expires <= now || expires > deadline(now, 30_000)? {
             return Err(Failure::InvalidInput);
         }
-        self.transaction(now, false, |tx, authority, now| {
+        self.transaction_admission(now, false, |tx, authority, now| {
             if expires <= now { return Err(Failure::Expired); }
             let row = admitted(tx,binding,reference,revision,now)?;
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;

@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.12.0 — 2026-09-25
+
+Local metadata has one authority. The host's registry, runtime stop state,
+mutation attempts, execution audit and approval state are decided by the Entity
+Runtime executor and recorded in Eventlog over SQLite; the SQLite file the host
+reads is a projection of that record. This is milestone M7 of the ESS evolution,
+`story:ess-evolution-er-metadata-adoption`.
+
+### Metadata authority
+
+- Every metadata write runs as an Entity Runtime command batch against an
+  Eventlog SQLite provider. Existing stores migrate from metadata schema levels
+  1–8 on first admitted write; the legacy source is retained for recovery and its
+  digest is checked on every open.
+- The ESS domains under `ess/` gain the typed homes the migrated records need, and
+  `ess/components.yaml` names the component that owns them. The generated
+  `crates/connectors-host/src/local/metadata/entity-runtime-definitions.json` is
+  lowered from that model.
+- A read-only observation rebuilds its view from the record outside the metadata
+  lock and takes the lock back before it acts. When a writer advanced the
+  registry clock in that window, the retry now rebuilds while holding the lock,
+  so it cannot lose the same race again; before, four concurrent CLI reads could
+  lose it eight times in a row and answer `metadata_unavailable`. The locked
+  rebuild held the lock 172 ms on average and 254 ms at most in the Kubernetes
+  CLI journey, against the unchanged 2-second lock bound.
+- A SQLite sidecar (`-wal`, `-shm`, `-journal`) retired by another process between
+  listing and checking reads as absent instead of refusing the open. Non-private
+  files and symlinks are still refused.
+- `connectors_core::read_json`, `canonical()` and `digest()` read and digest JSON
+  numbers alike whether or not `serde_json`'s `arbitrary_precision` is enabled,
+  which Entity Runtime turns on in every host build.
+
+### Contracts
+
+- The 15 authored scenarios under `contracts/operations/v1alpha1/scenarios`
+  supply the inputs the M7 mutation model requires: `request_fingerprint`,
+  `owner_nonce` and `publication_fence` on `PrepareAttempt`; `settled_at` and
+  `terminal_result_json` on `AbortPrepared`, `RecordCompletion` and
+  `RecordRefusal`; `terminal_result_json` on `RecordUncertainty`. Values take the
+  shapes the host writes. No input was made optional in the model.
+
+### Gate
+
+- `final_audit_recovery_preserves_every_live_business_result` runs in its own
+  step, alone and single-threaded, right after the workspace test lane. Its
+  250 ms recovery window is a product bound, and parallel neighbours on a
+  4-thread runner consumed it. The step is green only when exactly that one case
+  ran and passed.
+- The shared ESS boundary check accepts a root `ess/components.yaml` that owns
+  only domains the model's manifest lists.
+
+### Pins
+
+- Entity Runtime 0.23.0 (`77aac6ea`), Eventlog 0.4.0 (`70096af8`) and ESS 0.31.0
+  (`f7de9f82`); `Cargo.lock` holds one source of each.
+- The planning check uses AEP 0.59.2 (`d3d80e9b`) with the retained
+  findings patch, which 0.59.2 does not contain.
+
+### Planning
+
+- The planning store moved to Eventlog authority and then to `aep.project/3`, a
+  tree store Git merges, rendered as `aep.planning-md/2`. Six review-body digests
+  were rebound after those migrations had rewritten home paths and literals in
+  the immutable review bodies they name.
+
 ## 0.11.0 — 2026-09-14
 
 GitLab has one runtime. The catalog provider serves every operation the native

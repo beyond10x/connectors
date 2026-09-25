@@ -190,7 +190,7 @@ pub struct Record {
     pub final_observation: Option<FinalObservation>,
 }
 impl Record {
-    pub(super) fn encode(&self) -> Result<String> {
+    pub(in crate::local) fn encode(&self) -> Result<String> {
         self.anchor.validate()?;
         if self.reference.instance != self.anchor.instance_id {
             return Err(Failure::InvalidInput);

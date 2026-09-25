@@ -21,6 +21,19 @@ timeline:
     approval_mode: not_required
     approval_ref: null
     idempotency_key: create-1
+    request_fingerprint:
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      route: null
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
+    owner_nonce: c44defea-3d48-5f6d-983d-445aba8e934c
+    publication_fence: f6102d47-9d74-5575-9f08-3b9d38a79730
   outcome: prepared
   events:
   - event: connectors.mutations.AttemptPrepared
@@ -72,7 +85,10 @@ timeline:
   - event: connectors.mutations.DispatchOpened
 - at: '2026-09-08T09:00:03Z'
   command: connectors.mutations.RecordUncertainty
-  input: *id001
+  input:
+    attempt_id:
+      $instance: first-attempt
+    terminal_result_json: '{"kind":"failure","error":{"code":"outcome_unknown"}}'
   outcome: indeterminate
   events:
   - event: connectors.mutations.AttemptIndeterminate

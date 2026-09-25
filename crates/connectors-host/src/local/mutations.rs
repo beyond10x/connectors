@@ -106,6 +106,7 @@ impl<C: Clock> Store<C> {
             return Err(Failure::MetadataUnavailable);
         }
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
+        metadata.persist().map_err(host_error)?;
         #[cfg(test)]
         if self.take_fault(2) {
             return Err(Failure::OutcomeUnknown);

@@ -1,12 +1,7 @@
-//! Production CLI, real private owner/adapter processes, disposable custody and
-//! a real PostgreSQL server. This is the only place a genuine database is
-//! required; every other SQL test runs against a loopback wire fixture.
-//!
-//! The custody harness below is the one the Kubernetes journey proved; only the
-//! provider and the journey differ.
+//! The shipped GitLab catalog selection through the production CLI, owner,
+//! adapter child, local TLS fixture and disposable Secret Service.
 use super::*;
 use connectors_host::local::{config::Paths, keyring, owner};
-use serde_json::Value;
 use std::{
     io::Write,
     process::{Child as Process, Output, Stdio},
@@ -14,12 +9,14 @@ use std::{
 };
 
 struct OwnedProcess(Process);
+
 impl Drop for OwnedProcess {
     fn drop(&mut self) {
         let _ = self.0.kill();
         let _ = self.0.wait();
     }
 }
+
 struct Custody {
     daemon: Option<OwnedProcess>,
     _bus: OwnedProcess,
@@ -27,8 +24,9 @@ struct Custody {
     socket: PathBuf,
     epoch: u32,
 }
+
 impl Custody {
-    fn new(parent: &std::path::Path) -> Self {
+    fn new(parent: &Path) -> Self {
         let directory = parent.join("custody");
         filesystem::directory(&directory, true, true).unwrap();
         filesystem::directory(&directory.join("home"), true, true).unwrap();
@@ -61,6 +59,7 @@ impl Custody {
         fixture.start();
         fixture
     }
+
     fn start(&mut self) {
         assert!(self.daemon.is_none());
         self.epoch += 1;
@@ -95,15 +94,12 @@ impl Custody {
             .stdin
             .take()
             .unwrap()
-            .write_all(b"fictional-cli-fixture-keyring-password")
+            .write_all(b"fictional-catalog-fixture-keyring-password")
             .unwrap();
         self.daemon = Some(daemon);
         let until = Instant::now() + Duration::from_secs(10);
         while !keyring::custody::available_at(Some(&self.socket)) {
-            assert!(
-                Instant::now() < until,
-                "qualified private fixture custody unavailable"
-            );
+            assert!(Instant::now() < until, "fixture custody unavailable");
             assert!(
                 self.daemon
                     .as_mut()
@@ -116,17 +112,20 @@ impl Custody {
             std::thread::sleep(Duration::from_millis(30));
         }
     }
+
     fn restart(&mut self) {
         drop(self.daemon.take());
         self.start();
     }
 }
+
 struct Cli {
     binary: PathBuf,
     paths: Paths,
 }
+
 impl Cli {
-    fn new(root: &std::path::Path) -> Self {
+    fn new(root: &Path) -> Self {
         let binary = std::env::var_os("CONNECTORS_TEST_CLI")
             .expect("built production CLI required")
             .into();
@@ -138,6 +137,7 @@ impl Cli {
             },
         }
     }
+
     fn command(&self, args: &[&str]) -> Command {
         let mut command = Command::new(&self.binary);
         command
@@ -152,9 +152,11 @@ impl Cli {
             .stderr(Stdio::piped());
         command
     }
+
     fn run(&self, args: &[&str]) -> Output {
         self.command(args).output().unwrap()
     }
+
     fn shutdown(&self) {
         if let Ok(client) = owner::Client::connect(&self.paths, false) {
             let host = client.host_incarnation.clone();
@@ -167,11 +169,13 @@ impl Cli {
         }
     }
 }
+
 impl Drop for Cli {
     fn drop(&mut self) {
         self.shutdown();
     }
 }
+
 #[track_caller]
 fn success(output: Output) -> Value {
     assert!(
@@ -182,125 +186,69 @@ fn success(output: Output) -> Value {
     assert!(output.stderr.is_empty());
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["ok"], true);
-    assert!(!String::from_utf8_lossy(&output.stdout).contains("sandbox-reader-pw"));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("fixture-pat-one"));
     value["result"].clone()
 }
+
 #[track_caller]
-fn refusal(output: Output, code: &str) -> Value {
+fn refusal(output: Output, code: &str) {
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
-    assert!(!String::from_utf8_lossy(&output.stderr).contains("sandbox-reader-pw"));
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("fixture-pat-one"));
     let value: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(value["error"]["data"]["code"], code, "{value}");
-    value["error"]["data"].clone()
 }
 
-/// The sandbox is opt-in: `CONNECTORS_PG_SANDBOX=host:port` names a running
-/// PostgreSQL with the role and table the journey expects. Without it the test
-/// is skipped rather than silently passing against nothing.
-fn sandbox() -> Option<(String, u16)> {
-    let value = std::env::var("CONNECTORS_PG_SANDBOX").ok()?;
-    let (host, port) = value.rsplit_once(':')?;
-    Some((host.to_owned(), port.parse().ok()?))
-}
-
-fn configure(
-    cli: &Cli,
-    root: &std::path::Path,
-    custody: &Custody,
-    host: &str,
-    port: u16,
-) -> PathBuf {
+fn configure(cli: &Cli, provider: &Provider, custody: &Custody) {
     success(cli.run(&["setup", "init"]));
     success(cli.run(&["setup", "check"]));
-    let native = root.join("private/postgres.json");
-    private(
-        &native,
-        &serde_json::to_vec(&json!({
-            "format":"connectors-sql-local/1","instance":"pg-sandbox",
-            "host":host,"port":port,"database":"incidents","user":"reader",
-            // Loopback only. The sandbox server runs without TLS; this is the
-            // one thing the journey below does not establish.
-            "allow_plaintext":true,"ca_file":null
-        }))
-        .unwrap(),
-    );
-    let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-sql"))
-        .canonicalize()
-        .unwrap();
-    let output = Command::new(&binary)
-        .arg("--local-config")
-        .arg(&native)
-        .arg("--print-local-bootstrap")
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let bootstrap: Bootstrap = serde_json::from_slice(&output.stdout).unwrap();
-    bootstrap.validate().unwrap();
+    let adapter = provider.selection();
     let q = |value: &str| serde_json::to_string(value).unwrap();
     let configuration = format!(
-        "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.warehouse]\ninstance_id='pg-sandbox'\nadapter_id='sql'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.warehouse.permissions]\nprofiles=['postgres.password']\noperations=['schema.list','query.read']\n[adapters.warehouse.executable]\npath={}\nsha256={}\nargs={}\n",
+        "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.gitlab]\ninstance_id={}\nadapter_id='catalog'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.gitlab.permissions]\nprofiles=['gitlab.pat']\noperations=['project.get','issues.list']\n[adapters.gitlab.executable]\npath={}\nsha256={}\nargs={}\n",
         filesystem::uid(),
         q(custody.socket.to_str().unwrap()),
-        q(&bootstrap.configuration_revision),
-        q(binary.to_str().unwrap()),
-        q(&hex::encode(Sha256::digest(fs::read(&binary).unwrap()))),
-        serde_json::to_string(&["--local-config", native.to_str().unwrap()]).unwrap()
+        q(&adapter.instance_id),
+        q(&adapter.configuration_revision),
+        q(adapter.executable.path.to_str().unwrap()),
+        q(&adapter.executable.sha256),
+        serde_json::to_string(&adapter.executable.args).unwrap()
     );
     private(&cli.paths.config, configuration.as_bytes());
     connectors_host::local::config::Config::load(&cli.paths.config).unwrap();
-    native
 }
 
 #[test]
-#[ignore = "requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service"]
-fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
-    let Some((host, port)) = sandbox() else {
-        eprintln!("CONNECTORS_PG_SANDBOX is unset; skipping");
-        return;
-    };
-    let root = tempfile::tempdir().unwrap();
-    filesystem::directory(&root.path().join("private"), true, true).unwrap();
-    let mut custody = Custody::new(root.path());
-    let cli = Cli::new(root.path());
-    configure(&cli, root.path(), &custody, &host, port);
-
-    let credential = root.path().join("private/credential.json");
-    private(&credential, br#"{"password":"sandbox-reader-pw"}"#);
-    // A wrong password is the server's own refusal, not a local guess.
-    let wrong = root.path().join("private/wrong.json");
-    private(&wrong, br#"{"password":"not-the-password"}"#);
-    // `owner::Code` carries no invalid_credential, so a rejected credential is
-    // service_failure with the provider's own code preserved beside it. That is
-    // the same envelope GitLab and Kubernetes produce, and 28P01 is the
-    // server's answer rather than anything this binding decided.
-    let refused = refusal(
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
+    let provider = Provider::new();
+    let mut custody = Custody::new(provider.root.path());
+    let cli = Cli::new(provider.root.path());
+    configure(&cli, &provider, &custody);
+    refusal(
         cli.run(&[
             "connections",
             "connect",
             "--adapter",
-            "warehouse",
+            "gitlab",
             "--profile",
-            "postgres.password",
+            "missing",
             "--credential-file",
-            wrong.to_str().unwrap(),
+            "/never-read",
         ]),
-        "service_failure",
+        "forbidden",
     );
-    assert_eq!(refused["service_code"], "unauthorized", "{refused}");
-    assert_eq!(refused["stage"], "dispatch");
+    assert_eq!(provider.count(), 0);
 
+    let credential = provider.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
     let connected = success(cli.run(&[
         "connections",
         "connect",
         "--adapter",
-        "warehouse",
+        "gitlab",
         "--profile",
-        "postgres.password",
+        "gitlab.pat",
         "--credential-file",
         credential.to_str().unwrap(),
     ]))["connection"]
@@ -315,68 +263,68 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
         .to_owned();
     assert_eq!(connected["summary"]["state"], "ready");
 
-    let describe = success(cli.run(&[
+    let description = success(cli.run(&[
         "operations",
         "describe",
         "--adapter",
-        "warehouse",
+        "gitlab",
         "--operation",
-        "query.read",
+        "project.get",
     ]));
-    let schema = describe["schema"].as_str().unwrap().to_owned();
-    let descriptor = describe["revision"].as_str().unwrap().to_owned();
-    let read = |input: &str| {
-        [
-            "operations",
-            "invoke",
-            "--adapter",
-            "warehouse",
-            "--connection",
-            &reference,
-            "--operation",
-            "query.read",
-            "--schema",
-            &schema,
-            "--revision",
-            &descriptor,
-            "--input-json",
-            input,
-        ]
-        .map(String::from)
-    };
-    let critical = read(
-        r#"{"query":"SELECT id, severity FROM incidents WHERE severity = $1 ORDER BY id","parameters":["critical"],"limit":10}"#,
-    );
-    let args: Vec<&str> = critical.iter().map(String::as_str).collect();
-    let value = success(cli.run(&args));
-    let rows: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
-    // Two critical rows exist and the minor one must not appear: the parameter
-    // reached bind rather than being interpolated into the text.
-    assert_eq!(rows["rows"].as_array().map(|r| r.len()), Some(2), "{rows}");
-
-    // A write is refused by the read-only transaction, not by a keyword filter.
-    let write = read(
-        r#"{"query":"INSERT INTO incidents VALUES (99,'minor',now(),NULL)","parameters":[],"limit":1}"#,
-    );
-    let write: Vec<&str> = write.iter().map(String::as_str).collect();
-    assert!(
-        !cli.run(&write).status.success(),
-        "a write must not succeed"
+    let schema = description["schema"].as_str().unwrap().to_owned();
+    let descriptor = description["revision"].as_str().unwrap().to_owned();
+    let invoke = [
+        "operations",
+        "invoke",
+        "--adapter",
+        "gitlab",
+        "--connection",
+        &reference,
+        "--operation",
+        "project.get",
+        "--schema",
+        &schema,
+        "--revision",
+        &descriptor,
+        "--input-json",
+        r#"{"id":"org/project"}"#,
+    ];
+    let result = success(cli.run(&invoke));
+    assert_eq!(
+        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        7
     );
 
-    // Restart both the CLI process and the owner, and drop the only other copy
-    // of the password: the saved credential version must carry the next read.
+    let old_host = success(cli.run(&["adapters", "status", "--adapter", "gitlab"]))["observation"]
+        ["host_incarnation"]
+        .clone();
     cli.shutdown();
     custody.restart();
     fs::remove_file(&credential).unwrap();
-    // Refresh provider evidence after the restart. This uses the saved custody
-    // version: the input credential file is gone, and the original bounded
-    // evidence may have expired during the earlier real server checks.
+    let calls_before_refusal = provider.count();
+    refusal(
+        cli.run(&[
+            "connections",
+            "revalidate",
+            "--adapter",
+            "gitlab",
+            "--connection",
+            &reference,
+            "--expected-revision",
+            "wrong-revision",
+        ]),
+        "lifecycle_conflict",
+    );
+    assert_eq!(provider.count(), calls_before_refusal);
+    assert!(!cli.paths.state.join("owner.sock").exists());
+    // The saved credential survives the restart. Refresh its bounded provider
+    // evidence explicitly before a new dispatch, even when the journey itself
+    // took longer than the original evidence lifetime.
     let refreshed = success(cli.run(&[
         "connections",
         "revalidate",
         "--adapter",
-        "warehouse",
+        "gitlab",
         "--connection",
         &reference,
         "--expected-revision",
@@ -384,43 +332,63 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
     ]));
     assert_eq!(refreshed["connection"]["summary"]["state"], "ready");
     assert_eq!(refreshed["connection"]["summary"]["revision"], revision);
-    let value = success(cli.run(&args));
-    let rows: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
-    assert_eq!(rows["rows"].as_array().map(|r| r.len()), Some(2));
+    let calls_before = provider.count();
+    let result = success(cli.run(&invoke));
+    assert_eq!(
+        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        7
+    );
+    assert!(provider.count() > calls_before);
+    let new_host = success(cli.run(&["adapters", "status", "--adapter", "gitlab"]))["observation"]
+        ["host_incarnation"]
+        .clone();
+    assert_ne!(new_host, old_host);
     let current = success(cli.run(&[
         "connections",
         "status",
         "--adapter",
-        "warehouse",
+        "gitlab",
         "--connection",
         &reference,
     ]));
     assert_eq!(current["connection"]["summary"]["revision"], revision);
 
-    // schema.list reaches the same server through the same saved credential.
-    let describe = success(cli.run(&[
-        "operations",
-        "describe",
+    let before_refusal = provider.count();
+    refusal(
+        cli.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "gitlab",
+            "--operation",
+            "file.get",
+        ]),
+        "forbidden",
+    );
+    assert_eq!(provider.count(), before_refusal);
+
+    success(
+        cli.run(&[
+            "connections",
+            "revoke",
+            "--adapter",
+            "gitlab",
+            "--connection",
+            &reference,
+            "--expected-revision",
+            current["connection"]["summary"]["revision"]
+                .as_str()
+                .unwrap(),
+        ]),
+    );
+    cli.shutdown();
+    let revoked = success(cli.run(&[
+        "connections",
+        "status",
         "--adapter",
-        "warehouse",
-        "--operation",
-        "schema.list",
-    ]));
-    let listed = success(cli.run(&[
-        "operations",
-        "invoke",
-        "--adapter",
-        "warehouse",
+        "gitlab",
         "--connection",
         &reference,
-        "--operation",
-        "schema.list",
-        "--schema",
-        describe["schema"].as_str().unwrap(),
-        "--revision",
-        describe["revision"].as_str().unwrap(),
-        "--input-json",
-        r#"{"schema":"public","limit":100}"#,
     ]));
-    assert!(listed["result"].as_str().unwrap().contains("incidents"));
+    assert_eq!(revoked["connection"]["summary"]["state"], "revoked");
 }
