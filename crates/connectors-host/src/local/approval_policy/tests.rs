@@ -23,7 +23,7 @@ fn fixture() -> tempfile::TempDir {
 // This suite qualifies metadata/serialization only. The actual key coordinator
 // owns custody qualification; a retained issuer does not assert an active key.
 fn issuer(path: &Path, instance: &str) -> Uuid {
-    let m = Metadata::update_approval_keys(path).unwrap();
+    let mut m = Metadata::update_approval_keys(path).unwrap();
     m.connection.execute("INSERT INTO registry_instances(instance_id,adapter_id,configuration_revision) VALUES (?1,'adapter','cfg-1')", [instance]).unwrap();
     let id = Uuid::new_v4();
     m.connection
@@ -37,6 +37,7 @@ fn issuer(path: &Path, instance: &str) -> Uuid {
             ],
         )
         .unwrap();
+    m.persist().unwrap();
     id
 }
 fn version(path: &Path) -> i64 {
@@ -132,13 +133,14 @@ fn exact_selections_and_operations_are_required_for_use() {
     assert_eq!(current.policy().unwrap(), &first);
     drop(current);
     // Key rotation changes no caller namespace or policy revision.
-    let m = Metadata::update_approval_keys(root.path()).unwrap();
+    let mut m = Metadata::update_approval_keys(root.path()).unwrap();
     m.connection
         .execute(
             "UPDATE local_approval_issuers SET revision=?1",
             [Uuid::new_v4().to_string()],
         )
         .unwrap();
+    m.persist().unwrap();
     drop(m);
     assert_eq!(
         s.acquire(&selection(), "item.write")
@@ -188,21 +190,12 @@ fn failed_sql_write_preserves_policy_but_lost_ack_requires_observation() {
     issuer(root.path(), "instance");
     let s = store(root.path());
     let first = enabled(&s);
-    {
-        let m = Metadata::update_approval_policy(root.path()).unwrap();
-        m.connection.execute_batch("CREATE TRIGGER test_refuse_policy BEFORE UPDATE ON local_approval_policies BEGIN SELECT RAISE(ABORT,'fixture failure'); END;").unwrap();
-    }
+    refuse_next_sql_write();
     assert_eq!(
         s.set_admitted(&selection(), vec![], Some(1)),
         Err(Failure::MetadataUnavailable)
     );
     assert_eq!(s.status().unwrap(), Some(first.clone()));
-    {
-        let m = Metadata::update_approval_policy(root.path()).unwrap();
-        m.connection
-            .execute_batch("DROP TRIGGER test_refuse_policy;")
-            .unwrap();
-    }
     assert_eq!(
         s.publish(&selection(), vec![], Some(1), || Err(Failure::Conflict)),
         Err(Failure::OutcomeUnknown)
@@ -433,7 +426,7 @@ fn exhausted_revision_never_wraps_or_reuses_identity() {
     let s = store(root.path());
     enabled(&s);
     {
-        let m = Metadata::update_approval_policy(root.path()).unwrap();
+        let mut m = Metadata::update_approval_policy(root.path()).unwrap();
         // Seed the terminal counter directly in this fixture, retaining the
         // production trigger afterwards; no runtime escape permits this jump.
         let trigger: String = m
@@ -454,6 +447,7 @@ fn exhausted_revision_never_wraps_or_reuses_identity() {
             )
             .unwrap();
         m.connection.execute_batch(&trigger).unwrap();
+        m.persist().unwrap();
     }
     let retained = s.status().unwrap();
     assert_eq!(

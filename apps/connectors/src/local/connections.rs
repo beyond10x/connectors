@@ -135,7 +135,9 @@ fn description(alias: &str, connection: &ObservedConnection) -> Value {
 fn registry_failure(error: registry::Failure) -> HandlerReply {
     use registry::Failure::*;
     let (code, stage, action, usage) = match error {
-        MetadataUnavailable => ("metadata_unavailable", "observation", "retry_status", false),
+        MetadataUnavailable | ConcurrentRevision => {
+            ("metadata_unavailable", "observation", "retry_status", false)
+        }
         OutcomeUnknown => ("outcome_unknown", "publication", "retry_status", false),
         NotFound => ("not_found", "observation", "check_configuration", false),
         Conflict => ("lifecycle_conflict", "admission", "retry_status", false),

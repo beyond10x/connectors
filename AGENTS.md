@@ -122,25 +122,19 @@ earlier local-only Connectors publication boundary for these releases.
 4. Have the single planning-store writer record the release scope, evidence and
    current lifecycle state through AEP, reconciling earlier publication exclusions
    with this instruction. Do not close unfinished work to make a release look done.
-5. Integrate the verified changes and release metadata on `main`, commit using
-   `b10x-gates bot`, and create an annotated `v<version>` tag at that
-   exact release commit. Verify author, committer and tagger identities. Existing
-   release tags are immutable.
-6. Publish to the source remote through `b10x-gates bot`, or `publish` with its
-   retained receipt, under the coordinated hooks. **This checkout has no GitHub
-   remote.** The destination is the `next` branch of `beyond10x/connectors`, which
-   carries a 1:1 replay of this history with rewritten parents: every commit there
-   has the same tree, message, author and dates as its counterpart here, and only
-   the SHA differs. Publish by replaying the new commits onto the remote head with
-   `git commit-tree`, preserving `GIT_AUTHOR_*` and `GIT_COMMITTER_*` from each
-   source commit and asserting tree equality at every step, then pushing that head.
-   Recreate the annotated tag at the mapped commit; the local tag and the published
-   tag name different SHAs by design. `git fetch` auto-follows tags, so check that a
-   fetched tag has not landed on an unmapped commit before pushing it. Verify the
-   remote branch head's tree equals local `main`'s and that the peeled tag is an
-   ancestor of it. Finish with clean `main`, retained release evidence and cleanup of
-   task-owned managed worktrees through `worktree`. Report the version, commit,
-   destination and verification result.
+5. Integrate the verified changes and release metadata on `main` of
+   `beyond10x/connectors` — the `origin` remote and the repository's default
+   branch — the way every change reaches it: a branch pushed through
+   `b10x-gates bot`, a pull request opened and merged through `b10x-gates api`,
+   and the shared source check green on it. The release commit is the merge
+   commit on `origin/main`; `git fetch` and confirm it before tagging.
+6. Create an annotated `v<version>` tag on that merge commit through
+   `b10x-gates bot` and push the tag. Verify the author and committer of the
+   merged commits and the tagger (`b10x-bot[bot]` for each), that the peeled tag
+   is an ancestor of `origin/main`, and that its tree is the tree the gate ran on.
+   Existing release tags are immutable. Report the version, commit, destination
+   and verification result, and clean up task-owned managed worktrees through
+   `worktree`.
 7. Publish the hosted release page for that exact tag through
    `b10x-gates gh -- release create v<version> --verify-tag --notes-file <file>`,
    so the page is authored by `b10x-bot[bot]` like every commit and tag before it.
@@ -148,12 +142,21 @@ earlier local-only Connectors publication boundary for these releases.
    authored by a person, and is corrected the same way: delete it and recreate it
    under the bot, never leave it. Take the notes from the annotated tag with
    `git tag -l --format='%(contents)'`; `--notes-from-tag` is refused alongside
-   `--repo`. Write no new commit, move no tag and edit no existing release. `next` is
-   the repository's default branch, so a release cut from it is Latest and needs no
-   flag; pass `--latest=false` only when the release is deliberately not the newest.
-   A page that is not Latest is invisible on the repository's front page, which is
-   how v0.8.0 and v0.9.0 went unnoticed after they shipped. Verify the created
-   page's author, its Latest state and that it resolves to the tag's peeled commit.
+   `--repo`. Write no new commit, move no tag and edit no existing release. A
+   release cut from `main`, the default branch, is Latest and needs no flag; pass
+   `--latest=false` only when the release is deliberately not the newest. A page
+   that is not Latest is invisible on the repository's front page, which is how
+   v0.8.0 and v0.9.0 went unnoticed after they shipped. Verify the created page's
+   author, its Latest state and that it resolves to the tag's peeled commit. No
+   workflow builds release artifacts; the page carries the source archives GitHub
+   generates and nothing else.
+
+v0.8.0–v0.11.0 were cut from a checkout with no GitHub remote and published by
+replaying its history onto the `next` branch with `git commit-tree`, so each of
+those tags peels to a `next` commit whose tree equals its counterpart on `main`
+(v0.11.0: `5330fb94c` on `next`, `bc0bcb7a6` on `main`). Since #29 the
+repository is worked through pull requests to `main`; `next` stopped at the
+v0.11.0 plan close (`dec210fc8`) and is not a release destination.
 
 A local commit or local tag alone is not a cut release, and neither is a pushed
 tag with no release page. Source release does not implicitly include a
@@ -201,7 +204,7 @@ record itself is deferred there for the same reason.
 
 The lineage is Atlas ADR 0051 (*`beyond10x/connectors` is the v2 lineage; v1 is its
 predecessor*, accepted 2026-09-15): the name `beyond10x/connectors` denotes this
-lineage, which owns that repository's `next` default branch, its `v0.8.0`-and-later
+lineage, which owns that repository's `main` default branch, its `v0.8.0`-and-later
 tag namespace and its Latest release. The v1 component at
 `/home/timo/beyond10x/connectors`, whose releases end at `v0.7.2`, is the
 predecessor, not a parallel current component.

@@ -21,6 +21,19 @@ timeline:
       approval_mode: required
       approval_ref: opaque-test-reference
       idempotency_key: null
+      request_fingerprint:
+        operation_ref: '["connectors.operation/v1","test-instance","test-adapter","issue.create"]'
+        connection_ref: test-connection
+        connection_revision: connection-r1
+        contract_ref: operations/v1alpha1
+        profile: mutation
+        descriptor_revision: descriptor-r1
+        configuration_revision: config-r1
+        canonicalization_version: adapter-v1-canonical-json
+        input_digest: test-digest
+        route: null
+      owner_nonce: 732c948d-118a-5fbe-ba33-f922a6e20f6f
+      publication_fence: ef4eb26f-f31b-556a-9a5c-4251a6bd21de
     outcome: prepared
     events:
       - event: connectors.mutations.AttemptPrepared
@@ -39,6 +52,8 @@ timeline:
     command: connectors.mutations.RecordRefusal
     input:
       attempt_id: {$instance: attempt}
+      settled_at: '2026-09-08T09:00:02Z'
+      terminal_result_json: '{"kind":"failure","error":{"code":"forbidden"}}'
     outcome: refused
     events:
       - event: connectors.mutations.AttemptRefused
@@ -47,6 +62,8 @@ timeline:
     command: connectors.mutations.AbortPrepared
     input:
       attempt_id: {$instance: attempt}
+      settled_at: '2026-09-08T09:00:03Z'
+      terminal_result_json: '{"kind":"failure","error":{"code":"timeout"}}'
     outcome: wrong-state
     error:
       name: connectors.mutations.AttemptStateConflict

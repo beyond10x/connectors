@@ -154,15 +154,40 @@ fn fixture() -> (
 ) {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
-    let metadata = Metadata::initialize(root.path()).unwrap();
-    metadata.connection.execute_batch("INSERT INTO registry_instances VALUES ('instance','adapter','config',0);
-      INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1','{}');
-      INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms) VALUES ('connection','instance','profile','{}','scope','revision','fence','live',1,1);").unwrap();
+    let mut metadata = Metadata::initialize(root.path()).unwrap();
+    metadata
+        .connection
+        .execute_batch("INSERT INTO registry_instances VALUES ('instance','adapter','config',0);")
+        .unwrap();
+    let binding = crate::local::registry::fixture_binding("instance");
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1',?1)",
+            [serde_json::to_string(&binding.profile).unwrap()],
+        )
+        .unwrap();
+    metadata.connection.execute(
+        "INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms)
+         VALUES ('connection','instance','profile',?1,'scope','revision','fence','live',1,1)",
+        [serde_json::to_string(&binding).unwrap()],
+    ).unwrap();
+    metadata.persist().unwrap();
     drop(metadata);
     let clock = TestClock::new();
     let ledger = m::Store::new(root.path(), clock.clone(), m::Limits::default()).unwrap();
     let spend = Store::new(root.path(), clock.clone(), 100).unwrap();
     (root, clock, ledger, spend)
+}
+
+fn corrupt_metadata_authority(path: &Path) {
+    rusqlite::Connection::open(path.join("metadata.sqlite3"))
+        .unwrap()
+        .execute(
+            "UPDATE local_authority SET authority_id=?1 WHERE singleton=1",
+            [uuid::Uuid::new_v4().to_string()],
+        )
+        .unwrap();
 }
 fn prepare(
     ledger: &m::Store<TestClock>,
@@ -627,14 +652,15 @@ fn fresh_spend_rechecks_policy_key_time_and_exact_initial_proof() {
             2 => clock.set(NOW + 296000, NOW + 296000),
             3 => e = signer().issue(&s, &p, &clock).unwrap(),
             _ => {
-                Metadata::update(root.path(), false)
-                    .unwrap()
+                let mut metadata = Metadata::update(root.path(), false).unwrap();
+                metadata
                     .connection
                     .execute(
                         "UPDATE registry_connections SET publication_fence='repaired'",
                         [],
                     )
                     .unwrap();
+                metadata.persist().unwrap();
             }
         }
         assert!(matches!(
@@ -908,14 +934,10 @@ fn unavailable_live_binding_is_storage_failure_without_receipt_or_retry() {
     let p = policy(&s);
     let e = signer().issue(&s, &p, &clock).unwrap();
     let prepared = prepare(&ledger, &s, &e, &p, &clock);
-    let metadata = Metadata::update(root.path(), false).unwrap();
-    // Deliberately corrupt a test-owned schema after preparation. Historical
-    // migration digests cannot establish availability of current row queries.
-    metadata
-        .connection
-        .execute_batch("PRAGMA foreign_keys=OFF; DROP TABLE registry_connections;")
-        .unwrap();
-    drop(metadata);
+    assert_eq!(count(root.path()), 0);
+    // Deliberately contradict the retained level-9 binding in this test-owned
+    // physical recovery source. Reopening must refuse rather than infer absence.
+    corrupt_metadata_authority(root.path());
     assert!(matches!(
         store.spend(&prepared, &e, &s, &p),
         Err(Failure::MetadataUnavailable)
@@ -924,7 +946,6 @@ fn unavailable_live_binding_is_storage_failure_without_receipt_or_retry() {
         store.spend(&prepared, &e, &s, &p),
         Err(Failure::Refused)
     ));
-    assert_eq!(count(root.path()), 0);
 }
 
 #[test]
@@ -936,16 +957,29 @@ fn unavailable_redemption_evidence_cannot_open_dispatch() {
     let prepared = prepare(&ledger, &s, &e, &p, &clock);
     let reference = prepared.reference();
     let receipt = store.spend(&prepared, &e, &s, &p).unwrap();
-    Metadata::update(root.path(), false)
-        .unwrap()
-        .connection
-        .execute_batch("DROP TABLE approval_redemptions;")
-        .unwrap();
+    assert_eq!(ledger.observe(reference).unwrap().state, m::State::Prepared);
+    // Deleting the in-memory SQL projection cannot remove an immutable ER
+    // redemption. Damage the latest recorded event, which includes the spend,
+    // and require the dispatch gate to refuse unreadable durable evidence.
+    let physical = rusqlite::Connection::open(root.path().join("metadata.sqlite3")).unwrap();
+    assert_eq!(
+        physical
+            .execute(
+                "UPDATE connectors_er_events SET data='{}' WHERE global_seq=(SELECT max(global_seq) FROM connectors_er_events WHERE event_name='er.recorded_entry')",
+                [],
+            )
+            .unwrap(),
+        1
+    );
+    drop(physical);
     assert!(matches!(
         ledger.open_approved_dispatch(prepared, receipt),
         Err(m::Failure::MetadataUnavailable)
     ));
-    assert_eq!(ledger.observe(reference).unwrap().state, m::State::Prepared);
+    assert_eq!(
+        ledger.observe(reference),
+        Err(m::Failure::MetadataUnavailable)
+    );
 }
 
 #[test]
@@ -975,9 +1009,14 @@ fn policy_guard_survives_commit_and_clock_is_rechecked_after_storage() {
             )
             .unwrap();
             assert_eq!(
-                conn.query_row("SELECT count(*) FROM approval_redemptions", [], |r| r
-                    .get::<_, u32>(0))
-                    .unwrap(),
+                conn.query_row(
+                    "SELECT count(*) FROM connectors_er_p_er_subjects_v1 \
+                     WHERE json_extract(body,'$[1].subject[0]')=\
+                       'connectors.delegation.ApprovalRedemption'",
+                    [],
+                    |r| r.get::<_, u32>(0)
+                )
+                .unwrap(),
                 1
             );
         }
@@ -1051,20 +1090,53 @@ fn mismatched_receipt_missing_subject_and_existing_key_never_open_new_gate() {
     let second = prepare(&ledger, &s, &e, &p, &clock);
     let receipt = store.spend(&first, &e, &s, &p).unwrap();
     assert!(ledger.open_approved_dispatch(second, receipt).is_err());
-    let fresh = signer().issue(&s, &p, &clock).unwrap();
-    let prepared = prepare(&ledger, &s, &fresh, &p, &clock);
-    Metadata::update(root.path(), false)
-        .unwrap()
+    // Missing-subject projection corruption is refused before it can replace
+    // the immutable attempt. Check the same live-approval guard against that
+    // malformed projection, then corrupt the recorded authority separately.
+    let (bad_root, bad_clock, bad_ledger, bad_store) = fixture();
+    let bad_evidence = signer().issue(&s, &p, &bad_clock).unwrap();
+    let bad_prepared = prepare(&bad_ledger, &s, &bad_evidence, &p, &bad_clock);
+    let mut metadata = Metadata::update(bad_root.path(), false).unwrap();
+    let authority = metadata.authority().unwrap();
+    metadata
         .connection
         .execute(
             "UPDATE mutation_attempts SET approval_subject=NULL WHERE attempt_id=?1",
-            [prepared.reference().attempt_id.to_string()],
+            [bad_prepared.reference().attempt_id.to_string()],
         )
         .unwrap();
+    let tx = metadata.connection.transaction().unwrap();
     assert!(matches!(
-        store.spend(&prepared, &fresh, &s, &p),
-        Err(Failure::Refused)
+        bad_prepared.check_live_approval(&tx, authority),
+        Err(m::Failure::Conflict)
     ));
+    drop(tx);
+    assert!(metadata.persist().is_err());
+    drop(metadata);
+    assert_eq!(
+        bad_ledger.observe(bad_prepared.reference()).unwrap().state,
+        m::State::Prepared
+    );
+    let physical = rusqlite::Connection::open(bad_root.path().join("metadata.sqlite3")).unwrap();
+    assert_eq!(
+        physical
+            .execute(
+                "UPDATE connectors_er_events SET data='{}' WHERE global_seq=(SELECT max(global_seq) FROM connectors_er_events WHERE event_name='er.recorded_entry')",
+                [],
+            )
+            .unwrap(),
+        1
+    );
+    drop(physical);
+    assert!(matches!(
+        bad_store.spend(&bad_prepared, &bad_evidence, &s, &p),
+        Err(Failure::MetadataUnavailable)
+    ));
+    assert_eq!(
+        bad_ledger.observe(bad_prepared.reference()),
+        Err(m::Failure::MetadataUnavailable)
+    );
+    let fresh = signer().issue(&s, &p, &clock).unwrap();
     let verified = verify(&fresh, &s, &p, &clock).unwrap();
     let mut c = candidate(&s, &fresh);
     c.caller_key = Some("same-key".into());
