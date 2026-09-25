@@ -21,6 +21,19 @@ timeline:
     approval_mode: not_required
     approval_ref: null
     idempotency_key: create-1
+    request_fingerprint:
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      route: null
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
+    owner_nonce: 6cd4eac4-a013-5985-8b07-6fb54a702e02
+    publication_fence: 8d90d16c-f151-5afd-97c0-427f7fe1ed90
   outcome: prepared
   events:
   - event: connectors.mutations.AttemptPrepared
@@ -72,7 +85,11 @@ timeline:
   - event: connectors.mutations.DispatchOpened
 - at: '2026-09-08T09:00:03Z'
   command: connectors.mutations.RecordRefusal
-  input: *id001
+  input:
+    attempt_id:
+      $instance: first-attempt
+    settled_at: '2026-09-08T09:00:03Z'
+    terminal_result_json: '{"kind":"failure","error":{"code":"forbidden"}}'
   outcome: refused
   events:
   - event: connectors.mutations.AttemptRefused

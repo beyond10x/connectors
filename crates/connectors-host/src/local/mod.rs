@@ -23,6 +23,8 @@ pub enum Failure {
     InvalidConfiguration,
     ConfigurationExists,
     MetadataUnavailable,
+    /// An ER write was definitely not committed because its recorded revision moved.
+    ConcurrentRevision,
     OutcomeUnknown,
 }
 

@@ -21,6 +21,19 @@ timeline:
     approval_mode: not_required
     approval_ref: null
     idempotency_key: create-1
+    request_fingerprint:
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      route: null
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
+    owner_nonce: e316edcb-df9e-54d1-b827-9a925b5ffbd7
+    publication_fence: 4c9658db-16f0-5c85-b109-628e8a01f30e
   outcome: prepared
   events:
   - event: connectors.mutations.AttemptPrepared

@@ -2,7 +2,7 @@
 name = "connectors-build"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+rust-version = "1.91"
 license.workspace = true
 
 [dependencies]
@@ -17,3 +17,8 @@ tempfile.workspace = true
 pulldown-cmark = "0.13.4"
 regex = "1"
 jsonschema.workspace = true
+ess-compiler.workspace = true
+ess-domain.workspace = true
+ess-entity-runtime.workspace = true
+ess-service-contract.workspace = true
+ess-synth.workspace = true

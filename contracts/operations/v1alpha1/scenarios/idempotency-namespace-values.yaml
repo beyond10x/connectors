@@ -34,6 +34,19 @@ timeline:
     approval_mode: not_required
     approval_ref: null
     idempotency_key: create-1
+    request_fingerprint:
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      route: null
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
+    owner_nonce: effc27e3-8d8b-59aa-982e-17caaf4562cf
+    publication_fence: 25429b68-14a6-5847-a982-402d445fae95
   outcome: prepared
   events:
   - event: connectors.mutations.AttemptPrepared
@@ -98,6 +111,9 @@ timeline:
     approval_mode: not_required
     approval_ref: null
     idempotency_key: create-1
+    request_fingerprint: *id001
+    owner_nonce: da28081a-6eb3-596f-a1e5-332eaeeecfa5
+    publication_fence: 25429b68-14a6-5847-a982-402d445fae95
   outcome: prepared
   events:
   - event: connectors.mutations.AttemptPrepared
@@ -140,6 +156,9 @@ timeline:
     approval_mode: not_required
     approval_ref: null
     idempotency_key: create-1
+    request_fingerprint: *id001
+    owner_nonce: c09ef3f5-7488-545b-a69e-77922c722708
+    publication_fence: 25429b68-14a6-5847-a982-402d445fae95
   outcome: prepared
   events:
   - event: connectors.mutations.AttemptPrepared
@@ -182,6 +201,22 @@ timeline:
     approval_mode: not_required
     approval_ref: null
     idempotency_key: create-1
+    request_fingerprint:
+      operation_ref: test-instance/jira.issue.create
+      connection_ref: test-connection
+      connection_revision: connection-r1
+      contract_ref: operations/v1alpha1
+      profile: mutation
+      descriptor_revision: descriptor-r1
+      configuration_revision: config-r1
+      route:
+        gateway_instance: trusted-gateway
+        route_id: fixture-route
+        route_revision: route-r1
+      canonicalization_version: adapter-v1-canonical-json
+      input_digest: test-digest
+    owner_nonce: 02678db9-8e73-5d51-b19d-d1de537fcb20
+    publication_fence: 25429b68-14a6-5847-a982-402d445fae95
   outcome: prepared
   events:
   - event: connectors.mutations.AttemptPrepared

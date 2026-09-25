@@ -6,7 +6,10 @@ use connectors_host::local::{
 };
 use std::{
     fs,
-    os::unix::fs::{PermissionsExt, symlink},
+    os::{
+        fd::AsRawFd,
+        unix::fs::{PermissionsExt, symlink},
+    },
     sync::{Arc, Barrier},
     time::{Duration, Instant},
 };
@@ -220,7 +223,11 @@ fn contending_metadata_open_refuses_at_its_bound_and_recovers_after_release() {
     let paths = paths(&root);
     Config::initialize(&paths).unwrap();
     let configuration = fs::read(&paths.config).unwrap();
-    let held = Metadata::inspect(&paths.state).unwrap();
+    // Current ER inspection releases the physical lifecycle lock after it
+    // closes the legacy SQLite handle. Hold the lock as a migration or
+    // serialized business transaction would, so this tests its actual bound.
+    let held = fs::File::open(paths.state.join("metadata.lock")).unwrap();
+    assert_eq!(unsafe { libc::flock(held.as_raw_fd(), libc::LOCK_EX) }, 0);
     let state = paths.state.clone();
     let (send, receive) = std::sync::mpsc::channel();
     let worker = std::thread::spawn(move || {
@@ -275,6 +282,12 @@ fn sidecar_symlink_is_refused_without_touching_its_target() {
     let target = root.path().join("untouched");
     fs::write(&target, b"sentinel").unwrap();
     let sidecar = paths.state.join("metadata.sqlite3-wal");
+    // Entity Runtime retires its SQLite bridge after the setup handle drops.
+    // Wait for that legitimate WAL to close before installing the hostile link.
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while sidecar.exists() && std::time::Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(10));
+    }
     assert!(!sidecar.exists());
     symlink(&target, &sidecar).unwrap();
     assert!(matches!(
