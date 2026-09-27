@@ -4,6 +4,8 @@
 //! connection/supervisor coordinators must be bound before credential acquisition.
 #[cfg(test)]
 mod adversary_w2_tests;
+#[cfg(test)]
+mod adversary_w3_tests;
 pub mod approval_keys;
 pub mod approval_policy;
 pub mod approvals;

@@ -15,8 +15,9 @@ types:
     # caller input or an unqualified wall-clock sample. Both bounds contain
     # actual current time; upper fixes settlement conservatively, and lower
     # proves retention expiry. Unavailable/invalid evidence permits no expiry.
-    # UNMAPPED: a deployment must qualify its clock source; ESS does not prove
-    # the interval's provenance or containment of actual time.
+    # ESS-LIMIT: a deployment must qualify its clock source; ESS 0.36 has no
+    # trusted-time construct, so it proves neither the interval's provenance nor
+    # its containment of actual time.
   - name: connectors.mutations.AttemptId
     kind: newtype
     of: Uuid
@@ -46,8 +47,11 @@ types:
       - {name: effects, type: "List<connectors.mutations.ExecutableEffect>"}
       - {name: semantic_effects, type: "List<connectors.mutations.SemanticEffect>"}
     # Private excerpt, not a public codec or new OperationDeclaration fields.
-    # UNMAPPED: selected-profile support/completeness, distinct array members,
-    # mutation iff external_write for business effects, and authority checks.
+    # ESS-LIMIT: selected-profile support/completeness, distinct array members,
+    # mutation iff external_write for business effects, and authority checks. The
+    # mutation flag and the profile live on other records; ESS 0.36 has no
+    # distinct-members predicate over a list and no cross-record read in a type
+    # invariant.
   - name: connectors.mutations.SessionEstablishmentObservation
     kind: struct
     fields:
@@ -55,9 +59,15 @@ types:
       - {name: ready_session, type: "Optional<connectors.sessions.SessionId>"}
     # A ready-receipt reference is historical evidence, not current liveness or
     # authority. Optional omission here is not a public required-null encoding.
-    # UNMAPPED: trusted protocol-specific effect evidence, publication
+    # A ready receipt requires applied knowledge; applied need not have a receipt
+    # (contracts/operations/v1alpha1/semantics.md:144-146).
+    invariants:
+      - any:
+          - missing(ready_session)
+          - {mutation.classification: applied}
+    # ESS-LIMIT: trusted protocol-specific effect evidence, publication
     # after full readiness, current disclosure, and serialized terminal races.
-    # A ready receipt requires applied knowledge; applied need not have a receipt.
+    # ESS 0.36 has no evidence-provenance or serialization construct.
     # This value declares no persistent Session/Attempt ownership relation.
 
   - name: connectors.mutations.IdempotencyKind
@@ -107,8 +117,10 @@ entities:
         target: connectors.auth_bindings.Connection
         cardinality: one
         via: connection_ref
-    # UNMAPPED: the operation reference needs instance/adapter qualification;
+    # ESS-LIMIT: the operation reference needs instance/adapter qualification;
     # OperationDeclaration.operation_id alone is not a runtime operation identity.
+    # A qualified reference joins (instance_id, operation_id); an ESS 0.36 relation
+    # `via` names one field, so no composite-key relation is declared.
     # KeyReservation in connectors.idempotency explicitly references this attempt;
     # its lifecycle covers replay retention, separately from audit retention.
     # ApprovalRedemption in connectors.delegation references this attempt;
@@ -117,7 +129,9 @@ entities:
     # neither owner cascades deletion or lifecycle changes into the other.
     # The selected Connection is retained independently after local revocation;
     # the reference neither grants current use nor owns binding deletion.
-    # UNMAPPED: admission principal/tenant entities remain outside this binding.
+    # DEFERRED: admission principal/tenant entities remain outside this binding;
+    # owned by a story to be filed (story:multi-tenant-principal-assignment, not yet
+    # in the store on 2026-09-27).
     lifecycle:
       initial: Prepared
       states: [Prepared, Dispatching, Aborted, Completed, Failed, Indeterminate]
@@ -303,8 +317,10 @@ views:
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
       - {name: state, type: connectors.mutations.AttemptRecord.State}
 
-# UNMAPPED: durable compare-and-set, evidence provenance, actual send cardinality,
+# ESS-LIMIT: durable compare-and-set, evidence provenance, actual send cardinality,
 # crash recovery, deadline races, and classification/cause projection require host
-# port tests. ESS checks this state graph and scenario references, not those facts.
-# UNMAPPED: Observation's classification mapping is the normative table in the
-# contract. No executable expression here derives it from state or transport data.
+# port tests. ESS checks this state graph and scenario references, not those facts;
+# ESS 0.36 has no durable-storage, compare-and-set or crash-recovery construct.
+# ESS-LIMIT: Observation's classification mapping is the normative table in the
+# contract. ESS 0.36 has no derived-value expression that computes a field from
+# lifecycle state or transport data, so none derives it here.

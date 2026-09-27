@@ -58,7 +58,9 @@ types:
       - {name: provider_ms, type: Integer}
       - {name: connect_ms, type: Integer}
 
-# UNMAPPED codec obligations: exact selected route/version; mandatory-null versus
+# ESS-LIMIT codec obligations (ESS 0.36 has no wire-codec construct: Optional
+# projects to omission, not a required-null rule; no byte-length or canonical
+# encoding predicate; no cross-record read): exact selected route/version; mandatory-null versus
 # omitted fields (ESS Optional captures values, not this codec's emission rule);
 # closed outer request/response and arbitrary operation-local schema payloads;
 # numeric/string bounds and canonical encoding; error/status/effect combinations;

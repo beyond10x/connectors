@@ -180,11 +180,17 @@ views:
       - {name: final_observation, type: "Optional<connectors.execution_audit.FinalObservation>"}
 
 # ESS checks the declaration graph, known instance/attempt/connection references and
-# lifecycle causation. Optional-field co-presence, trusted fact derivation,
-# UUID/string/aggregate/count bounds, durable acknowledgements, atomic append,
-# injective `(instance_id,audit_ref)` qualification/resolution, same-id/content
-# recovery, capacity, clocks, retention and dispatch order
-# are UNMAPPED persistence/conformance obligations. An early_refusal cannot
+# lifecycle causation.
+# DEFERRED: the anchor co-presence rules (contracts/service/audit.md:41-44,53,148-150)
+# are writable as AuditRecord invariants, but those lower into Entity Runtime rules
+# and need a view publishing the fields; owned by a story to be filed
+# (story:audit-anchor-co-presence, not yet in the store on 2026-09-27).
+# ESS-LIMIT: trusted fact derivation, the UTF-8/ASCII byte bounds and 4 KiB aggregate
+# (audit.md:104-114), the 100,000-record capacity, durable acknowledgements, atomic
+# append, injective `(instance_id,audit_ref)` qualification/resolution, same-id/content
+# recovery, clocks, retention and dispatch order are persistence/conformance
+# obligations. ESS 0.36 has no byte-length predicate, no cross-record count or
+# uniqueness constraint, no durable-storage and no trusted-time construct. An early_refusal cannot
 # satisfy the execution gate; an admitted anchor alone still cannot dispatch.
 # No delete transition is selected. Audit outlives replay/index payload cleanup,
 # approval/nonce compaction and any other owner that merely references it.

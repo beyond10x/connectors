@@ -13,7 +13,9 @@ types:
     kind: enum
     variants: [prometheus, loki, alertmanager]
 
-# UNMAPPED: configured source/profile compatibility, complete collection evidence
-# and public codecs. Map only these reviewed datasource type values to declared
+# ESS-LIMIT: configured source/profile compatibility, complete collection evidence
+# and public codecs (recognition/candidate required-null). ESS 0.36 has no
+# cross-record read, no evidence-completeness construct and no required-null codec
+# rule. Map only these reviewed datasource type values to declared
 # recognition; unknown plugins stay observable with recognition/candidate null.
 # These values neither collect nor publish an observation or execute a recognizer.

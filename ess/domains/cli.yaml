@@ -76,6 +76,9 @@ types:
     fields:
       - {name: adapter, type: String}
       - {name: observation, type: connectors.clock.Observation}
+    # ESS-LIMIT: clock.md:84 orders an observation (upper >= lower). The comparison
+    # is writable here, but ESS 0.36 `generate cli` refuses any invariant on a CLI
+    # type ("unsupported invariants or union semantics"), so it is not declared.
   - name: connectors.cli.ApprovalKeyState
     kind: enum
     variants: [candidate, active, retired, retiring, deleted]
@@ -627,7 +630,10 @@ types:
     fields:
       - {name: result, type: "String"}
 
-# UNMAPPED executable obligations: context/path and selector resolution, bounds,
+# ESS-LIMIT executable obligations (ESS 0.36 has no file-system, process, terminal
+# or OS-permission construct, no TOML/JSON reader-closure or codec construct, no
+# cross-record or multi-record-transaction construct and no redaction construct):
+# context/path and selector resolution, bounds,
 # closed TOML decoding/defaults, JSON carrier parsing/duplicate-key/depth checks,
 # dynamic input/result schema resolution, status one-of, acquisition state/reason
 # and yielded-connection projection, cached/stale and page validity reduction,
@@ -681,6 +687,10 @@ entities:
         - {name: expire, from: [Active], to: Expired}
     # This is the opaque cross-process stale-page fence. It grants no provider,
     # connection or dispatch authority and is retained after logical expiry.
+
+errors:
+  - name: connectors.cli.CursorStateConflict
+    fields: [{name: state, type: connectors.cli.ConnectionListCursor.State}]
 
 commands:
   - name: connectors.cli.RecordLocalRuntime
@@ -771,10 +781,13 @@ commands:
         payload:
           connectors.cli.ConnectionListCursorExpired:
             cursor_id: input.cursor_id
-    # UNMAPPED: expiring an Expired cursor is refused by this lifecycle with no
-    # declared error; this domain has no cursor state-conflict error, and the host
-    # removal path (er.rs:3114-3118) only expires Active cursors. Open question for
-    # the owner; synthesis refuses the scenario (ESS-SYNTH-012).
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.cli.CursorStateConflict
+    # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:297-298) and the host
+    # removal path (er.rs:3114-3118) only expires Active cursors. The error name is
+    # the decision; no source names one.
 
 events:
   - name: connectors.cli.LocalRuntimeRecorded
