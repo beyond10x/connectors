@@ -1,5 +1,5 @@
 diff --git a/crates/edge/aep-cli/src/planning.rs b/crates/edge/aep-cli/src/planning.rs
-index 425aca83..b4a5ff17 100644
+index 2f1c2bc6..e2d73a47 100644
 --- a/crates/edge/aep-cli/src/planning.rs
 +++ b/crates/edge/aep-cli/src/planning.rs
 @@ -44,6 +44,7 @@ pub(crate) const OUTCOME_DAYS: u64 = 14;
@@ -10,7 +10,7 @@ index 425aca83..b4a5ff17 100644
  
  /// The directory inside `.engineering` that holds the plan.
  const PLANNING_DIRECTORY: &str = "planning";
-@@ -4677,8 +4678,10 @@ fn print_waves(derived: &waves::Derivation) {
+@@ -4868,8 +4869,10 @@ fn print_waves(derived: &waves::Derivation) {
  pub(crate) fn shown_from(
      stored: &aep_backend_markdown::StoredDocument,
      providers: Option<&aep_domain::project::ProjectConfig>,
@@ -21,7 +21,7 @@ index 425aca83..b4a5ff17 100644
      Shown {
          id: frontmatter.id.to_string(),
          kind: frontmatter.kind.to_string(),
-@@ -4719,7 +4722,8 @@ pub(crate) fn shown_from(
+@@ -4910,7 +4913,8 @@ pub(crate) fn shown_from(
          // Always an array, `[]` where the body carries no block and `[]` where it carries one this
          // build cannot read — `validate` is what reports the second, because `show` printing an
          // error in place of a document would make an unreadable block hide the document it is in.
@@ -31,7 +31,7 @@ index 425aca83..b4a5ff17 100644
          outcomes: Vec::new(),
          body: stored.document.body.clone(),
      }
-@@ -4761,7 +4765,7 @@ fn show(args: &StoreArgs, id: &str, body_only: bool) -> Result<ExitCode> {
+@@ -4952,7 +4956,7 @@ fn show(args: &StoreArgs, id: &str, body_only: bool) -> Result<ExitCode> {
      // store handed to `--store` outside any project has no project.yaml, and printing the
      // references without their links is the right answer there.
      let config = aep_project::project::load_config(&args.repository_root()).ok();
@@ -40,7 +40,7 @@ index 425aca83..b4a5ff17 100644
      // On the review, not on the artifact it is about. A reader holding a review id is asking
      // whether that lens ever changed anything, and the record that answers it is filed against the
      // reviewed artifact — so a verb that only showed what is filed *here* would answer *no* to a
-@@ -5915,11 +5919,10 @@ fn findings_ledger(
+@@ -6106,11 +6110,10 @@ fn findings_ledger(
          return Ok(ExitCode::SUCCESS);
      };
  
@@ -56,7 +56,7 @@ index 425aca83..b4a5ff17 100644
      let compared = findings::compare(&before, &after);
  
      let ledger = FindingsLedger {
-@@ -6187,12 +6190,10 @@ fn review_value(args: &StoreArgs, since: Option<&str>) -> Result<ExitCode> {
+@@ -6378,12 +6381,10 @@ fn review_value(args: &StoreArgs, since: Option<&str>) -> Result<ExitCode> {
          counted += 1;
          let tally = tallies.entry(reviewer_of(stored)).or_default();
          tally.reviews += 1;
@@ -73,7 +73,7 @@ index 425aca83..b4a5ff17 100644
          for outcome in records.outcomes.get(id).into_iter().flatten() {
              *tally.outcomes.entry(*outcome).or_default() += 1;
          }
-@@ -6442,14 +6443,15 @@ pub(crate) fn findings(
+@@ -6646,14 +6647,15 @@ pub(crate) fn findings(
      // a **problem**: `new` refuses one, so a broken block in the store was hand-written past the
      // command, which is the same class as drift. A block that is simply absent is reported.
      let mut without_findings = Vec::new();
@@ -91,7 +91,7 @@ index 425aca83..b4a5ff17 100644
                  "{id} states its findings as prose only — nothing can enumerate what it found, so                  the next review starts from nowhere"
              )),
              Ok(_) => {}
-@@ -8593,6 +8595,8 @@ pub(crate) struct Shown {
+@@ -8801,6 +8803,8 @@ pub(crate) struct Shown {
      /// Always written, on any kind. A `review-result` is where one belongs, and a reader that had
      /// to know the kind before it knew whether the key would be there would be reading two shapes.
      findings: Vec<aep_backend_markdown::findings::Finding>,
@@ -100,7 +100,7 @@ index 425aca83..b4a5ff17 100644
      /// What became of it, for a `review-result`: every `review_outcome` record naming it.
      outcomes: Vec<ShownOutcome>,
      /// The markdown body, exactly as the store holds it.
-@@ -9106,7 +9110,7 @@ pub(crate) fn shown_of(location: &StoreLocation, id: &str) -> Result<Shown> {
+@@ -9319,7 +9323,7 @@ pub(crate) fn shown_of(location: &StoreLocation, id: &str) -> Result<Shown> {
          .get(&id)
          .with_context(|| opened.missing(&id))?;
      let config = aep_project::project::load_config(&location.repository_root()).ok();
@@ -231,10 +231,10 @@ index 00000000..fabcf178
 +    }))
 +}
 diff --git a/crates/edge/aep-cli/src/store_command.rs b/crates/edge/aep-cli/src/store_command.rs
-index 50d80673..f739d05c 100644
+index 262fdffe..461f4107 100644
 --- a/crates/edge/aep-cli/src/store_command.rs
 +++ b/crates/edge/aep-cli/src/store_command.rs
-@@ -3654,6 +3654,7 @@ mod tests {
+@@ -3735,6 +3735,7 @@ mod tests {
                  .get(&arms.artifact)
                  .expect("the crossing document loaded"),
              config.as_ref(),
@@ -242,7 +242,7 @@ index 50d80673..f739d05c 100644
          ))
          .expect("`show` serialises");
          drop(before);
-@@ -3668,6 +3669,7 @@ mod tests {
+@@ -3749,6 +3750,7 @@ mod tests {
                  .get(&arms.artifact)
                  .expect("the crossing artifact is in the Eventlog authority"),
              config.as_ref(),
@@ -251,7 +251,7 @@ index 50d80673..f739d05c 100644
          .expect("`show` serialises");
          drop(after);
 diff --git a/crates/edge/aep-cli/tests/planning_cli.rs b/crates/edge/aep-cli/tests/planning_cli.rs
-index eb2a2c86..14e191ea 100644
+index bb376e1e..997487db 100644
 --- a/crates/edge/aep-cli/tests/planning_cli.rs
 +++ b/crates/edge/aep-cli/tests/planning_cli.rs
 @@ -4678,6 +4678,233 @@ fn subject_epic(store: &Path) {
@@ -488,7 +488,7 @@ index eb2a2c86..14e191ea 100644
  #[test]
  fn a_review_results_findings_block_is_parsed_at_new_and_returned_by_show_as_an_array() {
      let store = scratch("aep-plan-findings-parsed");
-@@ -4787,6 +5014,45 @@ fn a_malformed_findings_block_is_refused_at_new_with_the_line_it_is_wrong_on() {
+@@ -5110,6 +5337,45 @@ fn findings_input_outside_the_entry_schema_is_refused_and_nothing_is_written() {
      );
  }
  
@@ -535,10 +535,10 @@ index eb2a2c86..14e191ea 100644
  fn validate_reports_a_review_result_with_no_findings_block_without_failing() {
      let store = scratch("aep-plan-findings-absent");
 diff --git a/crates/plan/aep-backend-markdown/src/findings.rs b/crates/plan/aep-backend-markdown/src/findings.rs
-index 9c34ac9f..a69aa8cb 100644
+index 91c93697..8ce41c04 100644
 --- a/crates/plan/aep-backend-markdown/src/findings.rs
 +++ b/crates/plan/aep-backend-markdown/src/findings.rs
-@@ -63,11 +63,13 @@ pub enum Severity {
+@@ -64,11 +64,13 @@ pub enum Severity {
      Warning,
      /// Worth writing down, and nothing is owed.
      Note,
@@ -553,7 +553,7 @@ index 9c34ac9f..a69aa8cb 100644
  
      /// The severity as written in a block.
      #[must_use]
-@@ -76,6 +78,7 @@ impl Severity {
+@@ -77,6 +79,7 @@ impl Severity {
              Self::Blocker => "blocker",
              Self::Warning => "warning",
              Self::Note => "note",

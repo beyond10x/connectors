@@ -205,6 +205,9 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.SessionOffered
+    payload:
+      connectors.sessions.SessionOffered:
+        session_id: {generated: true}
 - name: connectors.sessions.AcceptOffer
   input:
   - name: session_id
@@ -215,6 +218,9 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.OfferAccepted
+    payload:
+      connectors.sessions.OfferAccepted:
+        session_id: input.session_id
   - name: wrong-state
     wrong_state: true
     error: connectors.sessions.StateConflict
@@ -233,11 +239,19 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.SessionReady
+    payload:
+      connectors.sessions.SessionReady:
+        session_id: input.session_id
+        lease: input.lease
     when: decision == allow
   - name: authority-terminated
     moves: connectors.sessions.Session.deny_ready
     instance: session_id
     emits: [connectors.sessions.DataAuthorityTerminated]
+    payload:
+      connectors.sessions.DataAuthorityTerminated:
+        session_id: input.session_id
+        decision: input.decision
   - name: wrong-state
     wrong_state: true
     error: connectors.sessions.StateConflict
@@ -256,11 +270,19 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.DataPermitted
+    payload:
+      connectors.sessions.DataPermitted:
+        session_id: input.session_id
+        direction: input.direction
     when: decision == allow
   - name: authority-terminated
     moves: connectors.sessions.Session.deny_data
     instance: session_id
     emits: [connectors.sessions.DataAuthorityTerminated]
+    payload:
+      connectors.sessions.DataAuthorityTerminated:
+        session_id: input.session_id
+        decision: input.decision
   - name: wrong-state
     wrong_state: true
     error: connectors.sessions.StateConflict
@@ -279,11 +301,19 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.DataLeaseRenewed
+    payload:
+      connectors.sessions.DataLeaseRenewed:
+        session_id: input.session_id
+        lease: input.lease
     when: decision == allow
   - name: authority-terminated
     moves: connectors.sessions.Session.deny_renewal
     instance: session_id
     emits: [connectors.sessions.DataAuthorityTerminated]
+    payload:
+      connectors.sessions.DataAuthorityTerminated:
+        session_id: input.session_id
+        decision: input.decision
   - name: wrong-state
     wrong_state: true
     error: connectors.sessions.StateConflict
@@ -306,6 +336,12 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.ClosingBegun
+    payload:
+      connectors.sessions.ClosingBegun:
+        session_id: input.session_id
+        terminal: input.terminal
+        cutoff_due_at: input.cutoff_due_at
+        teardown_due_at: input.teardown_due_at
   - name: wrong-state
     wrong_state: true
     error: connectors.sessions.StateConflict
@@ -324,12 +360,19 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.LocalResourcesReleased
+    payload:
+      connectors.sessions.LocalResourcesReleased:
+        session_id: input.session_id
+        peer_shutdown: input.peer_shutdown
     when: decision == released
   - name: lost
     moves: connectors.sessions.Session.cleanup_lost
     instance: session_id
     emits:
     - connectors.sessions.LocalCleanupUnaccounted
+    payload:
+      connectors.sessions.LocalCleanupUnaccounted:
+        session_id: input.session_id
   - name: wrong-state
     wrong_state: true
     error: connectors.sessions.StateConflict
@@ -343,6 +386,9 @@ commands:
     instance: session_id
     emits:
     - connectors.sessions.ContinuityLost
+    payload:
+      connectors.sessions.ContinuityLost:
+        session_id: input.session_id
   - name: wrong-state
     wrong_state: true
     error: connectors.sessions.StateConflict

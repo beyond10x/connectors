@@ -45,6 +45,9 @@ commands:
         creates: connectors.clock.LocalClockFloor
         instance: owner
         emits: [connectors.clock.LocalClockFloorRecorded]
+        payload:
+          connectors.clock.LocalClockFloorRecorded:
+            owner: input.owner
         sets:
           lower_unix_ms: input.lower_unix_ms
   - name: connectors.clock.AdvanceLocalClockFloor
@@ -56,6 +59,10 @@ commands:
         moves: connectors.clock.LocalClockFloor.advance
         instance: owner
         emits: [connectors.clock.LocalClockFloorAdvanced]
+        payload:
+          connectors.clock.LocalClockFloorAdvanced:
+            owner: input.owner
+            lower_unix_ms: input.lower_unix_ms
         sets:
           lower_unix_ms: input.lower_unix_ms
 
