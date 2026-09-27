@@ -33,6 +33,25 @@ types:
       - {name: scheme, type: connectors.auth_access.Scheme}
       - {name: flow, type: connectors.auth_access.AcquisitionFlow}
       - {name: capability, type: connectors.auth_access.CapabilityName}
+    # contracts/auth/profile/v1alpha1/semantics.md:111-116: the two non-credential
+    # access modes are closed purpose/subject/scheme/flow/capability combinations.
+    invariants:
+      - any:
+          - not: {mode: direct_anonymous}
+          - all:
+              - {purpose: anonymous}
+              - {subject: none}
+              - {scheme: none}
+              - {flow: static_config}
+              - {capability: http-anonymous}
+      - any:
+          - not: {mode: parent_authenticated}
+          - all:
+              - {purpose: mediated_access}
+              - {subject: none}
+              - {scheme: parent}
+              - {flow: static_config}
+              - {capability: mediated-http}
   - name: connectors.auth_access.AcquisitionDeclaration
     kind: struct
     fields:
@@ -59,6 +78,12 @@ types:
       - {name: call_limit, type: Integer}
       - {name: concurrency_limit, type: Integer}
       - {name: deadline, type: Timestamp}
+    # contracts/auth/evidence/v1alpha1/semantics.md:146-148: at most 64 targets,
+    # 64 calls and four concurrent checks; smaller ceilings down to zero are allowed.
+    invariants:
+      - target_limit: {gte: 0, lte: 64}
+      - call_limit: {gte: 0, lte: 64}
+      - concurrency_limit: {gte: 0, lte: 4}
   - name: connectors.auth_access.PermissionResult
     kind: enum
     variants: [allowed, denied, unavailable]
@@ -81,18 +106,34 @@ types:
     fields:
       - {name: complete, type: Boolean}
       - {name: targets, type: "List<connectors.auth_access.AuthorizationTarget>"}
+    # contracts/auth/evidence/v1alpha1/semantics.md:174-176: at most 64 entries,
+    # and any denial sets complete false.
+    invariants:
+      - targets.count <= 64
+      - any:
+          - {complete: false}
+          - forall: {in: targets, as: t, that: {t.result: allowed}}
 
-# UNMAPPED: cross-field mode/purpose/subject/scheme/flow/capability combinations;
-# required/forbidden flow fields, registration/validation and source adequacy;
-# supported-versus-reserved advertisement, explicit profile selection and current
-# config/route/parent-generation equality. AccessMode covers this selection
+# Declared above: the closed non-credential access combinations (AccessSelection),
+# the 64/64/4 budget ceilings (PermissionBudget) and the coverage bound and
+# denial rule (AuthorizationCoverage).
+# The contract gives no closed table for the credential-bearing combinations, so
+# none is declared for them.
+# ESS-LIMIT: required/forbidden flow fields, registration/validation and source
+# adequacy, supported-versus-reserved advertisement, explicit profile selection and
+# current config/route/parent-generation equality read configuration and records
+# outside the value; ESS 0.36 has no cross-record read in a type invariant.
+# AccessMode covers this selection
 # decision, not an exhaustive classification of every future transport profile.
 # Parent/connection/profile/route ownership and persistence relations remain
 # with their dedicated models. Strings introduce no synthetic entity/identity.
 # No provider account, child CredentialGeneration or custody record is fabricated.
-# Permission target/binding equality, numeric ceilings (64/64/4), deduplication,
-# shared budget reservation/consumption, current policy/time/dispatch fences,
-# completeness and permitted/denied reduction and cursor invalidation are not
-# executed or proven by these schemas. Shape-valid contradictions are possible.
+# Permission target/binding equality, deduplication and canonical order, the
+# 256-byte coordinate bound, shared budget reservation/consumption, current
+# policy/time/dispatch fences, the permitted/denied reduction and cursor
+# invalidation are not executed or proven by these schemas. ESS 0.36 has no
+# distinct-members or ordering predicate over a list, no UTF-8 byte length
+# (`.count` counts Unicode scalars), no cross-record or shared-counter constraint,
+# and no trusted-time or dispatch-fence construct.
 # Safe public coverage omits private cache/generation/route locators. Optional
 # projects to omission, not null; generic schemas are not service/config codecs.

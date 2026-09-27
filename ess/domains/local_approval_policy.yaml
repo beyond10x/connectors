@@ -99,8 +99,12 @@ events:
     fields:
       - {name: policy_id, type: Uuid}
       - {name: revision, type: Integer}
-# UNMAPPED executable predicates: one policy per instance, issuer-instance equality,
+# ESS-LIMIT executable predicates: one policy per instance, issuer-instance equality,
 # monotonic non-reused bounded revision/CAS and durable acknowledgement, current
 # peer UID, shared/exclusive process leases, strict canonical snapshots, sorted
 # distinct supported write operations, current descriptor/clock/connection checks,
 # and protected proof publication. These need the host runtime, not fake ESS moves.
+# ESS 0.36 has no cross-record uniqueness (one policy per instance) or equality
+# constraint, no `input.<field>` operand in `when_subject` for a monotonic revision
+# (value-expressions E6, not implemented), no sorted/distinct list predicate and no
+# process, OS-identity or trusted-time construct.
