@@ -282,7 +282,8 @@ fn concurrent_initial_publication_has_one_winner() {
 }
 
 fn child(path: &Path, action: &str) -> std::process::Child {
-    Command::new(std::env::current_exe().unwrap())
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
         .args([
             "--exact",
             "local::approval_policy::tests::policy_child",
@@ -290,9 +291,18 @@ fn child(path: &Path, action: &str) -> std::process::Child {
             "--nocapture",
         ])
         .env("CONNECTORS_POLICY_TEST_PATH", path)
-        .env("CONNECTORS_POLICY_TEST_ACTION", action)
-        .spawn()
-        .unwrap()
+        .env("CONNECTORS_POLICY_TEST_ACTION", action);
+    // `blocked` asserts Conflict against a lease this test holds on purpose,
+    // so it keeps production's wait; every other child waits only on a hang.
+    if action == "blocked" {
+        crate::local::metadata::child_production_lock_wait(&mut command);
+    } else {
+        crate::local::metadata::child_lock_wait(
+            &mut command,
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        );
+    }
+    command.spawn().unwrap()
 }
 #[test]
 #[ignore = "child fixture; launched by process serialization tests"]
@@ -310,6 +320,15 @@ fn policy_child() {
         "crash-after-commit" => {
             let _ = s.publish(&selection(), vec![], Some(1), || std::process::exit(71));
             panic!("must exit before acknowledgement");
+        }
+        "waits" => {
+            std::fs::write(path.join("child-waiting"), b"waiting").unwrap();
+            assert_eq!(
+                s.set_admitted(&selection(), vec![], Some(1))
+                    .unwrap()
+                    .revision,
+                2
+            );
         }
         "hold" => {
             let guard = s.acquire(&selection(), "item.write").unwrap();
@@ -342,13 +361,38 @@ fn held_use_blocks_cross_process_revocation_until_release() {
 }
 
 #[test]
+fn child_process_waits_on_the_lock_wait_its_parent_hands_it() {
+    let root = fixture();
+    issuer(root.path(), "instance");
+    let s = store(root.path());
+    enabled(&s);
+    let held = s.acquire(&selection(), "item.write").unwrap();
+    let mut waiter = child(root.path(), "waits");
+    let until = Instant::now() + crate::local::metadata::CONTENDED_LOCK_WAIT;
+    while !root.path().join("child-waiting").exists() {
+        if Instant::now() >= until {
+            let _ = waiter.kill();
+            let _ = waiter.wait();
+            panic!("child never reached the lease");
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    // Hold past the production two-second wait: only a wait the child was
+    // handed outlasts it.
+    std::thread::sleep(Duration::from_secs(3));
+    drop(held);
+    assert!(waiter.wait().unwrap().success());
+    assert_eq!(s.status().unwrap().unwrap().revision, 2);
+}
+
+#[test]
 fn child_exit_releases_lease_and_committed_unacknowledged_revision_survives() {
     let root = fixture();
     issuer(root.path(), "instance");
     let s = store(root.path());
     let first = enabled(&s);
     let mut holder = child(root.path(), "hold");
-    let until = Instant::now() + Duration::from_secs(5);
+    let until = Instant::now() + crate::local::metadata::CONTENDED_LOCK_WAIT;
     while !root.path().join("child-ready").exists() {
         if Instant::now() >= until {
             let _ = holder.kill();

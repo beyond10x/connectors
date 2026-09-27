@@ -2,6 +2,8 @@
 //!
 //! These owners do not grant provider access. Custody qualification and the
 //! connection/supervisor coordinators must be bound before credential acquisition.
+#[cfg(test)]
+mod adversary_w2_tests;
 pub mod approval_keys;
 pub mod approval_policy;
 pub mod approvals;

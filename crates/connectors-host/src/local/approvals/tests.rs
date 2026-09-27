@@ -1176,17 +1176,20 @@ fn mismatched_receipt_missing_subject_and_existing_key_never_open_new_gate() {
 fn abrupt_process_exits_recover_without_refunding_or_resending() {
     for phase in ["spend-before", "spend-after", "gate-after", "effect-after"] {
         let (root, _, ledger, _) = fixture();
-        let status = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "local::approvals::tests::crash_child",
-                "--ignored",
-                "--nocapture",
-            ])
-            .env("CONNECTORS_APPROVAL_CRASH_ROOT", root.path())
-            .env("CONNECTORS_APPROVAL_CRASH_PHASE", phase)
-            .status()
-            .unwrap();
+        let status = crate::local::metadata::child_lock_wait(
+            &mut std::process::Command::new(std::env::current_exe().unwrap()),
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        )
+        .args([
+            "--exact",
+            "local::approvals::tests::crash_child",
+            "--ignored",
+            "--nocapture",
+        ])
+        .env("CONNECTORS_APPROVAL_CRASH_ROOT", root.path())
+        .env("CONNECTORS_APPROVAL_CRASH_PHASE", phase)
+        .status()
+        .unwrap();
         assert_eq!(status.code(), Some(73));
         let reference = m::AttemptRef {
             authority: Metadata::inspect(root.path()).unwrap().authority().unwrap(),

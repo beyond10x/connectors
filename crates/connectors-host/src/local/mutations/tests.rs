@@ -816,17 +816,20 @@ fn version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authorit
 fn abrupt_process_exit_preserves_each_durable_boundary_without_resend() {
     for stage in ["prepared", "gate", "effect", "terminal"] {
         let (root, store, candidate) = fixture();
-        let output = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "local::mutations::tests::crash_child",
-                "--ignored",
-                "--nocapture",
-            ])
-            .env("CONNECTORS_MUTATION_CRASH_PATH", root.path())
-            .env("CONNECTORS_MUTATION_CRASH_STAGE", stage)
-            .output()
-            .unwrap();
+        let output = crate::local::metadata::child_lock_wait(
+            &mut std::process::Command::new(std::env::current_exe().unwrap()),
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        )
+        .args([
+            "--exact",
+            "local::mutations::tests::crash_child",
+            "--ignored",
+            "--nocapture",
+        ])
+        .env("CONNECTORS_MUTATION_CRASH_PATH", root.path())
+        .env("CONNECTORS_MUTATION_CRASH_STAGE", stage)
+        .output()
+        .unwrap();
         assert_eq!(
             output.status.code(),
             Some(23),
