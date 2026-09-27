@@ -309,17 +309,20 @@ fn process_exits_keep_pre_and_post_publication_distinct() {
         let store = fixture_store(&f);
         let initial = store.init(None).unwrap();
         let old = initial.active().unwrap().key_id;
-        let result = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--ignored",
-                "--exact",
-                "local::approval_keys::tests::key_crash_child",
-            ])
-            .env("CONNECTORS_KEY_CRASH_PHASE", phase)
-            .env("CONNECTORS_KEY_CRASH_STATE", &store.path)
-            .env("CONNECTORS_KEY_CRASH_SOCKET", &f.socket)
-            .output()
-            .unwrap();
+        let result = crate::local::metadata::child_lock_wait(
+            &mut std::process::Command::new(std::env::current_exe().unwrap()),
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        )
+        .args([
+            "--ignored",
+            "--exact",
+            "local::approval_keys::tests::key_crash_child",
+        ])
+        .env("CONNECTORS_KEY_CRASH_PHASE", phase)
+        .env("CONNECTORS_KEY_CRASH_STATE", &store.path)
+        .env("CONNECTORS_KEY_CRASH_SOCKET", &f.socket)
+        .output()
+        .unwrap();
         assert_eq!(
             result.status.code(),
             Some(73),
