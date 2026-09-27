@@ -10,12 +10,30 @@ scope:
 - confidence: cited
   path: crates/connectors-build/src/gate.rs
 - confidence: cited
+  path: crates/connectors-host/src/local/approval_keys.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/approval_keys/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/approval_policy.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/approval_policy/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/approvals/tests.rs
+- confidence: cited
   path: crates/connectors-host/src/local/audit.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/audit/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/src/local/mutations/tests.rs
 - confidence: cited
+  path: crates/connectors-host/src/local/owner/mutation.rs
+- confidence: cited
   path: crates/connectors-host/src/local/owner/mutation/tests.rs
-revision: 5
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/tests.rs
+revision: 14
 ---
 ## Acceptance
 
@@ -80,3 +98,28 @@ Release 0.13.0 gating, host under concurrent builds:
 
 `append_recovering_with_now` (`audit.rs:201`) already takes an injected clock. A test that drives
 expiry through it needs no wall-clock bound, no `#[ignore]` and no solo run in the gate.
+
+
+## Result, wave 2026-09-27 (e77049daa)
+
+`cargo test --locked --offline -p connectors-host --lib`: 3 of 3 runs `166 passed; 0 failed`, load
+average 24.88, 33.69 and 36.79 before each run, with no load generator.
+
+| test | bound it waited on | change |
+|---|---|---|
+| `final_audit_recovery_preserves_every_live_business_result` | 250 ms recovery window, `audit.rs:212` | frozen clock through `finish_audit_with_now`; `#[ignore]` and the gate's solo run removed |
+| `concurrent_duplicate_prepare_…` and the audit, registry and approvals contention tests | 2 s lifecycle lock, `metadata.rs:803` | test-only per-thread lock wait, 120 s |
+| approval-policy and approval-key contention tests | 2 s leases, `approval_policy.rs:378`, `approval_keys.rs:620` | same override |
+| `production_finish_audit_recovers_a_lost_acknowledgement_on_the_real_clock` | — | new; kills a wrapper that stops passing the real clock |
+
+## Remaining, not fixed here
+
+- `drop_eof_and_original_deadline_destroy_pending_without_a_write` and
+  `native_outcomes_and_lost_replies_never_repeat_a_send` (`process/write_tests.rs:386-394`) pass a
+  2 s wall-clock deadline to a separate adapter process; a controlled clock needs a runtime change.
+  Neither failed in the three runs above.
+- Tests that contend from a child process (`approval_policy/tests.rs:285` and similar in `audit`,
+  `approvals`, `approval_keys`, `mutations`) and `keyring/custody.rs:172,281,304` keep 2 s bounds the
+  per-thread override cannot reach. Not measured under load.
+- `protected::tests::controlling_terminal_hides_input_and_restores_echo_after_sigint`
+  (`protected/tests.rs:188`) failed once under load; cause not established.
