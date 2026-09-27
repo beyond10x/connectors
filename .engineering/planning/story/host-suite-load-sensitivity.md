@@ -2,11 +2,20 @@
 format: aep.planning-md/2
 id: story:host-suite-load-sensitivity
 kind: story
-status: draft
+status: active
 title: The connectors-host timing suite fails under concurrent load and passes alone
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connectors-build/src/gate.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/audit.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/mutations/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/mutation/tests.rs
+revision: 5
 ---
 ## Acceptance
 
@@ -58,3 +67,16 @@ Which bound each test waits on, and whether the three share one mechanism or hav
 three. Nothing here reads the test sources — this story is filed from four
 observations and their re-runs, and the first task under it is to read the three
 tests and say what each is waiting for.
+
+
+## Observed again, 2026-09-27
+
+Release 0.13.0 gating, host under concurrent builds:
+
+| test | location | bound |
+|---|---|---|
+| `final_audit_recovery_preserves_every_live_business_result` | `crates/connectors-host/src/local/owner/mutation/tests.rs:6` | 250 ms recovery window, `crates/connectors-host/src/local/audit.rs:212`; the test is `#[ignore]` and run alone by `crates/connectors-build/src/gate.rs:90-92` |
+| `concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation` | `crates/connectors-host/src/local/mutations/tests.rs:268` | not yet read |
+
+`append_recovering_with_now` (`audit.rs:201`) already takes an injected clock. A test that drives
+expiry through it needs no wall-clock bound, no `#[ignore]` and no solo run in the gate.
