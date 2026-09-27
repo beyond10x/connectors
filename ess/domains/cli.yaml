@@ -771,6 +771,10 @@ commands:
         payload:
           connectors.cli.ConnectionListCursorExpired:
             cursor_id: input.cursor_id
+    # UNMAPPED: expiring an Expired cursor is refused by this lifecycle with no
+    # declared error; this domain has no cursor state-conflict error, and the host
+    # removal path (er.rs:3114-3118) only expires Active cursors. Open question for
+    # the owner; synthesis refuses the scenario (ESS-SYNTH-012).
 
 events:
   - name: connectors.cli.LocalRuntimeRecorded

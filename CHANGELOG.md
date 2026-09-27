@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Specification
+
+- Every system under `ess/` and `adapters/*/spec/ess` declares source format `ess/14`.
+- The ESS crates and the pinned ESS toolchain move from 0.35.0 to 0.36.0. No Rust API change was
+  needed; the generated Entity Runtime definitions change only in their source and synthesis
+  digests.
+- `connectors.discovery_state`: publishing a view increments `last_generation` and replaces
+  `publication_revision`; retiring a view or a collection replaces `publication_revision`
+  (`contracts/discovery/resources/v1alpha1/semantics.md`). Each `ObservationChanged` names the state
+  its transition enters instead of a generated value.
+
+### Planning
+
+- AEP moves from 0.60.0 to 0.61.1 for the toolchain, CI and the store's protocols pin. The local
+  findings patch applies unchanged onto 0.61.1, which does not contain the correction.
+
 ## 0.13.0 — 2026-09-27
 
 The specification and the planning tools move to their newest releases.
