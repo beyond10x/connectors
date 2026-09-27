@@ -100,6 +100,11 @@ types:
       - {name: alg, type: String}
       - {name: kid, type: String}
       - {name: typ, type: String}
+    # contracts/service/delegation.md:95,101,139: fixed Ed25519 algorithm and the
+    # two proof types.
+    invariants:
+      - alg == "Ed25519"
+      - typ: {in: ["b10x.connectors-delegation.v1+jws", "b10x.connectors-approval.v1+jws"]}
   # Current trusted approval-key configuration value, not a discovered key or
   # a new issuer entity. The host's guarded policy binding supplies this value;
   # public_key is the canonical unpadded base64url encoding of 32 Ed25519 bytes.
@@ -144,6 +149,15 @@ types:
       - {name: nbf, type: Integer}
       - {name: exp, type: Integer}
       - {name: jti, type: String}
+    # contracts/service/delegation.md:51,125: integers in [0, 9007199254740991];
+    # jti is 64 hex characters and body_sha256 a 64-character digest.
+    invariants:
+      - execution_deadline_unix_ms: {gte: 0, lte: 9007199254740991}
+      - iat: {gte: 0, lte: 9007199254740991}
+      - nbf: {gte: 0, lte: 9007199254740991}
+      - exp: {gte: 0, lte: 9007199254740991}
+      - jti.count == 64
+      - body_sha256.count == 64
   - name: connectors.delegation.ApprovalClaims
     kind: struct
     fields:
@@ -154,6 +168,13 @@ types:
       - {name: iat, type: Integer}
       - {name: nbf, type: Integer}
       - {name: exp, type: Integer}
+    # contracts/service/delegation.md:139,145: reference is 64 hex characters;
+    # timestamps obey the §4.1 integer bounds.
+    invariants:
+      - reference.count == 64
+      - iat: {gte: 0, lte: 9007199254740991}
+      - nbf: {gte: 0, lte: 9007199254740991}
+      - exp: {gte: 0, lte: 9007199254740991}
 
 # Receipts are immutable acknowledged facts. They do not authenticate a request,
 # open a business gate, or prove atomicity simply by existing in this model.
@@ -230,9 +251,15 @@ events:
   - name: connectors.delegation.ApprovalRedemptionRecorded
     fields: [{name: receipt_id, type: connectors.delegation.ReceiptId}]
 
-# UNMAPPED: proof constants, integer/string bounds, mandatory-null emission,
-# canonical JSON/base64url, signature/key provenance, purpose/correlation and
-# co-presence predicates, approved authority/target reconstruction and disclosure.
+# Declared above: the fixed header constants (ProofHeader), the integer bounds and
+# the jti/reference/digest lengths (DeliveryClaims, ApprovalClaims).
+# ESS-LIMIT: the window equalities nbf = iat - 5 and exp = iat + 25/295
+# (delegation.md:145) are field arithmetic; lowercase-hex and 256-byte ID bounds,
+# the 512 B/12 KiB/18 KiB proof sizes, mandatory-null emission and canonical
+# JSON/base64url are codec rules; signature/key provenance, purpose/correlation
+# predicates across the request, and approved authority/target reconstruction read
+# data outside the value. ESS 0.36 has no arithmetic in predicates (a hex character set is expressible with alphabet), no pattern or
+# byte-length predicate, no required-null codec rule and no signature construct.
 # Issuer, grant and principal CONFIGURATION entities remain with their owners.
 # Connection is declared in connectors.auth_bindings; fixed mediated and gateway
 # route bindings are values. Proof subjects here retain historical coordinates,
@@ -241,9 +268,12 @@ events:
 # gateway and execution-hop AuditRecords are separate records in
 # connectors.execution_audit. Neither receipt owns an audit record, and audit
 # completion proves neither nonce consumption nor approval redemption.
-# actual atomic uniqueness (issuer/receiver/nonce and issuer/reference), one
+# Actual atomic uniqueness (issuer/receiver/nonce and issuer/reference), one
 # approval per prepared attempt, cross-record state checks/fencing, trusted clocks,
-# live-key revocation, durability/replicas and anti-rollback remain host obligations.
+# revocation of live keys, durability or replicas and anti-rollback remain host
+# obligations: ESS 0.36 has no cross-record uniqueness constraint (ESS design
+# cross-record-and-stored-field-guards, rule 2, out of scope), no multi-record
+# transaction and no trusted-time construct.
 # Retiring a nonce INDEX after safe expiry does not erase this historical receipt;
 # physical retention/compaction and all receipt creation are persistence bindings.
 # No fake state transition/command simulates Ed25519 verification or a policy gate.

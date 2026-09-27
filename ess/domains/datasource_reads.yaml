@@ -75,28 +75,36 @@ types:
     kind: enum
     variants: [scoped_fetch, metadata_revalidation, cache_reuse, not_found, forbidden, refused]
 
-# UNMAPPED: adapter-owned query grammar and root recognition, selector equality
+# ESS-LIMIT: adapter-owned query grammar and root recognition, selector equality
 # admission, original-byte preservation, canonical timestamp parsing and numeric
 # ranges, checked interval arithmetic, effective provider limits, source exhaustion
 # and no silent malformed-entry skipping. Boolean observations do not prove these.
-# UNMAPPED: occurrence multiplicity, stable local order/offset progress, byte and
+# ESS 0.36 has no grammar/parser construct, no byte-preservation construct and no
+# arithmetic in predicates.
+# ESS-LIMIT: occurrence multiplicity, stable local order/offset progress, byte and
 # storage accounting, Unicode/redaction/framing, exact versus unknown counts,
 # immutable retained context and all current auth/source/projection equality,
 # clock/TTL/restart/key-loss behavior and atomic publication/disclosure fencing.
-# PageFacts and LogPageDecision do not execute the completeness reduction.
-# UNMAPPED: per-profile public input/result schemas, provider-native JSON payloads,
-# native stream options and framing/target preparation. No generic JSON property
+# PageFacts and LogPageDecision do not execute the completeness reduction. ESS 0.36
+# has no derived-value (reduction) expression, no byte-length or ordering predicate
+# over a list, no cross-record equality and no trusted-time or transaction construct.
+# DECIDED 2026-09-27: per-profile public input/result schemas, provider-native JSON
+# payloads, native stream options and framing/target preparation stay in each
+# adapter's own specification (AGENTS.md ownership table: adapters own native
+# behaviour); none is modelled in this shared domain. No generic JSON property
 # bag is introduced as a substitute for a declared provider representation.
 # Retained observations are bounded ephemeral values under ReadCursorCachePort,
 # not new persistent provider entities or discovery views. Undeclared persistent
 # Connection/cache ownership/cardinality/lifecycle relations remain under the
 # broader ESS modeling audit in docs/design.md §31; no invented owns edge.
-# UNMAPPED: adapter-owned identifier syntax and native representation schemas,
+# ESS-LIMIT: adapter-owned identifier syntax and native representation schemas,
 # scope-filter and canonical-object resolution guarantees, native query grammar,
 # quoting/order/continuation, metadata/body observation correlation,
 # and current per-dispatch/disclosure authority. Optional observations distinguish
 # unestablished facts from observed false; they do not execute provider checks.
-# UNMAPPED: complete bounded lossless JSON decoding, duplicate-key refusal,
+# ESS 0.36 has no grammar/parser, provider-resolution or dispatch-fence construct.
+# ESS-LIMIT (ESS 0.36 has no JSON codec construct, no byte-length predicate and no
+# derived-value expression): complete bounded lossless JSON decoding, duplicate-key refusal,
 # representation-specific byte counts, scalar-aligned text prefixes, full-object
 # omission, serialized page/envelope accounting, original deadlines and aggregate
 # source-call/byte limits, original-age cache reuse and cursor/cache invalidation.

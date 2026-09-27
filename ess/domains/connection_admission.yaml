@@ -80,11 +80,13 @@ types:
       - {name: acquisition, type: "Optional<String>"}
       - {name: expected_revision, type: "Optional<String>"}
 
-# UNMAPPED: these types do not execute the ordered readiness reduction, current
+# ESS-LIMIT: these types do not execute the ordered readiness reduction, current
 # metadata/clock checks, alternative selection, scope subset, exact target and
 # generation matching, requirement applicability, authority or final dispatch.
 # RequirementResult variants are restricted per check by the normative owner;
-# the generic type projector cannot enforce those cross-value predicates.
+# the generic type projector cannot enforce those cross-value predicates. ESS 0.36
+# has no derived-value (reduction) expression, no subset predicate between two
+# lists, no cross-record read and no trusted-time or dispatch-fence construct.
 # Optional projects to omission, not a required-null wire codec. Timestamp
 # fields above are semantic values, not the public Unix-millisecond spelling.
 # No persistent Connection, Acquisition or AuthProfile entity is introduced.

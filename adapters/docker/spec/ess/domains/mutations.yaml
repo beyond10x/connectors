@@ -17,6 +17,24 @@ types:
       - {name: stop_signal, type: "Optional<String>"}
       - {name: stop_timeout_seconds, type: "Optional<Integer>"}
     # Private resolved intent, not a public lifecycle input or provider entity.
-    # UNMAPPED: daemon binding/identity, full-ID and exact-name constraints,
-    # allowlist proof, start omits stop options, stop/restart require fixed admitted
-    # options, signal vocabulary, 0..10 wait and original remaining-budget checks.
+    # adapters/docker/contracts/mutations/v1alpha1/semantics.md:15: start omits the
+    # stop options; stop/restart carry the fixed admitted signal (nonempty, at most
+    # 32 bytes, so at most 32 characters) and a 0..10 second wait.
+    invariants:
+      - any:
+          - not: {action: start}
+          - all: [missing(stop_signal), missing(stop_timeout_seconds)]
+      - any:
+          - {action: start}
+          - all: [defined(stop_signal), defined(stop_timeout_seconds)]
+      - any:
+          - missing(stop_timeout_seconds)
+          - stop_timeout_seconds: {gte: 0, lte: 10}
+      - any:
+          - missing(stop_signal)
+          - stop_signal.count: {gte: 1, lte: 32}
+    # ESS-LIMIT: daemon binding/identity, full-ID and exact-name constraints,
+    # allowlist proof, the ASCII daemon-supported signal vocabulary and original
+    # remaining-budget checks read the admitted daemon and configuration; ESS 0.36
+    # has no cross-record read in a type invariant, no vocabulary predicate (a character set is expressible with alphabet) and no
+    # trusted-time budget construct.

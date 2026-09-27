@@ -94,10 +94,12 @@ entities:
       states: [Generated]
       terminal: [Generated]
 
-# UNMAPPED: injective key allocation, immutable record conflict checks, digest and
+# ESS-LIMIT: injective key allocation, immutable record conflict checks, digest and
 # exact retained-byte verification, original/transformed source distinction,
 # license truth, path safety, unique file/source sets, curation completeness and
 # profile/realization compatibility, deterministic toolchain output and retention.
-# These are declared binding predicates, not executed by schema compilation.
+# These are declared binding predicates, not executed by schema compilation: ESS
+# 0.36 has no cross-record uniqueness, no digest-over-bytes, no file-system and no
+# distinct-members construct.
 # No distribution publication/installation lifecycle, deletion cascade, tenant,
 # generator change or new public/adapter/manifest reader support is selected.
