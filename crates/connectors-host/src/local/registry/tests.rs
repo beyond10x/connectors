@@ -1267,3 +1267,21 @@ fn receipt_identity_and_known_missing_material_cannot_be_substituted() {
     );
     assert!(registry.dispatch_read(captured, NOW + 1).is_err());
 }
+
+// `ExpireAcquisition` runs from Pending as well as Completing
+// (`ess/domains/auth_bindings.yaml`). No other case expires an acquisition that
+// was never consumed, so dropping Pending from that transition went unnoticed.
+#[test]
+fn expiry_sweep_retires_a_pending_acquisition_that_was_never_consumed() {
+    let (root, registry) = fixture();
+    let acquisition = registry.begin(&binding(), NOW).unwrap();
+    assert_eq!(registry.expire(NOW + ENTRY_MS - 1).unwrap(), 0);
+    assert_eq!(registry.expire(NOW + ENTRY_MS).unwrap(), 1);
+    drop(registry);
+    let reopened = Registry::new(root.path());
+    assert!(matches!(
+        reopened.consume(acquisition, NOW + ENTRY_MS),
+        Err(Failure::Conflict)
+    ));
+    assert_eq!(reopened.expire(NOW + ENTRY_MS + 1).unwrap(), 0);
+}
