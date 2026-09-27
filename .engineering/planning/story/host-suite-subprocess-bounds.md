@@ -2,7 +2,7 @@
 format: aep.planning-md/2
 id: story:host-suite-subprocess-bounds
 kind: story
-status: active
+status: implemented
 title: Subprocess and child-process test bounds are set by the test
 relations:
 - serves: vision:independent-contract-adapters
@@ -17,7 +17,7 @@ scope:
   path: crates/connectors-host/src/local/protected/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
-revision: 8
+revision: 9
 ---
 ## Acceptance
 

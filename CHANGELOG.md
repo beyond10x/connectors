@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.2 — 2026-09-27
+
+### Tests
+
+- Tests hand subprocess and child-process bounds from the test: a preparation that fails only
+  after its deadline is retried on a fresh child with a doubled budget and its discarded attempt
+  is checked; a child honours a lock wait only from its own parent; keyring custody locks use the
+  test-only wait; the terminal test gives its child 120 s and keeps its stderr. Production keeps
+  its 2 s bounds.
+
 ## 0.13.1 — 2026-09-27
 
 ### Specification
