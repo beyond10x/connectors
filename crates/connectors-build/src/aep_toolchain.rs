@@ -109,7 +109,7 @@ fn check(binary: &Path, pin: &Pin) -> Result<PathBuf> {
     // Check the receipt and bytes before executing even --version.
     receipt_matches(&receipt, pin, &fs::read(&binary)?)?;
     let actual = run(Command::new(&binary).arg("--version"))?;
-    if String::from_utf8(actual.stdout)?.trim() != format!("protocol {}", pin.aep) {
+    if String::from_utf8(actual.stdout)?.trim() != format!("aep {}", pin.aep) {
         return Err("AEP executable version disagrees with the source pin".into());
     }
     Ok(binary)
