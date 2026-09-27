@@ -58,16 +58,39 @@ fn run_relock_hook() {
 }
 
 /// Production waits two seconds for the lifecycle lock, and for the approval
-/// policy and approval key leases, which read the same wait. A test whose
-/// threads contend for one of them by design sets its own wait here, so the
-/// bound it asserts under is one it chose rather than one a loaded scheduler
-/// can consume.
+/// policy and approval key leases and the custody writer locks, which read the
+/// same wait. A test whose threads contend for one of them by design sets its
+/// own wait here, and hands it to a child process through `child_lock_wait`,
+/// so the bound it asserts under is one it chose rather than one a loaded
+/// scheduler can consume.
 const LIFECYCLE_LOCK_WAIT: Duration = Duration::from_secs(2);
 
 #[cfg(test)]
 thread_local! {
     static TEST_LIFECYCLE_LOCK_WAIT: std::cell::Cell<Duration> =
-        const { std::cell::Cell::new(LIFECYCLE_LOCK_WAIT) };
+        std::cell::Cell::new(inherited_lock_wait());
+}
+
+/// Every thread of a child process starts from the wait its own parent handed
+/// it through [`child_lock_wait`], and from production's wait otherwise. The
+/// value names the process that handed it, so a variable merely inherited, from
+/// a grandparent or an outer shell, is ignored.
+#[cfg(test)]
+fn inherited_lock_wait() -> Duration {
+    static INHERITED: std::sync::OnceLock<Duration> = std::sync::OnceLock::new();
+    *INHERITED.get_or_init(|| {
+        parse_lock_wait(
+            std::env::var(LOCK_WAIT_ENV).ok().as_deref(),
+            std::os::unix::process::parent_id(),
+        )
+        .unwrap_or(LIFECYCLE_LOCK_WAIT)
+    })
+}
+
+#[cfg(test)]
+fn parse_lock_wait(value: Option<&str>, parent: u32) -> Option<Duration> {
+    let (handed_by, ms) = value?.split_once(':')?;
+    (handed_by.parse::<u32>().ok()? == parent).then_some(Duration::from_millis(ms.parse().ok()?))
 }
 
 /// For tests whose threads serialize on the lifecycle lock by design: a bound
@@ -75,6 +98,33 @@ thread_local! {
 /// the writers queued ahead.
 #[cfg(test)]
 pub(super) const CONTENDED_LOCK_WAIT: Duration = Duration::from_secs(120);
+
+/// A test that starts a child process of this test binary hands it a lock
+/// wait through this variable. Only test builds read it.
+#[cfg(test)]
+const LOCK_WAIT_ENV: &str = "CONNECTORS_TEST_LOCK_WAIT_MS";
+
+/// Hand a child process of this test binary `wait` as its lock wait, so a
+/// bound the per-thread override sets in the parent holds in the child too.
+#[cfg(test)]
+pub(super) fn child_lock_wait(
+    command: &mut std::process::Command,
+    wait: Duration,
+) -> &mut std::process::Command {
+    command.env(
+        LOCK_WAIT_ENV,
+        format!("{}:{}", std::process::id(), wait.as_millis()),
+    )
+}
+
+/// Keep production's wait in a child of this test binary even if this
+/// process's own environment carries the variable.
+#[cfg(test)]
+pub(super) fn child_production_lock_wait(
+    command: &mut std::process::Command,
+) -> &mut std::process::Command {
+    command.env_remove(LOCK_WAIT_ENV)
+}
 
 #[cfg(test)]
 pub(super) fn set_lifecycle_lock_wait(wait: Duration) {
@@ -893,6 +943,16 @@ pub(super) fn legacy_fixture(path: &Path, target: i64) -> uuid::Uuid {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_handing_parent_binds_a_lock_wait() {
+        let handed = |value| parse_lock_wait(value, 41);
+        assert_eq!(handed(Some("41:120000")), Some(Duration::from_secs(120)));
+        assert_eq!(handed(Some("7:120000")), None);
+        assert_eq!(handed(Some("120000")), None);
+        assert_eq!(handed(Some("41:")), None);
+        assert_eq!(handed(None), None);
+    }
 
     fn wal_writer_lock_held(shm: &Path) -> bool {
         use std::os::unix::ffi::OsStrExt;

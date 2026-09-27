@@ -75,7 +75,10 @@ fn terminal_fixture() {
             label: "Fictional credential".into(),
             max_bytes: 64,
         }],
-        connectors_sdk::now_ms() + 5000,
+        std::env::var("CONNECTORS_TERMINAL_FIXTURE_DEADLINE_MS")
+            .unwrap()
+            .parse()
+            .unwrap(),
     );
     if mode == "interrupt" {
         assert!(matches!(
@@ -103,9 +106,17 @@ fn attrs(file: &File) -> libc::termios {
     assert_eq!(unsafe { libc::tcgetattr(file.as_raw_fd(), &mut mode) }, 0);
     mode
 }
+/// Neither terminal mode consults its deadline except as a hang guard, so the
+/// bound this test hands the child, and waits on itself, is one only a hang
+/// reaches.
+const TERMINAL_BUDGET: Duration = Duration::from_secs(120);
+
 #[test]
 fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
-    for mode in ["complete", "interrupt"] {
+    // `late` answers the prompt 5.5 s after it appears, past the 5 s the
+    // fixture used to assume, so it passes only on the deadline this test
+    // hands the child.
+    for mode in ["complete", "interrupt", "late"] {
         let (mut master_fd, mut slave_fd) = (-1, -1);
         // SAFETY: initialized output slots; default terminal size/mode requested.
         assert_eq!(
@@ -136,6 +147,9 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         );
         let original = attrs(&slave);
         assert_ne!(original.c_lflag & libc::ECHO, 0);
+        // The child's own assertion message is the only record of why it
+        // failed; keep it where the failure below can report it.
+        let diagnostics = tempfile::tempfile().unwrap();
         let mut command = Command::new(std::env::current_exe().unwrap());
         command
             .args([
@@ -144,9 +158,13 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
                 "--nocapture",
             ])
             .env("CONNECTORS_TERMINAL_FIXTURE", mode)
+            .env(
+                "CONNECTORS_TERMINAL_FIXTURE_DEADLINE_MS",
+                (connectors_sdk::now_ms() + TERMINAL_BUDGET.as_millis() as u64).to_string(),
+            )
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(diagnostics.try_clone().unwrap());
         // SAFETY: this child alone creates the session and adopts the already
         // owned slave. Parent retains both fds; no foreign process is signalled.
         unsafe {
@@ -159,7 +177,7 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         }
         let mut child = Child(command.spawn().unwrap());
         let mut observed = Vec::new();
-        let until = Instant::now() + Duration::from_secs(5);
+        let until = Instant::now() + TERMINAL_BUDGET;
         while !observed.ends_with(b": ") {
             let mut bytes = [0; 256];
             match master.read(&mut bytes) {
@@ -172,6 +190,9 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
             std::thread::sleep(Duration::from_millis(5));
         }
         assert_eq!(attrs(&slave).c_lflag & libc::ECHO, 0);
+        if mode == "late" {
+            std::thread::sleep(Duration::from_millis(5_500));
+        }
         master.write_all(b"fictional-inputx\x7f").unwrap();
         if mode == "interrupt" {
             master.write_all(&[3]).unwrap();
@@ -185,7 +206,13 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
             assert!(Instant::now() < until, "fixture did not finish");
             std::thread::sleep(Duration::from_millis(5));
         };
-        assert!(status.success(), "fixture assertion failed");
+        assert!(status.success(), "fixture assertion failed ({mode}): {}", {
+            let mut stderr = String::new();
+            let mut diagnostics = diagnostics;
+            std::io::Seek::rewind(&mut diagnostics).unwrap();
+            diagnostics.read_to_string(&mut stderr).unwrap();
+            stderr
+        });
         let restored = attrs(&slave);
         assert_eq!(restored.c_lflag, original.c_lflag);
         assert_eq!(restored.c_cc, original.c_cc);
