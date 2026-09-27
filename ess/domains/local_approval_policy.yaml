@@ -62,6 +62,9 @@ commands:
         creates: connectors.local_approval_policy.LocalApprovalPolicy
         instance: policy_id
         emits: [connectors.local_approval_policy.LocalApprovalPolicyConfigured]
+        payload:
+          connectors.local_approval_policy.LocalApprovalPolicyConfigured:
+            policy_id: input.policy_id
         sets:
           instance_id: input.instance_id
           issuer_id: input.issuer_id
@@ -80,6 +83,10 @@ commands:
         moves: connectors.local_approval_policy.LocalApprovalPolicy.revise
         instance: policy_id
         emits: [connectors.local_approval_policy.LocalApprovalPolicyRevised]
+        payload:
+          connectors.local_approval_policy.LocalApprovalPolicyRevised:
+            policy_id: input.policy_id
+            revision: input.revision
         sets:
           revision: input.revision
           selection: input.selection

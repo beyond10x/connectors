@@ -123,6 +123,11 @@ commands:
         creates: connectors.execution_audit.AuditRecord
         instance: audit_record_ref
         emits: [connectors.execution_audit.AuditAnchored]
+        payload:
+          connectors.execution_audit.AuditAnchored:
+            audit_record_ref: {generated: true}
+            instance_id: input.instance_id
+            audit_ref: input.audit_ref
       - name: capacity
         error: connectors.execution_audit.AuditCapacity
 
@@ -140,6 +145,10 @@ commands:
         moves: connectors.execution_audit.AuditRecord.append_final
         instance: audit_record_ref
         emits: [connectors.execution_audit.FinalObservationRecorded]
+        payload:
+          connectors.execution_audit.FinalObservationRecorded:
+            audit_record_ref: input.audit_record_ref
+            observation_id: {generated: true}
       - name: unavailable
         error: connectors.execution_audit.AppendUnavailable
       - name: wrong-state

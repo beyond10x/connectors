@@ -29,15 +29,17 @@ release profile and the bridge deadline are unchanged.
 
 ## Pinned tools
 
-The ESS evolution selection is ESS 0.31.0 at
-`f7de9f82af1e2b47a5a8789cbe7ce03ab649a329` and AEP 0.59.2 at
-`d3d80e9b5ce3219685cdef183028752823f72ba2`. The Cargo dependencies select Entity
+The ESS evolution selection is ESS 0.35.0 at
+`a86579e13385476e324a1550aab2a5e207048ee2` and AEP 0.60.0 at
+`99ad0b51b748629ddf3708c366f18d69fe86cf5e`. The Cargo dependencies select Entity
 Runtime 0.23.0 at `77aac6eac95d0392a00e8dee8d04038ef70e47de` and Eventlog 0.4.0 at
-`70096af8c231fedf6d2206c97ce2940b99aecdb8`. AEP additionally carries the digest-pinned
+`70096af8c231fedf6d2206c97ce2940b99aecdb8`; ESS 0.35.0 additionally brings Entity
+Runtime Core 0.24.1 at `4746bd7cc37d27c7cc5815c44a62a96f3ddc1f44` through
+`ess-entity-runtime`. AEP additionally carries the digest-pinned
 [findings correction](../crates/connectors-build/aep-findings.patch): it recognizes
 explicit empty findings blocks and source-bound transcriptions of immutable legacy
 reviews. This is a local patch on current AEP source, not an upstream released fix;
-AEP 0.59.2 does not contain it, so the patch is carried forward onto that source.
+AEP 0.60.0 does not contain it, so the patch is carried forward onto that source.
 Remove the patch when selecting an upstream commit that contains the correction.
 
 The transcription practice the second clause was written for stopped on 2026-09-15:
