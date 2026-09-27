@@ -163,6 +163,16 @@ fn version(scope: Scope) -> Version {
 }
 
 #[test]
+fn custody_locks_wait_as_long_as_the_test_sets() {
+    crate::local::metadata::set_lifecycle_lock_wait(crate::local::metadata::CONTENDED_LOCK_WAIT);
+    let wait = lock_until().saturating_duration_since(Instant::now());
+    assert!(
+        wait > crate::local::metadata::CONTENDED_LOCK_WAIT - Duration::from_secs(1),
+        "{wait:?}"
+    );
+}
+
+#[test]
 fn private_custody_identities_are_non_nil() {
     assert!(Scope::new(Uuid::nil(), Uuid::new_v4()).is_err());
     assert!(Scope::new(Uuid::new_v4(), Uuid::nil()).is_err());
@@ -284,6 +294,9 @@ fn disposable_secret_service_restart_and_failures() {
             let store = fixture.store(own_scope).unwrap();
             let barrier = barrier.clone();
             std::thread::spawn(move || {
+                crate::local::metadata::set_lifecycle_lock_wait(
+                    crate::local::metadata::CONTENDED_LOCK_WAIT,
+                );
                 barrier.wait();
                 store.write_new(contested, &Secret(vec![i + 1]))
             })
