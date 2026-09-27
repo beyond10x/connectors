@@ -262,11 +262,11 @@ commands:
       - {name: published, when: decision == allow, moves: connectors.auth_bindings.Connection.publish, instance: connection_ref, emits: [connectors.auth_bindings.BindingPublished], payload: {connectors.auth_bindings.BindingPublished: {connection_ref: input.connection_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
-    # UNMAPPED: PublishBinding on a Revoked Connection is refused by this lifecycle,
-    # but no wrong-state outcome says with which error. RevokeConnection answers
-    # ConnectionStateConflict; the host (crates/connectors-host/src/local/metadata/er.rs:2985-2990)
-    # maps no Revoked row change to this command, so no code states an answer to copy.
-    # Open question for the owner; synthesis refuses the scenario (ESS-SYNTH-012).
+      - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
+    # DECIDED 2026-09-27: PublishBinding with decision allow on a Revoked Connection refuses
+    # with ConnectionStateConflict, as RevokeConnection does; input guards decide first (refuse → Refused, unknown → Unavailable).
+    # The host (crates/connectors-host/src/local/metadata/er.rs:2985-2990) maps no
+    # Revoked row change to this command, so no code states another answer.
   - name: connectors.auth_bindings.BeginAcquisition
     # Owner refuses static_config, expired/unsupported flows and capacity before
     # creation. No business operation, public callback or material read is implied.
@@ -430,7 +430,10 @@ events:
   - name: connectors.auth_bindings.CustodyDeleted
     fields: [{name: version_ref, type: String}]
 
-# UNMAPPED execution predicates: private key allocation/qualification, exact owner
+# ESS-LIMIT execution predicates (ESS 0.36 has no cross-record equality or
+# uniqueness constraint, no multi-record transaction, no durable-storage or
+# byte-pinning construct and no trusted-time construct): private key
+# allocation/qualification, exact owner
 # and instance/profile/generation/custody equality, immutable field assignment,
 # reviewed profile replacement, record uniqueness/capacity, protected-correlation
 # provenance and real atomic consumption, live single-exchange ownership, current

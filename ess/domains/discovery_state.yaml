@@ -382,7 +382,9 @@ events:
       - {name: observation_ref, type: String}
       - {name: state, type: connectors.discovery_state.ResourceObservation.State}
 
-# UNMAPPED implementation predicates: injective host-qualified identity/epoch
+# ESS-LIMIT implementation predicates (ESS 0.36 has no cross-record uniqueness or
+# equality, no multi-record transaction or compare-and-set, no crash-recovery and
+# no trusted-time construct): injective host-qualified identity/epoch
 # allocation; exact canonical scope, instance/operation/source compatibility;
 # trusted fact provenance and native exhaustion/fixed-target equality; no repeat
 # withdrawn incarnation; state-to-public-evidence projection; original clock and

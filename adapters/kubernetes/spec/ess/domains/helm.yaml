@@ -16,11 +16,15 @@ types:
     # release must match ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
     # and be at most 53 bytes (pinned validate_name.go:35,60 in the v4 line and
     # :36,61 in the v3 line). String does not enforce that predicate; the binding
-    # does, before any provider request.
-    # UNMAPPED: whether a release name identifies one release cluster-wide. The
-    # pinned source keys storage objects within a namespace only, and the
-    # all-namespaces selection is a separate admitted scope under the auth
-    # contract. Do not read these coordinates as a global identity.
+    # does, before any provider request. The character-count half of the bound
+    # (at most 53 bytes implies at most 53 characters) is declared.
+    invariants:
+      - release.count: {gte: 1, lte: 53}
+    # A release name identifies a release within one namespace only: the pinned
+    # source keys storage objects within a namespace, and the contract admits no
+    # all-namespaces mode (adapters/kubernetes/contracts/helm/v1alpha1/semantics.md:44-48);
+    # that selection is a separate admitted scope under the auth contract. The
+    # identity is the (namespace, release) pair, never a global one.
   - name: connectors_kubernetes.helm.ReleaseStatus
     kind: enum
     variants: [unknown, deployed, uninstalled, superseded, failed, uninstalling, pending_install, pending_upgrade, pending_rollback]
@@ -40,6 +44,10 @@ types:
       - {name: status, type: connectors_kubernetes.helm.ReleaseStatus}
       - {name: created_at_unix_s, type: "Optional<Integer>"}
       - {name: modified_at_unix_s, type: "Optional<Integer>"}
+    invariants:
+      - any:
+          - missing(source_revision)
+          - source_revision.count <= 512
     # source_secret is the exact object name sh.helm.release.v1.<release>.v<revision>
     # (pinned storage.go:327-328 / :251-252); it is the provenance the observation
     # came from, not a caller-selectable locator. source_revision is the
@@ -65,12 +73,14 @@ types:
     # This model does not encode a single current revision, because the provider
     # does not guarantee one.
     #
-    # UNMAPPED: the relation between a revision and the cluster resources it
-    # manages. The stored body carries a rendered manifest but no resolved
-    # resource identities, and info.resources is populated by a status action
-    # rather than by the storage driver. UNMAPPED: whether an observed collection
-    # of revisions is the complete history — a driver prunes by max history and
-    # the provider's own list is a paged observation of a mutable collection.
+    # DECIDED 2026-09-27: no relation is declared between a revision and the
+    # cluster resources it manages. The stored body carries a rendered manifest but
+    # no resolved resource identities, and info.resources is populated by a status
+    # action rather than by the storage driver, so any relation would be invented.
+    # DECIDED 2026-09-27: an observed collection of revisions is never claimed to be
+    # the complete release history — a driver prunes by max history and the list is
+    # a paged observation of a mutable collection; a page's `complete` covers only
+    # the stored objects it read (semantics.md:70-75).
   - name: connectors_kubernetes.helm.RecordedValueKind
     kind: enum
     variants: [object, array, string, number, boolean, null_value]
@@ -83,6 +93,8 @@ types:
       - {name: path, type: String}
       - {name: kind, type: connectors_kubernetes.helm.RecordedValueKind}
       - {name: value_digest, type: String}
+    invariants:
+      - path.count: {gte: 1, lte: 1024}
     # The safe projection of one entry in the release's recorded values
     # (config, pinned release.go:41 / :31). path is the dotted location, kind is
     # its JSON shape and value_digest is an unsalted SHA-256 over the canonical
@@ -95,17 +107,19 @@ types:
     # of this type that carries one. Unsalted also means the digest confirms a
     # guessed literal offline: it bounds disclosure of an unenumerable value and
     # does not protect a guessable one.
-    # UNMAPPED: how a path reads back. It is a dotted display projection, not
-    # a selector: a recorded key containing a dot or a bracket produces a path
-    # that cannot be parsed back to its location unambiguously.
+    # DECIDED 2026-09-27: path never reads back. It is a dotted display projection,
+    # not a selector: a recorded key containing a dot or a bracket produces a path
+    # that cannot be parsed back to its location unambiguously, so no operation
+    # accepts it as an input location.
     # path is bounded at 1..=1024 bytes, which is the bound the operation's
     # published output schema declares. A node whose path falls outside it is
     # not projected and the page reports itself incomplete; emitting it would
     # produce a result the host rejects, and the host terminates the adapter
     # child on that rejection rather than refusing the call.
-    # UNMAPPED: whether an absent path means unset or defaulted. The stored
-    # config holds only the values supplied at install or upgrade; chart defaults
-    # live in the unread chart, so absence here is not evidence of a default.
+    # DECIDED 2026-09-27: an absent path means only "not among the supplied
+    # values"; it is evidence of neither unset nor defaulted. The stored config
+    # holds only the values supplied at install or upgrade; chart defaults live in
+    # the unread chart.
   - name: connectors_kubernetes.helm.ManifestDocumentProjection
     kind: struct
     fields:
@@ -132,10 +146,11 @@ types:
     # document's exact length. This projection is therefore no stronger than the
     # recorded-value one and in a public chart can be weaker: like value_digest,
     # content_digest confirms a guess offline.
-    # UNMAPPED: the apiVersion, kind, name and namespace of the document. The
-    # stored manifest is YAML and this binding has no YAML reader; extracting
-    # those from lines would be a guess, not a parse, so they are absent rather
-    # than approximated. UNMAPPED: whether the document separator this binding
+    # DECIDED 2026-09-27: the document's apiVersion, kind, name and namespace are
+    # not projected. The stored manifest is YAML and this binding has no YAML
+    # reader; extracting those from lines would be a guess, not a parse, so they
+    # are absent rather than approximated (the code's behaviour today).
+    # DECIDED 2026-09-27: no claim is made that the document separator this binding
     # splits on partitions the manifest exactly as a YAML reader would — a
     # separator inside a block scalar is indistinguishable without a parse, so
     # the projection reports its own splitting, not a document model.

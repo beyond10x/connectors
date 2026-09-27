@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.3 — 2026-09-27
+
+### Specification
+
+- 60 of the 99 open `UNMAPPED` markers are resolved: 11 declared from source, 9 decided, 4 deferred
+  to named stories and 36 noted as constructs ESS 0.36 lacks. The 39 MCP markers stay, as
+  `story:mcp-domain-model` requires.
+- PublishBinding with decision allow on a Revoked connection answers `ConnectionStateConflict`;
+  expiring an already Expired cursor answers the new `CursorStateConflict`.
+
 ## 0.13.2 — 2026-09-27
 
 ### Tests

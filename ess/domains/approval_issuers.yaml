@@ -140,7 +140,10 @@ errors:
   - name: connectors.approval_issuers.KeyStateConflict
     fields:
       - {name: state, type: connectors.approval_issuers.ApprovalSigningKey.State}
-# UNMAPPED: durable custody acknowledgements, purpose-separated private locators,
+# ESS-LIMIT: durable custody acknowledgements, purpose-separated private locators,
 # revision CAS, at-most-one active/candidate, bounded retention, atomic publication
 # plus old-key retirement, trusted caller policy/time, and process lease exclusion
-# require the host binding. No entity here stores a seed or grants approval use.
+# require the host binding. ESS 0.36 has no cross-record constraint (at most one
+# key per state per issuer), no multi-record transaction, no compare-and-set or
+# durable-acknowledgement construct and no trusted-time or process-lease construct.
+# No entity here stores a seed or grants approval use.
