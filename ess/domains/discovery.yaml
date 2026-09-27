@@ -159,6 +159,13 @@ types:
       - {name: max_rows_per_scope, type: Integer}
       - {name: max_concurrent_provider_requests, type: Integer}
       - {name: max_provider_response_bytes, type: Integer}
+    # contracts/discovery/composition.md:51-53: positive limits that may narrow, never
+    # exceed, the 256-scope, 500-row-per-scope and four-request ceilings.
+    invariants:
+      - max_scopes: {gte: 1, lte: 256}
+      - max_rows_per_scope: {gte: 1, lte: 500}
+      - max_concurrent_provider_requests: {gte: 1, lte: 4}
+      - max_provider_response_bytes >= 1
   - name: connectors.discovery.CompositionDeclaration
     kind: struct
     fields:
@@ -167,7 +174,9 @@ types:
       - {name: route_bindings, type: "List<connectors.discovery.InstalledRouteBinding>"}
       - {name: limits, type: connectors.discovery.CompositionLimits}
 
-# UNMAPPED: canonical private scope/membership/authority equality, source and
+# ESS-LIMIT (ESS 0.36 has no cross-record equality, merge/ordering over a list,
+# multi-record transaction, trusted-time or process-identity construct):
+# canonical private scope/membership/authority equality, source and
 # physical cluster identity, provider exhaustion/coherent-list evidence, numeric
 # caps, whole-view merge/retention/order, original clocks/expiry, no false absence,
 # immutable paging/cursor admission, exact incarnation/hidden-target comparison,
@@ -177,10 +186,12 @@ types:
 # CollectionScope is a safe reference shape, not a second authority namespace.
 # ConfiguredSourceIdentity is a private configured authority coordinate, not a
 # globally unique physical-cluster identity or public origin-disclosure schema.
-# UNMAPPED: declaration/profile/source compatibility, URL canonicalization/TLS
+# ESS-LIMIT: declaration/profile/source compatibility, URL canonicalization/TLS
 # trust, adapter-specific recognition inputs/priority/case folding,
 # nullable public recognition/candidate and partition-coordinate codecs,
 # current admission and candidate support. These new values execute no recognizer.
+# ESS 0.36 has no canonicalization or TLS construct, no case-insensitive comparison
+# (value-expressions E7, not implemented) and no required-null codec rule.
 # Collection/ResourceObservation ownership and lifecycle are selected and modeled
 # in connectors.discovery_state. Fixed mediated routing is a value on Connection;
 # CompositionDeclaration is immutable admitted configuration, not a database
@@ -188,8 +199,11 @@ types:
 # This is distinct from the gateway idempotency.RouteBinding fingerprint value.
 # Optional projects to omission, not required-null public JSON; Timestamp and
 # SnapshotSummary are semantic shapes, not complete discovery payload codecs.
-# UNMAPPED implementation predicates: resolve composition instance_id values to
+# ESS-LIMIT implementation predicates: resolve composition instance_id values to
 # existing ServiceConfiguration records and compare exact revisions; unique
 # participants/installed bindings, aggregate positive ceilings, current live-port
 # compatibility; direct/via/parent/route option agreement and same-target evidence
-# replacement. ESS value fields are not executable foreign-key or grant checks.
+# replacement. The positive ceilings are declared on CompositionLimits.
+# ESS value fields are not executable foreign-key or grant checks:
+# an ESS 0.36 relation joins entities only, so a struct value cannot reference a
+# ServiceConfiguration record, and there is no distinct-members predicate.

@@ -86,9 +86,11 @@ types:
 # Binding/lease/terminal are values; SessionId is opaque, not a wire-format mandate.
 # Connection now exists in connectors.auth_bindings. This supervisor keeps its
 # existing embedded Binding coordinates; it declares no flat reference carrier.
-# UNMAPPED: a future selected session binding must join its one Connection and
+# DEFERRED: a future selected session binding must join its one Connection and
 # establishment authority, whose persistence model remains unselected. Sessions
 # are outside the current three-adapter model milestone; no stub edge is implied.
+# Owned by a story to be filed (story:session-connection-binding, not yet in the
+# store on 2026-09-27).
 # Stream and endpoint enforcement records are transient binding data; this model
 # does not invent persistence ownership or a guessed endpoint cardinality.
 entities:
@@ -173,7 +175,11 @@ errors:
 # authenticated lease. PermitData and RenewDataLease additionally require the
 # Session already be Ready. A denial never leaves a session renewable.
 # Its derivation, lease lifetime <= 2000 ms including uncertainty, delay/replay
-# rejection, and atomic renewal/revocation are UNMAPPED executable obligations.
+# rejection, and atomic renewal/revocation are executable obligations.
+# ESS-LIMIT: the lifetime bound is effective_expiry - issued_at, arithmetic over
+# two fields, and the derivation, replay rejection and atomic renewal need a
+# trusted clock and a transaction; ESS 0.36 has no arithmetic in predicates, no
+# trusted-time and no multi-record transaction construct.
 # Any non-allow decision in readiness/data/renewal atomically begins Closing;
 # no separately queued BeginClose is required before renewal becomes impossible.
 # GateDecision.expired means live DATA-LEASE expiry and fixes lease_expired.
@@ -452,7 +458,9 @@ views:
   - name: terminal
     type: Optional<connectors.sessions.TerminalFact>
 
-# UNMAPPED: field assignment and immutable first-terminal retention; correlated
+# ESS-LIMIT (ESS 0.36 has no timer/scheduler, buffer, transport or resource-
+# accounting construct and no sequential-trace execution): field assignment and
+# immutable first-terminal retention; correlated
 # request cancellation/outcome accounting; actual gate cutoff on all direct/relay
 # or device paths; expiring authority issuance/translation/anti-replay; timer and
 # scheduler execution; zero data drain and bounded lower-layer buffers; teardown,

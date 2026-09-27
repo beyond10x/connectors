@@ -14,7 +14,9 @@ types:
       - {name: name, type: String}
       - {name: subresource, type: String}
 
-# UNMAPPED: exact tuple normalization/equality, admission and permission checks.
+# ESS-LIMIT: exact tuple normalization/equality, admission and permission checks.
+# ESS 0.36 has no normalization construct and no cross-record or provider-call
+# construct for an admission or permission check.
 # The adapter binds this typed tuple to the private target_ref under binding_ref
 # in shared PermissionTarget observations; neither reference is a caller grant.
 # Public authorization.target stays this exact tuple under its selected profile;

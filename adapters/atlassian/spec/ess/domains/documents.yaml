@@ -6,7 +6,10 @@ summary: Atlassian-owned native document representation and membership vocabular
 types:
   - name: connectors_atlassian.documents.DocumentRepresentation
     kind: enum
-    variants: [confluence_storage, jira_fields_v2]
+    # Public spellings: adapters/atlassian/contracts/documents/v1alpha1/semantics.md:12-13.
+    variants:
+      - {name: confluence_storage, wire: confluence.storage}
+      - {name: jira_fields_v2, wire: jira.fields.v2}
   - name: connectors_atlassian.documents.DocumentScopeKind
     kind: enum
     variants: [confluence_space, jira_project]
@@ -16,12 +19,19 @@ types:
       - {name: cql, type: String}
       - {name: limit, type: Integer}
       - {name: max_body_bytes, type: Integer}
+    # adapters/atlassian/contracts/documents/v1alpha1/semantics.md:190: limit 1–100.
+    invariants:
+      - limit: {gte: 1, lte: 100}
 
-# UNMAPPED: profile compatibility and public spelling (confluence.storage versus
-# jira.fields.v2), full native payload schemas, scoped collection predicates,
-# current canonical identity/membership, query grammar and byte accounting.
+# The public spelling (confluence.storage versus jira.fields.v2) is declared as
+# the representation variants' wire names above.
+# ESS-LIMIT: profile compatibility, full native payload schemas, scoped collection
+# predicates, current canonical identity/membership, query grammar, the 8 KiB CQL
+# bound and byte accounting. ESS 0.36 has no cross-record read in a type
+# invariant, no grammar/parser construct and no UTF-8 byte-length predicate.
 # Shared DocumentReadSelection carries an opaque representation identifier;
 # this vocabulary does not advertise implemented codecs or new declaration fields.
-# UNMAPPED: the structural CQL grammar and original-span/scope rewriting in
+# ESS-LIMIT: the structural CQL grammar and original-span/scope rewriting in
 # adapters/atlassian/contracts/documents/v1alpha1/cql.md, provider field/function interpretation,
 # continuation lineage, bounded state and aggregate source/page-result accounting.
+# ESS 0.36 has no grammar/rewriting construct and no cross-record accounting.
