@@ -284,6 +284,9 @@ fn concurrent_finalization_has_one_immutable_winner_and_exact_retry() {
                 scope.spawn(move || {
                     let mut value = final_value();
                     value.observation_id = Uuid::from_u128(100 + index);
+                    crate::local::metadata::set_lifecycle_lock_wait(
+                        crate::local::metadata::CONTENDED_LOCK_WAIT,
+                    );
                     barrier.wait();
                     (value.clone(), store.append(reference, &value))
                 })
@@ -372,24 +375,13 @@ fn capacity_is_atomic_per_instance_without_eviction_or_append_restriction() {
                 let barrier = barrier.clone();
                 let store = &store;
                 scope.spawn(move || {
+                    // Eight threads queue for four slots on one lifecycle lock; the
+                    // wait each is allowed is the test's, not a loaded scheduler's.
+                    crate::local::metadata::set_lifecycle_lock_wait(
+                        crate::local::metadata::CONTENDED_LOCK_WAIT,
+                    );
                     barrier.wait();
-                    // Eight threads contend for four slots against one SQLite file. This
-                    // test asserts that capacity is atomic, not how the store behaves when
-                    // its busy timeout is exhausted — and under a loaded machine running
-                    // the rest of the suite beside it, a thread can exhaust that timeout
-                    // and return MetadataUnavailable, which is neither of the two answers
-                    // capacity has. Retry that one failure mode so the assertion below
-                    // measures what it is about. See story:host-suite-load-sensitivity.
-                    let mut attempt = 0;
-                    loop {
-                        match store.anchor(&anchor()) {
-                            Err(Failure::MetadataUnavailable) if attempt < 16 => {
-                                attempt += 1;
-                                std::thread::sleep(Duration::from_millis(50));
-                            }
-                            outcome => break outcome,
-                        }
-                    }
+                    store.anchor(&anchor())
                 })
             })
             .collect();
@@ -845,11 +837,13 @@ fn recovering_append_never_substitutes_a_different_final_observation() {
             _ => unreachable!(),
         }
         store.appends.lock().unwrap().clear();
+        let start = Instant::now();
         assert_eq!(
-            store.append_recovering(
+            store.append_recovering_with_now(
                 &reference,
                 &changed,
-                Instant::now() + Duration::from_secs(60)
+                start + Duration::from_secs(60),
+                || start,
             ),
             Err(Failure::Conflict)
         );
@@ -946,11 +940,13 @@ fn recovering_append_requires_a_readable_exact_original_anchor() {
     drop(physical);
     store.appends.lock().unwrap().clear();
     store.reads.store(0, Ordering::SeqCst);
+    let start = Instant::now();
     assert_eq!(
-        store.append_recovering(
+        store.append_recovering_with_now(
             &reference,
             &final_value(),
-            Instant::now() + Duration::from_secs(60)
+            start + Duration::from_secs(60),
+            || start,
         ),
         Err(Failure::MetadataUnavailable)
     );

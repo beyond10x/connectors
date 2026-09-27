@@ -736,6 +736,9 @@ fn concurrent_reference_and_attempt_spend_produce_one_receipt() {
                     let s = &s;
                     let p = &p;
                     scope.spawn(move || {
+                        crate::local::metadata::set_lifecycle_lock_wait(
+                            crate::local::metadata::CONTENDED_LOCK_WAIT,
+                        );
                         barrier.wait();
                         store.spend(prepared, e, s, p)
                     })
@@ -908,10 +911,16 @@ fn concurrent_substituted_reference_cannot_rebind_one_attempt() {
     let barrier = Barrier::new(2);
     let results = std::thread::scope(|scope| {
         let good = scope.spawn(|| {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             barrier.wait();
             store.spend(&prepared, &e, &s, &p)
         });
         let substituted = scope.spawn(|| {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             barrier.wait();
             store.spend(&prepared, &other, &s, &p)
         });

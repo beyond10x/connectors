@@ -461,6 +461,9 @@ fn concurrent_observations_replay_current_clock_without_losing_a_floor() {
         let reference = reference.clone();
         let barrier = Arc::clone(&barrier);
         workers.push(std::thread::spawn(move || {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             barrier.wait();
             Registry::with_system_clock(&path)
                 .describe(
@@ -692,15 +695,24 @@ fn concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence() {
         let a = Registry::new(root.path());
         let start = barrier.clone();
         let publish = std::thread::spawn(move || {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             start.wait();
             a.publish(stored, NOW)
         });
         let b = Registry::new(root.path());
         let start = barrier.clone();
         let dispatch = std::thread::spawn(move || {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             start.wait();
             b.dispatch_read(captured, NOW)
         });
+        crate::local::metadata::set_lifecycle_lock_wait(
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        );
         barrier.wait();
         registry
             .revoke(
@@ -1054,6 +1066,9 @@ fn competing_repairs_have_one_winner_and_old_dispatch_is_fenced() {
             let path = root.path().to_owned();
             let barrier = barrier.clone();
             std::thread::spawn(move || {
+                crate::local::metadata::set_lifecycle_lock_wait(
+                    crate::local::metadata::CONTENDED_LOCK_WAIT,
+                );
                 barrier.wait();
                 Registry::new(&path).publish(candidate, NOW + 2)
             })
