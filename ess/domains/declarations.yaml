@@ -193,6 +193,9 @@ commands:
         creates: connectors.declarations.ServiceConfiguration
         instance: instance_id
         emits: [connectors.declarations.ServiceConfigurationRecorded]
+        payload:
+          connectors.declarations.ServiceConfigurationRecorded:
+            instance_id: input.instance_id
         sets:
           adapter_id: input.adapter_id
           revision: input.revision
@@ -206,6 +209,10 @@ commands:
         moves: connectors.declarations.ServiceConfiguration.advance_registry_epoch
         instance: instance_id
         emits: [connectors.declarations.RegistryEpochAdvanced]
+        payload:
+          connectors.declarations.RegistryEpochAdvanced:
+            instance_id: input.instance_id
+            registry_epoch: input.registry_epoch
         sets:
           registry_epoch: input.registry_epoch
 

@@ -154,6 +154,9 @@ commands:
         creates: connectors.discovery_state.DiscoveryCollection
         instance: collection_ref
         emits: [connectors.discovery_state.CollectionAllocated]
+        payload:
+          connectors.discovery_state.CollectionAllocated:
+            collection_ref: {generated: true}
       - name: refused
         error: connectors.discovery_state.DecisionUnavailable
 
@@ -172,6 +175,11 @@ commands:
         moves: connectors.discovery_state.DiscoveryCollection.publish
         instance: collection_ref
         emits: [connectors.discovery_state.ViewPublished]
+        payload:
+          connectors.discovery_state.ViewPublished:
+            collection_ref: input.collection_ref
+            attempt_ref: input.attempt_ref
+            generation: {generated: true}
       - name: refused
         error: connectors.discovery_state.DecisionUnavailable
       - name: acknowledgement-unknown
@@ -192,6 +200,11 @@ commands:
       - name: current-commit-observed
         when: decision == allow
         emits: [connectors.discovery_state.PublicationObserved]
+        payload:
+          connectors.discovery_state.PublicationObserved:
+            collection_ref: input.collection_ref
+            attempt_ref: input.attempt_ref
+            generation: {generated: true}
       - name: unavailable
         error: connectors.discovery_state.DecisionUnavailable
     # Read-only owner observation; no authoritative not-committed inference from
@@ -208,6 +221,9 @@ commands:
         moves: connectors.discovery_state.DiscoveryCollection.retire_view
         instance: collection_ref
         emits: [connectors.discovery_state.ViewRetired]
+        payload:
+          connectors.discovery_state.ViewRetired:
+            collection_ref: input.collection_ref
       - name: refused
         error: connectors.discovery_state.DecisionUnavailable
       - name: wrong-state
@@ -225,6 +241,9 @@ commands:
         moves: connectors.discovery_state.DiscoveryCollection.retire_collection
         instance: collection_ref
         emits: [connectors.discovery_state.CollectionRetired]
+        payload:
+          connectors.discovery_state.CollectionRetired:
+            collection_ref: input.collection_ref
       - name: refused
         error: connectors.discovery_state.DecisionUnavailable
       - name: wrong-state
@@ -249,6 +268,10 @@ commands:
         creates: connectors.discovery_state.ResourceObservation
         instance: observation_ref
         emits: [connectors.discovery_state.ObservationChanged]
+        payload:
+          connectors.discovery_state.ObservationChanged:
+            observation_ref: {generated: true}
+            state: {generated: true}
       - name: refused
         error: connectors.discovery_state.DecisionUnavailable
 
@@ -261,6 +284,10 @@ commands:
         moves: connectors.discovery_state.ResourceObservation.observe_equal
         instance: observation_ref
         emits: [connectors.discovery_state.ObservationChanged]
+        payload:
+          connectors.discovery_state.ObservationChanged:
+            observation_ref: input.observation_ref
+            state: {generated: true}
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict
@@ -274,6 +301,10 @@ commands:
         moves: connectors.discovery_state.ResourceObservation.retain_stale
         instance: observation_ref
         emits: [connectors.discovery_state.ObservationChanged]
+        payload:
+          connectors.discovery_state.ObservationChanged:
+            observation_ref: input.observation_ref
+            state: {generated: true}
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict
@@ -287,6 +318,10 @@ commands:
         moves: connectors.discovery_state.ResourceObservation.withdraw
         instance: observation_ref
         emits: [connectors.discovery_state.ObservationChanged]
+        payload:
+          connectors.discovery_state.ObservationChanged:
+            observation_ref: input.observation_ref
+            state: {generated: true}
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict
@@ -300,6 +335,10 @@ commands:
         moves: connectors.discovery_state.ResourceObservation.retire
         instance: observation_ref
         emits: [connectors.discovery_state.ObservationChanged]
+        payload:
+          connectors.discovery_state.ObservationChanged:
+            observation_ref: input.observation_ref
+            state: {generated: true}
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict

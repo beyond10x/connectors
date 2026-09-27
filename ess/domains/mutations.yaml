@@ -156,6 +156,10 @@ commands:
         creates: connectors.mutations.AttemptRecord
         instance: attempt_id
         emits: [connectors.mutations.AttemptPrepared]
+        payload:
+          connectors.mutations.AttemptPrepared:
+            attempt_id: {generated: true}
+            approval_mode: input.approval_mode
         sets:
           instance_id: input.instance_id
           request_id: input.request_id
@@ -179,6 +183,9 @@ commands:
         moves: connectors.mutations.AttemptRecord.open_dispatch
         instance: attempt_id
         emits: [connectors.mutations.DispatchOpened]
+        payload:
+          connectors.mutations.DispatchOpened:
+            attempt_id: input.attempt_id
       - name: wrong-state
         wrong_state: true
         error: connectors.mutations.AttemptStateConflict
@@ -194,6 +201,9 @@ commands:
         moves: connectors.mutations.AttemptRecord.abort
         instance: attempt_id
         emits: [connectors.mutations.AttemptAborted]
+        payload:
+          connectors.mutations.AttemptAborted:
+            attempt_id: input.attempt_id
         sets:
           settled_at: input.settled_at
           terminal_result_json: input.terminal_result_json
@@ -212,6 +222,9 @@ commands:
         moves: connectors.mutations.AttemptRecord.complete
         instance: attempt_id
         emits: [connectors.mutations.AttemptCompleted]
+        payload:
+          connectors.mutations.AttemptCompleted:
+            attempt_id: input.attempt_id
         sets:
           settled_at: input.settled_at
           terminal_result_json: input.terminal_result_json
@@ -230,6 +243,9 @@ commands:
         moves: connectors.mutations.AttemptRecord.refuse
         instance: attempt_id
         emits: [connectors.mutations.AttemptRefused]
+        payload:
+          connectors.mutations.AttemptRefused:
+            attempt_id: input.attempt_id
         sets:
           settled_at: input.settled_at
           terminal_result_json: input.terminal_result_json
@@ -247,6 +263,9 @@ commands:
         moves: connectors.mutations.AttemptRecord.lose_outcome
         instance: attempt_id
         emits: [connectors.mutations.AttemptIndeterminate]
+        payload:
+          connectors.mutations.AttemptIndeterminate:
+            attempt_id: input.attempt_id
         sets:
           terminal_result_json: input.terminal_result_json
       - name: wrong-state

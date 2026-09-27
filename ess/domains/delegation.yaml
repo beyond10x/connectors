@@ -215,6 +215,9 @@ commands:
         creates: connectors.delegation.ApprovalRedemption
         instance: receipt_id
         emits: [connectors.delegation.ApprovalRedemptionRecorded]
+        payload:
+          connectors.delegation.ApprovalRedemptionRecorded:
+            receipt_id: input.receipt_id
         sets:
           instance_id: input.instance_id
           issuer: input.issuer
