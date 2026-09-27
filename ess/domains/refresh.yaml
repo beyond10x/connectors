@@ -115,6 +115,9 @@ commands:
         creates: connectors.refresh.RefreshAttempt
         instance: attempt_id
         emits: [connectors.refresh.RefreshReserved]
+        payload:
+          connectors.refresh.RefreshReserved:
+            attempt_id: {generated: true}
       - name: source-unavailable
         error: connectors.refresh.SourceUnavailable
   - name: connectors.refresh.AuthorizeExchange
@@ -133,6 +136,9 @@ commands:
         moves: connectors.refresh.RefreshAttempt.authorize
         instance: attempt_id
         emits: [connectors.refresh.ExchangeAuthorized]
+        payload:
+          connectors.refresh.ExchangeAuthorized:
+            attempt_id: input.attempt_id
       - name: ownership-conflict
         when: decision == ownership_conflict
         error: connectors.refresh.OwnershipConflict
@@ -151,6 +157,9 @@ commands:
         moves: connectors.refresh.RefreshAttempt.fence
         instance: attempt_id
         emits: [connectors.refresh.ReservedOwnerFenced]
+        payload:
+          connectors.refresh.ReservedOwnerFenced:
+            attempt_id: input.attempt_id
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict
@@ -169,6 +178,10 @@ commands:
         moves: connectors.refresh.RefreshAttempt.store_response
         instance: attempt_id
         emits: [connectors.refresh.RefreshResponseStored]
+        payload:
+          connectors.refresh.RefreshResponseStored:
+            attempt_id: input.attempt_id
+            candidate_generation_id: input.candidate_generation_id
       - name: ownership-conflict
         error: connectors.refresh.OwnershipConflict
       - name: wrong-state
@@ -185,6 +198,9 @@ commands:
         moves: connectors.refresh.RefreshAttempt.quarantine
         instance: attempt_id
         emits: [connectors.refresh.RefreshUncertain]
+        payload:
+          connectors.refresh.RefreshUncertain:
+            attempt_id: input.attempt_id
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict
@@ -200,6 +216,9 @@ commands:
         moves: connectors.refresh.RefreshAttempt.recover_response
         instance: attempt_id
         emits: [connectors.refresh.StoredResponseRecovered]
+        payload:
+          connectors.refresh.StoredResponseRecovered:
+            attempt_id: input.attempt_id
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict
@@ -219,6 +238,10 @@ commands:
         moves: connectors.refresh.RefreshAttempt.publish
         instance: attempt_id
         emits: [connectors.refresh.RefreshPublished]
+        payload:
+          connectors.refresh.RefreshPublished:
+            attempt_id: input.attempt_id
+            candidate_generation_id: input.candidate_generation_id
       - name: ownership-conflict
         when: decision == ownership_conflict
         error: connectors.refresh.OwnershipConflict
@@ -237,6 +260,9 @@ commands:
         moves: connectors.refresh.RefreshAttempt.discard
         instance: attempt_id
         emits: [connectors.refresh.RefreshCandidateDiscarded]
+        payload:
+          connectors.refresh.RefreshCandidateDiscarded:
+            attempt_id: input.attempt_id
       - name: wrong-state
         wrong_state: true
         error: connectors.refresh.RefreshStateConflict
