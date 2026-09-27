@@ -277,6 +277,9 @@ fn concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation() 
                 let mut c = candidate.clone();
                 c.request_id = format!("request-{index}");
                 scope.spawn(move || {
+                    crate::local::metadata::set_lifecycle_lock_wait(
+                        crate::local::metadata::CONTENDED_LOCK_WAIT,
+                    );
                     barrier.wait();
                     store.prepare(&c).unwrap()
                 })

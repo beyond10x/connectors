@@ -186,9 +186,7 @@ impl Store {
         })
     }
 
-    /// Recover acknowledgement of this exact live observation only. No read can
-    /// reconstruct admission or substitute another observation after a crash.
-    /// Extra calls check both deadlines; each retains the metadata port's wait.
+    #[cfg(test)]
     pub(crate) fn append_recovering(
         &self,
         reference: &Reference,
@@ -198,7 +196,11 @@ impl Store {
         self.append_recovering_with_now(reference, observation, until, Instant::now)
     }
 
-    fn append_recovering_with_now(
+    /// Recover acknowledgement of this exact live observation only. No read can
+    /// reconstruct admission or substitute another observation after a crash.
+    /// Extra calls check both deadlines; each retains the metadata port's wait.
+    /// `now` is the clock both deadlines are read on; the owner passes the real one.
+    pub(crate) fn append_recovering_with_now(
         &self,
         reference: &Reference,
         observation: &FinalObservation,

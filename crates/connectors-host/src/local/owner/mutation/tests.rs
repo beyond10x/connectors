@@ -2,7 +2,50 @@ use super::*;
 use std::{sync::atomic::Ordering, time::Duration};
 
 #[test]
-#[ignore = "run alone by the connectors-build gate: its 250 ms recovery window is a product bound"]
+fn production_finish_audit_recovers_a_lost_acknowledgement_on_the_real_clock() {
+    let (_root, store) = audit::tests::fixture();
+    let request = Uuid::new_v4().to_string();
+    let mut facts = audit::tests::anchor();
+    facts.request_id = Some(request.clone());
+    let audit::Acknowledgement::Execution(admission) = store.anchor(&facts).unwrap() else {
+        panic!("missing audit admission");
+    };
+    let reference = store.confirm(admission, &facts).unwrap();
+    let mut value = Delivery {
+        request_id: request.clone(),
+        result: Some(serde_json::json!({"retained":"native result"})),
+        error: None,
+        mutation: MutationObservation {
+            classification: Classification::Applied,
+            attempt: Some(Attempt {
+                instance: "alpha".into(),
+                id: Uuid::new_v4(),
+            }),
+            original_request_id: Some(request),
+            replayed: false,
+            cause: Some(Cause {
+                code: connectors_core::ErrorCode::Unavailable,
+                stage: Stage::Response,
+            }),
+        },
+        source_audit: SourceAudit {
+            instance: "alpha".into(),
+            audit_ref: None,
+            audit_status: AuditStatus::Unavailable,
+        },
+    };
+    value.validate().unwrap();
+    store.fault.store(2, Ordering::SeqCst);
+    finish_audit(
+        &store,
+        reference,
+        &mut value,
+        Instant::now() + Duration::from_secs(60),
+    );
+    assert_eq!(value.source_audit.audit_status, AuditStatus::Complete);
+}
+
+#[test]
 fn final_audit_recovery_preserves_every_live_business_result() {
     for (classification, applied_error) in [
         (Classification::Applied, false),
@@ -64,12 +107,15 @@ fn final_audit_recovery_preserves_every_live_business_result() {
             let mut before = serde_json::to_value(&value).unwrap();
             before.as_object_mut().unwrap().remove("source_audit");
             store.fault.store(fault, Ordering::SeqCst);
+            // A frozen clock: the live cases keep their whole recovery window
+            // however slowly storage runs, and the expired ones start past it.
+            let start = Instant::now();
             let until = if expired {
-                Instant::now()
+                start
             } else {
-                Instant::now() + Duration::from_secs(1)
+                start + Duration::from_secs(1)
             };
-            finish_audit(&store, reference.clone(), &mut value, until);
+            finish_audit_with_now(&store, reference.clone(), &mut value, until, || start);
             value.validate().unwrap();
             assert_eq!(value.source_audit.audit_status, expected);
             assert_eq!(

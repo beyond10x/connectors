@@ -1,4 +1,4 @@
-format: ess/13
+format: ess/14
 system: connectors
 # ESS model version; implemented v1alpha1 and proposed v1alpha2 wire versions are independent.
 version: v1

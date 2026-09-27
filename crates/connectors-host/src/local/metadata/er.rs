@@ -3913,4 +3913,97 @@ mod tests {
         assert_eq!(terminal.terminal.lifecycle_state, "Completed");
         assert_eq!(terminal.history.records.len(), 2);
     }
+
+    // `ExpireConnectionListCursor` enters Expired (`ess/domains/cli.yaml`). The
+    // listing path deletes an expired row again before reading it, so a cursor
+    // recorded as still Active is invisible to every registry case; only the
+    // recorded subject shows whether the transition's target was honoured.
+    #[test]
+    fn cursor_expiry_is_recorded_in_the_expired_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let cursor_id = "0b6f7f1c-4d0e-4a55-9a53-2d4f3c1e8a10";
+        let active = RowImage {
+            entity: "connectors.cli.ConnectionListCursor".into(),
+            id: format!("s:{cursor_id}"),
+            revision: 1,
+            lifecycle_state: "Active".into(),
+            fields: json!({
+                "cursor_id": cursor_id,
+                "instance_id": "instance",
+                "adapter_id": "adapter",
+                "configuration_revision": "configuration",
+                "registry_epoch": 7,
+                "last_connection_ref": "connection",
+                "page_limit": 2,
+                "expires_at": "2026-09-17T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (mut authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![active.clone()]).unwrap();
+        let mut expired = active.clone();
+        expired.lifecycle_state = "Expired".into();
+        expired.revision = 2;
+        transition(
+            &authority,
+            &active,
+            &expired,
+            "connectors.cli.ExpireConnectionListCursor",
+        )
+        .unwrap();
+        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        let terminal = authority
+            .baseline
+            .get(&(active.entity.clone(), active.id.clone()))
+            .unwrap();
+        assert_eq!(terminal.lifecycle_state, "Expired");
+    }
+
+    // `PublishKey` moves a Candidate key to Active (`ess/domains/approval_issuers.yaml`).
+    // The key journeys that publish one need a qualified Secret Service and are
+    // ignored by default, so this case holds the recorded transition without custody.
+    #[test]
+    fn key_publication_is_recorded_in_the_active_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let key_id = "7a3d52c4-1f0b-4b8e-9d0a-5e2c6f1b3a47";
+        let candidate = RowImage {
+            entity: "connectors.approval_issuers.ApprovalSigningKey".into(),
+            id: format!("s:{key_id}"),
+            revision: 1,
+            lifecycle_state: "Candidate".into(),
+            fields: json!({
+                "key_id": key_id,
+                "issuer_id": "2d9e6b1a-8c4f-4e7a-b3d5-0f1a2c3e4b5d",
+                "public_key": "public-key",
+                "not_before_unix_ms": 0,
+                "not_after_unix_ms": 9_007_199_254_740_991_i64,
+                "material_version": "c1e4a7b2-5d8f-4a3c-9e6b-1f2d3c4b5a69",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (mut authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![candidate.clone()]).unwrap();
+        let mut active = candidate.clone();
+        active.lifecycle_state = "Active".into();
+        active.revision = 2;
+        transition(
+            &authority,
+            &candidate,
+            &active,
+            "connectors.approval_issuers.PublishKey",
+        )
+        .unwrap();
+        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        let terminal = authority
+            .baseline
+            .get(&(candidate.entity.clone(), candidate.id.clone()))
+            .unwrap();
+        assert_eq!(terminal.lifecycle_state, "Active");
+    }
 }

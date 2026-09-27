@@ -5,7 +5,7 @@ members = ["crates/*", "adapters/catalog", "adapters/kubernetes", "adapters/sql"
 exclude = ["apps/connectors-cli-contract"]
 
 [workspace.package]
-version = "0.13.0"
+version = "0.13.1"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -22,11 +22,11 @@ entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "
 entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.23.0" }
 entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.23.0" }
 eventlog-core = { git = "https://github.com/beyond10x/eventlog", rev = "70096af8c231fedf6d2206c97ce2940b99aecdb8" }
-ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.35.0" }
-ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.35.0" }
-ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.35.0" }
-ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.35.0" }
-ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.35.0" }
+ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.36.0" }
+ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.36.0" }
+ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.36.0" }
+ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.36.0" }
+ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.36.0" }
 async-trait = "0.1"
 axum = "0.8.9"
 base64 = "0.22"

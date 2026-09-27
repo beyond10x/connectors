@@ -175,6 +175,13 @@ commands:
         moves: connectors.discovery_state.DiscoveryCollection.publish
         instance: collection_ref
         emits: [connectors.discovery_state.ViewPublished]
+        # contracts/discovery/resources/v1alpha1/semantics.md:202-206 and :264-266:
+        # publication allocates the next generation (40 -> 41) and changes the
+        # publication revision. The payload generation is the value after the
+        # increment; {subject: last_generation} reads it before, so it stays generated.
+        sets:
+          last_generation: {increment: 1}
+          publication_revision: {generated: true}
         payload:
           connectors.discovery_state.ViewPublished:
             collection_ref: input.collection_ref
@@ -221,6 +228,8 @@ commands:
         moves: connectors.discovery_state.DiscoveryCollection.retire_view
         instance: collection_ref
         emits: [connectors.discovery_state.ViewRetired]
+        # semantics.md:203: the revision changes on view retirement.
+        sets: {publication_revision: {generated: true}}
         payload:
           connectors.discovery_state.ViewRetired:
             collection_ref: input.collection_ref
@@ -241,6 +250,8 @@ commands:
         moves: connectors.discovery_state.DiscoveryCollection.retire_collection
         instance: collection_ref
         emits: [connectors.discovery_state.CollectionRetired]
+        # semantics.md:203: the revision changes on collection retirement.
+        sets: {publication_revision: {generated: true}}
         payload:
           connectors.discovery_state.CollectionRetired:
             collection_ref: input.collection_ref
@@ -271,7 +282,7 @@ commands:
         payload:
           connectors.discovery_state.ObservationChanged:
             observation_ref: {generated: true}
-            state: {generated: true}
+            state: Observed
       - name: refused
         error: connectors.discovery_state.DecisionUnavailable
 
@@ -287,7 +298,7 @@ commands:
         payload:
           connectors.discovery_state.ObservationChanged:
             observation_ref: input.observation_ref
-            state: {generated: true}
+            state: Observed
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict
@@ -304,7 +315,7 @@ commands:
         payload:
           connectors.discovery_state.ObservationChanged:
             observation_ref: input.observation_ref
-            state: {generated: true}
+            state: Stale
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict
@@ -321,7 +332,7 @@ commands:
         payload:
           connectors.discovery_state.ObservationChanged:
             observation_ref: input.observation_ref
-            state: {generated: true}
+            state: Withdrawn
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict
@@ -338,7 +349,7 @@ commands:
         payload:
           connectors.discovery_state.ObservationChanged:
             observation_ref: input.observation_ref
-            state: {generated: true}
+            state: Retired
       - name: wrong-state
         wrong_state: true
         error: connectors.discovery_state.ObservationStateConflict
@@ -364,6 +375,9 @@ events:
     fields:
       - {name: collection_ref, type: String}
   - name: connectors.discovery_state.ObservationChanged
+    # Each emitting outcome names its state as the literal `to` of the transition it
+    # takes (semantics.md:189 lists the classifications). Read from this lifecycle,
+    # not from an implementation: no runtime emits this event yet.
     fields:
       - {name: observation_ref, type: String}
       - {name: state, type: connectors.discovery_state.ResourceObservation.State}

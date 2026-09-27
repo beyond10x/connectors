@@ -375,7 +375,7 @@ impl Lease {
             }
         }
         let file = fs::private_file_at(&directory, OsStr::new(LOCK))?;
-        let until = Instant::now() + Duration::from_secs(2);
+        let until = Instant::now() + super::metadata::lifecycle_lock_wait();
         loop {
             // SAFETY: a live owned descriptor; flock is released at close.
             let result = unsafe {
