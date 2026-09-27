@@ -27,11 +27,25 @@ types:
       - {name: id, type: String}
       - {name: kind, type: connectors_kubernetes.discovery.PartitionKind}
       - {name: namespace, type: "Optional<String>"}
+    # adapters/kubernetes/contracts/discovery/v1alpha1/semantics.md:13-15: namespace
+    # mode carries the namespace; all-namespaces (cluster) mode carries none.
+    invariants:
+      - any:
+          - not: {kind: namespace}
+          - defined(namespace)
+      - any:
+          - not: {kind: cluster}
+          - missing(namespace)
 
-# UNMAPPED: exact Argo name OR app_name recognition (legacy aliases do not select
+# ESS-LIMIT: exact Argo name OR app_name recognition (legacy aliases do not select
 # Argo), monitoring priority/case folding, nullable public recognition/candidate,
 # current admission and candidate support. These values execute no recognizer.
+# ESS 0.36 has no derived-value expression that computes a recognition from the
+# input, no case-insensitive comparison (value-expressions E7, not implemented) and
+# no required-null codec rule.
 # The adapter projects these closed identifiers and coordinates into the shared
 # observation/coverage envelope. The shared model does not import this model.
-# UNMAPPED: required-null public partition codec, id/namespace correspondence,
-# partition completeness, and exact current binding/profile compatibility.
+# ESS-LIMIT: the required-null public partition codec (Optional projects to
+# omission), id/namespace correspondence, partition completeness, and exact current
+# binding/profile compatibility. ESS 0.36 has no required-null codec rule, no
+# derived-value expression and no cross-record read.

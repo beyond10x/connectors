@@ -12,11 +12,17 @@ types:
       - {name: name, type: String}
       - {name: uid, type: String}
       - {name: resource_version, type: String}
-    # UNMAPPED: the selected built-in Deployment conditional binding requires
-    # canonical positive ASCII decimal resource_version in 1..18446744073709551615.
-    # Reject zero/aliases/noncanonical/overflow before key inspection or dispatch;
-    # copy accepted bytes unchanged. String does not enforce this provider-specific
-    # predicate. It must not be generalized to other Kubernetes API bindings.
+    # The selected built-in Deployment conditional binding requires canonical
+    # positive ASCII decimal resource_version in 1..18446744073709551615: at most 20
+    # digits and no leading zero, which also rejects zero.
+    invariants:
+      - resource_version.count: {gte: 1, lte: 20}
+      - not: {resource_version: {starts_with: "0"}}
+    # DEFERRED: the digits-only rule is expressible in ESS 0.36 (a String type with alphabet "0123456789") but
+    # synthesis refuses a type invariant no view holds (ESS-SYNTH-013); story:identity-views-for-witnessing owns it. ESS-LIMIT: the 18446744073709551615 overflow bound and alias rejection need a numeric-text predicate, which ESS 0.36
+    # does not have. Reject before key inspection or dispatch and copy accepted bytes
+    # unchanged. This provider-specific predicate must not be generalized to other
+    # Kubernetes API bindings.
   - name: connectors_kubernetes.mutations.PreparedDeploymentRestart
     kind: struct
     fields:
@@ -24,7 +30,9 @@ types:
       - {name: restart_marker, type: String}
     # Private candidate preparation. Marker is a once-generated host epoch-ms
     # decimal annotation, not caller input, provider UID, authority or host key.
-    # UNMAPPED: trusted source qualification, exact provider preconditions,
+    # ESS-LIMIT: trusted source qualification, exact provider preconditions,
     # marker generation/fixity, immutable body associated with the winning attempt,
     # validated patch-accepted proof, no-effect evidence and F02 replay admission.
+    # ESS 0.36 has no evidence-provenance, trusted-time, byte-fixity or cross-record
+    # construct.
     # No provider-resource entity, lifecycle or persistent ownership is introduced.

@@ -21,9 +21,27 @@ types:
       - {name: page_limit, type: Integer}
       - {name: collection_limit, type: Integer}
       - {name: max_line_bytes, type: Integer}
+    # adapters/loki/contracts/logs/v1alpha1/semantics.md:38: page and collection
+    # limits in 1–1,000, max_line_bytes in 1–8,192; :101: nanoseconds are canonical
+    # `0` or a decimal without leading zero, at most 19 digits.
+    invariants:
+      - page_limit: {gte: 1, lte: 1000}
+      - collection_limit: {gte: 1, lte: 1000}
+      - max_line_bytes: {gte: 1, lte: 8192}
+      - start_unix_ns.count: {gte: 1, lte: 19}
+      - end_unix_ns.count: {gte: 1, lte: 19}
+      - any:
+          - start_unix_ns == "0"
+          - not: {start_unix_ns: {starts_with: "0"}}
+      - any:
+          - end_unix_ns == "0"
+          - not: {end_unix_ns: {starts_with: "0"}}
 
-# UNMAPPED: exact LogQL grammar/root recognition and every-selector equality
+# ESS-LIMIT: exact LogQL grammar/root recognition and every-selector equality
 # admission, original query bytes, canonical nanosecond timestamps/ranges,
-# effective provider limits and saturation/exhaustion interpretation.
+# effective provider limits and saturation/exhaustion interpretation, plus
+# page_limit <= collection_limit, start < end and the one-day window. ESS 0.36 has
+# no grammar/parser, byte-preservation or numeric-text predicate (a digit character set is expressible with alphabet) and no comparison
+# between sibling fields of a type.
 # This profile's native query selection is not a universal input for pod or
 # container streams. Shared collection/page facts do not execute this binding.

@@ -69,8 +69,10 @@ entities:
         via: attempt_id
     # References, not owns: expiry of the replay reservation cannot delete audit
     # evidence. Each key generation is bound to one immutable attempt identity.
-    # UNMAPPED: namespace authority/issuer/tenant configuration remains outside
-    # this selected binding. Fingerprints preserve historical Connection/route
+    # DEFERRED: namespace authority/issuer/tenant configuration remains outside
+    # this selected binding; owned by a story to be filed
+    # (story:multi-tenant-principal-assignment, not yet in the store on 2026-09-27).
+    # Fingerprints preserve historical Connection/route
     # coordinates as values; the attempt has the actual Connection reference.
     # Value equality is an owner predicate and grants no current use.
     lifecycle:
@@ -185,8 +187,11 @@ views:
       - {name: caller_key, type: String}
       - {name: state, type: connectors.idempotency.KeyReservation.State}
 
-# UNMAPPED executable obligations: current admission and replay-result visibility;
+# ESS-LIMIT executable obligations: current admission and replay-result visibility;
 # namespace/fingerprint derivation and equality; atomic namespace/key uniqueness
 # with Prepared attempt creation; state coupling to that attempt; timestamp
 # assignment/expiry comparison; generation-safe eviction; actual result storage.
-# ESS validates shapes, references and lifecycle causation, not these algorithms.
+# ESS validates shapes, references and lifecycle causation, not these algorithms:
+# ESS 0.36 has no cross-record uniqueness constraint, no multi-record transaction
+# coupling two entities' states, no derived-value expression and no trusted-time
+# or storage construct.
