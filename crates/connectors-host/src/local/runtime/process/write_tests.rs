@@ -82,6 +82,11 @@ impl Adapter for Fixture {
         if self.mode == "slow-preflight" {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
+        // Stands in for a scheduler that spends the first budget before the
+        // preparation can answer.
+        if self.mode == "stalled-preflight" {
+            tokio::time::sleep(Duration::from_millis(2_500)).await;
+        }
         Ok(Box::new(Pending {
             root: self.root.clone(),
             mode: self.mode.clone(),
@@ -138,7 +143,8 @@ impl PreparedWrite for Pending {
             }
             "lost" => std::process::exit(0),
             "timeout" => {
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                // Outlasts every budget `expiring` hands out; the host kills it.
+                tokio::time::sleep(Duration::from_secs(600)).await;
                 WriteOutcome::Applied(Ok(self.input.clone()))
             }
             _ => WriteOutcome::Applied(Ok(self.input.clone())),
@@ -326,13 +332,13 @@ fn malformed_preparation_cancel_and_result_replies_reap_the_exact_child() {
         let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
         if mode.starts_with("peer-prepare-") {
             assert_eq!(
-                prepare(&mut child, 2000).err(),
+                prepare(&mut child, HANG_BUDGET_MS).err(),
                 Some(Failure::Protocol),
                 "{mode}"
             );
             assert_eq!(count(root.path(), "received-commit-or-cancel"), 0, "{mode}");
         } else {
-            let pending = prepare(&mut child, 2000).unwrap();
+            let pending = prepare(&mut child, HANG_BUDGET_MS).unwrap();
             if mode == "peer-cancel" {
                 assert_eq!(pending.cancel(), Err(Failure::Protocol));
             } else {
@@ -383,15 +389,64 @@ fn selection(root: &Path, mode: &str, protocol: PrivateProtocol) -> config::Adap
         },
     }
 }
+/// The budget of every preparation and invocation whose test is not about its
+/// deadline expiring: a hang guard, out of reach of a loaded scheduler.
+const HANG_BUDGET_MS: u64 = 60_000;
+
 fn prepare(child: &mut Child, budget_ms: u64) -> Result<PreparedInvocation<'_>> {
+    prepare_by(child, connectors_sdk::now_ms() + budget_ms)
+}
+fn prepare_by(child: &mut Child, deadline_ms: u64) -> Result<PreparedInvocation<'_>> {
     child.prepare_write(
         "write",
         "fixture-private-descriptor",
         "partition",
         &Secret(b"fictional-only".to_vec()),
         br#"{"value":true}"#,
-        connectors_sdk::now_ms() + budget_ms,
+        deadline_ms,
     )
+}
+
+/// The largest budget `expiring` hands out before it gives up.
+const EXPIRING_CAP: Duration = Duration::from_secs(64);
+
+/// Spawn `mode` and prepare it under a deadline meant to expire, then hand
+/// the preparation and its budget to `run`. A loaded scheduler can spend the
+/// budget before the preparation answers, which is not what these tests
+/// assert: an attempt whose preparation failed only after its deadline had
+/// passed is discarded, and the next one, on a fresh child and root, gets
+/// twice the budget. A preparation that fails before its deadline is a real
+/// failure.
+fn expiring<R>(
+    mode: &str,
+    mut run: impl FnMut(&Path, PreparedInvocation<'_>, Duration) -> R,
+) -> (tempfile::TempDir, Child, R) {
+    let mut budget = Duration::from_secs(2);
+    loop {
+        let root = temp();
+        let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
+        let deadline_ms = connectors_sdk::now_ms() + budget.as_millis() as u64;
+        let outcome = prepare_by(&mut child, deadline_ms).map(|p| run(root.path(), p, budget));
+        let failure = match outcome {
+            Ok(result) => return (root, child, result),
+            Err(failure) => failure,
+        };
+        assert!(
+            connectors_sdk::now_ms() >= deadline_ms && budget < EXPIRING_CAP,
+            "{mode}: preparation failed with {failure:?} under a {budget:?} budget"
+        );
+        // The discarded attempt is still a preparation that outlived its
+        // deadline: a socket timeout or a peer that closed at the deadline,
+        // an exact child already reaped, and nothing sent.
+        assert!(
+            matches!(failure, Failure::Timeout | Failure::Unavailable),
+            "{mode}: {failure:?}"
+        );
+        assert!(!child.live, "{mode}: child left live after its deadline");
+        assert!(child.process.try_wait().unwrap().is_some(), "{mode}");
+        assert_eq!(count(root.path(), "send"), 0, "{mode}");
+        budget *= 2;
+    }
 }
 fn temp() -> tempfile::TempDir {
     tempfile::Builder::new()
@@ -404,14 +459,14 @@ fn temp() -> tempfile::TempDir {
 fn prepared_request_does_not_send_until_commit_and_cancel_destroys_before_ack() {
     let root = temp();
     let mut child = Child::spawn(&selection(root.path(), "ok", PrivateProtocol::V2)).unwrap();
-    let pending = prepare(&mut child, 2000).unwrap();
+    let pending = prepare(&mut child, HANG_BUDGET_MS).unwrap();
     assert_eq!(count(root.path(), "prepare"), 1);
     assert_eq!(count(root.path(), "send"), 0);
     pending.cancel().unwrap();
     assert_eq!(count(root.path(), "destroy"), 1);
     assert_eq!(count(root.path(), "send"), 0);
     assert!(child.running().unwrap());
-    let result = prepare(&mut child, 2000).unwrap().commit();
+    let result = prepare(&mut child, HANG_BUDGET_MS).unwrap().commit();
     assert_eq!(result.effect, WriteEffect::Applied);
     assert_eq!(result.result.unwrap(), json!({"value":true}));
     assert_eq!(count(root.path(), "send"), 1);
@@ -446,28 +501,25 @@ fn native_outcomes_and_lost_replies_never_repeat_a_send() {
             Some(Failure::Timeout),
         ),
     ] {
-        let root = temp();
-        let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
-        let result = prepare(
-            &mut child,
-            // Same reasoning as above: the expiring modes keep a deadline that passes, on a
-            // margin a loaded scheduler cannot consume before `prepare` returns; the rest
-            // never consult it. See story:host-suite-load-sensitivity.
-            if matches!(mode, "timeout" | "peer-expired-eof") {
-                2_000
-            } else {
-                60_000
-            },
-        )
-        .unwrap()
-        .commit();
+        // The expiring modes keep a deadline that passes, on a budget `expiring` grows
+        // past whatever a loaded scheduler spends before `prepare` returns; the rest never
+        // consult theirs. See story:host-suite-subprocess-bounds.
+        let (root, mut child, result) = if matches!(mode, "timeout" | "peer-expired-eof") {
+            expiring(mode, |_, pending, _| pending.commit())
+        } else {
+            let root = temp();
+            let mut child =
+                Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
+            let result = prepare(&mut child, HANG_BUDGET_MS).unwrap().commit();
+            (root, child, result)
+        };
         assert_eq!(result.effect, effect, "{mode}");
         assert_eq!(result.result.err(), failure, "{mode}");
         assert_eq!(count(root.path(), "send"), 1, "{mode}");
         if matches!(mode, "lost" | "timeout" | "peer-expired-eof") {
             assert!(!child.live);
             assert!(child.process.try_wait().unwrap().is_some());
-            assert!(prepare(&mut child, 60_000).is_err());
+            assert!(prepare(&mut child, HANG_BUDGET_MS).is_err());
         }
     }
 }
@@ -481,7 +533,10 @@ fn schema_preflight_and_read_path_refusals_have_no_write() {
         PrivateProtocol::V2,
     ))
     .unwrap();
-    assert_eq!(prepare(&mut child, 2000).err(), Some(Failure::Forbidden));
+    assert_eq!(
+        prepare(&mut child, HANG_BUDGET_MS).err(),
+        Some(Failure::Forbidden)
+    );
     assert_eq!(count(root.path(), "prepare"), 1);
     assert_eq!(
         child
@@ -491,7 +546,7 @@ fn schema_preflight_and_read_path_refusals_have_no_write() {
                 "partition",
                 &Secret(b"fictional-only".to_vec()),
                 br#"{"value":"bad"}"#,
-                connectors_sdk::now_ms() + 2000
+                connectors_sdk::now_ms() + HANG_BUDGET_MS
             )
             .err(),
         Some(Failure::InvalidInput)
@@ -504,7 +559,7 @@ fn schema_preflight_and_read_path_refusals_have_no_write() {
             "partition",
             &Secret(b"fictional-only".to_vec()),
             br#"{"value":true}"#,
-            connectors_sdk::now_ms() + 2000
+            connectors_sdk::now_ms() + HANG_BUDGET_MS
         ),
         Err(Failure::Unsupported)
     );
@@ -517,7 +572,7 @@ fn schema_preflight_and_read_path_refusals_have_no_write() {
                 "partition",
                 &Secret(b"fictional-only".to_vec()),
                 b"{}",
-                connectors_sdk::now_ms() + 2000
+                connectors_sdk::now_ms() + HANG_BUDGET_MS
             )
             .is_ok()
     );
@@ -525,54 +580,55 @@ fn schema_preflight_and_read_path_refusals_have_no_write() {
 
 #[test]
 fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
-    for mode in ["drop", "eof", "expiry", "slow-preflight"] {
-        let root = temp();
-        let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
-        // Budgets are sized so `prepare` cannot lose a race with a busy scheduler before
-        // the test's own assertion begins. `drop` and `eof` never consult the deadline, so
-        // theirs is simply out of reach; `expiry` and `slow-preflight` still expire, just
-        // on a margin load cannot eat. See story:host-suite-load-sensitivity.
-        let pending = prepare(
-            &mut child,
-            match mode {
-                "expiry" | "slow-preflight" => 2_000,
-                _ => 60_000,
-            },
-        )
-        .unwrap();
-        match mode {
-            "drop" => drop(pending),
-            "eof" => {
-                pending
-                    .child
-                    .channel
-                    .shutdown(std::net::Shutdown::Both)
-                    .unwrap();
-                // The child exits on EOF; retain the exact owned handle until it does.
-                pending.child.process.wait().unwrap();
-                assert_eq!(count(root.path(), "destroy"), 1);
+    for mode in [
+        "drop",
+        "eof",
+        "expiry",
+        "slow-preflight",
+        "stalled-preflight",
+    ] {
+        // `drop` and `eof` never consult the deadline, so theirs is out of reach; the
+        // other modes expire on a budget `expiring` grows past whatever a loaded
+        // scheduler spends before `prepare` returns. See story:host-suite-subprocess-bounds.
+        let (root, mut child, ()) = match mode {
+            "drop" | "eof" => {
+                let root = temp();
+                let mut child =
+                    Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
+                let pending = prepare(&mut child, HANG_BUDGET_MS).unwrap();
+                if mode == "eof" {
+                    pending
+                        .child
+                        .channel
+                        .shutdown(std::net::Shutdown::Both)
+                        .unwrap();
+                    // The child exits on EOF; retain the exact owned handle until it does.
+                    pending.child.process.wait().unwrap();
+                    assert_eq!(count(root.path(), "destroy"), 1);
+                }
                 drop(pending);
+                (root, child, ())
             }
-            "expiry" => {
+            "expiry" => expiring(mode, |root, pending, budget| {
                 let result = channel::read::<Value>(
                     &mut pending.child.channel,
-                    Instant::now() + Duration::from_secs(30),
+                    Instant::now() + budget + Duration::from_secs(30),
                     false,
                     0,
                 );
                 assert!(matches!(result, Err(Failure::Unavailable)));
-                assert_eq!(count(root.path(), "destroy"), 1);
+                assert_eq!(count(root, "destroy"), 1);
                 drop(pending);
-            }
-            _ => {
-                // Sleep past the budget above rather than a hand-tuned margin over it.
-                std::thread::sleep(Duration::from_millis(2_100));
+            }),
+            _ => expiring(mode, |_, pending, budget| {
+                // Sleep past the budget rather than a hand-tuned margin over it.
+                std::thread::sleep(budget + Duration::from_millis(100));
                 assert_eq!(pending.remaining(), Err(Failure::Timeout));
                 let result = pending.commit();
                 assert_eq!(result.effect, WriteEffect::Unknown);
                 assert_eq!(result.result.err(), Some(Failure::Timeout));
-            }
-        }
+            }),
+        };
         assert_eq!(count(root.path(), "send"), 0, "{mode}");
         assert!(!child.live);
         assert!(child.process.try_wait().unwrap().is_some());
@@ -594,7 +650,7 @@ fn replacement_material_wrong_ids_and_other_requests_close_pending_without_send(
     ] {
         let root = temp();
         let mut child = Child::spawn(&selection(root.path(), "ok", PrivateProtocol::V2)).unwrap();
-        let pending = prepare(&mut child, 2000).unwrap();
+        let pending = prepare(&mut child, HANG_BUDGET_MS).unwrap();
         let mut request =
             json!({"kind":"commit_write","id":pending.id,"preparation_id":pending.preparation_id});
         match mode {
@@ -647,7 +703,7 @@ fn replacement_material_wrong_ids_and_other_requests_close_pending_without_send(
 fn duplicate_commit_refuses_and_legacy_selection_never_exposes_a_write() {
     let root = temp();
     let mut child = Child::spawn(&selection(root.path(), "ok", PrivateProtocol::V2)).unwrap();
-    let pending = prepare(&mut child, 2000).unwrap();
+    let pending = prepare(&mut child, HANG_BUDGET_MS).unwrap();
     let request = writes::WriteRequest::Commit {
         id: pending.id.clone(),
         preparation_id: pending.preparation_id.clone(),
@@ -661,7 +717,10 @@ fn duplicate_commit_refuses_and_legacy_selection_never_exposes_a_write() {
     for mode in ["ok", "legacy"] {
         let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V1)).unwrap();
         assert_eq!(child.bootstrap().descriptor().unwrap().operations.len(), 1);
-        assert_eq!(prepare(&mut child, 2000).err(), Some(Failure::Unsupported));
+        assert_eq!(
+            prepare(&mut child, HANG_BUDGET_MS).err(),
+            Some(Failure::Unsupported)
+        );
         assert!(
             child
                 .invoke(
@@ -670,7 +729,7 @@ fn duplicate_commit_refuses_and_legacy_selection_never_exposes_a_write() {
                     "partition",
                     &Secret(b"fictional-only".to_vec()),
                     b"{}",
-                    connectors_sdk::now_ms() + 2000
+                    connectors_sdk::now_ms() + HANG_BUDGET_MS
                 )
                 .is_ok()
         );

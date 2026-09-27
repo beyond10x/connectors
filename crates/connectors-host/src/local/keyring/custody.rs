@@ -169,7 +169,7 @@ impl Store {
         {
             return Err(Failure::InvalidMaterial);
         }
-        let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let until = lock_until();
         let _writer = self.writer_lock(until)?;
         let _lock = self.persistence.lock(until)?;
         self.admit(version)?;
@@ -278,7 +278,7 @@ impl Store {
             return Err(Failure::Denied);
         }
         self.admit(version)?;
-        let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let until = lock_until();
         let _writer = self.writer_lock(until)?;
         let _lock = self.persistence.lock(until)?;
         self.admit(version)?;
@@ -301,7 +301,7 @@ impl Store {
         guard: impl FnOnce() -> Result<()>,
     ) -> Result<DeletedVersion> {
         self.admit(version)?;
-        let until = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let until = lock_until();
         let _writer = self.writer_lock(until)?;
         let _lock = self.persistence.lock(until)?;
         self.admit(version)?;
@@ -444,6 +444,11 @@ impl Drop for Store {
             let _: zbus::Result<()> = proxy.call("Close", &());
         }
     }
+}
+
+/// The writer and persistence locks wait as long as the lifecycle lock.
+fn lock_until() -> std::time::Instant {
+    std::time::Instant::now() + super::super::metadata::lifecycle_lock_wait()
 }
 
 fn unavailable<T>(_: T) -> Failure {

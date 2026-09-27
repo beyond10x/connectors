@@ -726,17 +726,20 @@ fn abrupt_process_exits_preserve_acknowledgement_boundaries_without_resend() {
         "final-after",
     ] {
         let (root, store) = fixture();
-        let status = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "local::audit::tests::crash_child",
-                "--ignored",
-                "--nocapture",
-            ])
-            .env("CONNECTORS_AUDIT_CRASH_ROOT", root.path())
-            .env("CONNECTORS_AUDIT_CRASH_PHASE", phase)
-            .status()
-            .unwrap();
+        let status = crate::local::metadata::child_lock_wait(
+            &mut std::process::Command::new(std::env::current_exe().unwrap()),
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        )
+        .args([
+            "--exact",
+            "local::audit::tests::crash_child",
+            "--ignored",
+            "--nocapture",
+        ])
+        .env("CONNECTORS_AUDIT_CRASH_ROOT", root.path())
+        .env("CONNECTORS_AUDIT_CRASH_PHASE", phase)
+        .status()
+        .unwrap();
         assert_eq!(status.code(), Some(73));
         let reference = Reference {
             instance: "alpha".into(),
