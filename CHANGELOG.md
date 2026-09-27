@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.13.1 — 2026-09-27
+
+### Specification
+
+- Every system under `ess/` and `adapters/*/spec/ess` declares source format `ess/14`.
+- The ESS crates and the pinned ESS toolchain move from 0.35.0 to 0.36.0. No Rust API change was
+  needed; the generated Entity Runtime definitions change only in their source and synthesis
+  digests.
+- `connectors.discovery_state`: publishing a view increments `last_generation` and replaces
+  `publication_revision`; retiring a view or a collection replaces `publication_revision`
+  (`contracts/discovery/resources/v1alpha1/semantics.md`). Each `ObservationChanged` names the state
+  its transition enters instead of a generated value.
+
+### Planning
+
+- AEP moves from 0.60.0 to 0.61.1 for the toolchain, CI and the store's protocols pin. The local
+  findings patch applies unchanged onto 0.61.1, which does not contain the correction.
+
+### Tests
+
+- `connectors-host` tests that contend on a lock or a recovery window bound it themselves: a frozen
+  clock for the 250 ms audit recovery window and a test-only 120 s lock wait for the 2 s lifecycle,
+  approval-policy and approval-key locks. Production keeps both bounds.
+  `final_audit_recovery_preserves_every_live_business_result` is no longer ignored, and the gate no
+  longer runs it alone. The library suite passed three of three runs at load average 25 to 37.
+- New tests kill three model mutants: acquisition expiry, cursor expiry and key publication.
+
 ## 0.13.0 — 2026-09-27
 
 The specification and the planning tools move to their newest releases.

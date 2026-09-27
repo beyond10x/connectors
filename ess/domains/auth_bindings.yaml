@@ -262,6 +262,11 @@ commands:
       - {name: published, when: decision == allow, moves: connectors.auth_bindings.Connection.publish, instance: connection_ref, emits: [connectors.auth_bindings.BindingPublished], payload: {connectors.auth_bindings.BindingPublished: {connection_ref: input.connection_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
+    # UNMAPPED: PublishBinding on a Revoked Connection is refused by this lifecycle,
+    # but no wrong-state outcome says with which error. RevokeConnection answers
+    # ConnectionStateConflict; the host (crates/connectors-host/src/local/metadata/er.rs:2985-2990)
+    # maps no Revoked row change to this command, so no code states an answer to copy.
+    # Open question for the owner; synthesis refuses the scenario (ESS-SYNTH-012).
   - name: connectors.auth_bindings.BeginAcquisition
     # Owner refuses static_config, expired/unsupported flows and capacity before
     # creation. No business operation, public callback or material read is implied.

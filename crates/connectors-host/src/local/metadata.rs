@@ -57,6 +57,40 @@ fn run_relock_hook() {
     }
 }
 
+/// Production waits two seconds for the lifecycle lock, and for the approval
+/// policy and approval key leases, which read the same wait. A test whose
+/// threads contend for one of them by design sets its own wait here, so the
+/// bound it asserts under is one it chose rather than one a loaded scheduler
+/// can consume.
+const LIFECYCLE_LOCK_WAIT: Duration = Duration::from_secs(2);
+
+#[cfg(test)]
+thread_local! {
+    static TEST_LIFECYCLE_LOCK_WAIT: std::cell::Cell<Duration> =
+        const { std::cell::Cell::new(LIFECYCLE_LOCK_WAIT) };
+}
+
+/// For tests whose threads serialize on the lifecycle lock by design: a bound
+/// only a hang reaches, where two seconds is spent by a loaded scheduler on
+/// the writers queued ahead.
+#[cfg(test)]
+pub(super) const CONTENDED_LOCK_WAIT: Duration = Duration::from_secs(120);
+
+#[cfg(test)]
+pub(super) fn set_lifecycle_lock_wait(wait: Duration) {
+    TEST_LIFECYCLE_LOCK_WAIT.with(|slot| slot.set(wait));
+}
+
+#[cfg(test)]
+pub(super) fn lifecycle_lock_wait() -> Duration {
+    TEST_LIFECYCLE_LOCK_WAIT.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+pub(super) fn lifecycle_lock_wait() -> Duration {
+    LIFECYCLE_LOCK_WAIT
+}
+
 #[cfg(test)]
 fn take_migration_fault(point: u8) -> bool {
     MIGRATION_FAULT.with(|fault| {
@@ -800,7 +834,7 @@ fn lifecycle_lock(directory: &std::fs::File) -> Result<std::fs::File> {
 }
 
 fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + lifecycle_lock_wait();
     loop {
         // SAFETY: file owns the live descriptor. Dropping it releases the lock.
         let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_NB | libc::LOCK_EX) };

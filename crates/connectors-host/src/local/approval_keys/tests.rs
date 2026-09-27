@@ -180,10 +180,16 @@ fn key_use_excludes_rotation_and_concurrent_init_has_one_winner() {
     let gate = std::sync::Barrier::new(2);
     std::thread::scope(|s| {
         let a = s.spawn(|| {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             gate.wait();
             store.init(None)
         });
         let b = s.spawn(|| {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             gate.wait();
             store.init(None)
         });

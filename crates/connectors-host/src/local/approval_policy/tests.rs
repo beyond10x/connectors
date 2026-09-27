@@ -257,9 +257,15 @@ fn concurrent_initial_publication_has_one_winner() {
         let start = barrier.clone();
         let path = root.path();
         let a = scope.spawn(move || {
+            crate::local::metadata::set_lifecycle_lock_wait(
+                crate::local::metadata::CONTENDED_LOCK_WAIT,
+            );
             start.wait();
             store(path).set_admitted(&selection(), vec![], None)
         });
+        crate::local::metadata::set_lifecycle_lock_wait(
+            crate::local::metadata::CONTENDED_LOCK_WAIT,
+        );
         barrier.wait();
         let b = store(root.path()).set_admitted(&selection(), vec![], None);
         [a.join().unwrap(), b]
