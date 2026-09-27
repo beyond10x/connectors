@@ -311,6 +311,15 @@ fn finish_audit(
     delivery: &mut Delivery,
     until: Instant,
 ) {
+    finish_audit_with_now(store, reference, delivery, until, Instant::now)
+}
+fn finish_audit_with_now(
+    store: &audit::Store,
+    reference: audit::Reference,
+    delivery: &mut Delivery,
+    until: Instant,
+    now: impl FnMut() -> Instant,
+) {
     let observation = audit::FinalObservation {
         observation_id: Uuid::new_v4(),
         outcome: if delivery.mutation.classification == Classification::Unknown {
@@ -334,7 +343,7 @@ fn finish_audit(
     };
     delivery.source_audit.audit_ref = Some(reference.audit_ref.clone());
     delivery.source_audit.audit_status = if store
-        .append_recovering(&reference, &observation, until)
+        .append_recovering_with_now(&reference, &observation, until, now)
         .is_ok()
     {
         AuditStatus::Complete
