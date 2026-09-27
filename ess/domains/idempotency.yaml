@@ -102,6 +102,9 @@ commands:
         creates: connectors.idempotency.KeyReservation
         instance: reservation_id
         emits: [connectors.idempotency.KeyReserved]
+        payload:
+          connectors.idempotency.KeyReserved:
+            reservation_id: {generated: true}
   - name: connectors.idempotency.RetainResult
     # Requires a durable Completed/Failed/Aborted attempt. The host atomically
     # fixes settled_at and replay_expires_at = settled_at + 86400s. Input values
@@ -115,6 +118,11 @@ commands:
         moves: connectors.idempotency.KeyReservation.retain_result
         instance: reservation_id
         emits: [connectors.idempotency.ResultRetained]
+        payload:
+          connectors.idempotency.ResultRetained:
+            reservation_id: input.reservation_id
+            settled_at: input.settled_at
+            replay_expires_at: input.replay_expires_at
       - name: wrong-state
         wrong_state: true
         error: connectors.idempotency.ReservationStateConflict
@@ -128,6 +136,9 @@ commands:
         moves: connectors.idempotency.KeyReservation.quarantine
         instance: reservation_id
         emits: [connectors.idempotency.KeyQuarantined]
+        payload:
+          connectors.idempotency.KeyQuarantined:
+            reservation_id: input.reservation_id
       - name: wrong-state
         wrong_state: true
         error: connectors.idempotency.ReservationStateConflict
@@ -141,6 +152,9 @@ commands:
         moves: connectors.idempotency.KeyReservation.expire
         instance: reservation_id
         emits: [connectors.idempotency.ResultExpired]
+        payload:
+          connectors.idempotency.ResultExpired:
+            reservation_id: input.reservation_id
       - name: wrong-state
         wrong_state: true
         error: connectors.idempotency.ReservationStateConflict

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.13.0 — 2026-09-27
+
+The specification and the planning tools move to their newest releases.
+
+### Specification
+
+- Every system under `ess/` and `adapters/*/spec/ess` declares source format `ess/13`.
+- `ess/13` requires an explicit source for every emitted payload field. 123 fields in `ess/domains`
+  now map to their command input (`input.<field>`, 103) or are declared produced by the host
+  (`{generated: true}`, 20). The generated Entity Runtime definitions drop the host-filled slots
+  for those fields; all 55 commands remain.
+- The ESS crates and the pinned ESS toolchain move from 0.31.0 to 0.35.0. No Rust API change was
+  needed.
+
+### Planning
+
+- AEP moves from 0.59.2 to 0.60.0 for the toolchain, CI and the store's protocols pin. The local
+  findings patch is rebased onto 0.60.0, which does not contain the correction. `aep --version` now
+  prints `aep <version>`, and the toolchain check accepts it.
+
+### Known limitations
+
+- `connectors-host` `final_audit_recovery_preserves_every_live_business_result` fails on a heavily
+  loaded machine at this release and at 0.12.0 alike; its recovery runs under a 250 ms bound.
+
 ## 0.12.0 — 2026-09-25
 
 Local metadata has one authority. The host's registry, runtime stop state,

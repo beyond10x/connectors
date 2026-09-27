@@ -529,7 +529,7 @@ dependencies = [
 
 [[package]]
 name = "connectors"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-build"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "clap",
  "connectors-catalog",
@@ -569,7 +569,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "connectors-core",
  "hex",
@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog-provider"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -616,7 +616,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-client"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "connectors-core",
  "futures-util",
@@ -628,7 +628,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-conformance"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "clap",
  "connectors-cli-contract",
@@ -643,7 +643,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-contracts"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-core"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "hex",
  "serde",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-host"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -670,7 +670,7 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-sdk",
- "entity-core",
+ "entity-core 0.23.0",
  "entity-eventlog",
  "entity-executor",
  "entity-store",
@@ -702,7 +702,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-kubernetes"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sdk"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -744,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-spec"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "clap",
  "connectors-core",
@@ -760,7 +760,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sql"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -975,11 +975,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "entity-core"
+version = "0.24.1"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.24.1#4746bd7cc37d27c7cc5815c44a62a96f3ddc1f44"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "entity-eventlog"
 version = "0.23.0"
 source = "git+https://github.com/beyond10x/entity-runtime?tag=0.23.0#77aac6eac95d0392a00e8dee8d04038ef70e47de"
 dependencies = [
- "entity-core",
+ "entity-core 0.23.0",
  "entity-executor",
  "entity-query",
  "entity-store",
@@ -997,7 +1006,7 @@ name = "entity-executor"
 version = "0.23.0"
 source = "git+https://github.com/beyond10x/entity-runtime?tag=0.23.0#77aac6eac95d0392a00e8dee8d04038ef70e47de"
 dependencies = [
- "entity-core",
+ "entity-core 0.23.0",
  "entity-store",
  "serde_json",
 ]
@@ -1007,7 +1016,7 @@ name = "entity-query"
 version = "0.23.0"
 source = "git+https://github.com/beyond10x/entity-runtime?tag=0.23.0#77aac6eac95d0392a00e8dee8d04038ef70e47de"
 dependencies = [
- "entity-core",
+ "entity-core 0.23.0",
  "entity-store",
  "serde",
  "serde_json",
@@ -1018,7 +1027,7 @@ name = "entity-store"
 version = "0.23.0"
 source = "git+https://github.com/beyond10x/entity-runtime?tag=0.23.0#77aac6eac95d0392a00e8dee8d04038ef70e47de"
 dependencies = [
- "entity-core",
+ "entity-core 0.23.0",
  "fs2",
  "serde",
  "serde_json",
@@ -1063,8 +1072,8 @@ dependencies = [
 
 [[package]]
 name = "ess-compiler"
-version = "0.31.0"
-source = "git+https://github.com/beyond10x/ess?tag=0.31.0#f7de9f82af1e2b47a5a8789cbe7ce03ab649a329"
+version = "0.35.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.35.0#a86579e13385476e324a1550aab2a5e207048ee2"
 dependencies = [
  "ess-domain",
  "ess-primitives",
@@ -1075,8 +1084,8 @@ dependencies = [
 
 [[package]]
 name = "ess-domain"
-version = "0.31.0"
-source = "git+https://github.com/beyond10x/ess?tag=0.31.0#f7de9f82af1e2b47a5a8789cbe7ce03ab649a329"
+version = "0.35.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.35.0#a86579e13385476e324a1550aab2a5e207048ee2"
 dependencies = [
  "ess-primitives",
  "schemars 0.8.22",
@@ -1088,10 +1097,10 @@ dependencies = [
 
 [[package]]
 name = "ess-entity-runtime"
-version = "0.31.0"
-source = "git+https://github.com/beyond10x/ess?tag=0.31.0#f7de9f82af1e2b47a5a8789cbe7ce03ab649a329"
+version = "0.35.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.35.0#a86579e13385476e324a1550aab2a5e207048ee2"
 dependencies = [
- "entity-core",
+ "entity-core 0.24.1",
  "ess-compiler",
  "ess-domain",
  "ess-primitives",
@@ -1103,8 +1112,8 @@ dependencies = [
 
 [[package]]
 name = "ess-gen"
-version = "0.31.0"
-source = "git+https://github.com/beyond10x/ess?tag=0.31.0#f7de9f82af1e2b47a5a8789cbe7ce03ab649a329"
+version = "0.35.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.35.0#a86579e13385476e324a1550aab2a5e207048ee2"
 dependencies = [
  "ess-compiler",
  "ess-domain",
@@ -1118,8 +1127,8 @@ dependencies = [
 
 [[package]]
 name = "ess-primitives"
-version = "0.31.0"
-source = "git+https://github.com/beyond10x/ess?tag=0.31.0#f7de9f82af1e2b47a5a8789cbe7ce03ab649a329"
+version = "0.35.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.35.0#a86579e13385476e324a1550aab2a5e207048ee2"
 dependencies = [
  "schemars 0.8.22",
  "serde",
@@ -1130,8 +1139,8 @@ dependencies = [
 
 [[package]]
 name = "ess-service-contract"
-version = "0.31.0"
-source = "git+https://github.com/beyond10x/ess?tag=0.31.0#f7de9f82af1e2b47a5a8789cbe7ce03ab649a329"
+version = "0.35.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.35.0#a86579e13385476e324a1550aab2a5e207048ee2"
 dependencies = [
  "ess-compiler",
  "ess-domain",
@@ -1140,8 +1149,8 @@ dependencies = [
 
 [[package]]
 name = "ess-synth"
-version = "0.31.0"
-source = "git+https://github.com/beyond10x/ess?tag=0.31.0#f7de9f82af1e2b47a5a8789cbe7ce03ab649a329"
+version = "0.35.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.35.0#a86579e13385476e324a1550aab2a5e207048ee2"
 dependencies = [
  "ess-compiler",
  "ess-domain",

@@ -695,6 +695,9 @@ commands:
         creates: connectors.cli.LocalRuntimeRecord
         instance: instance_id
         emits: [connectors.cli.LocalRuntimeRecorded]
+        payload:
+          connectors.cli.LocalRuntimeRecorded:
+            instance_id: input.instance_id
         sets:
           suppressed: input.suppressed
           selection: input.selection
@@ -709,6 +712,10 @@ commands:
         moves: connectors.cli.LocalRuntimeRecord.set_suppression
         instance: instance_id
         emits: [connectors.cli.LocalRuntimeSuppressionSet]
+        payload:
+          connectors.cli.LocalRuntimeSuppressionSet:
+            instance_id: input.instance_id
+            suppressed: input.suppressed
         sets: {suppressed: input.suppressed}
   - name: connectors.cli.RememberLocalRuntimeBootstrap
     input:
@@ -721,6 +728,9 @@ commands:
         moves: connectors.cli.LocalRuntimeRecord.remember_bootstrap
         instance: instance_id
         emits: [connectors.cli.LocalRuntimeBootstrapRemembered]
+        payload:
+          connectors.cli.LocalRuntimeBootstrapRemembered:
+            instance_id: input.instance_id
         sets:
           selection: input.selection
           bootstrap: input.bootstrap
@@ -740,6 +750,9 @@ commands:
         creates: connectors.cli.ConnectionListCursor
         instance: cursor_id
         emits: [connectors.cli.ConnectionListCursorRecorded]
+        payload:
+          connectors.cli.ConnectionListCursorRecorded:
+            cursor_id: input.cursor_id
         sets:
           instance_id: input.instance_id
           adapter_id: input.adapter_id
@@ -755,6 +768,9 @@ commands:
         moves: connectors.cli.ConnectionListCursor.expire
         instance: cursor_id
         emits: [connectors.cli.ConnectionListCursorExpired]
+        payload:
+          connectors.cli.ConnectionListCursorExpired:
+            cursor_id: input.cursor_id
 
 events:
   - name: connectors.cli.LocalRuntimeRecorded

@@ -230,7 +230,7 @@ commands:
       - {name: declaration, type: "Optional<connectors.auth_bindings.ProfileDeclaration>"}
       - {name: local_static_profile, type: "Optional<connectors.auth_bindings.LocalStaticProfile>"}
     outcomes:
-      - {name: recorded, creates: connectors.auth_bindings.AuthProfile, instance: profile_record_ref, emits: [connectors.auth_bindings.ProfileRecorded]}
+      - {name: recorded, creates: connectors.auth_bindings.AuthProfile, instance: profile_record_ref, emits: [connectors.auth_bindings.ProfileRecorded], payload: {connectors.auth_bindings.ProfileRecorded: {profile_record_ref: {generated: true}}}}
   - name: connectors.auth_bindings.AllocateConnection
     input:
       - {name: decision, type: connectors.auth_bindings.Decision}
@@ -239,7 +239,7 @@ commands:
       - {name: owner_scope, type: String}
       - {name: access_mode, type: connectors.auth_access.AccessMode}
     outcomes:
-      - {name: allocated, when: decision == allow, creates: connectors.auth_bindings.Connection, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionAllocated]}
+      - {name: allocated, when: decision == allow, creates: connectors.auth_bindings.Connection, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionAllocated], payload: {connectors.auth_bindings.ConnectionAllocated: {connection_ref: {generated: true}}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
   - name: connectors.auth_bindings.RevokeConnection
@@ -247,7 +247,7 @@ commands:
       - {name: decision, type: connectors.auth_bindings.Decision}
       - {name: connection_ref, type: String}
     outcomes:
-      - {name: revoked, when: decision == allow, moves: connectors.auth_bindings.Connection.revoke, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionRevoked]}
+      - {name: revoked, when: decision == allow, moves: connectors.auth_bindings.Connection.revoke, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionRevoked], payload: {connectors.auth_bindings.ConnectionRevoked: {connection_ref: input.connection_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
@@ -259,7 +259,7 @@ commands:
       - {name: connection_ref, type: String}
       - {name: publication, type: connectors.auth_bindings.BindingPublication}
     outcomes:
-      - {name: published, when: decision == allow, moves: connectors.auth_bindings.Connection.publish, instance: connection_ref, emits: [connectors.auth_bindings.BindingPublished]}
+      - {name: published, when: decision == allow, moves: connectors.auth_bindings.Connection.publish, instance: connection_ref, emits: [connectors.auth_bindings.BindingPublished], payload: {connectors.auth_bindings.BindingPublished: {connection_ref: input.connection_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
   - name: connectors.auth_bindings.BeginAcquisition
@@ -273,7 +273,7 @@ commands:
       - {name: repair_connection_ref, type: "Optional<String>"}
       - {name: expires_at, type: Timestamp}
     outcomes:
-      - {name: pending, when: decision == allow, creates: connectors.auth_bindings.Acquisition, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionBegan]}
+      - {name: pending, when: decision == allow, creates: connectors.auth_bindings.Acquisition, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionBegan], payload: {connectors.auth_bindings.AcquisitionBegan: {acquisition_ref: {generated: true}}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
   - name: connectors.auth_bindings.ConsumeAcquisition
@@ -283,7 +283,7 @@ commands:
       - {name: decision, type: connectors.auth_bindings.Decision}
       - {name: acquisition_ref, type: String}
     outcomes:
-      - {name: consumed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.consume, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionConsumed]}
+      - {name: consumed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.consume, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionConsumed], payload: {connectors.auth_bindings.AcquisitionConsumed: {acquisition_ref: input.acquisition_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
@@ -297,7 +297,7 @@ commands:
       - {name: result_connection_ref, type: String}
       - {name: publication, type: connectors.auth_bindings.BindingPublication}
     outcomes:
-      - {name: completed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.complete, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionCompleted]}
+      - {name: completed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.complete, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionCompleted], payload: {connectors.auth_bindings.AcquisitionCompleted: {acquisition_ref: input.acquisition_ref, result_connection_ref: input.result_connection_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
@@ -309,7 +309,7 @@ commands:
       - {name: acquisition_ref, type: String}
       - {name: candidate_custody_version_ref, type: String}
     outcomes:
-      - {name: candidate-recorded, moves: connectors.auth_bindings.Acquisition.record_candidate, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionCandidateRecorded]}
+      - {name: candidate-recorded, moves: connectors.auth_bindings.Acquisition.record_candidate, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionCandidateRecorded], payload: {connectors.auth_bindings.AcquisitionCandidateRecorded: {acquisition_ref: input.acquisition_ref, candidate_custody_version_ref: input.candidate_custody_version_ref}}}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
   - name: connectors.auth_bindings.FailAcquisition
     # A possible publication must first be resolved at the owning record; failure
@@ -320,7 +320,7 @@ commands:
       - {name: acquisition_ref, type: String}
       - {name: reason, type: connectors.auth_bindings.AcquisitionFailure}
     outcomes:
-      - {name: failed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.fail, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionFailed]}
+      - {name: failed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.fail, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionFailed], payload: {connectors.auth_bindings.AcquisitionFailed: {acquisition_ref: input.acquisition_ref, reason: input.reason}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
@@ -329,7 +329,7 @@ commands:
       - {name: decision, type: connectors.auth_bindings.Decision}
       - {name: acquisition_ref, type: String}
     outcomes:
-      - {name: expired, when: decision == allow, moves: connectors.auth_bindings.Acquisition.expire, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionExpired]}
+      - {name: expired, when: decision == allow, moves: connectors.auth_bindings.Acquisition.expire, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionExpired], payload: {connectors.auth_bindings.AcquisitionExpired: {acquisition_ref: input.acquisition_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
@@ -343,7 +343,7 @@ commands:
       - {name: store_version, type: String}
       - {name: credential_set, type: connectors.auth_bindings.CredentialSet}
     outcomes:
-      - {name: candidate, when: decision == allow, creates: connectors.auth_bindings.CustodyVersion, instance: version_ref, emits: [connectors.auth_bindings.CustodyCandidateRecorded]}
+      - {name: candidate, when: decision == allow, creates: connectors.auth_bindings.CustodyVersion, instance: version_ref, emits: [connectors.auth_bindings.CustodyCandidateRecorded], payload: {connectors.auth_bindings.CustodyCandidateRecorded: {version_ref: {generated: true}}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
   - name: connectors.auth_bindings.AcknowledgeCustodyWrite
@@ -352,7 +352,7 @@ commands:
       - {name: version_ref, type: String}
       - {name: acknowledged_at, type: Timestamp}
     outcomes:
-      - {name: stored, when: decision == allow, moves: connectors.auth_bindings.CustodyVersion.acknowledge, instance: version_ref, emits: [connectors.auth_bindings.CustodyWritten]}
+      - {name: stored, when: decision == allow, moves: connectors.auth_bindings.CustodyVersion.acknowledge, instance: version_ref, emits: [connectors.auth_bindings.CustodyWritten], payload: {connectors.auth_bindings.CustodyWritten: {version_ref: input.version_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.CustodyStateConflict}
@@ -361,7 +361,7 @@ commands:
       - {name: version_ref, type: String}
       - {name: reason, type: String}
     outcomes:
-      - {name: invalidated, moves: connectors.auth_bindings.CustodyVersion.invalidate, instance: version_ref, emits: [connectors.auth_bindings.CustodyInvalidated]}
+      - {name: invalidated, moves: connectors.auth_bindings.CustodyVersion.invalidate, instance: version_ref, emits: [connectors.auth_bindings.CustodyInvalidated], payload: {connectors.auth_bindings.CustodyInvalidated: {version_ref: input.version_ref, reason: input.reason}}}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.CustodyStateConflict}
   - name: connectors.auth_bindings.RetireCustodyVersion
     input:
@@ -370,7 +370,7 @@ commands:
       - {name: retired_at, type: Timestamp}
       - {name: retire_not_before, type: Timestamp}
     outcomes:
-      - {name: retiring, moves: connectors.auth_bindings.CustodyVersion.retire, instance: version_ref, emits: [connectors.auth_bindings.CustodyRetiring]}
+      - {name: retiring, moves: connectors.auth_bindings.CustodyVersion.retire, instance: version_ref, emits: [connectors.auth_bindings.CustodyRetiring], payload: {connectors.auth_bindings.CustodyRetiring: {version_ref: input.version_ref}}}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.CustodyStateConflict}
   - name: connectors.auth_bindings.AcknowledgeCustodyDeletion
     # allow requires guarded retirement, trusted retention/no-use proof and a
@@ -380,7 +380,7 @@ commands:
       - {name: decision, type: connectors.auth_bindings.Decision}
       - {name: version_ref, type: String}
     outcomes:
-      - {name: deleted, when: decision == allow, moves: connectors.auth_bindings.CustodyVersion.delete, instance: version_ref, emits: [connectors.auth_bindings.CustodyDeleted]}
+      - {name: deleted, when: decision == allow, moves: connectors.auth_bindings.CustodyVersion.delete, instance: version_ref, emits: [connectors.auth_bindings.CustodyDeleted], payload: {connectors.auth_bindings.CustodyDeleted: {version_ref: input.version_ref}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.CustodyStateConflict}

@@ -54,6 +54,9 @@ commands:
         creates: connectors.approval_issuers.ApprovalIssuer
         instance: issuer_id
         emits: [connectors.approval_issuers.IssuerBound]
+        payload:
+          connectors.approval_issuers.IssuerBound:
+            issuer_id: input.issuer_id
         sets:
           instance_id: input.instance_id
           issuer: input.issuer
@@ -69,6 +72,10 @@ commands:
         moves: connectors.approval_issuers.ApprovalIssuer.advance_revision
         instance: issuer_id
         emits: [connectors.approval_issuers.IssuerRevisionAdvanced]
+        payload:
+          connectors.approval_issuers.IssuerRevisionAdvanced:
+            issuer_id: input.issuer_id
+            revision: input.revision
         sets: {revision: input.revision}
   - name: connectors.approval_issuers.StageKey
     input:
@@ -83,6 +90,9 @@ commands:
         creates: connectors.approval_issuers.ApprovalSigningKey
         instance: key_id
         emits: [connectors.approval_issuers.KeyStaged]
+        payload:
+          connectors.approval_issuers.KeyStaged:
+            key_id: input.key_id
         sets:
           issuer_id: input.issuer_id
           public_key: input.public_key
@@ -92,22 +102,22 @@ commands:
   - name: connectors.approval_issuers.PublishKey
     input: [{name: key_id, type: Uuid}]
     outcomes:
-      - {name: published, moves: connectors.approval_issuers.ApprovalSigningKey.publish, instance: key_id, emits: [connectors.approval_issuers.KeyPublished]}
+      - {name: published, moves: connectors.approval_issuers.ApprovalSigningKey.publish, instance: key_id, emits: [connectors.approval_issuers.KeyPublished], payload: {connectors.approval_issuers.KeyPublished: {key_id: input.key_id}}}
       - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
   - name: connectors.approval_issuers.RevokeKey
     input: [{name: key_id, type: Uuid}]
     outcomes:
-      - {name: revoked, moves: connectors.approval_issuers.ApprovalSigningKey.revoke, instance: key_id, emits: [connectors.approval_issuers.KeyRevoked]}
+      - {name: revoked, moves: connectors.approval_issuers.ApprovalSigningKey.revoke, instance: key_id, emits: [connectors.approval_issuers.KeyRevoked], payload: {connectors.approval_issuers.KeyRevoked: {key_id: input.key_id}}}
       - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
   - name: connectors.approval_issuers.RetireKey
     input: [{name: key_id, type: Uuid}]
     outcomes:
-      - {name: retiring, moves: connectors.approval_issuers.ApprovalSigningKey.retire, instance: key_id, emits: [connectors.approval_issuers.KeyRetiring]}
+      - {name: retiring, moves: connectors.approval_issuers.ApprovalSigningKey.retire, instance: key_id, emits: [connectors.approval_issuers.KeyRetiring], payload: {connectors.approval_issuers.KeyRetiring: {key_id: input.key_id}}}
       - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
   - name: connectors.approval_issuers.ConfirmKeyDeletion
     input: [{name: key_id, type: Uuid}]
     outcomes:
-      - {name: deleted, moves: connectors.approval_issuers.ApprovalSigningKey.confirm_deletion, instance: key_id, emits: [connectors.approval_issuers.KeyDeleted]}
+      - {name: deleted, moves: connectors.approval_issuers.ApprovalSigningKey.confirm_deletion, instance: key_id, emits: [connectors.approval_issuers.KeyDeleted], payload: {connectors.approval_issuers.KeyDeleted: {key_id: input.key_id}}}
       - {name: conflict, wrong_state: true, error: connectors.approval_issuers.KeyStateConflict}
 events:
   - name: connectors.approval_issuers.IssuerBound
