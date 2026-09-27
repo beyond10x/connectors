@@ -65,6 +65,11 @@ commands:
             lower_unix_ms: input.lower_unix_ms
         sets:
           lower_unix_ms: input.lower_unix_ms
+    # UNMAPPED: docs/local-er-metadata.md:124-125 calls these floors owner
+    # anti-regression observations, so an advance should never lower
+    # lower_unix_ms. Declaring that needs an input operand in a subject guard
+    # (ESS value-expressions E6), which ESS 0.36.0 does not implement; the rule is
+    # held only by the host owner today.
 
 events:
   - name: connectors.clock.LocalClockFloorRecorded
