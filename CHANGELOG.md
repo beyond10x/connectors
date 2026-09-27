@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.1 — 2026-09-27
 
 ### Specification
 
@@ -17,6 +17,15 @@
 
 - AEP moves from 0.60.0 to 0.61.1 for the toolchain, CI and the store's protocols pin. The local
   findings patch applies unchanged onto 0.61.1, which does not contain the correction.
+
+### Tests
+
+- `connectors-host` tests that contend on a lock or a recovery window bound it themselves: a frozen
+  clock for the 250 ms audit recovery window and a test-only 120 s lock wait for the 2 s lifecycle,
+  approval-policy and approval-key locks. Production keeps both bounds.
+  `final_audit_recovery_preserves_every_live_business_result` is no longer ignored, and the gate no
+  longer runs it alone. The library suite passed three of three runs at load average 25 to 37.
+- New tests kill three model mutants: acquisition expiry, cursor expiry and key publication.
 
 ## 0.13.0 — 2026-09-27
 

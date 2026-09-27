@@ -2,7 +2,7 @@
 format: aep.planning-md/2
 id: story:host-suite-load-sensitivity
 kind: story
-status: active
+status: implemented
 title: The connectors-host timing suite fails under concurrent load and passes alone
 relations:
 - serves: vision:independent-contract-adapters
@@ -33,7 +33,7 @@ scope:
   path: crates/connectors-host/src/local/owner/mutation/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 14
+revision: 15
 ---
 ## Acceptance
 
