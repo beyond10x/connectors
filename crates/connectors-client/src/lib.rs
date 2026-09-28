@@ -36,6 +36,8 @@ impl Endpoint {
         if !endpoint.path().ends_with('/') {
             endpoint.set_path(&format!("{}/", endpoint.path()));
         }
+        // reqwest carries no crypto provider of its own; ring is the one this workspace selects.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let http = HttpClient::builder()
             .timeout(Duration::from_secs(20))
             .connect_timeout(Duration::from_secs(5))

@@ -136,7 +136,7 @@ fn validate_values(root: &Path, ess: &Path) -> Result<()> {
         if validator.is_valid(&case.value) != case.valid {
             let reasons = validator
                 .iter_errors(&case.value)
-                .map(|error| format!("{}: {error}", error.instance_path))
+                .map(|error| format!("{}: {error}", error.instance_path()))
                 .collect::<Vec<_>>()
                 .join("; ");
             return Err(format!(
