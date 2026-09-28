@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T22:19:23Z",
+  "actor": "human:timo",
+  "artifact": "story:local-bounded-clock",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Complete Connectors gate with Rust 1.88, production clock CLI and live verifier, eleven key tests, six GitLab journeys, website and local package checks",
+    "reference": "docs/evidence/local-clock-20260910/README.md"
+  }
+}

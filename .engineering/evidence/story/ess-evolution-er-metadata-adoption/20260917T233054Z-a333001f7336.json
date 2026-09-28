@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-17T23:30:54Z",
+  "actor": "human:timo",
+  "artifact": "story:ess-evolution-er-metadata-adoption",
+  "kind": "story",
+  "revision": 19,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Root exact pre-correction host audit diagnostic: exit101 after anchor, confirm MetadataUnavailable; source-traced canonical serialization defect, correction not yet verified",
+    "reference": "local-evidence:ess-evolution/waves/0012-connectors-adoption/host-audit-diagnostic/receipt.json"
+  }
+}

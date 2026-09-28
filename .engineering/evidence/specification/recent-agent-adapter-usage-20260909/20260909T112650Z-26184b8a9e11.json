@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T11:26:50Z",
+  "actor": "human:timo",
+  "artifact": "specification:recent-agent-adapter-usage-20260909",
+  "kind": "specification",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Local usage inventory integrity, evidence references, privacy review, gzip and whitespace checks; not provider conformance",
+    "reference": "docs/evidence/recent-adapter-usage-20260909/verification.md"
+  }
+}

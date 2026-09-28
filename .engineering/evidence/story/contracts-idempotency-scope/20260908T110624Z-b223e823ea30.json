@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T11:06:24Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-idempotency-scope",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full repository gate exited 0 with local TMPDIR:39 tests passed;67 ESS scenarios compiled, not runtime-executed",
+    "reference": "contracts/operations/v1alpha1/idempotency-verification.md"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:mcp-profile-selection-matrix
 kind: story
 status: implemented
@@ -13,6 +13,10 @@ scope:
 - confidence: inferred
   path: adapters/mcp/contracts/protocol/v1alpha1/selection.md
 revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-12T10:11:52Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-12T10:11:54Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-12T11:41:09Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":7}}, imported: true}
 ---
 ## Acceptance
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T23:46:20Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-evidence-precision",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "Independent specification reviewer B, agent judgment at d1dc83f5",
+    "reference": ".engineering/planning/review-result/spec-completion-b-final-20260909.md"
+  }
+}

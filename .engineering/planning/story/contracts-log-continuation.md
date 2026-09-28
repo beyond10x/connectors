@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-log-continuation
 kind: story
 status: implemented
@@ -34,6 +34,10 @@ scope:
 - confidence: cited
   path: ess/system.yaml
 revision: 14
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T19:57:38Z", actor: "human:timo", revision: 7, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T19:57:38Z", actor: "human:timo", revision: 8, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T23:45:50Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":1,"approval":2}}, imported: true}
 ---
 ## Context
 

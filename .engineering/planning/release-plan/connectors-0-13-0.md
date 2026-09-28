@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: release-plan:connectors-0-13-0
 kind: release-plan
 status: draft

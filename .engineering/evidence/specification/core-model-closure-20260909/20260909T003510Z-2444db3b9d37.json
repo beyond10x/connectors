@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-09T00:35:10Z",
+  "actor": "human:timo",
+  "artifact": "specification:core-model-closure-20260909",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:core-model-a-initial-20260909",
+    "reference": "docs/evidence/model-auth-closure-20260909/correction-mca01/addendum.md",
+    "review": "review-result:core-model-a-initial-20260909",
+    "outcome": "fixed"
+  }
+}

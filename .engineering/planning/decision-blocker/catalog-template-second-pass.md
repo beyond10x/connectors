@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: decision-blocker:catalog-template-second-pass
 kind: decision-blocker
 status: cleared
@@ -7,6 +7,8 @@ title: The catalog template unit is red after its second adversary pass
 relations:
 - blocks: story:catalog-operation-template
 revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-09-11T17:52:15Z", actor: "agent:cv2-gitlab", revision: 3, imported: true}
 ---
 ## What is open
 

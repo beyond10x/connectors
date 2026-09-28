@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:approval-keys-design-round-2
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Approval keys design review round 2
 relations:
 - reviews: story:local-approval-keys
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:50:35Z", actor: "human:timo", revision: 2, imported: true}
 ---
 approve
 

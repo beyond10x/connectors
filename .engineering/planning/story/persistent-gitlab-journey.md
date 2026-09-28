@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:persistent-gitlab-journey
 kind: story
 status: implemented
@@ -38,6 +38,10 @@ scope:
 - confidence: cited
   path: ess/domains
 revision: 19
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-10T09:48:14Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-10T09:48:39Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-13T07:20:25Z", actor: "human:timo", revision: 19, decided_on: {"recorded":{"test_result":8,"review_outcome":1}}, imported: true}
 ---
 ## Acceptance
 

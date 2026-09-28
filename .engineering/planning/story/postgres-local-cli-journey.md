@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:postgres-local-cli-journey
 kind: story
 status: implemented
@@ -19,6 +19,10 @@ scope:
 - confidence: cited
   path: docs
 revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-11T17:31:52Z", actor: "agent:cv2-gitlab", revision: 3, decided_on: {"recorded":{"test_result":2}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-11T17:31:56Z", actor: "agent:cv2-gitlab", revision: 4, decided_on: {"recorded":{"test_result":2}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-11T17:50:08Z", actor: "agent:cv2-gitlab", revision: 5, decided_on: {"recorded":{"test_result":3}}, imported: true}
 ---
 ## Acceptance
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T13:46:13Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Final private GitLab runtime gate, process/TLS fixtures and documentation checks",
+    "reference": "docs/evidence/gitlab-private-runtime-20260910/README.md"
+  }
+}

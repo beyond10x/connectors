@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T16:20:00Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-connection-readiness",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:connection-semantics-r1-20260908",
+    "reference": "docs/evidence/connection-semantics-20260908/dispositions.md#CS-A06",
+    "review": "review-result:connection-semantics-r1-20260908",
+    "outcome": "fixed"
+  }
+}

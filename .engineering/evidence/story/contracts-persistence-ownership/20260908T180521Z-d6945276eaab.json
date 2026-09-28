@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T18:05:21Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-persistence-ownership",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "review-result:profile-persistence-b-recheck1-20260908",
+    "reference": "docs/evidence/profile-persistence-20260908/reviews/b-recheck1-report.md"
+  }
+}

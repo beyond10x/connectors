@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T15:12:56Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 13,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Production GitLab CLI owner/restart fixtures, qualified native custody, full Rust 1.88 gate and website checks",
+    "reference": "docs/evidence/gitlab-cli-owner-20260910/README.md"
+  }
+}

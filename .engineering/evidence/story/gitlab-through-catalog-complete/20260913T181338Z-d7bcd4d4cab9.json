@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-13T18:13:38Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-through-catalog-complete",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "sandbox shipped.sh: 11 reads 200, merge applied 1 PUT, 3 guard refusals 0 PUTs",
+    "reference": "docs/evidence/gitlab-sandbox-20260913/shipped.log"
+  }
+}

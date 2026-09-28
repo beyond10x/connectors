@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-12T01:28:25Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-settlement-pass-1-20260912",
+    "reference": "guarded_merge.rs mode 10 final disclosure admission, finding 3",
+    "review": "review-result:adversary-settlement-pass-1-20260912",
+    "outcome": "fixed"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:profile-persistence-a-recheck1-20260908
 kind: review-result
 status: archived
@@ -8,6 +8,8 @@ relations:
 - reviews: story:contracts-discovery-profiles
 - reviews: story:contracts-persistence-ownership
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:53:34Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent recheck A — discovery profiles and persistence ownership
 

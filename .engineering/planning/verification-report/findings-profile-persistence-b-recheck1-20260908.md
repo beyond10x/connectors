@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: verification-report:findings-profile-persistence-b-recheck1-20260908
 kind: verification-report
 status: draft

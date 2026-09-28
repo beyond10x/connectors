@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:sessions-model-r2-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Session model final independent recheck
 relations:
 - reviews: story:contracts-session-revocation
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:53:59Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent session specification review B — recheck
 

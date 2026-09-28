@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T17:28:48Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-discovery-coverage",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:discovery-a-recheck1-20260908",
+    "reference": "docs/evidence/discovery-coverage-20260908/dispositions.md#dc-a-r2-02",
+    "review": "review-result:discovery-a-recheck1-20260908",
+    "outcome": "fixed"
+  }
+}

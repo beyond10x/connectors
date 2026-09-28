@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-13T13:36:56Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v080",
+  "kind": "release-plan",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/releases/tag/v0.8.0"
+  }
+}

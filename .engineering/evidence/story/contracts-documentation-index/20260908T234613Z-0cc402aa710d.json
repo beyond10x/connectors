@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T23:46:13Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-documentation-index",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full repository gate and MSRV at d1dc83f5, exit 0; specification checks and existing 58 Rust tests",
+    "reference": "docs/evidence/spec-completion-20260909/checkpoint.md"
+  }
+}

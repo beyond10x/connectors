@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T10:08:18Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Local CLI foundation gate and MSRV; not GitLab journey acceptance",
+    "reference": "docs/evidence/local-runtime-20260910/README.md"
+  }
+}

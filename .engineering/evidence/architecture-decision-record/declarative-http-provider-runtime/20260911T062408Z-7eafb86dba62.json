@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T06:24:08Z",
+  "actor": "human:timo",
+  "artifact": "architecture-decision-record:declarative-http-provider-runtime",
+  "kind": "architecture-decision-record",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "operator instruction relayed in the authorized session handoff, msg-from-cv2-aep-to-cv2-gitlab.md",
+    "reference": "home-path:sha256:01c5085a041026ae9259c346a8ef7898678a64b01d6db516e501492c2dfda783"
+  }
+}

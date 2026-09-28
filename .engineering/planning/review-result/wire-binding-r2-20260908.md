@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:wire-binding-r2-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Independent service binding recheck
 relations:
 - reviews: story:contracts-wire-compatibility
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:54:17Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent E02 recheck B, round 1
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T01:31:04Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Production approval CLI, GitLab restart journeys and full Rust 1.88 gate",
+    "reference": "docs/evidence/local-approval-issuance-20260911/README.md"
+  }
+}

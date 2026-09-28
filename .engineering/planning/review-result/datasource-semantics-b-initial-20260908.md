@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:datasource-semantics-b-initial-20260908
 kind: review-result
 status: archived
@@ -8,6 +8,8 @@ relations:
 - reviews: story:contracts-log-continuation
 - reviews: story:contracts-document-admission
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:51:45Z", actor: "human:timo", revision: 2, imported: true}
 ---
 needs-revision
 

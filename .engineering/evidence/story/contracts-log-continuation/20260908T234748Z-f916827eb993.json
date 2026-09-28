@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T23:47:48Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-log-continuation",
+  "kind": "story",
+  "revision": 13,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "LD-B-01 through LD-B-04 resolved; final A and B approve",
+    "reference": "adapters/loki/contracts/logs/v1alpha1/evidence/20260909/scenarios.md",
+    "review": "review-result:datasource-semantics-b-initial-20260908",
+    "outcome": "fixed"
+  }
+}

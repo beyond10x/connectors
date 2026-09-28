@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-09T13:51:19Z",
+  "actor": "human:timo",
+  "artifact": "story:local-cli-binding-semantics",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:cli-semantic-adversary-r1-20260909",
+    "reference": ".engineering/planning/review-result/cli-semantic-adversary-r2-20260909.md",
+    "review": "review-result:cli-semantic-adversary-r1-20260909",
+    "outcome": "fixed"
+  }
+}

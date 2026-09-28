@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-10T21:05:14Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-mr-validation",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:gitlab-validation-acceptance-round-1",
+    "reference": "story:gitlab-mr-validation@3#single-transition",
+    "review": "review-result:gitlab-validation-acceptance-round-1",
+    "outcome": "fixed"
+  }
+}

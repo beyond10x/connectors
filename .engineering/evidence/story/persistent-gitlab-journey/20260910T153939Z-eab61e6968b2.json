@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T15:39:39Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Final local GitLab revalidation gate, native CLI/custody fixtures, generation and website checks",
+    "reference": "docs/evidence/gitlab-revalidation-20260910/README.md"
+  }
+}

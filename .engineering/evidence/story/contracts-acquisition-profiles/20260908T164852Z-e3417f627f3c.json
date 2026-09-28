@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T16:48:52Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-acquisition-profiles",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:auth-access-a-r1-20260908",
+    "reference": "docs/evidence/auth-profile-budget-20260908/dispositions.md#ap-a-06",
+    "review": "review-result:auth-access-a-r1-20260908",
+    "outcome": "fixed"
+  }
+}

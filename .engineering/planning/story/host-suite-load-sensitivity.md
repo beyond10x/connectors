@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:host-suite-load-sensitivity
 kind: story
 status: implemented
@@ -34,6 +34,10 @@ scope:
 - confidence: cited
   path: crates/connectors-host/src/local/registry/tests.rs
 revision: 15
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-27T07:41:09Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-27T07:41:25Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-27T10:46:06Z", actor: "human:timo", revision: 15, decided_on: {"recorded":{"test_result":2}}, imported: true}
 ---
 ## Acceptance
 

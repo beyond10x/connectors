@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:remove-native-gitlab-adapter
 kind: story
 status: implemented
@@ -9,6 +9,10 @@ relations:
 - derived_from: specification:catalog-http-runtime-handoff
 - serves: vision:independent-contract-adapters
 revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-14T20:20:36Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-14T20:20:39Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-14T20:48:51Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":3}}, imported: true}
 ---
 ## Outcome
 

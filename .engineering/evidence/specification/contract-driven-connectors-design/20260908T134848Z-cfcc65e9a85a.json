@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T13:48:48Z",
+  "actor": "human:timo",
+  "artifact": "specification:contract-driven-connectors-design",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "B-F09: Fixed. SQL setup, wrapper and Bind bytes are asserted; wire round-trip checks the outcome; named branch gaps have focused coverage.",
+    "reference": "docs/independent-review-response-2026-09-08.md#every-source-finding",
+    "review": "review-result:independent-repository-b-20260908",
+    "outcome": "fixed"
+  }
+}

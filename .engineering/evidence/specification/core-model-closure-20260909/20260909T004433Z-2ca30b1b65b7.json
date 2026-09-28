@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T00:44:33Z",
+  "actor": "human:timo",
+  "artifact": "specification:core-model-closure-20260909",
+  "kind": "specification",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full repository gate with MSRV on 7e8c718; exit 0, 58 Rust tests and ESS structural checks",
+    "reference": "docs/evidence/core-model-closure-20260909/full-gate-7e8c718.log"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T23:02:01Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Policy metadata port only: 12 tests and Rust 1.88 gate passed; guarded CLI merge and sandbox acceptance still pending",
+    "reference": "docs/evidence/local-approval-policy-20260911/README.md"
+  }
+}

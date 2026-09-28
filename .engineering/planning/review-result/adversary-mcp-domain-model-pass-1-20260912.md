@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-mcp-domain-model-pass-1-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 1 — MCP domain model, wave 2
 relations:
 - reviews: story:mcp-domain-model
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:49:59Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ```
 unit: mcp-w2 — story:mcp-domain-model at d5270ca, worktree cv2-mcp-w1-20260912

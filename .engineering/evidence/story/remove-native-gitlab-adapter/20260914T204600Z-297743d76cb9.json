@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-14T20:46:00Z",
+  "actor": "human:timo",
+  "artifact": "story:remove-native-gitlab-adapter",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "sandbox retire.sh on the post-removal connectors-catalog-provider: 11 reads 200, 3 guarded write attempts refused before dispatch, 0 PUTs",
+    "reference": "docs/evidence/gitlab-retirement-20260914/retire.log"
+  }
+}

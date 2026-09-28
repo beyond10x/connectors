@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:idempotency-semantics-r1-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Idempotency independent semantics review, round 1
 relations:
 - reviews: story:contracts-idempotency-scope
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:52:34Z", actor: "human:timo", revision: 2, imported: true}
 ---
 needs-revision
 

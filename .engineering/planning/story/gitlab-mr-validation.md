@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:gitlab-mr-validation
 kind: story
 status: implemented
@@ -22,6 +22,10 @@ scope:
 - confidence: inferred
   path: website
 revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-10T21:05:16Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"review_outcome":2}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-10T21:05:17Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":2}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-13T07:20:32Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":2,"review_outcome":2}}, imported: true}
 ---
 ## Outcome
 

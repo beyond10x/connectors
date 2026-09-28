@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-12T01:03:36Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-settlement-pass-1-20260912",
+    "reference": "docs/gitlab-write-failure-matrix.md Attempt terminal settlement row, finding 1",
+    "review": "review-result:adversary-settlement-pass-1-20260912",
+    "outcome": "fixed"
+  }
+}

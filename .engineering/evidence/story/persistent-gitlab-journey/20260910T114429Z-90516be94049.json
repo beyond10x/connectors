@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T11:44:29Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Explicit disposable Secret Service tests and full Connectors gate with Rust 1.88; persistent CLI acceptance remains incomplete",
+    "reference": "docs/evidence/gitlab-custody-20260910/README.md"
+  }
+}

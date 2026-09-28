@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: initiative:complete-local-connectors
 kind: initiative
 status: active
@@ -11,6 +11,9 @@ relations:
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
 revision: 35
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-10T09:49:45Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-10T09:49:46Z", actor: "human:timo", revision: 3, imported: true}
 ---
 ## Outcome and authority
 

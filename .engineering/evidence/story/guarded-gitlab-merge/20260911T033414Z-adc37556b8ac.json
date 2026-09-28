@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T03:34:14Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 17,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Owner restart/crash and revoked preflight audit: eight production CLI journeys and full Rust 1.88 gate",
+    "reference": "docs/evidence/gitlab-owner-recovery-20260911/README.md"
+  }
+}
