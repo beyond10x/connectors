@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T18:05:22Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-persistence-ownership",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "ESS 0.20.0 value/compile checks, textual audit and existing full gate/MSRV; no new runtime conformance",
+    "reference": "docs/evidence/profile-persistence-20260908/verification.md"
+  }
+}

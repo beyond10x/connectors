@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-mcp-specification-pin-pass-1-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 1 — MCP specification pin, wave 1
 relations:
 - reviews: story:mcp-specification-pin
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:50:19Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ```
 unit: mcp-w1 — story:mcp-specification-pin, worktree cv2-mcp-w1-20260912, commit 4192883 plus one untracked test file

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:mcp-plan-critic-acceptance-r2-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Acceptance critic, MCP decomposition, round 2
 relations:
 - reviews: story:mcp-inbound-local-binding
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:52:43Z", actor: "human:timo", revision: 2, imported: true}
 ---
 needs-revision
 

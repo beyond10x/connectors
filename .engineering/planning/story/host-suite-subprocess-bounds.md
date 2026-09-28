@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:host-suite-subprocess-bounds
 kind: story
 status: implemented
@@ -18,6 +18,10 @@ scope:
 - confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
 revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-27T12:41:20Z", actor: "human:timo", revision: 6, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-27T12:41:41Z", actor: "human:timo", revision: 7, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-27T14:39:01Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Acceptance
 

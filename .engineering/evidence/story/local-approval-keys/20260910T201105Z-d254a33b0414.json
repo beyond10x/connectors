@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-10T20:11:05Z",
+  "actor": "human:timo",
+  "artifact": "story:local-approval-keys",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:approval-keys-acceptance-round-1",
+    "reference": "acceptance-single-transition",
+    "review": "review-result:approval-keys-acceptance-round-1",
+    "outcome": "fixed"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T13:48:45Z",
+  "actor": "human:timo",
+  "artifact": "specification:contract-driven-connectors-design",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "A-M4: Fixed. The mutation/idempotency stories name commits `34f298a`/`8903166` instead of saying uncommitted.",
+    "reference": "docs/independent-review-response-2026-09-08.md#every-source-finding",
+    "review": "review-result:independent-repository-a-20260908",
+    "outcome": "fixed"
+  }
+}

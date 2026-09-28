@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T06:22:43Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full Rust 1.88 gate; exact audit recovery and write-protocol tests; 11 production GitLab CLI journeys plus inert fixture entry; source/runtime hash and reference checks",
+    "reference": "docs/evidence/gitlab-audit-ack-recovery-20260911/README.md"
+  }
+}

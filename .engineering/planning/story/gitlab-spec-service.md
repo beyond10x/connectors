@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:gitlab-spec-service
 kind: story
 status: implemented
@@ -30,6 +30,10 @@ scope:
 - confidence: cited
   path: spec-kinds
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T06:46:52Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T06:46:52Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T07:37:33Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Context and decision
 

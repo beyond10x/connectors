@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-12T09:39:12Z",
+  "actor": "human:timo",
+  "artifact": "story:kubernetes-helm-release-reads",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv on wave/helm-reads-20260912 at 8cf80b8",
+    "reference": "file://home-path:sha256:4cbcc985d562cd5ba59cd2a0c3985a0b8ef18883f5d4c93bc7854336d99c2a67"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T14:19:16Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-session-revocation",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "B-S3",
+    "reference": "contracts/sessions/v1alpha1/verification.md#independent-review-corrections",
+    "review": "review-result:sessions-model-r1-20260908",
+    "outcome": "fixed"
+  }
+}

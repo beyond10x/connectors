@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T21:38:02Z",
+  "actor": "human:timo",
+  "artifact": "story:shared-ess-provider-boundary",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:ess-boundary-semantics-initial-20260908",
+    "reference": "docs/evidence/ess-boundary-20260908/checkpoint.md#esb-s-01",
+    "review": "review-result:ess-boundary-semantics-initial-20260908",
+    "outcome": "fixed"
+  }
+}

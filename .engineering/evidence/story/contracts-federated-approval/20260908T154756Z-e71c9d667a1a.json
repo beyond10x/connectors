@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T15:47:56Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-federated-approval",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:federation-subjects-r1-20260908",
+    "reference": "docs/evidence/federated-approval-20260908/verification.md#F03-A02",
+    "review": "review-result:federation-subjects-r1-20260908",
+    "outcome": "fixed"
+  }
+}

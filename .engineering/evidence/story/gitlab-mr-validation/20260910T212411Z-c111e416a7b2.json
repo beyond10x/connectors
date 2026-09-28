@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T21:24:11Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-mr-validation",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust 1.88 gate; 12 native MR tests; six final production CLI fixture journeys; local image and website checks",
+    "reference": "docs/evidence/gitlab-mr-validation-20260910/README.md"
+  }
+}

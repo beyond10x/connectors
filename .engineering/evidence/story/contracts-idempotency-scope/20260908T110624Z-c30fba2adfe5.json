@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T11:06:24Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-idempotency-scope",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:idempotency-semantics-r2-20260908",
+    "reference": "contracts/operations/v1alpha1/idempotency-verification.md",
+    "review": "review-result:idempotency-semantics-r2-20260908",
+    "outcome": "no-op"
+  }
+}

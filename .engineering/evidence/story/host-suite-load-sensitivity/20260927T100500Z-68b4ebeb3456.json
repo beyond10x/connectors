@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-27T10:05:00Z",
+  "actor": "human:timo",
+  "artifact": "story:host-suite-load-sensitivity",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-host --lib x3 under load 25-37: 166 passed each, at e77049daa"
+  }
+}

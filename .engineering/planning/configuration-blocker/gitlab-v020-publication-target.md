@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: configuration-blocker:gitlab-v020-publication-target
 kind: configuration-blocker
 status: cleared
@@ -9,6 +9,8 @@ relations:
 - blocks: release-plan:connectors-v030
 - blocks: release-plan:connectors-v080
 revision: 2
+transitions:
+- {from: "open", to: "cleared", at: "2026-09-13T13:34:48Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ## Missing input
 

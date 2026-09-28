@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:guarded-merge-acceptance-round-1
 kind: review-result
 status: archived
@@ -8,6 +8,8 @@ relations:
 - reviews: story:guarded-gitlab-merge
 - reviews: initiative:complete-local-connectors
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-10T22:59:27Z", actor: "human:timo", revision: 2, imported: true}
 ---
 approve
 

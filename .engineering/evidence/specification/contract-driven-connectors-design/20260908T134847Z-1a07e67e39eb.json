@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T13:48:47Z",
+  "actor": "human:timo",
+  "artifact": "specification:contract-driven-connectors-design",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "B-F01: Fixed. Fixture write/probe serialization; 100/100 default-thread runs pass.",
+    "reference": "docs/independent-review-response-2026-09-08.md#every-source-finding",
+    "review": "review-result:independent-repository-b-20260908",
+    "outcome": "fixed"
+  }
+}

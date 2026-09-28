@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T20:31:52Z",
+  "actor": "human:timo",
+  "artifact": "story:local-cli-ess-surface",
+  "kind": "story",
+  "revision": 31,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv, exit 0; pinned ESS full task check exit 0; final website build and reference check pass",
+    "reference": ".local/cli-contract-wave-20260909/integration-evidence/connectors/connectors-full-gate-04.log"
+  }
+}

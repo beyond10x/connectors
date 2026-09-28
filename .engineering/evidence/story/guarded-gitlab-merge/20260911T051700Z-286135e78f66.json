@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T05:17:00Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 21,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Background recovery: 11 production CLI journeys and fixture driver; ledger/worker failures; Rust 1.88 full gate; docs and executable identity checks",
+    "reference": "docs/evidence/gitlab-background-recovery-20260911/README.md"
+  }
+}

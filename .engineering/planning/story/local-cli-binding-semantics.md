@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:local-cli-binding-semantics
 kind: story
 status: implemented
@@ -13,6 +13,10 @@ scope:
 - confidence: cited
   path: ess/domains/cli.yaml
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-09T12:29:11Z", actor: "human:timo", revision: 6, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-09T12:29:13Z", actor: "human:timo", revision: 7, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-09T18:35:16Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}, imported: true}
 ---
 ## Context
 The observed journeys C01-C05 in docs/recent-adapter-usage-20260909.md require a usable local CLI. docs/design.md sections 17 and 32 require local infrastructure independence. contracts/auth/management.md keeps management with host coordinators; ess/domains/auth_bindings.yaml already models connection/acquisition/custody ownership.

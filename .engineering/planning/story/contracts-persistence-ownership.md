@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-persistence-ownership
 kind: story
 status: implemented
@@ -50,6 +50,10 @@ scope:
 - confidence: inferred
   path: ess/domains/refresh.yaml
 revision: 17
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T17:41:03Z", actor: "human:timo", revision: 14, decided_on: {"recorded":{"review_outcome":1}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T17:41:04Z", actor: "human:timo", revision: 15, decided_on: {"recorded":{"review_outcome":1}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T18:06:58Z", actor: "human:timo", revision: 17, decided_on: {"recorded":{"test_result":1,"approval":2,"review_outcome":13}}, imported: true}
 ---
 ## Context
 

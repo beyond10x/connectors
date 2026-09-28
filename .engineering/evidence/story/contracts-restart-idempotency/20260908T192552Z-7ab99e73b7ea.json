@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T19:25:52Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-restart-idempotency",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:mutation-profiles-b-initial-20260908",
+    "reference": "docs/evidence/restart-visibility-20260908/dispositions.md#mp-b-05",
+    "review": "review-result:mutation-profiles-b-initial-20260908",
+    "outcome": "fixed"
+  }
+}

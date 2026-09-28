@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-mcp-inbound-local-binding-pass-2-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 2 — MCP inbound local binding, wave 4a
 relations:
 - reviews: story:mcp-inbound-local-binding
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:50:06Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ```
 unit: mcp-w4a

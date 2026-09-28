@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:catalog-bundle-pipeline
 kind: story
 status: implemented
@@ -18,6 +18,10 @@ scope:
 - confidence: cited
   path: crates/connectors-catalog/tests/pipeline.rs
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-11T16:25:19Z", actor: "agent:cv2-aep", revision: 5, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-11T16:25:21Z", actor: "agent:cv2-aep", revision: 6, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-11T16:36:18Z", actor: "agent:cv2-aep", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}, imported: true}
 ---
 ## Outcome
 

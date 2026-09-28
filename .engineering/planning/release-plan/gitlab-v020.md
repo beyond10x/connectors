@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: release-plan:gitlab-v020
 kind: release-plan
 status: active
@@ -8,6 +8,8 @@ relations:
 - informed_by: initiative:complete-local-connectors
 - informed_by: story:gitlab-mr-validation
 revision: 3
+transitions:
+- {from: "draft", to: "active", at: "2026-09-10T23:29:22Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ## Scope and authority
 

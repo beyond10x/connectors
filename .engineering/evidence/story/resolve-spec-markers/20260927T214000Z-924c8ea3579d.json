@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-27T21:40:00Z",
+  "actor": "human:timo",
+  "artifact": "story:resolve-spec-markers",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv exit 0 at load 40 (0badf3fb1 content)"
+  }
+}

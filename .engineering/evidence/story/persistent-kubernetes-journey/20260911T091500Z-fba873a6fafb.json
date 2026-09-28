@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T09:15:00Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-kubernetes-journey",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --release -p connectors-gitlab --test local_runtime -- --ignored",
+    "reference": "docs/evidence/kubernetes-local-cli-20260911/gitlab-journeys.log.gz"
+  }
+}

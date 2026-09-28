@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T08:05:29Z",
+  "actor": "human:timo",
+  "artifact": "story:full-review-remediation",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Unified Rust gate: 35 tests, offline builds, generation, Clippy, dependency boundaries, Rust 1.88 all-target checks and zero-finding audit",
+    "reference": "docs/evidence/review-2026-09-08/"
+  }
+}

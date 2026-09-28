@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T16:20:02Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-connection-readiness",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:connection-ownership-r1-20260908",
+    "reference": "docs/evidence/connection-semantics-20260908/dispositions.md#RCB-08",
+    "review": "review-result:connection-ownership-r1-20260908",
+    "outcome": "fixed"
+  }
+}

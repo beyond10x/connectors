@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T23:47:52Z",
+  "actor": "human:timo",
+  "artifact": "specification:spec-completion-parallel-20260909",
+  "kind": "specification",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "SCA-01 corrected in 2360f1f and rechecked by final A and B",
+    "reference": "docs/evidence/spec-completion-20260909/checkpoint.md",
+    "review": "review-result:spec-completion-a-initial-20260909",
+    "outcome": "fixed"
+  }
+}

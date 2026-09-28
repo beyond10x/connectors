@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:local-cli-ess-surface
 kind: story
 status: implemented
@@ -65,6 +65,10 @@ scope:
 - confidence: inferred
   path: website/publication.json
 revision: 32
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-09T18:35:18Z", actor: "human:timo", revision: 29, decided_on: {"recorded":{"review_outcome":1}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-09T18:35:19Z", actor: "human:timo", revision: 30, decided_on: {"recorded":{"review_outcome":1}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-09T20:31:53Z", actor: "human:timo", revision: 32, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}, imported: true}
 ---
 ## Context
 ESS release 0.20.0 currently cannot place service-forwarding CLI calls while preserving component ownership; parameterized view projection and process contracts are incomplete. The approved sibling ESS story cli-presentation-binding supplies an additive, versioned presentation binding. Existing apps/connectors/src/main.rs remains the runtime baseline until a separately scoped runtime story.

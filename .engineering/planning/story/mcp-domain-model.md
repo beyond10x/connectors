@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:mcp-domain-model
 kind: story
 status: implemented
@@ -16,6 +16,10 @@ scope:
 - confidence: inferred
   path: adapters/mcp/spec/ess/system.yaml
 revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-12T09:31:33Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-12T09:31:35Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-12T10:10:21Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":14}}, imported: true}
 ---
 ## Acceptance
 

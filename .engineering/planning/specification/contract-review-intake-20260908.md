@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: specification:contract-review-intake-20260908
 kind: specification
 status: draft

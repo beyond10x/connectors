@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T13:48:44Z",
+  "actor": "human:timo",
+  "artifact": "specification:contract-driven-connectors-design",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "A-M3: Fixed. All 17 semantic documents are indexed; 22 rows are counted separately; configuration is deferred explicitly. Broader adapter-matrix reconciliation retains its existing story owner.",
+    "reference": "docs/independent-review-response-2026-09-08.md#every-source-finding",
+    "review": "review-result:independent-repository-a-20260908",
+    "outcome": "fixed"
+  }
+}

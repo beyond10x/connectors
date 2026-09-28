@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: release-plan:connectors-v030
 kind: release-plan
 status: superseded
@@ -7,6 +7,8 @@ title: Release v0.3.0 from the merged local Connectors increment
 relations:
 - informed_by: initiative:complete-local-connectors
 revision: 2
+transitions:
+- {from: "draft", to: "superseded", at: "2026-09-12T10:30:03Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ## Scope
 

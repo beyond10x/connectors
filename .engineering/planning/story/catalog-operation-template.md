@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:catalog-operation-template
 kind: story
 status: implemented
@@ -16,6 +16,10 @@ scope:
 - confidence: cited
   path: crates/connectors-catalog/tests/template.rs
 revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-11T15:11:55Z", actor: "agent:cv2-aep", revision: 5, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-11T15:11:58Z", actor: "agent:cv2-aep", revision: 6, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-11T16:05:07Z", actor: "agent:cv2-aep", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}, imported: true}
 ---
 ## Outcome
 

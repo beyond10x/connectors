@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-09T00:47:36Z",
+  "actor": "human:timo",
+  "artifact": "specification:core-model-closure-20260909",
+  "kind": "specification",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:core-model-a-final-20260909",
+    "reference": "docs/evidence/core-model-closure-20260909/reviews/reviewer-a-final.md",
+    "review": "review-result:core-model-a-final-20260909",
+    "outcome": "no-op"
+  }
+}

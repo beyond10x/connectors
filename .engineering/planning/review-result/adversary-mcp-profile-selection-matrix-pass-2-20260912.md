@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-mcp-profile-selection-matrix-pass-2-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 2 — MCP profile selection matrix, wave 3
 relations:
 - reviews: story:mcp-profile-selection-matrix
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:50:16Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ```
 unit: mcp-w3 story:mcp-profile-selection-matrix, worktree cv2-mcp-w1-20260912 at cc7b121

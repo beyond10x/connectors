@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: epic:contract-semantics-remediation
 kind: epic
 status: implemented
@@ -10,6 +10,10 @@ relations:
 - derived_from: specification:contract-driven-connectors-design
 - informed_by: specification:contract-review-intake-20260908
 revision: 22
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T10:27:50Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T10:27:50Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-09T00:09:07Z", actor: "human:timo", revision: 22, decided_on: {"recorded":{"test_result":1,"approval":1}}, imported: true}
 ---
 ## Context
 

@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-12T02:12:02Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-settlement-pass-2-20260912",
+    "reference": "guarded_merge.rs:682 refusal shape assertion, finding B",
+    "review": "review-result:adversary-settlement-pass-2-20260912",
+    "outcome": "fixed"
+  }
+}

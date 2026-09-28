@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:cli-toolchain-adversary-r1-20260909
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Exact-source ESS toolchain adversary, round 1
 relations:
 - reviews: story:local-cli-ess-surface
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:51:19Z", actor: "human:timo", revision: 2, imported: true}
 ---
 unit: story:local-cli-ess-surface exact-source toolchain ATTACK1; working tree cli-toolchain-20260909 at base 88c036562f6ae011bd5cb0ce8e4d4671146b4922
 verdict: nothing found

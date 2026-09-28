@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-13T16:26:04Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0100",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "gate --msrv on the release tree; hosted release page",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.10.0"
+  }
+}

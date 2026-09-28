@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-27T15:45:00Z",
+  "actor": "human:timo",
+  "artifact": "story:host-suite-subprocess-bounds",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv exit 0 on ffcdd03a7; connectors-host --lib 175 passed x3"
+  }
+}

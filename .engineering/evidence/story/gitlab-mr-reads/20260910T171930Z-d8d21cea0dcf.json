@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T17:19:30Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-mr-reads",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Final MR gate, five production CLI journeys, website and local packaging",
+    "reference": "docs/evidence/gitlab-mr-20260910/README.md"
+  }
+}

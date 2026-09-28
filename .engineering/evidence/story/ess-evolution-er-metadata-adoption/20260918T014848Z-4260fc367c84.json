@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-18T01:48:48Z",
+  "actor": "human:timo",
+  "artifact": "story:ess-evolution-er-metadata-adoption",
+  "kind": "story",
+  "revision": 20,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Original no-trace disposable Secret Service production CLI status/revoke/repeated-revoke/retirement/restart passed on authored ReadUse correction; 283.24s. Populated revoked legacy migration/reopen and fresh admission guard also passed. Whole M7 gate and integration remain open.",
+    "reference": "ess-evolution-local/waves/0012-connectors-adoption/host-audit-diagnostic/source-findings.json"
+  }
+}

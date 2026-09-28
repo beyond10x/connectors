@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: release-plan:connectors-v090
 kind: release-plan
 status: implemented
@@ -7,6 +7,9 @@ title: Release v0.9.0 from the live-provider GitLab acceptance
 relations:
 - informed_by: initiative:complete-local-connectors
 revision: 4
+transitions:
+- {from: "draft", to: "active", at: "2026-09-13T13:37:20Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-13T13:43:29Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 <!-- Starting point for a `release-plan` artifact. There is no `artifacts/kinds/release-plan.yaml` yet,
      so these sections are a suggestion rather than a declared expectation. -->

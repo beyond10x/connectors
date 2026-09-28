@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:ess-evolution-er-metadata-adoption
 kind: story
 status: implemented
@@ -71,6 +71,10 @@ scope:
 - confidence: cited
   path: ess
 revision: 31
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-16T21:11:16Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-16T21:11:18Z", actor: "human:timo", revision: 6, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-25T12:22:27Z", actor: "human:timo", revision: 31, decided_on: {"recorded":{"test_result":5}}, imported: true}
 ---
 # M7 — complete Connectors ER metadata adoption
 

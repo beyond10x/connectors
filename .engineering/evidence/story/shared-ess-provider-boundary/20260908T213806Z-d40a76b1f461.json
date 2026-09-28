@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T21:38:06Z",
+  "actor": "human:timo",
+  "artifact": "story:shared-ess-provider-boundary",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run -p connectors-build --locked --offline -- gate --msrv",
+    "reference": "docs/evidence/ess-boundary-20260908/full-gate.log"
+  }
+}

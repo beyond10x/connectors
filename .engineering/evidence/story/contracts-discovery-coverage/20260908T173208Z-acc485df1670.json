@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T17:32:08Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-discovery-coverage",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "ESS 0.20.0 shape/compile checks; textual audit; existing project gate/MSRV (no new runtime conformance)",
+    "reference": "docs/evidence/discovery-coverage-20260908/verification.md"
+  }
+}

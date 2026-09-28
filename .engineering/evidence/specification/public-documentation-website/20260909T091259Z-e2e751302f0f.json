@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T09:12:59Z",
+  "actor": "human:timo",
+  "artifact": "specification:public-documentation-website",
+  "kind": "specification",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "b10x UI/UX overhaul: browser navigation/search/themes, production walkthroughs, public indexing audit and repository gate",
+    "reference": "docs/website-verification.md"
+  }
+}

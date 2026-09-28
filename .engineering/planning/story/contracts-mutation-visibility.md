@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-mutation-visibility
 kind: story
 status: implemented
@@ -30,6 +30,10 @@ scope:
 - confidence: inferred
   path: ess/domains/declarations.yaml
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T18:48:55Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T18:48:56Z", actor: "human:timo", revision: 6, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T19:25:57Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"approval":2,"review_outcome":3}}, imported: true}
 ---
 ## Context
 

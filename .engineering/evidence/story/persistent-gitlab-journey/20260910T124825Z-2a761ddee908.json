@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T12:48:25Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "SQLite registry, native custody restart, CLI management and Rust 1.88 gate",
+    "reference": "docs/evidence/gitlab-registry-20260910/README.md"
+  }
+}
