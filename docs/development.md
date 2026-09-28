@@ -29,44 +29,24 @@ release profile and the bridge deadline are unchanged.
 
 ## Pinned tools
 
-The ESS evolution selection is ESS 0.36.0 at
-`be44a3365eb273cb3d447b74cd5b0e75181d284e` and AEP 0.64.0 at
-`58433bd85a1ccf939566c53d5543df86c3852b19`. The Cargo dependencies select Entity
-Runtime 0.23.0 at `77aac6eac95d0392a00e8dee8d04038ef70e47de` and Eventlog 0.4.0 at
-`70096af8c231fedf6d2206c97ce2940b99aecdb8`; ESS 0.36.0 additionally brings Entity
-Runtime Core 0.24.1 at `4746bd7cc37d27c7cc5815c44a62a96f3ddc1f44` through
-`ess-entity-runtime`. AEP additionally carries the digest-pinned
-[findings correction](../crates/connectors-build/aep-findings.patch): it recognizes
-explicit empty findings blocks and source-bound transcriptions of immutable legacy
-reviews. This is a local patch on current AEP source, not an upstream released fix;
-AEP 0.64.0 does not contain it, so the patch is carried forward onto that source.
-Remove the patch when selecting an upstream commit that contains the correction.
+The repository pins released tool versions, not source builds: ESS 0.40.0 in
+[`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json)
+and AEP 0.65.0 in [`crates/connectors-build/aep-toolchain.json`](../crates/connectors-build/aep-toolchain.json).
+Use the `ess` and `aep` executables the Beyond10x plugins install (`b10x upgrade`
+keeps them current). The Cargo dependencies select Entity Runtime 0.25.1 and
+Eventlog 0.6.0; ESS 0.40.0 additionally brings Entity Runtime Core 0.24.1 through
+`ess-entity-runtime`.
 
-The transcription practice the second clause was written for stopped on 2026-09-15:
-do not transcribe a `review-result` into a `verification-report`. Record findings in
-the review-result itself, in its findings block; author a `verification-report` only
-when a story or a gate actually consumes it. The 52 existing drafts under
-`.engineering/planning/verification-report/` stay as history and are neither deleted
-nor rewritten, so the patch keeps its transcription clause to hold them valid — that
-clause is what makes them pass, not authority to add another. No script and no task
-target performs the transcription, so nothing is disabled to stop it; it was an
-authoring practice and this paragraph retires it.
+The gate selects `--ess`, then `CONNECTORS_ESS`, then `ess` on PATH, and likewise
+`--aep`, then `CONNECTORS_AEP`, then `aep` on PATH. A candidate is accepted only when
+its `--version` names the pinned release exactly; an explicit selection that does
+not refuses without fallback. Resolution never installs or replaces a binary.
 
-Build from reviewed local Git repositories containing those exact commits:
-
-```sh
-cargo run --locked -p connectors-build -- toolchain --source /path/to/ess
-cargo run --locked -p connectors-build -- aep-toolchain --source /path/to/aep
-```
-
-The commands print the selected executable paths. For interactive planning, set
-`CONNECTORS_AEP` to the second path and invoke `"$CONNECTORS_AEP" plan artifact ...`.
-The gate selects `--aep`, then `CONNECTORS_AEP`, then its source-and-patch-keyed cache,
-then PATH candidates. It checks a local build receipt and binary digest before even
-running `--version`; an explicit invalid selection refuses without fallback. Tool
-resolution never installs or replaces a global binary. AEP source builds use only
-committed Git objects plus the pinned patch, so unrelated working-tree edits cannot
-enter the binary. These receipts record local builds, not signed upstream attestations.
+Do not transcribe a `review-result` into a `verification-report` (practice stopped
+2026-09-15). Record findings in the review-result itself, in its findings block;
+author a `verification-report` only when a story or a gate actually consumes it.
+The 52 existing drafts under `.engineering/planning/verification-report/` stay as
+history and are neither deleted nor rewritten.
 
 ESS 0.22 introduces generated-output ownership. On a checkout whose existing CLI
 fixture has no local ownership record, generate a fresh reference and adopt only
@@ -80,8 +60,7 @@ byte-identical output before regenerating it. `--check` needs no adoption:
 cargo run --locked -p connectors-build -- cli
 ```
 
-Use a fresh task-owned reference path. Set `CONNECTORS_ESS` to the path printed by
-the ESS build command. Preserve an adoption refusal and inspect the differing
+Use a fresh task-owned reference path. Set `CONNECTORS_ESS` to the pinned `ess` release (`command -v ess`). Preserve an adoption refusal and inspect the differing
 bytes; never overwrite them to manufacture an ownership record.
 
 The gate selects authored Cargo workspace members for formatting. `cargo fmt --all`
@@ -103,12 +82,8 @@ The v2 generator (`connectors-spec --generate`, ESS-backed Rust for a GET-only
 adapter document) keeps its tests against the frozen fixture
 `crates/connectors-spec/tests/fixtures/gitlab-v2.json`, whose upstream pin names
 `adapters/gitlab/upstream/openapi_v3.yaml`; no committed adapter selects it
-today. Generation and its tests need the exact pinned ESS source build and the
-recorded rustfmt version. The shared resolver checks `--ess`, then
-`CONNECTORS_ESS`, then the commit-keyed local cache, then `ess` on PATH. It
-verifies the pinned source receipt and executable digest before using a
-candidate. Explicit selections cannot fall back to another tool. Resolution never
-installs a tool or changes PATH.
+today. Generation and its tests need the pinned ESS release and the recorded rustfmt
+version, resolved as described under [Pinned tools](#pinned-tools).
 
 Each adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:
