@@ -701,7 +701,7 @@ pub(crate) fn finish(
     files.retain(|path, _| {
         !path.starts_with("rust/.ess-output/") && !path.starts_with("write-rust/.ess-output/")
     });
-    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(source),"upstream_sha256":spec.upstream.sha256,"ess":crate::toolchain::version()?,"ess_source":crate::toolchain::source()?,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
+    let manifest = json!({"format":"connectors.generated-bundle/v1","specification_sha256":hash(source),"upstream_sha256":spec.upstream.sha256,"ess":crate::toolchain::version()?,"rustfmt":String::from_utf8_lossy(&rustfmt.stdout).trim(),"files":files.iter().map(|(path,b)|(path.clone(),hash(b))).collect::<BTreeMap<_,_>>()});
     install(out, &files, &manifest, spec, check)?;
     Ok(())
 }

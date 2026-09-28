@@ -19,17 +19,16 @@ jobs:
           path: repository
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          repository: beyond10x/aep
-          ref: 0.64.0
-          path: aep
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-      - name: Build the pinned aep
-        run: cargo build --manifest-path aep/Cargo.toml --locked --release -p aep-cli --bin aep
+      - name: Install the pinned aep release
+        run: |
+          version="$(jq -r .aep repository/crates/connectors-build/aep-toolchain.json)"
+          archive="aep-$version-x86_64-unknown-linux-gnu.tar.gz"
+          base="https://github.com/beyond10x/aep/releases/download/$version"
+          curl -fsSLO "$base/$archive"
+          curl -fsSLO "$base/SHA256SUMS"
+          grep " $archive\$" SHA256SUMS | sha256sum -c -
+          tar -xzf "$archive"
+          echo "$PWD/aep-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
       - name: Validate the planning store
         working-directory: repository
-        run: |
-          aep="$GITHUB_WORKSPACE/aep/target/release/aep"
-          "$aep" plan artifact validate
+        run: aep plan artifact validate
