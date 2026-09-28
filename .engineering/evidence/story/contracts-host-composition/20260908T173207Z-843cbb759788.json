@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T17:32:07Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-host-composition",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "review-result:discovery-a-final-20260908",
+    "reference": "docs/evidence/discovery-coverage-20260908/reviews/a-final-report.md"
+  }
+}

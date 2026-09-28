@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T08:59:38Z",
+  "actor": "human:timo",
+  "artifact": "story:ess-executable-pin",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "README gates under both PATH orders, generation 5/5, isolated missing-pin refusals",
+    "reference": "docs/verification.md"
+  }
+}

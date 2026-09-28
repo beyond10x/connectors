@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-mutation-classification
 kind: story
 status: implemented
@@ -25,6 +25,10 @@ scope:
 - confidence: inferred
   path: ess/domains/mutations.yaml
 revision: 12
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T18:22:39Z", actor: "human:timo", revision: 9, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T18:22:40Z", actor: "human:timo", revision: 10, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T18:36:18Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"approval":2,"review_outcome":5}}, imported: true}
 ---
 ## Context
 

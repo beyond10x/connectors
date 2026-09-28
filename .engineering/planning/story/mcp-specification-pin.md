@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:mcp-specification-pin
 kind: story
 status: implemented
@@ -16,6 +16,10 @@ scope:
 - confidence: inferred
   path: adapters/mcp/design.md
 revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-12T08:50:47Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-12T08:50:49Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-12T09:31:02Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":8}}, imported: true}
 ---
 ## Acceptance
 

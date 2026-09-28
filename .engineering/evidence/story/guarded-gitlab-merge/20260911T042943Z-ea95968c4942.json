@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T04:29:43Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 19,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Exact-key recovery: nine production CLI journeys and fixture driver; full repository gate with Rust 1.88; reference drift and restored runtime hashes",
+    "reference": "docs/evidence/gitlab-keyed-recovery-20260911/README.md"
+  }
+}

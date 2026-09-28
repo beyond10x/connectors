@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-12T11:39:42Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-profile-selection-matrix",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv on wave/mcp-w3-20260912 at 34d3704",
+    "reference": "docs/evidence/mcp-waves-20260912/gate.log"
+  }
+}

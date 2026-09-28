@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-13T07:20:05Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-ci-runtime",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "docs/evidence/gitlab-sandbox-20260913/README.md"
+  }
+}

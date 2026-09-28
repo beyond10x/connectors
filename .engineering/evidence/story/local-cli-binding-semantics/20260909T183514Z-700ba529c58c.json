@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T18:35:14Z",
+  "actor": "human:timo",
+  "artifact": "story:local-cli-binding-semantics",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Connectors full gate --msrv: shared and five native models compile; 64 CLI structural fixtures, cache/acquisition/page assertions and 315 conformance scenarios pass",
+    "reference": ".local/tmp/cli-wave/connectors-full-gate-02.log"
+  }
+}

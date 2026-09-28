@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T09:20:00Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-kubernetes-journey",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv",
+    "reference": "docs/evidence/kubernetes-local-cli-20260911/gate.log.gz"
+  }
+}

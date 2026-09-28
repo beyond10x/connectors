@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adapter-ownership-gate-initial-20260909
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Initial extraction layout gate review
 relations:
 - reviews: story:extractable-adapter-contract-ownership
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:49:36Z", actor: "human:timo", revision: 2, imported: true}
 ---
 approve
 

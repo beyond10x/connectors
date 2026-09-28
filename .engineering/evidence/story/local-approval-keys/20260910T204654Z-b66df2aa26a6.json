@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T20:46:54Z",
+  "actor": "human:timo",
+  "artifact": "story:local-approval-keys",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust 1.88 gate, eleven key runtime tests, five GitLab CLI journeys and website/example checks",
+    "reference": "docs/evidence/local-approval-keys-20260910/README.md"
+  }
+}

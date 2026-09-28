@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:catalog-declared-dot-segment-resolution
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Declared dot segments refused at bind time
 relations:
 - reviews: story:catalog-operation-template
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:51:12Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ## What was open
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-12T09:30:45Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-specification-pin",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv on wave/mcp-contracts-20260912 at ba39bec",
+    "reference": "file://home-path:sha256:80435ee02b0308ba7d5d90e22b8cde4beb0655713637874a75a9a4e9b284f589"
+  }
+}

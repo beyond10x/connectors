@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:mutation-outcomes-semantics-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Mutation outcomes independent semantics review
 relations:
 - reviews: story:contracts-mutation-outcomes
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:53:19Z", actor: "human:timo", revision: 2, imported: true}
 ---
 approve
 

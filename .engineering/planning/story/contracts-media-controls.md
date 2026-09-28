@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-media-controls
 kind: story
 status: implemented
@@ -32,6 +32,10 @@ scope:
 - confidence: cited
   path: docs/compositions/media-session.md
 revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T22:54:13Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T22:54:13Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T23:46:02Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"approval":2}}, imported: true}
 ---
 ## Context
 

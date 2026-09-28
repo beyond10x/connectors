@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-12T09:08:20Z",
+  "actor": "human:timo",
+  "artifact": "story:kubernetes-helm-release-reads",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-helm-reads-pass-1-20260912",
+    "review": "review-result:adversary-helm-reads-pass-1-20260912",
+    "outcome": "fixed"
+  }
+}

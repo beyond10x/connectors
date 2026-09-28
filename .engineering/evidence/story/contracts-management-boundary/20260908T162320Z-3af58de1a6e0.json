@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T16:23:20Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-management-boundary",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Connection semantics: full gate exit0, two independent final approvals, ESS/value/textual evidence",
+    "reference": "docs/evidence/connection-semantics-20260908/verification.md"
+  }
+}

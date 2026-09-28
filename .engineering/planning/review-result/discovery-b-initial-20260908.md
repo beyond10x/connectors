@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:discovery-b-initial-20260908
 kind: review-result
 status: archived
@@ -8,6 +8,8 @@ relations:
 - reviews: story:contracts-discovery-coverage
 - reviews: story:contracts-host-composition
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:51:58Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent reviewer B — discovery coverage and host composition, initial review
 

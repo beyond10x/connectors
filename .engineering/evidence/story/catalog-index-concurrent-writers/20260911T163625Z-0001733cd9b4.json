@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T16:36:25Z",
+  "actor": "agent:cv2-aep",
+  "artifact": "story:catalog-index-concurrent-writers",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "eight concurrent runs all returned records and wrote their bundle; the index named two; 2/1/2/2 lost across four observed rounds, never green in five executions",
+    "reference": "crates/connectors-catalog/tests/pipeline_adversarial.rs concurrent_runs_into_one_directory_lose_index_entries"
+  }
+}

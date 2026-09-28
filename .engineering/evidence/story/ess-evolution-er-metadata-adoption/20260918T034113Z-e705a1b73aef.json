@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-18T03:41:13Z",
+  "actor": "human:timo",
+  "artifact": "story:ess-evolution-er-metadata-adoption",
+  "kind": "story",
+  "revision": 24,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "ER13b8a1f full actual-PG task check and bounded batch-read regression red/restored",
+    "reference": "local-evidence:ess-evolution/waves/0012-connectors-adoption/er-batch-read-correction/receipt.md"
+  }
+}

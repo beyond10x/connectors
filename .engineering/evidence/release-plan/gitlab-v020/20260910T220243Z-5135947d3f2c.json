@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T22:02:43Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:gitlab-v020",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Replayed verified release evidence from immutable v0.2.0 commit 93a31da5078440f354704017fa86e4a3a100becf",
+    "reference": "docs/evidence/release-v020-20260910/README.md"
+  }
+}

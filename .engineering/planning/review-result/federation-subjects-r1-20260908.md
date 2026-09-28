@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:federation-subjects-r1-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Independent F03 subjects review round 1
 relations:
 - reviews: story:contracts-federated-approval
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:52:23Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent F03 semantic review A — canonical approval and redemption ownership
 

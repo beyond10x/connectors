@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T20:31:55Z",
+  "actor": "human:timo",
+  "artifact": "epic:local-cli-contracts",
+  "kind": "epic",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Both approved CLI stories implemented; full Connectors and pinned ESS gates pass; local contract fixture milestone",
+    "reference": ".local/cli-contract-wave-20260909/integration-evidence/ess/summary.json"
+  }
+}

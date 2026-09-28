@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T15:04:16Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-wire-compatibility",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "ESS 0.20.0, 68 current decoder vectors, 27 textual vectors, full gate and two final independent reviews",
+    "reference": "docs/evidence/wire-compatibility-20260908/verification.md"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:resolve-spec-markers
 kind: story
 status: implemented
@@ -7,6 +7,10 @@ title: Every open spec marker has a recorded outcome
 relations:
 - serves: vision:independent-contract-adapters
 revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-27T18:44:55Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-27T18:45:12Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-27T21:44:10Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Acceptance
 

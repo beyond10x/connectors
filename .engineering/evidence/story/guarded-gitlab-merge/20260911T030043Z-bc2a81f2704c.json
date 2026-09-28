@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T03:00:43Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integrated production CLI merge, seven GitLab journeys, Rust 1.88 gate and website checks",
+    "reference": "docs/evidence/guarded-gitlab-cli-20260911/README.md"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-catalog-pipeline-pass-1
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 1 on the bundle pipeline
 relations:
 - reviews: story:catalog-bundle-pipeline
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:49:47Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Adversary pass 1 — story:catalog-bundle-pipeline
 

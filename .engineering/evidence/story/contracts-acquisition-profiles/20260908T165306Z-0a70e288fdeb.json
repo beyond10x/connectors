@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T16:53:06Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-acquisition-profiles",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "ESS0.20.0 schema inspection and existing repository gate; semantic traces are declared, not executed",
+    "reference": "docs/evidence/auth-profile-budget-20260908/verification.md"
+  }
+}

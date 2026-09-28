@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T18:56:49Z",
+  "actor": "human:timo",
+  "artifact": "story:local-execution-audit",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Private audit fixtures, full Rust 1.88 gate, website checks and five optimized CLI journeys",
+    "reference": "docs/evidence/local-execution-audit-20260910/README.md"
+  }
+}

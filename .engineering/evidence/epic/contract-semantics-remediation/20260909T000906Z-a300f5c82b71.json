@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T00:09:06Z",
+  "actor": "human:timo",
+  "artifact": "epic:contract-semantics-remediation",
+  "kind": "epic",
+  "revision": 21,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "Two independent final specification agent approvals plus completed child-story evidence",
+    "reference": "docs/evidence/spec-completion-20260909/checkpoint.md"
+  }
+}

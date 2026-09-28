@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-14T20:20:00Z",
+  "actor": "human:timo",
+  "artifact": "story:remove-native-gitlab-adapter",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --offline -p connectors-catalog-provider: engine 5, local_runtime 3, shipped 1, bundle_drift 1 passed, 0 failed",
+    "reference": "adapters/catalog/tests/local_runtime.rs"
+  }
+}

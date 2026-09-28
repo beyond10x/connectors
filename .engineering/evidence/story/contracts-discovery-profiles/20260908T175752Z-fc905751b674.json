@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T17:57:52Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-discovery-profiles",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:profile-persistence-a-initial-20260908",
+    "reference": "docs/evidence/profile-persistence-20260908/dispositions.md#pp-a-01",
+    "review": "review-result:profile-persistence-a-initial-20260908",
+    "outcome": "fixed"
+  }
+}

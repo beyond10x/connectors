@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: credential-blocker:gitlab-runtime-sandbox
 kind: credential-blocker
 status: cleared
@@ -12,6 +12,8 @@ relations:
 - blocks: story:guarded-gitlab-merge
 withholds: test_result
 revision: 2
+transitions:
+- {from: "open", to: "cleared", at: "2026-09-13T07:20:22Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Missing prerequisite
 

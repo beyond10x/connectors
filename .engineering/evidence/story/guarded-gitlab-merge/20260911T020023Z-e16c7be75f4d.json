@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T02:00:23Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 13,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Combined version-eight mutation ports, consuming HTTP and full gate with six GitLab CLI journeys",
+    "reference": "docs/evidence/mutation-composition-20260911/README.md"
+  }
+}

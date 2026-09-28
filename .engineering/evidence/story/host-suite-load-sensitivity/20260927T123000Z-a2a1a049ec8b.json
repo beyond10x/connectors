@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-27T12:30:00Z",
+  "actor": "human:timo",
+  "artifact": "story:host-suite-load-sensitivity",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv exit 0 on 22f5cdf77 (U2 + ESS 0.36.0)"
+  }
+}

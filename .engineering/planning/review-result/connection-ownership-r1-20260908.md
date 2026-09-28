@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:connection-ownership-r1-20260908
 kind: review-result
 status: archived
@@ -8,6 +8,8 @@ relations:
 - reviews: story:contracts-connection-readiness
 - reviews: story:contracts-management-boundary
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:51:22Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent connection semantics review B — initial requirements
 

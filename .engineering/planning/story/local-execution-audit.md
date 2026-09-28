@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:local-execution-audit
 kind: story
 status: implemented
@@ -22,6 +22,10 @@ scope:
 - confidence: inferred
   path: website
 revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-10T18:38:57Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-10T18:38:58Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-10T18:56:50Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Outcome
 

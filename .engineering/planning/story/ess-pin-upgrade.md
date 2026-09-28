@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:ess-pin-upgrade
 kind: story
 status: implemented
@@ -23,6 +23,10 @@ scope:
 - confidence: cited
   path: spec-kinds/adapter/v2/semantics.md
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T08:59:56Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T08:59:56Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T09:07:03Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Context
 

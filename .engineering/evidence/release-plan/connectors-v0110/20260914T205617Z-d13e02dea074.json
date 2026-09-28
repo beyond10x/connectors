@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-14T20:56:17Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0110",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "hosted release page https://github.com/beyond10x/connectors/releases/tag/v0.11.0, authored by b10x-bot[bot], Latest; tag peels to 5330fb94 = head of next, tree 3142dd8c = local main",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.11.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-12T10:10:51Z",
+  "actor": "human:timo",
+  "artifact": "story:kubernetes-helm-release-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv, retained in docs/evidence/helm-reads-20260912/gate.log",
+    "reference": "docs/evidence/helm-reads-20260912/gate.log"
+  }
+}

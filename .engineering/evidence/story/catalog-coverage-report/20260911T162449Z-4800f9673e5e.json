@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T16:24:49Z",
+  "actor": "agent:cv2-aep",
+  "artifact": "story:catalog-coverage-report",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "110 executed, 0 failed, exit 0; clippy 0; fmt 0; fix measured by disabling the escape, 8 cases went red",
+    "reference": "cargo test --locked -p connectors-catalog at c87066b"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: architecture-decision-record:declarative-http-provider-runtime
 kind: architecture-decision-record
 status: accepted
@@ -8,6 +8,8 @@ relations:
 - decides: initiative:complete-local-connectors
 - informed_by: specification:contract-driven-connectors-design
 revision: 2
+transitions:
+- {from: "proposed", to: "accepted", at: "2026-09-11T11:11:23Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"approval":1}}, imported: true}
 ---
 ## Decision and authority
 

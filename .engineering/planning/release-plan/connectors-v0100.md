@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: release-plan:connectors-v0100
 kind: release-plan
 status: implemented
@@ -7,6 +7,9 @@ title: 'Release v0.10.0: GitLab writes from the pinned source through the catalo
 relations:
 - informed_by: initiative:complete-local-connectors
 revision: 3
+transitions:
+- {from: "draft", to: "active", at: "2026-09-13T16:20:47Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-13T16:27:23Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Scope
 

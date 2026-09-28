@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T18:02:23Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-discovery-profiles",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "review-result:profile-persistence-a-recheck1-20260908",
+    "reference": "docs/evidence/profile-persistence-20260908/reviews/a-recheck1-report.md"
+  }
+}

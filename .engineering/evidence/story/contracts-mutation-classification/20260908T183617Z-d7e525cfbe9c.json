@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T18:36:17Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-mutation-classification",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "ESS 0.20.0 validate/compile; 215 identical projections; 27 schema cases; full existing gate/MSRV; independent 13/201 sessions compilation; textual audit",
+    "reference": "docs/evidence/mutation-profiles-20260908/classification-verification.md"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:approval-keys-parallel-safety-round-1
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Approval keys parallel-safety review round 1
 relations:
 - reviews: story:local-approval-keys
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:50:37Z", actor: "human:timo", revision: 2, imported: true}
 ---
 approve
 

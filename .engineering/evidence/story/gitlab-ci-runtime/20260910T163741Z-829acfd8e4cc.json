@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T16:37:41Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-ci-runtime",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Repository gate with Rust 1.88 and four production CLI fixture journeys; dedicated sandbox evidence remains open",
+    "reference": "docs/evidence/gitlab-ci-20260910/README.md"
+  }
+}

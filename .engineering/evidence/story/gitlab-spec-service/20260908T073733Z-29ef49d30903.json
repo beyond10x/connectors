@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T07:37:33Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-spec-service",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Workspace tests, generation refusals and drift, offline independent builds, ESS build/realization checks and exact-image direct/federated live acceptance",
+    "reference": "docs/evidence/gitlab-spec-service-2026-09-08/"
+  }
+}
