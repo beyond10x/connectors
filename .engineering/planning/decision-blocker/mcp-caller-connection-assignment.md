@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: decision-blocker:mcp-caller-connection-assignment
 kind: decision-blocker
 status: open

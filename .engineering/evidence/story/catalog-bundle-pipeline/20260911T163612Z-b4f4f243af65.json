@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T16:36:12Z",
+  "actor": "agent:cv2-aep",
+  "artifact": "story:catalog-bundle-pipeline",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "126 executed, 0 failed, exit 0; clippy 0; fmt 0; the concurrency case is pinned to today's behaviour under story:catalog-index-concurrent-writers",
+    "reference": "cargo test --locked -p connectors-catalog at 68e8ecf"
+  }
+}

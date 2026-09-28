@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T16:05:13Z",
+  "actor": "agent:cv2-aep",
+  "artifact": "story:catalog-operation-template",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "merged to main as 9b88cd0; 53 cases exit 0, clippy 0, fmt 0",
+    "reference": "9b88cd0"
+  }
+}

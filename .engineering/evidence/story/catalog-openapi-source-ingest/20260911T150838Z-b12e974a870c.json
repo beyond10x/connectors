@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T15:08:38Z",
+  "actor": "agent:cv2-aep",
+  "artifact": "story:catalog-openapi-source-ingest",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "6 passed, 0 failed, exit 0; clippy --all-targets -D warnings exit 0; commit 6056c76",
+    "reference": "cargo test --locked -p connectors-catalog"
+  }
+}
