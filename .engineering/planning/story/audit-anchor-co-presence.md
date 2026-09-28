@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:audit-anchor-co-presence
 kind: story
 status: draft

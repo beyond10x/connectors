@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:catalog-coverage-report
 kind: story
 status: implemented
@@ -16,6 +16,10 @@ scope:
 - confidence: cited
   path: crates/connectors-catalog/tests/coverage.rs
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-11T16:17:49Z", actor: "agent:cv2-aep", revision: 5, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-11T16:17:50Z", actor: "agent:cv2-aep", revision: 6, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-11T16:24:55Z", actor: "agent:cv2-aep", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}, imported: true}
 ---
 ## Outcome
 

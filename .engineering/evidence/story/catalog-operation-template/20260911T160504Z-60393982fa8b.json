@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T16:05:04Z",
+  "actor": "agent:cv2-aep",
+  "artifact": "story:catalog-operation-template",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "53 executed, 0 failed, exit 0; clippy exit 0; fmt --check exit 0; 11 adversarial cases from two passes included",
+    "reference": "cargo test --locked -p connectors-catalog at 594ccec"
+  }
+}

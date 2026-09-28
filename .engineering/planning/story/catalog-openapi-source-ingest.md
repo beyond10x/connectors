@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:catalog-openapi-source-ingest
 kind: story
 status: implemented
@@ -9,6 +9,10 @@ relations:
 - decomposes: initiative:complete-local-connectors
 - serves: vision:independent-contract-adapters
 revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-11T15:08:39Z", actor: "agent:cv2-aep", revision: 2, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-11T15:08:41Z", actor: "agent:cv2-aep", revision: 3, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-11T15:08:44Z", actor: "agent:cv2-aep", revision: 4, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Outcome
 

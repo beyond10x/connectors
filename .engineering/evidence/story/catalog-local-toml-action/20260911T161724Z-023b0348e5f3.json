@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T16:17:24Z",
+  "actor": "agent:cv2-aep",
+  "artifact": "story:catalog-local-toml-action",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "91 executed, 0 failed, exit 0; clippy exit 0; fmt --check exit 0; 4 adversarial cases included unmodified",
+    "reference": "cargo test --locked -p connectors-catalog at f3e4564"
+  }
+}

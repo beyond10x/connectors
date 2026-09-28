@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T17:54:02Z",
+  "actor": "agent:cv2-gitlab",
+  "artifact": "story:catalog-index-concurrent-writers",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog --test pipeline_adversarial concurrent, three consecutive runs",
+    "reference": "crates/connectors-catalog/tests/pipeline_adversarial.rs"
+  }
+}

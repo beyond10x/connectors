@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T17:49:52Z",
+  "actor": "agent:cv2-gitlab",
+  "artifact": "story:postgres-local-cli-journey",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "production CLI journey against a real provider sandbox",
+    "reference": "docs/evidence/provider-sandboxes-20260911/README.md"
+  }
+}

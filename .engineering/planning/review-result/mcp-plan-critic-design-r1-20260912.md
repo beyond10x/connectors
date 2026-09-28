@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:mcp-plan-critic-design-r1-20260912
 kind: review-result
 status: active

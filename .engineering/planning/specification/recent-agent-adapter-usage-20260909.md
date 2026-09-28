@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: specification:recent-agent-adapter-usage-20260909
 kind: specification
 status: draft
