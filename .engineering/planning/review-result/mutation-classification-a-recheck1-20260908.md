@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:mutation-classification-a-recheck1-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Mutation classification reviewer A recheck 1
 relations:
 - reviews: story:contracts-mutation-classification
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:52:47Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent classification recheck A — F10/E06
 

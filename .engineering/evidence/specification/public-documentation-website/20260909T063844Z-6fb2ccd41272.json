@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T06:38:44Z",
+  "actor": "human:timo",
+  "artifact": "specification:public-documentation-website",
+  "kind": "specification",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Practical GitLab walkthrough revision: browser scenarios, fixture validation, Rust/WASM tests and full repository gate",
+    "reference": "docs/website-verification.md"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T23:47:53Z",
+  "actor": "human:timo",
+  "artifact": "story:extractable-adapter-contract-ownership",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "ACO-S-04 removed from shared semantics; final reviewers confirm",
+    "reference": "docs/evidence/spec-completion-20260909/reviews/a-final.md",
+    "review": "review-result:adapter-ownership-semantics-recheck-20260909",
+    "outcome": "fixed"
+  }
+}

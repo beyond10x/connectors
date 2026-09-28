@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-11T00:31:27Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Private v2 transport, gate with Rust 1.88, six GitLab CLI journeys and website checks",
+    "reference": "docs/evidence/private-protocol-v2-20260911/README.md"
+  }
+}

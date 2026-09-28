@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T00:09:04Z",
+  "actor": "human:timo",
+  "artifact": "epic:contract-semantics-remediation",
+  "kind": "epic",
+  "revision": 21,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Exact ledger audit: 48 source rows, 27 distinct implemented owners; full gate exit 0",
+    "reference": "docs/evidence/spec-completion-20260909/checkpoint.md"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-13T18:40:00Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-through-catalog-complete",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv: all checks passed, 91 test targets, exit 0; website typecheck and build exit 0"
+  }
+}

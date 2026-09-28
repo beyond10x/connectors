@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-10T16:52:00Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-mr-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "Separated single observable acceptance from verification prerequisites (finding 2)",
+    "reference": ".engineering/planning/story/gitlab-mr-reads.md",
+    "review": "review-result:gitlab-mr-acceptance-round-1",
+    "outcome": "fixed"
+  }
+}

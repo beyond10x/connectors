@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-12T10:10:49Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-domain-model",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv, retained in docs/evidence/mcp-contracts-20260912/gate.log",
+    "reference": "docs/evidence/mcp-contracts-20260912/gate.log"
+  }
+}

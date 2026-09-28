@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-federated-approval
 kind: story
 status: implemented
@@ -42,6 +42,10 @@ scope:
 - confidence: cited
   path: ess/system.yaml
 revision: 12
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T15:18:52Z", actor: "human:timo", revision: 6, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T15:18:52Z", actor: "human:timo", revision: 7, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T15:54:08Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":1,"review_outcome":21}}, imported: true}
 ---
 ## Context
 

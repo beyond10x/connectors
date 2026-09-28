@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-credential-evidence
 kind: story
 status: implemented
@@ -36,6 +36,10 @@ scope:
 - confidence: cited
   path: ess/domains/credential_evidence.yaml
 revision: 26
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T11:26:41Z", actor: "human:timo", revision: 10, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T11:26:42Z", actor: "human:timo", revision: 11, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T11:58:17Z", actor: "human:timo", revision: 26, decided_on: {"recorded":{"test_result":1}}, imported: true}
 ---
 ## Context
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T01:59:36Z",
+  "actor": "human:timo",
+  "artifact": "specification:public-documentation-website",
+  "kind": "specification",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Local website build, browser, Rust example and full repository gate verification on 2026-09-09",
+    "reference": "docs/website-verification.md"
+  }
+}

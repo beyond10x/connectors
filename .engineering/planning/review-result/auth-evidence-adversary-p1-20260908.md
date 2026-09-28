@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:auth-evidence-adversary-p1-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: F05 credential evidence adversarial pass 1
 relations:
 - reviews: story:contracts-credential-evidence
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:51:06Z", actor: "human:timo", revision: 2, imported: true}
 ---
 unit: story:contracts-credential-evidence; impl/contracts-credential-evidence working tree over 1e567571d9ac62070933c7099b93a4e030613e58
 verdict: green

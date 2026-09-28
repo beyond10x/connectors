@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-10T17:42:46Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 18,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:mutation-ledger-acceptance-round-1",
+    "reference": ".engineering/planning/story/persistent-gitlab-journey.md",
+    "review": "review-result:mutation-ledger-acceptance-round-1",
+    "outcome": "fixed"
+  }
+}

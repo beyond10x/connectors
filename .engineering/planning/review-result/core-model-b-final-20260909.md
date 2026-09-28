@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:core-model-b-final-20260909
 kind: review-result
 status: active

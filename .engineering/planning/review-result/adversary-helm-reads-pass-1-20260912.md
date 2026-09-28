@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-helm-reads-pass-1-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 1 — Helm release reads, unit 1
 relations:
 - reviews: story:kubernetes-helm-release-reads
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:49:54Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ```
 unit: 1 — story:kubernetes-helm-release-reads, worktree cv2-helm-reads-20260912 at 5e4b0c4 + 1 untracked test file

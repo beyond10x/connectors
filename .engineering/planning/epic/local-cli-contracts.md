@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: epic:local-cli-contracts
 kind: epic
 status: implemented
@@ -7,6 +7,10 @@ title: Specify local CLI contracts and the ESS presentation surface
 relations:
 - informed_by: specification:local-cli-wave-20260909
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-09T14:55:43Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"approval":1}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-09T14:55:45Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"approval":1}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-09T20:31:57Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"approval":1}}, imported: true}
 ---
 ## Outcome
 Specify and prove the local CLI presentation, configuration and lifecycle contracts under specification:local-cli-wave-20260909. The user approved OS keyring, protected terminal/file/stdin input, task-grouped commands, per-adapter TOML startup=on-demand|automatic, on-demand default, automatic at local-host startup, no MCP in this stage.

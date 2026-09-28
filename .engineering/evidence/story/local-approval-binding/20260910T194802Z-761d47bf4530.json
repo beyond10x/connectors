@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T19:48:02Z",
+  "actor": "human:timo",
+  "artifact": "story:local-approval-binding",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full Connectors Rust 1.88 gate, 17 approval tests, website/example checks and five optimized GitLab CLI journeys",
+    "reference": "docs/evidence/local-approval-binding-20260910/README.md"
+  }
+}

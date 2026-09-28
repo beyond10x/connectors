@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-settlement-pass-2-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 2 — terminal settlement CLI journey, unit 1
 relations:
 - reviews: story:guarded-gitlab-merge
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:50:25Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ```
 unit: 1

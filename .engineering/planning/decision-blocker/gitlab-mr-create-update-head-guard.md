@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: decision-blocker:gitlab-mr-create-update-head-guard
 kind: decision-blocker
 status: cleared
@@ -8,6 +8,8 @@ relations:
 - blocks: initiative:complete-local-connectors
 withholds: test_result
 revision: 4
+transitions:
+- {from: "open", to: "cleared", at: "2026-09-13T15:19:53Z", actor: "human:timo", revision: 3, imported: true}
 ---
 ## Withheld result
 

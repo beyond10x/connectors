@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-12T02:12:04Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 25,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-settlement-pass-2-20260912",
+    "reference": "mode 11 retained as the deterministic restart-state assertion, finding C",
+    "review": "review-result:adversary-settlement-pass-2-20260912",
+    "outcome": "fixed"
+  }
+}

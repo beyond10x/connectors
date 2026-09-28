@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-14T21:05:00Z",
+  "actor": "human:timo",
+  "artifact": "epic:retire-native-gitlab-adapter",
+  "kind": "epic",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "gate --msrv on the removal tree (78 targets, 0 failed); cargo tree -p connectors-gitlab: no such package; sandbox retire.sh: 11 reads 200, 3 writes refused before dispatch",
+    "reference": "docs/evidence/gitlab-retirement-20260914/README.md"
+  }
+}

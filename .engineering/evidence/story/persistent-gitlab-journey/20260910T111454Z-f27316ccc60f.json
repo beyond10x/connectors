@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T11:14:54Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-gitlab-journey",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "GitLab native auth helper, production HTTP fixture and full gate; not CLI journey acceptance",
+    "reference": "docs/evidence/gitlab-auth-20260910/README.md"
+  }
+}

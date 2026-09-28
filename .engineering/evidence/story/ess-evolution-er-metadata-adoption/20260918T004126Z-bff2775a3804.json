@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-18T00:41:26Z",
+  "actor": "human:timo",
+  "artifact": "story:ess-evolution-er-metadata-adoption",
+  "kind": "story",
+  "revision": 19,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Exact unchanged24-round recovery diagnostic passed1136.92s with test opt-level1 and debug/overflow checks retained; original30s call deadline unchanged. Actual CLI and ordinary full-gate acceptance remain pending.",
+    "reference": "local-evidence:ess-evolution/waves/0012-connectors-adoption/host-audit-diagnostic/source-findings.json"
+  }
+}

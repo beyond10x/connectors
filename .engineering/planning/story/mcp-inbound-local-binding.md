@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:mcp-inbound-local-binding
 kind: story
 status: implemented
@@ -14,6 +14,10 @@ scope:
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/semantics.md
 revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-12T10:23:45Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":3}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-12T10:23:47Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":3}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-12T11:41:12Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":15}}, imported: true}
 ---
 ## Acceptance
 

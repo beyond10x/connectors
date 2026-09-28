@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-09T14:55:41Z",
+  "actor": "human:timo",
+  "artifact": "epic:local-cli-contracts",
+  "kind": "epic",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "Operator approved implementation of the local CLI contract wave and reiterated continuation with its goal and epic in scope"
+  }
+}

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:sessions-semantics-r2-20260908
 kind: review-result
 status: archived
@@ -8,6 +8,8 @@ relations:
 - reviews: story:contracts-session-revocation
 - reviews: story:contracts-tenant-header
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:54:08Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Independent review A: final specification recheck
 

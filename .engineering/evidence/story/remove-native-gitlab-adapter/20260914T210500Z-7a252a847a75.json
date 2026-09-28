@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-14T21:05:00Z",
+  "actor": "human:timo",
+  "artifact": "story:remove-native-gitlab-adapter",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked --offline -p connectors-build -- gate --msrv on the removal tree: all checks passed, 78 test targets, 0 failed, exit 0",
+    "reference": "docs/evidence/gitlab-retirement-20260914/gate.log"
+  }
+}

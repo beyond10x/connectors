@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:federation-subjects-r3-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Independent F03 final subjects review
 relations:
 - reviews: story:contracts-federated-approval
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:52:27Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # F03 independent final semantic recheck A — round 3
 

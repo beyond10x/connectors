@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:gitlab-through-catalog-complete
 kind: story
 status: implemented
@@ -9,6 +9,10 @@ relations:
 - derived_from: specification:catalog-http-runtime-handoff
 - serves: vision:independent-contract-adapters
 revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-13T18:17:28Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":2}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-13T18:17:31Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":2}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-13T18:22:34Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":3}}, imported: true}
 ---
 ## Outcome
 

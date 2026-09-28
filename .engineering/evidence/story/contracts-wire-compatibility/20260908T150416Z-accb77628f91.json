@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T15:04:16Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-wire-compatibility",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:wire-binding-r1-20260908",
+    "reference": "docs/evidence/wire-compatibility-20260908/verification.md",
+    "review": "review-result:wire-binding-r1-20260908",
+    "outcome": "fixed"
+  }
+}

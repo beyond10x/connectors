@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T19:25:56Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-mutation-visibility",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "ESS 0.20.0 validate/compile; 222 matching schemas; 46 shape cases; 48 textual traces; 8 pinned provider archives; existing gate50/MSRV1.88; sessions13/201; unchanged correction IR",
+    "reference": "docs/evidence/restart-visibility-20260908/verification.md"
+  }
+}

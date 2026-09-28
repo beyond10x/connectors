@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T13:48:46Z",
+  "actor": "human:timo",
+  "artifact": "specification:contract-driven-connectors-design",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "A-N2: Documented limit. README states that federation downstreams use built-in public roots and have no private-CA setting. That optional capability is not implemented.",
+    "reference": "docs/independent-review-response-2026-09-08.md#every-source-finding",
+    "review": "review-result:independent-repository-a-20260908",
+    "outcome": "fixed"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T23:47:49Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-document-admission",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "LD-A-04 through LD-A-08 resolved; final A and B approve",
+    "reference": "adapters/atlassian/contracts/documents/v1alpha1/evidence/20260909/scenarios.md",
+    "review": "review-result:datasource-semantics-a-initial-20260908",
+    "outcome": "fixed"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T13:48:04Z",
+  "actor": "human:timo",
+  "artifact": "story:independent-review-remediation",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full pinned-ESS gate with Rust 1.88: exit 0, 50 passing tests; live SQL cancellation and 100/100 stress runs",
+    "reference": "docs/independent-review-response-2026-09-08.md"
+  }
+}

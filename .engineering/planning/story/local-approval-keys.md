@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:local-approval-keys
 kind: story
 status: implemented
@@ -32,6 +32,10 @@ scope:
 - confidence: inferred
   path: website
 revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-10T20:17:11Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"review_outcome":3}}, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-10T20:17:11Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":3}}, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-10T20:46:55Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":3}}, imported: true}
 ---
 ## Outcome
 

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-discovery-profiles
 kind: story
 status: implemented
@@ -27,6 +27,10 @@ scope:
 - confidence: inferred
   path: ess/domains/discovery.yaml
 revision: 12
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T17:41:00Z", actor: "human:timo", revision: 9, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T17:41:00Z", actor: "human:timo", revision: 10, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T18:06:57Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":1,"approval":2,"review_outcome":6}}, imported: true}
 ---
 ## Context
 

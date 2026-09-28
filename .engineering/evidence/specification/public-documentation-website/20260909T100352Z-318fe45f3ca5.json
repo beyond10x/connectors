@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-09T10:03:52Z",
+  "actor": "human:timo",
+  "artifact": "specification:public-documentation-website",
+  "kind": "specification",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Lifecycle viewport: TypeScript, production build/public audit, responsive browser geometry and disclosure checks passed",
+    "reference": "docs/website-verification.md"
+  }
+}

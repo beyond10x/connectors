@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-08T14:09:50Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-tenant-header",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "E30 textual scenario and relative-link audit",
+    "reference": "docs/evidence/spec-stabilization-20260908/tenant-header.md"
+  }
+}

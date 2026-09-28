@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T13:48:49Z",
+  "actor": "human:timo",
+  "artifact": "specification:contract-driven-connectors-design",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "B-F11: Fixed clarification. `Secret` documentation distinguishes prevention of accidental formatting from trusted holders' deliberate access to plaintext.",
+    "reference": "docs/independent-review-response-2026-09-08.md#every-source-finding",
+    "review": "review-result:independent-repository-b-20260908",
+    "outcome": "fixed"
+  }
+}

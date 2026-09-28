@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T18:36:16Z",
+  "actor": "human:timo",
+  "artifact": "story:contracts-mutation-classification",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:mutation-classification-b-recheck1-20260908",
+    "reference": "docs/evidence/mutation-profiles-20260908/classification-dispositions.md#mp-b-c01",
+    "review": "review-result:mutation-classification-b-recheck1-20260908",
+    "outcome": "fixed"
+  }
+}

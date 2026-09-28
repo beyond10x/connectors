@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-08T13:48:44Z",
+  "actor": "human:timo",
+  "artifact": "specification:contract-driven-connectors-design",
+  "kind": "specification",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "A-M1: Fixed. Current GitLab design text uses ESS 0.20.0; historical observations retain their original versions.",
+    "reference": "docs/independent-review-response-2026-09-08.md#every-source-finding",
+    "review": "review-result:independent-repository-a-20260908",
+    "outcome": "fixed"
+  }
+}

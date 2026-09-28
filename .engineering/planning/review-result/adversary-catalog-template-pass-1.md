@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-catalog-template-pass-1
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 1 on the catalog operation template
 relations:
 - reviews: story:catalog-operation-template
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:49:49Z", actor: "human:timo", revision: 2, imported: true}
 ---
 # Adversary pass 1 — story:catalog-operation-template
 

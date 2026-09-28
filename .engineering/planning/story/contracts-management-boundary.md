@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-management-boundary
 kind: story
 status: implemented
@@ -33,6 +33,10 @@ scope:
 - confidence: inferred
   path: ess/system.yaml
 revision: 12
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T15:58:40Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T15:58:40Z", actor: "human:timo", revision: 6, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T16:23:20Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":1,"review_outcome":10}}, imported: true}
 ---
 ## Context
 

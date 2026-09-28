@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:ess-boundary-semantics-initial-20260908
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Shared ESS boundary independent semantics review, initial
 relations:
 - reviews: story:shared-ess-provider-boundary
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:52:11Z", actor: "human:timo", revision: 2, imported: true}
 ---
 needs-revision
 

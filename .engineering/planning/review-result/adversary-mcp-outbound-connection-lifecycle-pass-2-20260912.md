@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: review-result:adversary-mcp-outbound-connection-lifecycle-pass-2-20260912
 kind: review-result
 status: archived
@@ -7,6 +7,8 @@ title: Adversary pass 2 — MCP outbound connection lifecycle, wave 4b
 relations:
 - reviews: story:mcp-outbound-connection-lifecycle
 revision: 2
+transitions:
+- {from: "active", to: "archived", at: "2026-09-14T22:50:12Z", actor: "human:timo", revision: 2, imported: true}
 ---
 ```
 unit: mcp-w4b

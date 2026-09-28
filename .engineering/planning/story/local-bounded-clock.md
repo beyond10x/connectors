@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:local-bounded-clock
 kind: story
 status: implemented
@@ -40,6 +40,10 @@ scope:
 - confidence: cited
   path: website/publication.json
 revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-10T21:42:10Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-10T21:42:11Z", actor: "human:timo", revision: 5, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-10T22:19:24Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}, imported: true}
 ---
 ## Outcome
 

@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: story:contracts-idempotency-scope
 kind: story
 status: implemented
@@ -37,6 +37,10 @@ scope:
 - confidence: cited
   path: ess/system.yaml
 revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-08T10:49:09Z", actor: "human:timo", revision: 3, imported: true}
+- {from: "proposed", to: "active", at: "2026-09-08T10:49:09Z", actor: "human:timo", revision: 4, imported: true}
+- {from: "active", to: "implemented", at: "2026-09-08T11:06:25Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":4}}, imported: true}
 ---
 ## Context
 

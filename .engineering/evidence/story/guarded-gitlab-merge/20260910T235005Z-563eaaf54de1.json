@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-10T23:50:05Z",
+  "actor": "human:timo",
+  "artifact": "story:guarded-gitlab-merge",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "v3 generation and independent consumer fixture; full Rust 1.88 gate and website checks; production merge acceptance remains open",
+    "reference": "docs/evidence/write-generation-20260911/README.md"
+  }
+}

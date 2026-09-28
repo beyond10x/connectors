@@ -1,5 +1,5 @@
 ---
-format: aep.planning-md/2
+format: aep.planning-md/3
 id: decision-blocker:ess-upgrade-decision
 kind: decision-blocker
 status: cleared
@@ -7,6 +7,8 @@ title: Nobody has decided whether to upgrade the ESS pin to 0.18.0
 relations:
 - blocks: story:ess-pin-upgrade
 revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-09-08T08:51:25Z", actor: "human:timo", revision: 3, imported: true}
 ---
 ## Question
 
