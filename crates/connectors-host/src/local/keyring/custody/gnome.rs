@@ -86,7 +86,14 @@ impl Persistence {
             return Err(Failure::Unavailable);
         }
         let mut digest = Sha256::new();
-        std::io::copy(&mut executable, &mut digest).map_err(unavailable)?;
+        let mut buffer = [0; 64 * 1024];
+        loop {
+            let read = executable.read(&mut buffer).map_err(unavailable)?;
+            if read == 0 {
+                break;
+            }
+            digest.update(&buffer[..read]);
+        }
         if hex::encode(digest.finalize()) != DAEMON_SHA256 {
             return Err(Failure::Unavailable);
         }

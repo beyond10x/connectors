@@ -117,6 +117,8 @@ impl ScopedHttp {
                 "authentication cannot replace HTTP routing or framing headers",
             ));
         }
+        // reqwest carries no crypto provider of its own; ring is the one this workspace selects.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let mut builder = Client::builder()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
@@ -129,10 +131,7 @@ impl ScopedHttp {
             if certificates.is_empty() {
                 return Err(Error::invalid("configured CA contains no certificates"));
             }
-            builder = builder.tls_built_in_root_certs(false);
-            for certificate in certificates {
-                builder = builder.add_root_certificate(certificate);
-            }
+            builder = builder.tls_certs_only(certificates);
         }
         Ok(Self {
             client: builder.build().map_err(|_| Error::internal())?,
