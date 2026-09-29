@@ -30,8 +30,27 @@ use tokio_rustls::{
     rustls::{self, pki_types::PrivatePkcs8KeyDer},
 };
 
+#[path = "local_runtime/basic_auth.rs"]
+mod basic_auth;
+#[path = "local_runtime/basic_auth_adversary.rs"]
+mod basic_auth_adversary;
+#[path = "local_runtime/basic_auth_adversary_pass2.rs"]
+mod basic_auth_adversary_pass2;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
+
+/// Fictional HTTP basic material the fixture accepts, and the exact header it
+/// expects: `Basic base64("fixture-account@example.test:fixture-api-token-one")`,
+/// computed outside the provider with coreutils `base64`.
+const BASIC_ACCOUNT: &str = "fixture-account@example.test";
+const BASIC_TOKEN: &str = "fixture-api-token-one";
+const BASIC_WRONG_TOKEN: &str = "fixture-api-token-wrong";
+const BASIC_HEADER: &str =
+    "Basic Zml4dHVyZS1hY2NvdW50QGV4YW1wbGUudGVzdDpmaXh0dXJlLWFwaS10b2tlbi1vbmU=";
+const BASIC_PROFILE: &str = "fixture.basic";
+
+/// Route and `Authorization` header of each fixture request.
+type Authorizations = Arc<Mutex<Vec<(String, Option<String>)>>>;
 
 struct Provider {
     stop: Option<oneshot::Sender<()>>,
@@ -40,11 +59,23 @@ struct Provider {
     ca: PathBuf,
     pem: String,
     config: PathBuf,
+    profile: &'static str,
     calls: Arc<Mutex<Vec<String>>>,
+    /// The route and `Authorization` header of every request. Only compared,
+    /// never printed, so fixture credentials stay out of failure diagnostics.
+    authorizations: Authorizations,
     pause: Arc<std::sync::atomic::AtomicBool>,
 }
 impl Provider {
     fn new() -> Self {
+        Self::with_auth(None)
+    }
+    /// A provider whose profile is HTTP basic and requires `minimum_scope`;
+    /// the fixture grants only `api`.
+    fn basic(minimum_scope: &str) -> Self {
+        Self::with_auth(Some(minimum_scope))
+    }
+    fn with_auth(basic: Option<&str>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -67,6 +98,9 @@ impl Provider {
         let (stop, mut stopped) = oneshot::channel();
         let calls = Arc::new(Mutex::new(Vec::new()));
         let observed = calls.clone();
+        let authorizations = Arc::new(Mutex::new(Vec::new()));
+        let observed_authorizations = authorizations.clone();
+        let basic_mode = basic.is_some();
         let pause = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let paused = pause.clone();
         let thread = std::thread::spawn(move || {
@@ -101,20 +135,32 @@ impl Provider {
                         .unwrap_or_default()
                         .to_owned();
                     let route = path.split('?').next().unwrap();
-                    let credential = request.lines().find_map(|line| {
-                        line.split_once(':')
-                            .filter(|(name, _)| name.eq_ignore_ascii_case("private-token"))
-                            .map(|(_, value)| value.trim())
-                    });
+                    let header = |wanted: &str| {
+                        request.lines().find_map(|line| {
+                            line.split_once(':')
+                                .filter(|(name, _)| name.eq_ignore_ascii_case(wanted))
+                                .map(|(_, value)| value.trim().to_owned())
+                        })
+                    };
+                    let credential = header("private-token");
+                    let authorization = header("authorization");
                     // Only fictional fixture material is accepted. Do not retain
-                    // raw headers in observations or failure diagnostics.
-                    let valid = matches!(credential, Some("fixture-pat-one" | "fixture-pat-two"));
-                    let user = if credential == Some("fixture-pat-two") {
+                    // raw headers in failure diagnostics.
+                    let valid = if basic_mode {
+                        authorization.as_deref() == Some(BASIC_HEADER)
+                    } else {
+                        matches!(credential.as_deref(), Some("fixture-pat-one" | "fixture-pat-two"))
+                    };
+                    let user = if credential.as_deref() == Some("fixture-pat-two") {
                         43
                     } else {
                         42
                     };
                     observed.lock().unwrap().push(path.clone());
+                    observed_authorizations
+                        .lock()
+                        .unwrap()
+                        .push((route.to_owned(), authorization));
                     if paused.load(std::sync::atomic::Ordering::SeqCst) {
                         tokio::select! {_=&mut stopped=>break,_=tokio::time::sleep(Duration::from_secs(2))=>{}}
                     }
@@ -150,6 +196,34 @@ impl Provider {
         let address = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
         let config = directory.join("catalog.json");
+        let (profile, auth) = match basic {
+            None => (
+                "gitlab.pat",
+                json!({
+                    "profile": "gitlab.pat",
+                    "header": "PRIVATE-TOKEN",
+                    "bearer": false,
+                    "label": "GitLab personal access token",
+                    "identity": {"path": "user", "kind": "gitlab.user", "subject_pointer": "/id"},
+                    "scopes": {"path": "personal_access_tokens/self", "pointer": "/scopes"},
+                    "minimum_scopes": ["api"]
+                }),
+            ),
+            Some(minimum) => (
+                BASIC_PROFILE,
+                json!({
+                    "profile": BASIC_PROFILE,
+                    "scheme": "basic",
+                    "header": "Authorization",
+                    "bearer": false,
+                    "account_label": "Fixture account email",
+                    "label": "Fixture API token",
+                    "identity": {"path": "user", "kind": "fixture.user", "subject_pointer": "/id"},
+                    "scopes": {"path": "personal_access_tokens/self", "pointer": "/scopes"},
+                    "minimum_scopes": [minimum]
+                }),
+            ),
+        };
         private(
             &config,
             &serde_json::to_vec(&json!({
@@ -159,15 +233,7 @@ impl Provider {
                 "bundle_directory": repository.join("generated/bundles").canonicalize().unwrap(),
                 "api_base": format!("https://localhost:{}/api/v4", address.port()),
                 "ca_file": ca,
-                "auth": {
-                    "profile": "gitlab.pat",
-                    "header": "PRIVATE-TOKEN",
-                    "bearer": false,
-                    "label": "GitLab personal access token",
-                    "identity": {"path": "user", "kind": "gitlab.user", "subject_pointer": "/id"},
-                    "scopes": {"path": "personal_access_tokens/self", "pointer": "/scopes"},
-                    "minimum_scopes": ["api"]
-                },
+                "auth": auth,
                 "operations_file": repository.join("providers/gitlab/operations.json").canonicalize().unwrap(),
             }))
             .unwrap(),
@@ -179,7 +245,9 @@ impl Provider {
             ca,
             pem,
             config,
+            profile,
             calls,
+            authorizations,
             pause,
         }
     }
@@ -240,6 +308,55 @@ fn token(one: bool) -> Secret {
     } else {
         br#"{"token":"fixture-pat-two"}"#.to_vec()
     })
+}
+fn basic(token: &str) -> Secret {
+    Secret(serde_json::to_vec(&json!({"account": BASIC_ACCOUNT, "token": token})).unwrap())
+}
+/// Whether `haystack` carries the basic account or any basic token, raw or as
+/// the encoded header value.
+fn carries_basic_material(haystack: &[u8]) -> bool {
+    [
+        BASIC_ACCOUNT,
+        BASIC_TOKEN,
+        BASIC_WRONG_TOKEN,
+        BASIC_HEADER.trim_start_matches("Basic "),
+    ]
+    .iter()
+    .any(|needle| {
+        haystack
+            .windows(needle.len())
+            .any(|window| window == needle.as_bytes())
+    })
+}
+/// Live processes whose argv names `config`: the provider children started for
+/// that configuration, whoever spawned them.
+fn provider_children(config: &Path) -> Vec<u32> {
+    let needle = config.to_str().unwrap().as_bytes().to_vec();
+    let own = std::process::id();
+    fs::read_dir("/proc")
+        .unwrap()
+        .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse::<u32>().ok())
+        .filter(|pid| *pid != own)
+        .filter(|pid| {
+            fs::read(format!("/proc/{pid}/cmdline")).is_ok_and(|cmdline| {
+                cmdline
+                    .split(|b| *b == 0)
+                    .any(|argument| argument == needle.as_slice())
+            })
+        })
+        .collect()
+}
+/// Neither argv nor the environment of any provider child for `config` carries
+/// basic material, and at least one such child is observed.
+fn assert_children_carry_no_basic_material(config: &Path) {
+    let children = provider_children(config);
+    assert!(!children.is_empty(), "no provider child observed");
+    for pid in children {
+        let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap();
+        let environ = fs::read(format!("/proc/{pid}/environ")).unwrap();
+        assert!(!carries_basic_material(&cmdline), "argv of {pid}");
+        assert!(!carries_basic_material(&environ), "environment of {pid}");
+    }
 }
 fn deadline() -> u64 {
     connectors_sdk::now_ms() + 30_000
