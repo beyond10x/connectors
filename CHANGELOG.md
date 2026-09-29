@@ -13,6 +13,33 @@
   `owner_build_mismatch` and next action `stop_owner`, including an owner from before
   this handshake. It never stops or replaces the owner itself. A same-build owner at
   capacity still answers `capacity`.
+- The shipped GitLab catalog selection adds `projects.list`, `tags.list`,
+  `releases.list` and `project.events`, paged by `page`/`per_page`.
+- The catalog provider reads Jira Cloud: `issues.search` (JQL, `nextPageToken` paging),
+  `issue.comments` and `issue.changelog`, from the pinned platform REST v3 document with
+  HTTP basic auth; see `docs/catalog-jira.md`.
+- Catalog selections can bound a query parameter
+  (`bounds: {"<param>": {"minimum": n, "maximum": n}}`); the shipped GitLab list reads
+  bound `per_page` to 1–100 and refuse other or non-integer values as `invalid_input`
+  before any request.
+
+### Changed
+
+- A local process replays its metadata store once and then reads back only what was
+  appended, instead of replaying every recorded event on every open and write. A read
+  `operations invoke` does one full replay instead of eleven; on a 600-event store the
+  median per-invoke time fell from 26.1 s to 5.5 s (release build). Per-invoke time still
+  grows with the store inside Entity Runtime batch execution.
+- `setup init` writes `connectors-local/2`, so an adapter entry that selects its private
+  protocol passes `setup check`; existing `connectors-local/1` files load unchanged. The
+  postgres and kubernetes guides add `private_protocol = "connectors-private/1"`.
+- `invalid_configuration` for a `connectors-local/1` entry carrying `private_protocol`, or a
+  `connectors-local/2` entry lacking it, names `configuration_format` and the first such
+  entry's `instance_id` in its error data, on every command except `setup init`.
+- A provider's own refusal of a read (upstream 403, 404 or 410) is reported at stage
+  `dispatch` instead of `admission`. Refusals the host or an adapter raises from its
+  configured scope still read `admission`. Adapter children send the new private-protocol
+  failure `provider_forbidden`, which a host older than this release cannot read.
 
 ### Tests
 

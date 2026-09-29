@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:setup-init-writes-current-config-format
 kind: story
-status: active
+status: implemented
 title: setup init writes the configuration format its adapter entries need
 relations:
 - serves: vision:independent-contract-adapters
@@ -11,24 +11,31 @@ scope:
   path: apps/connectors/tests/local_cli.rs
 - confidence: cited
   path: apps/connectors/tests/owner_build_security.rs
-- confidence: inferred
+- confidence: cited
+  path: apps/connectors/tests/setup_init_format_adversary.rs
+- confidence: cited
   path: contracts/cli/v1alpha1/private-mutations.md
-- confidence: inferred
+- confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-host/src/local/approval_keys/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/config.rs
 - confidence: cited
   path: crates/connectors-host/src/local/keyring/custody/tests.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/owner/approval_issuance/tests.rs
 - confidence: cited
   path: crates/connectors-host/tests/local_foundation.rs
 - confidence: cited
+  path: docs/local-kubernetes-cli.md
+- confidence: cited
+  path: docs/local-postgres-cli.md
+- confidence: cited
   path: docs/local-runtime-foundation.md
-revision: 6
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-29T15:46:16Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-09-29T15:46:16Z", actor: "human:timo", revision: 6}
+- {from: "active", to: "implemented", at: "2026-09-29T20:39:42Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Observed
 
