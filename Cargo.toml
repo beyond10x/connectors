@@ -22,13 +22,13 @@ entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "
 entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.25.1" }
 entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.25.1" }
 eventlog-core = { git = "https://github.com/beyond10x/eventlog", rev = "0a0484634e8c640be29d6b6541d6cc1c1aaef7d3" }
-ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.40.0" }
-ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.40.0" }
-ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.40.0" }
-ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.40.0" }
-ess-primitives = { git = "https://github.com/beyond10x/ess", tag = "0.40.0" }
-ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.40.0" }
-ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.40.0" }
+ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.45.0" }
+ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.45.0" }
+ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.45.0" }
+ess-entity-runtime = { git = "https://github.com/beyond10x/ess", tag = "0.45.0" }
+ess-primitives = { git = "https://github.com/beyond10x/ess", tag = "0.45.0" }
+ess-service-contract = { git = "https://github.com/beyond10x/ess", tag = "0.45.0" }
+ess-synth = { git = "https://github.com/beyond10x/ess", tag = "0.45.0" }
 async-trait = "0.1"
 axum = "0.8.9"
 base64 = "0.23"
