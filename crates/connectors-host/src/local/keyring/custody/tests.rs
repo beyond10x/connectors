@@ -414,7 +414,7 @@ fn disposable_registry_publication_cli_and_retirement_restart() {
     Config::initialize(&paths).unwrap();
     let config = std::fs::read_to_string(&paths.config).unwrap()
         + &format!(
-            "\n[adapters.fixture]\ninstance_id='fixture-instance'\nadapter_id='fixture-adapter'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.fixture.executable]\npath='/not-installed/must-not-start'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.fixture]\ninstance_id='fixture-instance'\nadapter_id='fixture-adapter'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.fixture.executable]\npath='/not-installed/must-not-start'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     std::fs::write(&paths.config, config).unwrap();

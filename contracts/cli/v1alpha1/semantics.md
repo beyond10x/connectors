@@ -204,7 +204,10 @@ path in safe results identifies the selection; it is not a credential locator.
 `setup init` exclusively creates an owner-only file and directories with no
 symlink traversal, writes/fsyncs a temporary file, publishes without replacing an
 existing file, and fsyncs its directory before returning `created`. Existing
-configuration returns `configuration_exists`, never overwrites it. It records the
+configuration returns `configuration_exists`, never overwrites it. The file uses
+the current `connectors-local/2` format, whose adapter entries each select a
+`private_protocol` ([private mutation extension](private-mutations.md)); an
+existing `connectors-local/1` file keeps loading unchanged. It records the
 local owner policy and OS keyring requirement; it does not write credentials,
 authenticate, install artifacts or start processes. `setup check` checks syntax,
 permissions, configured artifacts and non-interactive keyring availability. A

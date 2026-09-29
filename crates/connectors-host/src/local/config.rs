@@ -267,7 +267,7 @@ impl Config {
         super::metadata::Metadata::initialize(&paths.state)?;
         state.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
         let config = Self {
-            format: "connectors-local/1".into(),
+            format: "connectors-local/2".into(),
             owner_uid: fs::uid(),
             approval_clock: None,
             secret_service_socket: None,
