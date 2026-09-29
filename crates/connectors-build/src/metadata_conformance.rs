@@ -24,7 +24,7 @@ use entity_core::{
 };
 use ess_conformance::{
     AdmittedSuite, CountReport, CountRun, CountStatus, Runner,
-    mutate::{self, EmittedMutant, EmittedSuite, Manifest, MutantClass},
+    mutate::{self, EmittedMutant, EmittedSuite, Manifest, MutantClass, RefusalKey},
     scenario::{CommandRef, ErrorRef, EventRef, OutcomeRef},
     target::*,
 };
@@ -876,6 +876,8 @@ fn emit_suite(ir: &ess_compiler::ir::EssIr, dir: &str, out: &Path) -> Result<Emi
     let synthesis = ess_conformance::synthesize::synthesize_for(ir, metadata_entities::COMPONENT)
         .map_err(|error| error.to_string())?;
     let json = synthesis.suite.to_canonical_json()?;
+    let mut refused: Vec<RefusalKey> = synthesis.refusals.iter().map(RefusalKey::of).collect();
+    refused.sort();
     AdmittedSuite::from_json(&json)?;
     let target = out.join(dir);
     std::fs::create_dir_all(&target)?;
@@ -886,10 +888,34 @@ fn emit_suite(ir: &ess_compiler::ir::EssIr, dir: &str, out: &Path) -> Result<Emi
     )?;
     Ok(EmittedSuite {
         dir: dir.to_owned(),
-        refusals: synthesis.refusals.len(),
+        refusals: refused.len(),
+        refused: Some(refused),
         scenarios: synthesis.suite.len(),
         spec_digest: synthesis.suite.provenance.spec_digest.to_string(),
     })
+}
+
+/// The manifest text, refused unless the pinned ESS reader admits it.
+///
+/// Written as `ess-mutation-manifest/2`: this scoped emitter records each suite's refusals but
+/// does not decide which guard mutants left their outcome unsatisfiable (ESS keeps that analysis
+/// private to its own `emit`), and `/3` is the format that claims it was decided.
+fn manifest(
+    ir: &ess_compiler::ir::EssIr,
+    baseline: EmittedSuite,
+    mut mutants: Vec<EmittedMutant>,
+) -> Result<String> {
+    mutants.sort_by(|left, right| left.id.cmp(&right.id));
+    let manifest = Manifest {
+        spec_digest: baseline.spec_digest.clone(),
+        baseline,
+        format: mutate::MANIFEST_FORMAT_2.to_owned(),
+        mutants,
+        specification: format!("{} {}", ir.system(), ir.version()),
+    };
+    let text = manifest.to_canonical_json();
+    Manifest::from_json(&text)?;
+    Ok(text)
 }
 
 /// `mutate --emit`, scoped to the component the host implements.
@@ -916,16 +942,19 @@ pub fn emit(root: &Path, out: &Path) -> Result<()> {
             dir: None,
             id: mutant.id.clone(),
             refusals: None,
+            refused: None,
             scenarios: None,
             site: mutant.mutation.site(),
             spec_digest: None,
             stillborn: None,
+            unsatisfiable_guard: None,
         };
         match mutate::compile(mutated, &loaded.sources) {
             Ok(ir) => {
                 let suite = emit_suite(&ir, &mutant.id, out)?;
                 entry.dir = Some(suite.dir);
                 entry.refusals = Some(suite.refusals);
+                entry.refused = suite.refused;
                 entry.scenarios = Some(suite.scenarios);
                 entry.spec_digest = Some(suite.spec_digest);
             }
@@ -939,18 +968,9 @@ pub fn emit(root: &Path, out: &Path) -> Result<()> {
         )?;
         entries.push(entry);
     }
-    entries.sort_by(|left, right| left.id.cmp(&right.id));
-    let manifest = Manifest {
-        spec_digest: baseline.spec_digest.clone(),
-        baseline,
-        format: mutate::MANIFEST_FORMAT.to_owned(),
-        mutants: entries,
-        specification: format!("{} {}", baseline_ir.system(), baseline_ir.version()),
-    };
-    std::fs::write(
-        out.join(mutate::MANIFEST_FILE),
-        manifest.to_canonical_json(),
-    )?;
+    let text = manifest(&baseline_ir, baseline, entries)?;
+    std::fs::write(out.join(mutate::MANIFEST_FILE), &text)?;
+    let manifest = Manifest::from_json(&text)?;
     let stillborn = manifest
         .mutants
         .iter()
@@ -997,6 +1017,52 @@ mod tests {
             "declarations": {},
         }))
         .unwrap()
+    }
+
+    /// `mutate --collect` reads what `emit` writes, so the manifest must be one the pinned ESS
+    /// admits: its format, and each suite's refusals as that format requires them.
+    #[test]
+    fn emitted_manifest_is_admitted_by_the_pinned_ess() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let loaded = metadata_entities::load(&root).unwrap();
+        let ir = mutate::compile(loaded.documents.clone(), &loaded.sources).unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let baseline = emit_suite(&ir, mutate::BASELINE_DIR, out.path()).unwrap();
+        let text = manifest(&ir, baseline, Vec::new()).unwrap();
+        let admitted = Manifest::from_json(&text).unwrap();
+
+        // The refusals a synthesis run separate from `emit_suite` reports for the same model.
+        let independent =
+            ess_conformance::synthesize::synthesize_for(&ir, metadata_entities::COMPONENT).unwrap();
+        let mut expected: Vec<RefusalKey> =
+            independent.refusals.iter().map(RefusalKey::of).collect();
+        expected.sort();
+        assert!(
+            !expected.is_empty(),
+            "the model synthesizes with no refusals"
+        );
+        assert_eq!(admitted.baseline.refused.as_ref(), Some(&expected));
+        assert_eq!(admitted.baseline.refusals, expected.len());
+
+        // No refused scenario is in the suite the manifest points at.
+        let suite: Value = serde_json::from_slice(
+            &std::fs::read(
+                out.path()
+                    .join(&admitted.baseline.dir)
+                    .join(mutate::SUITE_FILE),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let scenarios = suite["scenarios"].as_object().unwrap();
+        for key in &expected {
+            if let Some(scenario) = &key.scenario {
+                assert!(
+                    !scenarios.contains_key(scenario),
+                    "{scenario} is refused and emitted"
+                );
+            }
+        }
     }
 
     #[test]

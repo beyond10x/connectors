@@ -156,6 +156,38 @@ mod tests {
         );
         parse_pin(br#"{"ess":"0.40.0"}"#).unwrap();
     }
+    /// The executable pin and the `ess-*` libraries the build links must be one release:
+    /// every workspace `ess-*` git dependency names the pinned tag, and every locked package
+    /// from the ESS repository resolves that tag.
+    #[test]
+    fn the_ess_libraries_follow_the_pin() {
+        const REPOSITORY: &str = "https://github.com/beyond10x/ess";
+        let pinned = pin().unwrap().ess;
+        let manifest = include_str!("../../../Cargo.toml");
+        let dependencies: Vec<&str> = manifest
+            .lines()
+            .filter(|line| line.starts_with("ess-") && line.contains(REPOSITORY))
+            .collect();
+        assert_eq!(dependencies.len(), 7, "{dependencies:?}");
+        for line in dependencies {
+            assert!(
+                line.contains(&format!("tag = \"{pinned}\"")),
+                "Cargo.toml `{line}` does not name ESS {pinned}"
+            );
+        }
+        let lock = include_str!("../../../Cargo.lock");
+        let sources: Vec<&str> = lock
+            .lines()
+            .filter(|line| line.starts_with(&format!("source = \"git+{REPOSITORY}?")))
+            .collect();
+        assert!(!sources.is_empty());
+        for line in sources {
+            assert!(
+                line.contains(&format!("?tag={pinned}#")),
+                "Cargo.lock `{line}` does not resolve ESS {pinned}"
+            );
+        }
+    }
     #[test]
     fn default_search_is_independent_of_path_version_order() {
         let _guard = FIXTURE_PROCESSES.lock().unwrap();
