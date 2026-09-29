@@ -36,7 +36,7 @@ The repository reviews and ships one selection set per provider under
 `adapters/catalog/providers/<provider>/operations.json`. The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
-serves the provider from the pinned source alone:
+serves the provider from the pinned source alone, plus four repository reads:
 
 | id | source operation | effect |
 |---|---|---|
@@ -48,8 +48,28 @@ serves the provider from the pinned source alone:
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
 
+The repository reads list one page per call. Each takes `page` and `per_page`;
+a caller has walked the list when a page comes back shorter than `per_page`.
+GitLab serves at most 100 items per page, so send `per_page` of 100 or less:
+with a larger value every page is short and the walk stops after page one
+(the provider does not refuse it yet). The provider returns `status`, `body` and `provenance`, not GitLab's
+`X-Next-Page` header. Every other query parameter the pinned source declares
+is accepted by name.
+
+| id | source operation | request | time filter | effect |
+|---|---|---|---|---|
+| `projects.list` | `getApiV4Projects` | `GET /projects`, e.g. `membership`, `simple=false`, `archived`, `order_by=last_activity_at` | `last_activity_after` | read |
+| `tags.list` | `getApiV4ProjectsIdRepositoryTags` | `GET /projects/{id}/repository/tags` | none; each tag carries its commit id | read |
+| `releases.list` | `getApiV4ProjectsIdReleases` | `GET /projects/{id}/releases` | none; each release carries `released_at` | read |
+| `project.events` | `getApiV4ProjectsIdEvents` | `GET /projects/{id}/events` | `after`, `before` (dates) | read |
+
+`projects.list` returns each project unchanged, including `archived`,
+`created_at`, `last_activity_at` and `path_with_namespace`. All four need only
+the `read_api` token scope.
+
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
-and checks that every id the native adapter carried is present. The native
+and pins the complete list of shipped ids, so a renamed, dropped or added id
+fails the gate. The native
 `merge_request.validate` has no entry: it was `merge_request.get` plus
 `pipeline.get` and a comparison, which the merge guard now makes itself.
 
