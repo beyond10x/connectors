@@ -6,7 +6,7 @@ status: draft
 title: An owner that saw an acquisition fail still admits work
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Report (knowledge-ingest consumer, 2026-09-29, v0.15.1, not reproduced here)
 
@@ -29,3 +29,13 @@ later admission. Nothing here yet says which state, or whether step 1 matters.
 - After a failed acquisition, a later `connect` success and `operations invoke` on the same owner
   succeed without stopping the owner.
 - `connections list` does not report `ready` while that owner refuses every invoke at admission.
+
+## Further observations (same consumer, 2026-09-29 around 15:10, v0.15.1, not reproduced here)
+
+- After the connection's evidence expired, `operations invoke` answered `not_granted` with next
+  action `repair_connection` while `connections list` said `pending`; nothing pointed at revalidate.
+- `revalidate` answered `outcome_unknown` at stage `publication`, and `connections list` showed
+  `ready` right after.
+
+Both are the same symptom as steps 2–4: the answer to a command and the state `list` reports
+disagree after a publication-stage failure.
