@@ -1441,3 +1441,56 @@ fn acknowledged_deletion_cannot_keep_the_byte_size() {
     );
     metadata.persist().unwrap();
 }
+
+// A read use whose expiry an admitted sweep has recorded leaves the SQL
+// projection while its Entity Runtime history remains. A clock-only
+// observation after that (status, list, the observation before revalidate or
+// invoke) must still be admitted; it failed with MetadataUnavailable.
+#[test]
+fn observation_after_a_recorded_read_use_expiry_is_admitted() {
+    let (_root, registry) = fixture();
+    let (_claim, first) = prepared(&registry, "one", NOW);
+    let connection = publish_fixture(&registry, first, NOW);
+    registry
+        .capture_read(&binding(), &connection, &BTreeSet::new(), NOW, NOW + 1000)
+        .unwrap();
+    // This capture's admitted sweep records the first use Expired.
+    let _ = registry.capture_read(
+        &binding(),
+        &connection,
+        &BTreeSet::new(),
+        NOW + 2000,
+        NOW + 3000,
+    );
+    let observed = registry.describe(
+        "fixture-instance",
+        "fixture-adapter",
+        "config-1",
+        &connection,
+        NOW + 4000,
+        true,
+    );
+    assert!(observed.is_ok(), "{:?}", observed.err());
+}
+
+// Revoking a connection is terminal for that connection only: the same
+// identity connects again through a fresh acquisition.
+#[test]
+fn the_same_identity_connects_again_after_revoke() {
+    let (_root, registry) = fixture();
+    let (_claim, first) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, first, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &revision,
+            NOW + 1,
+        )
+        .unwrap();
+    let (_claim, second) = prepared(&registry, "one", NOW + 2);
+    let again = publish_fixture(&registry, second, NOW + 2);
+    assert_ne!(again, reference);
+}
