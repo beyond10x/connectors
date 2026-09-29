@@ -435,6 +435,7 @@ never replay a possible write after interruption, timeout or lost response.
 | stale revision, occupied changed configuration | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
+| running owner is a different executable build (`next_action = stop_owner`) | `owner_build_mismatch` | 1 |
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
