@@ -667,6 +667,17 @@
       }
     },
     {
+      "id": "owner-from-another-build-is-refused",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "owner_build_mismatch",
+        "stage": "readiness",
+        "next_action": "stop_owner"
+      }
+    },
+    {
       "id": "valid-ConnectionStatusInput-36",
       "type": "connectors.cli.ConnectionStatusInput",
       "valid": true,
