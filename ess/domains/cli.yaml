@@ -707,8 +707,12 @@ entities:
     # ESS-LIMIT: a cursor is stale when its registry_epoch differs from the
     # ServiceConfiguration's, which publication, revoke and known invalidity advance
     # (docs/local-connection-registry.md:107-108); the 300 s expiry and the 10,000
-    # live-cursor cap (:104) are host rules. ESS 0.40 has no guard over a related
-    # record's field, no count over an entity's records and no trusted time.
+    # live-cursor cap (:104) are host rules. The guard over the related
+    # configuration's field is `when_related:`, added in ESS 0.41 at source format
+    # ess/18; this specification is ess/15, which refuses it
+    # (unsupported_format_version), and the ESS 0.45 Entity Runtime lowering
+    # refuses it at any format (RelatedGuardUnsupported). ESS 0.45 has no count
+    # over an entity's records and no trusted time.
 
 errors:
   - name: connectors.cli.CursorStateConflict

@@ -179,11 +179,14 @@ errors:
 # commands fenced by the issuer revision, trusted caller policy/time, and process
 # lease exclusion require the host binding. ESS 0.40 has no cross-record
 # constraint (at most one key per state per issuer, uniqueness of a non-identity
-# field, a count of sibling rows), no guard that reads another entity's field,
-# no transition inside `affects:` and no state read in its `where`, no
-# duplicate-identity refusal that lowers to Entity Runtime (`existing_instance:`
-# is refused there), and no durable-acknowledgement, trusted-time or
-# process-lease construct. The issuer's own revision CAS is declared above.
+# field, a count of sibling rows), no transition inside `affects:` and no state
+# read in its `where`, no duplicate-identity refusal that lowers to Entity
+# Runtime (`existing_instance:` is refused there), and no
+# durable-acknowledgement, trusted-time or process-lease construct. A guard that
+# reads another entity's field is `when_related:`, added in ESS 0.41 at source
+# format ess/18; this specification is ess/15, which refuses it
+# (unsupported_format_version), and the ESS 0.45 Entity Runtime lowering refuses
+# it at any format (RelatedGuardUnsupported). The issuer's own revision CAS is declared above.
 # No entity here stores a seed or grants approval use.
 
 views:
