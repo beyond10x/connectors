@@ -190,7 +190,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -297,6 +298,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -511,7 +513,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -618,6 +621,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -790,7 +794,8 @@
                           "approval_required",
                           "approval_refused",
                           "approval_replayed",
-                          "idempotency_conflict"
+                          "idempotency_conflict",
+                          "owner_build_mismatch"
                         ]
                       },
                       "connection": {
@@ -897,6 +902,7 @@
                           "refresh_description",
                           "request_permission",
                           "retry_explicitly",
+                          "stop_owner",
                           "none"
                         ]
                       },
@@ -1058,7 +1064,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -1165,6 +1172,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -1346,7 +1354,8 @@
                           "approval_required",
                           "approval_refused",
                           "approval_replayed",
-                          "idempotency_conflict"
+                          "idempotency_conflict",
+                          "owner_build_mismatch"
                         ]
                       },
                       "connection": {
@@ -1453,6 +1462,7 @@
                           "refresh_description",
                           "request_permission",
                           "retry_explicitly",
+                          "stop_owner",
                           "none"
                         ]
                       },
@@ -1614,7 +1624,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -1721,6 +1732,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -1899,7 +1911,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -2006,6 +2019,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -2203,7 +2217,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -2310,6 +2325,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -2521,7 +2537,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -2628,6 +2645,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -2839,7 +2857,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -2946,6 +2965,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -3157,7 +3177,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -3264,6 +3285,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -3475,7 +3497,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -3582,6 +3605,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -3793,7 +3817,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -3900,6 +3925,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -4105,7 +4131,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -4212,6 +4239,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -4431,7 +4459,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -4538,6 +4567,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -4748,7 +4778,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -4855,6 +4886,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -5246,7 +5278,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -5353,6 +5386,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -5594,7 +5628,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -5701,6 +5736,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -5933,7 +5969,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -6040,6 +6077,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -6274,7 +6312,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -6381,6 +6420,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -6625,7 +6665,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -6732,6 +6773,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -6967,7 +7009,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -7074,6 +7117,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -7262,7 +7306,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -7369,6 +7414,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -7529,6 +7575,7 @@
                       "refresh_description",
                       "request_permission",
                       "retry_explicitly",
+                      "stop_owner",
                       "none"
                     ]
                   },
@@ -7673,7 +7720,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -7780,6 +7828,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -7987,7 +8036,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -8094,6 +8144,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -8409,7 +8460,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -8516,6 +8568,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -8732,7 +8785,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -8839,6 +8893,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -8982,6 +9037,7 @@
                       "refresh_description",
                       "request_permission",
                       "retry_explicitly",
+                      "stop_owner",
                       "none"
                     ]
                   },
@@ -9044,7 +9100,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -9151,6 +9208,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
@@ -9320,7 +9378,8 @@
                   "approval_required",
                   "approval_refused",
                   "approval_replayed",
-                  "idempotency_conflict"
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
                 ]
               },
               "connection": {
@@ -9427,6 +9486,7 @@
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
+                  "stop_owner",
                   "none"
                 ]
               },
