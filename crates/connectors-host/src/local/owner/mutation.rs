@@ -1,6 +1,6 @@
 //! Local write coordination. Selectors are reconstructed under current owner
 //! policy; observations never grant a native preparation or a dispatch receipt.
-use super::{Code, Error, approval_issuance as issuance};
+use super::{Code, Error, Origin, approval_issuance as issuance};
 use crate::local::{audit, config::Paths, mutations as ledger};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -35,12 +35,53 @@ pub struct Failure {
     pub code: FailureCode,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_code: Option<connectors_core::ErrorCode>,
+    /// Stored with the settled outcome so a replay reports what the live reply
+    /// did. Absent (host) on every entry written before it existed, and never
+    /// written for the host, so those entries keep their earlier bytes.
+    #[serde(default, skip_serializing_if = "Origin::is_host")]
+    pub origin: Origin,
+}
+impl Failure {
+    /// The stage a write failure reports. The provider's answer is `dispatch`;
+    /// the host's refusal before anything was sent is `admission`; a host
+    /// failure once the write was sent, or may have been, stays `dispatch`.
+    pub fn stage(&self, classification: Classification) -> &'static str {
+        if self.origin == Origin::Host && classification == Classification::NotAttempted {
+            "admission"
+        } else {
+            "dispatch"
+        }
+    }
+    /// The next action a refused, failed or unknown write reports. Only the
+    /// provider's own answer names something the operator can act on; every
+    /// other write failure, including the host's approval refusals, sends the
+    /// caller back to the attempt's status. A write that took effect, or may
+    /// have, is never offered a plain retry.
+    pub fn next_action(&self, classification: Classification) -> &'static str {
+        use connectors_core::ErrorCode as E;
+        if self.origin != Origin::Provider {
+            return "retry_status";
+        }
+        let possible_effect = matches!(
+            classification,
+            Classification::Applied | Classification::Unknown
+        );
+        match (self.code, &self.service_code) {
+            (FailureCode::Owner(Code::Forbidden), _) => "request_permission",
+            (FailureCode::Owner(Code::ServiceFailure), Some(E::NotFound)) => "none",
+            (FailureCode::Owner(Code::Timeout | Code::Capacity), _) if !possible_effect => {
+                "retry_explicitly"
+            }
+            _ => "retry_status",
+        }
+    }
 }
 impl From<Error> for Failure {
     fn from(error: Error) -> Self {
         Self {
             code: FailureCode::Owner(error.code),
             service_code: error.service_code,
+            origin: error.origin,
         }
     }
 }
@@ -54,6 +95,7 @@ impl From<ApprovalCode> for Failure {
         Self {
             code: FailureCode::Approval(code),
             service_code: None,
+            origin: Origin::Host,
         }
     }
 }
@@ -214,6 +256,39 @@ impl Deadline {
 enum StoredOutcome {
     Success { value: Value },
     Failure { error: Failure },
+}
+impl From<Result<Value, Failure>> for StoredOutcome {
+    fn from(outcome: Result<Value, Failure>) -> Self {
+        match outcome {
+            Ok(value) => Self::Success { value },
+            Err(error) => Self::Failure { error },
+        }
+    }
+}
+
+/// Classify a committed native write and project its result into the closed
+/// safe outcome the ledger stores. The failure keeps whether the provider
+/// answered, so the reply and every later replay report the same stage.
+pub(crate) fn native_outcome(
+    native: crate::local::runtime::WriteResult,
+) -> (Classification, Result<Value, Failure>) {
+    use crate::local::runtime::WriteEffect;
+    match native.effect {
+        WriteEffect::Applied => (
+            Classification::Applied,
+            native.result.map_err(|error| Error::from(error).into()),
+        ),
+        WriteEffect::Refused => (
+            Classification::Refused,
+            Err(native
+                .result
+                .err()
+                .map(Error::from)
+                .unwrap_or_else(|| Code::ServiceFailure.into())
+                .into()),
+        ),
+        WriteEffect::Unknown => (Classification::Unknown, Err(Code::OutcomeUnknown.into())),
+    }
 }
 
 struct NoClock;
@@ -425,6 +500,22 @@ fn project(
     request_id: &str,
     original: ledger::Observation,
 ) -> Result<Delivery, Error> {
+    let (classification, outcome) = replayed(&original)?;
+    let pending = matches!(
+        original.state,
+        ledger::State::Prepared | ledger::State::Dispatching
+    );
+    let mut value = delivery(current, request_id, classification, outcome);
+    value.mutation.attempt = Some(Attempt {
+        instance: current.adapter.instance_id.clone(),
+        id: original.reference.attempt_id,
+    });
+    value.mutation.original_request_id = Some(original.request_id);
+    value.mutation.replayed = !pending;
+    Ok(value)
+}
+/// The classification and closed safe outcome a durable attempt replays with.
+fn replayed(original: &ledger::Observation) -> Result<(Classification, StoredOutcome), Error> {
     let classification = match original.state {
         ledger::State::Aborted => Classification::NotAttempted,
         ledger::State::Completed => Classification::Applied,
@@ -443,7 +534,7 @@ fn project(
         }
     } else {
         // A malformed retained safe result establishes no disclosure authority.
-        let raw = original.result.ok_or(Code::MetadataUnavailable)?;
+        let raw = original.result.clone().ok_or(Code::MetadataUnavailable)?;
         let outcome: StoredOutcome = if original.state == ledger::State::Aborted
             && raw == serde_json::json!({"cause":"recovery_before_dispatch"})
         {
@@ -471,14 +562,7 @@ fn project(
         }
         outcome
     };
-    let mut value = delivery(current, request_id, classification, outcome);
-    value.mutation.attempt = Some(Attempt {
-        instance: current.adapter.instance_id.clone(),
-        id: original.reference.attempt_id,
-    });
-    value.mutation.original_request_id = Some(original.request_id);
-    value.mutation.replayed = !pending;
-    Ok(value)
+    Ok((classification, outcome))
 }
 
 /// Current disclosure admission precedes exact lookup. This performs no secret,
@@ -584,6 +668,7 @@ fn observe_as_original(
             value.error = Some(Failure {
                 code: FailureCode::Owner(Code::ServiceFailure),
                 service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
+                origin: Origin::Host,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,

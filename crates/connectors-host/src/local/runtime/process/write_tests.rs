@@ -79,6 +79,14 @@ impl Adapter for Fixture {
         if self.mode == "preflight-refused" {
             return Err(Failure::Forbidden);
         }
+        // The preflight's own provider request was sent and its transport
+        // deadline passed, as `http::provider_error` marks it.
+        if self.mode == "preflight-provider-timeout" {
+            return Err(Failure::from_provider(
+                connectors_core::Error::new(ErrorCode::Timeout, "provider request timed out")
+                    .answered(),
+            ));
+        }
         if self.mode == "slow-preflight" {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
@@ -135,6 +143,11 @@ impl PreparedWrite for Pending {
         };
         match self.mode.as_str() {
             "refused" => WriteOutcome::Refused(error()),
+            // The provider's own answer, as the catalog adapter marks it.
+            "provider-forbidden" => WriteOutcome::Refused(error().answered()),
+            "provider-not-found" => WriteOutcome::Refused(
+                connectors_core::Error::new(ErrorCode::NotFound, "private native error").answered(),
+            ),
             "unknown" => WriteOutcome::Unknown(error()),
             "applied-error" => WriteOutcome::Applied(Err(error())),
             "bad-output" => WriteOutcome::Applied(Ok(json!({"value":"bad"}))),
@@ -753,4 +766,82 @@ fn duplicate_commit_refuses_and_legacy_selection_never_exposes_a_write() {
     }
     assert!(Child::spawn(&selection(root.path(), "legacy", PrivateProtocol::V2)).is_err());
     assert_eq!(count(root.path(), "send"), 1);
+}
+
+/// A guarded write the provider refuses crosses the private boundary and the
+/// owner's settlement projection as the provider's refusal, with the next
+/// action the CLI reports at `dispatch`.
+#[test]
+fn a_provider_refusal_of_a_write_names_the_provider_and_a_fitting_next_action() {
+    use crate::local::owner::{Origin, mutation};
+    for (mode, failure, action) in [
+        (
+            "provider-forbidden",
+            Failure::ProviderForbidden,
+            "request_permission",
+        ),
+        ("provider-not-found", Failure::ProviderNotFound, "none"),
+        // A child's plain refusal is not the provider's answer.
+        ("refused", Failure::Forbidden, "retry_status"),
+    ] {
+        let root = temp();
+        let mut child = Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
+        let result = prepare(&mut child, HANG_BUDGET_MS).unwrap().commit();
+        assert_eq!(result.effect, WriteEffect::Refused, "{mode}");
+        assert_eq!(result.result.as_ref().err(), Some(&failure), "{mode}");
+        assert_eq!(count(root.path(), "send"), 1, "{mode}");
+        let (classification, outcome) = mutation::native_outcome(result);
+        assert_eq!(classification, mutation::Classification::Refused, "{mode}");
+        let error = outcome.unwrap_err();
+        assert_eq!(
+            error.origin,
+            if mode == "refused" {
+                Origin::Host
+            } else {
+                Origin::Provider
+            },
+            "{mode}"
+        );
+        assert_eq!(error.next_action(classification), action, "{mode}");
+        assert_eq!(error.stage(classification), "dispatch", "{mode}");
+    }
+}
+
+/// A preflight request the provider transport sent and whose deadline passed
+/// is the provider's timeout; the host's own expired budget stays the host's.
+#[test]
+fn a_provider_timeout_is_the_providers_and_the_host_deadline_stays_the_hosts() {
+    use crate::local::owner::{self, Code, Origin, mutation};
+    let root = temp();
+    let mut child = Child::spawn(&selection(
+        root.path(),
+        "preflight-provider-timeout",
+        PrivateProtocol::V2,
+    ))
+    .unwrap();
+    let refused = prepare(&mut child, HANG_BUDGET_MS).err().unwrap();
+    assert_eq!(refused, Failure::ProviderTimeout);
+    assert_eq!(count(root.path(), "send"), 0);
+    let error = owner::Error::from(refused);
+    assert_eq!(error.code, Code::Timeout);
+    assert_eq!(error.origin, Origin::Provider);
+    // The preparation failed, so the write was not attempted (execution.rs).
+    let error = mutation::Failure::from(error);
+    let not_attempted = mutation::Classification::NotAttempted;
+    assert_eq!(error.next_action(not_attempted), "retry_explicitly");
+    assert_eq!(error.stage(not_attempted), "dispatch");
+    // The host's own deadline: an already expired budget never reaches the child.
+    let root = temp();
+    let mut child = Child::spawn(&selection(root.path(), "ok", PrivateProtocol::V2)).unwrap();
+    let expired = prepare_by(&mut child, connectors_sdk::now_ms() - 1)
+        .err()
+        .unwrap();
+    assert_eq!(expired, Failure::Timeout);
+    assert_eq!(count(root.path(), "prepare"), 0);
+    let error = owner::Error::from(expired);
+    assert_eq!(error.code, Code::Timeout);
+    assert_eq!(error.origin, Origin::Host);
+    let error = mutation::Failure::from(error);
+    assert_eq!(error.next_action(not_attempted), "retry_status");
+    assert_eq!(error.stage(not_attempted), "admission");
 }

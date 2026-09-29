@@ -404,7 +404,10 @@ fn database_roots(path: Option<&std::path::Path>) -> Result<rustls::RootCertStor
 }
 
 fn database_error(error: tokio_postgres::Error) -> Error {
-    let code = match error.code().map(|c| c.code()) {
+    sqlstate_error(error.code().map(|c| c.code()))
+}
+fn sqlstate_error(state: Option<&str>) -> Error {
+    let code = match state {
         Some("57014") => ErrorCode::Timeout,
         Some("25006" | "42501") => ErrorCode::Forbidden,
         Some("28P01" | "28000") => ErrorCode::Unauthorized,
@@ -412,7 +415,35 @@ fn database_error(error: tokio_postgres::Error) -> Error {
         Some(c) if c.starts_with("42") || c.starts_with("22") => ErrorCode::InvalidInput,
         _ => ErrorCode::Unavailable,
     };
-    Error::new(code, "database could not complete the requested read")
+    let answered = matches!(code, ErrorCode::Timeout | ErrorCode::Capacity);
+    let error = Error::new(code, "database could not complete the requested read");
+    // The database's statement timeout and its connection limit are its own
+    // answers to a sent request; the adapter's deadlines (`query_timeout`) are not.
+    if answered { error.answered() } else { error }
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+    #[test]
+    fn the_databases_statement_timeout_and_capacity_answers_are_marked_and_own_deadlines_are_not() {
+        for (state, code, answered) in [
+            ("57014", ErrorCode::Timeout, true),
+            ("53300", ErrorCode::Capacity, true),
+            ("42501", ErrorCode::Forbidden, false),
+            ("42601", ErrorCode::InvalidInput, false),
+            ("08006", ErrorCode::Unavailable, false),
+        ] {
+            let error = sqlstate_error(Some(state));
+            assert_eq!(error.code, code, "{state}");
+            assert_eq!(error.upstream_answer, answered, "{state}");
+        }
+        let error = sqlstate_error(None);
+        assert_eq!(error.code, ErrorCode::Unavailable);
+        assert!(!error.upstream_answer);
+        // The adapter's own connect and work deadlines are not the database's.
+        assert!(!query_timeout().upstream_answer);
+    }
 }
 
 #[cfg(test)]

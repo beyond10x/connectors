@@ -89,6 +89,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         {
             ("dispatch", "none", false)
         }
+        // A sent request's deadline that passed, or a marked upstream capacity
+        // answer; the host's and the adapter's own limits stay admission.
+        Timeout | Capacity if provider => ("dispatch", "retry_explicitly", false),
         InvalidInput => ("arguments", "none", true),
         InvalidConfiguration => ("configuration", "check_configuration", true),
         ProtectedEntryUnavailable => ("protected_entry", "select_protected_source", true),
@@ -391,5 +394,46 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             "retry_status",
             false,
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stage(error: owner::Error) -> (Value, Value) {
+        let (HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. }) =
+            owner_failure(error)
+        else {
+            panic!("not a failure");
+        };
+        (data["stage"].clone(), data["next_action"].clone())
+    }
+    fn error(code: owner::Code, origin: owner::Origin) -> owner::Error {
+        let mut error = owner::Error::from(code);
+        error.origin = origin;
+        error
+    }
+
+    #[test]
+    fn a_provider_timeout_or_capacity_answer_reports_dispatch_and_the_hosts_own_admission() {
+        use owner::{Code, Origin};
+        for code in [Code::Timeout, Code::Capacity] {
+            assert_eq!(
+                stage(error(code, Origin::Provider)),
+                (json!("dispatch"), json!("retry_explicitly")),
+                "{code:?}"
+            );
+            assert_eq!(
+                stage(error(code, Origin::Host)),
+                (json!("admission"), json!("retry_explicitly")),
+                "{code:?}"
+            );
+        }
+        // Every source of `unsupported` is raised before dispatch.
+        assert_eq!(
+            stage(error(Code::Unsupported, Origin::Provider)),
+            (json!("admission"), json!("none"))
+        );
     }
 }
