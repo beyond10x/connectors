@@ -93,6 +93,12 @@ impl Session {
             cancelled: false,
         }))
     }
+    /// The preparsed callable and its context, when the arguments parsed.
+    pub fn selected(&self) -> Option<(&str, &Context)> {
+        self.selection
+            .as_ref()
+            .map(|s| (s.callable.as_str(), &s.context))
+    }
     pub fn signals(&mut self) -> owner::Result<()> {
         if self.signals.is_none() {
             self.signals = Some(protected::Signals::install()?);
