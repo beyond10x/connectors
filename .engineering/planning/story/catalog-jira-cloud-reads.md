@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: story:catalog-jira-cloud-reads
 kind: story
-status: draft
+status: active
 title: Jira Cloud issues, comments and changelog through the catalog provider
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-basic-auth-profile
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/atlassian/upstream/jira-platform-v3.json
@@ -22,7 +23,10 @@ scope:
   path: adapters/catalog/tests/jira.rs
 - confidence: cited
   path: docs/catalog-jira.md
-revision: 5
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-29T15:46:20Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":6}}}
+- {from: "proposed", to: "active", at: "2026-09-29T15:46:21Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":6}}}
 ---
 ## Source
 
@@ -49,3 +53,8 @@ Jira Cloud platform REST v3 OpenAPI document, pinned by digest under `adapters/a
 - Per operation, a recorded-fixture test asserts the exact request the provider sends (path, query including the time filter, auth header) and that `operations invoke` returns the fixture body byte-identical.
 - For every list operation in the table, a paging test walks two fixture pages and asserts the walk stops at that operation's documented end condition.
 - `adapters/catalog/tests/bundle_drift.rs` reproduces this provider's bundle byte for byte; no live credential is needed for the gate.
+
+## Decided for the wave (coordinator, 2026-09-29)
+
+- The catalog engine parses and re-serialises the response body (`adapters/catalog/src/lib.rs:581`),
+  so "byte-identical" in the acceptance is tested as JSON equality with the fixture.

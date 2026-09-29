@@ -2,12 +2,24 @@
 format: aep.planning-md/3
 id: story:catalog-gitlab-repository-reads
 kind: story
-status: draft
+status: active
 title: GitLab projects, tags, releases and project events through the catalog provider
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - serves: vision:independent-contract-adapters
-revision: 3
+scope:
+- confidence: cited
+  path: adapters/catalog/providers/gitlab/operations.json
+- confidence: inferred
+  path: adapters/catalog/tests/local_runtime.rs
+- confidence: cited
+  path: adapters/catalog/tests/shipped.rs
+- confidence: cited
+  path: docs/local-catalog-provider.md
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-29T15:46:15Z", actor: "human:timo", revision: 7}
+- {from: "proposed", to: "active", at: "2026-09-29T15:46:15Z", actor: "human:timo", revision: 8}
 ---
 ## Source
 
@@ -60,3 +72,13 @@ consumer switches without renaming:
 | `tags.list` | `getApiV4ProjectsIdRepositoryTags` |
 | `releases.list` | `getApiV4ProjectsIdReleases` |
 | `project.events` | `getApiV4ProjectsIdEvents` |
+
+## Decided for the wave (coordinator, 2026-09-29)
+
+- The catalog read result carries only `status`, `body` and `provenance` (`adapters/catalog/src/lib.rs:350-352`),
+  so a caller cannot see `X-Next-Page`. The paging tests stop on "page shorter than `per_page`";
+  `lib.rs` does not change.
+- The engine parses and re-serialises the body (`lib.rs:581`), so "byte-identical" in the acceptance
+  is tested as JSON equality with the fixture.
+- Fixture tests extend the TLS fixture server in `adapters/catalog/tests/local_runtime.rs:106-195`;
+  `shipped.rs:26` moves from 14 to 18 declared ids.
