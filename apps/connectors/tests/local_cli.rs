@@ -175,6 +175,61 @@ fn setup_init_admits_an_adapter_entry_that_selects_its_private_protocol() {
     assert!(prerequisites.iter().any(|p| p["name"] == "artifact:forge"));
 }
 
+fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &str) {
+    success(&command(root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let config = fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("connectors-local/2", format)
+        + &format!(
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n{private_protocol}[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "a".repeat(64)
+        );
+    fs::write(&config_path, config).unwrap();
+}
+
+#[test]
+fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_entry() {
+    for (format, private_protocol) in [
+        (
+            "connectors-local/1",
+            "private_protocol='connectors-private/2'\n",
+        ),
+        ("connectors-local/2", ""),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        configured_entry(&root, format, private_protocol);
+        let output = command(&root, &["adapters", "list"]);
+        assert_eq!(output.status.code(), Some(2), "{format}");
+        assert!(output.stdout.is_empty());
+        let refusal: Value = serde_json::from_slice(&output.stderr).unwrap();
+        // Exactly the declared operator-written coordinates: no parser text.
+        assert_eq!(
+            refusal,
+            serde_json::json!({"ok":false,"error":{"code":"failure","data":{
+                "kind":"usage","code":"invalid_configuration","stage":"configuration",
+                "next_action":"check_configuration",
+                "configuration_format":format,"instance_id":"forge-local"}}}),
+            "{format}"
+        );
+    }
+    // Any other invalid entry keeps the uncoordinated refusal.
+    let root = tempfile::tempdir().unwrap();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\nunreviewed='sentinel'\n",
+    );
+    let output = command(&root, &["adapters", "list"]);
+    assert_eq!(output.status.code(), Some(2));
+    let refusal: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(
+        refusal["error"]["data"],
+        serde_json::json!({"kind":"usage","code":"invalid_configuration",
+            "stage":"configuration","next_action":"check_configuration"})
+    );
+}
+
 #[test]
 fn inventory_and_unavailable_status_never_launch_configured_executable() {
     let root = tempfile::tempdir().unwrap();
