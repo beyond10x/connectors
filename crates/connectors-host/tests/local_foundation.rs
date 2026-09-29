@@ -104,6 +104,52 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
 }
 
 #[test]
+fn a_format_and_private_protocol_mismatch_names_the_format_and_entry() {
+    use connectors_host::local::config::Refusal;
+    let root = root();
+    let paths = paths(&root);
+    Config::initialize(&paths).unwrap();
+    let setup = fs::read_to_string(&paths.config).unwrap();
+    let entry = |private: &str| {
+        format!(
+            "\n[adapters.fixture]\ninstance_id='fixture-one'\nadapter_id='fixture'\nconfiguration_revision='one'\nprotocol='v1alpha1'\n{private}[adapters.fixture.executable]\npath='/fixture'\nsha256='{}'\n",
+            "a".repeat(64)
+        )
+    };
+    for (format, private) in [
+        (
+            "connectors-local/1",
+            "private_protocol='connectors-private/2'\n",
+        ),
+        ("connectors-local/2", ""),
+    ] {
+        let text = setup.replace("connectors-local/2", format) + &entry(private);
+        fs::write(&paths.config, &text).unwrap();
+        assert_eq!(
+            Config::read(&paths.config).unwrap_err(),
+            Refusal::PrivateProtocolMismatch {
+                format: format.into(),
+                instance_id: "fixture-one".into(),
+            }
+        );
+        // The owner's own load keeps the payload-free failure.
+        assert_eq!(
+            Config::load(&paths.config).unwrap_err(),
+            Failure::InvalidConfiguration
+        );
+    }
+    // A mismatched entry whose instance id is itself invalid names nothing.
+    let text = setup.replace("connectors-local/2", "connectors-local/1")
+        + &entry("private_protocol='connectors-private/2'\n")
+            .replace("fixture-one", "not a selector");
+    fs::write(&paths.config, &text).unwrap();
+    assert_eq!(
+        Config::read(&paths.config).unwrap_err(),
+        Refusal::Failure(Failure::InvalidConfiguration)
+    );
+}
+
+#[test]
 fn exclusive_setup_persists_private_metadata_and_refuses_overwrite() {
     let root = root();
     let paths = paths(&root);

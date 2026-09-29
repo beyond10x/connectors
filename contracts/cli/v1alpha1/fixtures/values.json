@@ -678,6 +678,46 @@
       }
     },
     {
+      "id": "T04-configuration-refusal-names-format-and-entry",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "usage",
+        "code": "invalid_configuration",
+        "stage": "configuration",
+        "next_action": "check_configuration",
+        "configuration_format": "connectors-local/1",
+        "instance_id": "forge-local"
+      }
+    },
+    {
+      "id": "T04-configuration-refusal-carries-no-parser-text",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "usage",
+        "code": "invalid_configuration",
+        "stage": "configuration",
+        "next_action": "check_configuration",
+        "configuration_format": "connectors-local/1",
+        "instance_id": "forge-local",
+        "parser": "TOML parse error at line 1"
+      }
+    },
+    {
+      "id": "T04-configuration-format-is-a-closed-enum",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "usage",
+        "code": "invalid_configuration",
+        "stage": "configuration",
+        "next_action": "check_configuration",
+        "configuration_format": "TOML parse error at line 1, column 1",
+        "instance_id": "forge-local"
+      }
+    },
+    {
       "id": "valid-ConnectionStatusInput-36",
       "type": "connectors.cli.ConnectionStatusInput",
       "valid": true,

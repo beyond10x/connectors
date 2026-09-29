@@ -66,6 +66,7 @@ appear in stdout, stderr, logs or ordinary serialized management requests.
 | T01 valid TOML | [Valid fixture](fixtures/config-valid.toml), with omitted forge startup/restart. | Effective forge on-demand/never, database automatic/never. No process is started merely by parsing. |
 | T02 invalid TOML | [Invalid fixture](fixtures/config-invalid.toml). | `invalid_configuration`, exit 2, launches 0, fictional credential field/value absent from diagnostic. Each independent invalid field should additionally be isolated in runtime tests. |
 | T03 identity/path/keys | Duplicate alias or instance, unknown top-level/entry key, unsupported format, relative artifact, missing digest, unresolved default, reserved management collision. | Reject whole configuration without discovery, build, authentication or partial launch. |
+| T04 format/private protocol | A `connectors-local/1` entry carrying `private_protocol`; a `connectors-local/2` entry lacking it; every other entry admissible. Run through every command except `setup init`. | `invalid_configuration`, exit 2, `check_configuration`; error data names `configuration_format` and the first mismatched entry's `instance_id` in alias order, and nothing else. A file with any other defect, in any entry, omits both fields. |
 
 The generated CLI's portable default Sources implementation may prove bounded
 UTF-8 acquisition and hidden TTY selection. Its acceptance does not prove P02–P04,
