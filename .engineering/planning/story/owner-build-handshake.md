@@ -2,8 +2,10 @@
 format: aep.planning-md/3
 id: story:owner-build-handshake
 kind: story
-status: draft
+status: active
 title: The CLI refuses or replaces an owner running a different build
+relations:
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: apps/connectors/src/local.rs
@@ -25,7 +27,10 @@ scope:
   path: crates/connectors-host/tests/local_foundation.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-29T11:07:12Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-09-29T11:07:12Z", actor: "human:timo", revision: 4}
 ---
 ## Problem
 After upgrading `connectors`, the running `__connectors-owner` keeps serving with the old build. Observed 2026-09-29: an owner started 07:43:58 from a 0.15.0 binary (digest dca05368…) served every command after 0.15.1 (60fcf27f…) was installed at 08:52, so the 0.15.1 observation fix never ran.

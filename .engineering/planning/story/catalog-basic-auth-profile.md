@@ -2,10 +2,11 @@
 format: aep.planning-md/3
 id: story:catalog-basic-auth-profile
 kind: story
-status: draft
+status: active
 title: The catalog provider authenticates with HTTP basic (identity plus API token)
 relations:
 - decomposes: epic:catalog-knowledge-sources
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/catalog/src/local.rs
@@ -13,7 +14,10 @@ scope:
   path: adapters/catalog/tests/local_runtime.rs
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 4
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-29T11:07:11Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "proposed", to: "active", at: "2026-09-29T11:07:11Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}}
 ---
 ## Problem
 
