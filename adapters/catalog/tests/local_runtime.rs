@@ -173,6 +173,8 @@ impl Provider {
                             200,
                             json!({"id":99,"user_id":user,"active":true,"revoked":false,"scopes":["api"],"expires_at":null}),
                         )
+                    } else if let Some(page) = repository_page(route, &path) {
+                        (200, page)
                     } else if path.contains("/issues?") {
                         (200, json!([{"id":1,"title":"fixture"}]))
                     } else if path.contains("/repository/files/") {
@@ -297,6 +299,75 @@ impl Drop for Provider {
         let _ = self.stop.take().unwrap().send(());
         self.thread.take().unwrap().join().unwrap();
     }
+}
+/// The recorded GitLab repository listings the fixture serves: projects, tags,
+/// releases and project events, two items on page one and one on page two, so
+/// a walk at `per_page=2` ends on the short second page. `None` for any other
+/// route.
+fn repository_page(route: &str, path: &str) -> Option<Value> {
+    let second = path
+        .split_once('?')
+        .is_some_and(|(_, query)| query.split('&').any(|pair| pair == "page=2"));
+    let items: Vec<Value> = if route == "/api/v4/projects" {
+        let project = |id: u64, archived: bool| {
+            json!({
+                "id": id,
+                "path_with_namespace": format!("org/project-{id}"),
+                "description": format!("fixture project {id}"),
+                "archived": archived,
+                "created_at": "2026-01-02T03:04:05.000Z",
+                "last_activity_at": "2026-09-20T10:00:00.000Z",
+                "topics": ["fixture", "knowledge"],
+                "default_branch": "main",
+                "visibility": "private",
+                "web_url": format!("https://gitlab.example.test/org/project-{id}")
+            })
+        };
+        if second {
+            vec![project(3, true)]
+        } else {
+            vec![project(1, false), project(2, false)]
+        }
+    } else if route.ends_with("/repository/tags") {
+        let tag = |name: &str, commit: &str| {
+            json!({"name": name, "message": "", "target": commit,
+                   "commit": {"id": commit, "created_at": "2026-09-10T08:00:00.000Z"},
+                   "release": null, "protected": false})
+        };
+        if second {
+            vec![tag("v0.1.0", "c0ffee01")]
+        } else {
+            vec![tag("v0.3.0", "c0ffee03"), tag("v0.2.0", "c0ffee02")]
+        }
+    } else if route.ends_with("/releases") {
+        let release = |tag: &str, at: &str| {
+            json!({"tag_name": tag, "name": format!("Release {tag}"),
+                   "description": "fixture notes", "released_at": at,
+                   "created_at": at, "upcoming_release": false})
+        };
+        if second {
+            vec![release("v0.1.0", "2026-07-01T00:00:00.000Z")]
+        } else {
+            vec![
+                release("v0.3.0", "2026-09-01T00:00:00.000Z"),
+                release("v0.2.0", "2026-08-01T00:00:00.000Z"),
+            ]
+        }
+    } else if route.ends_with("/events") {
+        let event = |id: u64, action: &str| {
+            json!({"id": id, "project_id": 7, "action_name": action,
+                   "target_type": null, "author_id": 42,
+                   "created_at": "2026-09-15T12:00:00.000Z"})
+        };
+        if second {
+            vec![event(501, "created")]
+        } else {
+            vec![event(503, "pushed to"), event(502, "pushed new")]
+        }
+    } else {
+        return None;
+    };
+    Some(Value::Array(items))
 }
 fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
@@ -562,4 +633,94 @@ fn lost_validation_response_closes_the_owned_channel_without_replay() {
         Err(Failure::Unavailable)
     ));
     assert_eq!(provider.count(), 1);
+}
+
+/// The four repository reads the knowledge-ingest consumer selects, each with
+/// the exact request the fixture must observe for its first page at
+/// `per_page=2`, including the time filter where the operation has one.
+fn repository_reads() -> [(&'static str, Value, &'static str); 4] {
+    [
+        (
+            "projects.list",
+            json!({"membership": true, "simple": false, "archived": false,
+                   "order_by": "last_activity_at",
+                   "last_activity_after": "2026-09-01T00:00:00Z",
+                   "page": 1, "per_page": 2}),
+            "/api/v4/projects?order_by=last_activity_at&archived=false&membership=true\
+             &last_activity_after=2026-09-01T00%3A00%3A00Z&page=1&per_page=2&simple=false",
+        ),
+        (
+            "tags.list",
+            json!({"id": "org/project", "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/repository/tags?page=1&per_page=2",
+        ),
+        (
+            "releases.list",
+            json!({"id": "org/project", "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/releases?page=1&per_page=2",
+        ),
+        (
+            "project.events",
+            json!({"id": "org/project", "after": "2026-09-01", "before": "2026-09-30",
+                   "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/events?before=2026-09-30&after=2026-09-01\
+             &page=1&per_page=2",
+        ),
+    ]
+}
+
+#[test]
+fn repository_reads_send_the_declared_request_and_return_the_recorded_body() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, input, expected) in repository_reads() {
+        let before = provider.count();
+        let result = invoke(&mut child, operation, "one", &token(true), input)
+            .unwrap_or_else(|failure| panic!("`{operation}` failed: {failure:?}"));
+        let calls = provider.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), before + 1, "`{operation}` requests");
+        assert_eq!(calls[before], expected, "`{operation}` request");
+        assert_eq!(result["status"], 200, "`{operation}` status");
+        let route = expected.split('?').next().unwrap();
+        assert_eq!(
+            Some(&result["body"]),
+            repository_page(route, expected).as_ref(),
+            "`{operation}` body"
+        );
+        assert_eq!(result["provenance"]["instance"], "fixture-gitlab");
+    }
+}
+
+#[test]
+fn repository_list_reads_walk_two_pages_and_stop_on_a_short_page() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, first, expected) in repository_reads() {
+        let before = provider.count();
+        let per_page = first["per_page"].as_u64().unwrap() as usize;
+        let mut items = Vec::new();
+        let mut page = 1;
+        loop {
+            let mut input = first.clone();
+            input["page"] = json!(page);
+            let result = invoke(&mut child, operation, "one", &token(true), input)
+                .unwrap_or_else(|failure| panic!("`{operation}` page {page}: {failure:?}"));
+            let body = result["body"].as_array().unwrap().clone();
+            let short = body.len() < per_page;
+            items.extend(body);
+            if short {
+                break;
+            }
+            page += 1;
+            assert!(page <= 3, "`{operation}` did not stop");
+        }
+        assert_eq!(page, 2, "`{operation}` pages walked");
+        assert_eq!(items.len(), 3, "`{operation}` items");
+        let calls = provider.calls.lock().unwrap().clone();
+        assert_eq!(
+            calls[before..],
+            [expected.to_owned(), expected.replace("page=1", "page=2")],
+            "`{operation}` requests"
+        );
+    }
 }
