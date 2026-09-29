@@ -250,6 +250,9 @@ types:
   - name: connectors.cli.NextAction
     kind: enum
     variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, none]
+  - name: connectors.cli.ConfigurationFormat
+    kind: enum
+    variants: [connectors-local/1, connectors-local/2]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created]
@@ -276,6 +279,12 @@ types:
       - {name: request_id, type: "Optional<String>"}
       - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
       - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
+      - {name: configuration_format, type: "Optional<connectors.cli.ConfigurationFormat>"}
+      # ESS-LIMIT: instance_id is an admitted selector (connectors_core::valid_id, at most
+      # 128 bytes) and appears only with configuration_format on invalid_configuration.
+      # ESS 0.40 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
+      # so both rules are enforced by the host and pinned by tests, not declared here.
+      - {name: instance_id, type: "Optional<String>"}
   - name: connectors.cli.Prerequisite
     kind: struct
     fields:
