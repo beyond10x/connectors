@@ -219,7 +219,7 @@ pub fn upstream_json(response: &HttpResponse) -> Result<Value> {
             500..=599 => ErrorCode::Unavailable,
             _ => ErrorCode::UpstreamProtocol,
         };
-        let mut error = Error::new(code, "provider refused the request");
+        let mut error = Error::new(code, "provider refused the request").answered();
         error.retry_after_seconds = response
             .headers
             .get("retry-after")

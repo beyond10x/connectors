@@ -80,7 +80,15 @@ impl Handler for LocalHandler {
 
 fn owner_failure(error: owner::Error) -> HandlerReply {
     use owner::Code::*;
+    let provider = error.origin == owner::Origin::Provider;
     let (stage, action, usage) = match error.code {
+        // A provider's refusal of a dispatched call is not a host admission refusal.
+        Forbidden if provider => ("dispatch", "request_permission", false),
+        ServiceFailure
+            if provider && error.service_code == Some(connectors_core::ErrorCode::NotFound) =>
+        {
+            ("dispatch", "none", false)
+        }
         InvalidInput => ("arguments", "none", true),
         InvalidConfiguration => ("configuration", "check_configuration", true),
         ProtectedEntryUnavailable => ("protected_entry", "select_protected_source", true),
