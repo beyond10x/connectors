@@ -2,18 +2,35 @@
 format: aep.planning-md/3
 id: story:catalog-basic-auth-profile
 kind: story
-status: draft
+status: implemented
 title: The catalog provider authenticates with HTTP basic (identity plus API token)
 relations:
 - decomposes: epic:catalog-knowledge-sources
+- serves: vision:independent-contract-adapters
 scope:
+- confidence: cited
+  path: Cargo.lock
+- confidence: cited
+  path: adapters/catalog/Cargo.toml
 - confidence: cited
   path: adapters/catalog/src/local.rs
 - confidence: cited
   path: adapters/catalog/tests/local_runtime.rs
 - confidence: cited
+  path: adapters/catalog/tests/local_runtime/basic_auth.rs
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/basic_auth_adversary.rs
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/basic_auth_adversary_pass2.rs
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/cli_journey.rs
+- confidence: cited
   path: docs/local-catalog-provider.md
-revision: 4
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-29T11:07:11Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "proposed", to: "active", at: "2026-09-29T11:07:11Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "active", to: "implemented", at: "2026-09-29T12:47:22Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":6,"verification":1}}}
 ---
 ## Problem
 
