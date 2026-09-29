@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-29T11:45:54Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-basic-auth-profile",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-catalog-provider (basic_auth::basic_profile_loads_and_sends_the_exact_basic_authorization; adversary cases)",
+    "reference": "base d215b3569 has no basic scheme (config refused) vs unit: exact Authorization: Basic base64(account:token) asserted"
+  }
+}

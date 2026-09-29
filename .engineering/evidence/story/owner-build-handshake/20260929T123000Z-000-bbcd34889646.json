@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-29T12:30:00Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-build-handshake",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "coordinator: cargo test -p connectors --test local_cli (retry-loop and build-less caller cases), 2 passed, wave0929-owner"
+  }
+}

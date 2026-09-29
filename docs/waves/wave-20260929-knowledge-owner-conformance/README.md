@@ -7,9 +7,9 @@ Run: interactive; stage 1 stopped for operator approval.
 
 | unit | serves | scope | agents | branch | head | worktree | build dir | stage |
 |---|---|---|---|---|---|---|---|---|
-| story:catalog-basic-auth-profile | vision:independent-contract-adapters | cited | aep:implementor, aep:adversary | — | — | — | /dev/shm/timo-wave-basic-auth | proposed |
-| story:fixture-input-conformance | vision:independent-contract-adapters | cited (+1 inferred: CHANGELOG.md) | aep:implementor, aep:adversary | — | — | — | /dev/shm/timo-wave-fixture | proposed |
-| story:owner-build-handshake | vision:independent-contract-adapters | inferred | aep:implementor, aep:adversary, aep:security-reviewer | — | — | — | /dev/shm/timo-wave-owner | proposed |
+| story:catalog-basic-auth-profile | vision:independent-contract-adapters | cited | aep:implementor, aep:adversary | impl/catalog-basic-auth-profile | b53975ec5 | <managed-trees>/wave0929-basic-auth (id wave0929-basic-auth) | <shm>/wave-basic-auth; scratch <wave-scratch>/basic-auth/scratch | merged (47fd03972); build dir moved to the worktree target/ (shm refuses child executables) |
+| story:fixture-input-conformance | vision:independent-contract-adapters | cited (+1 inferred: CHANGELOG.md) | aep:implementor, aep:adversary | impl/fixture-input-conformance | d215b3569 | <managed-trees>/wave0929-fixture (id wave0929-fixture) | <shm>/wave-fixture; scratch <wave-scratch>/fixture/scratch | merged (779b53f68) |
+| story:owner-build-handshake | vision:independent-contract-adapters | inferred | aep:implementor, aep:adversary, aep:security-reviewer | impl/owner-build-handshake | d215b3569 | <managed-trees>/wave0929-owner (id wave0929-owner) | <shm>/wave-owner; scratch <wave-scratch>/owner/scratch | merged (a46ff35b4) |
 
 Integration branch: `wave/20260929-knowledge-owner-conformance` off `origin/main` 7041707e.
 
@@ -107,3 +107,13 @@ unassessed: story:multi-tenant-principal-assignment
 unassessed: story:session-connection-binding
 5 wave(s), 28 collision(s), 8 unassessed
 ```
+
+## Close
+
+- Gate: `cargo run -p connectors-build -- gate` at `779b53f68`, `CONNECTORS_ESS` = ESS 0.40.0:
+  `gate: all checks passed`, exit 0; local metadata authority conformance 285 scenarios,
+  24 synthesis refusals.
+- Stories moved to implemented: catalog-basic-auth-profile, owner-build-handshake,
+  fixture-input-conformance. Scopes rewritten from each unit commit (all entries cited).
+- Filed during the wave: owner-refuses-buildless-callers, ess-pin-newest-release,
+  catalog-gitlab-repository-reads, owner-recovers-after-failed-acquisition.
