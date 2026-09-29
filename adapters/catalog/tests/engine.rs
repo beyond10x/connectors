@@ -33,7 +33,8 @@ fn document() -> Vec<u8> {
                     "operationId": "listMergeRequests",
                     "parameters": [
                         path("id"),
-                        {"name": "state", "in": "query", "required": false, "schema": {"type": "string"}}
+                        {"name": "state", "in": "query", "required": false, "schema": {"type": "string"}},
+                        {"name": "per_page", "in": "query", "required": false, "schema": {"type": "integer"}}
                     ],
                     "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
                 }
@@ -114,6 +115,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         description: None,
         guard: None,
         response: None,
+        bounds: BTreeMap::new(),
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {
@@ -648,5 +650,150 @@ async fn multi_check_guard_holds_every_check_before_and_after_dispatch() {
             }))
             .await;
         assert_eq!(classify(outcome), expected);
+    }
+}
+
+/// A selection written as data, as a shipped selection file carries it.
+fn written(value: Value) -> Selection {
+    serde_json::from_value(value).unwrap()
+}
+
+#[test]
+fn a_bound_must_name_a_declared_query_parameter_and_is_omitted_when_absent() {
+    let bounded = written(json!({
+        "id": "merge_requests.list", "operation_id": "listMergeRequests", "effect": "read",
+        "bounds": {"per_page": {"minimum": 1, "maximum": 100}}
+    }));
+    let engine = Engine::new(&bundle(), "/api/v4", &[bounded]).unwrap();
+    // The declared schema carries the bound for callers.
+    let declared = &engine.declarations(&[Effect::Read])[0].input_schema["properties"]["per_page"];
+    assert_eq!(declared["maximum"], 100);
+    assert_eq!(declared["minimum"], 1);
+    // A maximum alone declares no minimum.
+    let open = written(json!({
+        "id": "merge_requests.list", "operation_id": "listMergeRequests", "effect": "read",
+        "bounds": {"per_page": {"maximum": 100}}
+    }));
+    let engine = Engine::new(&bundle(), "/api/v4", &[open]).unwrap();
+    let declared = &engine.declarations(&[Effect::Read])[0].input_schema["properties"]["per_page"];
+    assert!(declared.get("minimum").is_none(), "{declared}");
+    // A minimum above the maximum admits no value: refused when it loads.
+    let empty = written(json!({
+        "id": "merge_requests.list", "operation_id": "listMergeRequests", "effect": "read",
+        "bounds": {"per_page": {"minimum": 101, "maximum": 100}}
+    }));
+    let error = Engine::new(&bundle(), "/api/v4", &[empty]).err().unwrap();
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+    // An unbounded minimum serialises without its key.
+    assert_eq!(
+        serde_json::to_value(written(json!({
+            "id": "merge_requests.list", "operation_id": "listMergeRequests", "effect": "read",
+            "bounds": {"per_page": {"maximum": 100}}
+        })))
+        .unwrap()["bounds"],
+        json!({"per_page": {"maximum": 100}})
+    );
+    // An undeclared parameter, or a path parameter, cannot be bounded: the
+    // selection is refused when it loads.
+    for (id, parameter) in [("undeclared", "limit"), ("path_parameter", "id")] {
+        let selection = written(json!({
+            "id": id, "operation_id": "listMergeRequests", "effect": "read",
+            "bounds": {parameter: {"maximum": 100}}
+        }));
+        let error = Engine::new(&bundle(), "/api/v4", &[selection])
+            .err()
+            .unwrap_or_else(|| panic!("`{id}` loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "`{id}`");
+    }
+    // A bound carries a maximum and optionally a minimum, nothing else.
+    for bound in [
+        json!({}),
+        json!({"maximum": 100, "exclusive": 1}),
+        json!({"minimum": 1}),
+        json!({"maximum": -1}),
+    ] {
+        assert!(
+            serde_json::from_value::<Selection>(json!({
+                "id": "merge_requests.list", "operation_id": "listMergeRequests",
+                "effect": "read", "bounds": {"per_page": bound}
+            }))
+            .is_err(),
+            "{bound}"
+        );
+    }
+    // An unbounded selection serialises without the key, as before bounds.
+    let plain = serde_json::to_value(select(
+        "merge_requests.list",
+        "listMergeRequests",
+        Effect::Read,
+    ))
+    .unwrap();
+    assert!(plain.get("bounds").is_none(), "{plain}");
+}
+
+#[tokio::test]
+async fn a_bounded_parameter_is_checked_as_an_integer_before_any_request() {
+    let bounded = written(json!({
+        "id": "merge_requests.list", "operation_id": "listMergeRequests", "effect": "read",
+        "bounds": {"per_page": {"minimum": 1, "maximum": 100}}
+    }));
+    let engine = Engine::new(&bundle(), "/api/v4", &[bounded]).unwrap();
+    // Above the maximum, below the minimum (`-0` included), or not an integer
+    // at all, whether sent as a number, a string or a boolean: refused as
+    // invalid input with nothing sent.
+    for per_page in [
+        json!(101),
+        json!("101"),
+        json!(0),
+        json!("0"),
+        json!("-0"),
+        json!(-1),
+        json!("-100"),
+        json!("ten"),
+        json!("1.5"),
+        json!(1.5),
+        json!(""),
+        json!(true),
+        json!("18446744073709551616"),
+    ] {
+        let http = reads(vec![]);
+        let error = engine
+            .read(
+                http.as_ref(),
+                "fixture",
+                "merge_requests.list",
+                json!({"id": "org/project", "per_page": per_page}),
+            )
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("per_page={per_page} was sent"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "per_page={per_page}");
+        assert!(http.calls.lock().unwrap().is_empty(), "per_page={per_page}");
+    }
+    // At or below the maximum, or absent, the read goes out unchanged.
+    for (per_page, query) in [
+        (json!(100), vec![("per_page", "100")]),
+        (json!("100"), vec![("per_page", "100")]),
+        (json!(1), vec![("per_page", "1")]),
+        (Value::Null, vec![]),
+    ] {
+        let mut input = json!({"id": "org/project"});
+        if !per_page.is_null() {
+            input["per_page"] = per_page.clone();
+        }
+        let http = reads(vec![response(200, json!([]))]);
+        engine
+            .read(http.as_ref(), "fixture", "merge_requests.list", input)
+            .await
+            .unwrap_or_else(|error| panic!("per_page={per_page}: {error}"));
+        let expected: Vec<(String, String)> = query
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        assert_eq!(
+            http.calls.lock().unwrap()[0].1,
+            expected,
+            "per_page={per_page}"
+        );
     }
 }

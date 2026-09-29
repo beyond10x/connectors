@@ -51,9 +51,13 @@ serves the provider from the pinned source alone, plus four repository reads:
 
 The repository reads list one page per call. Each takes `page` and `per_page`;
 a caller has walked the list when a page comes back shorter than `per_page`.
-GitLab serves at most 100 items per page, so send `per_page` of 100 or less:
-with a larger value every page is short and the walk stops after page one
-(the provider does not refuse it yet). The provider returns `status`, `body` and `provenance`, not GitLab's
+GitLab serves at most 100 items per page, so with a larger value every page
+would be short and the walk would stop after page one. The pinned source
+declares no range, so the shipped selection bounds `per_page` to 1 through 100
+on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
+`pipeline.jobs` and these four): a value of zero or below never ends a walk on a
+short page. A value outside that range, or one that is not an integer, is
+refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares
 is accepted by name.
 
@@ -142,6 +146,14 @@ The complete configuration used against the sandbox is
   the provider answers plain text, as GitLab does for a job trace. Without it the
   bundle decides: a 2xx declared only as `text/…` is read as text, anything else
   as JSON. A write never carries it.
+- `bounds` is optional: `{"<parameter>": {"minimum": <n>, "maximum": <n>}}`
+  narrows a query parameter the source declares, such as a provider's page-size
+  cap; `minimum` may be omitted. The value, whether sent as a number or a
+  string, must be a decimal integer no greater than `maximum` and no less than
+  `minimum` (`-0` is zero); anything else is refused as `invalid_input` before
+  any request. A bound on a parameter the operation does not declare as a query
+  parameter, or with a `minimum` above its `maximum`, is refused when the
+  selection loads. The declared input schema carries both limits as well.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
