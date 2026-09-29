@@ -377,9 +377,8 @@ fn child_process_waits_on_the_lock_wait_its_parent_hands_it() {
         }
         std::thread::sleep(Duration::from_millis(5));
     }
-    // Hold past the production two-second wait: only a wait the child was
-    // handed outlasts it.
-    std::thread::sleep(Duration::from_secs(3));
+    // Hold past the production wait: only a wait the child was handed outlasts it.
+    std::thread::sleep(crate::local::metadata::WAIT_BOUND + Duration::from_secs(1));
     drop(held);
     assert!(waiter.wait().unwrap().success());
     assert_eq!(s.status().unwrap().unwrap().revision, 2);

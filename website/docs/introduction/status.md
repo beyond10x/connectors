@@ -4,10 +4,10 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.13.3
+# Source release v0.14.0
 
-Version **0.13.3** moves the specification to ESS source format `ess/14` with
-ESS 0.36.0 and plans with AEP 0.61.1. Like 0.12.0, it keeps connection metadata (identities, credential references,
+Version **0.14.0** specifies at ESS source format `ess/14` with the released
+ESS 0.40.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
 provider, as in 0.11.0, which retired the native GitLab adapter. The earlier **v0.1.0

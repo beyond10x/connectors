@@ -1,7 +1,7 @@
 use super::{
     APPROVAL_KEYS_MIGRATION, APPROVAL_MIGRATION, APPROVAL_POLICY_MIGRATION, AUDIT_MIGRATION,
     Failure, MIGRATION as BASE_MIGRATION, MUTATION_MIGRATION, REGISTRY_MIGRATION,
-    RUNTIME_MIGRATION, Result, migration_digest as base_migration_digest, unavailable,
+    RUNTIME_MIGRATION, Result, WAIT_BOUND, migration_digest as base_migration_digest, unavailable,
 };
 use entity_core::{EntityDefinition, EntityInstance, OperationFieldAction, Registry};
 use entity_eventlog::{
@@ -1570,9 +1570,7 @@ pub(super) fn advance_projection_level(er: &mut ErAuthority, level: i64) -> Resu
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(unavailable)?;
-    connection
-        .busy_timeout(Duration::from_secs(30))
-        .map_err(unavailable)?;
+    connection.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
     let changed = connection
         .execute(
             "UPDATE connectors_er_authority SET projection_level=?1 \

@@ -81,7 +81,7 @@ proofs under current policy/key leases. Complete business write dispatch remains
 unfinished; production GitLab continues to advertise reads.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
-temporary storage, with two-second lock/busy bounds. Versioned migrations commit
+temporary storage, with 30-second lock/busy bounds. Versioned migrations commit
 atomically. A foreign database, unknown future schema version, changed migration
 digest or different owner is refused; no automatic downgrade or reset occurs.
 Inspection does not create missing state or migrate an existing database.
