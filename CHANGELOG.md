@@ -1,5 +1,75 @@
 # Changelog
 
+## 0.15.0 — 2026-09-29
+
+Hardened with six ESS hardening techniques and a design review of the 13 domains the
+host runs on Entity Runtime. Constructs ESS or Entity Runtime cannot yet express are
+filed as beyond10x/ess #231-#237 and stay host-enforced.
+
+### Fixed
+
+- Credential custody addresses the `login` Secret Service collection by its object
+  path. It read the desktop's `default` alias and required it to resolve to `login`,
+  which forced changing a setting every other application depends on. The alias is
+  now never read or changed.
+- A connection-material retirement batch sorts tied deadlines by version, so the same
+  16 rows are chosen every time.
+- `clock_exchange_precedes_leases_and_policy_is_rechecked_after_network` sets its own
+  clock query timeout and observation width; under load its contended metadata write
+  outlasted production's 2 s and 4,000 ms and the test failed with `Unavailable`.
+
+### Specification
+
+- The shared system and the Kubernetes adapter move to source format `ess/15`.
+- Guards the host already enforced are now declared and enforced by Entity Runtime:
+  a clock floor or registry epoch never goes lower, an approval policy revision is a
+  compare-and-set that advances, an issuer revision advance is a compare-and-set to a
+  fresh revision, a binding publication refuses a stale publication fence, an
+  acquisition completion refuses a result for another target, a required-approval
+  dispatch needs its captured subject, a dispatch refuses a generation other than the
+  admitted one.
+- Creating and updating commands store the inputs they carry (`sets:`) instead of
+  leaving the host to choose those fields.
+- Entity invariants for the audit anchor, attempt and reservation settlement,
+  approval subjects and fingerprints, key validity bounds, cursor page limit, policy
+  revision and operation bounds, and credential byte size.
+- Views publish the state and fields a conformance suite needs to see; before
+  integration, mutation testing killed 122 of 122 mutants against them.
+- A `LocalHost` actor in each of the 12 domains the host runs names who may send each
+  command.
+- A Kubernetes cluster partition declares `namespace: null` with
+  `presence: null_when_absent`.
+- The three design documents that said twenty entities, no CLI persistence entity and
+  no persistent clock record now match the specification.
+
+### Tests
+
+- New Entity Runtime tests for every declared guard and invariant, each seen failing
+  with its rule removed.
+- 13 metamorphic relations over the host (reopen, migration, replay, revoke isolation,
+  refusal leaves views unchanged, namespace separation).
+- A determinism test runs one command sequence twice and compares every decision.
+- `connectors-build metadata-conformance` runs the component's synthesized suite and
+  mutation emissions against the definitions the host embeds.
+- A disposable-keyring test proves custody neither reads nor changes the `default`
+  alias.
+
+### Website
+
+- `website/.npmrc` allows the git dependency for this project (npm 12 disables git
+  dependencies by default).
+- The realization example follows the current attempt model (`owner_nonce`,
+  `publication_fence`, `request_fingerprint`, settlement fields, the unknown-attempt
+  and missing-subject outcomes).
+
+### Known limitations
+
+- 70 synthesized scenarios whose inputs carry nested structs cannot run yet: synthesis
+  fills those members with placeholders that the new invariants refuse (beyond10x/ess
+  #234). The next release resolves them through fixtures.
+- Five wrong-state scenarios on `CompleteAcquisition` and `PublishBinding` are not
+  synthesized (ESS-SYNTH-003, #234).
+
 ## 0.14.0 — 2026-09-29
 
 ### Fixed
@@ -1052,7 +1122,7 @@ is no way to ship a `generator` that says `0.2.1` without cutting one.
   invalidates every entry whose commit it touched. All 87 findings were reclassified from scratch
   rather than carried over by count. `scripts/check-secrets.sh` had been failing since `4520cf47`
   and now exits 0.
-- `scripts/vendor-babelforce-specs.sh` no longer writes out the address it exists to scrub. The
+- The vendor specification script no longer writes out the address it exists to scrub. The
   script already declined to name two AWS account ids for that reason; the rule now applies to a
   person's name too.
 - AGENTS.md gains what this cycle taught: that the gate does not fit on one machine, that an offline

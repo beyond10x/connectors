@@ -23,6 +23,47 @@ const MAX_SAFE_MS: u128 = 9_007_199_254_740_991;
 const NS_PER_MS: u128 = 1_000_000;
 const NS_PER_S: u128 = 1_000_000_000;
 const QUERY_TIMEOUT: Duration = Duration::from_secs(2);
+// contracts/service/clock.md: an observation is at most 4,000 ms wide.
+const MAX_WIDTH_MS: u128 = 4000;
+
+// A test whose fake clock server does contended work before it replies sets
+// its own bound here, so a loaded scheduler cannot spend production's 2 s.
+#[cfg(test)]
+thread_local! {
+    static TEST_QUERY_TIMEOUT: std::cell::Cell<Duration> = const { std::cell::Cell::new(QUERY_TIMEOUT) };
+    static TEST_MAX_WIDTH_MS: std::cell::Cell<u128> = const { std::cell::Cell::new(MAX_WIDTH_MS) };
+}
+
+#[cfg(test)]
+pub(crate) fn set_test_query_timeout(timeout: Duration) {
+    TEST_QUERY_TIMEOUT.with(|slot| slot.set(timeout));
+}
+
+// The same test also chooses the observation width it accepts.
+#[cfg(test)]
+pub(crate) fn set_test_max_width_ms(width: u128) {
+    TEST_MAX_WIDTH_MS.with(|slot| slot.set(width));
+}
+
+#[cfg(test)]
+fn max_width_ms() -> u128 {
+    TEST_MAX_WIDTH_MS.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+fn max_width_ms() -> u128 {
+    MAX_WIDTH_MS
+}
+
+#[cfg(test)]
+fn query_timeout() -> Duration {
+    TEST_QUERY_TIMEOUT.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+fn query_timeout() -> Duration {
+    QUERY_TIMEOUT
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {
@@ -90,7 +131,7 @@ impl Configuration {
         })
         .map_err(|_| Failure::Unavailable)?;
         socket.connect(address).map_err(|_| Failure::Unavailable)?;
-        let deadline = Instant::now() + QUERY_TIMEOUT;
+        let deadline = Instant::now() + query_timeout();
         let started = Stamp::read()?;
         let (request, nonce) = protocol::request(&key)?;
         socket
@@ -198,7 +239,7 @@ impl BoundedClock {
             .and_then(|v| v.checked_add(3 * NS_PER_MS))
             .ok_or(Failure::Unavailable)?
             .div_ceil(NS_PER_MS);
-        if upper > MAX_SAFE_MS || upper.checked_sub(lower).is_none_or(|w| w > 4000) {
+        if upper > MAX_SAFE_MS || upper.checked_sub(lower).is_none_or(|w| w > max_width_ms()) {
             return Err(Failure::Unavailable);
         }
         // No leap announcement is consumed. Avoid extrapolating across any UTC

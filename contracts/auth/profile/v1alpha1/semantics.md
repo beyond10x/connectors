@@ -16,7 +16,7 @@ Design responsibility one of four: "Describe required authentication — provide
 
 ## 2. Old evidence and disposition
 
-Counts over `../connectors/providers/*.toml` (`rg` on 2026-09-08): schemes `bearer` 50, `basic` 6, `signing` 3 (twilio, slack, stripe); `entry = "connect_session"` 11; grants `authorization_code`+`refresh_token` 4, `authorization_code` 1, `client_credentials` 1, `password`+`refresh_token` 1 (babelforce); `subject = "app"` 11, `subject = "user"` 10.
+Counts over `../connectors/providers/*.toml` (`rg` on 2026-09-08): schemes `bearer` 50, `basic` 6, `signing` 3 (twilio, slack, stripe); `entry = "connect_session"` 11; grants `authorization_code`+`refresh_token` 4, `authorization_code` 1, `client_credentials` 1, `password`+`refresh_token` 1 (the downstream platform); `subject = "app"` 11, `subject = "user"` 10.
 
 | Old surface | Source | Disposition |
 |---|---|---|
@@ -72,7 +72,7 @@ Reserved vocabulary has a closed support disposition:
 | Name | Disposition | Requirement/source rationale |
 |---|---|---|
 | `http_signing` | reserved/refused | Three historical providers (Twilio, Slack and Stripe) used signing, so the name is retained for source translation; none of the selected profiles supplies canonicalization, key use or conformance, so it cannot be selected or advertised. |
-| `oauth2_password` | reserved/refused | One historical Babelforce profile used the password grant; the selected acquisition contract does not define that flow, so preserving the source name grants no runtime support. |
+| `oauth2_password` | reserved/refused | One historical downstream-platform profile used the password grant; the selected acquisition contract does not define that flow, so preserving the source name grants no runtime support. |
 
 Reserved/refused values are accepted only as documented source inventory. A
 selectable profile, safe descriptor or runtime capability containing one is

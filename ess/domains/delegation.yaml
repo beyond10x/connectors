@@ -34,6 +34,14 @@ types:
   - name: connectors.delegation.ReceiptId
     kind: newtype
     of: Uuid
+  # contracts/service/delegation.md:51,125,139: digests, jti and approval
+  # references are 64 lowercase hexadecimal characters. Used only on proof
+  # values; Entity Runtime refuses `alphabet:` and text `.count`, so the stored
+  # subject and redemption fields keep String (see the ESS-LIMIT at the end).
+  - name: connectors.delegation.LowercaseHex64
+    kind: newtype
+    of: String
+    alphabet: "0123456789abcdef"
   - name: connectors.delegation.AuthoritySnapshot
     kind: struct
     fields:
@@ -136,7 +144,7 @@ types:
       - {name: purpose, type: connectors.delegation.Purpose}
       - {name: method, type: connectors.delegation.HttpMethod}
       - {name: target, type: String}
-      - {name: body_sha256, type: String}
+      - {name: body_sha256, type: connectors.delegation.LowercaseHex64}
       - {name: authority, type: connectors.delegation.AdmittedAuthority}
       - {name: route, type: connectors.idempotency.RouteBinding}
       - {name: origin_request_id, type: "Optional<String>"}
@@ -148,9 +156,11 @@ types:
       - {name: iat, type: Integer}
       - {name: nbf, type: Integer}
       - {name: exp, type: Integer}
-      - {name: jti, type: String}
+      - {name: jti, type: connectors.delegation.LowercaseHex64}
     # contracts/service/delegation.md:51,125: integers in [0, 9007199254740991];
-    # jti is 64 hex characters and body_sha256 a 64-character digest.
+    # jti and body_sha256 are 64 lowercase hex; iss is the route's gateway.
+    # delegation.md:129-131: each purpose fixes its method, target and null
+    # members; describe hashes the empty body.
     invariants:
       - execution_deadline_unix_ms: {gte: 0, lte: 9007199254740991}
       - iat: {gte: 0, lte: 9007199254740991}
@@ -158,20 +168,55 @@ types:
       - exp: {gte: 0, lte: 9007199254740991}
       - jti.count == 64
       - body_sha256.count == 64
+      - iss == route.gateway_instance
+      - any:
+          - purpose != describe
+          - all:
+              - method == GET
+              - target == "/v1alpha2/describe"
+              - body_sha256 == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              - missing(origin_request_id)
+              - missing(request_id)
+              - missing(operation)
+              - missing(connection)
+              - missing(descriptor_revision)
+      - any:
+          - purpose != prepare
+          - all:
+              - method == POST
+              - target == "/v1alpha2/invoke"
+              - operation == "host.approval.prepare"
+              - defined(origin_request_id)
+      - any:
+          - purpose != invoke
+          - all:
+              - method == POST
+              - target == "/v1alpha2/invoke"
+              - defined(operation)
+              - operation != "host.approval.prepare"
+              - defined(origin_request_id)
   - name: connectors.delegation.ApprovalClaims
     kind: struct
     fields:
       - {name: iss, type: String}
       - {name: aud, type: String}
-      - {name: reference, type: String}
+      - {name: reference, type: connectors.delegation.LowercaseHex64}
       - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
       - {name: iat, type: Integer}
       - {name: nbf, type: Integer}
       - {name: exp, type: Integer}
-    # contracts/service/delegation.md:139,145: reference is 64 hex characters;
-    # timestamps obey the §4.1 integer bounds.
+    # contracts/service/delegation.md:27,51,139,145: reference is 64 lowercase
+    # hex; the subject is required-approval, carries the fixed format tag, and a
+    # direct origin names the executing instance with no route while a federated
+    # origin names the route's gateway; timestamps obey the §4.1 bounds.
     invariants:
       - reference.count == 64
+      - subject.approval_mode == required
+      - subject.format == "connectors.approval-subject/v1"
+      - any: [subject.origin.kind != direct, {not: "defined(subject.route.gateway_instance)"}]
+      - any: [subject.origin.kind != direct, subject.origin.authority_ref == subject.target.instance]
+      - any: [subject.origin.kind != federated, "defined(subject.route.gateway_instance)"]
+      - any: [subject.origin.kind != federated, subject.origin.authority_ref == subject.route.gateway_instance]
       - iat: {gte: 0, lte: 9007199254740991}
       - nbf: {gte: 0, lte: 9007199254740991}
       - exp: {gte: 0, lte: 9007199254740991}
@@ -205,6 +250,15 @@ entities:
       - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
       - {name: attempt_id, type: connectors.mutations.AttemptId}
       - {name: spent_at, type: Timestamp}
+    # The stored subject obeys the same rules as ApprovalClaims.subject; they are
+    # stated here because synthesis cannot build a command input of a struct
+    # type that carries its own invariants.
+    invariants:
+      - subject.format == "connectors.approval-subject/v1"
+      - any: [subject.origin.kind != direct, {not: "defined(subject.route.gateway_instance)"}]
+      - any: [subject.origin.kind != direct, subject.origin.authority_ref == subject.target.instance]
+      - any: [subject.origin.kind != federated, "defined(subject.route.gateway_instance)"]
+      - any: [subject.origin.kind != federated, subject.origin.authority_ref == subject.route.gateway_instance]
     relations:
       - name: receiver
         kind: references
@@ -251,15 +305,35 @@ events:
   - name: connectors.delegation.ApprovalRedemptionRecorded
     fields: [{name: receipt_id, type: connectors.delegation.ReceiptId}]
 
-# Declared above: the fixed header constants (ProofHeader), the integer bounds and
-# the jti/reference/digest lengths (DeliveryClaims, ApprovalClaims).
-# ESS-LIMIT: the window equalities nbf = iat - 5 and exp = iat + 25/295
-# (delegation.md:145) are field arithmetic; lowercase-hex and 256-byte ID bounds,
-# the 512 B/12 KiB/18 KiB proof sizes, mandatory-null emission and canonical
-# JSON/base64url are codec rules; signature/key provenance, purpose/correlation
-# predicates across the request, and approved authority/target reconstruction read
-# data outside the value. ESS 0.36 has no arithmetic in predicates (a hex character set is expressible with alphabet), no pattern or
-# byte-length predicate, no required-null codec rule and no signature construct.
+views:
+  - name: connectors.delegation.ApprovalRedemptions
+    source: connectors.delegation.ApprovalRedemption
+    consistency: read_your_writes
+    fields:
+      - {name: receipt_id, type: connectors.delegation.ReceiptId}
+      - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
+      - {name: instance_id, type: String}
+      - {name: issuer, type: String}
+      - {name: reference, type: String}
+      - {name: state, type: connectors.delegation.ApprovalRedemption.State}
+
+# Declared above: the fixed header constants (ProofHeader), the integer bounds, the
+# lowercase-hex jti/reference/digest values, iss = route gateway and the
+# purpose table (DeliveryClaims, ApprovalClaims), and the subject's format and
+# origin/route rules (ApprovalClaims, ApprovalRedemption).
+# ESS-LIMIT (ESS 0.40): the window equalities nbf = iat - 5 and exp = iat + 25/295
+# (delegation.md:145) need arithmetic in a predicate. IDs of at most 256 bytes
+# without control characters (delegation.md:51) and the 8 KiB, 512 B, 12 KiB and
+# 18 KiB sizes need a byte-length predicate and a character-class exclusion;
+# `.count` counts characters and `alphabet:` lists admitted ones. The stored
+# subject's digests and ApprovalRedemption.reference could take `alphabet:` and
+# `.count == 64`, but Entity Runtime refuses both (AlphabetUnsupported,
+# TextLengthUnsupported), so those host-run fields stay String and the host's
+# digest check holds them. The required-approval policy (issuer, audience, 300 s,
+# delegation.md:85) is a type invariant on a value no entity stores, which no
+# view can publish (ESS-SYNTH-013). Mandatory-null emission, canonical
+# JSON/base64url, signatures and reconstruction of the approved authority and
+# target read data outside the value.
 # Issuer, grant and principal CONFIGURATION entities remain with their owners.
 # Connection is declared in connectors.auth_bindings; fixed mediated and gateway
 # route bindings are values. Proof subjects here retain historical coordinates,
@@ -268,13 +342,19 @@ events:
 # gateway and execution-hop AuditRecords are separate records in
 # connectors.execution_audit. Neither receipt owns an audit record, and audit
 # completion proves neither nonce consumption nor approval redemption.
-# Actual atomic uniqueness (issuer/receiver/nonce and issuer/reference), one
-# approval per prepared attempt, cross-record state checks/fencing, trusted clocks,
-# revocation of live keys, durability or replicas and anti-rollback remain host
-# obligations: ESS 0.36 has no cross-record uniqueness constraint (ESS design
-# cross-record-and-stored-field-guards, rule 2, out of scope), no multi-record
-# transaction and no trusted-time construct.
+# Atomic uniqueness of (issuer, receiver, nonce) and (issuer, reference), one
+# redemption per Prepared attempt, and redemption only against a Prepared attempt
+# need compound and cross-record uniqueness and a guard on another record's
+# state; ESS 0.40 has neither (`affects:` sets fields on other rows but does not
+# select or refuse by them). Trusted clocks, revocation of live keys, durability
+# or replicas and anti-rollback remain host obligations.
 # Retiring a nonce INDEX after safe expiry does not erase this historical receipt;
 # physical retention/compaction and all receipt creation are persistence bindings.
 # No fake state transition/command simulates Ed25519 verification or a policy gate.
 # ESS compilation validates declarations and references, not sequential execution.
+
+
+actors:
+  - name: connectors.delegation.LocalHost
+    may:
+      - connectors.delegation.RecordApprovalRedemption

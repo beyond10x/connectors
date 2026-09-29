@@ -61,6 +61,22 @@ entities:
       - {name: attempt_id, type: connectors.mutations.AttemptId}
       - {name: settled_at, type: "Optional<Timestamp>"}
       - {name: replay_expires_at, type: "Optional<Timestamp>"}
+    # contracts/operations/v1alpha1/semantics.md:113,162-166,185 and
+    # docs/local-er-metadata.md:102: a nonempty key; the recorded canonicalization
+    # (a new identifier is a specification change); a direct origin is the
+    # receiver and has no route, a federated origin is the route's gateway; only
+    # a settled known result (Replayable, Expired) has settlement and expiry.
+    invariants:
+      - caller_key != ""
+      - fingerprint.canonicalization_version == "adapter-v1-canonical-json"
+      - any: [namespace.origin.kind != direct, namespace.origin.authority_ref == namespace.receiver_instance]
+      - any: [namespace.origin.kind != direct, {not: "defined(fingerprint.route.gateway_instance)"}]
+      - any: [namespace.origin.kind != federated, "defined(fingerprint.route.gateway_instance)"]
+      - any: [namespace.origin.kind != federated, namespace.origin.authority_ref == fingerprint.route.gateway_instance]
+      - any: [state == Replayable, state == Expired, "missing(settled_at)"]
+      - any: [state == Pending, state == Quarantined, "defined(settled_at)"]
+      - any: [state == Replayable, state == Expired, "missing(replay_expires_at)"]
+      - any: [state == Pending, state == Quarantined, "defined(replay_expires_at)"]
     relations:
       - name: attempt
         kind: references
@@ -107,6 +123,11 @@ commands:
         payload:
           connectors.idempotency.KeyReserved:
             reservation_id: {generated: true}
+        sets:
+          namespace: input.namespace
+          caller_key: input.caller_key
+          fingerprint: input.fingerprint
+          attempt_id: input.attempt_id
   - name: connectors.idempotency.RetainResult
     # Requires a durable Completed/Failed/Aborted attempt. The host atomically
     # fixes settled_at and replay_expires_at = settled_at + 86400s. Input values
@@ -125,6 +146,9 @@ commands:
             reservation_id: input.reservation_id
             settled_at: input.settled_at
             replay_expires_at: input.replay_expires_at
+        sets:
+          settled_at: input.settled_at
+          replay_expires_at: input.replay_expires_at
       - name: wrong-state
         wrong_state: true
         error: connectors.idempotency.ReservationStateConflict
@@ -186,12 +210,39 @@ views:
       - {name: namespace, type: connectors.idempotency.KeyNamespace}
       - {name: caller_key, type: String}
       - {name: state, type: connectors.idempotency.KeyReservation.State}
+  - name: connectors.idempotency.ReservationSettlements
+    source: connectors.idempotency.KeyReservation
+    consistency: read_your_writes
+    fields:
+      - {name: reservation_id, type: connectors.idempotency.ReservationId}
+      - {name: namespace, type: connectors.idempotency.KeyNamespace}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: fingerprint, type: connectors.idempotency.RequestFingerprint}
+      - {name: settled_at, type: "Optional<Timestamp>"}
+      - {name: replay_expires_at, type: "Optional<Timestamp>"}
+      - {name: state, type: connectors.idempotency.KeyReservation.State}
 
-# ESS-LIMIT executable obligations: current admission and replay-result visibility;
-# namespace/fingerprint derivation and equality; atomic namespace/key uniqueness
-# with Prepared attempt creation; state coupling to that attempt; timestamp
-# assignment/expiry comparison; generation-safe eviction; actual result storage.
-# ESS validates shapes, references and lifecycle causation, not these algorithms:
-# ESS 0.36 has no cross-record uniqueness constraint, no multi-record transaction
-# coupling two entities' states, no derived-value expression and no trusted-time
-# or storage construct.
+# Declared above: the stored key, fingerprint, attempt and host timestamps, the
+# nonempty key, the recorded canonicalization, origin/route coupling and which
+# states carry settlement and expiry.
+# ESS-LIMIT (ESS 0.40): replay_expires_at = settled_at + 86400 s
+# (contracts/operations/v1alpha1/semantics.md:185) needs timestamp arithmetic.
+# The (namespace, caller_key) index over live reservations (:164,175) needs a
+# state-conditioned compound uniqueness constraint. Reserve-and-prepare as one
+# responsibility (:160) needs multi-record creation, and retaining or
+# quarantining on the attempt's settlement (:185) a guard on, and a transition
+# coupled to, another record's state; `affects:` only sets fields on existing
+# rows. The capacity refusal for new reservations (:187) needs a count across
+# records, and the caller key's 256-byte bound a byte-length predicate.
+# Expiry at now >= replay_expires_at needs the host's trusted interval, not a
+# `now` guard (which Entity Runtime refuses anyway). Admission, namespace and
+# fingerprint derivation, generation-safe eviction and result storage remain host
+# obligations.
+
+actors:
+  - name: connectors.idempotency.LocalHost
+    may:
+      - connectors.idempotency.ExpireResult
+      - connectors.idempotency.QuarantineKey
+      - connectors.idempotency.ReserveKey
+      - connectors.idempotency.RetainResult

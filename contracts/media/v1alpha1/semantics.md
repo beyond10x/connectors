@@ -37,7 +37,7 @@ incoming control that names one is refused as unsupported.
 | Profile `pcm_s16le`, 8 kHz, mono, 20 ms, 320 bytes, asserted at bind time; no transcoding at the seam; a second profile arrives as a refusal, not an assumption | `../connectors/crates/voice-local-audio/README.md:18-26` | preserve as the first named profile; a profile fact, not a contract identity (`docs/design.md:639`) |
 | DTMF sent as RFC 4733 telephone-events on the negotiated media session; refusal error when the session declines | `../connectors/crates/driver-sip/src/lib.rs:359-381` | preserve as capability `dtmf`; RFC 4733 is the SIP binding's realization, not the contract's |
 | Application-side speech detection owns barge-in; the voice endpoint clears bounded playback; Agent steering is a separate fact | `../connectors/docs/design/05-native-sip-and-rtvbp.md:313-318` | preserve as capability `interrupt` |
-| RTVBP binding `b10x.voice.v1`; upstream label `L16/8000/1` stays inside the binding; headerless offer refused, explicit profile required; `babelforce.v1` stays downstream | old design 05, lines 271-295 | preserve; binding facts live with the RTVBP adapter |
+| RTVBP binding `b10x.voice.v1`; upstream label `L16/8000/1` stays inside the binding; headerless offer refused, explicit profile required; the downstream platform's profile stays downstream | old design 05, lines 271-295 | preserve; binding facts live with the RTVBP adapter |
 | Bridge: forwards compatible semantic media and controls; joint termination policy; imports neither SIP nor RTVBP | `docs/design.md:653` | preserve; bridge is a composition component conforming to this contract twice |
 
 ## 3. Types

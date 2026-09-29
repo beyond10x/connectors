@@ -336,6 +336,41 @@ fn disposable_secret_service_restart_and_failures() {
     // CLI status/revoke are exercised by the composition fixture below.
 }
 
+// The desktop's `default` alias belongs to every other application. Custody
+// addresses the login collection by object path, so pointing `default` at another
+// collection neither blocks qualification nor custody, and custody never moves it.
+#[test]
+#[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
+fn custody_neither_reads_nor_changes_the_default_alias() {
+    let fixture = Fixture::new();
+    let connection = zbus::blocking::connection::Builder::address(
+        format!("unix:path={}", fixture.socket.display()).as_str(),
+    )
+    .unwrap()
+    .build()
+    .unwrap();
+    let service = zbus::blocking::Proxy::new(
+        &connection,
+        "org.freedesktop.secrets",
+        "/org/freedesktop/secrets",
+        "org.freedesktop.Secret.Service",
+    )
+    .unwrap();
+    let session: zbus::zvariant::OwnedObjectPath =
+        service.call("ReadAlias", &("session",)).unwrap();
+    assert_ne!(session.as_str(), "/", "fixture has no session collection");
+    let () = service.call("SetAlias", &("default", &session)).unwrap();
+    assert!(available_at(Some(&fixture.socket)));
+    let own_scope = scope();
+    let written = version(own_scope);
+    let store = fixture.store(own_scope).expect("login collection by path");
+    let bytes = Secret(b"fictional-credential".to_vec());
+    assert_eq!(store.write_new(written, &bytes), Ok(()));
+    assert_eq!(store.read(written).unwrap().0, bytes.0);
+    let after: zbus::zvariant::OwnedObjectPath = service.call("ReadAlias", &("default",)).unwrap();
+    assert_eq!(after, session, "custody moved the default alias");
+}
+
 #[test]
 #[ignore = "requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR"]
 fn disposable_changed_keyring_format_is_refused_before_transfer() {
