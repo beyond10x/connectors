@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 — 2026-09-29
 
 ### Fixed
 
@@ -23,6 +23,15 @@
   the local AEP findings patch are gone. Entity Runtime moves to 0.25.1 and
   Eventlog to 0.6.0; every other Rust dependency moves to its newest release,
   including reqwest 0.13 on rustls with `ring`.
+
+### Compatibility
+
+- Without a configured `ca_file`, HTTPS trust now comes from the platform verifier
+  (the operating system trust store) instead of bundled webpki roots. A configured
+  CA still replaces the built-in roots.
+- `connectors-build toolchain` and `connectors-build aep-toolchain` are removed.
+  Install ESS 0.40.0 and AEP 0.65.0 (`b10x upgrade`) or select them with
+  `--ess`/`CONNECTORS_ESS` and `--aep`/`CONNECTORS_AEP`.
 
 ## 0.13.3 — 2026-09-27
 
