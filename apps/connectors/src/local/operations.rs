@@ -193,6 +193,7 @@ fn project(
             value.error = Some(owner::mutation::Failure {
                 code: FailureCode::Owner(Code::ServiceFailure),
                 service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
+                origin: owner::Origin::Host,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,
@@ -204,7 +205,8 @@ fn project(
         json!({"adapter":call.input["adapter"],"operation":call.input["operation"],"revision":call.input["revision"],"result":payload.to_string()})
     } else {
         let error = value.error.as_ref().ok_or(Code::OutcomeUnknown)?;
-        let mut data = json!({"kind":"operational","code":error.code,"stage":"dispatch","next_action":"retry_status"});
+        let classification = value.mutation.classification;
+        let mut data = json!({"kind":"operational","code":error.code,"stage":error.stage(classification),"next_action":error.next_action(classification)});
         if let Some(code) = &error.service_code {
             data["service_code"] = json!(code);
         }
