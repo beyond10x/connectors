@@ -1494,3 +1494,27 @@ fn the_same_identity_connects_again_after_revoke() {
     let again = publish_fixture(&registry, second, NOW + 2);
     assert_ne!(again, reference);
 }
+
+// A second configured instance of the same adapter in one store: the new
+// instance is declared beside the first and connects.
+#[test]
+fn a_second_instance_of_the_same_adapter_connects() {
+    let (_root, registry) = fixture();
+    let (_claim, first) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, first, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &revision,
+            NOW + 1,
+        )
+        .unwrap();
+    let mut second = binding();
+    second.instance_id = "second-instance".into();
+    second.configuration_revision = "config-2".into();
+    let acquisition = registry.begin(&second, NOW + 2);
+    assert!(acquisition.is_ok(), "{:?}", acquisition.err());
+}
