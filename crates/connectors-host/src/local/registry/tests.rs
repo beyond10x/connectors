@@ -1518,3 +1518,235 @@ fn a_second_instance_of_the_same_adapter_connects() {
     let acquisition = registry.begin(&second, NOW + 2);
     assert!(acquisition.is_ok(), "{:?}", acquisition.err());
 }
+
+/// Grows the recorded store to at least `events` events. Like the observed
+/// store it holds few subjects and many records: forty runtime records that
+/// each remember a 1 KiB description, whose suppression then flips until the
+/// store holds `events` events.
+fn seed_recorded_events(root: &Path, events: i64) {
+    const SUBJECTS: i64 = 40;
+    let descriptor = serde_json::json!({
+        "version":"v1alpha1", "instance":"fixture", "adapter":"adapter",
+        "revision":"descriptor", "configuration_schema":{"type":"object"},
+        "operations":[{"id":"read", "description":"d".repeat(1024), "contract":"fixture/1",
+            "profile":"pat", "input_schema":{"type":"object"},
+            "output_schema":{"type":"object"}}]
+    });
+    let bootstrap: crate::local::runtime::Bootstrap = serde_json::from_value(serde_json::json!({
+        "instance":"fixture", "adapter":"adapter", "protocol":"v1alpha1",
+        "configuration_revision":"cfg", "provider_authority":"fixture-authority",
+        "descriptor":descriptor.to_string(),
+        "profiles":[{"id":"pat", "revision":"1", "purpose":"delegated_user",
+            "subject":"user", "scheme":"http_bearer", "capability":"http-bearer",
+            "minimum_scopes":[], "evidence_lifetime_ms":60000,
+            "fields":[{"name":"token", "label":"Fictional credential", "max_bytes":100}]}],
+        "requirements":[{"operation":"read", "profile":"pat", "scopes":[], "effect":"read"}]
+    }))
+    .unwrap();
+    let description = serde_json::to_string(&bootstrap).unwrap();
+    // Ten members a batch keeps each batch well inside the bridge deadline on
+    // a loaded host.
+    const BATCH: i64 = 10;
+    for first in (0..SUBJECTS).step_by(BATCH as usize) {
+        let mut metadata = Metadata::update(root, true).unwrap();
+        for member in first..first + BATCH {
+            metadata
+                .connection
+                .execute(
+                    "INSERT INTO local_runtime_instances (instance_id,suppressed) VALUES (?1,0)",
+                    params![format!("seed-{member}")],
+                )
+                .unwrap();
+        }
+        metadata.persist_runtime_state().unwrap();
+        metadata
+            .connection
+            .execute(
+                "UPDATE local_runtime_instances SET selection='seed',bootstrap=?1,observed_at_ms=0 WHERE instance_id LIKE 'seed-%' AND bootstrap IS NULL",
+                [&description],
+            )
+            .unwrap();
+        metadata.persist_runtime_state().unwrap();
+    }
+    // A quarter of the records flip in each later batch. Entity Runtime's batch
+    // execution slows with both its member count and the store's size, so a
+    // wider batch outruns the bridge deadline on a grown store.
+    const GROUPS: i64 = 4;
+    let mut round = 0;
+    while recorded_events(root) < events {
+        let mut metadata = Metadata::update(root, true).unwrap();
+        metadata
+            .connection
+            .execute(
+                "UPDATE local_runtime_instances SET suppressed=1-suppressed WHERE instance_id LIKE 'seed-%' AND CAST(substr(instance_id,6) AS INTEGER)%?1=?2",
+                params![GROUPS, round % GROUPS],
+            )
+            .unwrap();
+        metadata.persist_runtime_state().unwrap();
+        round += 1;
+    }
+}
+
+fn recorded_events(root: &Path) -> i64 {
+    rusqlite::Connection::open_with_flags(
+        root.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap()
+    .query_row("SELECT count(*) FROM connectors_er_events", [], |r| {
+        r.get(0)
+    })
+    .unwrap()
+}
+
+/// The metadata transactions one `operations invoke` of a read operation
+/// performs, in the process that performs each: the CLI's cached-description
+/// reads, admission and owner handshake, then the owner's capture, dispatch
+/// and release. Each invoke's CLI is a fresh process; the owner is not.
+fn read_invoke(root: &Path, registry: &Registry, reference: &str, now: u64) -> u64 {
+    let before = super::super::metadata::full_replays();
+    super::super::metadata::simulate_process(now);
+    drop(Metadata::inspect(root).unwrap());
+    drop(Metadata::inspect(root).unwrap());
+    registry
+        .admit_read(&binding(), reference, &BTreeSet::new(), now)
+        .unwrap();
+    drop(Metadata::inspect(root).unwrap());
+    super::super::metadata::simulate_process(1);
+    let captured = registry
+        .capture_read(&binding(), reference, &BTreeSet::new(), now, now + 1000)
+        .unwrap();
+    let dispatched = registry.dispatch_read(captured, now).unwrap();
+    registry.release_read(dispatched, now).unwrap();
+    super::super::metadata::full_replays() - before
+}
+
+fn replay_fixture(events: i64) -> (tempfile::TempDir, Registry, String) {
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    seed_recorded_events(root.path(), events);
+    // The owner has served an invoke before the one under test.
+    read_invoke(root.path(), &registry, &reference, NOW + 1);
+    (root, registry, reference)
+}
+
+#[test]
+fn a_read_invoke_against_a_grown_store_replays_it_at_most_once() {
+    let (root, registry, reference) = replay_fixture(600);
+    assert!(recorded_events(root.path()) >= 600);
+    let replays = read_invoke(root.path(), &registry, &reference, NOW + 2);
+    assert!(
+        replays <= 1,
+        "one read invoke replayed the whole store {replays} times"
+    );
+    // And again once the store has grown by that invoke's own records.
+    let replays = read_invoke(root.path(), &registry, &reference, NOW + 3);
+    assert!(
+        replays <= 1,
+        "the next read invoke replayed the whole store {replays} times"
+    );
+    // What the owner caught up on, after another process wrote, is exactly
+    // what a complete replay in a fresh process reads.
+    super::super::metadata::simulate_process(1);
+    let held = Metadata::inspect(root.path()).unwrap().recorded_rows();
+    super::super::metadata::simulate_process(u64::MAX);
+    let replayed = Metadata::inspect(root.path()).unwrap().recorded_rows();
+    assert!(!held.is_empty());
+    assert_eq!(held, replayed);
+}
+
+/// A seeded store, reused from `saved` when it holds one so that two builds
+/// are measured against the same bytes, and saved there otherwise.
+fn saved_replay_fixture(
+    events: i64,
+    saved: Option<&Path>,
+) -> (tempfile::TempDir, Registry, String) {
+    let stored = saved.map(|saved| saved.join(events.to_string()));
+    let Some(stored) = stored.filter(|stored| stored.join("reference").exists()) else {
+        let (root, registry) = fixture();
+        let (_, candidate) = prepared(&registry, "one", NOW);
+        let reference = publish_fixture(&registry, candidate, NOW);
+        seed_recorded_events(root.path(), events);
+        if let Some(stored) = saved.map(|saved| saved.join(events.to_string())) {
+            std::fs::create_dir_all(&stored).unwrap();
+            rusqlite::Connection::open(root.path().join("metadata.sqlite3"))
+                .unwrap()
+                .execute(
+                    "VACUUM INTO ?1",
+                    [stored.join("metadata.sqlite3").to_str().unwrap()],
+                )
+                .unwrap();
+            // The copy is written in rollback mode; metadata admits only WAL.
+            rusqlite::Connection::open(stored.join("metadata.sqlite3"))
+                .unwrap()
+                .pragma_update(None, "journal_mode", "WAL")
+                .unwrap();
+            std::fs::write(stored.join("reference"), &reference).unwrap();
+        }
+        return (root, registry, reference);
+    };
+    let root = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    for name in ["metadata.sqlite3", "metadata.lock"] {
+        let target = root.path().join(name);
+        if name == "metadata.lock" {
+            std::fs::write(&target, b"").unwrap();
+        } else {
+            std::fs::copy(stored.join(name), &target).unwrap();
+        }
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    let reference = std::fs::read_to_string(stored.join("reference")).unwrap();
+    let registry = Registry::new(root.path());
+    (root, registry, reference)
+}
+
+/// Wall time of one read invoke's metadata transactions at 600 recorded
+/// events, or at the comma-separated sizes in `CONNECTORS_REPLAY_EVENTS`.
+/// A measurement, not a check: run it explicitly with
+/// `CONNECTORS_REPLAY_STORES=<dir> cargo test --release -p connectors-host --lib read_invoke_metadata_time -- --ignored --nocapture`;
+/// the first run seeds and saves the stores in `<dir>`, later runs reuse them.
+#[test]
+#[ignore = "timing measurement; run explicitly"]
+fn read_invoke_metadata_time() {
+    let saved = std::env::var_os("CONNECTORS_REPLAY_STORES").map(std::path::PathBuf::from);
+    let sizes = std::env::var("CONNECTORS_REPLAY_EVENTS").map_or_else(
+        |_| vec![600],
+        |sizes| {
+            sizes
+                .split(',')
+                .map(|size| size.trim().parse().unwrap())
+                .collect()
+        },
+    );
+    for events in sizes {
+        let (root, registry, reference) = saved_replay_fixture(events, saved.as_deref());
+        let recorded = recorded_events(root.path());
+        let mut timings = Vec::new();
+        let mut replays = 0;
+        let mut failed = 0;
+        // The first invoke starts the owner; the next five are measured.
+        for invoke in 0..6 {
+            let started = std::time::Instant::now();
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                read_invoke(root.path(), &registry, &reference, NOW + 1 + invoke)
+            }));
+            let elapsed = started.elapsed().as_millis();
+            println!("events={recorded} invoke={invoke} ms={elapsed} outcome={outcome:?}");
+            if invoke == 0 {
+                continue;
+            }
+            match outcome {
+                Ok(count) => replays += count,
+                Err(_) => failed += 1,
+            }
+            timings.push(elapsed);
+        }
+        timings.sort_unstable();
+        println!(
+            "events={recorded} invokes=5 failed={failed} replays={replays} median_ms={} min_ms={} max_ms={}",
+            timings[2], timings[0], timings[4]
+        );
+    }
+}
