@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-gitlab-repository-reads
 kind: story
-status: active
+status: implemented
 title: GitLab projects, tags, releases and project events through the catalog provider
 relations:
 - decomposes: epic:catalog-knowledge-sources
@@ -10,16 +10,19 @@ relations:
 scope:
 - confidence: cited
   path: adapters/catalog/providers/gitlab/operations.json
-- confidence: inferred
+- confidence: cited
+  path: adapters/catalog/tests/gitlab_repository_reads_adversary.rs
+- confidence: cited
   path: adapters/catalog/tests/local_runtime.rs
 - confidence: cited
   path: adapters/catalog/tests/shipped.rs
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 8
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-29T15:46:15Z", actor: "human:timo", revision: 7}
 - {from: "proposed", to: "active", at: "2026-09-29T15:46:15Z", actor: "human:timo", revision: 8}
+- {from: "active", to: "implemented", at: "2026-09-29T20:39:42Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Source
 

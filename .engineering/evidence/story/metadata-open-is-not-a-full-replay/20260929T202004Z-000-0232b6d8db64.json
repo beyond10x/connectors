@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-29T20:20:04Z",
+  "actor": "human:timo",
+  "artifact": "story:metadata-open-is-not-a-full-replay",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-metadata-replay-pass-1",
+    "review": "review-result:adversary-metadata-replay-pass-1",
+    "outcome": "fixed"
+  }
+}

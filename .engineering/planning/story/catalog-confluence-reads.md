@@ -2,12 +2,13 @@
 format: aep.planning-md/3
 id: story:catalog-confluence-reads
 kind: story
-status: draft
+status: active
 title: Confluence Cloud pages by space, updated since, with body
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-basic-auth-profile
 - depends_on: story:catalog-jira-cloud-reads
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/atlassian/upstream/confluence-v1-search.json
@@ -23,7 +24,10 @@ scope:
   path: adapters/catalog/tests/confluence.rs
 - confidence: cited
   path: docs/catalog-confluence.md
-revision: 6
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-29T16:39:50Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":5}}}
+- {from: "proposed", to: "active", at: "2026-09-29T16:39:51Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":5}}}
 ---
 ## Source
 

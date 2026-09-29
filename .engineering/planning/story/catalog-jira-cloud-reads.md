@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-jira-cloud-reads
 kind: story
-status: active
+status: implemented
 title: Jira Cloud issues, comments and changelog through the catalog provider
 relations:
 - decomposes: epic:catalog-knowledge-sources
@@ -10,7 +10,15 @@ relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
+  path: adapters/atlassian/upstream/LICENSE
+- confidence: cited
+  path: adapters/atlassian/upstream/README.md
+- confidence: cited
   path: adapters/atlassian/upstream/jira-platform-v3.json
+- confidence: cited
+  path: adapters/atlassian/upstream/jira-source-hashes.json
+- confidence: cited
+  path: adapters/atlassian/upstream/vendor/jira-platform-v3.json.gz
 - confidence: cited
   path: adapters/catalog/generated/bundles/index.json
 - confidence: cited
@@ -22,11 +30,16 @@ scope:
 - confidence: cited
   path: adapters/catalog/tests/jira.rs
 - confidence: cited
+  path: adapters/catalog/tests/jira_cloud_reads_adversary.rs
+- confidence: cited
   path: docs/catalog-jira.md
-revision: 8
+- confidence: cited
+  path: docs/local-catalog-provider.md
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-29T15:46:20Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":6}}}
 - {from: "proposed", to: "active", at: "2026-09-29T15:46:21Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":6}}}
+- {from: "active", to: "implemented", at: "2026-09-29T20:39:43Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":7}}}
 ---
 ## Source
 

@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-29T20:39:26Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-gitlab-repository-reads",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate on wave/20260929-replay-gitlab-setup-jira b69ead46c: all checks passed, metadata conformance 285 scenarios, exit 0"
+  }
+}

@@ -2,41 +2,30 @@
 format: aep.planning-md/3
 id: story:metadata-open-is-not-a-full-replay
 kind: story
-status: active
+status: implemented
 title: A metadata open or write does not replay and re-verify the whole store
 relations:
 - serves: vision:independent-contract-adapters
 scope:
-- confidence: inferred
-  path: apps/connectors/src/local/operations.rs
 - confidence: cited
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/metadata/metamorphic_tests.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/owner.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/owner/supervisor.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/owner/transport.rs
 - confidence: cited
-  path: crates/connectors-host/src/local/registry.rs
+  path: crates/connectors-host/src/local/mod.rs
 - confidence: cited
-  path: crates/connectors-host/src/local/registry/observation.rs
-- confidence: cited
-  path: crates/connectors-host/src/local/registry/revalidation.rs
-- confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/registry/use_and_retirement.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/runtime/state.rs
-revision: 7
+- confidence: cited
+  path: crates/connectors-host/src/local/security_replay_tests.rs
+- confidence: cited
+  path: crates/connectors-host/tests/metadata_reopen_adversary.rs
+- confidence: cited
+  path: docs/development.md
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-29T15:46:15Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-09-29T15:46:15Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-09-29T20:39:43Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":2,"review_outcome":2}}}
 ---
 ## Observed (2026-09-29, v0.15.1, the knowledge-ingest consumer's store)
 
@@ -99,3 +88,12 @@ store and total cost quadratically with its history.
   (`RecordedProviderFacade::read_history`) instead of a full snapshot.
 - The timing bound is recorded as measured numbers at 600 and 6,000 events, base against unit, with
   the same command.
+
+## Split (coordinator, 2026-09-29)
+
+The unit met the replay-count acceptance: one read invoke does 1 full replay instead of 11 (red test
+`a_read_invoke_against_a_grown_store`: 11), and the 600-event store went from 26.1 s to 5.5 s median per invoke.
+The lines on a bound independent of event count, the 6,000-event measurement and the ~700-invoke workload
+move to story:metadata-invoke-cost-flat-in-store-size: the remaining growth is in Entity Runtime batch
+execution and `read_history`, measured there. This story is done when the replay count holds and its reviews
+are routed.

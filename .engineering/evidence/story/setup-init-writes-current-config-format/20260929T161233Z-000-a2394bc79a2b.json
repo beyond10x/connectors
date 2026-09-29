@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-29T16:12:33Z",
+  "actor": "human:timo",
+  "artifact": "story:setup-init-writes-current-config-format",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-setup-init-format-pass-1",
+    "review": "review-result:adversary-setup-init-format-pass-1",
+    "outcome": "fixed"
+  }
+}
