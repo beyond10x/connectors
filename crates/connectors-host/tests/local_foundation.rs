@@ -2,7 +2,7 @@ use connectors_host::local::{
     Failure,
     config::{Config, Paths},
     filesystem,
-    metadata::Metadata,
+    metadata::{Metadata, WAIT_BOUND},
 };
 use std::{
     fs,
@@ -200,7 +200,7 @@ fn concurrent_initialization_round() {
     assert!(
         results.iter().all(|(r, elapsed)| r.is_ok()
             || *r == Err(Failure::ConfigurationExists)
-            || (*r == Err(Failure::MetadataUnavailable) && *elapsed >= Duration::from_secs(2))),
+            || (*r == Err(Failure::MetadataUnavailable) && *elapsed >= WAIT_BOUND)),
         "{results:?}"
     );
     Metadata::inspect(&paths.state).unwrap();
@@ -235,14 +235,46 @@ fn contending_metadata_open_refuses_at_its_bound_and_recovers_after_release() {
         send.send((Metadata::initialize(&state).map(|_| ()), started.elapsed()))
             .unwrap();
     });
-    let (result, elapsed) = receive.recv_timeout(Duration::from_secs(10)).unwrap();
+    let (result, elapsed) = receive
+        .recv_timeout(WAIT_BOUND + Duration::from_secs(10))
+        .unwrap();
     assert_eq!(result, Err(Failure::MetadataUnavailable));
-    assert!(elapsed >= Duration::from_secs(2));
+    assert!(elapsed >= WAIT_BOUND);
     worker.join().unwrap();
     drop(held);
     Metadata::initialize(&paths.state).unwrap();
     Metadata::inspect(&paths.state).unwrap();
     assert_eq!(fs::read(&paths.config).unwrap(), configuration);
+}
+
+#[test]
+fn contending_metadata_open_waits_for_a_live_holder_instead_of_reporting_it_unavailable() {
+    // Eight serialized writers on a loaded host queue for longer than one
+    // hold; the last of them must be admitted, not told the authority is gone.
+    // Three seconds exceeds the former two-second bound, which is exactly how
+    // concurrent prepare, publish and revoke answered `MetadataUnavailable`.
+    let hold = Duration::from_secs(3);
+    let root = root();
+    let paths = paths(&root);
+    Config::initialize(&paths).unwrap();
+    let held = fs::File::open(paths.state.join("metadata.lock")).unwrap();
+    assert_eq!(unsafe { libc::flock(held.as_raw_fd(), libc::LOCK_EX) }, 0);
+    let state = paths.state.clone();
+    let (send, receive) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let started = Instant::now();
+        send.send((Metadata::initialize(&state).map(|_| ()), started.elapsed()))
+            .unwrap();
+    });
+    std::thread::sleep(hold);
+    drop(held);
+    let (result, elapsed) = receive
+        .recv_timeout(WAIT_BOUND + Duration::from_secs(10))
+        .unwrap();
+    worker.join().unwrap();
+    assert_eq!(result, Ok(()), "waited {elapsed:?}");
+    assert!(elapsed >= hold, "admitted after {elapsed:?} while held");
+    Metadata::inspect(&paths.state).unwrap();
 }
 
 #[test]

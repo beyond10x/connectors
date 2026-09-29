@@ -20,6 +20,17 @@ const REGISTRY_MIGRATION: &str = include_str!("metadata/registry.sql");
 const RUNTIME_MIGRATION: &str = include_str!("metadata/runtime.sql");
 const MUTATION_MIGRATION: &str = include_str!("metadata/mutations.sql");
 const AUDIT_MIGRATION: &str = include_str!("metadata/audit.sql");
+/// How long opening local metadata waits for another handle to release the
+/// lifecycle lock, or SQLite its write lock, before refusing with
+/// [`Failure::MetadataUnavailable`].
+///
+/// A business write holds the lifecycle lock across its whole Entity Runtime
+/// replay and batch, so a writer queued behind N others waits N holds. Two
+/// seconds held on an idle machine; with eight concurrent writers on a loaded
+/// host, holds of 0.2-1.2 s queued past it and a healthy authority answered
+/// `MetadataUnavailable`, which callers read as "the store is gone". The bound
+/// only has to separate a live queue from a holder that never releases.
+pub const WAIT_BOUND: Duration = Duration::from_secs(30);
 const NAME: &str = "metadata.sqlite3";
 const LOCK: &str = "metadata.lock";
 type SchemaObject = (String, String, String, Option<String>);
@@ -57,13 +68,13 @@ fn run_relock_hook() {
     }
 }
 
-/// Production waits two seconds for the lifecycle lock, and for the approval
+/// Production waits [`WAIT_BOUND`] for the lifecycle lock, and for the approval
 /// policy and approval key leases and the custody writer locks, which read the
 /// same wait. A test whose threads contend for one of them by design sets its
 /// own wait here, and hands it to a child process through `child_lock_wait`,
 /// so the bound it asserts under is one it chose rather than one a loaded
 /// scheduler can consume.
-const LIFECYCLE_LOCK_WAIT: Duration = Duration::from_secs(2);
+const LIFECYCLE_LOCK_WAIT: Duration = WAIT_BOUND;
 
 #[cfg(test)]
 thread_local! {
@@ -94,7 +105,7 @@ fn parse_lock_wait(value: Option<&str>, parent: u32) -> Option<Duration> {
 }
 
 /// For tests whose threads serialize on the lifecycle lock by design: a bound
-/// only a hang reaches, where two seconds is spent by a loaded scheduler on
+/// only a hang reaches, where the production wait is spent by a loaded scheduler on
 /// the writers queued ahead.
 #[cfg(test)]
 pub(super) const CONTENDED_LOCK_WAIT: Duration = Duration::from_secs(120);
@@ -648,16 +659,9 @@ impl Metadata {
             access | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(unavailable)?;
-        // How long a writer waits for another to release the database before reporting
-        // it unavailable. Two seconds was enough for one CLI and its owner; it is not
-        // enough when the machine is loaded, and an exhausted busy timeout surfaces as
-        // `MetadataUnavailable` — indistinguishable from a store that is genuinely gone.
-        // Every caller above this carries its own deadline and cancels on it, so waiting
-        // longer here cannot hang a request; it only stops a contended write from
-        // reporting the wrong failure. See story:host-suite-load-sensitivity.
-        connection
-            .busy_timeout(Duration::from_secs(30))
-            .map_err(unavailable)?;
+        // SQLite's own write lock is waited on for the same bound as the lifecycle
+        // lock; see `WAIT_BOUND` for why neither is two seconds.
+        connection.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
         connection
             .pragma_update(None, "trusted_schema", false)
             .map_err(unavailable)?;

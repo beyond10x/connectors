@@ -16,6 +16,23 @@ fn cli(args: &[&str]) -> Output {
 }
 
 #[test]
+fn version_flags_print_name_and_workspace_version_and_succeed() {
+    let expected = format!("connectors {}\n", env!("CARGO_PKG_VERSION"));
+    for flag in ["--version", "-V"] {
+        let output = cli(&[flag]);
+        assert_eq!(
+            (
+                output.status.code(),
+                String::from_utf8(output.stdout).unwrap(),
+                String::from_utf8(output.stderr).unwrap(),
+            ),
+            (Some(0), expected.clone(), String::new()),
+            "`connectors {flag}` must print the name and version and exit 0",
+        );
+    }
+}
+
+#[test]
 fn compatibility_inventory_matches_existing_help() {
     let inventory: Value =
         serde_json::from_str(include_str!("../spec/compatibility.json")).unwrap();

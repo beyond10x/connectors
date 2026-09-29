@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `connectors --version` and `connectors -V` print `connectors <version>` and
+  exit 0. They exited 2 with `cli_parse`, unlike every other Beyond10x CLI, which
+  broke tools that detect an installed `connectors` by its version.
+- Concurrent local writers — CLI commands, connection publication, repair,
+  revoke and mutation preparation — wait up to 30 seconds for the metadata
+  lifecycle lock, the bound SQLite's own busy wait already had. The approval
+  policy and approval key leases and the custody writer locks read the same
+  wait. It was two seconds; each writer holds the lock for its whole Entity
+  Runtime replay and batch, so on a loaded host a writer queued behind a few
+  others answered `metadata_unavailable` while the store was healthy. A holder
+  that never releases is still refused, at the new bound.
+
+### Changed
+
+- The pinned tools are releases: ESS 0.40.0 and AEP 0.65.0, taken from `PATH`
+  (the Beyond10x plugins install them). The source builds, build receipts and
+  the local AEP findings patch are gone. Entity Runtime moves to 0.25.1 and
+  Eventlog to 0.6.0; every other Rust dependency moves to its newest release,
+  including reqwest 0.13 on rustls with `ring`.
+
 ## 0.13.3 — 2026-09-27
 
 ### Specification
