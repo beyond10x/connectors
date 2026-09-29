@@ -20,7 +20,7 @@ scope:
   path: adapters/slack/upstream/slack-web-api.json
 - confidence: cited
   path: docs/catalog-slack.md
-revision: 5
+revision: 6
 ---
 ## Source
 
@@ -30,8 +30,11 @@ Slack Web API OpenAPI document from `slackapi/slack-api-specs` (archived, Swagge
 
 | id | endpoint | paging | end condition | time filter |
 |---|---|---|---|---|
+| `conversations.list` | `GET /conversations.list` | `cursor`, `limit` | empty `response_metadata.next_cursor` | none; the consumer lists channels, then pages history per channel |
 | `conversations.history` | `GET /conversations.history` | `cursor`, `limit` | empty `response_metadata.next_cursor` | `oldest`, `latest` |
 | `conversations.replies` | `GET /conversations.replies` | `cursor`, `limit` | empty `response_metadata.next_cursor` | `oldest`, `latest` |
+
+`conversations.list` was added on 2026-09-29 at the knowledge-ingest consumer's request.
 
 ## Shared surfaces
 

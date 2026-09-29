@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-29T12:46:48Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-basic-auth-profile",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate on wave/20260929-knowledge-owner-conformance 779b53f68: all checks passed, metadata conformance 285 scenarios, exit 0 (finish time from the log; supersedes the 12:58Z record of the same run)"
+  }
+}

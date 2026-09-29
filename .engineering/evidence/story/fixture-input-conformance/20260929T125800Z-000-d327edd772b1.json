@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-29T12:58:00Z",
+  "actor": "human:timo",
+  "artifact": "story:fixture-input-conformance",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate on wave/20260929-knowledge-owner-conformance 779b53f68: all checks passed, metadata conformance 285 scenarios, exit 0"
+  }
+}

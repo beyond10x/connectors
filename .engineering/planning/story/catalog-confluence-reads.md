@@ -7,7 +7,7 @@ title: Confluence Cloud pages by space, updated since, with body
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-basic-auth-profile
-- depends_on: story:catalog-zendesk-reads
+- depends_on: story:catalog-jira-cloud-reads
 scope:
 - confidence: cited
   path: adapters/atlassian/upstream/confluence-v1-search.json
@@ -23,7 +23,7 @@ scope:
   path: adapters/catalog/tests/confluence.rs
 - confidence: cited
   path: docs/catalog-confluence.md
-revision: 5
+revision: 6
 ---
 ## Source
 
@@ -36,8 +36,10 @@ Confluence Cloud REST OpenAPI documents (v2 for pages, v1 for CQL search), pinne
 | `pages.changed` | `GET /wiki/rest/api/search` with CQL `space = "<key>" and type = page and lastmodified >= "<t>"` | `start`, `limit` | no `_links.next` | CQL `lastmodified >= "<t>"` |
 | `space.pages` | `GET /wiki/api/v2/spaces/{id}/pages` | `cursor`, `limit` | no `_links.next` | none (v2 has no updated-since filter); deltas come from `pages.changed` |
 | `page.get` | `GET /wiki/api/v2/pages/{id}?body-format=storage` | single item | n/a | n/a |
+| `page.comments` | `GET /wiki/api/v2/pages/{id}/footer-comments` | `cursor`, `limit` | no `_links.next` | none; deltas come from `pages.changed` |
 
-The fixture test for `page.get` asserts the request carries `body-format=storage`.
+The fixture test for `page.get` asserts the request carries `body-format=storage` (the consumer may
+also ask for `view`). Page comments were added on 2026-09-29 at the knowledge-ingest consumer's request.
 
 ## Shared surfaces
 
