@@ -115,6 +115,9 @@ commands:
       - {name: caller_key, type: String}
       - {name: fingerprint, type: connectors.idempotency.RequestFingerprint}
       - {name: attempt_id, type: connectors.mutations.AttemptId}
+    fixture_inputs:
+      namespace: direct-key-namespace
+      fingerprint: canonical-request-fingerprint
     outcomes:
       - name: reserved
         creates: connectors.idempotency.KeyReservation
