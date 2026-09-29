@@ -80,7 +80,8 @@ fn digest(bytes: &[u8]) -> String {
 
 struct View {
     source: String,
-    fields: Vec<String>,
+    /// Each field's name and its IR type reference.
+    fields: Vec<(String, Value)>,
 }
 
 /// What does not change between scenarios: the registry, the bindings and the views.
@@ -88,7 +89,71 @@ pub struct Authority {
     registry: Registry,
     bindings: BTreeMap<String, CommandBinding>,
     views: BTreeMap<String, View>,
+    /// The IR's declared types, by name.
+    types: Map<String, Value>,
     identity: String,
+}
+
+/// The specification form of a stored value: a member whose declared type is a named optional
+/// (`newtype of Optional<…>`) is required and null when absent, as the host reads it back
+/// (`er.rs` `approval_subject_nulls` with `restore`). A plain `Optional` member stays absent.
+fn restore_nulls(types: &Map<String, Value>, type_ref: &Value, value: &mut Value) {
+    if value.is_null() {
+        return;
+    }
+    match type_ref["kind"].as_str() {
+        Some("optional") => restore_nulls(types, &type_ref["of"], value),
+        Some("list") => {
+            if let Value::Array(items) = value {
+                for item in items {
+                    restore_nulls(types, &type_ref["of"], item);
+                }
+            }
+        }
+        Some("declared") => {
+            let Some(body) = type_ref["name"]
+                .as_str()
+                .and_then(|name| types.get(name))
+                .map(|declared| &declared["body"])
+            else {
+                return;
+            };
+            match body["kind"].as_str() {
+                Some("newtype") => restore_nulls(types, &body["of"], value),
+                Some("struct") => {
+                    let Value::Object(members) = value else {
+                        return;
+                    };
+                    for field in body["fields"].as_array().into_iter().flatten() {
+                        let (Some(name), field_type) = (field["name"].as_str(), &field["type_ref"])
+                        else {
+                            continue;
+                        };
+                        match members.get_mut(name) {
+                            Some(member) => restore_nulls(types, field_type, member),
+                            None if named_optional(types, field_type) => {
+                                members.insert(name.to_owned(), Value::Null);
+                            }
+                            None => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+}
+
+fn named_optional(types: &Map<String, Value>, type_ref: &Value) -> bool {
+    type_ref["kind"] == "declared"
+        && type_ref["name"]
+            .as_str()
+            .and_then(|name| types.get(name))
+            .is_some_and(|declared| {
+                declared["body"]["kind"] == "newtype"
+                    && declared["body"]["of"]["kind"] == "optional"
+            })
 }
 
 impl Authority {
@@ -113,14 +178,23 @@ impl Authority {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .filter_map(|field| field["name"].as_str().map(str::to_owned))
+                .filter_map(|field| {
+                    field["name"]
+                        .as_str()
+                        .map(|name| (name.to_owned(), field["type_ref"].clone()))
+                })
                 .collect();
             views.insert(name.clone(), View { source, fields });
         }
+        let types = ir_json["types"]
+            .as_object()
+            .cloned()
+            .ok_or("IR has no types")?;
         Ok(Self {
             registry: registry()?,
             bindings,
             views,
+            types,
             identity: format!("sha256:{}", digest(DEFINITIONS)),
         })
     }
@@ -152,6 +226,25 @@ fn unavailable(what: impl Into<String>, why: impl std::fmt::Display) -> TargetEr
     TargetError::unsupported(what, why.to_string())
 }
 
+/// What a kernel error during `command` means for the scenario.
+///
+/// Every command input is a declared fixture or a schema-valid value, so an invariant the kernel
+/// finds violated or cannot observe is the implementation's own defect: the resulting state was discarded, no
+/// declared outcome was reached and nothing was written, which fails the scenario that expected
+/// one. Any other kernel error is something this target cannot express and stays unsupported.
+fn kernel_refusal(
+    command: &str,
+    error: entity_core::CoreError,
+) -> std::result::Result<SemanticCommandResult, TargetError> {
+    match error {
+        entity_core::CoreError::InvariantViolation { .. }
+        | entity_core::CoreError::InvariantUnobservable { .. } => {
+            Ok(SemanticCommandResult::undeclared())
+        }
+        other => Err(unavailable(command, format!("kernel: {other}"))),
+    }
+}
+
 fn name(value: &str) -> std::result::Result<QualifiedName, TargetError> {
     QualifiedName::new(value).map_err(|error| unavailable(value, format!("{error:?}")))
 }
@@ -166,7 +259,7 @@ fn integral(value: Value) -> Value {
     match value {
         Value::Number(number) if number.as_i64().is_none() && number.as_u64().is_none() => {
             match number.as_f64() {
-                Some(float) if float.fract() == 0.0 && float.abs() < 9.0e15 => {
+                Some(float) if float.fract() == 0.0 && float.abs() <= 9_007_199_254_740_992.0 => {
                     json!(float as i64)
                 }
                 _ => Value::Number(number),
@@ -180,6 +273,21 @@ fn integral(value: Value) -> Value {
     }
 }
 
+/// The Entity Runtime form of a value: a required member whose value is null is an absent
+/// member, as the host writes it (`er.rs` `approval_subject_nulls`).
+fn absent_nulls(value: Value) -> Value {
+    match value {
+        Value::Array(items) => Value::Array(items.into_iter().map(absent_nulls).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .filter(|(_, v)| !v.is_null())
+                .map(|(k, v)| (k, absent_nulls(v)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
 fn to_node(value: &Value) -> std::result::Result<Node, TargetError> {
     serde_json::from_value(value.clone()).map_err(|error| unavailable("output value", error))
 }
@@ -187,6 +295,78 @@ fn to_node(value: &Value) -> std::result::Result<Node, TargetError> {
 fn to_nodes(map: &Map<String, Value>) -> std::result::Result<BTreeMap<String, Node>, TargetError> {
     map.iter()
         .map(|(key, value)| Ok((key.clone(), to_node(value)?)))
+        .collect()
+}
+
+/// The value of one fixture a command's `fixture_inputs` names. Each satisfies every invariant of
+/// the entity its command writes, and is the value the host's own tests use: the fingerprint of
+/// `er.rs` `prepared_attempt`, the direct namespace of `mutations/tests.rs` `candidate`, the direct
+/// subject of `er.rs` `direct_subject`, and the admitted invocation of `audit/tests.rs` `anchor`.
+/// A name not listed here is an error, never a default.
+fn fixture(name: &str) -> Option<Value> {
+    Some(match name {
+        "canonical-request-fingerprint" => json!({
+            "operation_ref": "[\"connectors.operation/v1\",\"instance\",\"adapter\",\"write\"]",
+            "connection_ref": "connection",
+            "connection_revision": "revision",
+            "contract_ref": "contract",
+            "profile": "profile",
+            "descriptor_revision": "descriptor",
+            "configuration_revision": "configuration",
+            "canonicalization_version": "adapter-v1-canonical-json",
+            "input_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        }),
+        "direct-key-namespace" => json!({
+            "receiver_instance": "instance",
+            "authority": {"caller": "caller"},
+            "origin": {"kind": "direct", "authority_ref": "instance"},
+        }),
+        "direct-approval-subject" => json!({
+            "format": "connectors.approval-subject/v1",
+            "target": {
+                "instance": "instance",
+                "operation": "write",
+                "connection": "connection",
+                "connection_revision": "revision",
+                "contract": "contract",
+                "profile": "profile",
+                "descriptor_revision": "descriptor",
+                "configuration_revision": "configuration",
+            },
+            "authority": {
+                "scope": {"tenant": null, "realm": null, "caller": "principal", "executor": null},
+                "current_authority": null,
+                "executor": null,
+            },
+            "origin": {"kind": "direct", "authority_ref": "instance"},
+            "route": null,
+            "canonicalization": "adapter-v1-canonical-json",
+            "input_sha256": "0".repeat(64),
+            "approval_mode": "required",
+        }),
+        "admission-stage" => json!("admission"),
+        "invoke-activity" => json!("invoke"),
+        _ => return None,
+    })
+}
+
+/// Every value a scenario's fixture contract names; an unknown name fails the scenario.
+fn fixture_values(
+    contract: &ess_conformance::fixtures::Contract,
+) -> std::result::Result<BTreeMap<String, Node>, TargetError> {
+    contract
+        .fields
+        .iter()
+        .map(|field| {
+            let name = field.name.as_str();
+            let value = fixture(name).ok_or_else(|| {
+                TargetError::unavailable(
+                    format!("fixture {name}"),
+                    "no value is declared for this fixture name",
+                )
+            })?;
+            Ok((name.to_owned(), to_node(&value)?))
+        })
         .collect()
 }
 
@@ -295,7 +475,7 @@ impl Target<'_> {
             .ok_or_else(|| unavailable(&command, "no scenario is open"))?;
         let mut input = Map::new();
         for (field, value) in &request.input {
-            input.insert(field.clone(), to_json(value)?);
+            input.insert(field.clone(), absent_nulls(to_json(value)?));
         }
         let bound = self.bound(scenario, binding, schema)?;
         let arguments = json!({"input": Value::Object(input.clone()), "bound": bound});
@@ -308,9 +488,12 @@ impl Target<'_> {
             ))
         };
         let evaluation = match &binding.entrypoint {
-            ess_entity_runtime::RuntimeEntrypoint::Create => runtime
-                .decide_create_derived(&entity, 1, arguments)
-                .map_err(|error| unavailable(&command, format!("kernel: {error}")))?,
+            ess_entity_runtime::RuntimeEntrypoint::Create => {
+                match runtime.decide_create_derived(&entity, 1, arguments) {
+                    Ok(evaluation) => evaluation,
+                    Err(error) => return kernel_refusal(&command, error),
+                }
+            }
             ess_entity_runtime::RuntimeEntrypoint::Operation { name: operation } => {
                 let InstanceBinding::Supplied { input_field } = &binding.instance else {
                     return Err(unavailable(
@@ -334,10 +517,17 @@ impl Target<'_> {
                     .ok_or_else(|| unavailable(input_field, "instance field absent from input"))?;
                 let id = entity_core::identity::address(kind, value)
                     .map_err(|error| unavailable(input_field, error))?;
-                match runtime
-                    .decide_before_load(&entity, 1, id.clone(), &operation.to_string(), arguments)
-                    .map_err(|error| unavailable(&command, format!("kernel: {error}")))?
-                {
+                let preload = match runtime.decide_before_load(
+                    &entity,
+                    1,
+                    id.clone(),
+                    &operation.to_string(),
+                    arguments,
+                ) {
+                    Ok(preload) => preload,
+                    Err(error) => return kernel_refusal(&command, error),
+                };
+                match preload {
                     PreloadDecision::Refused(refusal) => Evaluation::Refused(refusal),
                     PreloadDecision::Load(prepared) => {
                         match scenario.instances.get(&(entity.clone(), id.clone())) {
@@ -373,9 +563,11 @@ impl Target<'_> {
                                 })
                             }
                             Some(instance) => {
-                                match prepared.select_with(instance).map_err(|error| {
-                                    unavailable(&command, format!("kernel: {error}"))
-                                })? {
+                                let selected = match prepared.select_with(instance) {
+                                    Ok(selected) => selected,
+                                    Err(error) => return kernel_refusal(&command, error),
+                                };
+                                match selected {
                                     LoadedDecision::Complete(evaluation) => evaluation,
                                     LoadedDecision::NeedsFulfillment(outcome) => {
                                         let mut actions = BTreeMap::new();
@@ -402,9 +594,10 @@ impl Target<'_> {
                                             };
                                             actions.insert(field.clone(), action);
                                         }
-                                        outcome.complete(actions).map_err(|error| {
-                                            unavailable(&command, format!("kernel: {error}"))
-                                        })?
+                                        match outcome.complete(actions) {
+                                            Ok(evaluation) => evaluation,
+                                            Err(error) => return kernel_refusal(&command, error),
+                                        }
                                     }
                                 }
                             }
@@ -468,6 +661,14 @@ impl ConformanceTarget for Target<'_> {
             "connectors-local-metadata-authority",
             &self.authority.identity,
         ))
+    }
+
+    fn fixture_values(
+        &self,
+        _: &ScenarioContext,
+        contract: &ess_conformance::fixtures::Contract,
+    ) -> std::result::Result<BTreeMap<String, Node>, TargetError> {
+        fixture_values(contract)
     }
 
     fn begin_scenario(&self, _: &ScenarioContext) -> std::result::Result<(), TargetError> {
@@ -539,9 +740,13 @@ impl ConformanceTarget for Target<'_> {
                 continue;
             }
             let mut row = BTreeMap::new();
-            for field in &view.fields {
+            for (field, type_ref) in &view.fields {
                 let value = match instance.fields.get(field) {
-                    Some(value) => to_node(value)?,
+                    Some(value) => {
+                        let mut value = value.clone();
+                        restore_nulls(&self.authority.types, type_ref, &mut value);
+                        to_node(&value)?
+                    }
                     None if field == "state" => Node::Text(instance.lifecycle_state.clone()),
                     None => Node::Null,
                 };
@@ -760,4 +965,94 @@ pub fn emit(root: &Path, out: &Path) -> Result<()> {
         manifest.baseline.scenarios
     );
     Ok(())
+}
+
+/// The gate step: synthesizes this component's suite from the current specification, emits it
+/// under `out`, and runs it against the committed definitions. Every scenario must pass.
+pub fn gate(root: &Path, out: &Path) -> Result<()> {
+    let loaded = metadata_entities::load(root)?;
+    let ir = mutate::compile(loaded.documents.clone(), &loaded.sources)
+        .map_err(|stillborn| format!("{stillborn:?}"))?;
+    let suite = emit_suite(&ir, mutate::BASELINE_DIR, out)?;
+    let dir = out.join(&suite.dir);
+    run(
+        root,
+        &dir.join(mutate::SUITE_FILE),
+        &dir.join("report.json"),
+    )?;
+    println!(
+        "gate: local metadata authority conformance, {} scenarios, {} synthesis refusals; exit=0",
+        suite.scenarios, suite.refusals
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn contract(name: &str) -> ess_conformance::fixtures::Contract {
+        serde_json::from_value(json!({
+            "fields": [{"name": name, "type": "String"}],
+            "declarations": {},
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn unknown_fixture_is_an_error_not_a_default() {
+        let error = fixture_values(&contract("no-such-fixture")).unwrap_err();
+        assert!(!error.is_unsupported(), "{error}");
+    }
+
+    #[test]
+    fn named_optional_members_round_trip_through_the_runtime_form() {
+        let types: Map<String, Value> = serde_json::from_value(json!({
+            "t.Nullable": {"body": {"kind": "newtype", "of": {"kind": "optional", "of": {"kind": "primitive", "name": "string"}}}},
+            "t.S": {"body": {"kind": "struct", "fields": [
+                {"name": "a", "type_ref": {"kind": "declared", "name": "t.Nullable"}},
+                {"name": "b", "type_ref": {"kind": "optional", "of": {"kind": "primitive", "name": "string"}}},
+            ]}},
+        }))
+        .unwrap();
+        let spec = json!({"a": null});
+        let mut stored = absent_nulls(spec.clone());
+        assert_eq!(stored, json!({}));
+        restore_nulls(
+            &types,
+            &json!({"kind": "declared", "name": "t.S"}),
+            &mut stored,
+        );
+        assert_eq!(stored, spec);
+    }
+
+    /// Fixture inputs satisfy every invariant by construction, so a state the kernel discards for
+    /// an invariant is the implementation's defect: the command reached no declared outcome, and
+    /// the scenario that expected one fails. It is not an observation the target cannot expose.
+    #[test]
+    fn kernel_invariant_violation_is_a_failed_command_not_unsupported() {
+        let result = kernel_refusal(
+            "connectors.test.Command",
+            entity_core::CoreError::InvariantViolation {
+                rule: Some("rule".to_owned()),
+                message: "does not hold".to_owned(),
+            },
+        )
+        .expect("an invariant violation is an answer, not a target error");
+        assert_eq!(result.outcome, None);
+        assert_eq!(result.error, None);
+        assert!(result.direct_events.is_empty());
+    }
+
+    #[test]
+    fn other_kernel_errors_stay_unsupported() {
+        let error = kernel_refusal(
+            "connectors.test.Command",
+            entity_core::CoreError::OperationNotFound {
+                operation: "missing".to_owned(),
+            },
+        )
+        .unwrap_err();
+        assert!(error.is_unsupported(), "{error}");
+    }
 }
