@@ -152,30 +152,48 @@ async fn time_filters_reach_the_transport_verbatim_and_bodies_are_unchanged() {
 /// `per_page` at 100, so a request above the cap gets 100 items per page and a
 /// caller following the documented rule stops after page one with the rest of
 /// the list unread. The provider must refuse a `per_page` it cannot honour
-/// (or document the cap next to the stop rule).
+/// (or document the cap next to the stop rule). The value travels as a string
+/// as well as a number, since both reach the query as `101`; the other shipped
+/// list reads walk the same way and are held to the same cap.
 #[tokio::test]
-#[ignore = "story:catalog-selection-parameter-bounds: the selection set cannot bound a parameter yet"]
 async fn per_page_above_the_provider_cap_is_refused_before_any_request() {
     let engine = engine(&shipped());
-    for (id, mut input) in [
+    let mut escaped = Vec::new();
+    for (id, input) in [
         ("projects.list", json!({})),
         ("tags.list", json!({"id": "org/project"})),
         ("releases.list", json!({"id": "org/project"})),
         ("project.events", json!({"id": "org/project"})),
+        ("issues.list", json!({"id": "org/project"})),
+        ("merge_requests.list", json!({"id": "org/project"})),
+        ("pipelines.list", json!({"id": "org/project"})),
+        (
+            "pipeline.jobs",
+            json!({"id": "org/project", "pipeline_id": 5}),
+        ),
     ] {
-        input["per_page"] = json!(101);
-        let http = reads(vec![json!([])]);
-        let outcome = engine.read(&http, "one", id, input).await;
-        assert!(
-            outcome.is_err(),
-            "`{id}` sent per_page=101: {:?}",
-            http.calls.lock().unwrap()
-        );
-        assert!(
-            http.calls.lock().unwrap().is_empty(),
-            "`{id}` sent a request"
-        );
+        for per_page in [
+            json!(101),
+            json!("101"),
+            json!(0),
+            json!("0"),
+            json!("-0"),
+            json!(-1),
+        ] {
+            let mut input = input.clone();
+            input["per_page"] = per_page.clone();
+            let http = reads(vec![json!([])]);
+            let outcome = engine.read(&http, "one", id, input).await;
+            let sent = !http.calls.lock().unwrap().is_empty();
+            if sent || outcome.as_ref().err().map(|e| &e.code) != Some(&ErrorCode::InvalidInput) {
+                escaped.push(format!("`{id}` per_page={per_page} sent={sent}"));
+            }
+        }
     }
+    assert!(
+        escaped.is_empty(),
+        "not refused before any request: {escaped:#?}"
+    );
 }
 
 /// `effect: read` is enforced for the new ids: a write-shaped selection of one
