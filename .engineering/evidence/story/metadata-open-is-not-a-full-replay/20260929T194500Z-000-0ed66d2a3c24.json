@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-29T19:45:00Z",
+  "actor": "human:timo",
+  "artifact": "story:metadata-open-is-not-a-full-replay",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "coordinator: wave0929b-replay, a_read_invoke_against_a_grown_store_replays_it_at_most_once ok (358.42s), security_replay_tests 2 ok, metadata_reopen_adversary 4 ok"
+  }
+}
