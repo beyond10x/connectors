@@ -7,7 +7,7 @@ title: Read-only knowledge sources through the catalog provider
 relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - informed_by: specification:catalog-http-runtime-handoff
-revision: 4
+revision: 5
 ---
 ## Outcome
 
@@ -40,12 +40,12 @@ Every provider story compiles its bundle into `adapters/catalog/generated/bundle
 the one shared `index.json`, and `bundle::load` refuses a provider with no index row
 (`crates/connectors-catalog/src/bundle.rs:299-318`). `adapters/catalog/tests/bundle_drift.rs`
 compares against a one-provider index today (`:27-29`). Both files are therefore shared, and the
-four provider stories run in sequence, in the requested order, through `depends_on` edges:
-Jira → Zendesk → Confluence → Slack. `story:catalog-jira-cloud-reads` generalizes
-`bundle_drift.rs` to every indexed provider; each later story adds its row to `index.json` on top
-of the previous one. Each provider has its own guide (`docs/catalog-<provider>.md`), its own test
-file (`adapters/catalog/tests/<provider>.rs`), its own bundle
-(`adapters/catalog/generated/bundles/<provider>.bundle.json`) and its own pinned source files.
+provider stories run in sequence through `depends_on` edges, in the operator's priority of
+2026-09-29: Jira → Confluence → Slack → Grafana, then Zendesk (no longer requested; kept last).
+`story:catalog-jira-cloud-reads` generalizes `bundle_drift.rs` to every indexed provider; each later
+story adds its row to `index.json` on top of the previous one. Each provider has its own guide
+(`docs/catalog-<provider>.md`), its own test file (`adapters/catalog/tests/<provider>.rs`), its own
+bundle (`adapters/catalog/generated/bundles/<provider>.bundle.json`) and its own pinned source files.
 
 ## Acceptance
 
