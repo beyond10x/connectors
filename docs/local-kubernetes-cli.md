@@ -88,6 +88,7 @@ instance_id = "kubernetes-local"
 adapter_id = "kubernetes"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
 protocol = "v1alpha1"
+private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
