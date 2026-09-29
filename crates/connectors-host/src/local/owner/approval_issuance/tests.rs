@@ -459,6 +459,11 @@ struct ClockServer {
 #[test]
 fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
     let root = root();
+    // The fake server takes an exclusive metadata update before it replies.
+    crate::local::clock::set_test_query_timeout(crate::local::metadata::CONTENDED_LOCK_WAIT);
+    crate::local::clock::set_test_max_width_ms(
+        crate::local::metadata::CONTENDED_LOCK_WAIT.as_millis(),
+    );
     let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     socket
         .set_read_timeout(Some(Duration::from_secs(5)))
@@ -494,13 +499,17 @@ fn clock_exchange_precedes_leases_and_policy_is_rechecked_after_network() {
         until(),
     );
     exchange.join().unwrap();
-    assert!(matches!(
-        result,
-        Err(Error {
-            code: Code::Forbidden,
-            ..
-        })
-    ));
+    assert!(
+        matches!(
+            result,
+            Err(Error {
+                code: Code::Forbidden,
+                ..
+            })
+        ),
+        "{:?}",
+        result.as_ref().err()
+    );
     assert!(!output.exists());
 }
 impl ClockServer {

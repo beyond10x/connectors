@@ -15,9 +15,13 @@ types:
     # caller input or an unqualified wall-clock sample. Both bounds contain
     # actual current time; upper fixes settlement conservatively, and lower
     # proves retention expiry. Unavailable/invalid evidence permits no expiry.
-    # ESS-LIMIT: a deployment must qualify its clock source; ESS 0.36 has no
+    # ESS-LIMIT: a deployment must qualify its clock source; ESS 0.40 has no
     # trusted-time construct, so it proves neither the interval's provenance nor
-    # its containment of actual time.
+    # its containment of actual time. lower <= upper and the four-second width
+    # (docs/local-mutation-ledger.md:77) compare two sibling fields and subtract
+    # them; ESS 0.40 reads a bare right-hand side as a text literal and has no
+    # arithmetic in predicates. No entity or command uses this type: it names
+    # the host's clock evidence only.
   - name: connectors.mutations.AttemptId
     kind: newtype
     of: Uuid
@@ -49,7 +53,7 @@ types:
     # Private excerpt, not a public codec or new OperationDeclaration fields.
     # ESS-LIMIT: selected-profile support/completeness, distinct array members,
     # mutation iff external_write for business effects, and authority checks. The
-    # mutation flag and the profile live on other records; ESS 0.36 has no
+    # mutation flag and the profile live on other records; ESS 0.40 has no
     # distinct-members predicate over a list and no cross-record read in a type
     # invariant.
   - name: connectors.mutations.SessionEstablishmentObservation
@@ -67,7 +71,7 @@ types:
           - {mutation.classification: applied}
     # ESS-LIMIT: trusted protocol-specific effect evidence, publication
     # after full readiness, current disclosure, and serialized terminal races.
-    # ESS 0.36 has no evidence-provenance or serialization construct.
+    # ESS 0.40 has no evidence-provenance or serialization construct.
     # This value declares no persistent Session/Attempt ownership relation.
 
   - name: connectors.mutations.IdempotencyKind
@@ -106,6 +110,13 @@ entities:
       # Canonical bounded JSON text for the already typed provider result. This
       # is retained replay evidence, never an arbitrary entity property bag.
       - {name: terminal_result_json, type: "Optional<String>"}
+    # docs/local-er-metadata.md:102: only a known settlement (Aborted, Completed,
+    # Failed) has a settled timestamp; an unknown result has none.
+    # contracts/operations/v1alpha1/semantics.md:113: the recorded canonicalization.
+    invariants:
+      - request_fingerprint.canonicalization_version == "adapter-v1-canonical-json"
+      - any: [state == Aborted, state == Completed, state == Failed, "missing(settled_at)"]
+      - any: [state == Prepared, state == Dispatching, state == Indeterminate, "defined(settled_at)"]
     relations:
       - name: instance
         kind: references
@@ -119,7 +130,7 @@ entities:
         via: connection_ref
     # ESS-LIMIT: the operation reference needs instance/adapter qualification;
     # OperationDeclaration.operation_id alone is not a runtime operation identity.
-    # A qualified reference joins (instance_id, operation_id); an ESS 0.36 relation
+    # A qualified reference joins (instance_id, operation_id); an ESS 0.40 relation
     # `via` names one field, so no composite-key relation is declared.
     # KeyReservation in connectors.idempotency explicitly references this attempt;
     # its lifecycle covers replay retention, separately from audit retention.
@@ -148,6 +159,10 @@ errors:
     # The ledger state does not allow this transition; it remains unchanged.
     fields:
       - {name: state, type: connectors.mutations.AttemptRecord.State}
+  - name: connectors.mutations.ApprovalSubjectMissing
+    # A required-approval attempt holds no captured subject; it remains unchanged.
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
 
 commands:
   - name: connectors.mutations.PrepareAttempt
@@ -193,6 +208,13 @@ commands:
     input:
       - {name: attempt_id, type: connectors.mutations.AttemptId}
     outcomes:
+      # contracts/service/delegation.md:174-175: a required-approval attempt
+      # without the captured subject cannot gain an approved dispatch.
+      - name: subject-missing
+        when_subject:
+          predicate:
+            all: [approval_mode == required, "missing(approval_subject.format)"]
+        error: connectors.mutations.ApprovalSubjectMissing
       - name: opened
         moves: connectors.mutations.AttemptRecord.open_dispatch
         instance: attempt_id
@@ -315,12 +337,46 @@ views:
     fields:
       - {name: attempt_id, type: connectors.mutations.AttemptId}
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
+      - {name: instance_id, type: String}
+      - {name: request_id, type: String}
+      - {name: operation_id, type: String}
+      - {name: connection_ref, type: String}
+      - {name: input_digest, type: String}
+      - {name: approval_ref, type: "Optional<String>"}
+      - {name: idempotency_key, type: "Optional<String>"}
+      - {name: publication_fence, type: String}
+      - {name: state, type: connectors.mutations.AttemptRecord.State}
+  - name: connectors.mutations.AttemptSettlements
+    source: connectors.mutations.AttemptRecord
+    consistency: read_your_writes
+    fields:
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+      - {name: request_fingerprint, type: connectors.idempotency.RequestFingerprint}
+      - {name: approval_mode, type: connectors.mutations.ApprovalMode}
+      - {name: approval_subject, type: "Optional<connectors.delegation.CanonicalApprovalSubject>"}
+      - {name: settled_at, type: "Optional<Timestamp>"}
       - {name: state, type: connectors.mutations.AttemptRecord.State}
 
 # ESS-LIMIT: durable compare-and-set, evidence provenance, actual send cardinality,
 # crash recovery, deadline races, and classification/cause projection require host
-# port tests. ESS checks this state graph and scenario references, not those facts;
-# ESS 0.36 has no durable-storage, compare-and-set or crash-recovery construct.
+# port tests. ESS checks this state graph and scenario references, not those facts.
+# ESS 0.40 states a single-record compare-and-set (`when_subject` with `input.`)
+# but has no durability or crash-recovery construct. Opening dispatch after the
+# approval spend (contracts/operations/v1alpha1/semantics.md:107) needs a guard on
+# another record's existence (an ApprovalRedemption for this attempt), and the
+# per-instance attempt capacity (docs/local-mutation-ledger.md:99-100) a count
+# across records; ESS 0.40 has neither (`affects:` sets fields on other rows but
+# does not select or refuse by them). Result byte bounds are host configuration.
 # ESS-LIMIT: Observation's classification mapping is the normative table in the
-# contract. ESS 0.36 has no derived-value expression that computes a field from
+# contract. ESS 0.40 has no derived-value expression that computes a field from
 # lifecycle state or transport data, so none derives it here.
+
+actors:
+  - name: connectors.mutations.LocalHost
+    may:
+      - connectors.mutations.AbortPrepared
+      - connectors.mutations.OpenDispatch
+      - connectors.mutations.PrepareAttempt
+      - connectors.mutations.RecordCompletion
+      - connectors.mutations.RecordRefusal
+      - connectors.mutations.RecordUncertainty

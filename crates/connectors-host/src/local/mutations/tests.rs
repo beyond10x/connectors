@@ -899,3 +899,36 @@ fn crash_child() {
         .unwrap();
     std::process::exit(23);
 }
+
+// MU-5 (docs/local-mutation-ledger.md:99-101): 10,000 attempts and 256 KiB per
+// result by default; trusted configuration selects 1-100,000 attempts and
+// 64 bytes-1 MiB per result, and nothing outside those bounds opens a store.
+#[test]
+fn ledger_limits_default_and_configured_bounds() {
+    let root = tempfile::tempdir().unwrap();
+    let defaults = Limits::default();
+    assert_eq!(defaults.attempts_per_instance, 10_000);
+    assert_eq!(defaults.result_bytes, 262_144);
+    let clock = TestClock(Arc::new(Mutex::new(Err(Failure::ClockUnavailable))));
+    let open = |attempts_per_instance, result_bytes| {
+        Store::new(
+            root.path(),
+            clock.clone(),
+            Limits {
+                attempts_per_instance,
+                result_bytes,
+            },
+        )
+        .map(|_| ())
+    };
+    for (attempts, bytes) in [(1, 64), (100_000, 1_048_576)] {
+        assert_eq!(open(attempts, bytes), Ok(()), "{attempts}/{bytes} refused");
+    }
+    for (attempts, bytes) in [(0, 64), (100_001, 64), (1, 63), (1, 1_048_577)] {
+        assert_eq!(
+            open(attempts, bytes),
+            Err(Failure::InvalidInput),
+            "{attempts}/{bytes} accepted"
+        );
+    }
+}

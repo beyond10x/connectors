@@ -29,8 +29,10 @@ that owner's PID, verifies the executable digest, and requires the same mount an
 user namespaces and filesystem root. A dead owner cannot be replaced underneath
 an existing capability. There is no service activation, unlock, or prompt.
 
-Only an already-unlocked default collection resolving to the persistent `login`
-collection is selected. The binding derives its storage directory from the
+Only the persistent `login` collection, addressed by its object path
+`/org/freedesktop/secrets/collection/login` and already unlocked, is selected. The
+desktop's `default` alias belongs to every other application on the machine:
+Connectors never reads, requires or changes it, and never suggests changing it. The binding derives its storage directory from the
 verified daemon's bounded environment, using the audited HOME/XDG and legacy
 directory rules. It does not assume the client's environment matches the daemon's.
 The temporary environment buffer is zeroized without diagnostics. Duplicate or

@@ -2,6 +2,8 @@
 //! credential custody, approval or business dispatch authority.
 use super::{Failure, Result, filesystem as fs};
 mod er;
+#[cfg(test)]
+mod metamorphic_tests;
 use rusqlite::{Connection, OpenFlags, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use std::{
