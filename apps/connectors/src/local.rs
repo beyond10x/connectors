@@ -98,6 +98,7 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         IncarnationMismatch => ("stop", "retry_status", false),
         StaleDescription | DescriptionUnavailable => ("observation", "refresh_description", false),
         ServiceFailure => ("dispatch", "retry_explicitly", false),
+        OwnerBuildMismatch => ("readiness", "stop_owner", false),
     };
     let mut data = json!({"kind":if error.code == Interrupted {"interrupted"} else if usage {"usage"} else {"operational"},"code":error.code,"stage":stage,"next_action":action});
     if let Some(acquisition) = error.acquisition {

@@ -20,6 +20,24 @@ that instance. A busy/idle observation alone never owns the interval used for th
 
 Private requests reuse the bounded three-section framing of the
 [adapter binding](private-adapter.md), with distinct `connectors-owner/1` greetings.
+
+A greeting carries `build`, the SHA-256 of the caller's own running executable
+image, and the owner's reply returns its own. A caller that sends no `build` gets
+none back, so earlier callers still read the reply. The CLI sends no admission,
+capture, invocation, revalidation, status or stop request to an owner whose
+`build` differs, and fails with `owner_build_mismatch`, stage `readiness`,
+next action `stop_owner`. An owner built before this field closes the stream
+without a reply on the unknown field. A silent close alone proves nothing, so
+the CLI then greets without `build` and, on that established stream, sends a
+`build` request. An owner that answers it knows the handshake and is greeted
+again with `build`; only an owner that accepts the greeting and then closes on
+the unknown request is identified as an earlier build and refused the same way,
+rather than reported unavailable. Any reply, including a refusal, keeps its own
+code. An owner at its client limit answers `capacity` rather than closing
+without a reply. The CLI never signals, stops or replaces that owner: the
+user stops the running `__connectors-owner` process for the state directory, and
+the next admitted command starts one from the current build. The private
+shutdown request stays accepted across builds so a lifecycle harness can stop it.
 The actual socket peer must be the configured UID. No credential, source path,
 keyring tuple or continuation is part of ordinary control JSON. A capture admission
 returns only the profile, acquisition reference and original 300-second expiry.
