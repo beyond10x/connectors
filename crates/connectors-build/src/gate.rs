@@ -276,6 +276,11 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             .arg("--out")
             .arg(temp.path().join("contract-conformance.json")),
     )?;
+    // Execute the local metadata authority's synthesized scenarios against the lowered
+    // definitions the host runs, not only the model.
+    let metadata_conformance = temp.path().join("metadata-conformance");
+    std::fs::create_dir_all(&metadata_conformance)?;
+    super::metadata_conformance::gate(root, &metadata_conformance)?;
     let mut planning = Command::new(aep);
     planning.current_dir(root).env("TMPDIR", temp.path());
     execute(planning.args(["plan", "artifact", "validate"]))?;

@@ -285,6 +285,8 @@ commands:
       - {name: subject, type: connectors.delegation.CanonicalApprovalSubject}
       - {name: attempt_id, type: connectors.mutations.AttemptId}
       - {name: spent_at, type: Timestamp}
+    fixture_inputs:
+      subject: direct-approval-subject
     outcomes:
       - name: recorded
         creates: connectors.delegation.ApprovalRedemption
