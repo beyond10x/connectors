@@ -7,6 +7,14 @@
       "source_sha256": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530",
       "operations": 1847,
       "unsupported": 0
+    },
+    {
+      "provider": "jira",
+      "file_name": "jira.bundle.json",
+      "bundle_sha256": "5697593a5804921154f677b7e8488a423ee1272d0da8e26b043c31c5847dc67e",
+      "source_sha256": "655b4790a5c8543c81755c8250c6a8b8f58ee62712168a39d628d6d927549709",
+      "operations": 620,
+      "unsupported": 0
     }
   ]
 }
