@@ -40,14 +40,36 @@ struct ScopesProbe {
     path: String,
     pointer: String,
 }
+/// How the protected entry becomes the credential header.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Scheme {
+    /// `{"token"}` travels in `header`, prefixed `Bearer ` when `bearer` is set.
+    #[default]
+    Token,
+    /// `{"account","token"}` travels as `Authorization: Basic base64(account:token)`.
+    Basic,
+}
+impl Scheme {
+    fn is_token(&self) -> bool {
+        *self == Self::Token
+    }
+}
+
 /// The declarative authentication profile: where the token goes and how the
 /// provider is asked who holds it. No credential value lives here.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AuthConfig {
     profile: String,
+    /// Omitted for a token profile, so existing configuration revisions hold.
+    #[serde(default, skip_serializing_if = "Scheme::is_token")]
+    scheme: Scheme,
     header: String,
     bearer: bool,
+    /// The prompt label of the basic `account` field; only a basic profile has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    account_label: Option<String>,
     label: String,
     identity: IdentityProbe,
     #[serde(default)]
@@ -105,6 +127,51 @@ fn token<'de, D: Deserializer<'de>>(
     }
     Ok(value)
 }
+/// The basic profile's protected entry. The same token rules apply; the account
+/// may be any printable text without a colon, which basic cannot carry.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BasicEntry {
+    #[serde(deserialize_with = "account")]
+    account: Zeroizing<String>,
+    #[serde(deserialize_with = "token")]
+    token: Zeroizing<String>,
+}
+const ACCOUNT_LIMIT: usize = 1024;
+fn account<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Zeroizing<String>, D::Error> {
+    let value = Zeroizing::new(String::deserialize(deserializer)?);
+    if value.is_empty()
+        || value.len() > ACCOUNT_LIMIT
+        || value.contains(':')
+        || value.chars().any(char::is_control)
+    {
+        return Err(serde::de::Error::custom("invalid protected field"));
+    }
+    Ok(value)
+}
+/// `Basic ` followed by the standard padded base64 of `account:token`. Every
+/// buffer holding credential bytes is sized up front and zeroized on drop.
+fn basic_header(entry: &BasicEntry) -> Result<Secret> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    const PREFIX: &[u8] = b"Basic ";
+    let length = entry.account.len() + 1 + entry.token.len();
+    let mut joined = Zeroizing::new(Vec::with_capacity(length));
+    joined.extend_from_slice(entry.account.as_bytes());
+    joined.push(b':');
+    joined.extend_from_slice(entry.token.as_bytes());
+    let encoded = base64::encoded_len(length, true).ok_or(Failure::InvalidInput)?;
+    let mut header = Secret(vec![0; PREFIX.len() + encoded]);
+    header.0[..PREFIX.len()].copy_from_slice(PREFIX);
+    let written = STANDARD
+        .encode_slice(joined.as_slice(), &mut header.0[PREFIX.len()..])
+        .map_err(|_| Failure::InvalidInput)?;
+    if written != encoded {
+        return Err(Failure::InvalidInput);
+    }
+    Ok(header)
+}
 
 struct Fixed(Secret);
 #[async_trait::async_trait]
@@ -152,6 +219,20 @@ impl Local {
                 .as_ref()
                 .is_some_and(|s| segments(&s.path).is_empty())
             || (config.auth.scopes.is_none() && !config.auth.minimum_scopes.is_empty())
+            || match config.auth.scheme {
+                Scheme::Token => config.auth.account_label.is_some(),
+                // Basic has one fixed placement; the file states it rather than
+                // leaving a reader to infer that `header` is ignored.
+                Scheme::Basic => {
+                    !config.auth.header.eq_ignore_ascii_case("authorization")
+                        || config.auth.bearer
+                        || config
+                            .auth
+                            .account_label
+                            .as_ref()
+                            .is_none_or(|label| label.is_empty() || label.len() > 128)
+                }
+            }
             || !config.bundle_directory.is_absolute()
             || config
                 .operations_file
@@ -222,20 +303,36 @@ impl Local {
             )
             .map_err(Failure::from_service)?,
         );
+        let token_field = EntryField {
+            name: "token".into(),
+            label: config.auth.label.clone(),
+            max_bytes: 8192,
+        };
+        let (scheme, capability, fields) = match (config.auth.scheme, &config.auth.account_label) {
+            (Scheme::Basic, Some(label)) => (
+                "http_basic",
+                "http-basic",
+                vec![
+                    EntryField {
+                        name: "account".into(),
+                        label: label.clone(),
+                        max_bytes: ACCOUNT_LIMIT as u32,
+                    },
+                    token_field,
+                ],
+            ),
+            _ => ("http_bearer", "http-bearer", vec![token_field]),
+        };
         let mut profile = Profile {
             id: config.auth.profile.clone(),
             revision: String::new(),
             purpose: registry::Purpose::DelegatedUser,
             subject: registry::Subject::User,
-            scheme: "http_bearer".into(),
-            capability: "http-bearer".into(),
+            scheme: scheme.into(),
+            capability: capability.into(),
             minimum_scopes: config.auth.minimum_scopes.clone(),
             evidence_lifetime_ms: config.auth.evidence_lifetime_ms,
-            fields: vec![EntryField {
-                name: "token".into(),
-                label: config.auth.label.clone(),
-                max_bytes: 8192,
-            }],
+            fields,
         };
         profile.revision = connectors_core::digest(
             &serde_json::to_value(&profile).map_err(|_| Failure::Protocol)?,
@@ -298,10 +395,19 @@ impl Local {
         if document.len() > DOCUMENT_LIMIT {
             return Err(Failure::InvalidInput);
         }
-        let entry: ProtectedEntry =
-            serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
-        let token = Secret(entry.token.as_bytes().to_vec());
-        Ok(self.http.with_credential(Arc::new(Fixed(token))))
+        let credential = match self.auth.scheme {
+            Scheme::Token => {
+                let entry: ProtectedEntry =
+                    serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
+                Secret(entry.token.as_bytes().to_vec())
+            }
+            Scheme::Basic => {
+                let entry: BasicEntry =
+                    serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
+                basic_header(&entry)?
+            }
+        };
+        Ok(self.http.with_credential(Arc::new(Fixed(credential))))
     }
 }
 
