@@ -37,6 +37,9 @@ entities:
     relations:
       - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
       - {name: issuer, kind: references, target: connectors.approval_issuers.ApprovalIssuer, cardinality: one, via: issuer_id}
+    # local-mutations.md:22-23 and the host approval policy schema check 1..=9007199254740991.
+    invariants:
+      - revision: {gte: 1, lte: 9007199254740991}
     lifecycle:
       initial: Configured
       states: [Configured]
@@ -58,6 +61,14 @@ commands:
       - {name: selection, type: connectors.local_approval_policy.Selection}
       - {name: operations, type: List<String>}
     outcomes:
+      # local-mutations.md:22 "a random non-nil UUID" (approval_policy.rs validate).
+      - name: nil-identity
+        when: {policy_id: {in: ["00000000-0000-0000-0000-000000000000"]}}
+        error: connectors.local_approval_policy.NilPolicyIdentity
+      # local-mutations.md:26-27 "at most 256 write operation IDs" (MAX_OPERATIONS).
+      - name: too-many-operations
+        when: operations.count > 256
+        error: connectors.local_approval_policy.TooManyOperations
       - name: configured
         creates: connectors.local_approval_policy.LocalApprovalPolicy
         instance: policy_id
@@ -75,10 +86,34 @@ commands:
   - name: connectors.local_approval_policy.ReviseLocalApprovalPolicy
     input:
       - {name: policy_id, type: Uuid}
+      - {name: expected_revision, type: Integer}
       - {name: revision, type: Integer}
       - {name: selection, type: connectors.local_approval_policy.Selection}
       - {name: operations, type: List<String>}
     outcomes:
+      # local-mutations.md:32-33,43: a revision CAS. The caller's expected
+      # revision must equal the stored one (approval_policy.rs publish, Conflict).
+      - name: revision-conflict
+        when_subject:
+          predicate: revision != input.expected_revision
+        error: connectors.local_approval_policy.RevisionConflict
+      # local-mutations.md:23-24: exhaustion refuses without changing the policy
+      # (approval_policy.rs publish, Capacity).
+      - name: exhausted
+        when_subject:
+          predicate: revision >= 9007199254740991
+        error: connectors.local_approval_policy.RevisionExhausted
+      - name: too-many-operations
+        when: operations.count > 256
+        error: connectors.local_approval_policy.TooManyOperations
+      # The host writes the stored revision plus one (approval_policy.rs publish,
+      # trigger local_approval_policy_revision). This guard refuses a revision
+      # that does not advance; the exact +1 step stays host-held because
+      # `{increment: 1}` does not lower to Entity Runtime.
+      - name: stale-revision
+        when_subject:
+          predicate: revision >= input.revision
+        error: connectors.local_approval_policy.RevisionNotAdvanced
       - name: revised
         moves: connectors.local_approval_policy.LocalApprovalPolicy.revise
         instance: policy_id
@@ -99,12 +134,44 @@ events:
     fields:
       - {name: policy_id, type: Uuid}
       - {name: revision, type: Integer}
-# ESS-LIMIT executable predicates: one policy per instance, issuer-instance equality,
-# monotonic non-reused bounded revision/CAS and durable acknowledgement, current
-# peer UID, shared/exclusive process leases, strict canonical snapshots, sorted
-# distinct supported write operations, current descriptor/clock/connection checks,
-# and protected proof publication. These need the host runtime, not fake ESS moves.
-# ESS 0.36 has no cross-record uniqueness (one policy per instance) or equality
-# constraint, no `input.<field>` operand in `when_subject` for a monotonic revision
-# (value-expressions E6, not implemented), no sorted/distinct list predicate and no
-# process, OS-identity or trusted-time construct.
+# ESS-LIMIT: one policy per instance, issuer-instance equality, the exact +1
+# revision step, a first set that requires absence, durable acknowledgement,
+# current peer UID, shared/exclusive process leases, strict canonical snapshots,
+# sorted distinct supported write operations, current descriptor/clock/connection
+# checks and protected proof publication need the host runtime. ESS 0.40 has no
+# uniqueness of a non-identity field (one policy per instance), no guard over
+# list members against other records (supported operations) and no sorted or
+# distinct list predicate. `{increment: 1}` states the +1 step,
+# `{related: {via: input.issuer_id, field: instance_id}}` the issuer-instance
+# equality and `existing_instance:` the absence, but Entity Runtime refuses all
+# three when lowering. ESS has no process, OS-identity or trusted-time construct.
+# The revision CAS, bounds, exhaustion and the 256-operation count are declared above.
+
+errors:
+  - name: connectors.local_approval_policy.RevisionConflict
+    fields: [{name: policy_id, type: Uuid}]
+  - name: connectors.local_approval_policy.RevisionExhausted
+    fields: [{name: policy_id, type: Uuid}]
+  - name: connectors.local_approval_policy.RevisionNotAdvanced
+    fields: [{name: policy_id, type: Uuid}]
+  - name: connectors.local_approval_policy.NilPolicyIdentity
+    fields: [{name: policy_id, type: Uuid}]
+  - name: connectors.local_approval_policy.TooManyOperations
+    fields: [{name: policy_id, type: Uuid}]
+
+views:
+  - name: connectors.local_approval_policy.LocalApprovalPolicies
+    source: connectors.local_approval_policy.LocalApprovalPolicy
+    consistency: read_your_writes
+    fields:
+      - {name: policy_id, type: Uuid}
+      - {name: revision, type: Integer}
+      - {name: issuer_id, type: Uuid}
+      - {name: owner_uid, type: Integer}
+      - {name: state, type: connectors.local_approval_policy.LocalApprovalPolicy.State}
+
+actors:
+  - name: connectors.local_approval_policy.LocalHost
+    may:
+      - connectors.local_approval_policy.ConfigureLocalApprovalPolicy
+      - connectors.local_approval_policy.ReviseLocalApprovalPolicy

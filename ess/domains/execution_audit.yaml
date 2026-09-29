@@ -80,6 +80,22 @@ entities:
         target: connectors.auth_bindings.Connection
         cardinality: one
         via: connection_ref
+    # contracts/service/audit.md:41-43, as the host enforces them
+    # (crates/connectors-host/src/local/audit/types.rs Anchor::validate): an
+    # admitted anchor is at admission with a verified principal and an activity,
+    # an admitted invocation also has its operation, and a describe has neither
+    # an operation nor an attempt.
+    invariants:
+      - any:
+          - not: {anchor_kind: admitted_execution}
+          - all: [{stage: admission}, defined(principal_ref), defined(activity)]
+      - any:
+          - not: {anchor_kind: admitted_execution}
+          - not: {activity: invoke}
+          - defined(operation_id)
+      - any:
+          - not: {activity: describe}
+          - all: [missing(operation_id), missing(attempt_id)]
     lifecycle:
       initial: Anchored
       states: [Anchored, FinalObserved]
@@ -128,16 +144,36 @@ commands:
             audit_record_ref: {generated: true}
             instance_id: input.instance_id
             audit_ref: input.audit_ref
+        # audit.md:38: the anchor's immutable facts known at the acknowledging
+        # hop; an anchor carries no final observation yet.
+        sets:
+          instance_id: input.instance_id
+          audit_ref: input.audit_ref
+          anchor_kind: input.anchor_kind
+          activity: input.activity
+          hop_role: input.hop_role
+          stage: input.stage
+          request_id: input.request_id
+          principal_ref: input.principal_ref
+          operation_id: input.operation_id
+          connection_ref: input.connection_ref
+          descriptor_revision: input.descriptor_revision
+          recorded_at: input.recorded_at
+          attempt_id: input.attempt_id
+          final_observation: {cleared: true}
       - name: capacity
         error: connectors.execution_audit.AuditCapacity
 
   - name: connectors.execution_audit.AppendFinalObservation
-    # The owner allocates observation_id before append. Same-id/same-content
-    # retry acknowledgement and conflicting-id refusal are binding obligations;
-    # neither this transition nor recovery grants redispatch.
+    # contracts/service/audit.md:84-94. The owner allocates observation_id before
+    # the first append; `observation_id` is that id, flattened because a payload
+    # cannot read `input.final_observation.observation_id`. The host fills it from
+    # the same observation (metadata/er.rs `command_arguments`); the equality is in
+    # the ESS-LIMIT below. Neither this transition nor recovery grants redispatch.
     input:
       - {name: decision, type: connectors.execution_audit.AppendDecision}
       - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
+      - {name: observation_id, type: connectors.execution_audit.ObservationId}
       - {name: final_observation, type: connectors.execution_audit.FinalObservation}
     outcomes:
       - name: recorded
@@ -148,9 +184,15 @@ commands:
         payload:
           connectors.execution_audit.FinalObservationRecorded:
             audit_record_ref: input.audit_record_ref
-            observation_id: {generated: true}
+            observation_id: input.observation_id
+        sets:
+          final_observation: input.final_observation
       - name: unavailable
         error: connectors.execution_audit.AppendUnavailable
+      # audit.md:93-94: a different observation after one final exists (the same
+      # id with different fields, or a different id) refuses as a conflict and
+      # leaves the original unchanged. The byte-identical repeat that audit.md:91-92
+      # answers with the original acknowledgement is not modelled: see ESS-LIMIT.
       - name: wrong-state
         wrong_state: true
         error: connectors.execution_audit.AuditStateConflict
@@ -176,21 +218,52 @@ views:
       - {name: instance_id, type: String}
       - {name: audit_ref, type: connectors.execution_audit.AuditRef}
       - {name: state, type: connectors.execution_audit.AuditRecord.State}
+      - {name: anchor_kind, type: connectors.execution_audit.AnchorKind}
+      - {name: activity, type: "Optional<connectors.execution_audit.Activity>"}
+      - {name: hop_role, type: connectors.execution_audit.HopRole}
+      - {name: stage, type: connectors.execution_audit.AnchorStage}
+      - {name: request_id, type: "Optional<String>"}
+      - {name: principal_ref, type: "Optional<String>"}
+      - {name: operation_id, type: "Optional<String>"}
+      - {name: connection_ref, type: "Optional<String>"}
+      - {name: descriptor_revision, type: "Optional<String>"}
+      - {name: recorded_at, type: Timestamp}
       - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
       - {name: final_observation, type: "Optional<connectors.execution_audit.FinalObservation>"}
 
-# ESS checks the declaration graph, known instance/attempt/connection references and
-# lifecycle causation.
-# DEFERRED: the anchor co-presence rules (contracts/service/audit.md:41-44,53,148-150)
-# are writable as AuditRecord invariants, but those lower into Entity Runtime rules
-# and need a view publishing the fields; owned by a story to be filed
-# (story:audit-anchor-co-presence, not yet in the store on 2026-09-27).
-# ESS-LIMIT: trusted fact derivation, the UTF-8/ASCII byte bounds and 4 KiB aggregate
-# (audit.md:104-114), the 100,000-record capacity, durable acknowledgements, atomic
-# append, injective `(instance_id,audit_ref)` qualification/resolution, same-id/content
-# recovery, clocks, retention and dispatch order are persistence/conformance
-# obligations. ESS 0.36 has no byte-length predicate, no cross-record count or
-# uniqueness constraint, no durable-storage and no trusted-time construct. An early_refusal cannot
-# satisfy the execution gate; an admitted anchor alone still cannot dispatch.
-# No delete transition is selected. Audit outlives replay/index payload cleanup,
-# approval/nonce compaction and any other owner that merely references it.
+# ESS checks the declaration graph, known instance/attempt/connection references,
+# lifecycle causation, the anchor co-presence invariants and the final-observation
+# retry/conflict answers.
+# ESS-LIMIT (checked against ESS 0.40): these are persistence/conformance obligations.
+# - Byte bounds (audit.md:104-114): ESS has no UTF-8 byte-length predicate, and
+#   `.count` on text counts characters. The 64-ASCII-byte `code` and the base64url
+#   512-byte `audit_record_ref` are writable with `alphabet:` and `.count`, but the
+#   Entity Runtime lowering refuses both (AlphabetUnsupported, TextLengthUnsupported).
+#   The 4 KiB encoded aggregate has no construct at all.
+# - The 100,000 records per instance (audit.md:114): no cross-record count.
+# - Injective `(instance_id, audit_ref)` qualification (audit.md:17-19): no compound
+#   uniqueness constraint.
+# - Attempt and connection references agreeing with the anchor's instance and with
+#   the attempt's connection (audit.md:52-53): no cross-record equality guard.
+# - The byte-identical repeat returning the original acknowledgement (audit.md:91-92;
+#   crates/connectors-host/src/local/audit.rs `append`): a `when_subject` over
+#   `final_observation.*` members selecting a `preserves:` branch validates, but
+#   synthesis cannot evaluate a guard over a stored Optional struct member and then
+#   refuses every outcome of the command, `recorded` included; the Entity Runtime
+#   lowering additionally needs a command `response:` for that preserve.
+#   `when_subject_state` cannot be combined with a subject-fact guard either.
+# - `observation_id` equal to `final_observation.observation_id`: a `when:` guard
+#   validates, but synthesis cannot build an input that satisfies it and then
+#   refuses `recorded`. A payload cannot read the dotted input path directly.
+# - Trusted fact derivation, durable acknowledgement, clocks, retention and dispatch
+#   order: no provenance, durable-storage or trusted-time construct.
+# An early_refusal cannot satisfy the execution gate; an admitted anchor alone
+# still cannot dispatch. No delete transition is selected. Audit outlives
+# replay/index payload cleanup, approval/nonce compaction and any other owner that
+# merely references it.
+
+actors:
+  - name: connectors.execution_audit.LocalHost
+    may:
+      - connectors.execution_audit.AcknowledgeAnchor
+      - connectors.execution_audit.AppendFinalObservation

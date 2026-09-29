@@ -14,7 +14,7 @@ use ess_synth::SynthesisPlan;
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, num::NonZeroU32, path::Path};
 
-const COMPONENT: &str = "local-metadata-authority";
+pub const COMPONENT: &str = "local-metadata-authority";
 const DEFINITIONS: &[&str] = &[
     "connectors.approval_issuers.ApprovalIssuer",
     "connectors.approval_issuers.ApprovalSigningKey",
@@ -40,30 +40,51 @@ const DEFINITIONS: &[&str] = &[
     "connectors.mutations.AttemptRecord",
 ];
 
-pub fn run(root: &Path, check: bool) -> Result<()> {
+/// The shared specification's documents, as the lowering and the mutation audit read them.
+pub struct Loaded {
+    pub documents: Vec<(Source, RawSpecFile)>,
+    pub sources: SourceMap,
+    pub labels: Vec<String>,
+}
+
+pub fn load(root: &Path) -> Result<Loaded> {
     let source = root.join("ess");
     let mut paths = Vec::new();
     collect_yaml(&source, &mut paths)?;
     paths.sort();
-    let mut parsed = Vec::new();
+    let mut documents = Vec::new();
     let mut labels = Vec::new();
     let mut sources = SourceMap::new();
     for path in paths {
         let label = path.strip_prefix(&source)?.display().to_string();
         let text = std::fs::read_to_string(&path)?;
         sources.insert(label.clone(), text.clone());
-        parsed.push((
+        documents.push((
             Source::new(label.clone()),
             RawSpecFile::parse(&text).map_err(|error| format!("{label}: {error}"))?,
         ));
         labels.push(label);
     }
-    let specification = Specification::assemble(parsed)?;
-    let ir = compile_locating(&specification, &sources, &labels)
-        .map_err(|diagnostics| format!("ESS compile diagnostics: {diagnostics:?}"))?;
-    let plan = SynthesisPlan::of(&ir);
+    Ok(Loaded {
+        documents,
+        sources,
+        labels,
+    })
+}
+
+pub fn compile(loaded: &Loaded) -> Result<ess_compiler::ir::EssIr> {
+    let specification = Specification::assemble(loaded.documents.clone())?;
+    Ok(
+        compile_locating(&specification, &loaded.sources, &loaded.labels)
+            .map_err(|diagnostics| format!("ESS compile diagnostics: {diagnostics:?}"))?,
+    )
+}
+
+/// The local metadata authority lowered to Entity Runtime, exactly as the host's definitions are.
+pub fn lower_component(ir: &ess_compiler::ir::EssIr) -> Result<ess_entity_runtime::LoweredService> {
+    let plan = SynthesisPlan::of(ir);
     let component = ComponentName::new(COMPONENT)?;
-    let service = extract(&ir, &plan, &component)
+    let service = extract(ir, &plan, &component)
         .map_err(|diagnostics| format!("service extraction diagnostics: {diagnostics:?}"))?;
     let options = LoweringOptions {
         definition_versions: DEFINITIONS
@@ -77,8 +98,13 @@ pub fn run(root: &Path, check: bool) -> Result<()> {
             .collect::<std::result::Result<BTreeMap<_, _>, Box<dyn std::error::Error>>>()?,
         scales: BTreeMap::new(),
     };
-    let lowered = lower(&service, &options)
-        .map_err(|diagnostics| format!("Entity Runtime lowering diagnostics: {diagnostics:?}"))?;
+    Ok(lower(&service, &options)
+        .map_err(|diagnostics| format!("Entity Runtime lowering diagnostics: {diagnostics:?}"))?)
+}
+
+pub fn run(root: &Path, check: bool) -> Result<()> {
+    let ir = compile(&load(root)?)?;
+    let lowered = lower_component(&ir)?;
     let definitions = lowered
         .definitions()
         .iter()

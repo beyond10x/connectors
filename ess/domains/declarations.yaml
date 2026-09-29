@@ -61,8 +61,9 @@ types:
     # revision and refusal precedence, projection intersection, actual readiness,
     # candidate-only approval/preflight and dispatch-time authority fencing. The
     # §3.2.1 precedence (contracts/service/v1alpha2/semantics.md:78-92) reduces
-    # OperationAvailability facts to this decision; ESS 0.36 has no derived-value
-    # expression relating two values, no provenance and no dispatch-fence construct.
+    # OperationAvailability facts to this decision. ESS 0.40 has no derived value
+    # (a value computed from other values by a declared function), no provenance
+    # and no dispatch-fence construct.
     # No new entity, grant relation, lifecycle or declaration field is implied.
 
   # Proposed v3 write mapping; the existing v1/v2 readers remain unchanged.
@@ -95,7 +96,7 @@ types:
     # ESS-LIMIT executable obligations: closed put-only reader, scalar schema
     # agreement, exact pinned upstream binding, immutable prepared request,
     # separate one-use write transport and legacy read-only projection. These are
-    # reader/codec and transport rules; ESS 0.36 has no reader-closure, upstream-pin
+    # reader/codec and transport rules; ESS 0.40 has no reader-closure, upstream-pin
     # or transport construct.
 
 # Immutable declarations, not the lifecycle of a running process or connection.
@@ -210,6 +211,13 @@ commands:
       - {name: instance_id, type: String}
       - {name: registry_epoch, type: Integer}
     outcomes:
+      # The host only ever writes `epoch=epoch+1` (registry/lifecycle.rs `bump`),
+      # so a lower epoch is refused. An equal one is accepted: a row whose other
+      # columns change keeps its epoch and is recorded through this command.
+      - name: regressed
+        when_subject:
+          predicate: registry_epoch > input.registry_epoch
+        error: connectors.declarations.RegistryEpochRegressed
       - name: advanced
         moves: connectors.declarations.ServiceConfiguration.advance_registry_epoch
         instance: instance_id
@@ -229,7 +237,28 @@ events:
       - {name: instance_id, type: String}
       - {name: registry_epoch, type: Integer}
 
+errors:
+  - name: connectors.declarations.RegistryEpochRegressed
+    fields: [{name: instance_id, type: String}]
+
   # DEFERRED: multi-tenant SaaS ownership/assignment cardinality remains outside
   # this local, explicitly configured service slice. No tenant is caller-selected.
   # Owned by a story to be filed (story:multi-tenant-principal-assignment, not yet in
   # the store on 2026-09-27).
+
+views:
+  - name: connectors.declarations.ServiceConfigurations
+    source: connectors.declarations.ServiceConfiguration
+    consistency: read_your_writes
+    fields:
+      - {name: instance_id, type: String}
+      - {name: adapter_id, type: String}
+      - {name: revision, type: String}
+      - {name: registry_epoch, type: Integer}
+      - {name: state, type: connectors.declarations.ServiceConfiguration.State}
+
+actors:
+  - name: connectors.declarations.LocalHost
+    may:
+      - connectors.declarations.AdvanceRegistryEpoch
+      - connectors.declarations.RecordServiceConfiguration

@@ -1226,6 +1226,35 @@ fn cursors_are_scoped_bounded_and_invalidated_by_metadata_change() {
     ));
 }
 
+// contracts/cli/v1alpha1/semantics.md:297-298 and docs/local-connection-registry.md:106-107:
+// a continuation expires 300 s after the first page, and a later page's cursor
+// keeps that original deadline rather than starting a new one.
+#[test]
+fn cursors_expire_at_the_original_five_minute_deadline() {
+    let (_root, registry) = fixture();
+    for subject in ["a", "b", "c"] {
+        let (_, prepared) = prepared(&registry, subject, NOW);
+        publish_fixture(&registry, prepared, NOW);
+    }
+    let page = |cursor: Option<&str>, now: u64| {
+        registry.list(
+            "fixture-instance",
+            "fixture-adapter",
+            "config-1",
+            PageOptions { limit: 1, cursor },
+            now,
+            true,
+        )
+    };
+    let first = page(None, NOW).unwrap();
+    let second = page(first.next_cursor.as_deref(), NOW + ENTRY_MS - 1).unwrap();
+    let cursor = second.next_cursor.as_deref().unwrap();
+    assert!(matches!(
+        page(Some(cursor), NOW + ENTRY_MS),
+        Err(Failure::StaleCursor)
+    ));
+}
+
 #[test]
 fn abandoned_candidates_require_acknowledged_retirement_and_full_retention() {
     let (_root, registry) = fixture();
@@ -1284,4 +1313,131 @@ fn expiry_sweep_retires_a_pending_acquisition_that_was_never_consumed() {
         Err(Failure::Conflict)
     ));
     assert_eq!(reopened.expire(NOW + ENTRY_MS + 1).unwrap(), 0);
+}
+
+// auth/evidence semantics.md:204: at most 64 retained scopes
+// (`ess/domains/credential_evidence.yaml` ESS-LIMIT; `scopes_valid`).
+#[test]
+fn retained_scopes_are_at_most_sixty_four() {
+    let (_root, registry) = fixture();
+    let acquisition = registry.begin(&binding(), NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let scopes = |count: usize| {
+        let mut scopes = (1..count)
+            .map(|index| format!("scope-{index}"))
+            .collect::<BTreeSet<_>>();
+        scopes.insert("read".into());
+        scopes
+    };
+    let mut too_many = baseline("one", NOW);
+    too_many.granted_scopes = Some(scopes(65));
+    assert_eq!(
+        registry.prepare(&claim, too_many, 12, NOW).map(|_| ()),
+        Err(Failure::InvalidInput)
+    );
+    let mut bounded = baseline("one", NOW);
+    bounded.granted_scopes = Some(scopes(64));
+    registry.prepare(&claim, bounded, 12, NOW).unwrap();
+}
+
+// auth/evidence semantics.md:204: every retained scope is nonempty
+// (`ess/domains/credential_evidence.yaml` ESS-LIMIT; `scopes_valid`).
+#[test]
+fn retained_scopes_are_nonempty() {
+    let (_root, registry) = fixture();
+    let acquisition = registry.begin(&binding(), NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let mut empty = baseline("one", NOW);
+    empty.granted_scopes = Some(BTreeSet::from(["read".into(), String::new()]));
+    assert_eq!(
+        registry.prepare(&claim, empty, 12, NOW).map(|_| ()),
+        Err(Failure::InvalidInput)
+    );
+}
+
+// Acquisition semantics §4.3: at `now >= expires_at` known expiry prevents
+// further exchange and publication; one millisecond earlier both remain open.
+// The deadline is host time (`ess/domains/auth_bindings.yaml` ESS-LIMIT).
+#[test]
+fn acquisition_deadline_closes_consumption_and_publication_at_expiry() {
+    // The registry clock never runs backwards, so the late attempt is checked last.
+    let (_root, registry) = fixture();
+    let late = registry.begin(&binding(), NOW).unwrap();
+    let acquisition = registry.begin(&binding(), NOW).unwrap();
+    let before = NOW + ENTRY_MS - 1;
+    let claim = registry.consume(acquisition, before).unwrap();
+    let prepared = registry
+        .prepare(&claim, baseline("one", before), 12, before)
+        .unwrap();
+    let receipt = custody::WrittenVersion::fixture(prepared.version());
+    let stored = registry.acknowledge(prepared, receipt, before).unwrap();
+    assert!(matches!(
+        registry.consume(late, NOW + ENTRY_MS),
+        Err(Failure::Expired)
+    ));
+    assert!(matches!(
+        registry.publish(stored, NOW + ENTRY_MS),
+        Err(Failure::Expired)
+    ));
+}
+
+// Connection semantics §4.2: the baseline is cleared on terminal local
+// revocation. The ER lowering cannot clear an Optional field
+// (`ess/domains/auth_bindings.yaml` ESS-LIMIT), so the owner does it.
+#[test]
+fn revocation_clears_the_baseline_with_the_active_material() {
+    let (root, registry) = fixture();
+    let (_claim, candidate) = prepared(&registry, "one", NOW);
+    let connection = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &connection, NOW).revision;
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &connection,
+            &revision,
+            NOW + 1,
+        )
+        .unwrap();
+    let metadata = Metadata::inspect(root.path()).unwrap();
+    let (baseline, generation, material): (Option<String>, Option<String>, Option<String>) =
+        metadata
+            .connection
+            .query_row(
+                "SELECT baseline,active_generation,active_material FROM registry_connections WHERE connection_ref=?1",
+                [&connection],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+    assert_eq!((baseline, generation, material), (None, None, None));
+}
+
+// Local connection registry: acknowledged deletion clears byte-size metadata
+// and keeps identity/fence history. The ER lowering cannot clear an Optional
+// field (`ess/domains/auth_bindings.yaml` ESS-LIMIT); the schema refuses a
+// deletion that keeps the size.
+#[test]
+fn acknowledged_deletion_cannot_keep_the_byte_size() {
+    let (root, registry) = fixture();
+    let (claim, _candidate) = prepared(&registry, "one", NOW);
+    registry.fail(&claim, NOW + 1).unwrap();
+    let mut metadata = Metadata::update(root.path(), false).unwrap();
+    assert!(
+        metadata
+            .connection
+            .execute("UPDATE registry_materials SET deleted=1", [])
+            .is_err(),
+        "a deleted version kept its byte size"
+    );
+    assert_eq!(
+        metadata
+            .connection
+            .execute(
+                "UPDATE registry_materials SET deleted=1,byte_size=NULL WHERE retirement_fence IS NOT NULL",
+                [],
+            )
+            .unwrap(),
+        1
+    );
+    metadata.persist().unwrap();
 }

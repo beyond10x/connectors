@@ -50,6 +50,19 @@ pub(super) enum Task {
         profile: String,
     },
 }
+/// The explicit resume actions of contracts/cli/v1alpha1/semantics.md:282-285:
+/// connect/repair (an explicit `Ensure`), revalidate and invoke clear a stop's
+/// durable suppression. The automatic sweep, credential validation and a write
+/// observation never do.
+fn resumes_suppression(task: &Task) -> bool {
+    matches!(
+        task,
+        Task::Ensure { resume: true }
+            | Task::Invoke { .. }
+            | Task::Write { .. }
+            | Task::Revalidate { .. }
+    )
+}
 pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
     Baseline(runtime::Baseline),
@@ -487,13 +500,7 @@ fn worker(
                     return Err(Code::Unavailable.into());
                 }
             }
-            let resume = matches!(
-                job.task,
-                Task::Ensure { resume: true }
-                    | Task::Invoke { .. }
-                    | Task::Write { .. }
-                    | Task::Revalidate { .. }
-            );
+            let resume = resumes_suppression(&job.task);
             match &job.task {
                 Task::Validate { profile, .. } | Task::Revalidate { profile, .. }
                     if !current.permissions.profiles.contains(profile) =>
@@ -865,5 +872,67 @@ mod maintenance_tests {
         assert!(!root.path().join("unopened-state").exists());
         drop(release);
         pool.shutdown().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod suppression_tests {
+    use super::*;
+
+    // contracts/cli/v1alpha1/semantics.md:281-288: only an explicit connect,
+    // repair, revalidate or invoke resumes a stopped entry; the automatic sweep
+    // and every other task leave the durable suppression in place.
+    #[test]
+    fn only_explicit_resume_actions_clear_stop_suppression() {
+        let until = Instant::now();
+        let text = String::new;
+        let resuming = [
+            Task::Ensure { resume: true },
+            Task::Invoke {
+                connection: text(),
+                operation: text(),
+                schema: text(),
+                revision: text(),
+                document: Vec::new(),
+            },
+            Task::Write {
+                connection: text(),
+                operation: text(),
+                schema: text(),
+                revision: text(),
+                document: text(),
+                key: None,
+                proof: None,
+                until,
+            },
+            Task::Revalidate {
+                connection: text(),
+                revision: text(),
+                profile: text(),
+            },
+        ];
+        for task in &resuming {
+            assert!(resumes_suppression(task));
+        }
+        let passive = [
+            Task::Ensure { resume: false },
+            Task::Validate {
+                profile: text(),
+                secret: Secret(Vec::new()),
+                capture_epoch: 0,
+            },
+            Task::ObserveWrite {
+                connection: text(),
+                operation: text(),
+                schema: text(),
+                revision: text(),
+                document: text(),
+                key: text(),
+                until,
+            },
+        ];
+        for task in &passive {
+            assert!(!resumes_suppression(task));
+        }
     }
 }

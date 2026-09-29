@@ -16,6 +16,15 @@ types:
   - name: connectors.artifact_provenance.Realization
     kind: enum
     variants: [generic, implemented, unresolved]
+  # Hex SHA-256 as the generator writes and the v2 reader admits it
+  # (crates/connectors-spec/src/v2.rs:157-158, 704). Only Bundle uses it: Source is
+  # lowered to Entity Runtime, whose 0.40 lowering refuses `alphabet:`. The
+  # 64-character length is not declared: a `.count` invariant has no synthesized
+  # scenario (ESS-SYNTH-013, a view row cannot assert `.count`).
+  - name: connectors.artifact_provenance.Sha256Hex
+    kind: newtype
+    of: String
+    alphabet: "0123456789abcdefABCDEF"
   - name: connectors.artifact_provenance.ArtifactFile
     kind: struct
     fields:
@@ -70,8 +79,8 @@ entities:
     fields:
       - {name: adapter_id, type: String}
       - {name: format, type: String}
-      - {name: specification_sha256, type: String}
-      - {name: upstream_sha256, type: "Optional<String>"}
+      - {name: specification_sha256, type: connectors.artifact_provenance.Sha256Hex}
+      - {name: upstream_sha256, type: "Optional<connectors.artifact_provenance.Sha256Hex>"}
       - {name: ess, type: String}
       - {name: rustfmt, type: String}
       - {name: files, type: "List<connectors.artifact_provenance.ArtifactFile>"}
@@ -98,8 +107,12 @@ entities:
 # exact retained-byte verification, original/transformed source distinction,
 # license truth, path safety, unique file/source sets, curation completeness and
 # profile/realization compatibility, deterministic toolchain output and retention.
-# These are declared binding predicates, not executed by schema compilation: ESS
-# 0.36 has no cross-record uniqueness, no digest-over-bytes, no file-system and no
-# distinct-members construct.
+# These are declared binding predicates, not executed by schema compilation. ESS
+# 0.40 has no uniqueness over a compound key such as (url, revision), no
+# digest-over-bytes, no file-system and no distinct-members list construct. A
+# refusal to re-record an existing Source is writable (`existing_instance:`,
+# ess/16), but the Entity Runtime lowering in 0.40 refuses it
+# (ExistenceSelectionUnsupported), and no host path records a Source today
+# (the provider-bundle contract semantics, lines 245-248).
 # No distribution publication/installation lifecycle, deletion cascade, tenant,
 # generator change or new public/adapter/manifest reader support is selected.

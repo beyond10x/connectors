@@ -9,6 +9,8 @@ page.on('pageerror',error=>errors.push(String(error)));
 async function visit(route){
   await page.goto(base+route,{waitUntil:'networkidle'});
   assert.equal(await page.locator('#webpack-dev-server-client-overlay').count(),0);
+  // networkidle can precede client rendering on a loaded dev server; wait for the page, then count.
+  await page.locator('h1').first().waitFor();
   assert.equal(await page.locator('h1').count(),1,route+' must have one primary heading');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),route+' overflows');
 }
