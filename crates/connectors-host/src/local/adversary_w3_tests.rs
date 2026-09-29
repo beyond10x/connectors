@@ -49,7 +49,7 @@ fn refusal_error(evaluation: Evaluation) -> String {
 
 fn publish(decision: &str) -> Value {
     json!({
-        "bound": {},
+        "bound": {"b00000000": "fence-2"},
         "input": {
             "connection_ref": "fixture",
             "decision": decision,
@@ -72,13 +72,13 @@ const EXPIRE: &str = "connectors.cli.ExpireConnectionListCursor";
 fn publish_binding_allowed_on_a_revoked_connection_refuses_with_connection_state_conflict() {
     let registry = registry();
     let definition = registry.get(CONNECTION, 1).unwrap();
-    let evaluation = decide(
-        definition,
-        &instance(CONNECTION, "Revoked"),
-        PUBLISH,
-        publish("allow"),
-    )
-    .expect("the kernel answers");
+    // A recorded Connection always holds its fence; PublishBinding compares it first.
+    let mut revoked = instance(CONNECTION, "Revoked");
+    revoked
+        .fields
+        .insert("publication_fence".into(), json!("fence-1"));
+    let evaluation =
+        decide(definition, &revoked, PUBLISH, publish("allow")).expect("the kernel answers");
     assert_eq!(
         refusal_error(evaluation),
         "connectors.auth_bindings.ConnectionStateConflict"

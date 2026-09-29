@@ -22,7 +22,7 @@ advertisement behavior for each name after the textual contract edits.
 | Name(s) | Disposition and rationale | Selection rule | Status |
 |---|---|---|---|
 | `http_signing` | reserved/refused; historical Twilio, Slack and Stripe declarations do not supply a selected current canonicalization/profile binding | cannot be selected or advertised | pass after coordinator capability patch |
-| `oauth2_password` | reserved/refused; the historical Babelforce-only value has no selected acquisition flow or current provider binding | cannot be selected or advertised | pass |
+| `oauth2_password` | reserved/refused; the historical downstream-platform-only value has no selected acquisition flow or current provider binding | cannot be selected or advertised | pass |
 | `hold`, `transfer` | reserved/refused; no selected media/SIP state, admission, target or failure semantics exist | cannot be advertised, negotiated or accepted | pass |
 | `promql-instant`, `promql-labels` | Prometheus-native reserved/refused values; only `promql-range` has a selected source operation and complete profile contract | cannot be selected or advertised | pass |
 | `address` resource locator | removed/refused; `endpoint_discovery` owns address/port observations while resource discovery accepts opaque locators | cannot be emitted or selected as resource-discovery vocabulary | pass |

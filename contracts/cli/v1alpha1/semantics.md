@@ -286,7 +286,10 @@ current authority and requests one fresh launch. An unrelated command never
 resumes it. `restart = "never"` also forbids background crash-restart loops;
 observed unexpected termination is `failed`, and a later explicit admitted request
 may attempt one new launch. Config changes do not silently clear stop suppression.
-These are owner obligations, not a new CLI persistence entity.
+The suppression marker is the `suppressed` field of the configuration owner's
+`local_runtime_instances` row, modeled as `connectors.cli.LocalRuntimeRecord`
+(`ess/domains/cli.yaml`, mapped in `docs/local-er-metadata.md`); the resume and
+restart rules above remain owner obligations.
 
 Bounds for this first binding are explicit, selected limits, not measured runtime
 performance: 64 configured entries; four concurrent launches; one live launch per

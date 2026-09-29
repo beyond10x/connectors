@@ -119,6 +119,15 @@ entities:
       - {name: active_generation, kind: references, target: connectors.credentials.CredentialGeneration, cardinality: one, via: active_generation_id}
       - {name: active_custody_version, kind: references, target: connectors.auth_bindings.CustodyVersion, cardinality: one, via: active_custody_version_ref}
       - {name: superseded_custody_versions, kind: references, target: connectors.auth_bindings.CustodyVersion, cardinality: many, via: superseded_custody_version_refs}
+    # connection semantics.md:140-143: active custody requires an active
+    # generation; a material-free access mode has neither.
+    invariants:
+      - any:
+          - defined(active_generation_id)
+          - not: defined(active_custody_version_ref)
+      - any:
+          - access_mode == credential
+          - none: [defined(active_generation_id), defined(active_custody_version_ref)]
     lifecycle:
       initial: Live
       states: [Live, Revoked]
@@ -175,8 +184,8 @@ entities:
         - {name: fail, from: [Pending, Completing], to: Failed}
         - {name: expire, from: [Pending, Completing], to: Expired}
     # Completing is durable one-use consumption, publicly still pending.
-    # No terminal handle/state is recycled. Creation/result assignment and safe
-    # callback payload erasure are owner obligations, not implicit ESS updates.
+    # No terminal handle/state is recycled. Safe callback payload erasure is an
+    # owner obligation, not an implicit ESS update.
 
   - name: connectors.auth_bindings.CustodyVersion
     identity: {name: version_ref, type: String}
@@ -196,6 +205,11 @@ entities:
       - {name: retired_at, type: "Optional<Timestamp>"}
     relations:
       - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
+    # docs/local-secret-service.md:94: a recorded byte size is 1–65536.
+    invariants:
+      - any:
+          - not: defined(byte_size)
+          - byte_size: {gte: 1, lte: 65536}
     lifecycle:
       initial: Candidate
       states: [Candidate, Stored, Invalid, Retiring, Deleted]
@@ -208,6 +222,9 @@ entities:
     # Exact scoped version key; no live Connection owner is required for orphan
     # material. Stored records the last acknowledged write, not current availability.
     # Deletion retains this identity/fence, dropping the material handle and bytes.
+    # Invalid is shipped host state: registry_materials.invalid_reason, set by
+    # registry/revalidation.rs invalidate and use_and_retirement.rs invalidate_read;
+    # custody semantics §4.1 names only Stored and Deleted.
 
 errors:
   - name: connectors.auth_bindings.Refused
@@ -220,6 +237,10 @@ errors:
     fields: [{name: state, type: connectors.auth_bindings.Acquisition.State}]
   - name: connectors.auth_bindings.CustodyStateConflict
     fields: [{name: state, type: connectors.auth_bindings.CustodyVersion.State}]
+  - name: connectors.auth_bindings.PublicationFenceConflict
+    fields: [{name: connection_ref, type: String}]
+  - name: connectors.auth_bindings.AcquisitionResultMismatch
+    fields: [{name: acquisition_ref, type: String}]
 
 commands:
   - name: connectors.auth_bindings.RecordProfile
@@ -230,7 +251,19 @@ commands:
       - {name: declaration, type: "Optional<connectors.auth_bindings.ProfileDeclaration>"}
       - {name: local_static_profile, type: "Optional<connectors.auth_bindings.LocalStaticProfile>"}
     outcomes:
-      - {name: recorded, creates: connectors.auth_bindings.AuthProfile, instance: profile_record_ref, emits: [connectors.auth_bindings.ProfileRecorded], payload: {connectors.auth_bindings.ProfileRecorded: {profile_record_ref: {generated: true}}}}
+      # auth/profile semantics.md:125-128: the record stores its exact
+      # (adapter_id, profile_id, declaration_revision) tuple.
+      - name: recorded
+        creates: connectors.auth_bindings.AuthProfile
+        instance: profile_record_ref
+        sets:
+          adapter_id: input.adapter_id
+          profile_id: input.profile_id
+          declaration_revision: input.declaration_revision
+          declaration: input.declaration
+          local_static_profile: input.local_static_profile
+        emits: [connectors.auth_bindings.ProfileRecorded]
+        payload: {connectors.auth_bindings.ProfileRecorded: {profile_record_ref: {generated: true}}}
   - name: connectors.auth_bindings.AllocateConnection
     input:
       - {name: decision, type: connectors.auth_bindings.Decision}
@@ -238,8 +271,23 @@ commands:
       - {name: profile_record_ref, type: String}
       - {name: owner_scope, type: String}
       - {name: access_mode, type: connectors.auth_access.AccessMode}
+      - {name: publication_fence, type: String}
     outcomes:
-      - {name: allocated, when: decision == allow, creates: connectors.auth_bindings.Connection, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionAllocated], payload: {connectors.auth_bindings.ConnectionAllocated: {connection_ref: {generated: true}}}}
+      # connection semantics.md:120-126: the allocated binding keeps its admitted
+      # instance, profile record, owner scope, fixed access mode and the private
+      # publication fence the owner allocated with it (registry/lifecycle.rs begin).
+      - name: allocated
+        when: decision == allow
+        creates: connectors.auth_bindings.Connection
+        instance: connection_ref
+        sets:
+          instance_id: input.instance_id
+          profile_record_ref: input.profile_record_ref
+          owner_scope: input.owner_scope
+          access_mode: input.access_mode
+          publication_fence: input.publication_fence
+        emits: [connectors.auth_bindings.ConnectionAllocated]
+        payload: {connectors.auth_bindings.ConnectionAllocated: {connection_ref: {generated: true}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
   - name: connectors.auth_bindings.RevokeConnection
@@ -259,7 +307,20 @@ commands:
       - {name: connection_ref, type: String}
       - {name: publication, type: connectors.auth_bindings.BindingPublication}
     outcomes:
-      - {name: published, when: decision == allow, moves: connectors.auth_bindings.Connection.publish, instance: connection_ref, emits: [connectors.auth_bindings.BindingPublished], payload: {connectors.auth_bindings.BindingPublished: {connection_ref: input.connection_ref}}}
+      # connection semantics.md:140-141 and docs/design.md:1358: publication is
+      # compare-and-set on the private fence and advances it.
+      - name: stale-fence
+        when_subject:
+          predicate: publication_fence != input.publication.expected_publication_fence
+        error: connectors.auth_bindings.PublicationFenceConflict
+      - name: published
+        when: decision == allow
+        moves: connectors.auth_bindings.Connection.publish
+        instance: connection_ref
+        sets:
+          publication_fence: {generated: true}
+        emits: [connectors.auth_bindings.BindingPublished]
+        payload: {connectors.auth_bindings.BindingPublished: {connection_ref: input.connection_ref}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
@@ -278,7 +339,20 @@ commands:
       - {name: repair_connection_ref, type: "Optional<String>"}
       - {name: expires_at, type: Timestamp}
     outcomes:
-      - {name: pending, when: decision == allow, creates: connectors.auth_bindings.Acquisition, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionBegan], payload: {connectors.auth_bindings.AcquisitionBegan: {acquisition_ref: {generated: true}}}}
+      # acquisition semantics.md:144-147: instance, profile record, original
+      # expiry and the fixed target (and optional repair) Connection.
+      - name: pending
+        when: decision == allow
+        creates: connectors.auth_bindings.Acquisition
+        instance: acquisition_ref
+        sets:
+          instance_id: input.instance_id
+          profile_record_ref: input.profile_record_ref
+          target_connection_ref: input.target_connection_ref
+          repair_connection_ref: input.repair_connection_ref
+          expires_at: input.expires_at
+        emits: [connectors.auth_bindings.AcquisitionBegan]
+        payload: {connectors.auth_bindings.AcquisitionBegan: {acquisition_ref: {generated: true}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
   - name: connectors.auth_bindings.ConsumeAcquisition
@@ -302,7 +376,19 @@ commands:
       - {name: result_connection_ref, type: String}
       - {name: publication, type: connectors.auth_bindings.BindingPublication}
     outcomes:
-      - {name: completed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.complete, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionCompleted], payload: {connectors.auth_bindings.AcquisitionCompleted: {acquisition_ref: input.acquisition_ref, result_connection_ref: input.result_connection_ref}}}
+      # acquisition semantics.md:149-150: Completed's result equals the fixed target.
+      - name: result-mismatch
+        when_subject:
+          predicate: target_connection_ref != input.result_connection_ref
+        error: connectors.auth_bindings.AcquisitionResultMismatch
+      - name: completed
+        when: decision == allow
+        moves: connectors.auth_bindings.Acquisition.complete
+        instance: acquisition_ref
+        sets:
+          result_connection_ref: input.result_connection_ref
+        emits: [connectors.auth_bindings.AcquisitionCompleted]
+        payload: {connectors.auth_bindings.AcquisitionCompleted: {acquisition_ref: input.acquisition_ref, result_connection_ref: input.result_connection_ref}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
@@ -325,7 +411,15 @@ commands:
       - {name: acquisition_ref, type: String}
       - {name: reason, type: connectors.auth_bindings.AcquisitionFailure}
     outcomes:
-      - {name: failed, when: decision == allow, moves: connectors.auth_bindings.Acquisition.fail, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionFailed], payload: {connectors.auth_bindings.AcquisitionFailed: {acquisition_ref: input.acquisition_ref, reason: input.reason}}}
+      # acquisition semantics.md:161-162: the terminal record keeps its reason.
+      - name: failed
+        when: decision == allow
+        moves: connectors.auth_bindings.Acquisition.fail
+        instance: acquisition_ref
+        sets:
+          terminal_reason: input.reason
+        emits: [connectors.auth_bindings.AcquisitionFailed]
+        payload: {connectors.auth_bindings.AcquisitionFailed: {acquisition_ref: input.acquisition_ref, reason: input.reason}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
@@ -334,7 +428,15 @@ commands:
       - {name: decision, type: connectors.auth_bindings.Decision}
       - {name: acquisition_ref, type: String}
     outcomes:
-      - {name: expired, when: decision == allow, moves: connectors.auth_bindings.Acquisition.expire, instance: acquisition_ref, emits: [connectors.auth_bindings.AcquisitionExpired], payload: {connectors.auth_bindings.AcquisitionExpired: {acquisition_ref: input.acquisition_ref}}}
+      # acquisition semantics.md:169-170: Expired carries reason `expired`.
+      - name: expired
+        when: decision == allow
+        moves: connectors.auth_bindings.Acquisition.expire
+        instance: acquisition_ref
+        sets:
+          terminal_reason: expired
+        emits: [connectors.auth_bindings.AcquisitionExpired]
+        payload: {connectors.auth_bindings.AcquisitionExpired: {acquisition_ref: input.acquisition_ref}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.AcquisitionStateConflict}
@@ -348,7 +450,19 @@ commands:
       - {name: store_version, type: String}
       - {name: credential_set, type: connectors.auth_bindings.CredentialSet}
     outcomes:
-      - {name: candidate, when: decision == allow, creates: connectors.auth_bindings.CustodyVersion, instance: version_ref, emits: [connectors.auth_bindings.CustodyCandidateRecorded], payload: {connectors.auth_bindings.CustodyCandidateRecorded: {version_ref: {generated: true}}}}
+      # custody semantics.md:72-74: the exact (scope_ref, store_version) key, its
+      # ServiceConfiguration and the coherent CredentialSet.
+      - name: candidate
+        when: decision == allow
+        creates: connectors.auth_bindings.CustodyVersion
+        instance: version_ref
+        sets:
+          instance_id: input.instance_id
+          scope_ref: input.scope_ref
+          store_version: input.store_version
+          credential_set: input.credential_set
+        emits: [connectors.auth_bindings.CustodyCandidateRecorded]
+        payload: {connectors.auth_bindings.CustodyCandidateRecorded: {version_ref: {generated: true}}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
   - name: connectors.auth_bindings.AcknowledgeCustodyWrite
@@ -357,7 +471,16 @@ commands:
       - {name: version_ref, type: String}
       - {name: acknowledged_at, type: Timestamp}
     outcomes:
-      - {name: stored, when: decision == allow, moves: connectors.auth_bindings.CustodyVersion.acknowledge, instance: version_ref, emits: [connectors.auth_bindings.CustodyWritten], payload: {connectors.auth_bindings.CustodyWritten: {version_ref: input.version_ref}}}
+      # custody semantics.md:86 and docs/local-connection-registry.md:32: the
+      # acknowledgement, invalidity and retirement facts are recorded.
+      - name: stored
+        when: decision == allow
+        moves: connectors.auth_bindings.CustodyVersion.acknowledge
+        instance: version_ref
+        sets:
+          acknowledged_at: input.acknowledged_at
+        emits: [connectors.auth_bindings.CustodyWritten]
+        payload: {connectors.auth_bindings.CustodyWritten: {version_ref: input.version_ref}}
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.CustodyStateConflict}
@@ -366,7 +489,13 @@ commands:
       - {name: version_ref, type: String}
       - {name: reason, type: String}
     outcomes:
-      - {name: invalidated, moves: connectors.auth_bindings.CustodyVersion.invalidate, instance: version_ref, emits: [connectors.auth_bindings.CustodyInvalidated], payload: {connectors.auth_bindings.CustodyInvalidated: {version_ref: input.version_ref, reason: input.reason}}}
+      - name: invalidated
+        moves: connectors.auth_bindings.CustodyVersion.invalidate
+        instance: version_ref
+        sets:
+          invalid_reason: input.reason
+        emits: [connectors.auth_bindings.CustodyInvalidated]
+        payload: {connectors.auth_bindings.CustodyInvalidated: {version_ref: input.version_ref, reason: input.reason}}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.CustodyStateConflict}
   - name: connectors.auth_bindings.RetireCustodyVersion
     input:
@@ -375,7 +504,15 @@ commands:
       - {name: retired_at, type: Timestamp}
       - {name: retire_not_before, type: Timestamp}
     outcomes:
-      - {name: retiring, moves: connectors.auth_bindings.CustodyVersion.retire, instance: version_ref, emits: [connectors.auth_bindings.CustodyRetiring], payload: {connectors.auth_bindings.CustodyRetiring: {version_ref: input.version_ref}}}
+      - name: retiring
+        moves: connectors.auth_bindings.CustodyVersion.retire
+        instance: version_ref
+        sets:
+          retirement_fence: input.retirement_fence
+          retired_at: input.retired_at
+          retire_not_before: input.retire_not_before
+        emits: [connectors.auth_bindings.CustodyRetiring]
+        payload: {connectors.auth_bindings.CustodyRetiring: {version_ref: input.version_ref}}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.CustodyStateConflict}
   - name: connectors.auth_bindings.AcknowledgeCustodyDeletion
     # allow requires guarded retirement, trusted retention/no-use proof and a
@@ -430,16 +567,127 @@ events:
   - name: connectors.auth_bindings.CustodyDeleted
     fields: [{name: version_ref, type: String}]
 
-# ESS-LIMIT execution predicates (ESS 0.36 has no cross-record equality or
-# uniqueness constraint, no multi-record transaction, no durable-storage or
-# byte-pinning construct and no trusted-time construct): private key
-# allocation/qualification, exact owner
-# and instance/profile/generation/custody equality, immutable field assignment,
-# reviewed profile replacement, record uniqueness/capacity, protected-correlation
-# provenance and real atomic consumption, live single-exchange ownership, current
-# expiry/authority, coordinated publication/revoke/final dispatch, pending-field
-# assignment, no-child-material combinations, physical byte pinning/deletion,
-# retirement fences and trusted no-use/retention clocks, payload erasure and safe
-# projections. Commands/events do not implement these updates or durable effects.
+views:
+  - name: connectors.auth_bindings.AuthProfiles
+    source: connectors.auth_bindings.AuthProfile
+    consistency: read_your_writes
+    fields:
+      - {name: profile_record_ref, type: String}
+      - {name: adapter_id, type: String}
+      - {name: profile_id, type: String}
+      - {name: declaration_revision, type: String}
+      - {name: state, type: connectors.auth_bindings.AuthProfile.State}
+  - name: connectors.auth_bindings.Connections
+    source: connectors.auth_bindings.Connection
+    consistency: read_your_writes
+    fields:
+      - {name: connection_ref, type: String}
+      - {name: instance_id, type: String}
+      - {name: profile_record_ref, type: String}
+      - {name: owner_scope, type: String}
+      - {name: access_mode, type: connectors.auth_access.AccessMode}
+      - {name: publication_fence, type: String}
+      - {name: active_generation_id, type: "Optional<connectors.credentials.CredentialGenerationId>"}
+      - {name: active_custody_version_ref, type: "Optional<String>"}
+      - {name: state, type: connectors.auth_bindings.Connection.State}
+  - name: connectors.auth_bindings.Acquisitions
+    source: connectors.auth_bindings.Acquisition
+    consistency: read_your_writes
+    fields:
+      - {name: acquisition_ref, type: String}
+      - {name: instance_id, type: String}
+      - {name: profile_record_ref, type: String}
+      - {name: target_connection_ref, type: String}
+      - {name: repair_connection_ref, type: "Optional<String>"}
+      - {name: result_connection_ref, type: "Optional<String>"}
+      - {name: terminal_reason, type: "Optional<connectors.auth_bindings.AcquisitionFailure>"}
+      - {name: expires_at, type: Timestamp}
+      - {name: state, type: connectors.auth_bindings.Acquisition.State}
+  - name: connectors.auth_bindings.CustodyVersions
+    source: connectors.auth_bindings.CustodyVersion
+    consistency: read_your_writes
+    fields:
+      - {name: version_ref, type: String}
+      - {name: instance_id, type: String}
+      - {name: scope_ref, type: String}
+      - {name: store_version, type: String}
+      - {name: byte_size, type: "Optional<Integer>"}
+      - {name: acknowledged_at, type: "Optional<Timestamp>"}
+      - {name: invalid_reason, type: "Optional<String>"}
+      - {name: retirement_fence, type: "Optional<String>"}
+      - {name: retired_at, type: "Optional<Timestamp>"}
+      - {name: retire_not_before, type: "Optional<Timestamp>"}
+      - {name: state, type: connectors.auth_bindings.CustodyVersion.State}
+
+# ESS-LIMIT (checked against ESS 0.40.0, format ess/15, and its Entity Runtime
+# lowering). Declared above: field assignment from command inputs, the private
+# fence compare-and-set and advance on PublishBinding, Completed's result equal
+# to its target, terminal reasons, the custody/generation and access-mode
+# invariants and the byte-size bound. Still owner predicates:
+# - clearing an Optional field (baseline on revocation, byte size and material
+#   handle on deletion): `{cleared: true}` validates, but the lowering refuses it
+#   (ClearedValueUnsupported); the host clears the column.
+# - installing generation, custody version and identity from BindingPublication:
+#   `sets:` cannot read a dotted input (ESS-COMMAND-001), and the lowering refuses
+#   an Optional input copied on an update (OptionalBoundOutputUnsupported).
+# - baseline presence and generation/binding equality, null identity on
+#   material-free children, a result present only on Completed: `defined()` over
+#   an Optional struct and state-conditioned invariants need format ess/16.
+# - at most six distinct baseline checks without permission_check: a list
+#   invariant validates, but synthesis cannot witness it through any view.
+# - parent never itself or a mediated parent: no field-vs-identity comparison
+#   (ESS-ENTITY-002) and no cross-record guard.
+# - unique (adapter_id, profile_id, declaration_revision) and (scope_ref,
+#   store_version): no compound uniqueness constraint.
+# - capacity of connections, acquisitions and retained versions: no
+#   cross-record count. superseded_custody_version_refs also lists deleted
+#   versions, so the eight-version bound is not a bound on that list.
+# - one winning completion per target, deactivation before retirement: no
+#   cross-record guard.
+# - acquisition ceilings and a deadline that never slides: no timestamp arithmetic.
+# - current expiry at now >= expires_at and trusted retention clocks: ess/16 `now`
+#   reads only inputs in `when:`, and the lowering refuses it (CurrentTimeUnsupported).
+# - private key allocation, protected-correlation provenance, real atomic
+#   consumption, coordinated publication/revoke/final dispatch, physical byte
+#   pinning/deletion, payload erasure and safe projections: no multi-record
+#   transaction or storage construct (`affects:` sets fields and takes no transition).
 # No tenant/assignment entity, registration-secret owner, public management codec,
 # provider-native rule, dynamic installation or storage backend is introduced.
+
+  - name: connectors.auth_bindings.AcquisitionStates
+    source: connectors.auth_bindings.Acquisition
+    consistency: read_your_writes
+    fields:
+      - {name: acquisition_ref, type: String}
+      - {name: state, type: connectors.auth_bindings.Acquisition.State}
+  - name: connectors.auth_bindings.ConnectionStates
+    source: connectors.auth_bindings.Connection
+    consistency: read_your_writes
+    fields:
+      - {name: connection_ref, type: String}
+      - {name: state, type: connectors.auth_bindings.Connection.State}
+  - name: connectors.auth_bindings.CustodyVersionStates
+    source: connectors.auth_bindings.CustodyVersion
+    consistency: read_your_writes
+    fields:
+      - {name: version_ref, type: String}
+      - {name: state, type: connectors.auth_bindings.CustodyVersion.State}
+
+actors:
+  - name: connectors.auth_bindings.LocalHost
+    may:
+      - connectors.auth_bindings.AcknowledgeCustodyDeletion
+      - connectors.auth_bindings.AcknowledgeCustodyWrite
+      - connectors.auth_bindings.AllocateConnection
+      - connectors.auth_bindings.BeginAcquisition
+      - connectors.auth_bindings.CompleteAcquisition
+      - connectors.auth_bindings.ConsumeAcquisition
+      - connectors.auth_bindings.ExpireAcquisition
+      - connectors.auth_bindings.FailAcquisition
+      - connectors.auth_bindings.InvalidateCustodyVersion
+      - connectors.auth_bindings.PublishBinding
+      - connectors.auth_bindings.RecordAcquisitionCandidate
+      - connectors.auth_bindings.RecordCustodyVersion
+      - connectors.auth_bindings.RecordProfile
+      - connectors.auth_bindings.RetireCustodyVersion
+      - connectors.auth_bindings.RevokeConnection
