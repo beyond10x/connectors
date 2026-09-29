@@ -732,3 +732,38 @@ fn typed_application_usage_operational_and_interrupt_outcomes_use_distinct_exits
     refusal(&malformed, 1);
     assert!(!malformed.stderr.contains("fictional-sentinel"));
 }
+
+#[test]
+fn a_configuration_refusal_may_name_the_format_and_entry_and_nothing_else() {
+    let named = json!({"kind":"usage","code":"invalid_configuration","stage":"configuration",
+        "next_action":"check_configuration","configuration_format":"connectors-local/1",
+        "instance_id":"forge-local"});
+    let mut sources = InputSources::default();
+    let args = ["adapters", "list", "--output", "json"];
+    let output = refusal(
+        &run(
+            &args,
+            &mut sources,
+            &mut ReplyOnce(Some(HandlerReply::UsageError {
+                code: "failure".into(),
+                data: named.clone(),
+            })),
+            None,
+        ),
+        2,
+    );
+    assert_eq!(output["error"], json!({"code":"failure","data":named}));
+    let mut parser_text = named.clone();
+    parser_text["parser"] = "TOML parse error at line 1".into();
+    let refused = run(
+        &args,
+        &mut sources,
+        &mut ReplyOnce(Some(HandlerReply::UsageError {
+            code: "failure".into(),
+            data: parser_text,
+        })),
+        None,
+    );
+    refusal(&refused, 1);
+    assert!(!refused.stderr.contains("TOML"));
+}

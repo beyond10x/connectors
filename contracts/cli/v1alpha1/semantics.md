@@ -447,6 +447,22 @@ never replay a possible write after interruption, timeout or lost response.
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
 | user interruption | `interrupted` | 130 |
 
+A configuration whose adapter entry contradicts its format — a
+`connectors-local/1` entry that carries `private_protocol`, or a
+`connectors-local/2` entry that lacks it — is `invalid_configuration` with
+`next_action = check_configuration`, and its `Failure` additionally carries
+`configuration_format` (the file's `format` value) and `instance_id` (the
+entry's `instance_id`). They are named only after every entry has passed every
+other check, so the refusal never depends on alias order: the first mismatched
+entry in alias order is named, and a file with any other defect names nothing.
+`configuration_format` is the closed enum `ConfigurationFormat`; `instance_id`
+is an admitted selector (at most 128 bytes of `[A-Za-z0-9._-]`). Every CLI
+command except `setup init` refuses such a file this way, before acquiring any
+protected source or dispatching. The selector shape and the rule that both
+fields appear only on `invalid_configuration` are host obligations: ESS 0.40
+declares no invariant on a CLI type. No parser, OS or database text is ever
+carried.
+
 Other admitted provider/service failures preserve their existing shared error code
 inside `Failure.service_code`; `code = service_failure` identifies that route.
 Provider strings never bypass safe message projection. Failure has a safe stage
